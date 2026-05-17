@@ -2437,7 +2437,7 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
         if isinstance(dispatch_channel, discord.TextChannel):
             try:
                 message = await dispatch_channel.fetch_message(dispatch_message_id)
-                await message.delete(reason="Order cancelled, delete related dispatch panel")
+                await message.delete()
             except discord.NotFound:
                 pass
             except discord.Forbidden:
