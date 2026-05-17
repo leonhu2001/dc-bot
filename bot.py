@@ -1854,16 +1854,6 @@ class OrderControlSelect(discord.ui.Select):
                 description="開啟自助下單面板給開單用戶填寫"
             ),
             discord.SelectOption(
-                label="存單",
-                value="store",
-                description="保留票口並鎖定派單接單面板"
-            ),
-            discord.SelectOption(
-                label="恢復訂單",
-                value="resume",
-                description="恢復已存單訂單，重新開放接單面板"
-            ),
-            discord.SelectOption(
                 label="取消訂單",
                 value="cancel",
                 description="取消並關閉這張下單票口"
@@ -3099,6 +3089,16 @@ class StaffOrderOperationSelect(discord.ui.Select):
                 label="已結單",
                 value="done",
                 description="填寫收據並送出評論按鈕"
+            ),
+            discord.SelectOption(
+                label="存單",
+                value="store",
+                description="保留票口並鎖定派單接單面板"
+            ),
+            discord.SelectOption(
+                label="恢復訂單",
+                value="resume",
+                description="恢復已存單訂單，重新開放接單面板"
             ),
             discord.SelectOption(
                 label="取消訂單",
