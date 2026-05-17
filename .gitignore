@@ -1,0 +1,7 @@
+.env
+node_modules/
+*.exe
+Code.exe
+data/
+database/
+*.log
