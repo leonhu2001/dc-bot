@@ -1,4 +1,7 @@
-require("dotenv").config();
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import os
 import json
 import asyncio
