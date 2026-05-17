@@ -1612,6 +1612,12 @@ def _serialize_claims() -> dict:
             "source_channel_id": data.get("source_channel_id"),
             "companion_preference": data.get("companion_preference"),
             "dispatch_channel_id": data.get("dispatch_channel_id"),
+            "status": data.get("status", "active"),
+            "stored_at": data.get("stored_at"),
+            "stored_by": data.get("stored_by"),
+            "stored_reason": data.get("stored_reason"),
+            "stored_expected_time": data.get("stored_expected_time"),
+            "stored_note": data.get("stored_note"),
         }
 
     return result
@@ -1669,6 +1675,12 @@ def load_bot_data() -> None:
             "source_channel_id": data.get("source_channel_id"),
             "companion_preference": data.get("companion_preference"),
             "dispatch_channel_id": data.get("dispatch_channel_id"),
+            "status": data.get("status", "active"),
+            "stored_at": data.get("stored_at"),
+            "stored_by": data.get("stored_by"),
+            "stored_reason": data.get("stored_reason"),
+            "stored_expected_time": data.get("stored_expected_time"),
+            "stored_note": data.get("stored_note"),
         }
 
 
@@ -1707,6 +1719,7 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
         source_channel_id=int(data["source_channel_id"]),
         companion_preference=data.get("companion_preference"),
         locked=bool(data.get("locked", False)),
+        status=str(data.get("status", "active")),
     )
 
 
@@ -1839,6 +1852,16 @@ class OrderControlSelect(discord.ui.Select):
                 label="派單",
                 value="dispatch",
                 description="開啟自助下單面板給開單用戶填寫"
+            ),
+            discord.SelectOption(
+                label="存單",
+                value="store",
+                description="保留票口並鎖定派單接單面板"
+            ),
+            discord.SelectOption(
+                label="恢復訂單",
+                value="resume",
+                description="恢復已存單訂單，重新開放接單面板"
             ),
             discord.SelectOption(
                 label="取消訂單",
@@ -2189,6 +2212,7 @@ class DispatchClaimView(discord.ui.View):
         source_channel_id: int,
         companion_preference: str | None = None,
         locked: bool = False,
+        status: str = "active",
     ):
         super().__init__(timeout=None)
         self.customer_id = customer_id
@@ -2198,6 +2222,7 @@ class DispatchClaimView(discord.ui.View):
         self.source_channel_id = source_channel_id
         self.companion_preference = companion_preference
         self.locked = locked
+        self.status = status
 
         self.add_item(DispatchCancelClaimButton(disabled=locked))
 
@@ -2232,6 +2257,7 @@ class DispatchClaimView(discord.ui.View):
         data.setdefault("source_channel_id", self.source_channel_id)
         data.setdefault("companion_preference", self.companion_preference)
         data.setdefault("dispatch_channel_id", DISPATCH_CHANNEL_ID)
+        data.setdefault("status", self.status)
 
         return data
 
@@ -2288,7 +2314,19 @@ class DispatchClaimView(discord.ui.View):
             receiver_text=receiver_text
         )
 
-        if claim_data.get("locked"):
+        status = claim_data.get("status", "active")
+
+        if status == "stored":
+            new_embed.add_field(
+                name="接單狀態",
+                value=(
+                    "已存單，接單面板已鎖定\n"
+                    f"存單原因：{claim_data.get('stored_reason') or '未填寫'}\n"
+                    f"預計恢復：{claim_data.get('stored_expected_time') or '未填寫'}"
+                ),
+                inline=False
+            )
+        elif claim_data.get("locked"):
             new_embed.add_field(
                 name="接單狀態",
                 value="已結單，接單面板已鎖定",
@@ -2304,7 +2342,8 @@ class DispatchClaimView(discord.ui.View):
                 payment_method=self.payment_method,
                 source_channel_id=self.source_channel_id,
                 companion_preference=self.companion_preference,
-                locked=bool(claim_data.get("locked"))
+                locked=bool(claim_data.get("locked")),
+                status=str(claim_data.get("status", "active"))
             ),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -2430,8 +2469,10 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     claim_data["companion_preference"] = data.get("companion_preference")
     claim_data["dispatch_channel_id"] = dispatch_channel_id
     claim_data["locked"] = True
+    claim_data["status"] = "closed"
 
     data["closed"] = True
+    data["status"] = "closed"
     data["closed_at"] = get_taipei_now_iso()
     remember_order_data(order_channel_id, data)
     remember_claim_data(dispatch_message_id, claim_data)
@@ -2481,7 +2522,8 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
                 payment_method=payment_method,
                 source_channel_id=order_channel_id,
                 companion_preference=companion_preference,
-                locked=True
+                locked=True,
+                status="closed"
             ),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -2491,6 +2533,306 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         )
     except (discord.NotFound, discord.Forbidden, discord.HTTPException):
         pass
+
+async def store_dispatch_claim_panel(
+    guild: discord.Guild,
+    order_channel: discord.TextChannel,
+    staff_member: discord.Member,
+    reason: str,
+    expected_time: str | None = None,
+    note: str | None = None,
+):
+    """將訂單標記為存單，鎖定派單接單面板但保留票口。"""
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
+    dispatch_message_id = data.get("dispatch_message_id")
+    dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
+
+    if dispatch_message_id is None:
+        raise ValueError("找不到這張訂單對應的派單訊息，請確認顧客是否已完成付款方式並送出派單。")
+
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+    if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
+        raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
+
+    try:
+        message = await dispatch_channel.fetch_message(dispatch_message_id)
+    except discord.NotFound as exc:
+        raise ValueError("找不到派單訊息，可能已被刪除。") from exc
+    except discord.Forbidden as exc:
+        raise ValueError("Bot 權限不足，無法讀取派單訊息。") from exc
+    except discord.HTTPException as exc:
+        raise ValueError(f"讀取派單訊息失敗：{exc}") from exc
+
+    customer_id = data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
+    category = data.get("category")
+    item = data.get("item", "未紀錄")
+    payment_method = data.get("payment_method", "未紀錄")
+    companion_preference = data.get("companion_preference")
+    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+
+    claim_data = ORDER_CLAIMS.setdefault(
+        dispatch_message_id,
+        {
+            "companion": set(),
+            "booster": set(),
+            "locked": False,
+        }
+    )
+    claim_data["customer_id"] = customer_id
+    claim_data["category_label"] = category_label
+    claim_data["item"] = item
+    claim_data["payment_method"] = payment_method
+    claim_data["source_channel_id"] = order_channel.id
+    claim_data["companion_preference"] = companion_preference
+    claim_data["dispatch_channel_id"] = dispatch_channel_id
+    claim_data["locked"] = True
+    claim_data["status"] = "stored"
+    claim_data["stored_at"] = get_taipei_now_iso()
+    claim_data["stored_by"] = staff_member.id
+    claim_data["stored_reason"] = reason
+    claim_data["stored_expected_time"] = expected_time or None
+    claim_data["stored_note"] = note or None
+
+    data["customer_id"] = customer_id
+    data["dispatch_message_id"] = dispatch_message_id
+    data["dispatch_channel_id"] = dispatch_channel_id
+    data["closed"] = False
+    data["status"] = "stored"
+    data["stored_at"] = claim_data["stored_at"]
+    data["stored_by"] = staff_member.id
+    data["stored_reason"] = reason
+    data["stored_expected_time"] = expected_time or None
+    data["stored_note"] = note or None
+
+    remember_order_data(order_channel.id, data)
+    remember_claim_data(dispatch_message_id, claim_data)
+
+    companion_ids = sorted(claim_data.get("companion", set()))
+    booster_ids = sorted(claim_data.get("booster", set()))
+    lines = []
+
+    if companion_ids:
+        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+
+    if booster_ids:
+        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+
+    receiver_text = "\n".join(lines) if lines else None
+
+    embed = build_self_service_order_embed(
+        customer_mention=customer_mention,
+        category_label=category_label,
+        item=item,
+        payment_method=payment_method,
+        source_channel=order_channel,
+        companion_preference=companion_preference,
+        receiver_text=receiver_text
+    )
+    embed.add_field(
+        name="接單狀態",
+        value=(
+            "已存單，接單面板已鎖定\n"
+            f"存單原因：{reason}\n"
+            f"預計恢復：{expected_time or '未填寫'}"
+        ),
+        inline=False
+    )
+
+    if note:
+        embed.add_field(
+            name="存單備註",
+            value=note,
+            inline=False
+        )
+
+    await message.edit(
+        embed=embed,
+        view=DispatchClaimView(
+            customer_id=customer_id or 0,
+            category_label=category_label,
+            item=item,
+            payment_method=payment_method,
+            source_channel_id=order_channel.id,
+            companion_preference=companion_preference,
+            locked=True,
+            status="stored"
+        ),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False
+        )
+    )
+
+
+async def resume_stored_order(
+    guild: discord.Guild,
+    order_channel: discord.TextChannel,
+    staff_member: discord.Member,
+):
+    """恢復已存單的訂單，重新開放派單接單面板。"""
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
+    dispatch_message_id = data.get("dispatch_message_id")
+    dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
+
+    if dispatch_message_id is None:
+        raise ValueError("找不到這張訂單對應的派單訊息，無法恢復。")
+
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+    if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
+        raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
+
+    try:
+        message = await dispatch_channel.fetch_message(dispatch_message_id)
+    except discord.NotFound as exc:
+        raise ValueError("找不到派單訊息，可能已被刪除。") from exc
+    except discord.Forbidden as exc:
+        raise ValueError("Bot 權限不足，無法讀取派單訊息。") from exc
+    except discord.HTTPException as exc:
+        raise ValueError(f"讀取派單訊息失敗：{exc}") from exc
+
+    claim_data = ORDER_CLAIMS.get(dispatch_message_id)
+
+    if not claim_data:
+        raise ValueError("找不到已保存的接單資料，請重新派單。")
+
+    customer_id = claim_data.get("customer_id") or data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
+    category_label = claim_data.get("category_label") or ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "未紀錄")
+    item = claim_data.get("item") or data.get("item", "未紀錄")
+    payment_method = claim_data.get("payment_method") or data.get("payment_method", "未紀錄")
+    companion_preference = claim_data.get("companion_preference") or data.get("companion_preference")
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+
+    claim_data["locked"] = False
+    claim_data["status"] = "active"
+
+    data["closed"] = False
+    data["status"] = "active"
+
+    remember_order_data(order_channel.id, data)
+    remember_claim_data(dispatch_message_id, claim_data)
+
+    companion_ids = sorted(claim_data.get("companion", set()))
+    booster_ids = sorted(claim_data.get("booster", set()))
+    lines = []
+
+    if companion_ids:
+        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+
+    if booster_ids:
+        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+
+    receiver_text = "\n".join(lines) if lines else None
+
+    embed = build_self_service_order_embed(
+        customer_mention=customer_mention,
+        category_label=str(category_label),
+        item=str(item),
+        payment_method=str(payment_method),
+        source_channel=order_channel,
+        companion_preference=companion_preference,
+        receiver_text=receiver_text
+    )
+    embed.add_field(
+        name="接單狀態",
+        value=f"已由 {staff_member.mention} 恢復訂單，接單面板重新開放。",
+        inline=False
+    )
+
+    await message.edit(
+        embed=embed,
+        view=DispatchClaimView(
+            customer_id=customer_id or 0,
+            category_label=str(category_label),
+            item=str(item),
+            payment_method=str(payment_method),
+            source_channel_id=order_channel.id,
+            companion_preference=companion_preference,
+            locked=False,
+            status="active"
+        ),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False
+        )
+    )
+
+
+class StoreOrderModal(discord.ui.Modal, title="存單"):
+    reason = discord.ui.TextInput(
+        label="存單原因",
+        placeholder="例如：顧客暫時無法遊玩、改約時間、等待活動開啟",
+        required=True,
+        max_length=200
+    )
+
+    expected_time = discord.ui.TextInput(
+        label="預計恢復時間",
+        placeholder="例如：今晚 20:00、明天、未定",
+        required=False,
+        max_length=100
+    )
+
+    note = discord.ui.TextInput(
+        label="備註",
+        placeholder="可填寫付款狀態、注意事項或客服備註",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=800
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            return
+
+        if not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以存單。", ephemeral=True)
+            return
+
+        guild = interaction.guild
+
+        if guild is None:
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        if not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            await store_dispatch_claim_panel(
+                guild=guild,
+                order_channel=interaction.channel,
+                staff_member=interaction.user,
+                reason=self.reason.value.strip(),
+                expected_time=self.expected_time.value.strip() or None,
+                note=self.note.value.strip() or None,
+            )
+        except ValueError as e:
+            await interaction.followup.send(str(e), ephemeral=True)
+            return
+
+        await interaction.channel.send(
+            f"此訂單已由 {interaction.user.mention} 存單。\n\n"
+            f"存單原因：{self.reason.value.strip()}\n"
+            f"預計恢復：{self.expected_time.value.strip() or '未填寫'}\n"
+            f"備註：{self.note.value.strip() or '無'}",
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False
+            )
+        )
+
+        await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
+
 
 class PaymentMethodSelect(discord.ui.Select):
     def __init__(self, customer_id: int, channel_id: int):
@@ -2829,6 +3171,36 @@ class StaffOrderOperationView(discord.ui.View):
 
         if selected == "done":
             await interaction.response.send_modal(ReceiptModal())
+        elif selected == "store":
+            await interaction.response.send_modal(StoreOrderModal())
+        elif selected == "resume":
+            guild = interaction.guild
+
+            if guild is None:
+                await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+                return
+
+            await interaction.response.defer(ephemeral=True)
+
+            try:
+                await resume_stored_order(
+                    guild=guild,
+                    order_channel=interaction.channel,
+                    staff_member=interaction.user,
+                )
+            except ValueError as e:
+                await interaction.followup.send(str(e), ephemeral=True)
+                return
+
+            await interaction.channel.send(
+                f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False
+                )
+            )
+            await interaction.followup.send("已恢復訂單。", ephemeral=True)
         elif selected == "cancel":
             await interaction.response.send_message(
                 "是否確定要取消這筆訂單？",
@@ -3669,6 +4041,21 @@ async def on_ready():
     bot.add_view(ComplaintPanelView())
     bot.add_view(FeedbackPanelView())
     bot.add_view(ComplaintResolveView())
+
+    restored_dispatch_views = 0
+    for message_id in list(ORDER_CLAIMS.keys()):
+        view = get_dispatch_claim_view_from_data(message_id)
+        if view is None:
+            continue
+
+        try:
+            bot.add_view(view, message_id=message_id)
+            restored_dispatch_views += 1
+        except ValueError:
+            pass
+
+    if restored_dispatch_views:
+        print(f"Restored dispatch claim views: {restored_dispatch_views}")
 
     guild_for_voice = bot.get_guild(GUILD_ID)
     if guild_for_voice is not None:
