@@ -1540,8 +1540,14 @@ class ConfirmCancelOrderView(discord.ui.View):
 
         channel = interaction.channel
 
+        if interaction.guild is not None and isinstance(channel, discord.TextChannel):
+            await delete_dispatch_claim_panel_for_order(
+                guild=interaction.guild,
+                order_channel_id=channel.id,
+            )
+
         await interaction.response.send_message(
-            "已確認取消訂單，這個頻道將在 3 秒後關閉。",
+            "已確認取消訂單，這個頻道將在 3 秒後關閉，對應的派單訊息也會一併刪除。",
             ephemeral=False
         )
 
@@ -2419,6 +2425,35 @@ class DispatchClaimView(discord.ui.View):
         await self.claim_order(interaction, "booster")
 
 
+async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_channel_id: int):
+    """取消票口時，一併刪除派單頻道對應的接單面板，並清除保存資料。"""
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+
+    if dispatch_message_id is not None:
+        dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+        if isinstance(dispatch_channel, discord.TextChannel):
+            try:
+                message = await dispatch_channel.fetch_message(dispatch_message_id)
+                await message.delete(reason="Order cancelled, delete related dispatch panel")
+            except discord.NotFound:
+                pass
+            except discord.Forbidden:
+                print("Bot 權限不足，無法刪除派單接單面板。")
+            except discord.HTTPException as e:
+                print(f"刪除派單接單面板失敗：{e}")
+
+        ORDER_CLAIMS.pop(dispatch_message_id, None)
+
+    if order_channel_id in SELF_SERVICE_ORDER_SELECTIONS:
+        SELF_SERVICE_ORDER_SELECTIONS.pop(order_channel_id, None)
+        save_bot_data()
+    elif dispatch_message_id is not None:
+        save_bot_data()
+
+
 async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int):
     """客服結單後，鎖定派單頻道對應的陪玩 / 打手接單面板。"""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
@@ -2662,12 +2697,12 @@ async def resume_stored_order(
     order_channel: discord.TextChannel,
     staff_member: discord.Member,
 ):
-    """恢復已存單的訂單，重新開放派單接單面板。"""
+    """恢復已存單的訂單，保留原本接單人員，並把派單面板重新發到派單頻道最下面。"""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
-    dispatch_message_id = data.get("dispatch_message_id")
+    old_dispatch_message_id = data.get("dispatch_message_id")
     dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
 
-    if dispatch_message_id is None:
+    if old_dispatch_message_id is None:
         raise ValueError("找不到這張訂單對應的派單訊息，無法恢復。")
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
@@ -2675,16 +2710,19 @@ async def resume_stored_order(
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
         raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
 
+    old_message = None
+
     try:
-        message = await dispatch_channel.fetch_message(dispatch_message_id)
-    except discord.NotFound as exc:
-        raise ValueError("找不到派單訊息，可能已被刪除。") from exc
+        old_message = await dispatch_channel.fetch_message(old_dispatch_message_id)
+    except discord.NotFound:
+        # 舊訊息不見時仍可用保存資料重新發一則，只要 bot_data.json 還有接單資料。
+        old_message = None
     except discord.Forbidden as exc:
         raise ValueError("Bot 權限不足，無法讀取派單訊息。") from exc
     except discord.HTTPException as exc:
         raise ValueError(f"讀取派單訊息失敗：{exc}") from exc
 
-    claim_data = ORDER_CLAIMS.get(dispatch_message_id)
+    claim_data = ORDER_CLAIMS.get(old_dispatch_message_id)
 
     if not claim_data:
         raise ValueError("找不到已保存的接單資料，請重新派單。")
@@ -2698,12 +2736,18 @@ async def resume_stored_order(
 
     claim_data["locked"] = False
     claim_data["status"] = "active"
+    claim_data["customer_id"] = customer_id
+    claim_data["category_label"] = str(category_label)
+    claim_data["item"] = str(item)
+    claim_data["payment_method"] = str(payment_method)
+    claim_data["source_channel_id"] = order_channel.id
+    claim_data["companion_preference"] = companion_preference
+    claim_data["dispatch_channel_id"] = dispatch_channel.id
 
+    # 存單相關資料保留在 bot_data.json 裡當紀錄，但不再顯示為已存單。
     data["closed"] = False
     data["status"] = "active"
-
-    remember_order_data(order_channel.id, data)
-    remember_claim_data(dispatch_message_id, claim_data)
+    data["dispatch_channel_id"] = dispatch_channel.id
 
     companion_ids = sorted(claim_data.get("companion", set()))
     booster_ids = sorted(claim_data.get("booster", set()))
@@ -2728,11 +2772,11 @@ async def resume_stored_order(
     )
     embed.add_field(
         name="接單狀態",
-        value=f"已由 {staff_member.mention} 恢復訂單，接單面板重新開放。",
+        value=f"已由 {staff_member.mention} 恢復訂單，接單面板已重新發到最新位置。",
         inline=False
     )
 
-    await message.edit(
+    new_message = await dispatch_channel.send(
         embed=embed,
         view=DispatchClaimView(
             customer_id=customer_id or 0,
@@ -2750,6 +2794,22 @@ async def resume_stored_order(
             everyone=False
         )
     )
+
+    # 刪除舊的存單面板，避免同一張單在派單頻道出現兩個面板。
+    if old_message is not None:
+        try:
+            await old_message.delete(reason=f"Stored order resumed by {staff_member}")
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    # 把接單資料移到新的 message_id，保留原本陪玩/打手接單人員。
+    ORDER_CLAIMS.pop(old_dispatch_message_id, None)
+    ORDER_CLAIMS[new_message.id] = claim_data
+    data["dispatch_message_id"] = new_message.id
+
+    remember_order_data(order_channel.id, data)
+    remember_claim_data(new_message.id, claim_data)
+    save_bot_data()
 
 
 class StoreOrderModal(discord.ui.Modal, title="存單"):
