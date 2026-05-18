@@ -5418,6 +5418,182 @@ async def set_customer_rewards(
 
     await interaction.response.send_message(embed=after_embed, ephemeral=True)
 
+
+
+def _parse_iso_datetime_safely(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
+    return dt
+
+
+def _get_order_closed_time(data: dict) -> datetime | None:
+    return (
+        _parse_iso_datetime_safely(data.get("closed_at"))
+        or _parse_iso_datetime_safely(data.get("reward_counted_at"))
+        or _parse_iso_datetime_safely(data.get("updated_at"))
+    )
+
+
+def _get_order_amount_for_stats(data: dict) -> int:
+    for key in ("reward_amount", "amount", "total_amount"):
+        value = data.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            parsed = parse_receipt_amount(str(value))
+            if parsed is not None:
+                return parsed
+    return 0
+
+
+def _is_closed_order_for_stats(data: dict) -> bool:
+    return bool(data.get("closed")) or str(data.get("status", "")).lower() == "closed"
+
+
+def _is_stored_order_for_stats(data: dict) -> bool:
+    return str(data.get("status", "")).lower() == "stored"
+
+
+def _is_cancelled_order_for_stats(data: dict) -> bool:
+    return str(data.get("status", "")).lower() in {"cancelled", "canceled"}
+
+
+def build_sales_stats_embed(title: str, start_dt: datetime, end_dt: datetime) -> discord.Embed:
+    closed_orders = []
+    stored_count = 0
+    cancelled_count = 0
+
+    for data in SELF_SERVICE_ORDER_SELECTIONS.values():
+        if not isinstance(data, dict):
+            continue
+
+        if _is_stored_order_for_stats(data):
+            stored_count += 1
+        if _is_cancelled_order_for_stats(data):
+            cancelled_count += 1
+
+        if not _is_closed_order_for_stats(data):
+            continue
+
+        closed_at = _get_order_closed_time(data)
+        if closed_at is None or not (start_dt <= closed_at < end_dt):
+            continue
+
+        closed_orders.append(data)
+
+    total_revenue = sum(_get_order_amount_for_stats(data) for data in closed_orders)
+    completed_count = len(closed_orders)
+    avg_order = total_revenue // completed_count if completed_count else 0
+
+    embed = discord.Embed(
+        title=title,
+        color=discord.Color.green(),
+        timestamp=get_taipei_now(),
+    )
+    embed.add_field(name="完成訂單數", value=f"{completed_count:,} 單", inline=True)
+    embed.add_field(name="營收", value=format_t_amount(total_revenue), inline=True)
+    embed.add_field(name="平均客單價", value=format_t_amount(avg_order), inline=True)
+    embed.add_field(name="目前存單數", value=f"{stored_count:,} 單", inline=True)
+    embed.add_field(name="目前取消單數", value=f"{cancelled_count:,} 單", inline=True)
+    embed.set_footer(text=f"統計區間：{start_dt.strftime('%Y/%m/%d %H:%M')} ～ {end_dt.strftime('%Y/%m/%d %H:%M')}")
+    return embed
+
+
+def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool:
+    return (
+        isinstance(interaction.user, discord.Member)
+        and (is_customer_staff(interaction.user) or has_role(interaction.user, MANAGER_ROLE_ID) or interaction.user.guild_permissions.administrator)
+    )
+
+
+@bot.tree.command(
+    name="stats_today",
+    description="客服查詢今日營運統計",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def stats_today(interaction: discord.Interaction):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以查詢營運統計。", ephemeral=True)
+        return
+
+    now = get_taipei_now()
+    start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_dt = start_dt + timedelta(days=1)
+    embed = build_sales_stats_embed("今日營運統計", start_dt, end_dt)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="stats_month",
+    description="客服查詢本月營運統計",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def stats_month(interaction: discord.Interaction):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以查詢營運統計。", ephemeral=True)
+        return
+
+    now = get_taipei_now()
+    start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if start_dt.month == 12:
+        end_dt = start_dt.replace(year=start_dt.year + 1, month=1)
+    else:
+        end_dt = start_dt.replace(month=start_dt.month + 1)
+    embed = build_sales_stats_embed("本月營運統計", start_dt, end_dt)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="top_customers",
+    description="客服查詢顧客累積消費排行前 10 名",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def top_customers(interaction: discord.Interaction):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以查詢顧客排行。", ephemeral=True)
+        return
+
+    ranked = []
+    for user_id, data in CUSTOMER_REWARDS.items():
+        if not isinstance(data, dict):
+            continue
+        total_spent = int(data.get("total_spent", 0) or 0)
+        if total_spent <= 0:
+            continue
+        ranked.append((user_id, total_spent, int(data.get("order_count", 0) or 0), get_member_level(total_spent)["name"]))
+
+    ranked.sort(key=lambda row: row[1], reverse=True)
+    top_rows = ranked[:10]
+
+    embed = discord.Embed(
+        title="顧客消費排行 TOP 10",
+        color=discord.Color.gold(),
+        timestamp=get_taipei_now(),
+    )
+
+    if not top_rows:
+        embed.description = "目前還沒有可排行的顧客消費資料。"
+    else:
+        lines = []
+        medals = ["🥇", "🥈", "🥉"]
+        for index, (user_id, total_spent, order_count, level_name) in enumerate(top_rows, start=1):
+            prefix = medals[index - 1] if index <= 3 else f"#{index}"
+            lines.append(
+                f"{prefix} <@{user_id}>｜{format_t_amount(total_spent)}｜{order_count:,} 單｜{level_name}"
+            )
+        embed.description = "\n".join(lines)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 @bot.tree.command(
     name="setup_panel",
     description="建立魔丸娛樂客服面板",
