@@ -5,6 +5,7 @@ load_dotenv()
 import os
 import json
 import re
+import random
 import shutil
 import sqlite3
 import asyncio
@@ -1789,6 +1790,33 @@ def init_database() -> None:
             day_key TEXT PRIMARY KEY,
             count INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_settings (
+            key TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_entries (
+            period TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            chances INTEGER NOT NULL DEFAULT 0,
+            points_used INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (period, user_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_draws (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period TEXT NOT NULL,
+            prize TEXT NOT NULL,
+            winner_id INTEGER NOT NULL,
+            drawn_by INTEGER NOT NULL,
+            drawn_at TEXT NOT NULL
         )
         """)
         conn.commit()
@@ -5277,6 +5305,547 @@ async def on_ready():
 
 
 # ========= Slash 指令 =========
+
+
+
+# ========= 點數抽獎系統 =========
+
+LOTTERY_COST_PER_CHANCE_DEFAULT = 5
+LOTTERY_MAX_CHANCES_PER_USER_DEFAULT = 20
+
+
+def get_default_lottery_period() -> str:
+    return get_taipei_now().strftime("%Y-%m")
+
+
+def get_lottery_settings() -> dict:
+    init_database()
+    default = {
+        "period": get_default_lottery_period(),
+        "title": "魔丸點數抽獎",
+        "note": "獎品由管理層討論後，開獎時手動輸入。",
+        "status": "open",
+        "cost_per_chance": LOTTERY_COST_PER_CHANCE_DEFAULT,
+        "max_chances_per_user": LOTTERY_MAX_CHANCES_PER_USER_DEFAULT,
+        "updated_at": get_taipei_now_iso(),
+    }
+
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT data FROM lottery_settings WHERE key='current'").fetchone()
+    except sqlite3.Error as e:
+        print(f"讀取抽獎設定失敗：{e}")
+        return default
+
+    if row is None:
+        save_lottery_settings(default)
+        return default
+
+    try:
+        data = json.loads(row["data"])
+    except json.JSONDecodeError:
+        return default
+
+    for key, value in default.items():
+        data.setdefault(key, value)
+
+    return data
+
+
+def save_lottery_settings(data: dict) -> None:
+    init_database()
+    data["updated_at"] = get_taipei_now_iso()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO lottery_settings (key, data, updated_at) VALUES (?, ?, ?)",
+                ("current", json.dumps(data, ensure_ascii=False), data["updated_at"]),
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"保存抽獎設定失敗：{e}")
+
+
+def get_lottery_entries(period: str) -> list[dict]:
+    init_database()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT user_id, chances, points_used, updated_at
+                FROM lottery_entries
+                WHERE period=? AND chances > 0
+                ORDER BY chances DESC, updated_at ASC
+                """,
+                (period,),
+            ).fetchall()
+    except sqlite3.Error as e:
+        print(f"讀取抽獎池失敗：{e}")
+        return []
+
+    return [
+        {
+            "user_id": int(row["user_id"]),
+            "chances": int(row["chances"]),
+            "points_used": int(row["points_used"]),
+            "updated_at": row["updated_at"],
+        }
+        for row in rows
+    ]
+
+
+def get_lottery_entry(period: str, user_id: int) -> dict | None:
+    init_database()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT user_id, chances, points_used, updated_at FROM lottery_entries WHERE period=? AND user_id=?",
+                (period, user_id),
+            ).fetchone()
+    except sqlite3.Error as e:
+        print(f"讀取抽獎報名資料失敗：{e}")
+        return None
+
+    if row is None:
+        return None
+
+    return {
+        "user_id": int(row["user_id"]),
+        "chances": int(row["chances"]),
+        "points_used": int(row["points_used"]),
+        "updated_at": row["updated_at"],
+    }
+
+
+def upsert_lottery_entry(period: str, user_id: int, chances_delta: int, points_delta: int) -> None:
+    init_database()
+    now_text = get_taipei_now_iso()
+    current = get_lottery_entry(period, user_id)
+    new_chances = chances_delta if current is None else int(current["chances"]) + chances_delta
+    new_points_used = points_delta if current is None else int(current["points_used"]) + points_delta
+
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            if new_chances <= 0:
+                conn.execute("DELETE FROM lottery_entries WHERE period=? AND user_id=?", (period, user_id))
+            else:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO lottery_entries (period, user_id, chances, points_used, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (period, user_id, new_chances, max(new_points_used, 0), now_text),
+                )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"更新抽獎報名資料失敗：{e}")
+
+
+def clear_lottery_entries(period: str) -> None:
+    init_database()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute("DELETE FROM lottery_entries WHERE period=?", (period,))
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"清空抽獎池失敗：{e}")
+
+
+def record_lottery_draw(period: str, prize: str, winner_id: int, drawn_by: int) -> None:
+    init_database()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute(
+                """
+                INSERT INTO lottery_draws (period, prize, winner_id, drawn_by, drawn_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (period, prize, winner_id, drawn_by, get_taipei_now_iso()),
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"保存抽獎結果失敗：{e}")
+
+
+def build_lottery_info_embed(settings: dict) -> discord.Embed:
+    period = str(settings.get("period", get_default_lottery_period()))
+    entries = get_lottery_entries(period)
+    total_chances = sum(int(row["chances"]) for row in entries)
+    participant_count = len(entries)
+    cost = int(settings.get("cost_per_chance", LOTTERY_COST_PER_CHANCE_DEFAULT))
+    max_chances = int(settings.get("max_chances_per_user", LOTTERY_MAX_CHANCES_PER_USER_DEFAULT))
+    status_text = "開放報名" if settings.get("status") == "open" else "已關閉"
+
+    embed = discord.Embed(
+        title=str(settings.get("title") or "魔丸點數抽獎"),
+        color=discord.Color.gold(),
+    )
+    embed.add_field(name="本期", value=period, inline=True)
+    embed.add_field(name="狀態", value=status_text, inline=True)
+    embed.add_field(name="規則", value=f"{cost} 點 = 1 次抽獎機會\n每人本期最多 {max_chances} 次", inline=False)
+    embed.add_field(name="目前抽獎池", value=f"參與人數：{participant_count} 人\n總抽獎次數：{total_chances} 次", inline=False)
+    note = str(settings.get("note") or "獎品由管理層討論後，開獎時手動輸入。")
+    embed.add_field(name="獎池備註", value=note[:1000], inline=False)
+    return embed
+
+
+def build_lottery_status_embed(settings: dict) -> discord.Embed:
+    period = str(settings.get("period", get_default_lottery_period()))
+    entries = get_lottery_entries(period)
+    total_chances = sum(int(row["chances"]) for row in entries)
+
+    embed = build_lottery_info_embed(settings)
+    embed.title = f"抽獎池狀態｜{period}"
+
+    if not entries:
+        embed.add_field(name="參加名單", value="目前沒有人參加。", inline=False)
+        return embed
+
+    lines = []
+    for index, row in enumerate(entries[:20], start=1):
+        chance_rate = (int(row["chances"]) / total_chances * 100) if total_chances else 0
+        lines.append(f"{index}. <@{row['user_id']}>｜{row['chances']} 次｜約 {chance_rate:.1f}%")
+
+    if len(entries) > 20:
+        lines.append(f"...另有 {len(entries) - 20} 人")
+
+    embed.add_field(name="參加名單", value="\n".join(lines), inline=False)
+    return embed
+
+
+def pick_weighted_lottery_winners(entries: list[dict], winners: int) -> list[int]:
+    pool = [dict(row) for row in entries if int(row.get("chances", 0)) > 0]
+    picked: list[int] = []
+
+    for _ in range(max(winners, 0)):
+        if not pool:
+            break
+
+        total_weight = sum(int(row["chances"]) for row in pool)
+        if total_weight <= 0:
+            break
+
+        ticket = random.randint(1, total_weight)
+        running = 0
+        chosen_index = 0
+
+        for index, row in enumerate(pool):
+            running += int(row["chances"])
+            if ticket <= running:
+                chosen_index = index
+                break
+
+        winner = pool.pop(chosen_index)
+        picked.append(int(winner["user_id"]))
+
+    return picked
+
+
+def is_lottery_admin(member: discord.Member) -> bool:
+    return is_customer_staff(member) or has_role(member, MANAGER_ROLE_ID) or member.guild_permissions.administrator
+
+
+@bot.tree.command(
+    name="lottery_info",
+    description="查看目前魔丸點數抽獎活動",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def lottery_info(interaction: discord.Interaction):
+    settings = get_lottery_settings()
+    await interaction.response.send_message(embed=build_lottery_info_embed(settings), ephemeral=True)
+
+
+@bot.tree.command(
+    name="join_lottery",
+    description="使用魔丸點數參加抽獎，5 點 = 1 次抽獎機會",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(chances="要參加幾次抽獎，每次會消耗 5 點")
+async def join_lottery(interaction: discord.Interaction, chances: int):
+    if chances <= 0:
+        await interaction.response.send_message("抽獎次數必須大於 0。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    if settings.get("status") != "open":
+        await interaction.response.send_message("目前抽獎尚未開放報名。", ephemeral=True)
+        return
+
+    period = str(settings.get("period", get_default_lottery_period()))
+    cost = int(settings.get("cost_per_chance", LOTTERY_COST_PER_CHANCE_DEFAULT))
+    max_chances = int(settings.get("max_chances_per_user", LOTTERY_MAX_CHANCES_PER_USER_DEFAULT))
+    current_entry = get_lottery_entry(period, interaction.user.id)
+    current_chances = int(current_entry["chances"]) if current_entry else 0
+
+    if current_chances + chances > max_chances:
+        await interaction.response.send_message(
+            f"本期每人最多 {max_chances} 次，你目前已有 {current_chances} 次，最多還能加 {max(0, max_chances - current_chances)} 次。",
+            ephemeral=True,
+        )
+        return
+
+    points_needed = chances * cost
+    data = get_customer_reward_data(interaction.user.id)
+    current_points = get_current_reward_points(data)
+
+    if current_points < points_needed:
+        await interaction.response.send_message(
+            f"點數不足。你目前有 {current_points:,} 點，本次需要 {points_needed:,} 點。",
+            ephemeral=True,
+        )
+        return
+
+    ok, message = await adjust_customer_points(
+        customer_id=interaction.user.id,
+        delta_points=-points_needed,
+        operator_id=interaction.user.id,
+        reason=f"參加 {period} 點數抽獎 {chances} 次",
+    )
+    if not ok:
+        await interaction.response.send_message(message, ephemeral=True)
+        return
+
+    upsert_lottery_entry(period, interaction.user.id, chances, points_needed)
+
+    await send_order_log(
+        interaction.guild,
+        title="抽獎報名",
+        fields=[
+            ("顧客", interaction.user.mention, True),
+            ("期別", period, True),
+            ("抽獎次數", f"{chances} 次", True),
+            ("消耗點數", f"{points_needed:,} 點", True),
+        ],
+        color=discord.Color.gold(),
+    )
+
+    await interaction.response.send_message(
+        f"已成功參加 **{period}** 抽獎 {chances} 次，消耗 {points_needed:,} 點。\n"
+        f"你本期目前共 {current_chances + chances} 次抽獎機會。",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="lottery_status",
+    description="客服查看目前抽獎池狀態",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def lottery_status(interaction: discord.Interaction):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以查看抽獎池。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    await interaction.response.send_message(embed=build_lottery_status_embed(settings), ephemeral=True)
+
+
+@bot.tree.command(
+    name="lottery_open",
+    description="管理層設定或開啟本期點數抽獎，獎品不用先寫死",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    period="期別，例如 2026-05；不填則使用本月",
+    title="抽獎活動名稱，可不填",
+    note="獎池備註，可先寫：獎品內部討論中",
+    max_chances_per_user="每人本期最多可投入幾次，預設 20"
+)
+async def lottery_open(
+    interaction: discord.Interaction,
+    period: str | None = None,
+    title: str | None = None,
+    note: str | None = None,
+    max_chances_per_user: int | None = None,
+):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以設定抽獎。", ephemeral=True)
+        return
+
+    if max_chances_per_user is not None and max_chances_per_user <= 0:
+        await interaction.response.send_message("每人上限必須大於 0。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    settings["period"] = (period or get_default_lottery_period()).strip()
+    settings["title"] = (title or settings.get("title") or "魔丸點數抽獎").strip()
+    settings["note"] = (note or "獎品由管理層討論後，開獎時手動輸入。").strip()
+    settings["status"] = "open"
+    settings["cost_per_chance"] = LOTTERY_COST_PER_CHANCE_DEFAULT
+    settings["max_chances_per_user"] = int(max_chances_per_user or LOTTERY_MAX_CHANCES_PER_USER_DEFAULT)
+    save_lottery_settings(settings)
+
+    await send_order_log(
+        interaction.guild,
+        title="抽獎已開啟 / 設定",
+        fields=[
+            ("期別", settings["period"], True),
+            ("名稱", settings["title"], True),
+            ("每人上限", f"{settings['max_chances_per_user']} 次", True),
+            ("設定人員", interaction.user.mention, True),
+            ("備註", settings["note"], False),
+        ],
+        color=discord.Color.gold(),
+    )
+
+    await interaction.response.send_message("抽獎已設定並開放報名。", embed=build_lottery_info_embed(settings), ephemeral=True)
+
+
+@bot.tree.command(
+    name="lottery_close",
+    description="管理層關閉本期抽獎報名",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def lottery_close(interaction: discord.Interaction):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以關閉抽獎。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    settings["status"] = "closed"
+    save_lottery_settings(settings)
+    await interaction.response.send_message(f"已關閉 **{settings['period']}** 抽獎報名。", ephemeral=True)
+
+
+@bot.tree.command(
+    name="draw_lottery",
+    description="客服開獎；獎品開獎時手動輸入，一定會從抽獎池中抽出得主",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    prize="本次獎品名稱，例如 500T折抵券",
+    winners="要抽出幾位得主，預設 1"
+)
+async def draw_lottery(interaction: discord.Interaction, prize: str, winners: int = 1):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以開獎。", ephemeral=True)
+        return
+
+    if winners <= 0:
+        await interaction.response.send_message("得獎人數必須大於 0。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    period = str(settings.get("period", get_default_lottery_period()))
+    entries = get_lottery_entries(period)
+
+    if not entries:
+        await interaction.response.send_message("目前抽獎池沒有人參加，無法開獎。", ephemeral=True)
+        return
+
+    if winners > len(entries):
+        winners = len(entries)
+
+    picked = pick_weighted_lottery_winners(entries, winners)
+    for winner_id in picked:
+        record_lottery_draw(period, prize, winner_id, interaction.user.id)
+
+    result_lines = [f"{index}. <@{winner_id}>" for index, winner_id in enumerate(picked, start=1)]
+    embed = discord.Embed(
+        title="🎁 魔丸點數抽獎開獎",
+        color=discord.Color.gold(),
+    )
+    embed.add_field(name="期別", value=period, inline=True)
+    embed.add_field(name="獎品", value=prize, inline=True)
+    embed.add_field(name="開獎人", value=interaction.user.mention, inline=True)
+    embed.add_field(name="得獎者", value="\n".join(result_lines), inline=False)
+
+    await send_order_log(
+        interaction.guild,
+        title="抽獎開獎",
+        fields=[
+            ("期別", period, True),
+            ("獎品", prize, True),
+            ("開獎人", interaction.user.mention, True),
+            ("得獎者", "\n".join(result_lines), False),
+        ],
+        color=discord.Color.gold(),
+    )
+
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(
+    name="cancel_lottery_entry",
+    description="客服取消顧客本期抽獎報名並退還點數",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(customer="要取消報名的顧客", reason="取消原因，可不填")
+async def cancel_lottery_entry(interaction: discord.Interaction, customer: discord.Member, reason: str | None = None):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以取消抽獎報名。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    period = str(settings.get("period", get_default_lottery_period()))
+    entry = get_lottery_entry(period, customer.id)
+
+    if entry is None or int(entry.get("chances", 0)) <= 0:
+        await interaction.response.send_message(f"{customer.mention} 本期沒有抽獎報名紀錄。", ephemeral=True)
+        return
+
+    refund_points = int(entry["points_used"])
+    upsert_lottery_entry(period, customer.id, -int(entry["chances"]), -refund_points)
+    ok, message = await adjust_customer_points(
+        customer_id=customer.id,
+        delta_points=refund_points,
+        operator_id=interaction.user.id,
+        reason=f"取消 {period} 抽獎報名退點：{reason or '未填寫'}",
+    )
+
+    await send_order_log(
+        interaction.guild,
+        title="抽獎報名已取消",
+        fields=[
+            ("顧客", customer.mention, True),
+            ("期別", period, True),
+            ("退還點數", f"{refund_points:,} 點", True),
+            ("操作人員", interaction.user.mention, True),
+            ("原因", reason or "未填寫", False),
+        ],
+        color=discord.Color.orange(),
+    )
+
+    await interaction.response.send_message(message, ephemeral=True)
+
+
+@bot.tree.command(
+    name="reset_lottery",
+    description="清空本期抽獎池，不自動退點。需輸入確認文字",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(confirm_text="請輸入：確認清空", reason="清空原因，可不填")
+async def reset_lottery(interaction: discord.Interaction, confirm_text: str, reason: str | None = None):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以清空抽獎池。", ephemeral=True)
+        return
+
+    if confirm_text != "確認清空":
+        await interaction.response.send_message("未清空。若確定要清空，confirm_text 請輸入：確認清空", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    period = str(settings.get("period", get_default_lottery_period()))
+    entries = get_lottery_entries(period)
+    clear_lottery_entries(period)
+
+    await send_order_log(
+        interaction.guild,
+        title="抽獎池已清空",
+        fields=[
+            ("期別", period, True),
+            ("清空人員", interaction.user.mention, True),
+            ("原參與人數", f"{len(entries)} 人", True),
+            ("原因", reason or "未填寫", False),
+        ],
+        color=discord.Color.red(),
+    )
+
+    await interaction.response.send_message(f"已清空 **{period}** 抽獎池。注意：此操作不會自動退點。", ephemeral=True)
+
 
 @bot.tree.command(
     name="my_points",
