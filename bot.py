@@ -5,6 +5,7 @@ load_dotenv()
 import os
 import json
 import re
+import shutil
 import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -70,6 +71,12 @@ MEMBER_LEVELS = [
     {"name": "鑽石魔丸", "threshold": 30000},
     {"name": "頂級魔丸", "threshold": 77777},
 ]
+
+# 訂單日誌 / 備份設定
+ORDER_LOG_CATEGORY_ID = 1483895536938651809
+ORDER_LOG_CHANNEL_NAME = "📒┃訂單日誌"
+BACKUP_KEEP_DAYS = 30
+ORDER_ID_PREFIX = "MO"
 
 # 接單身分組 ID
 COMPANION_RECEIVER_ROLE_ID = 1503706721883783218  # 陪玩接單
@@ -991,6 +998,18 @@ async def create_private_channel(
         )
     )
 
+    if topic and "order_customer_id=" in topic:
+        await send_order_log(
+            guild,
+            title="新票口已建立",
+            fields=[
+                ("開單人", member.mention, True),
+                ("票口", channel.mention, True),
+                ("狀態", "已確認詳閱規章內容", False),
+            ],
+            color=discord.Color.purple(),
+        )
+
     try:
         await interaction.delete_original_response()
     except discord.NotFound:
@@ -1395,13 +1414,6 @@ def get_taipei_now_text() -> str:
 
 
 class ReceiptModal(discord.ui.Modal, title="已結單收據"):
-    receipt_id = discord.ui.TextInput(
-        label="編號",
-        placeholder="日期+今天第幾單 ex.20260427001",
-        required=True,
-        max_length=100
-    )
-
     payee = discord.ui.TextInput(
         label="收款人",
         placeholder="例如：zYao或客服暱稱(代收)",
@@ -1473,12 +1485,18 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         order_content, payment_method = get_order_summary_from_channel(order_channel.id)
         date_text = get_taipei_now_text()
+        receipt_id = generate_order_receipt_id()
+
+        order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+        order_data["receipt_id"] = receipt_id
+        order_data["receipt_created_at"] = get_taipei_now_iso()
+        remember_order_data(order_channel.id, order_data)
 
         receipt_text = (
             "```text\n"
             "收據\n"
             "\n"
-            f"編號：{self.receipt_id.value}\n"
+            f"編號：{receipt_id}\n"
             f"日期：{date_text}\n"
             "\n"
             f"收款人：{self.payee.value}\n"
@@ -1531,6 +1549,22 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             order_channel_id=order_channel.id,
             customer_id=customer_id,
             amount_text=self.amount.value,
+            notify_channel=interaction.channel,
+        )
+
+        await send_order_log(
+            guild,
+            title="訂單已結單",
+            fields=[
+                ("訂單編號", receipt_id, True),
+                ("顧客", f"<@{customer_id}>", True),
+                ("客服", interaction.user.mention, True),
+                ("金額", self.amount.value, True),
+                ("付款方式", payment_method, True),
+                ("票口", order_channel.mention, False),
+                ("內容", order_content, False),
+            ],
+            color=discord.Color.green(),
         )
 
         await interaction.response.send_message(
@@ -1616,7 +1650,13 @@ ORDER_CLAIMS = {}
 # user_id -> {total_spent, order_count, last_order_at, points, platinum_channel_id}
 CUSTOMER_REWARDS = {}
 
+# 訂單編號計數器：YYYYMMDD -> 當日最後流水號
+ORDER_COUNTERS = {}
+
+BACKUP_TASK_STARTED = False
+
 DATA_FILE = Path(__file__).parent / "bot_data.json"
+BACKUP_DIR = Path(__file__).parent / "backups"
 CLOSED_ORDER_KEEP_DAYS = 60
 
 
@@ -1668,11 +1708,16 @@ def _serialize_customer_rewards() -> dict:
         for user_id, data in CUSTOMER_REWARDS.items()
     }
 
+
+def _serialize_order_counters() -> dict:
+    return {str(day): int(count) for day, count in ORDER_COUNTERS.items()}
+
 def save_bot_data() -> None:
     payload = {
         "orders": _serialize_orders(),
         "claims": _serialize_claims(),
         "customers": _serialize_customer_rewards(),
+        "order_counters": _serialize_order_counters(),
     }
 
     tmp_path = DATA_FILE.with_suffix(".tmp")
@@ -1699,6 +1744,7 @@ def load_bot_data() -> None:
     SELF_SERVICE_ORDER_SELECTIONS.clear()
     ORDER_CLAIMS.clear()
     CUSTOMER_REWARDS.clear()
+    ORDER_COUNTERS.clear()
 
     for channel_id_text, data in payload.get("orders", {}).items():
         channel_id = _to_int(channel_id_text)
@@ -1747,6 +1793,14 @@ def load_bot_data() -> None:
             "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
         }
 
+    for day_text, count in payload.get("order_counters", {}).items():
+        if not isinstance(day_text, str):
+            continue
+        count_int = _to_int(count)
+        if count_int is None:
+            continue
+        ORDER_COUNTERS[day_text] = count_int
+
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
@@ -1756,6 +1810,114 @@ def remember_order_data(channel_id: int, data: dict) -> None:
 def remember_claim_data(message_id: int, data: dict) -> None:
     ORDER_CLAIMS[message_id] = data
     save_bot_data()
+
+
+def generate_order_receipt_id() -> str:
+    """自動產生訂單編號，例如 MO20260519001。"""
+    day_key = get_taipei_now().strftime("%Y%m%d")
+    next_number = int(ORDER_COUNTERS.get(day_key, 0) or 0) + 1
+    ORDER_COUNTERS[day_key] = next_number
+    save_bot_data()
+    return f"{ORDER_ID_PREFIX}{day_key}{next_number:03d}"
+
+
+def get_or_create_order_log_channel_sync_hint() -> str:
+    return f"{ORDER_LOG_CHANNEL_NAME}（類別 ID：{ORDER_LOG_CATEGORY_ID}）"
+
+
+async def get_or_create_order_log_channel(guild: discord.Guild) -> discord.TextChannel | None:
+    category = guild.get_channel(ORDER_LOG_CATEGORY_ID)
+    if not isinstance(category, discord.CategoryChannel):
+        return None
+
+    for channel in category.text_channels:
+        if channel.name == ORDER_LOG_CHANNEL_NAME:
+            return channel
+
+    try:
+        return await guild.create_text_channel(
+            name=ORDER_LOG_CHANNEL_NAME,
+            category=category,
+            reason="Create order log channel"
+        )
+    except (discord.Forbidden, discord.HTTPException) as e:
+        print(f"建立訂單日誌頻道失敗：{e}")
+        return None
+
+
+async def send_order_log(
+    guild: discord.Guild | None,
+    title: str,
+    description: str | None = None,
+    fields: list[tuple[str, str, bool]] | None = None,
+    color: discord.Color | None = None,
+) -> None:
+    if guild is None:
+        return
+
+    channel = await get_or_create_order_log_channel(guild)
+    if channel is None:
+        print(f"找不到或無法建立訂單日誌頻道：{get_or_create_order_log_channel_sync_hint()}")
+        return
+
+    embed = discord.Embed(
+        title=title,
+        description=description or "",
+        color=color or discord.Color.blurple(),
+        timestamp=get_taipei_now(),
+    )
+
+    for name, value, inline in fields or []:
+        embed.add_field(name=name, value=value if value else "未紀錄", inline=inline)
+
+    try:
+        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+    except discord.HTTPException as e:
+        print(f"送出訂單日誌失敗：{e}")
+
+
+def run_daily_backup_once() -> str | None:
+    """若今天還沒有備份，複製 bot_data.json 到 backups/，並清掉過舊備份。"""
+    if not DATA_FILE.exists():
+        return None
+
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    day_key = get_taipei_now().strftime("%Y%m%d")
+    backup_path = BACKUP_DIR / f"bot_data_{day_key}.json"
+
+    if not backup_path.exists():
+        shutil.copy2(DATA_FILE, backup_path)
+
+    cutoff = get_taipei_now() - timedelta(days=BACKUP_KEEP_DAYS)
+    for old_file in BACKUP_DIR.glob("bot_data_*.json"):
+        try:
+            date_part = old_file.stem.replace("bot_data_", "")
+            file_date = datetime.strptime(date_part, "%Y%m%d").replace(tzinfo=timezone(timedelta(hours=8)))
+        except ValueError:
+            continue
+        if file_date < cutoff:
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+
+    return str(backup_path)
+
+
+async def daily_backup_loop():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            backup_path = run_daily_backup_once()
+            if backup_path:
+                print(f"bot_data.json backup checked: {backup_path}")
+        except Exception as e:
+            print(f"每日備份 bot_data.json 失敗：{e}")
+        await asyncio.sleep(3600)
+
+
+def is_manager_or_admin(member: discord.Member) -> bool:
+    return has_role(member, MANAGER_ROLE_ID) or member.guild_permissions.administrator
 
 def parse_receipt_amount(amount_text: str) -> int | None:
     """從收據金額欄位擷取第一組數字，例如 NT$ 2,500 會回傳 2500。"""
@@ -1951,6 +2113,7 @@ async def add_customer_reward_from_order(
     order_channel_id: int,
     customer_id: int,
     amount_text: str,
+    notify_channel: discord.abc.Messageable | None = None,
 ) -> str:
     order_data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
 
@@ -1962,7 +2125,9 @@ async def add_customer_reward_from_order(
         return "會員消費未累積：收據金額欄位沒有可辨識的數字。"
 
     data = get_customer_reward_data(customer_id)
-    data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
+    old_total_spent = int(data.get("total_spent", 0) or 0)
+    old_level = get_member_level(old_total_spent)
+    data["total_spent"] = old_total_spent + amount
     data["order_count"] = int(data.get("order_count", 0) or 0) + 1
     data["last_order_at"] = get_taipei_now_iso()
     data["points"] = get_current_reward_points(data)
@@ -1975,9 +2140,21 @@ async def add_customer_reward_from_order(
     member = await fetch_member_safely(guild, customer_id)
     benefit_notices = await ensure_reward_member_benefits(guild, member, data)
 
+    level = get_member_level(int(data["total_spent"]))
+    if level["threshold"] > old_level["threshold"]:
+        upgrade_notice = f"恭喜 <@{customer_id}> 升級為 **{level['name']}**！目前累積消費：{format_t_amount(int(data['total_spent']))}"
+        benefit_notices.insert(0, upgrade_notice)
+        if notify_channel is not None:
+            try:
+                await notify_channel.send(
+                    upgrade_notice,
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
+                )
+            except discord.HTTPException:
+                pass
+
     save_bot_data()
 
-    level = get_member_level(int(data["total_spent"]))
     result = (
         f"會員累積已更新：+{format_t_amount(amount)}，"
         f"目前累積 {format_t_amount(int(data['total_spent']))}，"
@@ -2029,6 +2206,8 @@ async def add_manual_purchase(
         return False, "日期格式錯誤，請用 20260512、2026/05/12 或 2026-05-12。"
 
     data = get_customer_reward_data(customer_id)
+    old_total_spent = int(data.get("total_spent", 0) or 0)
+    old_level = get_member_level(old_total_spent)
     manual_keys = data.setdefault("manual_purchase_keys", [])
     purchase_key = build_manual_purchase_key(customer_id, amount, date_iso, note)
 
@@ -2053,6 +2232,9 @@ async def add_manual_purchase(
     save_bot_data()
 
     level = get_member_level(int(data["total_spent"]))
+    if level["threshold"] > old_level["threshold"]:
+        benefit_notices.insert(0, f"恭喜 <@{customer_id}> 升級為 **{level['name']}**！目前累積消費：{format_t_amount(int(data['total_spent']))}")
+
     msg = (
         f"已補登 <@{customer_id}>：+{format_t_amount(amount)}，日期 {display_date}。"
         f"目前累積 {format_t_amount(int(data['total_spent']))}，"
@@ -2894,6 +3076,17 @@ class DispatchClaimView(discord.ui.View):
         claim_data[claim_type].add(interaction.user.id)
         remember_claim_data(interaction.message.id, claim_data)
 
+        await send_order_log(
+            interaction.guild,
+            title=f"{receiver_label}",
+            fields=[
+                ("接單人", interaction.user.mention, True),
+                ("顧客", f"<@{self.customer_id}>", True),
+                ("訂單", f"{self.category_label}｜{self.item} x{self.quantity}", False),
+            ],
+            color=discord.Color.green(),
+        )
+
         await self.refresh_panel(interaction)
 
     async def cancel_claim(self, interaction: discord.Interaction):
@@ -2923,6 +3116,17 @@ class DispatchClaimView(discord.ui.View):
             return
 
         remember_claim_data(interaction.message.id, claim_data)
+
+        await send_order_log(
+            interaction.guild,
+            title="取消接單",
+            fields=[
+                ("操作人", interaction.user.mention, True),
+                ("顧客", f"<@{self.customer_id}>", True),
+                ("訂單", f"{self.category_label}｜{self.item} x{self.quantity}", False),
+            ],
+            color=discord.Color.orange(),
+        )
 
         await self.refresh_panel(interaction)
 
@@ -3397,6 +3601,18 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
                 expected_time=self.expected_time.value.strip() or None,
                 note=self.note.value.strip() or None,
             )
+            await send_order_log(
+                guild,
+                title="訂單已存單",
+                fields=[
+                    ("票口", interaction.channel.mention, True),
+                    ("操作人員", interaction.user.mention, True),
+                    ("存單原因", self.reason.value.strip(), False),
+                    ("預計恢復", self.expected_time.value.strip() or "未填寫", True),
+                    ("備註", self.note.value.strip() or "未填寫", False),
+                ],
+                color=discord.Color.gold(),
+            )
         except ValueError as e:
             await interaction.followup.send(str(e), ephemeral=True)
             return
@@ -3578,6 +3794,22 @@ class PaymentMethodView(discord.ui.View):
         data["closed"] = False
         remember_order_data(interaction.channel.id, data)
         remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
+
+        await send_order_log(
+            guild,
+            title="新自助下單已派單",
+            fields=[
+                ("顧客", interaction.user.mention, True),
+                ("訂單類別", category_label, True),
+                ("訂單項目", item, True),
+                ("數量", f"{quantity} 單", True),
+                ("付款方式", payment_method, True),
+                ("指定選項", companion_preference, True),
+                ("票口", interaction.channel.mention, False),
+                ("派單訊息", dispatch_message.jump_url, False),
+            ],
+            color=discord.Color.blue(),
+        )
 
         await interaction.response.defer()
 
@@ -3804,6 +4036,15 @@ class StaffOrderOperationView(discord.ui.View):
                     guild=guild,
                     order_channel=interaction.channel,
                     staff_member=interaction.user,
+                )
+                await send_order_log(
+                    guild,
+                    title="訂單已恢復",
+                    fields=[
+                        ("票口", interaction.channel.mention, True),
+                        ("操作人員", interaction.user.mention, True),
+                    ],
+                    color=discord.Color.green(),
                 )
             except ValueError as e:
                 await interaction.followup.send(str(e), ephemeral=True)
@@ -4651,6 +4892,7 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
+    global BACKUP_TASK_STARTED
     bot.add_view(MainPanelView())
     bot.add_view(OrderControlView())
     bot.add_view(StaffOrderOperationView())
@@ -4676,6 +4918,10 @@ async def on_ready():
 
     guild_for_voice = bot.get_guild(GUILD_ID)
     if guild_for_voice is not None:
+        await get_or_create_order_log_channel(guild_for_voice)
+        if not BACKUP_TASK_STARTED:
+            BACKUP_TASK_STARTED = True
+            asyncio.create_task(daily_backup_loop())
         try:
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
@@ -4761,6 +5007,19 @@ async def adjust_points(
         reason=reason,
     )
 
+    if ok:
+        await send_order_log(
+            interaction.guild,
+            title="會員點數已調整",
+            fields=[
+                ("顧客", customer.mention, True),
+                ("操作人員", interaction.user.mention, True),
+                ("點數變動", f"{points:+,} 點", True),
+                ("原因", reason or "未填寫", False),
+            ],
+            color=discord.Color.orange(),
+        )
+
     await interaction.response.send_message(message, ephemeral=True)
 
 
@@ -4803,6 +5062,20 @@ async def add_purchase(
         operator_id=interaction.user.id,
         note=note,
     )
+
+    if ok:
+        await send_order_log(
+            guild,
+            title="歷史消費已補登",
+            fields=[
+                ("顧客", customer.mention, True),
+                ("操作人員", interaction.user.mention, True),
+                ("金額", format_t_amount(amount), True),
+                ("日期", date, True),
+                ("備註", note or "未填寫", False),
+            ],
+            color=discord.Color.blue(),
+        )
 
     await interaction.response.send_message(message, ephemeral=True)
 
@@ -4881,6 +5154,101 @@ async def import_purchases(interaction: discord.Interaction, records: str):
 
     await interaction.followup.send(f"{summary}\n\n{detail}", ephemeral=True)
 
+
+
+@bot.tree.command(
+    name="set_customer_rewards",
+    description="管理員手動修正顧客會員資料",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要修正的顧客",
+    total_spent="累積消費總額，不填則不修改",
+    order_count="完成訂單數，不填則不修改",
+    last_order_date="最後下單日期，例如 20260512、2026/05/12；不填則不修改",
+    point_adjustment="額外點數修正值，可正可負；不填則不修改",
+    reason="修正原因，可不填"
+)
+async def set_customer_rewards(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    total_spent: int | None = None,
+    order_count: int | None = None,
+    last_order_date: str | None = None,
+    point_adjustment: int | None = None,
+    reason: str | None = None,
+):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_manager_or_admin(interaction.user):
+        await interaction.response.send_message("只有管理員或店長可以手動修正顧客會員資料。", ephemeral=True)
+        return
+
+    if total_spent is None and order_count is None and last_order_date is None and point_adjustment is None:
+        await interaction.response.send_message("請至少填一個要修正的欄位。", ephemeral=True)
+        return
+
+    if total_spent is not None and total_spent < 0:
+        await interaction.response.send_message("累積消費不能小於 0。", ephemeral=True)
+        return
+
+    if order_count is not None and order_count < 0:
+        await interaction.response.send_message("完成訂單數不能小於 0。", ephemeral=True)
+        return
+
+    date_iso = None
+    display_date = None
+    if last_order_date is not None:
+        date_iso, display_date = parse_manual_purchase_date(last_order_date)
+        if date_iso is None:
+            await interaction.response.send_message("最後下單日期格式錯誤，請用 20260512、2026/05/12 或 2026-05-12。", ephemeral=True)
+            return
+
+    data = get_customer_reward_data(customer.id)
+    before_embed = build_member_info_embed(customer, data, show_points=True)
+
+    if total_spent is not None:
+        data["total_spent"] = total_spent
+    if order_count is not None:
+        data["order_count"] = order_count
+    if date_iso is not None:
+        data["last_order_at"] = date_iso
+    if point_adjustment is not None:
+        data["point_adjustment"] = point_adjustment
+
+    data["points"] = get_current_reward_points(data)
+    data["last_manual_fixed_at"] = get_taipei_now_iso()
+    data["last_manual_fixed_by"] = interaction.user.id
+    data["last_manual_fixed_reason"] = (reason or "").strip()
+    CUSTOMER_REWARDS[customer.id] = data
+
+    benefit_notices = await ensure_reward_member_benefits(interaction.guild, customer, data) if interaction.guild else []
+    save_bot_data()
+
+    after_embed = build_member_info_embed(customer, data, show_points=True)
+    after_embed.title = "顧客會員資料已修正"
+    if reason:
+        after_embed.add_field(name="修正原因", value=reason, inline=False)
+    if benefit_notices:
+        after_embed.add_field(name="會員權益處理", value="\n".join(benefit_notices), inline=False)
+
+    await send_order_log(
+        interaction.guild,
+        title="顧客會員資料已手動修正",
+        fields=[
+            ("顧客", customer.mention, True),
+            ("操作人員", interaction.user.mention, True),
+            ("累積消費", format_t_amount(int(data.get("total_spent", 0) or 0)), True),
+            ("完成訂單", f"{int(data.get('order_count', 0) or 0)} 單", True),
+            ("目前點數", f"{get_current_reward_points(data):,} 點", True),
+            ("原因", reason or "未填寫", False),
+        ],
+        color=discord.Color.orange(),
+    )
+
+    await interaction.response.send_message(embed=after_embed, ephemeral=True)
 
 @bot.tree.command(
     name="setup_panel",
