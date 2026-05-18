@@ -1655,6 +1655,8 @@ CUSTOMER_REWARDS = {}
 ORDER_COUNTERS = {}
 
 BACKUP_TASK_STARTED = False
+STORED_REMINDER_TASK_STARTED = False
+STORED_ORDER_REMINDER_DAYS = [3, 7]
 
 DATA_FILE = Path(__file__).parent / "bot_data.json"  # 舊版 JSON 備援/遷移用
 DB_FILE = Path(__file__).parent / "bot.db"
@@ -1753,6 +1755,7 @@ def _deserialize_customer_data(data: dict) -> dict:
         "point_adjustment_logs": list(data.get("point_adjustment_logs", [])) if isinstance(data.get("point_adjustment_logs", []), list) else [],
         "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
         "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
+        "notes": list(data.get("notes", [])) if isinstance(data.get("notes", []), list) else [],
     }
 
 
@@ -2085,6 +2088,89 @@ async def daily_backup_loop():
         await asyncio.sleep(3600)
 
 
+def _parse_datetime_safe(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
+    return dt
+
+
+async def check_stored_order_reminders_once(guild: discord.Guild | None = None) -> None:
+    guild = guild or bot.get_guild(GUILD_ID)
+    if guild is None:
+        return
+
+    now = get_taipei_now()
+    changed = False
+
+    for channel_id, data in list(SELF_SERVICE_ORDER_SELECTIONS.items()):
+        if not isinstance(data, dict) or str(data.get("status", "")).lower() != "stored":
+            continue
+
+        stored_at = _parse_datetime_safe(data.get("stored_at"))
+        if stored_at is None:
+            continue
+
+        age_days = max(0, (now - stored_at).days)
+        sent = data.setdefault("stored_reminders_sent", [])
+        if not isinstance(sent, list):
+            sent = []
+            data["stored_reminders_sent"] = sent
+
+        due_days = [day for day in STORED_ORDER_REMINDER_DAYS if age_days >= day and day not in sent]
+        if not due_days:
+            continue
+
+        for day in due_days:
+            sent.append(day)
+
+            customer_id = data.get("customer_id") or get_order_customer_id_from_channel(guild.get_channel(channel_id)) if isinstance(guild.get_channel(channel_id), discord.TextChannel) else data.get("customer_id")
+            item = data.get("item") or "未紀錄"
+            quantity = _to_int(data.get("quantity"), 1) or 1
+            amount = _to_int(data.get("amount"), 0) or 0
+            order_no = data.get("order_no") or "未產生"
+            ticket_channel = guild.get_channel(channel_id)
+            ticket_text = ticket_channel.mention if isinstance(ticket_channel, discord.TextChannel) else f"票口 ID：{channel_id}"
+
+            description = (
+                f"有一筆存單已經超過 **{day} 天**，請客服確認是否需要恢復、取消或聯絡顧客。\n\n"
+                f"顧客：{f'<@{customer_id}>' if customer_id else '未紀錄'}\n"
+                f"票口：{ticket_text}\n"
+                f"訂單編號：{order_no}\n"
+                f"項目：{item} x{quantity}\n"
+                f"金額：{format_t_amount(amount) if amount else '未紀錄'}\n"
+                f"存單原因：{data.get('stored_reason') or '未填寫'}\n"
+                f"預計恢復：{data.get('stored_expected_time') or '未填寫'}"
+            )
+            await send_order_log(
+                guild,
+                title=f"存單提醒｜已超過 {day} 天",
+                description=description,
+                color=discord.Color.orange(),
+            )
+
+        SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
+        changed = True
+
+    if changed:
+        save_bot_data()
+
+
+async def stored_order_reminder_loop():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            await check_stored_order_reminders_once()
+        except Exception as e:
+            print(f"存單提醒檢查失敗：{e}")
+        await asyncio.sleep(21600)
+
+
 def is_manager_or_admin(member: discord.Member) -> bool:
     return has_role(member, MANAGER_ROLE_ID) or member.guild_permissions.administrator
 
@@ -2118,10 +2204,13 @@ def get_customer_reward_data(user_id: int) -> dict:
     data.setdefault("point_adjustment_logs", [])
     data.setdefault("platinum_channel_id", None)
     data.setdefault("manual_purchase_keys", [])
+    data.setdefault("notes", [])
     if not isinstance(data["manual_purchase_keys"], list):
         data["manual_purchase_keys"] = []
     if not isinstance(data["point_adjustment_logs"], list):
         data["point_adjustment_logs"] = []
+    if not isinstance(data["notes"], list):
+        data["notes"] = []
     return data
 
 def get_member_level(total_spent: int) -> dict:
@@ -2181,6 +2270,55 @@ def build_member_info_embed(member: discord.abc.User, data: dict, show_points: b
         )
 
     return embed
+
+
+def get_customer_notes(user_id: int) -> list[dict]:
+    data = get_customer_reward_data(user_id)
+    notes = data.setdefault("notes", [])
+    if not isinstance(notes, list):
+        data["notes"] = []
+        notes = data["notes"]
+    return notes
+
+
+def format_customer_notes_for_staff(user_id: int, limit: int = 8) -> str:
+    notes = get_customer_notes(user_id)
+    if not notes:
+        return "無備註"
+
+    lines = []
+    for index, note in enumerate(notes[:limit], start=1):
+        tag = "🚫 黑名單" if note.get("is_blacklist") else "📝 備註"
+        created_at = note.get("created_at") or "未紀錄時間"
+        operator_id = note.get("operator_id")
+        operator_text = f"<@{operator_id}>" if operator_id else "未紀錄"
+        content = str(note.get("content") or "未填寫")
+        lines.append(f"{index}. {tag}｜{content}\n　建立：{created_at}｜人員：{operator_text}")
+
+    if len(notes) > limit:
+        lines.append(f"…還有 {len(notes) - limit} 筆")
+
+    return "\n".join(lines)
+
+
+def format_customer_notes_for_ticket(user_id: int) -> str:
+    notes = get_customer_notes(user_id)
+    if not notes:
+        return ""
+
+    blacklist_notes = [n for n in notes if n.get("is_blacklist")]
+    normal_notes = [n for n in notes if not n.get("is_blacklist")]
+    picked = blacklist_notes[:3] + normal_notes[:3]
+
+    lines = ["\n\n⚠️ 客服注意：此顧客有備註紀錄"]
+    if blacklist_notes:
+        lines.append("🚫 含黑名單 / 高風險備註")
+
+    for index, note in enumerate(picked[:5], start=1):
+        tag = "黑名單" if note.get("is_blacklist") else "備註"
+        lines.append(f"{index}. [{tag}] {note.get('content') or '未填寫'}")
+
+    return "\n".join(lines)
 
 async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Member | None:
     member = guild.get_member(user_id)
@@ -3551,6 +3689,7 @@ async def store_dispatch_claim_panel(
     data["stored_reason"] = reason
     data["stored_expected_time"] = expected_time or None
     data["stored_note"] = note or None
+    data["stored_reminders_sent"] = []
 
     remember_order_data(order_channel.id, data)
     remember_claim_data(dispatch_message_id, claim_data)
@@ -4706,6 +4845,7 @@ class OrderModal(discord.ui.Modal, title="我要下單"):
             f"這裡有闆闆開單。\n\n"
             f"開單人：{member.mention}\n"
             f"狀態：已確認詳閱規章內容"
+            f"{format_customer_notes_for_ticket(member.id)}"
         )
 
         await create_private_channel(
@@ -5084,7 +5224,7 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
-    global BACKUP_TASK_STARTED
+    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED
     bot.add_view(MainPanelView())
     bot.add_view(OrderControlView())
     bot.add_view(StaffOrderOperationView())
@@ -5114,6 +5254,9 @@ async def on_ready():
         if not BACKUP_TASK_STARTED:
             BACKUP_TASK_STARTED = True
             asyncio.create_task(daily_backup_loop())
+        if not STORED_REMINDER_TASK_STARTED:
+            STORED_REMINDER_TASK_STARTED = True
+            asyncio.create_task(stored_order_reminder_loop())
         try:
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
@@ -5714,6 +5857,223 @@ async def top_customers(interaction: discord.Interaction):
         embed.description = "\n".join(lines)
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+@bot.tree.command(
+    name="order_search",
+    description="客服搜尋訂單，可用訂單編號、顧客 ID、項目或狀態查詢",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    keyword="關鍵字：訂單編號、顧客ID、項目名稱，可不填",
+    status="狀態：active / stored / closed / cancelled，可不填",
+    limit="最多顯示幾筆，預設 10，最多 20"
+)
+async def order_search(
+    interaction: discord.Interaction,
+    keyword: str | None = None,
+    status: str | None = None,
+    limit: int = 10,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以搜尋訂單。", ephemeral=True)
+        return
+
+    limit = max(1, min(int(limit or 10), 20))
+    keyword_text = (keyword or "").strip().lower()
+    status_text = (status or "").strip().lower()
+
+    matches = []
+    for channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items():
+        if not isinstance(data, dict):
+            continue
+
+        order_status = str(data.get("status") or ("closed" if data.get("closed") else "active")).lower()
+        if status_text and order_status != status_text:
+            continue
+
+        customer_id = data.get("customer_id") or ""
+        haystack = " ".join([
+            str(data.get("order_no") or ""),
+            str(customer_id),
+            str(data.get("category") or ""),
+            str(data.get("item") or ""),
+            str(data.get("payment_method") or ""),
+            str(channel_id),
+            order_status,
+        ]).lower()
+
+        if keyword_text and keyword_text not in haystack:
+            continue
+
+        matches.append((channel_id, data))
+
+    def sort_key(row):
+        _, data = row
+        return str(data.get("closed_at") or data.get("stored_at") or data.get("created_at") or data.get("updated_at") or "")
+
+    matches.sort(key=sort_key, reverse=True)
+    shown = matches[:limit]
+
+    embed = discord.Embed(
+        title="訂單搜尋結果",
+        color=discord.Color.blurple(),
+        timestamp=get_taipei_now(),
+    )
+
+    if not shown:
+        embed.description = "沒有找到符合條件的訂單。"
+    else:
+        lines = []
+        for channel_id, data in shown:
+            order_no = data.get("order_no") or "未產生"
+            customer_id = data.get("customer_id")
+            customer_text = f"<@{customer_id}>" if customer_id else "未紀錄"
+            item = data.get("item") or "未紀錄"
+            quantity = _to_int(data.get("quantity"), 1) or 1
+            amount = _to_int(data.get("amount"), 0) or 0
+            order_status = str(data.get("status") or ("closed" if data.get("closed") else "active"))
+            ticket_text = f"<#{channel_id}>" if int(channel_id) > 0 else f"歷史資料 {channel_id}"
+            lines.append(
+                f"**{order_no}**｜{order_status}\n"
+                f"顧客：{customer_text}｜項目：{item} x{quantity}｜金額：{format_t_amount(amount) if amount else '未紀錄'}\n"
+                f"票口：{ticket_text}"
+            )
+        embed.description = "\n\n".join(lines)
+        if len(matches) > limit:
+            embed.set_footer(text=f"只顯示前 {limit} 筆，共找到 {len(matches)} 筆")
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="check_stored_orders",
+    description="客服手動檢查是否有超過 3/7 天的存單提醒",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def check_stored_orders(interaction: discord.Interaction):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以檢查存單提醒。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    await check_stored_order_reminders_once(interaction.guild)
+    await interaction.followup.send("已檢查存單提醒，若有逾期存單會發到訂單日誌。", ephemeral=True)
+
+
+@bot.tree.command(
+    name="add_customer_note",
+    description="客服新增顧客備註或黑名單紀錄",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要新增備註的顧客",
+    note="備註內容",
+    blacklist="是否標記為黑名單 / 高風險備註"
+)
+async def add_customer_note(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    note: str,
+    blacklist: bool = False,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以新增顧客備註。", ephemeral=True)
+        return
+
+    content = note.strip()[:500]
+    if not content:
+        await interaction.response.send_message("備註內容不能空白。", ephemeral=True)
+        return
+
+    data = get_customer_reward_data(customer.id)
+    notes = data.setdefault("notes", [])
+    notes.append({
+        "content": content,
+        "is_blacklist": bool(blacklist),
+        "operator_id": interaction.user.id,
+        "created_at": get_taipei_now_iso(),
+    })
+    CUSTOMER_REWARDS[customer.id] = data
+    save_bot_data()
+
+    await send_order_log(
+        interaction.guild,
+        title="新增顧客備註",
+        fields=[
+            ("顧客", customer.mention, True),
+            ("類型", "黑名單 / 高風險" if blacklist else "一般備註", True),
+            ("操作人員", interaction.user.mention, True),
+            ("內容", content, False),
+        ],
+        color=discord.Color.red() if blacklist else discord.Color.blue(),
+    )
+
+    await interaction.response.send_message(
+        f"已新增 {'黑名單 / 高風險' if blacklist else '一般'}備註給 {customer.mention}。",
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+
+@bot.tree.command(
+    name="customer_notes",
+    description="客服查詢顧客備註 / 黑名單紀錄",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(customer="要查詢備註的顧客")
+async def customer_notes(interaction: discord.Interaction, customer: discord.Member):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以查詢顧客備註。", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="顧客備註 / 黑名單紀錄",
+        description=format_customer_notes_for_staff(customer.id, limit=15),
+        color=discord.Color.red() if any(n.get("is_blacklist") for n in get_customer_notes(customer.id)) else discord.Color.blue(),
+        timestamp=get_taipei_now(),
+    )
+    embed.add_field(name="顧客", value=customer.mention, inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="remove_customer_note",
+    description="客服刪除顧客備註，index 請看 /customer_notes 的編號",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要刪除備註的顧客",
+    index="要刪除第幾筆備註，從 1 開始"
+)
+async def remove_customer_note(interaction: discord.Interaction, customer: discord.Member, index: int):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以刪除顧客備註。", ephemeral=True)
+        return
+
+    data = get_customer_reward_data(customer.id)
+    notes = data.setdefault("notes", [])
+    if index < 1 or index > len(notes):
+        await interaction.response.send_message("找不到這個備註編號，請先用 /customer_notes 查看。", ephemeral=True)
+        return
+
+    removed = notes.pop(index - 1)
+    CUSTOMER_REWARDS[customer.id] = data
+    save_bot_data()
+
+    await send_order_log(
+        interaction.guild,
+        title="刪除顧客備註",
+        fields=[
+            ("顧客", customer.mention, True),
+            ("操作人員", interaction.user.mention, True),
+            ("刪除內容", str(removed.get("content") or "未填寫"), False),
+        ],
+        color=discord.Color.dark_grey(),
+    )
+
+    await interaction.response.send_message(f"已刪除 {customer.mention} 的第 {index} 筆備註。", ephemeral=True)
 
 
 @bot.tree.command(
