@@ -77,6 +77,7 @@ MEMBER_LEVELS = [
 # 訂單日誌 / 備份設定
 ORDER_LOG_CATEGORY_ID = 1483895536938651809
 ORDER_LOG_CHANNEL_NAME = "📒┃訂單日誌"
+LOTTERY_ANNOUNCE_CHANNEL_ID = 1482079302739693739
 BACKUP_KEEP_DAYS = 30
 ORDER_ID_PREFIX = "MO"
 
@@ -2074,6 +2075,36 @@ async def send_order_log(
         await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
     except discord.HTTPException as e:
         print(f"送出訂單日誌失敗：{e}")
+
+
+async def send_lottery_announcement(
+    guild: discord.Guild | None,
+    content: str,
+    embed: discord.Embed | None = None,
+) -> None:
+    if guild is None:
+        return
+
+    channel = guild.get_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
+    if channel is None:
+        try:
+            channel = await guild.fetch_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+            print(f"找不到抽獎公告頻道：{e}")
+            return
+
+    if not isinstance(channel, discord.TextChannel):
+        print("抽獎公告頻道不是文字頻道。")
+        return
+
+    try:
+        await channel.send(
+            content=content,
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(everyone=True, users=True, roles=False),
+        )
+    except discord.HTTPException as e:
+        print(f"送出抽獎公告失敗：{e}")
 
 
 def run_daily_backup_once() -> str | None:
@@ -5691,7 +5722,15 @@ async def lottery_open(
         color=discord.Color.gold(),
     )
 
-    await interaction.response.send_message("抽獎已設定並開放報名。", embed=build_lottery_info_embed(settings), ephemeral=True)
+    announcement_embed = build_lottery_info_embed(settings)
+    announcement_embed.title = f"🎁 {settings['title']} 開始報名"
+    await send_lottery_announcement(
+        interaction.guild,
+        content="@everyone 🎁 魔丸點數抽獎已開放報名！使用 `/lottery_info` 查看活動，使用 `/join_lottery` 參加抽獎。",
+        embed=announcement_embed,
+    )
+
+    await interaction.response.send_message("抽獎已設定並開放報名，公告已送出。", embed=build_lottery_info_embed(settings), ephemeral=True)
 
 
 @bot.tree.command(
@@ -5765,7 +5804,13 @@ async def draw_lottery(interaction: discord.Interaction, prize: str, winners: in
         color=discord.Color.gold(),
     )
 
-    await interaction.response.send_message(embed=embed)
+    await send_lottery_announcement(
+        interaction.guild,
+        content="@everyone 🎉 魔丸點數抽獎開獎啦！恭喜得獎者！",
+        embed=embed,
+    )
+
+    await interaction.response.send_message("開獎完成，公告已送出。", embed=embed, ephemeral=True)
 
 
 @bot.tree.command(
