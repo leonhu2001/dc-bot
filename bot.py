@@ -6,6 +6,7 @@ import os
 import json
 import re
 import shutil
+import sqlite3
 import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -1655,7 +1656,8 @@ ORDER_COUNTERS = {}
 
 BACKUP_TASK_STARTED = False
 
-DATA_FILE = Path(__file__).parent / "bot_data.json"
+DATA_FILE = Path(__file__).parent / "bot_data.json"  # 舊版 JSON 備援/遷移用
+DB_FILE = Path(__file__).parent / "bot.db"
 BACKUP_DIR = Path(__file__).parent / "backups"
 CLOSED_ORDER_KEEP_DAYS = 60
 
@@ -1712,34 +1714,218 @@ def _serialize_customer_rewards() -> dict:
 def _serialize_order_counters() -> dict:
     return {str(day): int(count) for day, count in ORDER_COUNTERS.items()}
 
-def save_bot_data() -> None:
-    payload = {
-        "orders": _serialize_orders(),
-        "claims": _serialize_claims(),
-        "customers": _serialize_customer_rewards(),
-        "order_counters": _serialize_order_counters(),
+def _json_default(value):
+    if isinstance(value, set):
+        return sorted(value)
+    return str(value)
+
+
+def _deserialize_claim_data(data: dict) -> dict:
+    return {
+        "companion": {uid for uid in (_to_int(x) for x in data.get("companion", [])) if uid is not None},
+        "booster": {uid for uid in (_to_int(x) for x in data.get("booster", [])) if uid is not None},
+        "locked": bool(data.get("locked", False)),
+        "customer_id": data.get("customer_id"),
+        "category_label": data.get("category_label"),
+        "item": data.get("item"),
+        "quantity": _to_int(data.get("quantity"), 1) or 1,
+        "payment_method": data.get("payment_method"),
+        "source_channel_id": data.get("source_channel_id"),
+        "companion_preference": data.get("companion_preference"),
+        "dispatch_channel_id": data.get("dispatch_channel_id"),
+        "status": data.get("status", "active"),
+        "stored_at": data.get("stored_at"),
+        "stored_by": data.get("stored_by"),
+        "stored_reason": data.get("stored_reason"),
+        "stored_expected_time": data.get("stored_expected_time"),
+        "stored_note": data.get("stored_note"),
     }
 
-    tmp_path = DATA_FILE.with_suffix(".tmp")
 
+def _deserialize_customer_data(data: dict) -> dict:
+    return {
+        "total_spent": _to_int(data.get("total_spent"), 0) or 0,
+        "order_count": _to_int(data.get("order_count"), 0) or 0,
+        "last_order_at": data.get("last_order_at"),
+        "points": _to_int(data.get("points"), 0) or 0,
+        "point_adjustment": _to_int(data.get("point_adjustment"), 0) or 0,
+        "point_adjustment_logs": list(data.get("point_adjustment_logs", [])) if isinstance(data.get("point_adjustment_logs", []), list) else [],
+        "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
+        "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
+    }
+
+
+def init_database() -> None:
+    """建立 SQLite 資料表。第一階段先用 SQLite 保存 Bot 既有資料結構，避免大改造成風險。"""
+    with sqlite3.connect(DB_FILE) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            channel_id INTEGER PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS claims (
+            message_id INTEGER PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS customers (
+            user_id INTEGER PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS order_counters (
+            day_key TEXT PRIMARY KEY,
+            count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        conn.commit()
+
+
+def save_bot_data() -> None:
+    """將資料寫入 SQLite。另保留一份 bot_data.json 快照，方便人工查看與緊急回復。"""
+    init_database()
+    now_text = get_taipei_now_iso()
+
+    orders_payload = _serialize_orders()
+    claims_payload = _serialize_claims()
+    customers_payload = _serialize_customer_rewards()
+    counters_payload = _serialize_order_counters()
+
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            cur = conn.cursor()
+
+            cur.execute("DELETE FROM orders")
+            cur.executemany(
+                "INSERT OR REPLACE INTO orders (channel_id, data, updated_at) VALUES (?, ?, ?)",
+                [
+                    (int(channel_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                    for channel_id, data in orders_payload.items()
+                ]
+            )
+
+            cur.execute("DELETE FROM claims")
+            cur.executemany(
+                "INSERT OR REPLACE INTO claims (message_id, data, updated_at) VALUES (?, ?, ?)",
+                [
+                    (int(message_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                    for message_id, data in claims_payload.items()
+                ]
+            )
+
+            cur.execute("DELETE FROM customers")
+            cur.executemany(
+                "INSERT OR REPLACE INTO customers (user_id, data, updated_at) VALUES (?, ?, ?)",
+                [
+                    (int(user_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                    for user_id, data in customers_payload.items()
+                ]
+            )
+
+            cur.execute("DELETE FROM order_counters")
+            cur.executemany(
+                "INSERT OR REPLACE INTO order_counters (day_key, count, updated_at) VALUES (?, ?, ?)",
+                [
+                    (str(day), int(count), now_text)
+                    for day, count in counters_payload.items()
+                ]
+            )
+
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"保存 bot.db 失敗：{e}")
+        return
+
+    # 保留 JSON 快照，不再作為主要資料庫。這讓你緊急查資料比較方便。
+    payload = {
+        "orders": orders_payload,
+        "claims": claims_payload,
+        "customers": customers_payload,
+        "order_counters": counters_payload,
+    }
+    tmp_path = DATA_FILE.with_suffix(".tmp")
     try:
         with tmp_path.open("w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
         tmp_path.replace(DATA_FILE)
     except OSError as e:
-        print(f"保存 bot_data.json 失敗：{e}")
+        print(f"保存 bot_data.json 快照失敗：{e}")
 
 
-def load_bot_data() -> None:
+def load_bot_data_from_sqlite() -> bool:
+    if not DB_FILE.exists():
+        return False
+
+    init_database()
+
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+
+            orders_rows = cur.execute("SELECT channel_id, data FROM orders").fetchall()
+            claims_rows = cur.execute("SELECT message_id, data FROM claims").fetchall()
+            customers_rows = cur.execute("SELECT user_id, data FROM customers").fetchall()
+            counter_rows = cur.execute("SELECT day_key, count FROM order_counters").fetchall()
+    except sqlite3.Error as e:
+        print(f"讀取 bot.db 失敗：{e}")
+        return False
+
+    # 如果 bot.db 存在但還沒有任何資料，就回頭讀舊 JSON。
+    if not orders_rows and not claims_rows and not customers_rows and not counter_rows:
+        return False
+
+    SELF_SERVICE_ORDER_SELECTIONS.clear()
+    ORDER_CLAIMS.clear()
+    CUSTOMER_REWARDS.clear()
+    ORDER_COUNTERS.clear()
+
+    for row in orders_rows:
+        try:
+            data = json.loads(row["data"])
+        except json.JSONDecodeError:
+            continue
+        SELF_SERVICE_ORDER_SELECTIONS[int(row["channel_id"])] = data
+
+    for row in claims_rows:
+        try:
+            data = json.loads(row["data"])
+        except json.JSONDecodeError:
+            continue
+        ORDER_CLAIMS[int(row["message_id"])] = _deserialize_claim_data(data)
+
+    for row in customers_rows:
+        try:
+            data = json.loads(row["data"])
+        except json.JSONDecodeError:
+            continue
+        CUSTOMER_REWARDS[int(row["user_id"])] = _deserialize_customer_data(data)
+
+    for row in counter_rows:
+        ORDER_COUNTERS[str(row["day_key"])] = int(row["count"] or 0)
+
+    return True
+
+
+def load_bot_data_from_json() -> bool:
     if not DATA_FILE.exists():
-        return
+        return False
 
     try:
         with DATA_FILE.open("r", encoding="utf-8") as f:
             payload = json.load(f)
     except (OSError, json.JSONDecodeError) as e:
         print(f"讀取 bot_data.json 失敗：{e}")
-        return
+        return False
 
     SELF_SERVICE_ORDER_SELECTIONS.clear()
     ORDER_CLAIMS.clear()
@@ -1756,42 +1942,13 @@ def load_bot_data() -> None:
         message_id = _to_int(message_id_text)
         if message_id is None or not isinstance(data, dict):
             continue
-
-        ORDER_CLAIMS[message_id] = {
-            "companion": {uid for uid in (_to_int(x) for x in data.get("companion", [])) if uid is not None},
-            "booster": {uid for uid in (_to_int(x) for x in data.get("booster", [])) if uid is not None},
-            "locked": bool(data.get("locked", False)),
-            "customer_id": data.get("customer_id"),
-            "category_label": data.get("category_label"),
-            "item": data.get("item"),
-            "quantity": _to_int(data.get("quantity"), 1) or 1,
-            "payment_method": data.get("payment_method"),
-            "source_channel_id": data.get("source_channel_id"),
-            "companion_preference": data.get("companion_preference"),
-            "dispatch_channel_id": data.get("dispatch_channel_id"),
-            "status": data.get("status", "active"),
-            "stored_at": data.get("stored_at"),
-            "stored_by": data.get("stored_by"),
-            "stored_reason": data.get("stored_reason"),
-            "stored_expected_time": data.get("stored_expected_time"),
-            "stored_note": data.get("stored_note"),
-        }
+        ORDER_CLAIMS[message_id] = _deserialize_claim_data(data)
 
     for user_id_text, data in payload.get("customers", {}).items():
         user_id = _to_int(user_id_text)
         if user_id is None or not isinstance(data, dict):
             continue
-
-        CUSTOMER_REWARDS[user_id] = {
-            "total_spent": _to_int(data.get("total_spent"), 0) or 0,
-            "order_count": _to_int(data.get("order_count"), 0) or 0,
-            "last_order_at": data.get("last_order_at"),
-            "points": _to_int(data.get("points"), 0) or 0,
-            "point_adjustment": _to_int(data.get("point_adjustment"), 0) or 0,
-            "point_adjustment_logs": list(data.get("point_adjustment_logs", [])) if isinstance(data.get("point_adjustment_logs", []), list) else [],
-            "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
-            "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
-        }
+        CUSTOMER_REWARDS[user_id] = _deserialize_customer_data(data)
 
     for day_text, count in payload.get("order_counters", {}).items():
         if not isinstance(day_text, str):
@@ -1801,6 +1958,17 @@ def load_bot_data() -> None:
             continue
         ORDER_COUNTERS[day_text] = count_int
 
+    return True
+
+
+def load_bot_data() -> None:
+    # 先讀 SQLite；若還沒有資料，讀舊 JSON 並立即寫入 SQLite。
+    if load_bot_data_from_sqlite():
+        return
+
+    if load_bot_data_from_json():
+        save_bot_data()
+        print("已從 bot_data.json 匯入資料並寫入 bot.db。")
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
@@ -1877,21 +2045,21 @@ async def send_order_log(
 
 
 def run_daily_backup_once() -> str | None:
-    """若今天還沒有備份，複製 bot_data.json 到 backups/，並清掉過舊備份。"""
-    if not DATA_FILE.exists():
+    """若今天還沒有備份，複製 bot.db 到 backups/，並清掉過舊備份。"""
+    if not DB_FILE.exists():
         return None
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     day_key = get_taipei_now().strftime("%Y%m%d")
-    backup_path = BACKUP_DIR / f"bot_data_{day_key}.json"
+    backup_path = BACKUP_DIR / f"bot_{day_key}.db"
 
     if not backup_path.exists():
-        shutil.copy2(DATA_FILE, backup_path)
+        shutil.copy2(DB_FILE, backup_path)
 
     cutoff = get_taipei_now() - timedelta(days=BACKUP_KEEP_DAYS)
-    for old_file in BACKUP_DIR.glob("bot_data_*.json"):
+    for old_file in BACKUP_DIR.glob("bot_*.db"):
         try:
-            date_part = old_file.stem.replace("bot_data_", "")
+            date_part = old_file.stem.replace("bot_", "")
             file_date = datetime.strptime(date_part, "%Y%m%d").replace(tzinfo=timezone(timedelta(hours=8)))
         except ValueError:
             continue
@@ -1910,9 +2078,9 @@ async def daily_backup_loop():
         try:
             backup_path = run_daily_backup_once()
             if backup_path:
-                print(f"bot_data.json backup checked: {backup_path}")
+                print(f"bot.db backup checked: {backup_path}")
         except Exception as e:
-            print(f"每日備份 bot_data.json 失敗：{e}")
+            print(f"每日備份 bot.db 失敗：{e}")
         await asyncio.sleep(3600)
 
 
