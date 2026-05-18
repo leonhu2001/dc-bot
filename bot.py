@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 import json
+import re
 import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -52,6 +53,23 @@ VIP_VOICE_LOBBY_ROLE_ID = 1482080566760177706
 CUSTOMER_ROLE_ID = 1482084782031638548
 EXAMINER_ROLE_ID = 1497427024644411543
 MANAGER_ROLE_ID = 1131128849443328030
+
+# 會員制度 ID / 設定
+SILVER_MEMBER_ROLE_ID = 1482080566760177706
+PLATINUM_PRIVATE_CATEGORY_ID = 1483871504419520654
+PLATINUM_CHAT_ROLE_IDS = [
+    1503706721883783218,
+    1503701170504339458,
+]
+REWARD_POINT_DIVISOR = 100
+MEMBER_LEVELS = [
+    {"name": "普通魔丸", "threshold": 0},
+    {"name": "銀級魔丸", "threshold": 2500},
+    {"name": "金級魔丸", "threshold": 7000},
+    {"name": "白金魔丸", "threshold": 13000},
+    {"name": "鑽石魔丸", "threshold": 30000},
+    {"name": "頂級魔丸", "threshold": 77777},
+]
 
 # 接單身分組 ID
 COMPANION_RECEIVER_ROLE_ID = 1503706721883783218  # 陪玩接單
@@ -1506,8 +1524,16 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         await lock_dispatch_claim_panel(guild, order_channel.id)
 
+        reward_result = await add_customer_reward_from_order(
+            guild=guild,
+            order_channel_id=order_channel.id,
+            customer_id=customer_id,
+            amount_text=self.amount.value,
+        )
+
         await interaction.response.send_message(
             f"此單已由 {interaction.user.mention} 結單，收據已送出。\n\n"
+            f"{reward_result}\n\n"
             f"請闆闆留下評論",
             view=ReviewButtonView(customer_id=customer_id),
             allowed_mentions=discord.AllowedMentions(
@@ -1584,6 +1610,10 @@ SELF_SERVICE_ORDER_SELECTIONS = {}
 # 重要訂單資料會保存到 bot_data.json，Bot 重啟後會自動讀回。
 ORDER_CLAIMS = {}
 
+# 顧客會員 / 獎勵資料
+# user_id -> {total_spent, order_count, last_order_at, points, platinum_channel_id}
+CUSTOMER_REWARDS = {}
+
 DATA_FILE = Path(__file__).parent / "bot_data.json"
 CLOSED_ORDER_KEEP_DAYS = 60
 
@@ -1629,10 +1659,17 @@ def _serialize_claims() -> dict:
     return result
 
 
+def _serialize_customer_rewards() -> dict:
+    return {
+        str(user_id): data
+        for user_id, data in CUSTOMER_REWARDS.items()
+    }
+
 def save_bot_data() -> None:
     payload = {
         "orders": _serialize_orders(),
         "claims": _serialize_claims(),
+        "customers": _serialize_customer_rewards(),
     }
 
     tmp_path = DATA_FILE.with_suffix(".tmp")
@@ -1658,6 +1695,7 @@ def load_bot_data() -> None:
 
     SELF_SERVICE_ORDER_SELECTIONS.clear()
     ORDER_CLAIMS.clear()
+    CUSTOMER_REWARDS.clear()
 
     for channel_id_text, data in payload.get("orders", {}).items():
         channel_id = _to_int(channel_id_text)
@@ -1689,6 +1727,20 @@ def load_bot_data() -> None:
             "stored_note": data.get("stored_note"),
         }
 
+    for user_id_text, data in payload.get("customers", {}).items():
+        user_id = _to_int(user_id_text)
+        if user_id is None or not isinstance(data, dict):
+            continue
+
+        CUSTOMER_REWARDS[user_id] = {
+            "total_spent": _to_int(data.get("total_spent"), 0) or 0,
+            "order_count": _to_int(data.get("order_count"), 0) or 0,
+            "last_order_at": data.get("last_order_at"),
+            "points": _to_int(data.get("points"), 0) or 0,
+            "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
+            "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
+        }
+
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
@@ -1698,6 +1750,298 @@ def remember_order_data(channel_id: int, data: dict) -> None:
 def remember_claim_data(message_id: int, data: dict) -> None:
     ORDER_CLAIMS[message_id] = data
     save_bot_data()
+
+def parse_receipt_amount(amount_text: str) -> int | None:
+    """從收據金額欄位擷取第一組數字，例如 NT$ 2,500 會回傳 2500。"""
+    normalized = amount_text.replace(",", "")
+    match = re.search(r"\d+", normalized)
+    if match is None:
+        return None
+    return int(match.group(0))
+
+def get_customer_reward_data(user_id: int) -> dict:
+    data = CUSTOMER_REWARDS.setdefault(
+        user_id,
+        {
+            "total_spent": 0,
+            "order_count": 0,
+            "last_order_at": None,
+            "points": 0,
+            "platinum_channel_id": None,
+            "manual_purchase_keys": [],
+        }
+    )
+    data.setdefault("total_spent", 0)
+    data.setdefault("order_count", 0)
+    data.setdefault("last_order_at", None)
+    data.setdefault("points", 0)
+    data.setdefault("platinum_channel_id", None)
+    data.setdefault("manual_purchase_keys", [])
+    if not isinstance(data["manual_purchase_keys"], list):
+        data["manual_purchase_keys"] = []
+    return data
+
+def get_member_level(total_spent: int) -> dict:
+    current = MEMBER_LEVELS[0]
+    for level in MEMBER_LEVELS:
+        if total_spent >= level["threshold"]:
+            current = level
+        else:
+            break
+    return current
+
+def get_next_member_level(total_spent: int) -> dict | None:
+    for level in MEMBER_LEVELS:
+        if total_spent < level["threshold"]:
+            return level
+    return None
+
+def format_t_amount(amount: int) -> str:
+    return f"{amount:,}T"
+
+def calculate_reward_points(total_spent: int) -> int:
+    return total_spent // REWARD_POINT_DIVISOR
+
+def build_member_info_embed(member: discord.abc.User, data: dict, show_points: bool = True) -> discord.Embed:
+    total_spent = int(data.get("total_spent", 0) or 0)
+    order_count = int(data.get("order_count", 0) or 0)
+    points = int(data.get("points", calculate_reward_points(total_spent)) or 0)
+    level = get_member_level(total_spent)
+    next_level = get_next_member_level(total_spent)
+
+    embed = discord.Embed(
+        title="你的會員資料" if show_points else "顧客會員資料",
+        color=discord.Color.purple()
+    )
+    embed.add_field(name="顧客", value=member.mention, inline=False)
+    embed.add_field(name="累積消費", value=format_t_amount(total_spent), inline=True)
+    if show_points:
+        embed.add_field(name="目前點數", value=f"{points:,} 點", inline=True)
+    embed.add_field(name="完成訂單", value=f"{order_count:,} 單", inline=True)
+    embed.add_field(name="會員等級", value=level["name"], inline=True)
+
+    if next_level is None:
+        embed.add_field(name="距離下一級還差", value="已達最高等級", inline=False)
+    else:
+        gap = max(0, int(next_level["threshold"]) - total_spent)
+        embed.add_field(
+            name="距離下一級還差",
+            value=f"{format_t_amount(gap)}（下一級：{next_level['name']}）",
+            inline=False
+        )
+
+    return embed
+
+async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Member | None:
+    member = guild.get_member(user_id)
+    if member is not None:
+        return member
+    try:
+        return await guild.fetch_member(user_id)
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+        return None
+
+async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Member | None, data: dict) -> list[str]:
+    if member is None:
+        return []
+
+    notices = []
+    total_spent = int(data.get("total_spent", 0) or 0)
+
+    if total_spent >= 2500:
+        silver_role = guild.get_role(SILVER_MEMBER_ROLE_ID)
+        if silver_role is not None and silver_role not in member.roles:
+            try:
+                await member.add_roles(silver_role, reason="累積消費達銀級魔丸門檻")
+                notices.append("已給予銀級魔丸身分組")
+            except discord.Forbidden:
+                notices.append("銀級魔丸身分組給予失敗：Bot 權限不足或身分組位置不夠高")
+            except discord.HTTPException:
+                notices.append("銀級魔丸身分組給予失敗：Discord API 錯誤")
+
+    if total_spent >= 13000:
+        existing_channel_id = _to_int(data.get("platinum_channel_id"))
+        if existing_channel_id is not None and guild.get_channel(existing_channel_id) is not None:
+            return notices
+
+        category = guild.get_channel(PLATINUM_PRIVATE_CATEGORY_ID)
+        if not isinstance(category, discord.CategoryChannel):
+            notices.append("白金專屬頻道建立失敗：找不到指定類別")
+            return notices
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False,
+                send_messages=False,
+                read_message_history=False,
+            ),
+            member: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+            ),
+        }
+
+        if guild.me is not None:
+            overwrites[guild.me] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                manage_channels=True,
+                read_message_history=True,
+                attach_files=True,
+            )
+
+        for role_id in PLATINUM_CHAT_ROLE_IDS:
+            role = guild.get_role(role_id)
+            if role is not None:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                )
+
+        clean_name = "".join(c if c.isalnum() else "-" for c in member.display_name.lower())[:40]
+        channel_name = f"白金魔丸-{clean_name}-{member.id}"[:90]
+
+        try:
+            channel = await guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites,
+                topic=f"platinum_customer_id={member.id}",
+                reason="累積消費達白金魔丸門檻，自動建立專屬聊天頻道"
+            )
+            data["platinum_channel_id"] = channel.id
+            notices.append(f"已建立白金專屬聊天頻道：{channel.mention}")
+
+            await channel.send(
+                f"{member.mention} 已達白金魔丸會員，這裡是你的專屬聊天頻道。",
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
+            )
+        except discord.Forbidden:
+            notices.append("白金專屬頻道建立失敗：Bot 權限不足")
+        except discord.HTTPException:
+            notices.append("白金專屬頻道建立失敗：Discord API 錯誤")
+
+    return notices
+
+async def add_customer_reward_from_order(
+    guild: discord.Guild,
+    order_channel_id: int,
+    customer_id: int,
+    amount_text: str,
+) -> str:
+    order_data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
+
+    if order_data.get("reward_counted"):
+        return "此訂單已累積過會員消費，未重複累積。"
+
+    amount = parse_receipt_amount(amount_text)
+    if amount is None or amount <= 0:
+        return "會員消費未累積：收據金額欄位沒有可辨識的數字。"
+
+    data = get_customer_reward_data(customer_id)
+    data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
+    data["order_count"] = int(data.get("order_count", 0) or 0) + 1
+    data["last_order_at"] = get_taipei_now_iso()
+    data["points"] = calculate_reward_points(int(data["total_spent"]))
+
+    order_data["reward_counted"] = True
+    order_data["reward_amount"] = amount
+    order_data["reward_counted_at"] = get_taipei_now_iso()
+    SELF_SERVICE_ORDER_SELECTIONS[order_channel_id] = order_data
+
+    member = await fetch_member_safely(guild, customer_id)
+    benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+
+    save_bot_data()
+
+    level = get_member_level(int(data["total_spent"]))
+    result = (
+        f"會員累積已更新：+{format_t_amount(amount)}，"
+        f"目前累積 {format_t_amount(int(data['total_spent']))}，"
+        f"完成訂單 {int(data['order_count'])} 單，"
+        f"等級：{level['name']}。"
+    )
+
+    if benefit_notices:
+        result += "\n" + "\n".join(f"- {notice}" for notice in benefit_notices)
+
+    return result
+
+
+
+def parse_manual_purchase_date(date_text: str) -> tuple[str, str] | tuple[None, None]:
+    """支援 20260512、2026/05/12、2026-05-12，回傳 ISO 與顯示文字。"""
+    text = date_text.strip()
+
+    for fmt in ("%Y%m%d", "%Y/%m/%d", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(text, fmt)
+            taipei_tz = timezone(timedelta(hours=8))
+            dt = dt.replace(tzinfo=taipei_tz)
+            return dt.isoformat(timespec="seconds"), dt.strftime("%Y/%m/%d")
+        except ValueError:
+            pass
+
+    return None, None
+
+
+def build_manual_purchase_key(customer_id: int, amount: int, date_iso: str, note: str | None = None) -> str:
+    clean_note = (note or "").strip()
+    return f"manual:{customer_id}:{amount}:{date_iso}:{clean_note}"
+
+
+async def add_manual_purchase(
+    guild: discord.Guild,
+    customer_id: int,
+    amount: int,
+    date_text: str,
+    operator_id: int,
+    note: str | None = None,
+) -> tuple[bool, str]:
+    if amount <= 0:
+        return False, "金額必須大於 0。"
+
+    date_iso, display_date = parse_manual_purchase_date(date_text)
+    if date_iso is None or display_date is None:
+        return False, "日期格式錯誤，請用 20260512、2026/05/12 或 2026-05-12。"
+
+    data = get_customer_reward_data(customer_id)
+    manual_keys = data.setdefault("manual_purchase_keys", [])
+    purchase_key = build_manual_purchase_key(customer_id, amount, date_iso, note)
+
+    if purchase_key in manual_keys:
+        return False, f"已跳過重複補登：<@{customer_id}> {format_t_amount(amount)} {display_date}。"
+
+    data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
+    data["order_count"] = int(data.get("order_count", 0) or 0) + 1
+    data["points"] = calculate_reward_points(int(data["total_spent"]))
+
+    old_last = data.get("last_order_at")
+    if not old_last or str(date_iso) > str(old_last):
+        data["last_order_at"] = date_iso
+
+    manual_keys.append(purchase_key)
+    data["last_manual_added_at"] = get_taipei_now_iso()
+    data["last_manual_added_by"] = operator_id
+    CUSTOMER_REWARDS[customer_id] = data
+
+    member = await fetch_member_safely(guild, customer_id)
+    benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+    save_bot_data()
+
+    level = get_member_level(int(data["total_spent"]))
+    msg = (
+        f"已補登 <@{customer_id}>：+{format_t_amount(amount)}，日期 {display_date}。"
+        f"目前累積 {format_t_amount(int(data['total_spent']))}，"
+        f"完成訂單 {int(data['order_count'])} 單，等級：{level['name']}。"
+    )
+    if benefit_notices:
+        msg += "\n" + "\n".join(f"- {notice}" for notice in benefit_notices)
+    return True, msg
 
 
 def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | None":
@@ -4139,6 +4483,157 @@ async def on_ready():
 
 
 # ========= Slash 指令 =========
+
+@bot.tree.command(
+    name="my_points",
+    description="查詢自己的魔丸會員資料",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def my_points(interaction: discord.Interaction):
+    data = get_customer_reward_data(interaction.user.id)
+    embed = build_member_info_embed(interaction.user, data, show_points=True)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="customer_points",
+    description="客服查詢指定顧客的魔丸會員資料",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(customer="要查詢的顧客")
+async def customer_points(interaction: discord.Interaction, customer: discord.Member):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_customer_staff(interaction.user) and not has_role(interaction.user, MANAGER_ROLE_ID):
+        await interaction.response.send_message("只有客服或店長可以查詢顧客會員資料。", ephemeral=True)
+        return
+
+    data = get_customer_reward_data(customer.id)
+    embed = build_member_info_embed(customer, data, show_points=True)
+    embed.title = "顧客會員資料"
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+@bot.tree.command(
+    name="add_purchase",
+    description="客服補登單筆顧客歷史消費",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要補登的顧客",
+    amount="消費金額，例如 900",
+    date="完成日期，例如 20260512、2026/05/12 或 2026-05-12",
+    note="備註，可不填"
+)
+async def add_purchase(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    amount: int,
+    date: str,
+    note: str | None = None,
+):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_customer_staff(interaction.user) and not has_role(interaction.user, MANAGER_ROLE_ID):
+        await interaction.response.send_message("只有客服或店長可以補登會員消費。", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        return
+
+    ok, message = await add_manual_purchase(
+        guild=guild,
+        customer_id=customer.id,
+        amount=amount,
+        date_text=date,
+        operator_id=interaction.user.id,
+        note=note,
+    )
+
+    await interaction.response.send_message(message, ephemeral=True)
+
+
+@bot.tree.command(
+    name="import_purchases",
+    description="客服批量補登歷史消費，多行格式：顧客ID,金額,日期,備註",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    records="每行一筆：顧客ID,金額,日期,備註；備註可省略"
+)
+async def import_purchases(interaction: discord.Interaction, records: str):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_customer_staff(interaction.user) and not has_role(interaction.user, MANAGER_ROLE_ID):
+        await interaction.response.send_message("只有客服或店長可以批量補登會員消費。", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    success_count = 0
+    skipped_count = 0
+    result_lines = []
+
+    for line_number, raw_line in enumerate(records.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) < 3:
+            skipped_count += 1
+            result_lines.append(f"第 {line_number} 行失敗：格式不足，請用 顧客ID,金額,日期,備註")
+            continue
+
+        customer_text, amount_text, date_text = parts[0], parts[1], parts[2]
+        note = ",".join(parts[3:]).strip() if len(parts) >= 4 else None
+        customer_text = customer_text.replace("<@", "").replace(">", "").replace("!", "")
+
+        try:
+            customer_id = int(customer_text)
+            amount = int(amount_text.replace("T", "").replace("t", "").replace(",", ""))
+        except ValueError:
+            skipped_count += 1
+            result_lines.append(f"第 {line_number} 行失敗：顧客 ID 或金額不是數字。")
+            continue
+
+        ok, message = await add_manual_purchase(
+            guild=guild,
+            customer_id=customer_id,
+            amount=amount,
+            date_text=date_text,
+            operator_id=interaction.user.id,
+            note=note,
+        )
+
+        if ok:
+            success_count += 1
+        else:
+            skipped_count += 1
+
+        result_lines.append(message)
+
+    summary = f"批量補登完成：成功 {success_count} 筆，跳過/失敗 {skipped_count} 筆。"
+    detail = "\n".join(result_lines)
+    if len(detail) > 1700:
+        detail = detail[:1700] + "\n...（結果太長，已截斷）"
+
+    await interaction.followup.send(f"{summary}\n\n{detail}", ephemeral=True)
+
 
 @bot.tree.command(
     name="setup_panel",
