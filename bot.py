@@ -1737,6 +1737,8 @@ def load_bot_data() -> None:
             "order_count": _to_int(data.get("order_count"), 0) or 0,
             "last_order_at": data.get("last_order_at"),
             "points": _to_int(data.get("points"), 0) or 0,
+            "point_adjustment": _to_int(data.get("point_adjustment"), 0) or 0,
+            "point_adjustment_logs": list(data.get("point_adjustment_logs", [])) if isinstance(data.get("point_adjustment_logs", []), list) else [],
             "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
             "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
         }
@@ -1767,6 +1769,8 @@ def get_customer_reward_data(user_id: int) -> dict:
             "order_count": 0,
             "last_order_at": None,
             "points": 0,
+            "point_adjustment": 0,
+            "point_adjustment_logs": [],
             "platinum_channel_id": None,
             "manual_purchase_keys": [],
         }
@@ -1775,10 +1779,14 @@ def get_customer_reward_data(user_id: int) -> dict:
     data.setdefault("order_count", 0)
     data.setdefault("last_order_at", None)
     data.setdefault("points", 0)
+    data.setdefault("point_adjustment", 0)
+    data.setdefault("point_adjustment_logs", [])
     data.setdefault("platinum_channel_id", None)
     data.setdefault("manual_purchase_keys", [])
     if not isinstance(data["manual_purchase_keys"], list):
         data["manual_purchase_keys"] = []
+    if not isinstance(data["point_adjustment_logs"], list):
+        data["point_adjustment_logs"] = []
     return data
 
 def get_member_level(total_spent: int) -> dict:
@@ -1802,10 +1810,17 @@ def format_t_amount(amount: int) -> str:
 def calculate_reward_points(total_spent: int) -> int:
     return total_spent // REWARD_POINT_DIVISOR
 
+
+def get_current_reward_points(data: dict) -> int:
+    total_spent = int(data.get("total_spent", 0) or 0)
+    base_points = calculate_reward_points(total_spent)
+    adjustment = int(data.get("point_adjustment", 0) or 0)
+    return max(0, base_points + adjustment)
+
 def build_member_info_embed(member: discord.abc.User, data: dict, show_points: bool = True) -> discord.Embed:
     total_spent = int(data.get("total_spent", 0) or 0)
     order_count = int(data.get("order_count", 0) or 0)
-    points = int(data.get("points", calculate_reward_points(total_spent)) or 0)
+    points = get_current_reward_points(data)
     level = get_member_level(total_spent)
     next_level = get_next_member_level(total_spent)
 
@@ -1946,7 +1961,7 @@ async def add_customer_reward_from_order(
     data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
     data["order_count"] = int(data.get("order_count", 0) or 0) + 1
     data["last_order_at"] = get_taipei_now_iso()
-    data["points"] = calculate_reward_points(int(data["total_spent"]))
+    data["points"] = get_current_reward_points(data)
 
     order_data["reward_counted"] = True
     order_data["reward_amount"] = amount
@@ -2018,7 +2033,7 @@ async def add_manual_purchase(
 
     data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
     data["order_count"] = int(data.get("order_count", 0) or 0) + 1
-    data["points"] = calculate_reward_points(int(data["total_spent"]))
+    data["points"] = get_current_reward_points(data)
 
     old_last = data.get("last_order_at")
     if not old_last or str(date_iso) > str(old_last):
@@ -2042,6 +2057,50 @@ async def add_manual_purchase(
     if benefit_notices:
         msg += "\n" + "\n".join(f"- {notice}" for notice in benefit_notices)
     return True, msg
+
+
+async def adjust_customer_points(
+    customer_id: int,
+    delta_points: int,
+    operator_id: int,
+    reason: str | None = None,
+) -> tuple[bool, str]:
+    if delta_points == 0:
+        return False, "調整點數不能是 0。"
+
+    data = get_customer_reward_data(customer_id)
+    before_points = get_current_reward_points(data)
+
+    if before_points + delta_points < 0:
+        return False, f"扣點失敗：<@{customer_id}> 目前只有 {before_points:,} 點，不足扣除 {abs(delta_points):,} 點。"
+
+    data["point_adjustment"] = int(data.get("point_adjustment", 0) or 0) + delta_points
+    after_points = get_current_reward_points(data)
+    data["points"] = after_points
+
+    logs = data.setdefault("point_adjustment_logs", [])
+    logs.append({
+        "delta": delta_points,
+        "before": before_points,
+        "after": after_points,
+        "operator_id": operator_id,
+        "reason": (reason or "").strip(),
+        "created_at": get_taipei_now_iso(),
+    })
+    # 避免 JSON 檔越來越肥，先保留最近 100 筆點數調整紀錄。
+    if len(logs) > 100:
+        data["point_adjustment_logs"] = logs[-100:]
+
+    CUSTOMER_REWARDS[customer_id] = data
+    save_bot_data()
+
+    action = "增加" if delta_points > 0 else "扣除"
+    reason_text = f"，原因：{reason}" if reason else ""
+    return True, (
+        f"已為 <@{customer_id}> {action} {abs(delta_points):,} 點{reason_text}。\n"
+        f"調整前：{before_points:,} 點\n"
+        f"調整後：{after_points:,} 點"
+    )
 
 
 def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | None":
@@ -4515,6 +4574,40 @@ async def customer_points(interaction: discord.Interaction, customer: discord.Me
     embed.title = "顧客會員資料"
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+
+@bot.tree.command(
+    name="adjust_points",
+    description="客服調整顧客魔丸點數，可輸入正數加點或負數扣點",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要調整點數的顧客",
+    points="調整點數，正數為加點，負數為扣點，例如 10 或 -10",
+    reason="調整原因，可不填"
+)
+async def adjust_points(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    points: int,
+    reason: str | None = None,
+):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_customer_staff(interaction.user) and not has_role(interaction.user, MANAGER_ROLE_ID):
+        await interaction.response.send_message("只有客服或店長可以調整顧客點數。", ephemeral=True)
+        return
+
+    ok, message = await adjust_customer_points(
+        customer_id=customer.id,
+        delta_points=points,
+        operator_id=interaction.user.id,
+        reason=reason,
+    )
+
+    await interaction.response.send_message(message, ephemeral=True)
 
 
 @bot.tree.command(
