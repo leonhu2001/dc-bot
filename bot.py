@@ -1368,6 +1368,7 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
 
     category = data.get("category")
     item = data.get("item")
+    quantity = _to_int(data.get("quantity"), 1) or 1
     companion_preference = data.get("companion_preference")
     payment_method = data.get("payment_method", "未紀錄")
 
@@ -1380,6 +1381,7 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
         parts.append(ORDER_CATEGORY_LABELS.get(category, category))
 
     parts.append(item)
+    parts.append(f"數量：{quantity} 單")
 
     if companion_preference is not None:
         parts.append(companion_preference)
@@ -1644,6 +1646,7 @@ def _serialize_claims() -> dict:
             "customer_id": data.get("customer_id"),
             "category_label": data.get("category_label"),
             "item": data.get("item"),
+            "quantity": _to_int(data.get("quantity"), 1) or 1,
             "payment_method": data.get("payment_method"),
             "source_channel_id": data.get("source_channel_id"),
             "companion_preference": data.get("companion_preference"),
@@ -1715,6 +1718,7 @@ def load_bot_data() -> None:
             "customer_id": data.get("customer_id"),
             "category_label": data.get("category_label"),
             "item": data.get("item"),
+            "quantity": _to_int(data.get("quantity"), 1) or 1,
             "payment_method": data.get("payment_method"),
             "source_channel_id": data.get("source_channel_id"),
             "companion_preference": data.get("companion_preference"),
@@ -2124,6 +2128,7 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
         customer_id=int(data["customer_id"]),
         category_label=str(data["category_label"]),
         item=str(data["item"]),
+        quantity=_to_int(data.get("quantity"), 1) or 1,
         payment_method=str(data["payment_method"]),
         source_channel_id=int(data["source_channel_id"]),
         companion_preference=data.get("companion_preference"),
@@ -2241,6 +2246,13 @@ SPECIAL_COMPANION_ITEMS = {
     "Valorant 陪玩",
 }
 
+QUANTITY_SELECT_ITEMS = {
+    "娛樂陪",
+    "技術陪",
+}
+
+QUANTITY_OPTIONS = list(range(1, 9))
+
 COMPANION_PREFERENCE_OPTIONS = [
     "不指定陪玩/打手",
     "指定陪玩/打手",
@@ -2354,6 +2366,7 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         data["customer_id"] = self.customer_id
         data["category"] = selected_category
         data.pop("item", None)
+        data.pop("quantity", None)
         data.pop("companion_preference", None)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
@@ -2422,6 +2435,7 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         data["item"] = selected_item
+        data["quantity"] = 1
         data.pop("payment_method", None)
 
         if selected_item in SPECIAL_COMPANION_ITEMS:
@@ -2517,6 +2531,95 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
 
         await interaction.response.defer()
 
+class SelfServiceOrderQuantitySelect(discord.ui.Select):
+    def __init__(
+        self,
+        customer_id: int,
+        channel_id: int,
+        selected_item: str | None = None,
+        selected_quantity: int | None = None,
+    ):
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+        self.selected_item = selected_item
+        quantity = selected_quantity or 1
+
+        if selected_item is None:
+            options = [
+                discord.SelectOption(
+                    label="請先選擇訂單項目",
+                    value="need_item",
+                    description="選完上方項目後，這裡會自動更新"
+                )
+            ]
+            disabled = True
+            placeholder = "請先選擇訂單項目"
+        elif selected_item in QUANTITY_SELECT_ITEMS:
+            options = [
+                discord.SelectOption(
+                    label=f"{num} 單",
+                    value=str(num),
+                    description=f"下單數量：{num} 單",
+                    default=quantity == num
+                )
+                for num in QUANTITY_OPTIONS
+            ]
+            disabled = False
+            placeholder = "請選擇數量"
+        else:
+            options = [
+                discord.SelectOption(
+                    label="1 單",
+                    value="1",
+                    description="此項目數量固定為 1 單",
+                    default=True
+                )
+            ]
+            disabled = False
+            placeholder = "數量固定為 1 單"
+
+        super().__init__(
+            placeholder=placeholder,
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="self_service_order_quantity_select",
+            row=3,
+            disabled=disabled
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message("只有開這張票口的用戶可以選擇訂單數量。", ephemeral=True)
+            return
+
+        if self.values[0] == "need_item":
+            await interaction.response.defer()
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        selected_item = data.get("item")
+
+        try:
+            quantity = int(self.values[0])
+        except ValueError:
+            await interaction.response.send_message("數量選擇異常，請重新選擇。", ephemeral=True)
+            return
+
+        if selected_item not in QUANTITY_SELECT_ITEMS:
+            quantity = 1
+
+        if quantity < 1 or quantity > max(QUANTITY_OPTIONS):
+            await interaction.response.send_message("數量請選擇 1 到 8 單。", ephemeral=True)
+            return
+
+        data["customer_id"] = self.customer_id
+        data["quantity"] = quantity
+        data.pop("payment_method", None)
+        remember_order_data(self.channel_id, data)
+
+        await interaction.response.defer()
+
 def has_role(member: discord.Member, role_id: int) -> bool:
     return any(role.id == role_id for role in member.roles)
 
@@ -2525,6 +2628,7 @@ def build_self_service_order_embed(
     customer_mention: str,
     category_label: str,
     item: str,
+    quantity: int,
     payment_method: str,
     source_channel: discord.TextChannel,
     companion_preference: str | None = None,
@@ -2550,6 +2654,12 @@ def build_self_service_order_embed(
     embed.add_field(
         name="訂單項目",
         value=item,
+        inline=True
+    )
+
+    embed.add_field(
+        name="數量",
+        value=f"{quantity} 單",
         inline=True
     )
 
@@ -2607,6 +2717,7 @@ class DispatchClaimView(discord.ui.View):
         customer_id: int,
         category_label: str,
         item: str,
+        quantity: int,
         payment_method: str,
         source_channel_id: int,
         companion_preference: str | None = None,
@@ -2617,6 +2728,7 @@ class DispatchClaimView(discord.ui.View):
         self.customer_id = customer_id
         self.category_label = category_label
         self.item = item
+        self.quantity = quantity
         self.payment_method = payment_method
         self.source_channel_id = source_channel_id
         self.companion_preference = companion_preference
@@ -2652,6 +2764,7 @@ class DispatchClaimView(discord.ui.View):
         data.setdefault("customer_id", self.customer_id)
         data.setdefault("category_label", self.category_label)
         data.setdefault("item", self.item)
+        data.setdefault("quantity", self.quantity)
         data.setdefault("payment_method", self.payment_method)
         data.setdefault("source_channel_id", self.source_channel_id)
         data.setdefault("companion_preference", self.companion_preference)
@@ -2707,6 +2820,7 @@ class DispatchClaimView(discord.ui.View):
             customer_mention=f"<@{self.customer_id}>",
             category_label=self.category_label,
             item=self.item,
+            quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
             payment_method=self.payment_method,
             source_channel=source_channel,
             companion_preference=self.companion_preference,
@@ -2738,6 +2852,7 @@ class DispatchClaimView(discord.ui.View):
                 customer_id=self.customer_id,
                 category_label=self.category_label,
                 item=self.item,
+                quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
                 payment_method=self.payment_method,
                 source_channel_id=self.source_channel_id,
                 companion_preference=self.companion_preference,
@@ -2892,6 +3007,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     claim_data["customer_id"] = data.get("customer_id")
     claim_data["category_label"] = ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "未紀錄")
     claim_data["item"] = data.get("item", "未紀錄")
+    claim_data["quantity"] = _to_int(data.get("quantity"), 1) or 1
     claim_data["payment_method"] = data.get("payment_method", "未紀錄")
     claim_data["source_channel_id"] = order_channel_id
     claim_data["companion_preference"] = data.get("companion_preference")
@@ -2919,6 +3035,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
 
     category = data.get("category")
     item = data.get("item", "未紀錄")
+    quantity = _to_int(data.get("quantity"), 1) or 1
     payment_method = data.get("payment_method", "未紀錄")
     companion_preference = data.get("companion_preference")
     customer_id = data.get("customer_id")
@@ -2929,6 +3046,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         customer_mention=customer_mention,
         category_label=category_label,
         item=item,
+        quantity=quantity,
         payment_method=payment_method,
         source_channel=source_channel,
         companion_preference=companion_preference,
@@ -2947,6 +3065,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
                 customer_id=customer_id or 0,
                 category_label=category_label,
                 item=item,
+                quantity=quantity,
                 payment_method=payment_method,
                 source_channel_id=order_channel_id,
                 companion_preference=companion_preference,
@@ -2995,6 +3114,7 @@ async def store_dispatch_claim_panel(
     customer_id = data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
     category = data.get("category")
     item = data.get("item", "未紀錄")
+    quantity = _to_int(data.get("quantity"), 1) or 1
     payment_method = data.get("payment_method", "未紀錄")
     companion_preference = data.get("companion_preference")
     category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
@@ -3011,6 +3131,7 @@ async def store_dispatch_claim_panel(
     claim_data["customer_id"] = customer_id
     claim_data["category_label"] = category_label
     claim_data["item"] = item
+    claim_data["quantity"] = quantity
     claim_data["payment_method"] = payment_method
     claim_data["source_channel_id"] = order_channel.id
     claim_data["companion_preference"] = companion_preference
@@ -3024,6 +3145,7 @@ async def store_dispatch_claim_panel(
     claim_data["stored_note"] = note or None
 
     data["customer_id"] = customer_id
+    data["quantity"] = quantity
     data["dispatch_message_id"] = dispatch_message_id
     data["dispatch_channel_id"] = dispatch_channel_id
     data["closed"] = False
@@ -3053,6 +3175,7 @@ async def store_dispatch_claim_panel(
         customer_mention=customer_mention,
         category_label=category_label,
         item=item,
+        quantity=quantity,
         payment_method=payment_method,
         source_channel=order_channel,
         companion_preference=companion_preference,
@@ -3081,6 +3204,7 @@ async def store_dispatch_claim_panel(
             customer_id=customer_id or 0,
             category_label=category_label,
             item=item,
+            quantity=quantity,
             payment_method=payment_method,
             source_channel_id=order_channel.id,
             companion_preference=companion_preference,
@@ -3133,6 +3257,7 @@ async def resume_stored_order(
     customer_id = claim_data.get("customer_id") or data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
     category_label = claim_data.get("category_label") or ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "未紀錄")
     item = claim_data.get("item") or data.get("item", "未紀錄")
+    quantity = _to_int(claim_data.get("quantity"), _to_int(data.get("quantity"), 1)) or 1
     payment_method = claim_data.get("payment_method") or data.get("payment_method", "未紀錄")
     companion_preference = claim_data.get("companion_preference") or data.get("companion_preference")
     customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
@@ -3142,6 +3267,7 @@ async def resume_stored_order(
     claim_data["customer_id"] = customer_id
     claim_data["category_label"] = str(category_label)
     claim_data["item"] = str(item)
+    claim_data["quantity"] = quantity
     claim_data["payment_method"] = str(payment_method)
     claim_data["source_channel_id"] = order_channel.id
     claim_data["companion_preference"] = companion_preference
@@ -3150,6 +3276,7 @@ async def resume_stored_order(
     # 存單相關資料保留在 bot_data.json 裡當紀錄，但不再顯示為已存單。
     data["closed"] = False
     data["status"] = "active"
+    data["quantity"] = quantity
     data["dispatch_channel_id"] = dispatch_channel.id
 
     companion_ids = sorted(claim_data.get("companion", set()))
@@ -3168,6 +3295,7 @@ async def resume_stored_order(
         customer_mention=customer_mention,
         category_label=str(category_label),
         item=str(item),
+        quantity=quantity,
         payment_method=str(payment_method),
         source_channel=order_channel,
         companion_preference=companion_preference,
@@ -3185,6 +3313,7 @@ async def resume_stored_order(
             customer_id=customer_id or 0,
             category_label=str(category_label),
             item=str(item),
+            quantity=quantity,
             payment_method=str(payment_method),
             source_channel_id=order_channel.id,
             companion_preference=companion_preference,
@@ -3350,6 +3479,7 @@ class PaymentMethodView(discord.ui.View):
         data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
         category = data.get("category")
         item = data.get("item")
+        quantity = _to_int(data.get("quantity"), 1) or 1
         companion_preference = data.get("companion_preference")
         payment_method = data.get("payment_method")
 
@@ -3377,6 +3507,14 @@ class PaymentMethodView(discord.ui.View):
             )
             return
 
+        if item not in QUANTITY_SELECT_ITEMS:
+            quantity = 1
+            data["quantity"] = 1
+            remember_order_data(self.channel_id, data)
+        elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
+            await interaction.response.send_message("數量選擇異常，請回到自助下單面板重新選擇。", ephemeral=True)
+            return
+
         if companion_preference is None:
             companion_preference = "不指定陪玩/打手"
             data["companion_preference"] = companion_preference
@@ -3397,6 +3535,7 @@ class PaymentMethodView(discord.ui.View):
             customer_mention=interaction.user.mention,
             category_label=category_label,
             item=item,
+            quantity=quantity,
             payment_method=payment_method,
             source_channel=interaction.channel,
             companion_preference=companion_preference
@@ -3408,6 +3547,7 @@ class PaymentMethodView(discord.ui.View):
                 customer_id=interaction.user.id,
                 category_label=category_label,
                 item=item,
+                quantity=quantity,
                 payment_method=payment_method,
                 source_channel_id=interaction.channel.id,
                 companion_preference=companion_preference
@@ -3426,11 +3566,13 @@ class PaymentMethodView(discord.ui.View):
             "customer_id": interaction.user.id,
             "category_label": category_label,
             "item": item,
+            "quantity": quantity,
             "payment_method": payment_method,
             "source_channel_id": interaction.channel.id,
             "companion_preference": companion_preference,
             "dispatch_channel_id": dispatch_channel.id,
         }
+        data["quantity"] = quantity
         data["dispatch_message_id"] = dispatch_message.id
         data["dispatch_channel_id"] = dispatch_channel.id
         data["closed"] = False
@@ -3461,16 +3603,18 @@ class SelfServiceOrderView(discord.ui.View):
         category = selected_category or data.get("category")
         selected_item = data.get("item")
         selected_preference = data.get("companion_preference")
+        selected_quantity = _to_int(data.get("quantity"), 1) or 1
 
         self.add_item(SelfServiceOrderCategorySelect(customer_id, channel_id, category))
         self.add_item(SelfServiceOrderItemSelect(customer_id, channel_id, category, selected_item))
         self.add_item(SelfServiceCompanionPreferenceSelect(customer_id, channel_id, selected_item, selected_preference))
+        self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
 
     @discord.ui.button(
         label="前往付款",
         style=discord.ButtonStyle.success,
         custom_id="self_service_order_go_payment_button",
-        row=3
+        row=4
     )
     async def go_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.customer_id:
@@ -3484,6 +3628,7 @@ class SelfServiceOrderView(discord.ui.View):
         data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
         category = data.get("category")
         item = data.get("item")
+        quantity = _to_int(data.get("quantity"), 1) or 1
         companion_preference = data.get("companion_preference")
 
         if category is None or item is None:
@@ -3506,6 +3651,14 @@ class SelfServiceOrderView(discord.ui.View):
             )
             return
 
+        if item not in QUANTITY_SELECT_ITEMS:
+            quantity = 1
+            data["quantity"] = 1
+            remember_order_data(self.channel_id, data)
+        elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
+            await interaction.response.send_message("請重新選擇正確的數量。", ephemeral=True)
+            return
+
         if companion_preference is None:
             companion_preference = "不指定陪玩/打手"
             data["companion_preference"] = companion_preference
@@ -3518,6 +3671,7 @@ class SelfServiceOrderView(discord.ui.View):
                 f"下單用戶：{interaction.user.mention}\n\n"
                 f"訂單類別：{category_label}\n"
                 f"訂單項目：{item}\n"
+                f"數量：{quantity} 單\n"
                 "請選擇付款方式，完成後按「送出」。"
             ),
             color=discord.Color.gold()
