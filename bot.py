@@ -76,7 +76,7 @@ MEMBER_LEVELS = [
 
 # 訂單日誌 / 備份設定
 ORDER_LOG_CATEGORY_ID = 1483895536938651809
-ORDER_LOG_CHANNEL_NAME = "📒┃訂單日誌"
+ORDER_LOG_CHANNEL_NAME = "🤖┃機器人日誌"
 LOTTERY_ANNOUNCE_CHANNEL_ID = 1482079302739693739
 BACKUP_KEEP_DAYS = 30
 ORDER_ID_PREFIX = "MO"
@@ -2042,7 +2042,7 @@ async def get_or_create_order_log_channel(guild: discord.Guild) -> discord.TextC
             reason="Create order log channel"
         )
     except (discord.Forbidden, discord.HTTPException) as e:
-        print(f"建立訂單日誌頻道失敗：{e}")
+        print(f"建立機器人日誌頻道失敗：{e}")
         return None
 
 
@@ -2058,7 +2058,7 @@ async def send_order_log(
 
     channel = await get_or_create_order_log_channel(guild)
     if channel is None:
-        print(f"找不到或無法建立訂單日誌頻道：{get_or_create_order_log_channel_sync_hint()}")
+        print(f"找不到或無法建立機器人日誌頻道：{get_or_create_order_log_channel_sync_hint()}")
         return
 
     embed = discord.Embed(
@@ -2074,7 +2074,7 @@ async def send_order_log(
     try:
         await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
     except discord.HTTPException as e:
-        print(f"送出訂單日誌失敗：{e}")
+        print(f"送出機器人日誌失敗：{e}")
 
 
 async def send_lottery_announcement(
@@ -6629,7 +6629,7 @@ async def check_stored_orders(interaction: discord.Interaction):
 
     await interaction.response.defer(ephemeral=True)
     await check_stored_order_reminders_once(interaction.guild)
-    await interaction.followup.send("已檢查存單提醒，若有逾期存單會發到訂單日誌。", ephemeral=True)
+    await interaction.followup.send("已檢查存單提醒，若有逾期存單會發到機器人日誌。", ephemeral=True)
 
 
 @bot.tree.command(
