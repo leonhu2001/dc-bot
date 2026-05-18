@@ -1659,7 +1659,8 @@ BACKUP_TASK_STARTED = False
 DATA_FILE = Path(__file__).parent / "bot_data.json"  # 舊版 JSON 備援/遷移用
 DB_FILE = Path(__file__).parent / "bot.db"
 BACKUP_DIR = Path(__file__).parent / "backups"
-CLOSED_ORDER_KEEP_DAYS = 60
+CLOSED_ORDER_KEEP_DAYS = 0  # 已結單資料永久保留，不再自動刪除
+CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
 
 
 
@@ -2497,32 +2498,55 @@ def get_taipei_now_iso() -> str:
 
 
 def cleanup_old_closed_orders() -> None:
-    """清理已結單超過 CLOSED_ORDER_KEEP_DAYS 天的訂單與對應接單資料。"""
-    if CLOSED_ORDER_KEEP_DAYS <= 0:
+    """
+    清理過期的非必要暫存資料。
+
+    重要規則：
+    - 已結單 closed：永久保留，因為營收、會員累積、統計都會用到。
+    - 存單 stored：永久保留，避免存單被誤刪。
+    - 取消單 cancelled/canceled：超過 CANCELLED_ORDER_KEEP_DAYS 天後清理。
+    - 備份檔：由 run_daily_backup_once() 依 BACKUP_KEEP_DAYS 清理。
+    """
+    if CANCELLED_ORDER_KEEP_DAYS <= 0:
         return
 
     now = get_taipei_now()
-    cutoff = now - timedelta(days=CLOSED_ORDER_KEEP_DAYS)
+    cutoff = now - timedelta(days=CANCELLED_ORDER_KEEP_DAYS)
     order_channel_ids_to_remove = []
     dispatch_message_ids_to_remove = set()
 
     for channel_id, data in list(SELF_SERVICE_ORDER_SELECTIONS.items()):
-        if not isinstance(data, dict) or not data.get("closed"):
+        if not isinstance(data, dict):
             continue
 
-        closed_at_text = data.get("closed_at")
-        if not closed_at_text:
+        status = str(data.get("status", "")).lower()
+
+        # closed / stored 都是營運重要紀錄，不自動刪。
+        if status in {"closed", "stored"} or data.get("closed"):
+            continue
+
+        # 只清理取消單。
+        if status not in {"cancelled", "canceled"}:
+            continue
+
+        time_text = (
+            data.get("cancelled_at")
+            or data.get("updated_at")
+            or data.get("closed_at")
+            or data.get("created_at")
+        )
+        if not time_text:
             continue
 
         try:
-            closed_at = datetime.fromisoformat(str(closed_at_text))
+            order_time = datetime.fromisoformat(str(time_text))
         except ValueError:
             continue
 
-        if closed_at.tzinfo is None:
-            closed_at = closed_at.replace(tzinfo=timezone(timedelta(hours=8)))
+        if order_time.tzinfo is None:
+            order_time = order_time.replace(tzinfo=timezone(timedelta(hours=8)))
 
-        if closed_at < cutoff:
+        if order_time < cutoff:
             order_channel_ids_to_remove.append(channel_id)
             dispatch_message_id = _to_int(data.get("dispatch_message_id"))
             if dispatch_message_id is not None:
@@ -2538,7 +2562,7 @@ def cleanup_old_closed_orders() -> None:
         save_bot_data()
         print(
             f"已清理 {len(order_channel_ids_to_remove)} 筆超過 "
-            f"{CLOSED_ORDER_KEEP_DAYS} 天的已結單訂單資料。"
+            f"{CANCELLED_ORDER_KEEP_DAYS} 天的取消單暫存資料。"
         )
 
 
