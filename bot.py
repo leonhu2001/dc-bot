@@ -5354,7 +5354,8 @@ def get_lottery_settings() -> dict:
     default = {
         "period": get_default_lottery_period(),
         "title": "魔丸點數抽獎",
-        "note": "獎品由管理層討論後，開獎時手動輸入。",
+        "note": "獎品由管理層討論後設定。",
+        "prizes": "獎池尚未設定，請等待管理層公告。",
         "status": "open",
         "cost_per_chance": LOTTERY_COST_PER_CHANCE_DEFAULT,
         "max_chances_per_user": LOTTERY_MAX_CHANCES_PER_USER_DEFAULT,
@@ -5518,8 +5519,11 @@ def build_lottery_info_embed(settings: dict) -> discord.Embed:
     embed.add_field(name="狀態", value=status_text, inline=True)
     embed.add_field(name="規則", value=f"{cost} 點 = 1 次抽獎機會\n每人本期最多 {max_chances} 次", inline=False)
     embed.add_field(name="目前抽獎池", value=f"參與人數：{participant_count} 人\n總抽獎次數：{total_chances} 次", inline=False)
-    note = str(settings.get("note") or "獎品由管理層討論後，開獎時手動輸入。")
-    embed.add_field(name="獎池備註", value=note[:1000], inline=False)
+    prizes = str(settings.get("prizes") or "獎池尚未設定，請等待管理層公告。")
+    embed.add_field(name="獎池內容", value=prizes[:1000], inline=False)
+
+    note = str(settings.get("note") or "獎品由管理層討論後設定。")
+    embed.add_field(name="活動備註", value=note[:1000], inline=False)
     return embed
 
 
@@ -5676,13 +5680,13 @@ async def lottery_status(interaction: discord.Interaction):
 
 @bot.tree.command(
     name="lottery_open",
-    description="管理層設定或開啟本期點數抽獎，獎品不用先寫死",
+    description="管理層設定或開啟本期點數抽獎",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
     period="期別，例如 2026-05；不填則使用本月",
     title="抽獎活動名稱，可不填",
-    note="獎池備註，可先寫：獎品內部討論中",
+    note="活動備註，可先寫：獎品內部討論中",
     max_chances_per_user="每人本期最多可投入幾次，預設 20"
 )
 async def lottery_open(
@@ -5703,7 +5707,7 @@ async def lottery_open(
     settings = get_lottery_settings()
     settings["period"] = (period or get_default_lottery_period()).strip()
     settings["title"] = (title or settings.get("title") or "魔丸點數抽獎").strip()
-    settings["note"] = (note or "獎品由管理層討論後，開獎時手動輸入。").strip()
+    settings["note"] = (note or settings.get("note") or "獎品由管理層討論後設定。").strip()
     settings["status"] = "open"
     settings["cost_per_chance"] = LOTTERY_COST_PER_CHANCE_DEFAULT
     settings["max_chances_per_user"] = int(max_chances_per_user or LOTTERY_MAX_CHANCES_PER_USER_DEFAULT)
@@ -5734,6 +5738,58 @@ async def lottery_open(
 
 
 @bot.tree.command(
+    name="lottery_set_prizes",
+    description="管理層設定本期抽獎獎池內容",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    prizes="獎池內容，例如：一獎：500T折抵券 x1｜二獎：指定費免費 x2",
+    announce="是否發公告到抽獎公告頻道，預設否"
+)
+async def lottery_set_prizes(interaction: discord.Interaction, prizes: str, announce: bool = False):
+    if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
+        await interaction.response.send_message("只有客服、店長或管理員可以設定獎池。", ephemeral=True)
+        return
+
+    prize_text = prizes.strip()
+    if not prize_text:
+        await interaction.response.send_message("獎池內容不能是空的。", ephemeral=True)
+        return
+
+    if len(prize_text) > 1000:
+        await interaction.response.send_message("獎池內容太長，請控制在 1000 字以內。", ephemeral=True)
+        return
+
+    settings = get_lottery_settings()
+    settings["prizes"] = prize_text
+    save_lottery_settings(settings)
+
+    await send_order_log(
+        interaction.guild,
+        title="抽獎獎池已設定",
+        fields=[
+            ("期別", str(settings.get("period", get_default_lottery_period())), True),
+            ("設定人員", interaction.user.mention, True),
+            ("獎池內容", prize_text, False),
+        ],
+        color=discord.Color.gold(),
+    )
+
+    embed = build_lottery_info_embed(settings)
+    embed.title = f"🎁 {settings.get('title', '魔丸點數抽獎')} 獎池更新"
+
+    if announce:
+        await send_lottery_announcement(
+            interaction.guild,
+            content="@everyone 🎁 魔丸點數抽獎獎池已更新！使用 `/lottery_info` 查看活動詳情。",
+            embed=embed,
+        )
+        await interaction.response.send_message("獎池已設定，公告已送出。", embed=embed, ephemeral=True)
+    else:
+        await interaction.response.send_message("獎池已設定。", embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
     name="lottery_close",
     description="管理層關閉本期抽獎報名",
     guild=discord.Object(id=GUILD_ID)
@@ -5751,11 +5807,11 @@ async def lottery_close(interaction: discord.Interaction):
 
 @bot.tree.command(
     name="draw_lottery",
-    description="客服開獎；獎品開獎時手動輸入，一定會從抽獎池中抽出得主",
+    description="客服開獎；可依照已設定獎池輸入本次要抽的獎品",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    prize="本次獎品名稱，例如 500T折抵券",
+    prize="本次要抽的獎品名稱，例如 一獎：500T折抵券",
     winners="要抽出幾位得主，預設 1"
 )
 async def draw_lottery(interaction: discord.Interaction, prize: str, winners: int = 1):
