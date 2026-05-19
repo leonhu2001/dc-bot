@@ -1477,7 +1477,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
     amount = discord.ui.TextInput(
         label="金額",
-        placeholder="例如：NT$ XXXX 中文字大寫",
+        placeholder="例如：1275",
         required=True,
         max_length=100
     )
