@@ -4171,7 +4171,8 @@ class PaymentMethodSelect(discord.ui.Select):
 
         if payment_info is not None:
             await interaction.response.send_message(
-                f"已選擇付款方式：{selected_method}\n\n"
+                f"已選擇付款方式：{selected_method}\n"
+                f"請闆闆先付款再幫我們按送出喔~\n\n"
                 f"```text\n{payment_info}\n```",
                 ephemeral=True
             )
