@@ -1829,6 +1829,7 @@ def _deserialize_customer_data(data: dict) -> dict:
         "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
         "notes": list(data.get("notes", [])) if isinstance(data.get("notes", []), list) else [],
         "vip_level_index": _to_int(data.get("vip_level_index")),
+        "vip_progress_base_total_spent": _to_int(data.get("vip_progress_base_total_spent")),
         "vip_last_downgrade_check_month": data.get("vip_last_downgrade_check_month"),
         "vip_downgrade_logs": list(data.get("vip_downgrade_logs", [])) if isinstance(data.get("vip_downgrade_logs", []), list) else [],
     }
@@ -2458,6 +2459,7 @@ def get_customer_reward_data(user_id: int) -> dict:
             "platinum_channel_id": None,
             "manual_purchase_keys": [],
             "vip_level_index": None,
+            "vip_progress_base_total_spent": None,
             "vip_last_downgrade_check_month": None,
             "vip_downgrade_logs": [],
         }
@@ -2472,6 +2474,7 @@ def get_customer_reward_data(user_id: int) -> dict:
     data.setdefault("manual_purchase_keys", [])
     data.setdefault("notes", [])
     data.setdefault("vip_level_index", None)
+    data.setdefault("vip_progress_base_total_spent", None)
     data.setdefault("vip_last_downgrade_check_month", None)
     data.setdefault("vip_downgrade_logs", [])
     if not isinstance(data["manual_purchase_keys"], list):
@@ -2514,23 +2517,67 @@ def get_member_level_by_index(index: int) -> dict:
 
 def get_effective_member_level_index(data: dict) -> int:
     total_spent = int(data.get("total_spent", 0) or 0)
-    default_index = get_member_level_index_by_total_spent(total_spent)
+    cumulative_index = get_member_level_index_by_total_spent(total_spent)
     stored_index = _to_int(data.get("vip_level_index"))
+
     if stored_index is None:
-        return default_index
-    return max(0, min(int(stored_index), len(MEMBER_LEVELS) - 1))
+        return cumulative_index
+
+    stored_index = max(0, min(int(stored_index), len(MEMBER_LEVELS) - 1))
+
+    # 若顧客曾被降階，不能再用歷史累積總額直接判斷下一級，
+    # 要從降階後的新基準重新累積。
+    base_total = _to_int(data.get("vip_progress_base_total_spent"))
+    if stored_index < cumulative_index:
+        if base_total is None:
+            return stored_index
+
+        earned_after_reset = max(0, total_spent - base_total)
+        virtual_total = int(MEMBER_LEVELS[stored_index]["threshold"]) + earned_after_reset
+        progressed_index = get_member_level_index_by_total_spent(virtual_total)
+        return max(stored_index, min(progressed_index, len(MEMBER_LEVELS) - 1))
+
+    return stored_index
 
 def get_effective_member_level(data: dict) -> dict:
     return get_member_level_by_index(get_effective_member_level_index(data))
 
+def get_next_member_level_for_data(data: dict) -> tuple[dict | None, int]:
+    total_spent = int(data.get("total_spent", 0) or 0)
+    current_index = get_effective_member_level_index(data)
+
+    if current_index >= len(MEMBER_LEVELS) - 1:
+        return None, 0
+
+    next_level = get_member_level_by_index(current_index + 1)
+    current_level = get_member_level_by_index(current_index)
+    stored_index = _to_int(data.get("vip_level_index"))
+    base_total = _to_int(data.get("vip_progress_base_total_spent"))
+    cumulative_index = get_member_level_index_by_total_spent(total_spent)
+
+    # 降階後從該等級的 0 開始重新累積。
+    if stored_index is not None and stored_index < cumulative_index:
+        if base_total is None:
+            earned_after_reset = 0
+        else:
+            earned_after_reset = max(0, total_spent - base_total)
+        needed_between_levels = int(next_level["threshold"]) - int(current_level["threshold"])
+        return next_level, max(0, needed_between_levels - earned_after_reset)
+
+    return next_level, max(0, int(next_level["threshold"]) - total_spent)
+
 def sync_vip_level_to_cumulative_if_higher(data: dict) -> tuple[dict, dict]:
     old_level = get_effective_member_level(data)
-    cumulative_index = get_member_level_index_by_total_spent(int(data.get("total_spent", 0) or 0))
-    current_index = get_effective_member_level_index(data)
-    if cumulative_index > current_index:
-        data["vip_level_index"] = cumulative_index
-    elif data.get("vip_level_index") is None:
-        data["vip_level_index"] = current_index
+    current_stored_index = _to_int(data.get("vip_level_index"))
+
+    if current_stored_index is None:
+        data["vip_level_index"] = get_member_level_index_by_total_spent(int(data.get("total_spent", 0) or 0))
+    else:
+        effective_index = get_effective_member_level_index(data)
+        if effective_index > current_stored_index:
+            data["vip_level_index"] = effective_index
+            data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+
     new_level = get_effective_member_level(data)
     return old_level, new_level
 
@@ -2552,7 +2599,7 @@ def build_member_info_embed(member: discord.abc.User, data: dict, show_points: b
     order_count = int(data.get("order_count", 0) or 0)
     points = get_current_reward_points(data)
     level = get_effective_member_level(data)
-    next_level = get_next_member_level(total_spent)
+    next_level, next_level_gap = get_next_member_level_for_data(data)
 
     embed = discord.Embed(
         title="你的會員資料" if show_points else "顧客會員資料",
@@ -2568,10 +2615,9 @@ def build_member_info_embed(member: discord.abc.User, data: dict, show_points: b
     if next_level is None:
         embed.add_field(name="距離下一級還差", value="已達最高等級", inline=False)
     else:
-        gap = max(0, int(next_level["threshold"]) - total_spent)
         embed.add_field(
             name="距離下一級還差",
-            value=f"{format_t_amount(gap)}（下一級：{next_level['name']}）",
+            value=f"{format_t_amount(next_level_gap)}（下一級：{next_level['name']}）",
             inline=False
         )
 
@@ -6490,6 +6536,82 @@ async def set_customer_rewards(
     )
 
     await interaction.response.send_message(embed=after_embed, ephemeral=True)
+
+
+VIP_LEVEL_NAME_TO_INDEX = {level["name"]: index for index, level in enumerate(MEMBER_LEVELS)}
+VIP_LEVEL_CHOICES = [
+    app_commands.Choice(name=level["name"], value=level["name"])
+    for level in MEMBER_LEVELS
+]
+
+
+@bot.tree.command(
+    name="set_customer_level",
+    description="管理員直接指定顧客 VIP 等級",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要調整 VIP 等級的顧客",
+    level="要指定的會員等級",
+    reason="調整原因，可不填"
+)
+@app_commands.choices(level=VIP_LEVEL_CHOICES)
+async def set_customer_level(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    level: app_commands.Choice[str],
+    reason: str | None = None,
+):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_manager_or_admin(interaction.user):
+        await interaction.response.send_message("只有管理員或店長可以直接調整顧客 VIP 等級。", ephemeral=True)
+        return
+
+    target_index = VIP_LEVEL_NAME_TO_INDEX.get(level.value)
+    if target_index is None:
+        await interaction.response.send_message("會員等級不存在，請重新選擇。", ephemeral=True)
+        return
+
+    data = get_customer_reward_data(customer.id)
+    old_level = get_effective_member_level(data)
+
+    data["vip_level_index"] = target_index
+    # 直接調整 / 降階後，都從目前等級的 0 開始重新累積下一級進度。
+    data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+    data["last_level_manual_fixed_at"] = get_taipei_now_iso()
+    data["last_level_manual_fixed_by"] = interaction.user.id
+    data["last_level_manual_fixed_reason"] = (reason or "").strip()
+
+    CUSTOMER_REWARDS[customer.id] = data
+    benefit_notices = await ensure_reward_member_benefits(interaction.guild, customer, data) if interaction.guild else []
+    save_bot_data()
+
+    embed = build_member_info_embed(customer, data, show_points=True)
+    embed.title = "顧客 VIP 等級已調整"
+    embed.add_field(name="原等級", value=old_level["name"], inline=True)
+    embed.add_field(name="新等級", value=get_effective_member_level(data)["name"], inline=True)
+    if reason:
+        embed.add_field(name="調整原因", value=reason, inline=False)
+    if benefit_notices:
+        embed.add_field(name="會員權益處理", value="\n".join(benefit_notices), inline=False)
+
+    await send_order_log(
+        interaction.guild,
+        title="顧客 VIP 等級已手動調整",
+        fields=[
+            ("顧客", customer.mention, True),
+            ("操作人員", interaction.user.mention, True),
+            ("原等級", old_level["name"], True),
+            ("新等級", get_effective_member_level(data)["name"], True),
+            ("原因", reason or "未填寫", False),
+        ],
+        color=discord.Color.orange(),
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 
