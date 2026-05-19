@@ -1726,7 +1726,9 @@ ORDER_COUNTERS = {}
 
 BACKUP_TASK_STARTED = False
 STORED_REMINDER_TASK_STARTED = False
+VIP_DOWNGRADE_TASK_STARTED = False
 STORED_ORDER_REMINDER_DAYS = [3, 7]
+VIP_MAINTAIN_MIN_MONTHLY_SPEND = 500
 
 DATA_FILE = Path(__file__).parent / "bot_data.json"  # 舊版 JSON 備援/遷移用
 DB_FILE = Path(__file__).parent / "bot.db"
@@ -1826,6 +1828,9 @@ def _deserialize_customer_data(data: dict) -> dict:
         "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
         "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
         "notes": list(data.get("notes", [])) if isinstance(data.get("notes", []), list) else [],
+        "vip_level_index": _to_int(data.get("vip_level_index")),
+        "vip_last_downgrade_check_month": data.get("vip_last_downgrade_check_month"),
+        "vip_downgrade_logs": list(data.get("vip_downgrade_logs", [])) if isinstance(data.get("vip_downgrade_logs", []), list) else [],
     }
 
 
@@ -2296,6 +2301,121 @@ async def check_stored_order_reminders_once(guild: discord.Guild | None = None) 
         save_bot_data()
 
 
+def get_previous_calendar_month_range(now: datetime | None = None) -> tuple[datetime, datetime, str]:
+    now = now or get_taipei_now()
+    first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_prev_month = first_this_month - timedelta(seconds=1)
+    first_prev_month = last_prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_key = first_this_month.strftime("%Y-%m")
+    return first_prev_month, first_this_month, month_key
+
+def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_dt: datetime) -> int:
+    total = 0
+    start_text = start_dt.isoformat(timespec="seconds")
+    end_text = end_dt.isoformat(timespec="seconds")
+
+    for data in SELF_SERVICE_ORDER_SELECTIONS.values():
+        if not isinstance(data, dict):
+            continue
+        if _to_int(data.get("customer_id")) != customer_id:
+            continue
+        if str(data.get("status", "")).lower() != "closed" and not data.get("closed"):
+            continue
+        closed_text = _normalize_stats_datetime_text(data.get("closed_at") or data.get("reward_counted_at"))
+        if closed_text is None or not (start_text <= closed_text < end_text):
+            continue
+        total += _to_int(data.get("amount") or data.get("reward_amount"), 0) or 0
+
+    return total
+
+async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
+    guild = guild or bot.get_guild(GUILD_ID)
+    if guild is None:
+        return 0, ["找不到伺服器，無法檢查 VIP 降階。"]
+
+    start_dt, end_dt, check_month_key = get_previous_calendar_month_range()
+    changed_count = 0
+    messages = []
+
+    for user_id, data in list(CUSTOMER_REWARDS.items()):
+        if not isinstance(data, dict):
+            continue
+
+        current_index = get_effective_member_level_index(data)
+        if current_index <= 0:
+            data["vip_last_downgrade_check_month"] = check_month_key
+            continue
+
+        if not force and data.get("vip_last_downgrade_check_month") == check_month_key:
+            continue
+
+        monthly_spend = get_customer_closed_spend_between(user_id, start_dt, end_dt)
+        data["vip_last_downgrade_check_month"] = check_month_key
+
+        if monthly_spend >= VIP_MAINTAIN_MIN_MONTHLY_SPEND:
+            continue
+
+        old_level = get_member_level_by_index(current_index)
+        new_index = max(0, current_index - 1)
+        new_level = get_member_level_by_index(new_index)
+        data["vip_level_index"] = new_index
+
+        log = {
+            "checked_month": check_month_key,
+            "previous_month_start": start_dt.isoformat(timespec="seconds"),
+            "previous_month_end": end_dt.isoformat(timespec="seconds"),
+            "previous_month_spend": monthly_spend,
+            "required_spend": VIP_MAINTAIN_MIN_MONTHLY_SPEND,
+            "old_level": old_level["name"],
+            "new_level": new_level["name"],
+            "created_at": get_taipei_now_iso(),
+        }
+        logs = data.setdefault("vip_downgrade_logs", [])
+        if isinstance(logs, list):
+            logs.append(log)
+            data["vip_downgrade_logs"] = logs[-24:]
+        else:
+            data["vip_downgrade_logs"] = [log]
+
+        member = await fetch_member_safely(guild, user_id)
+        benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+        CUSTOMER_REWARDS[user_id] = data
+        changed_count += 1
+
+        message = (
+            f"<@{user_id}>：{old_level['name']} → {new_level['name']}｜"
+            f"上月消費 {format_t_amount(monthly_spend)}，未達 {format_t_amount(VIP_MAINTAIN_MIN_MONTHLY_SPEND)}"
+        )
+        if benefit_notices:
+            message += "｜" + "、".join(benefit_notices)
+        messages.append(message)
+
+    if changed_count:
+        save_bot_data()
+        await send_order_log(
+            guild,
+            title="VIP 會員自動降階",
+            description=(
+                f"檢查月份：{check_month_key}\n"
+                f"統計區間：{start_dt.strftime('%Y/%m/%d')} ～ {end_dt.strftime('%Y/%m/%d')}\n"
+                f"維持條件：上月消費滿 {format_t_amount(VIP_MAINTAIN_MIN_MONTHLY_SPEND)}\n\n"
+                + "\n".join(messages[:20])
+            ),
+            color=discord.Color.orange(),
+        )
+
+    return changed_count, messages
+
+async def vip_downgrade_loop():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            await check_vip_downgrades_once()
+        except Exception as e:
+            print(f"VIP 自動降階檢查失敗：{e}")
+        await asyncio.sleep(21600)
+
+
 async def stored_order_reminder_loop():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -2337,6 +2457,9 @@ def get_customer_reward_data(user_id: int) -> dict:
             "point_adjustment_logs": [],
             "platinum_channel_id": None,
             "manual_purchase_keys": [],
+            "vip_level_index": None,
+            "vip_last_downgrade_check_month": None,
+            "vip_downgrade_logs": [],
         }
     )
     data.setdefault("total_spent", 0)
@@ -2348,12 +2471,17 @@ def get_customer_reward_data(user_id: int) -> dict:
     data.setdefault("platinum_channel_id", None)
     data.setdefault("manual_purchase_keys", [])
     data.setdefault("notes", [])
+    data.setdefault("vip_level_index", None)
+    data.setdefault("vip_last_downgrade_check_month", None)
+    data.setdefault("vip_downgrade_logs", [])
     if not isinstance(data["manual_purchase_keys"], list):
         data["manual_purchase_keys"] = []
     if not isinstance(data["point_adjustment_logs"], list):
         data["point_adjustment_logs"] = []
     if not isinstance(data["notes"], list):
         data["notes"] = []
+    if not isinstance(data["vip_downgrade_logs"], list):
+        data["vip_downgrade_logs"] = []
     return data
 
 def get_member_level(total_spent: int) -> dict:
@@ -2370,6 +2498,41 @@ def get_next_member_level(total_spent: int) -> dict | None:
         if total_spent < level["threshold"]:
             return level
     return None
+
+def get_member_level_index_by_total_spent(total_spent: int) -> int:
+    index = 0
+    for i, level in enumerate(MEMBER_LEVELS):
+        if total_spent >= int(level["threshold"]):
+            index = i
+        else:
+            break
+    return index
+
+def get_member_level_by_index(index: int) -> dict:
+    safe_index = max(0, min(int(index), len(MEMBER_LEVELS) - 1))
+    return MEMBER_LEVELS[safe_index]
+
+def get_effective_member_level_index(data: dict) -> int:
+    total_spent = int(data.get("total_spent", 0) or 0)
+    default_index = get_member_level_index_by_total_spent(total_spent)
+    stored_index = _to_int(data.get("vip_level_index"))
+    if stored_index is None:
+        return default_index
+    return max(0, min(int(stored_index), len(MEMBER_LEVELS) - 1))
+
+def get_effective_member_level(data: dict) -> dict:
+    return get_member_level_by_index(get_effective_member_level_index(data))
+
+def sync_vip_level_to_cumulative_if_higher(data: dict) -> tuple[dict, dict]:
+    old_level = get_effective_member_level(data)
+    cumulative_index = get_member_level_index_by_total_spent(int(data.get("total_spent", 0) or 0))
+    current_index = get_effective_member_level_index(data)
+    if cumulative_index > current_index:
+        data["vip_level_index"] = cumulative_index
+    elif data.get("vip_level_index") is None:
+        data["vip_level_index"] = current_index
+    new_level = get_effective_member_level(data)
+    return old_level, new_level
 
 def format_t_amount(amount: int) -> str:
     return f"{amount:,}T"
@@ -2388,7 +2551,7 @@ def build_member_info_embed(member: discord.abc.User, data: dict, show_points: b
     total_spent = int(data.get("total_spent", 0) or 0)
     order_count = int(data.get("order_count", 0) or 0)
     points = get_current_reward_points(data)
-    level = get_member_level(total_spent)
+    level = get_effective_member_level(data)
     next_level = get_next_member_level(total_spent)
 
     embed = discord.Embed(
@@ -2478,8 +2641,10 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
 
     notices = []
     total_spent = int(data.get("total_spent", 0) or 0)
+    level = get_effective_member_level(data)
+    level_threshold = int(level.get("threshold", 0) or 0)
 
-    if total_spent >= 2500:
+    if level_threshold >= 2500:
         silver_role = guild.get_role(SILVER_MEMBER_ROLE_ID)
         if silver_role is not None and silver_role not in member.roles:
             try:
@@ -2489,8 +2654,18 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
                 notices.append("銀級魔丸身分組給予失敗：Bot 權限不足或身分組位置不夠高")
             except discord.HTTPException:
                 notices.append("銀級魔丸身分組給予失敗：Discord API 錯誤")
+    else:
+        silver_role = guild.get_role(SILVER_MEMBER_ROLE_ID)
+        if silver_role is not None and silver_role in member.roles:
+            try:
+                await member.remove_roles(silver_role, reason="VIP 維持條件未達，降至普通魔丸")
+                notices.append("已收回銀級魔丸身分組")
+            except discord.Forbidden:
+                notices.append("銀級魔丸身分組收回失敗：Bot 權限不足或身分組位置不夠高")
+            except discord.HTTPException:
+                notices.append("銀級魔丸身分組收回失敗：Discord API 錯誤")
 
-    if total_spent >= 13000:
+    if level_threshold >= 13000:
         existing_channel_id = _to_int(data.get("platinum_channel_id"))
         if existing_channel_id is not None and guild.get_channel(existing_channel_id) is not None:
             return notices
@@ -2576,11 +2751,12 @@ async def add_customer_reward_from_order(
 
     data = get_customer_reward_data(customer_id)
     old_total_spent = int(data.get("total_spent", 0) or 0)
-    old_level = get_member_level(old_total_spent)
+    old_level = get_effective_member_level(data)
     data["total_spent"] = old_total_spent + amount
     data["order_count"] = int(data.get("order_count", 0) or 0) + 1
     data["last_order_at"] = get_taipei_now_iso()
     data["points"] = get_current_reward_points(data)
+    _, level_after_sync = sync_vip_level_to_cumulative_if_higher(data)
 
     order_data["reward_counted"] = True
     order_data["reward_amount"] = amount
@@ -2590,7 +2766,7 @@ async def add_customer_reward_from_order(
     member = await fetch_member_safely(guild, customer_id)
     benefit_notices = await ensure_reward_member_benefits(guild, member, data)
 
-    level = get_member_level(int(data["total_spent"]))
+    level = get_effective_member_level(data)
     if level["threshold"] > old_level["threshold"]:
         upgrade_notice = f"恭喜 <@{customer_id}> 升級為 **{level['name']}**！目前累積消費：{format_t_amount(int(data['total_spent']))}"
         benefit_notices.insert(0, upgrade_notice)
@@ -2657,7 +2833,7 @@ async def add_manual_purchase(
 
     data = get_customer_reward_data(customer_id)
     old_total_spent = int(data.get("total_spent", 0) or 0)
-    old_level = get_member_level(old_total_spent)
+    old_level = get_effective_member_level(data)
     manual_keys = data.setdefault("manual_purchase_keys", [])
     purchase_key = build_manual_purchase_key(customer_id, amount, date_iso, note)
 
@@ -2675,13 +2851,14 @@ async def add_manual_purchase(
     manual_keys.append(purchase_key)
     data["last_manual_added_at"] = get_taipei_now_iso()
     data["last_manual_added_by"] = operator_id
+    sync_vip_level_to_cumulative_if_higher(data)
     CUSTOMER_REWARDS[customer_id] = data
 
     member = await fetch_member_safely(guild, customer_id)
     benefit_notices = await ensure_reward_member_benefits(guild, member, data)
     save_bot_data()
 
-    level = get_member_level(int(data["total_spent"]))
+    level = get_effective_member_level(data)
     if level["threshold"] > old_level["threshold"]:
         benefit_notices.insert(0, f"恭喜 <@{customer_id}> 升級為 **{level['name']}**！目前累積消費：{format_t_amount(int(data['total_spent']))}")
 
@@ -5319,7 +5496,7 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
-    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED
+    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
     bot.add_view(MainPanelView())
     bot.add_view(OrderControlView())
     bot.add_view(StaffOrderOperationView())
@@ -5352,6 +5529,9 @@ async def on_ready():
         if not STORED_REMINDER_TASK_STARTED:
             STORED_REMINDER_TASK_STARTED = True
             asyncio.create_task(stored_order_reminder_loop())
+        if not VIP_DOWNGRADE_TASK_STARTED:
+            VIP_DOWNGRADE_TASK_STARTED = True
+            asyncio.create_task(vip_downgrade_loop())
         try:
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
@@ -6559,7 +6739,7 @@ async def top_customers(interaction: discord.Interaction):
         total_spent = int(data.get("total_spent", 0) or 0)
         if total_spent <= 0:
             continue
-        ranked.append((user_id, total_spent, int(data.get("order_count", 0) or 0), get_member_level(total_spent)["name"]))
+        ranked.append((user_id, total_spent, int(data.get("order_count", 0) or 0), get_effective_member_level(data)["name"]))
 
     ranked.sort(key=lambda row: row[1], reverse=True)
     top_rows = ranked[:10]
@@ -6584,6 +6764,38 @@ async def top_customers(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+
+@bot.tree.command(
+    name="check_vip_downgrades",
+    description="管理員手動檢查 VIP 維持條件並執行降階",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(force="是否強制重新檢查本月，預設否")
+async def check_vip_downgrades(interaction: discord.Interaction, force: bool = False):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以檢查 VIP 降階。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+    changed_count, messages = await check_vip_downgrades_once(interaction.guild, force=force)
+
+    if changed_count == 0:
+        await interaction.followup.send(
+            f"檢查完成，目前沒有需要降階的會員。維持條件：上月消費滿 {format_t_amount(VIP_MAINTAIN_MIN_MONTHLY_SPEND)}。",
+            ephemeral=True
+        )
+        return
+
+    preview = "\n".join(messages[:10])
+    if len(messages) > 10:
+        preview += f"\n…還有 {len(messages) - 10} 位"
+
+    await interaction.followup.send(
+        f"VIP 降階檢查完成，已降階 {changed_count} 位會員。\n{preview}",
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
 
 
 @bot.tree.command(
