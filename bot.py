@@ -8,6 +8,7 @@ import re
 import random
 import shutil
 import sqlite3
+import hashlib
 import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -2311,23 +2312,49 @@ def get_previous_calendar_month_range(now: datetime | None = None) -> tuple[date
     return first_prev_month, first_this_month, month_key
 
 def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_dt: datetime) -> int:
-    total = 0
+    """直接從 SQLite orders 查會員維持消費，避免只看 Bot 記憶體漏算補登資料。"""
+    init_database()
     start_text = start_dt.isoformat(timespec="seconds")
     end_text = end_dt.isoformat(timespec="seconds")
 
-    for data in SELF_SERVICE_ORDER_SELECTIONS.values():
-        if not isinstance(data, dict):
-            continue
-        if _to_int(data.get("customer_id")) != customer_id:
-            continue
-        if str(data.get("status", "")).lower() != "closed" and not data.get("closed"):
-            continue
-        closed_text = _normalize_stats_datetime_text(data.get("closed_at") or data.get("reward_counted_at"))
-        if closed_text is None or not (start_text <= closed_text < end_text):
-            continue
-        total += _to_int(data.get("amount") or data.get("reward_amount"), 0) or 0
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cols = _db_columns(cur, "orders")
+            if {"customer_id", "amount", "status", "closed_at"}.issubset(cols):
+                row = cur.execute(
+                    """
+                    SELECT COALESCE(SUM(amount), 0) AS total
+                    FROM orders
+                    WHERE customer_id=?
+                      AND status='closed'
+                      AND closed_at >= ?
+                      AND closed_at < ?
+                    """,
+                    (int(customer_id), start_text, end_text),
+                ).fetchone()
+                return int(row["total"] or 0)
 
-    return total
+            # 舊 data 欄位資料庫 fallback。
+            total = 0
+            if "data" in cols:
+                for row in cur.execute("SELECT data FROM orders").fetchall():
+                    data = _json_load_maybe(row["data"], {})
+                    if not isinstance(data, dict):
+                        continue
+                    if _to_int(data.get("customer_id")) != customer_id:
+                        continue
+                    if str(data.get("status", "")).lower() != "closed" and not data.get("closed"):
+                        continue
+                    closed_text = _normalize_stats_datetime_text(data.get("closed_at") or data.get("reward_counted_at"))
+                    if closed_text is None or not (start_text <= closed_text < end_text):
+                        continue
+                    total += _to_int(data.get("amount") or data.get("reward_amount"), 0) or 0
+            return total
+    except sqlite3.Error as e:
+        print(f"查詢會員維持消費失敗：{e}")
+        return 0
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
     guild = guild or bot.get_guild(GUILD_ID)
@@ -2900,6 +2927,29 @@ async def add_manual_purchase(
     sync_vip_level_to_cumulative_if_higher(data)
     CUSTOMER_REWARDS[customer_id] = data
 
+    # 補登也寫入 orders，讓 /stats_today、/stats_month、VIP 維持消費都查得到。
+    # 使用 deterministic negative channel_id，避免重複補登與 Discord 真實頻道 ID 撞到。
+    manual_hash = int(hashlib.sha1(purchase_key.encode("utf-8")).hexdigest()[:14], 16)
+    manual_channel_id = -manual_hash
+    SELF_SERVICE_ORDER_SELECTIONS[manual_channel_id] = {
+        "customer_id": customer_id,
+        "order_no": f"MANUAL{date_iso[:10].replace('-', '')}{str(customer_id)[-4:]}",
+        "category": "manual_purchase",
+        "item": (note or "手動補登"),
+        "quantity": 1,
+        "payment_method": "補登",
+        "amount": amount,
+        "total_amount": amount,
+        "status": "closed",
+        "closed": True,
+        "created_at": date_iso,
+        "closed_at": date_iso,
+        "note": note or "手動補登",
+        "reward_counted": True,
+        "reward_amount": amount,
+        "reward_counted_at": date_iso,
+    }
+
     member = await fetch_member_safely(guild, customer_id)
     benefit_notices = await ensure_reward_member_benefits(guild, member, data)
     save_bot_data()
@@ -3058,9 +3108,11 @@ def cleanup_old_closed_orders() -> None:
 
     for channel_id in order_channel_ids_to_remove:
         SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
+        delete_order_row_from_db(channel_id)
 
     for message_id in dispatch_message_ids_to_remove:
         ORDER_CLAIMS.pop(message_id, None)
+        delete_claim_row_from_db(message_id=message_id)
 
     if order_channel_ids_to_remove or dispatch_message_ids_to_remove:
         save_bot_data()
@@ -3323,6 +3375,10 @@ def _order_data_from_normalized_row(row: sqlite3.Row) -> dict:
     ]:
         if key in row.keys() and row[key] is not None:
             data[key] = row[key]
+    if "store_reason" in data and "stored_reason" not in data:
+        data["stored_reason"] = data.get("store_reason")
+    if "resume_at" in data and "stored_expected_time" not in data:
+        data["stored_expected_time"] = data.get("resume_at")
     if str(data.get("status", "")).lower() == "closed":
         data["closed"] = True
     return data
@@ -3364,6 +3420,14 @@ def _customer_data_from_normalized_row(row: sqlite3.Row) -> dict:
         level_index = _level_index_from_name(row["level"])
         if level_index is not None and _to_int(data.get("vip_level_index")) is None:
             data["vip_level_index"] = level_index
+    # relational customers.points 是「目前可用點數」。
+    # 讀回記憶體時要轉成 point_adjustment，避免 get_current_reward_points() 又用累積消費重新算，
+    # 導致抽獎扣點、手動扣點後的點數被洗回來。
+    if "points" in row.keys() and row["points"] is not None:
+        saved_points = int(row["points"] or 0)
+        base_points = calculate_reward_points(int(data.get("total_spent", 0) or 0))
+        data["point_adjustment"] = saved_points - base_points
+        data["points"] = saved_points
     return _normalize_customer_after_load(data)
 
 
@@ -3428,6 +3492,11 @@ def load_bot_data_from_sqlite() -> bool:
 
 
 def save_bot_data() -> None:
+    """將目前記憶體資料同步到 relational SQLite。
+
+    重要：這版不再整表 DELETE 後重寫，避免手動補登、舊營收、存單紀錄被記憶體舊資料洗掉。
+    需要刪除資料時，請使用明確的 DELETE helper 或管理指令。
+    """
     init_database()
     now_text = get_taipei_now_iso()
 
@@ -3439,7 +3508,6 @@ def save_bot_data() -> None:
             claim_cols = _db_columns(cur, "claims")
             customer_cols = _db_columns(cur, "customers")
 
-            cur.execute("DELETE FROM orders")
             if "data" in order_cols:
                 cur.executemany(
                     "INSERT OR REPLACE INTO orders (channel_id, data, updated_at) VALUES (?, ?, ?)",
@@ -3480,14 +3548,13 @@ def save_bot_data() -> None:
                             data.get("closed_at") or data.get("reward_counted_at"),
                             data.get("stored_at"),
                             data.get("stored_reason") or data.get("store_reason"),
-                            data.get("resume_at"),
+                            data.get("resume_at") or data.get("stored_expected_time"),
                             data.get("note") or data.get("stored_note"),
                             json.dumps(data, ensure_ascii=False, default=_json_default),
                             now_text,
                         ),
                     )
 
-            cur.execute("DELETE FROM claims")
             if "data" in claim_cols:
                 cur.executemany(
                     "INSERT OR REPLACE INTO claims (message_id, data, updated_at) VALUES (?, ?, ?)",
@@ -3527,7 +3594,6 @@ def save_bot_data() -> None:
                         ),
                     )
 
-            cur.execute("DELETE FROM customers")
             if "data" in customer_cols:
                 key_col = "user_id" if "user_id" in customer_cols else "customer_id"
                 cur.executemany(
@@ -3565,7 +3631,6 @@ def save_bot_data() -> None:
                         ),
                     )
 
-            cur.execute("DELETE FROM order_counters")
             cur.executemany(
                 "INSERT OR REPLACE INTO order_counters (day_key, count, updated_at) VALUES (?, ?, ?)",
                 [(str(day), int(count), now_text) for day, count in _serialize_order_counters().items()],
@@ -3575,7 +3640,7 @@ def save_bot_data() -> None:
         print(f"保存 bot.db 失敗：{e}")
         return
 
-    # JSON 快照保留給你人工檢查。
+    # JSON 只保留為人工檢查用快照，不作為主要資料庫。
     payload = {
         "orders": _serialize_orders(),
         "claims": _serialize_claims(),
@@ -3589,6 +3654,32 @@ def save_bot_data() -> None:
         tmp_path.replace(DATA_FILE)
     except OSError as e:
         print(f"保存 bot_data.json 快照失敗：{e}")
+
+
+def delete_order_row_from_db(channel_id: int) -> None:
+    """明確刪除單筆 orders；避免 save_bot_data 不整表重寫後留下取消單殘影。"""
+    init_database()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.execute("DELETE FROM orders WHERE channel_id=?", (int(channel_id),))
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"刪除 orders 資料失敗：{e}")
+
+
+def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: int | None = None) -> None:
+    """明確刪除 claims。可用派單訊息 ID 或來源票口 ID。"""
+    init_database()
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            if message_id is not None:
+                conn.execute("DELETE FROM claims WHERE dispatch_message_id=?", (int(message_id),))
+                conn.execute("DELETE FROM claims WHERE message_id=?", (int(message_id),))
+            if source_channel_id is not None:
+                conn.execute("DELETE FROM claims WHERE source_channel_id=?", (int(source_channel_id),))
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"刪除 claims 資料失敗：{e}")
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
@@ -4464,9 +4555,11 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
                 print(f"刪除派單接單面板失敗：{e}")
 
         ORDER_CLAIMS.pop(dispatch_message_id, None)
+        delete_claim_row_from_db(message_id=dispatch_message_id)
 
     if order_channel_id in SELF_SERVICE_ORDER_SELECTIONS:
         SELF_SERVICE_ORDER_SELECTIONS.pop(order_channel_id, None)
+        delete_order_row_from_db(order_channel_id)
         save_bot_data()
     elif dispatch_message_id is not None:
         save_bot_data()
@@ -8000,6 +8093,7 @@ async def delete_dispatch_panel(
         return
 
     ORDER_CLAIMS.pop(target_message_id, None)
+    delete_claim_row_from_db(message_id=target_message_id)
 
     removed_order_links = 0
     for order_channel_id, data in list(SELF_SERVICE_ORDER_SELECTIONS.items()):
