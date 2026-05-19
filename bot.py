@@ -1539,11 +1539,28 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         order_content, payment_method = get_order_summary_from_channel(order_channel.id)
         date_text = get_taipei_now_text()
+
+        parsed_amount = parse_receipt_amount(self.amount.value)
+        if parsed_amount is None or parsed_amount <= 0:
+            await interaction.response.send_message(
+                "金額欄位無法辨識，請輸入可辨識的數字，例如：1275、NT$1275、1275T。",
+                ephemeral=True
+            )
+            return
+
         receipt_id = generate_order_receipt_id()
+        closed_at_text = get_taipei_now_iso()
 
         order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
         order_data["receipt_id"] = receipt_id
-        order_data["receipt_created_at"] = get_taipei_now_iso()
+        order_data["order_no"] = receipt_id
+        order_data["receipt_created_at"] = closed_at_text
+        order_data["closed_at"] = closed_at_text
+        order_data["closed"] = True
+        order_data["status"] = "closed"
+        order_data["amount"] = parsed_amount
+        order_data["total_amount"] = parsed_amount
+        order_data["payment_method"] = payment_method
         remember_order_data(order_channel.id, order_data)
 
         receipt_text = (
@@ -2293,12 +2310,20 @@ def is_manager_or_admin(member: discord.Member) -> bool:
     return has_role(member, MANAGER_ROLE_ID) or member.guild_permissions.administrator
 
 def parse_receipt_amount(amount_text: str) -> int | None:
-    """從收據金額欄位擷取第一組數字，例如 NT$ 2,500 會回傳 2500。"""
-    normalized = amount_text.replace(",", "")
-    match = re.search(r"\d+", normalized)
-    if match is None:
+    """從收據金額欄位擷取金額。
+    支援：1275、NT$1,275、1275T、750+595。
+    若有加號，會把所有數字相加；否則取第一組數字。
+    """
+    normalized = amount_text.replace(",", "").strip()
+    numbers = [int(value) for value in re.findall(r"\d+", normalized)]
+
+    if not numbers:
         return None
-    return int(match.group(0))
+
+    if "+" in normalized and len(numbers) >= 2:
+        return sum(numbers)
+
+    return numbers[0]
 
 def get_customer_reward_data(user_id: int) -> dict:
     data = CUSTOMER_REWARDS.setdefault(
@@ -3176,7 +3201,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
                 discord.SelectOption(
                     label=f"{num} 單",
                     value=str(num),
-                    description=f"下單數量：{num} 單",
+                    description=f"{num} 單 = 約 {num} 小時",
                     default=quantity == num
                 )
                 for num in QUANTITY_OPTIONS
@@ -4609,6 +4634,7 @@ class OrderControlView(discord.ui.View):
             description=(
                 f"下單用戶：{customer_mention}\n\n"
                 "請下單用戶選擇訂單類別與訂單項目，完成後按「前往付款」。\n"
+                "如果選擇娛樂陪、技術陪，數量欄位可選擇 1～8 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
                 "如果選擇娛樂陪、技術陪、保底單，請額外選擇是否指定陪玩/打手。"
             ),
             color=discord.Color.purple()
