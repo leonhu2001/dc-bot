@@ -3070,6 +3070,620 @@ def cleanup_old_closed_orders() -> None:
         )
 
 
+# ========= SQLite 相容修正版：正式支援 relational bot.db =========
+# 這段會覆蓋上方舊的 JSON blob 版 init / save / load。
+# 用途：
+# 1. 讓 /add_purchase、/import_purchases、/set_customer_rewards 寫進 customers 表。
+# 2. 保留直接 SQL 查詢用欄位：customer_id / total_spent / points / completed_orders / last_order_at / level。
+# 3. 會員降階從 2026/06 才開始檢查，避免 2026/05 開店時被 4 月資料誤降級。
+# 4. 降階後把 vip_progress_base_total_spent 設為當下累積消費，下一級進度從降階後重新開始。
+
+VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；不檢查 2026/04。
+
+
+def _db_table_exists(cur: sqlite3.Cursor, table_name: str) -> bool:
+    row = cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
+def _db_columns(cur: sqlite3.Cursor, table_name: str) -> set[str]:
+    try:
+        return {row[1] for row in cur.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    except sqlite3.Error:
+        return set()
+
+
+def _db_add_column_if_missing(cur: sqlite3.Cursor, table_name: str, column_name: str, column_type: str) -> None:
+    cols = _db_columns(cur, table_name)
+    if column_name not in cols:
+        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+
+
+def init_database() -> None:
+    """建立 / 補齊 SQLite 資料表。
+
+    若 VPS 上已經是舊 relational schema，會保留原本欄位並補 data_json / updated_at。
+    若是全新資料庫，直接建立 relational schema，方便你用 sqlite3 指令查帳。
+    """
+    with sqlite3.connect(DB_FILE) as conn:
+        cur = conn.cursor()
+
+        if not _db_table_exists(cur, "orders"):
+            cur.execute("""
+            CREATE TABLE orders (
+                channel_id INTEGER PRIMARY KEY,
+                customer_id INTEGER,
+                order_no TEXT,
+                category TEXT,
+                item TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                companion_preference TEXT,
+                payment_method TEXT,
+                amount INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                dispatch_message_id INTEGER,
+                dispatch_channel_id INTEGER,
+                created_at TEXT,
+                closed_at TEXT,
+                stored_at TEXT,
+                store_reason TEXT,
+                resume_at TEXT,
+                note TEXT,
+                data_json TEXT,
+                updated_at TEXT
+            )
+            """)
+        else:
+            order_cols = _db_columns(cur, "orders")
+            if "channel_id" in order_cols and "data" not in order_cols:
+                for name, typ in [
+                    ("customer_id", "INTEGER"),
+                    ("order_no", "TEXT"),
+                    ("category", "TEXT"),
+                    ("item", "TEXT"),
+                    ("quantity", "INTEGER NOT NULL DEFAULT 1"),
+                    ("companion_preference", "TEXT"),
+                    ("payment_method", "TEXT"),
+                    ("amount", "INTEGER NOT NULL DEFAULT 0"),
+                    ("status", "TEXT NOT NULL DEFAULT 'active'"),
+                    ("dispatch_message_id", "INTEGER"),
+                    ("dispatch_channel_id", "INTEGER"),
+                    ("created_at", "TEXT"),
+                    ("closed_at", "TEXT"),
+                    ("stored_at", "TEXT"),
+                    ("store_reason", "TEXT"),
+                    ("resume_at", "TEXT"),
+                    ("note", "TEXT"),
+                    ("data_json", "TEXT"),
+                    ("updated_at", "TEXT"),
+                ]:
+                    _db_add_column_if_missing(cur, "orders", name, typ)
+
+        if not _db_table_exists(cur, "claims"):
+            cur.execute("""
+            CREATE TABLE claims (
+                dispatch_message_id INTEGER PRIMARY KEY,
+                customer_id INTEGER,
+                source_channel_id INTEGER,
+                dispatch_channel_id INTEGER,
+                category_label TEXT,
+                item TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                payment_method TEXT,
+                companion_preference TEXT,
+                companion_ids TEXT NOT NULL DEFAULT '[]',
+                booster_ids TEXT NOT NULL DEFAULT '[]',
+                locked INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                data_json TEXT,
+                updated_at TEXT
+            )
+            """)
+        else:
+            claim_cols = _db_columns(cur, "claims")
+            if "dispatch_message_id" in claim_cols and "data" not in claim_cols:
+                for name, typ in [
+                    ("customer_id", "INTEGER"),
+                    ("source_channel_id", "INTEGER"),
+                    ("dispatch_channel_id", "INTEGER"),
+                    ("category_label", "TEXT"),
+                    ("item", "TEXT"),
+                    ("quantity", "INTEGER NOT NULL DEFAULT 1"),
+                    ("payment_method", "TEXT"),
+                    ("companion_preference", "TEXT"),
+                    ("companion_ids", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("booster_ids", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("locked", "INTEGER NOT NULL DEFAULT 0"),
+                    ("status", "TEXT NOT NULL DEFAULT 'active'"),
+                    ("data_json", "TEXT"),
+                    ("updated_at", "TEXT"),
+                ]:
+                    _db_add_column_if_missing(cur, "claims", name, typ)
+
+        if not _db_table_exists(cur, "customers"):
+            cur.execute("""
+            CREATE TABLE customers (
+                customer_id INTEGER PRIMARY KEY,
+                total_spent INTEGER NOT NULL DEFAULT 0,
+                points INTEGER NOT NULL DEFAULT 0,
+                completed_orders INTEGER NOT NULL DEFAULT 0,
+                last_order_at TEXT,
+                level TEXT NOT NULL DEFAULT '普通魔丸',
+                platinum_channel_id INTEGER,
+                data_json TEXT,
+                updated_at TEXT
+            )
+            """)
+        else:
+            customer_cols = _db_columns(cur, "customers")
+            if "customer_id" in customer_cols and "data" not in customer_cols:
+                for name, typ in [
+                    ("total_spent", "INTEGER NOT NULL DEFAULT 0"),
+                    ("points", "INTEGER NOT NULL DEFAULT 0"),
+                    ("completed_orders", "INTEGER NOT NULL DEFAULT 0"),
+                    ("last_order_at", "TEXT"),
+                    ("level", "TEXT NOT NULL DEFAULT '普通魔丸'"),
+                    ("platinum_channel_id", "INTEGER"),
+                    ("data_json", "TEXT"),
+                    ("updated_at", "TEXT"),
+                ]:
+                    _db_add_column_if_missing(cur, "customers", name, typ)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS order_counters (
+            day_key TEXT PRIMARY KEY,
+            count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_settings (
+            key TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_entries (
+            period TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            chances INTEGER NOT NULL DEFAULT 0,
+            points_used INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (period, user_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_draws (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period TEXT NOT NULL,
+            prize TEXT NOT NULL,
+            winner_id INTEGER NOT NULL,
+            drawn_by INTEGER NOT NULL,
+            drawn_at TEXT NOT NULL
+        )
+        """)
+        conn.commit()
+
+
+def _json_load_maybe(value, default):
+    if value is None:
+        return default
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+
+def _level_index_from_name(level_name: str | None) -> int | None:
+    if not level_name:
+        return None
+    for index, level in enumerate(MEMBER_LEVELS):
+        if level["name"] == level_name:
+            return index
+    return None
+
+
+def _normalize_customer_after_load(data: dict) -> dict:
+    data = _deserialize_customer_data(data)
+    total_spent = int(data.get("total_spent", 0) or 0)
+    stored_index = _to_int(data.get("vip_level_index"))
+    if stored_index is None:
+        # 舊資料 level 可能是「無會員」，那就以累積消費重算。
+        data["vip_level_index"] = get_member_level_index_by_total_spent(total_spent)
+    data["points"] = get_current_reward_points(data)
+    return data
+
+
+def _compat_order_amount(data: dict) -> int:
+    for key in ("amount", "total_amount", "reward_amount"):
+        value = data.get(key)
+        if value is None:
+            continue
+        parsed = _to_int(value)
+        if parsed is not None:
+            return parsed
+        parsed = parse_receipt_amount(str(value))
+        if parsed is not None:
+            return parsed
+    return 0
+
+
+def _order_data_from_normalized_row(row: sqlite3.Row) -> dict:
+    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
+    if not isinstance(data, dict):
+        data = {}
+    for key in [
+        "customer_id", "order_no", "category", "item", "quantity", "companion_preference",
+        "payment_method", "amount", "status", "dispatch_message_id", "dispatch_channel_id",
+        "created_at", "closed_at", "stored_at", "store_reason", "resume_at", "note",
+    ]:
+        if key in row.keys() and row[key] is not None:
+            data[key] = row[key]
+    if str(data.get("status", "")).lower() == "closed":
+        data["closed"] = True
+    return data
+
+
+def _claim_data_from_normalized_row(row: sqlite3.Row) -> dict:
+    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
+    if not isinstance(data, dict):
+        data = {}
+    companion_ids = _json_load_maybe(row["companion_ids"] if "companion_ids" in row.keys() else None, [])
+    booster_ids = _json_load_maybe(row["booster_ids"] if "booster_ids" in row.keys() else None, [])
+    data.update({
+        "companion": {uid for uid in (_to_int(x) for x in companion_ids) if uid is not None},
+        "booster": {uid for uid in (_to_int(x) for x in booster_ids) if uid is not None},
+        "locked": bool(row["locked"] if "locked" in row.keys() and row["locked"] is not None else data.get("locked", False)),
+    })
+    for key in [
+        "customer_id", "source_channel_id", "dispatch_channel_id", "category_label", "item",
+        "quantity", "payment_method", "companion_preference", "status",
+    ]:
+        if key in row.keys() and row[key] is not None:
+            data[key] = row[key]
+    return _deserialize_claim_data(data)
+
+
+def _customer_data_from_normalized_row(row: sqlite3.Row) -> dict:
+    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
+    if not isinstance(data, dict):
+        data = {}
+    if "total_spent" in row.keys() and row["total_spent"] is not None:
+        data["total_spent"] = int(row["total_spent"] or 0)
+    if "completed_orders" in row.keys() and row["completed_orders"] is not None:
+        data["order_count"] = int(row["completed_orders"] or 0)
+    if "last_order_at" in row.keys() and row["last_order_at"] is not None:
+        data["last_order_at"] = row["last_order_at"]
+    if "platinum_channel_id" in row.keys() and row["platinum_channel_id"] is not None:
+        data["platinum_channel_id"] = row["platinum_channel_id"]
+    if "level" in row.keys():
+        level_index = _level_index_from_name(row["level"])
+        if level_index is not None and _to_int(data.get("vip_level_index")) is None:
+            data["vip_level_index"] = level_index
+    return _normalize_customer_after_load(data)
+
+
+def load_bot_data_from_sqlite() -> bool:
+    if not DB_FILE.exists():
+        return False
+
+    init_database()
+
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            order_cols = _db_columns(cur, "orders")
+            claim_cols = _db_columns(cur, "claims")
+            customer_cols = _db_columns(cur, "customers")
+            counter_rows = cur.execute("SELECT day_key, count FROM order_counters").fetchall()
+
+            SELF_SERVICE_ORDER_SELECTIONS.clear()
+            ORDER_CLAIMS.clear()
+            CUSTOMER_REWARDS.clear()
+            ORDER_COUNTERS.clear()
+
+            if "data" in order_cols:
+                for row in cur.execute("SELECT channel_id, data FROM orders").fetchall():
+                    data = _json_load_maybe(row["data"], None)
+                    if isinstance(data, dict):
+                        SELF_SERVICE_ORDER_SELECTIONS[int(row["channel_id"])] = data
+            else:
+                for row in cur.execute("SELECT * FROM orders").fetchall():
+                    SELF_SERVICE_ORDER_SELECTIONS[int(row["channel_id"])] = _order_data_from_normalized_row(row)
+
+            if "data" in claim_cols:
+                for row in cur.execute("SELECT message_id, data FROM claims").fetchall():
+                    data = _json_load_maybe(row["data"], None)
+                    if isinstance(data, dict):
+                        ORDER_CLAIMS[int(row["message_id"])] = _deserialize_claim_data(data)
+            else:
+                for row in cur.execute("SELECT * FROM claims").fetchall():
+                    message_id = row["dispatch_message_id"] if "dispatch_message_id" in row.keys() else None
+                    if message_id is not None:
+                        ORDER_CLAIMS[int(message_id)] = _claim_data_from_normalized_row(row)
+
+            if "data" in customer_cols:
+                key_col = "user_id" if "user_id" in customer_cols else "customer_id"
+                for row in cur.execute(f"SELECT {key_col} AS uid, data FROM customers").fetchall():
+                    data = _json_load_maybe(row["data"], None)
+                    if isinstance(data, dict):
+                        CUSTOMER_REWARDS[int(row["uid"])] = _normalize_customer_after_load(data)
+            else:
+                for row in cur.execute("SELECT * FROM customers").fetchall():
+                    CUSTOMER_REWARDS[int(row["customer_id"])] = _customer_data_from_normalized_row(row)
+
+            for row in counter_rows:
+                ORDER_COUNTERS[str(row["day_key"])] = int(row["count"] or 0)
+
+    except sqlite3.Error as e:
+        print(f"讀取 bot.db 失敗：{e}")
+        return False
+
+    return bool(SELF_SERVICE_ORDER_SELECTIONS or ORDER_CLAIMS or CUSTOMER_REWARDS or ORDER_COUNTERS)
+
+
+def save_bot_data() -> None:
+    init_database()
+    now_text = get_taipei_now_iso()
+
+    try:
+        with sqlite3.connect(DB_FILE) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            order_cols = _db_columns(cur, "orders")
+            claim_cols = _db_columns(cur, "claims")
+            customer_cols = _db_columns(cur, "customers")
+
+            cur.execute("DELETE FROM orders")
+            if "data" in order_cols:
+                cur.executemany(
+                    "INSERT OR REPLACE INTO orders (channel_id, data, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (int(channel_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                        for channel_id, data in _serialize_orders().items()
+                    ]
+                )
+            else:
+                for channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items():
+                    if not isinstance(data, dict):
+                        continue
+                    status = str(data.get("status") or ("closed" if data.get("closed") else "active")).lower()
+                    amount = _compat_order_amount(data)
+                    cur.execute(
+                        """
+                        INSERT OR REPLACE INTO orders (
+                            channel_id, customer_id, order_no, category, item, quantity,
+                            companion_preference, payment_method, amount, status,
+                            dispatch_message_id, dispatch_channel_id, created_at, closed_at,
+                            stored_at, store_reason, resume_at, note, data_json, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(channel_id),
+                            _to_int(data.get("customer_id")),
+                            data.get("order_no") or data.get("receipt_id"),
+                            data.get("category"),
+                            data.get("item"),
+                            _to_int(data.get("quantity"), 1) or 1,
+                            data.get("companion_preference"),
+                            data.get("payment_method"),
+                            amount,
+                            status,
+                            _to_int(data.get("dispatch_message_id")),
+                            _to_int(data.get("dispatch_channel_id")),
+                            data.get("created_at"),
+                            data.get("closed_at") or data.get("reward_counted_at"),
+                            data.get("stored_at"),
+                            data.get("stored_reason") or data.get("store_reason"),
+                            data.get("resume_at"),
+                            data.get("note") or data.get("stored_note"),
+                            json.dumps(data, ensure_ascii=False, default=_json_default),
+                            now_text,
+                        ),
+                    )
+
+            cur.execute("DELETE FROM claims")
+            if "data" in claim_cols:
+                cur.executemany(
+                    "INSERT OR REPLACE INTO claims (message_id, data, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (int(message_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                        for message_id, data in _serialize_claims().items()
+                    ]
+                )
+            else:
+                for message_id, data in ORDER_CLAIMS.items():
+                    if not isinstance(data, dict):
+                        continue
+                    cur.execute(
+                        """
+                        INSERT OR REPLACE INTO claims (
+                            dispatch_message_id, customer_id, source_channel_id, dispatch_channel_id,
+                            category_label, item, quantity, payment_method, companion_preference,
+                            companion_ids, booster_ids, locked, status, data_json, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(message_id),
+                            _to_int(data.get("customer_id")),
+                            _to_int(data.get("source_channel_id")),
+                            _to_int(data.get("dispatch_channel_id")),
+                            data.get("category_label"),
+                            data.get("item"),
+                            _to_int(data.get("quantity"), 1) or 1,
+                            data.get("payment_method"),
+                            data.get("companion_preference"),
+                            json.dumps(sorted(list(data.get("companion", set()))), ensure_ascii=False),
+                            json.dumps(sorted(list(data.get("booster", set()))), ensure_ascii=False),
+                            1 if data.get("locked") else 0,
+                            str(data.get("status", "active")),
+                            json.dumps(_serialize_claims().get(str(message_id), data), ensure_ascii=False, default=_json_default),
+                            now_text,
+                        ),
+                    )
+
+            cur.execute("DELETE FROM customers")
+            if "data" in customer_cols:
+                key_col = "user_id" if "user_id" in customer_cols else "customer_id"
+                cur.executemany(
+                    f"INSERT OR REPLACE INTO customers ({key_col}, data, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (int(user_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                        for user_id, data in _serialize_customer_rewards().items()
+                    ]
+                )
+            else:
+                for user_id, data in CUSTOMER_REWARDS.items():
+                    if not isinstance(data, dict):
+                        continue
+                    total_spent = int(data.get("total_spent", 0) or 0)
+                    order_count = int(data.get("order_count", 0) or 0)
+                    data["points"] = get_current_reward_points(data)
+                    level_name = get_effective_member_level(data)["name"]
+                    cur.execute(
+                        """
+                        INSERT OR REPLACE INTO customers (
+                            customer_id, total_spent, points, completed_orders, last_order_at,
+                            level, platinum_channel_id, data_json, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(user_id),
+                            total_spent,
+                            int(data.get("points", 0) or 0),
+                            order_count,
+                            data.get("last_order_at"),
+                            level_name,
+                            _to_int(data.get("platinum_channel_id")),
+                            json.dumps(data, ensure_ascii=False, default=_json_default),
+                            now_text,
+                        ),
+                    )
+
+            cur.execute("DELETE FROM order_counters")
+            cur.executemany(
+                "INSERT OR REPLACE INTO order_counters (day_key, count, updated_at) VALUES (?, ?, ?)",
+                [(str(day), int(count), now_text) for day, count in _serialize_order_counters().items()],
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"保存 bot.db 失敗：{e}")
+        return
+
+    # JSON 快照保留給你人工檢查。
+    payload = {
+        "orders": _serialize_orders(),
+        "claims": _serialize_claims(),
+        "customers": _serialize_customer_rewards(),
+        "order_counters": _serialize_order_counters(),
+    }
+    tmp_path = DATA_FILE.with_suffix(".tmp")
+    try:
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2, default=_json_default)
+        tmp_path.replace(DATA_FILE)
+    except OSError as e:
+        print(f"保存 bot_data.json 快照失敗：{e}")
+
+
+async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
+    guild = guild or bot.get_guild(GUILD_ID)
+    if guild is None:
+        return 0, ["找不到伺服器，無法檢查 VIP 降階。"]
+
+    start_dt, end_dt, check_month_key = get_previous_calendar_month_range()
+
+    if check_month_key < VIP_DOWNGRADE_FIRST_CHECK_MONTH:
+        return 0, [
+            f"VIP 降階尚未啟用。第一次檢查月份為 {VIP_DOWNGRADE_FIRST_CHECK_MONTH}，"
+            f"本次 {check_month_key} 不檢查，避免 2026/04 未營運資料造成誤降階。"
+        ]
+
+    changed_count = 0
+    messages = []
+
+    for user_id, data in list(CUSTOMER_REWARDS.items()):
+        if not isinstance(data, dict):
+            continue
+
+        current_index = get_effective_member_level_index(data)
+        if current_index <= 0:
+            data["vip_last_downgrade_check_month"] = check_month_key
+            CUSTOMER_REWARDS[user_id] = data
+            continue
+
+        if not force and data.get("vip_last_downgrade_check_month") == check_month_key:
+            continue
+
+        monthly_spend = get_customer_closed_spend_between(user_id, start_dt, end_dt)
+        data["vip_last_downgrade_check_month"] = check_month_key
+
+        if monthly_spend >= VIP_MAINTAIN_MIN_MONTHLY_SPEND:
+            CUSTOMER_REWARDS[user_id] = data
+            continue
+
+        old_level = get_member_level_by_index(current_index)
+        new_index = max(0, current_index - 1)
+        new_level = get_member_level_by_index(new_index)
+        data["vip_level_index"] = new_index
+        # 降階後，下一級進度從降階當下重新開始累積。
+        data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+
+        log = {
+            "checked_month": check_month_key,
+            "previous_month_start": start_dt.isoformat(timespec="seconds"),
+            "previous_month_end": end_dt.isoformat(timespec="seconds"),
+            "previous_month_spend": monthly_spend,
+            "required_spend": VIP_MAINTAIN_MIN_MONTHLY_SPEND,
+            "old_level": old_level["name"],
+            "new_level": new_level["name"],
+            "progress_reset_total_spent": data["vip_progress_base_total_spent"],
+            "created_at": get_taipei_now_iso(),
+        }
+        logs = data.setdefault("vip_downgrade_logs", [])
+        if isinstance(logs, list):
+            logs.append(log)
+            data["vip_downgrade_logs"] = logs[-24:]
+        else:
+            data["vip_downgrade_logs"] = [log]
+
+        member = await fetch_member_safely(guild, user_id)
+        benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+        CUSTOMER_REWARDS[user_id] = data
+        changed_count += 1
+
+        message = (
+            f"<@{user_id}>：{old_level['name']} → {new_level['name']}｜"
+            f"上月消費 {format_t_amount(monthly_spend)}，未達 {format_t_amount(VIP_MAINTAIN_MIN_MONTHLY_SPEND)}"
+        )
+        if benefit_notices:
+            message += "｜" + "、".join(benefit_notices)
+        messages.append(message)
+
+    save_bot_data()
+
+    if changed_count:
+        await send_order_log(
+            guild,
+            title="VIP 會員自動降階",
+            description=(
+                f"檢查月份：{check_month_key}\n"
+                f"統計區間：{start_dt.strftime('%Y/%m/%d')} ～ {end_dt.strftime('%Y/%m/%d')}\n"
+                f"維持條件：上月消費滿 {format_t_amount(VIP_MAINTAIN_MIN_MONTHLY_SPEND)}\n\n"
+                + "\n".join(messages[:20])
+            ),
+            color=discord.Color.orange(),
+        )
+
+    return changed_count, messages
+
+
+
 load_bot_data()
 cleanup_old_closed_orders()
 
