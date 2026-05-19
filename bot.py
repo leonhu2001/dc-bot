@@ -2908,7 +2908,6 @@ COMPANION_PREFERENCE_OPTIONS = [
 ]
 
 PAYMENT_METHOD_OPTIONS = [
-    "LINE Pay Money",
     "街口",
     "轉帳",
 ]
@@ -4153,10 +4152,31 @@ class PaymentMethodSelect(discord.ui.Select):
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
-        data["payment_method"] = self.values[0]
+        selected_method = self.values[0]
+        data["payment_method"] = selected_method
         remember_order_data(self.channel_id, data)
 
-        await interaction.response.defer()
+        payment_info = {
+            "轉帳": (
+                "銀行轉帳-國泰\n"
+                "代碼：013\n"
+                "帳號：135700021419"
+            ),
+            "街口": (
+                "街口支付\n"
+                "代碼：396\n"
+                "帳號：900884222"
+            ),
+        }.get(selected_method)
+
+        if payment_info is not None:
+            await interaction.response.send_message(
+                f"已選擇付款方式：{selected_method}\n\n"
+                f"```text\n{payment_info}\n```",
+                ephemeral=True
+            )
+        else:
+            await interaction.response.defer()
 
 
 class PaymentMethodView(discord.ui.View):
