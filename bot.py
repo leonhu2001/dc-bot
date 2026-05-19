@@ -56,6 +56,7 @@ VIP_VOICE_LOBBY_ROLE_ID = 1482080566760177706
 CUSTOMER_ROLE_ID = 1482084782031638548
 EXAMINER_ROLE_ID = 1497427024644411543
 MANAGER_ROLE_ID = 1131128849443328030
+RECRUIT_APPLICANT_ROLE_ID = 1498829171042943057  # 入職票口開啟期間身分組
 
 # 會員制度 ID / 設定
 SILVER_MEMBER_ROLE_ID = 1482080566760177706
@@ -215,6 +216,56 @@ def get_recruit_info_from_channel(channel: discord.TextChannel) -> tuple[str, st
     position = data.get("recruit_position", "未紀錄職位")
 
     return nickname, position
+
+
+def get_recruit_member_id_from_channel(channel: discord.TextChannel) -> int | None:
+    """從入職票口 topic 讀取申請人 ID。"""
+    if not channel.topic:
+        return None
+
+    data = {}
+
+    for part in channel.topic.split(";"):
+        if "=" in part:
+            key, value = part.split("=", 1)
+            data[key.strip()] = value.strip()
+
+    recruit_member_id = data.get("recruit_member_id")
+
+    if recruit_member_id is None:
+        return None
+
+    try:
+        return int(recruit_member_id)
+    except ValueError:
+        return None
+
+
+async def remove_recruit_applicant_role(guild: discord.Guild | None, channel: discord.abc.GuildChannel | None):
+    """入職票口關閉時收回申請人暫時身分組。"""
+    if guild is None or not isinstance(channel, discord.TextChannel):
+        return
+
+    recruit_member_id = get_recruit_member_id_from_channel(channel)
+
+    if recruit_member_id is None:
+        return
+
+    member = guild.get_member(recruit_member_id)
+    role = guild.get_role(RECRUIT_APPLICANT_ROLE_ID)
+
+    if member is None or role is None:
+        return
+
+    if role not in member.roles:
+        return
+
+    try:
+        await member.remove_roles(role, reason="Recruit ticket closed")
+    except discord.Forbidden:
+        print("Bot 權限不足，無法收回入職申請暫時身分組。請確認 Bot 身分組位置高於該身分組。")
+    except discord.HTTPException as e:
+        print(f"收回入職申請暫時身分組失敗：{e}")
 
 
 def get_order_customer_id_from_channel(channel: discord.TextChannel) -> int | None:
@@ -2081,30 +2132,38 @@ async def send_lottery_announcement(
     guild: discord.Guild | None,
     content: str,
     embed: discord.Embed | None = None,
-) -> None:
+    channel: discord.TextChannel | None = None,
+) -> bool:
     if guild is None:
-        return
+        return False
 
-    channel = guild.get_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
-    if channel is None:
-        try:
-            channel = await guild.fetch_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
-            print(f"找不到抽獎公告頻道：{e}")
-            return
+    target_channel = channel
 
-    if not isinstance(channel, discord.TextChannel):
-        print("抽獎公告頻道不是文字頻道。")
-        return
+    if target_channel is None:
+        fetched_channel = guild.get_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
+        if fetched_channel is None:
+            try:
+                fetched_channel = await guild.fetch_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+                print(f"找不到抽獎公告頻道：{e}")
+                return False
+
+        if not isinstance(fetched_channel, discord.TextChannel):
+            print("抽獎公告頻道不是文字頻道。")
+            return False
+
+        target_channel = fetched_channel
 
     try:
-        await channel.send(
+        await target_channel.send(
             content=content,
             embed=embed,
             allowed_mentions=discord.AllowedMentions(everyone=True, users=True, roles=False),
         )
+        return True
     except discord.HTTPException as e:
         print(f"送出抽獎公告失敗：{e}")
+        return False
 
 
 def run_daily_backup_once() -> str | None:
@@ -2771,7 +2830,6 @@ ORDER_CATEGORY_LABELS = {
     "fun": "趣味單",
     "farm": "代解代肝",
     "season": "賽季限定活動",
-    "valorant": "Valorant - 陪玩/代打",
 }
 
 ORDER_ITEMS_BY_CATEGORY = {
@@ -2798,10 +2856,6 @@ ORDER_ITEMS_BY_CATEGORY = {
         "勇敢者行動",
         "S9炫彩勇敢者行動",
     ],
-    "valorant": [
-        "Valorant 陪玩",
-        "Valorant 代打",
-    ],
 }
 
 ORDER_ITEM_TO_CATEGORY = {
@@ -2814,7 +2868,6 @@ SPECIAL_COMPANION_ITEMS = {
     "娛樂陪",
     "技術陪",
     "保底單",
-    "Valorant 陪玩",
 }
 
 QUANTITY_SELECT_ITEMS = {
@@ -2830,10 +2883,9 @@ COMPANION_PREFERENCE_OPTIONS = [
 ]
 
 PAYMENT_METHOD_OPTIONS = [
-    "LinePay",
+    "LINE Pay Money",
     "街口",
     "轉帳",
-    "8591",
 ]
 
 
@@ -2908,12 +2960,6 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
                 value="season",
                 description="勇敢者行動、S9炫彩勇敢者行動",
                 default=selected_category == "season"
-            ),
-            discord.SelectOption(
-                label="Valorant - 陪玩/代打",
-                value="valorant",
-                description="Valorant 陪玩、Valorant 代打",
-                default=selected_category == "valorant"
             ),
         ]
 
@@ -3566,12 +3612,18 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
 
 
 async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int):
-    """客服結單後，鎖定派單頻道對應的陪玩 / 打手接單面板。"""
+    """客服結單後，鎖定派單頻道對應的陪玩 / 打手接單面板。
+
+    這版會同時處理「恢復訂單後重新發派單面板」的情況：
+    如果 orders 裡記到的是舊 dispatch_message_id，會再從 ORDER_CLAIMS 裡找同一張票口的派單訊息，
+    並把找到的派單面板全部鎖定，避免最新那則恢復訂單面板還能繼續被按。
+    """
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
-    dispatch_message_id = data.get("dispatch_message_id")
     dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
 
-    if dispatch_message_id is None:
+    source_channel = guild.get_channel(order_channel_id)
+
+    if source_channel is None or not isinstance(source_channel, discord.TextChannel):
         return
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
@@ -3579,100 +3631,128 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
         return
 
-    try:
-        message = await dispatch_channel.fetch_message(dispatch_message_id)
-    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+    # 優先鎖 orders 目前記錄的派單訊息，同時補抓所有 claims 裡來源票口相同的派單訊息。
+    candidate_message_ids: list[int] = []
+
+    first_dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    if first_dispatch_message_id is not None:
+        candidate_message_ids.append(first_dispatch_message_id)
+
+    for message_id, claim in list(ORDER_CLAIMS.items()):
+        claim_source_channel_id = _to_int(claim.get("source_channel_id"))
+        if claim_source_channel_id == order_channel_id:
+            parsed_message_id = _to_int(message_id)
+            if parsed_message_id is not None and parsed_message_id not in candidate_message_ids:
+                candidate_message_ids.append(parsed_message_id)
+
+    if not candidate_message_ids:
         return
 
-    source_channel = guild.get_channel(order_channel_id)
-
-    if source_channel is None or not isinstance(source_channel, discord.TextChannel):
-        return
-
-    claim_data = ORDER_CLAIMS.setdefault(
-        dispatch_message_id,
-        {
-            "companion": set(),
-            "booster": set(),
-            "locked": False,
-        }
-    )
-    claim_data["customer_id"] = data.get("customer_id")
-    claim_data["category_label"] = ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "未紀錄")
-    claim_data["item"] = data.get("item", "未紀錄")
-    claim_data["quantity"] = _to_int(data.get("quantity"), 1) or 1
-    claim_data["payment_method"] = data.get("payment_method", "未紀錄")
-    claim_data["source_channel_id"] = order_channel_id
-    claim_data["companion_preference"] = data.get("companion_preference")
-    claim_data["dispatch_channel_id"] = dispatch_channel_id
-    claim_data["locked"] = True
-    claim_data["status"] = "closed"
-
-    data["closed"] = True
-    data["status"] = "closed"
-    data["closed_at"] = get_taipei_now_iso()
-    remember_order_data(order_channel_id, data)
-    remember_claim_data(dispatch_message_id, claim_data)
-
-    companion_ids = sorted(claim_data.get("companion", set()))
-    booster_ids = sorted(claim_data.get("booster", set()))
-    lines = []
-
-    if companion_ids:
-        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
-
-    if booster_ids:
-        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
-
-    receiver_text = "\n".join(lines) if lines else None
-
+    customer_id = data.get("customer_id")
     category = data.get("category")
     item = data.get("item", "未紀錄")
     quantity = _to_int(data.get("quantity"), 1) or 1
     payment_method = data.get("payment_method", "未紀錄")
     companion_preference = data.get("companion_preference")
-    customer_id = data.get("customer_id")
-    category_label = ORDER_CATEGORY_LABELS.get(category, category or "未紀錄")
+    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
     customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
 
-    embed = build_self_service_order_embed(
-        customer_mention=customer_mention,
-        category_label=category_label,
-        item=item,
-        quantity=quantity,
-        payment_method=payment_method,
-        source_channel=source_channel,
-        companion_preference=companion_preference,
-        receiver_text=receiver_text
-    )
-    embed.add_field(
-        name="接單狀態",
-        value="已結單，接單面板已鎖定",
-        inline=False
-    )
+    data["closed"] = True
+    data["status"] = "closed"
+    data["closed_at"] = get_taipei_now_iso()
+    data["quantity"] = quantity
+    data["dispatch_channel_id"] = dispatch_channel_id
 
-    try:
-        await message.edit(
-            embed=embed,
-            view=DispatchClaimView(
-                customer_id=customer_id or 0,
-                category_label=category_label,
-                item=item,
-                quantity=quantity,
-                payment_method=payment_method,
-                source_channel_id=order_channel_id,
-                companion_preference=companion_preference,
-                locked=True,
-                status="closed"
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+    locked_any = False
+    newest_existing_message_id: int | None = None
+
+    for dispatch_message_id in candidate_message_ids:
+        try:
+            message = await dispatch_channel.fetch_message(dispatch_message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            continue
+
+        claim_data = ORDER_CLAIMS.setdefault(
+            dispatch_message_id,
+            {
+                "companion": set(),
+                "booster": set(),
+                "locked": False,
+            }
         )
-    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-        pass
+
+        # 若是舊資料，補齊缺少欄位。
+        claim_data["customer_id"] = claim_data.get("customer_id") or customer_id
+        claim_data["category_label"] = claim_data.get("category_label") or category_label
+        claim_data["item"] = claim_data.get("item") or item
+        claim_data["quantity"] = _to_int(claim_data.get("quantity"), quantity) or quantity
+        claim_data["payment_method"] = claim_data.get("payment_method") or payment_method
+        claim_data["source_channel_id"] = order_channel_id
+        claim_data["companion_preference"] = claim_data.get("companion_preference") or companion_preference
+        claim_data["dispatch_channel_id"] = dispatch_channel_id
+        claim_data["locked"] = True
+        claim_data["status"] = "closed"
+
+        companion_ids = sorted(claim_data.get("companion", set()))
+        booster_ids = sorted(claim_data.get("booster", set()))
+        lines = []
+
+        if companion_ids:
+            lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+
+        if booster_ids:
+            lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+
+        receiver_text = "\n".join(lines) if lines else None
+
+        embed = build_self_service_order_embed(
+            customer_mention=customer_mention,
+            category_label=str(claim_data.get("category_label") or category_label),
+            item=str(claim_data.get("item") or item),
+            quantity=_to_int(claim_data.get("quantity"), quantity) or quantity,
+            payment_method=str(claim_data.get("payment_method") or payment_method),
+            source_channel=source_channel,
+            companion_preference=claim_data.get("companion_preference") or companion_preference,
+            receiver_text=receiver_text
+        )
+        embed.add_field(
+            name="接單狀態",
+            value="已結單，接單面板已鎖定",
+            inline=False
+        )
+
+        try:
+            await message.edit(
+                embed=embed,
+                view=DispatchClaimView(
+                    customer_id=_to_int(claim_data.get("customer_id"), _to_int(customer_id, 0) or 0) or 0,
+                    category_label=str(claim_data.get("category_label") or category_label),
+                    item=str(claim_data.get("item") or item),
+                    quantity=_to_int(claim_data.get("quantity"), quantity) or quantity,
+                    payment_method=str(claim_data.get("payment_method") or payment_method),
+                    source_channel_id=order_channel_id,
+                    companion_preference=claim_data.get("companion_preference") or companion_preference,
+                    locked=True,
+                    status="closed"
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False
+                )
+            )
+            locked_any = True
+            newest_existing_message_id = dispatch_message_id
+            remember_claim_data(dispatch_message_id, claim_data)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            continue
+
+    if locked_any:
+        # 用實際成功鎖定的最新派單訊息覆蓋，避免之後再找到舊面板。
+        if newest_existing_message_id is not None:
+            data["dispatch_message_id"] = newest_existing_message_id
+        remember_order_data(order_channel_id, data)
+        save_bot_data()
 
 async def store_dispatch_claim_panel(
     guild: discord.Guild,
@@ -4529,7 +4609,7 @@ class OrderControlView(discord.ui.View):
             description=(
                 f"下單用戶：{customer_mention}\n\n"
                 "請下單用戶選擇訂單類別與訂單項目，完成後按「前往付款」。\n"
-                "如果選擇娛樂陪、技術陪、保底單、Valorant 陪玩，請額外選擇是否指定陪玩/打手。"
+                "如果選擇娛樂陪、技術陪、保底單，請額外選擇是否指定陪玩/打手。"
             ),
             color=discord.Color.purple()
         )
@@ -4550,114 +4630,6 @@ class OrderControlView(discord.ui.View):
         )
 
 # ========= 入職操作 Modal / 按鈕 =========
-
-class ExamScheduleModal(discord.ui.Modal, title="已預約考核"):
-    exam_time = discord.ui.TextInput(
-        label="考核時間",
-        placeholder="例如：2026/04/26 晚上 8:00",
-        required=True,
-        max_length=100
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
-
-        if not is_exam_staff(interaction.user):
-            await interaction.response.send_message("只有考官或店長可以操作。", ephemeral=True)
-            return
-
-        guild = interaction.guild
-
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        notice_channel = guild.get_channel(EXAM_NOTICE_CHANNEL_ID)
-
-        if notice_channel is None or not isinstance(notice_channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "找不到考核通知頻道，請確認 EXAM_NOTICE_CHANNEL_ID 是否正確。",
-                ephemeral=True
-            )
-            return
-
-        channel = interaction.channel
-        recruit_nickname = "未紀錄暱稱"
-        recruit_position = "未紀錄職位"
-
-        if isinstance(channel, discord.TextChannel):
-            recruit_nickname, recruit_position = get_recruit_info_from_channel(channel)
-
-        await notice_channel.send(
-            f"有新的考核預約。\n\n"
-            f"申請人暱稱：{recruit_nickname}\n"
-            f"應徵職位：{recruit_position}\n"
-            f"考核時間：{self.exam_time.value}"
-        )
-
-        await interaction.response.send_message(
-            f"已送出考核預約通知到 {notice_channel.mention}。這個頻道將在 3 秒後關閉。",
-            ephemeral=True
-        )
-
-        if isinstance(channel, discord.TextChannel):
-            await channel.send(
-                f"此入職申請已由 {interaction.user.mention} 預約考核。頻道將在 3 秒後關閉。"
-            )
-
-            await asyncio.sleep(3)
-
-            await channel.delete(reason=f"Recruit exam scheduled by {interaction.user}")
-
-
-class ConfirmCancelRecruitView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=60)
-
-    @discord.ui.button(
-        label="是，取消申請",
-        style=discord.ButtonStyle.danger,
-        custom_id="confirm_cancel_recruit_yes"
-    )
-    async def confirm_cancel_recruit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
-
-        if not is_exam_staff(interaction.user):
-            await interaction.response.send_message("只有考官或店長可以取消申請。", ephemeral=True)
-            return
-
-        channel = interaction.channel
-
-        await interaction.response.send_message(
-            "已確認取消入職申請，這個頻道將在 3 秒後關閉。",
-            ephemeral=False
-        )
-
-        await asyncio.sleep(3)
-
-        if isinstance(channel, discord.TextChannel):
-            await channel.delete(reason=f"Recruit application cancelled by {interaction.user}")
-
-    @discord.ui.button(
-        label="否，保留申請",
-        style=discord.ButtonStyle.secondary,
-        custom_id="confirm_cancel_recruit_no"
-    )
-    async def keep_recruit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
-
-        if not is_exam_staff(interaction.user):
-            await interaction.response.send_message("只有考官或店長可以操作。", ephemeral=True)
-            return
-
-        await interaction.response.send_message("已保留入職申請。", ephemeral=True)
-
 
 class RecruitControlView(discord.ui.View):
     def __init__(self):
@@ -4693,6 +4665,7 @@ class RecruitControlView(discord.ui.View):
         await asyncio.sleep(3)
 
         if isinstance(channel, discord.TextChannel):
+            await remove_recruit_applicant_role(interaction.guild, channel)
             await channel.delete(reason=f"Recruit exam completed by {interaction.user}")
 
 
@@ -4958,6 +4931,15 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
         examiner_role = guild.get_role(EXAMINER_ROLE_ID)
         manager_role = guild.get_role(MANAGER_ROLE_ID)
         customer_role = guild.get_role(CUSTOMER_ROLE_ID)
+        applicant_role = guild.get_role(RECRUIT_APPLICANT_ROLE_ID)
+
+        if applicant_role is not None and isinstance(member, discord.Member):
+            try:
+                await member.add_roles(applicant_role, reason="Recruit ticket opened")
+            except discord.Forbidden:
+                print("Bot 權限不足，無法給予入職申請暫時身分組。請確認 Bot 身分組位置高於該身分組。")
+            except discord.HTTPException as e:
+                print(f"給予入職申請暫時身分組失敗：{e}")
 
         intro = (
             f"這裡有人想入職。\n\n"
@@ -4975,7 +4957,7 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
             allowed_roles=[examiner_role, manager_role, customer_role],
             intro_message=intro,
             view=RecruitControlView(),
-            topic=f"recruit_nickname={self.nickname.value};recruit_position={self.position.value}"
+            topic=f"recruit_member_id={member.id};recruit_nickname={self.nickname.value};recruit_position={self.position.value}"
         )
 
 
@@ -5089,6 +5071,13 @@ async def on_member_join(member: discord.Member):
             everyone=False
         )
     )
+
+
+@bot.event
+async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
+    # 如果入職票口被手動刪除，也嘗試收回申請人暫時身分組。
+    await remove_recruit_applicant_role(channel.guild, channel)
+
 
 
 @bot.event
@@ -5687,7 +5676,8 @@ async def lottery_status(interaction: discord.Interaction):
     period="期別，例如 2026-05；不填則使用本月",
     title="抽獎活動名稱，可不填",
     note="活動備註，可先寫：獎品內部討論中",
-    max_chances_per_user="每人本期最多可投入幾次，預設 20"
+    max_chances_per_user="每人本期最多可投入幾次，預設 20",
+    announce_channel="抽獎開始公告要發到哪個頻道；不填則用預設公告頻道"
 )
 async def lottery_open(
     interaction: discord.Interaction,
@@ -5695,6 +5685,7 @@ async def lottery_open(
     title: str | None = None,
     note: str | None = None,
     max_chances_per_user: int | None = None,
+    announce_channel: discord.TextChannel | None = None,
 ):
     if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
         await interaction.response.send_message("只有客服、店長或管理員可以設定抽獎。", ephemeral=True)
@@ -5728,13 +5719,15 @@ async def lottery_open(
 
     announcement_embed = build_lottery_info_embed(settings)
     announcement_embed.title = f"🎁 {settings['title']} 開始報名"
-    await send_lottery_announcement(
+    announced = await send_lottery_announcement(
         interaction.guild,
         content="@everyone 🎁 魔丸點數抽獎已開放報名！使用 `/lottery_info` 查看活動，使用 `/join_lottery` 參加抽獎。",
         embed=announcement_embed,
+        channel=announce_channel,
     )
 
-    await interaction.response.send_message("抽獎已設定並開放報名，公告已送出。", embed=build_lottery_info_embed(settings), ephemeral=True)
+    announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
+    await interaction.response.send_message(f"抽獎已設定並開放報名，{announce_text}", embed=build_lottery_info_embed(settings), ephemeral=True)
 
 
 @bot.tree.command(
@@ -5744,9 +5737,15 @@ async def lottery_open(
 )
 @app_commands.describe(
     prizes="獎池內容，例如：一獎：500T折抵券 x1｜二獎：指定費免費 x2",
-    announce="是否發公告到抽獎公告頻道，預設否"
+    announce="是否發公告，預設否",
+    announce_channel="獎池公告要發到哪個頻道；不填則用預設公告頻道"
 )
-async def lottery_set_prizes(interaction: discord.Interaction, prizes: str, announce: bool = False):
+async def lottery_set_prizes(
+    interaction: discord.Interaction,
+    prizes: str,
+    announce: bool = False,
+    announce_channel: discord.TextChannel | None = None,
+):
     if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
         await interaction.response.send_message("只有客服、店長或管理員可以設定獎池。", ephemeral=True)
         return
@@ -5779,12 +5778,14 @@ async def lottery_set_prizes(interaction: discord.Interaction, prizes: str, anno
     embed.title = f"🎁 {settings.get('title', '魔丸點數抽獎')} 獎池更新"
 
     if announce:
-        await send_lottery_announcement(
+        announced = await send_lottery_announcement(
             interaction.guild,
             content="@everyone 🎁 魔丸點數抽獎獎池已更新！使用 `/lottery_info` 查看活動詳情。",
             embed=embed,
+            channel=announce_channel,
         )
-        await interaction.response.send_message("獎池已設定，公告已送出。", embed=embed, ephemeral=True)
+        announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
+        await interaction.response.send_message(f"獎池已設定，{announce_text}", embed=embed, ephemeral=True)
     else:
         await interaction.response.send_message("獎池已設定。", embed=embed, ephemeral=True)
 
@@ -5812,9 +5813,15 @@ async def lottery_close(interaction: discord.Interaction):
 )
 @app_commands.describe(
     prize="本次要抽的獎品名稱，例如 一獎：500T折抵券",
-    winners="要抽出幾位得主，預設 1"
+    winners="要抽出幾位得主，預設 1",
+    announce_channel="開獎公告要發到哪個頻道；不填則用預設公告頻道"
 )
-async def draw_lottery(interaction: discord.Interaction, prize: str, winners: int = 1):
+async def draw_lottery(
+    interaction: discord.Interaction,
+    prize: str,
+    winners: int = 1,
+    announce_channel: discord.TextChannel | None = None,
+):
     if not isinstance(interaction.user, discord.Member) or not is_lottery_admin(interaction.user):
         await interaction.response.send_message("只有客服、店長或管理員可以開獎。", ephemeral=True)
         return
@@ -5860,13 +5867,15 @@ async def draw_lottery(interaction: discord.Interaction, prize: str, winners: in
         color=discord.Color.gold(),
     )
 
-    await send_lottery_announcement(
+    announced = await send_lottery_announcement(
         interaction.guild,
         content="@everyone 🎉 魔丸點數抽獎開獎啦！恭喜得獎者！",
         embed=embed,
+        channel=announce_channel,
     )
 
-    await interaction.response.send_message("開獎完成，公告已送出。", embed=embed, ephemeral=True)
+    announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
+    await interaction.response.send_message(f"開獎完成，{announce_text}", embed=embed, ephemeral=True)
 
 
 @bot.tree.command(
@@ -6936,6 +6945,94 @@ async def setup_public_voice(interaction: discord.Interaction):
     await interaction.response.send_message(
         f"公共語音入口已建立 / 確認存在：{lobby_channel.mention}",
         ephemeral=True
+    )
+
+
+
+@bot.tree.command(
+    name="delete_dispatch_panel",
+    description="刪除派單頻道中已取消訂單的接單面板",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    message_id="要刪除的派單訊息 ID",
+    channel="派單訊息所在頻道；不填則使用目前頻道"
+)
+async def delete_dispatch_panel(
+    interaction: discord.Interaction,
+    message_id: str,
+    channel: discord.TextChannel | None = None,
+):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_customer_staff(interaction.user) and not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("只有客服或管理員可以刪除派單面板。", ephemeral=True)
+        return
+
+    target_channel = channel or interaction.channel
+
+    if not isinstance(target_channel, discord.TextChannel):
+        await interaction.response.send_message("請在文字頻道使用，或指定派單訊息所在頻道。", ephemeral=True)
+        return
+
+    try:
+        target_message_id = int(message_id.strip())
+    except ValueError:
+        await interaction.response.send_message("訊息 ID 格式錯誤，請貼純數字訊息 ID。", ephemeral=True)
+        return
+
+    try:
+        message = await target_channel.fetch_message(target_message_id)
+    except discord.NotFound:
+        await interaction.response.send_message("找不到這則派單訊息，可能已經被刪除了。", ephemeral=True)
+        return
+    except discord.Forbidden:
+        await interaction.response.send_message("Bot 權限不足，無法讀取該頻道訊息。", ephemeral=True)
+        return
+    except discord.HTTPException as e:
+        await interaction.response.send_message(f"讀取派單訊息失敗：{e}", ephemeral=True)
+        return
+
+    try:
+        await message.delete()
+    except discord.Forbidden:
+        await interaction.response.send_message("Bot 權限不足，無法刪除該派單訊息。", ephemeral=True)
+        return
+    except discord.HTTPException as e:
+        await interaction.response.send_message(f"刪除派單訊息失敗：{e}", ephemeral=True)
+        return
+
+    ORDER_CLAIMS.pop(target_message_id, None)
+
+    removed_order_links = 0
+    for order_channel_id, data in list(SELF_SERVICE_ORDER_SELECTIONS.items()):
+        if _to_int(data.get("dispatch_message_id")) == target_message_id:
+            data["status"] = "cancelled"
+            data["cancelled"] = True
+            data["cancelled_at"] = get_taipei_now_iso()
+            data["dispatch_message_id"] = None
+            SELF_SERVICE_ORDER_SELECTIONS[order_channel_id] = data
+            removed_order_links += 1
+
+    save_bot_data()
+
+    await interaction.response.send_message(
+        f"已刪除派單面板，並清理相關接單暫存資料。關聯訂單：{removed_order_links} 筆。",
+        ephemeral=True
+    )
+
+    await send_order_log(
+        interaction.guild,
+        "刪除派單面板",
+        (
+            f"操作人員：{interaction.user.mention}\n"
+            f"派單頻道：{target_channel.mention}\n"
+            f"訊息 ID：{target_message_id}\n"
+            f"關聯訂單：{removed_order_links} 筆"
+        ),
+        color=discord.Color.red()
     )
 
 @setup_panel.error
