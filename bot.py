@@ -3925,8 +3925,8 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以選擇訂單。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
             return
 
         selected_category = self.values[0]
@@ -3995,8 +3995,8 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以選擇訂單。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
             return
 
         selected_item = self.values[0]
@@ -4084,8 +4084,8 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以選擇訂單。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
             return
 
         if self.values[0] == "need_item":
@@ -4158,8 +4158,8 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以選擇訂單數量。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單數量。", ephemeral=True)
             return
 
         if self.values[0] == "need_item":
@@ -4191,6 +4191,25 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
 
 def has_role(member: discord.Member, role_id: int) -> bool:
     return any(role.id == role_id for role in member.roles)
+
+
+def can_operate_self_service_order(user, customer_id: int) -> bool:
+    """允許開票老闆本人、客服、店長或管理員代操作自助下單。
+
+    客服代操作時，訂單仍會記在原本 customer_id 身上，
+    不會把客服當成下單顧客。
+    """
+    if user.id == customer_id:
+        return True
+
+    if not isinstance(user, discord.Member):
+        return False
+
+    return (
+        is_customer_staff(user)
+        or has_role(user, MANAGER_ROLE_ID)
+        or user.guild_permissions.administrator
+    )
 
 
 def build_self_service_order_embed(
@@ -5076,8 +5095,8 @@ class PaymentMethodSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以選擇付款方式。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇付款方式。", ephemeral=True)
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
@@ -5124,8 +5143,8 @@ class PaymentMethodView(discord.ui.View):
         row=1
     )
     async def submit_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以送出付款方式。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以送出付款方式。", ephemeral=True)
             return
 
         guild = interaction.guild
@@ -5192,9 +5211,11 @@ class PaymentMethodView(discord.ui.View):
             return
 
         category_label = ORDER_CATEGORY_LABELS[category]
+        data["customer_id"] = self.customer_id
+        remember_order_data(self.channel_id, data)
 
         embed = build_self_service_order_embed(
-            customer_mention=interaction.user.mention,
+            customer_mention=f"<@{self.customer_id}>",
             category_label=category_label,
             item=item,
             quantity=quantity,
@@ -5206,7 +5227,7 @@ class PaymentMethodView(discord.ui.View):
         dispatch_message = await dispatch_channel.send(
             embed=embed,
             view=DispatchClaimView(
-                customer_id=interaction.user.id,
+                customer_id=self.customer_id,
                 category_label=category_label,
                 item=item,
                 quantity=quantity,
@@ -5225,7 +5246,7 @@ class PaymentMethodView(discord.ui.View):
             "companion": set(),
             "booster": set(),
             "locked": False,
-            "customer_id": interaction.user.id,
+            "customer_id": self.customer_id,
             "category_label": category_label,
             "item": item,
             "quantity": quantity,
@@ -5245,7 +5266,7 @@ class PaymentMethodView(discord.ui.View):
             guild,
             title="新自助下單已派單",
             fields=[
-                ("顧客", interaction.user.mention, True),
+                ("顧客", f"<@{self.customer_id}>", True),
                 ("訂單類別", category_label, True),
                 ("訂單項目", item, True),
                 ("數量", f"{quantity} 單", True),
@@ -5295,8 +5316,8 @@ class SelfServiceOrderView(discord.ui.View):
         row=4
     )
     async def go_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有開這張票口的用戶可以操作訂單。", ephemeral=True)
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以操作訂單。", ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
@@ -5346,7 +5367,7 @@ class SelfServiceOrderView(discord.ui.View):
         payment_embed = discord.Embed(
             title="付款方式",
             description=(
-                f"下單用戶：{interaction.user.mention}\n\n"
+                f"下單用戶：<@{self.customer_id}>\n\n"
                 f"訂單類別：{category_label}\n"
                 f"訂單項目：{item}\n"
                 f"數量：{quantity} 單\n"
@@ -6618,7 +6639,7 @@ async def join_lottery(interaction: discord.Interaction, chances: int):
         interaction.guild,
         title="抽獎報名",
         fields=[
-            ("顧客", interaction.user.mention, True),
+            ("顧客", f"<@{self.customer_id}>", True),
             ("期別", period, True),
             ("抽獎次數", f"{chances} 次", True),
             ("消耗點數", f"{points_needed:,} 點", True),
