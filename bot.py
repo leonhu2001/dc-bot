@@ -6120,7 +6120,7 @@ async def delete_dispatch_message_for_order(guild: discord.Guild | None, data: d
 
     try:
         message = await asyncio.wait_for(dispatch_channel.fetch_message(dispatch_message_id), timeout=5)
-        await asyncio.wait_for(message.delete(reason="Order manually deleted by staff"), timeout=5)
+        await asyncio.wait_for(message.delete(), timeout=5)
         return True
     except (asyncio.TimeoutError, discord.NotFound, discord.Forbidden, discord.HTTPException):
         return False
