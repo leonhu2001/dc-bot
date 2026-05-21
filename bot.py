@@ -3675,14 +3675,22 @@ def delete_order_row_from_db(channel_id: int) -> None:
 
 
 def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: int | None = None) -> None:
-    """明確刪除 claims。可用派單訊息 ID 或來源票口 ID。"""
+    """明確刪除 claims。可用派單訊息 ID 或來源票口 ID。
+
+    兼容舊版 JSON blob schema 的 message_id 欄位，以及新版 relational schema 的
+    dispatch_message_id 欄位，避免刪除存單 / 取消訂單時因缺欄位噴錯。
+    """
     init_database()
     try:
         with sqlite3.connect(DB_FILE) as conn:
+            cur = conn.cursor()
+            cols = _db_columns(cur, "claims")
             if message_id is not None:
-                conn.execute("DELETE FROM claims WHERE dispatch_message_id=?", (int(message_id),))
-                conn.execute("DELETE FROM claims WHERE message_id=?", (int(message_id),))
-            if source_channel_id is not None:
+                if "dispatch_message_id" in cols:
+                    conn.execute("DELETE FROM claims WHERE dispatch_message_id=?", (int(message_id),))
+                if "message_id" in cols:
+                    conn.execute("DELETE FROM claims WHERE message_id=?", (int(message_id),))
+            if source_channel_id is not None and "source_channel_id" in cols:
                 conn.execute("DELETE FROM claims WHERE source_channel_id=?", (int(source_channel_id),))
             conn.commit()
     except sqlite3.Error as e:
@@ -8390,6 +8398,509 @@ async def audit_data(interaction: discord.Interaction, limit: int = 10):
         description=f"操作人員：{interaction.user.mention}\n{embed.description}",
         color=embed.color,
     )
+
+
+# ========= 存單管理面板 =========
+
+def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
+    """回傳目前記憶體中的存單，依存單時間新到舊排序。"""
+    records: list[tuple[int, dict]] = []
+
+    for channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items():
+        if not isinstance(data, dict):
+            continue
+        if str(data.get("status", "")).lower() != "stored":
+            continue
+        records.append((int(channel_id), data))
+
+    records.sort(
+        key=lambda item: str(item[1].get("stored_at") or item[1].get("created_at") or ""),
+        reverse=True,
+    )
+    return records[:max(1, min(int(limit or 25), 25))]
+
+
+def format_stored_order_option_label(channel_id: int, data: dict) -> str:
+    item = str(data.get("item") or "未紀錄")[:30]
+    customer_id = data.get("customer_id") or "未紀錄"
+    amount = _to_int(data.get("amount"), 0) or 0
+    amount_text = f"{amount}T" if amount else "未紀錄金額"
+    return f"{item}｜{customer_id}｜{amount_text}"[:100]
+
+
+def format_stored_order_option_description(channel_id: int, data: dict) -> str:
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    stored_at = str(data.get("stored_at") or "未紀錄時間")[:19]
+    reason = str(data.get("stored_reason") or data.get("store_reason") or "未填寫原因")[:35]
+    return f"{quantity} 單｜{stored_at}｜{reason}"[:100]
+
+
+def build_stored_order_detail_embed(
+    guild: discord.Guild | None,
+    channel_id: int | None,
+    data: dict | None,
+    total_count: int,
+) -> discord.Embed:
+    embed = discord.Embed(
+        title="存單管理面板",
+        color=discord.Color.gold(),
+        timestamp=get_taipei_now(),
+    )
+
+    if channel_id is None or not data:
+        embed.description = "目前沒有存單。"
+        embed.add_field(name="存單數量", value="0 筆", inline=True)
+        return embed
+
+    customer_id = data.get("customer_id")
+    ticket_channel = guild.get_channel(channel_id) if guild is not None else None
+    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    dispatch_channel = guild.get_channel(dispatch_channel_id) if guild is not None else None
+
+    ticket_text = ticket_channel.mention if isinstance(ticket_channel, discord.TextChannel) else f"票口 ID：{channel_id}"
+    if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
+        dispatch_text = f"https://discord.com/channels/{GUILD_ID}/{dispatch_channel.id}/{dispatch_message_id}"
+    elif dispatch_message_id is not None:
+        dispatch_text = f"派單訊息 ID：{dispatch_message_id}"
+    else:
+        dispatch_text = "未紀錄"
+
+    amount = _to_int(data.get("amount"), 0) or 0
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    item = data.get("item") or "未紀錄"
+    category = data.get("category")
+    category_label = ORDER_CATEGORY_LABELS.get(category, data.get("category_label") or category or "未紀錄")
+
+    embed.description = f"目前共有 **{total_count}** 筆存單。請先選擇存單，再按下方按鈕操作。"
+    embed.add_field(name="顧客", value=f"<@{customer_id}>" if customer_id else "未紀錄", inline=True)
+    embed.add_field(name="票口", value=ticket_text, inline=True)
+    embed.add_field(name="狀態", value=str(data.get("status") or "stored"), inline=True)
+    embed.add_field(name="訂單", value=f"{category_label}｜{item} x{quantity}", inline=False)
+    embed.add_field(name="金額", value=format_t_amount(amount) if amount else "未紀錄", inline=True)
+    embed.add_field(name="付款方式", value=str(data.get("payment_method") or "未紀錄"), inline=True)
+    embed.add_field(name="存單時間", value=str(data.get("stored_at") or "未紀錄"), inline=False)
+    embed.add_field(name="存單原因", value=str(data.get("stored_reason") or data.get("store_reason") or "未填寫"), inline=False)
+    embed.add_field(name="預計恢復", value=str(data.get("stored_expected_time") or data.get("resume_at") or "未填寫"), inline=True)
+    embed.add_field(name="存單備註", value=str(data.get("stored_note") or data.get("note") or "無")[:1024], inline=False)
+    embed.add_field(name="派單訊息", value=dispatch_text, inline=False)
+    return embed
+
+
+async def update_stored_order_note_and_panel(
+    guild: discord.Guild,
+    order_channel_id: int,
+    reason: str,
+    expected_time: str | None,
+    note: str | None,
+    operator: discord.Member,
+) -> None:
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id)
+    if not isinstance(data, dict) or str(data.get("status", "")).lower() != "stored":
+        raise ValueError("找不到這筆存單，可能已被恢復、取消或結單。")
+
+    data["stored_reason"] = reason
+    data["stored_expected_time"] = expected_time or None
+    data["stored_note"] = note or None
+    data["stored_note_updated_at"] = get_taipei_now_iso()
+    data["stored_note_updated_by"] = operator.id
+    SELF_SERVICE_ORDER_SELECTIONS[order_channel_id] = data
+
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    if dispatch_message_id is not None:
+        claim_data = ORDER_CLAIMS.get(dispatch_message_id, {})
+        if isinstance(claim_data, dict):
+            claim_data["stored_reason"] = reason
+            claim_data["stored_expected_time"] = expected_time or None
+            claim_data["stored_note"] = note or None
+            claim_data["status"] = "stored"
+            claim_data["locked"] = True
+            ORDER_CLAIMS[dispatch_message_id] = claim_data
+
+    remember_order_data(order_channel_id, data)
+    if dispatch_message_id is not None and dispatch_message_id in ORDER_CLAIMS:
+        remember_claim_data(dispatch_message_id, ORDER_CLAIMS[dispatch_message_id])
+
+    order_channel = guild.get_channel(order_channel_id)
+    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+    if not isinstance(order_channel, discord.TextChannel) or not isinstance(dispatch_channel, discord.TextChannel) or dispatch_message_id is None:
+        return
+
+    try:
+        message = await dispatch_channel.fetch_message(dispatch_message_id)
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+        return
+
+    customer_id = data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
+    category = data.get("category")
+    item = data.get("item", "未紀錄")
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    payment_method = data.get("payment_method", "未紀錄")
+    companion_preference = data.get("companion_preference")
+    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+
+    claim_data = ORDER_CLAIMS.get(dispatch_message_id, {})
+    companion_ids = sorted(claim_data.get("companion", set())) if isinstance(claim_data, dict) else []
+    booster_ids = sorted(claim_data.get("booster", set())) if isinstance(claim_data, dict) else []
+    receiver_lines = []
+    if companion_ids:
+        receiver_lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+    if booster_ids:
+        receiver_lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+
+    embed = build_self_service_order_embed(
+        customer_mention=customer_mention,
+        category_label=category_label,
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        source_channel=order_channel,
+        companion_preference=companion_preference,
+        receiver_text="\n".join(receiver_lines) if receiver_lines else None,
+    )
+    embed.add_field(
+        name="接單狀態",
+        value=(
+            "已存單，接單面板已鎖定\n"
+            f"存單原因：{reason}\n"
+            f"預計恢復：{expected_time or '未填寫'}"
+        ),
+        inline=False,
+    )
+    if note:
+        embed.add_field(name="存單備註", value=note[:1024], inline=False)
+
+    await message.edit(
+        embed=embed,
+        view=DispatchClaimView(
+            customer_id=customer_id or 0,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            payment_method=payment_method,
+            source_channel_id=order_channel.id,
+            companion_preference=companion_preference,
+            locked=True,
+            status="stored",
+        ),
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+
+class StoredOrderNoteModal(discord.ui.Modal, title="修改存單備註"):
+    reason = discord.ui.TextInput(
+        label="存單原因",
+        placeholder="例如：顧客改約、等待活動、暫停服務",
+        required=True,
+        max_length=200,
+    )
+    expected_time = discord.ui.TextInput(
+        label="預計恢復時間",
+        placeholder="例如：今晚 20:00、明天、未定",
+        required=False,
+        max_length=100,
+    )
+    note = discord.ui.TextInput(
+        label="備註",
+        placeholder="可填寫付款狀態、注意事項或客服備註",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=800,
+    )
+
+    def __init__(self, order_channel_id: int, parent_view: "StoredOrderManageView"):
+        super().__init__()
+        self.order_channel_id = order_channel_id
+        self.parent_view = parent_view
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
+        self.reason.default = str(data.get("stored_reason") or data.get("store_reason") or "")[:200]
+        self.expected_time.default = str(data.get("stored_expected_time") or data.get("resume_at") or "")[:100]
+        self.note.default = str(data.get("stored_note") or data.get("note") or "")[:800]
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以修改存單。", ephemeral=True)
+            return
+        if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await update_stored_order_note_and_panel(
+                guild=interaction.guild,
+                order_channel_id=self.order_channel_id,
+                reason=self.reason.value.strip(),
+                expected_time=self.expected_time.value.strip() or None,
+                note=self.note.value.strip() or None,
+                operator=interaction.user,
+            )
+        except ValueError as e:
+            await interaction.followup.send(str(e), ephemeral=True)
+            return
+
+        await send_order_log(
+            interaction.guild,
+            title="修改存單備註",
+            fields=[
+                ("票口 ID", str(self.order_channel_id), True),
+                ("操作人員", interaction.user.mention, True),
+                ("存單原因", self.reason.value.strip(), False),
+                ("預計恢復", self.expected_time.value.strip() or "未填寫", True),
+                ("備註", self.note.value.strip() or "未填寫", False),
+            ],
+            color=discord.Color.gold(),
+        )
+        await interaction.followup.send("已更新存單備註。", ephemeral=True)
+
+
+class StoredOrderSelect(discord.ui.Select):
+    def __init__(self, records: list[tuple[int, dict]], selected_channel_id: int | None = None):
+        options = []
+        for channel_id, data in records[:25]:
+            options.append(
+                discord.SelectOption(
+                    label=format_stored_order_option_label(channel_id, data),
+                    value=str(channel_id),
+                    description=format_stored_order_option_description(channel_id, data),
+                    default=selected_channel_id == channel_id,
+                )
+            )
+
+        if not options:
+            options = [discord.SelectOption(label="目前沒有存單", value="none", description="沒有可管理的存單")]
+            disabled = True
+        else:
+            disabled = False
+
+        super().__init__(
+            placeholder="選擇要管理的存單",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="stored_order_select",
+            disabled=disabled,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以管理存單。", ephemeral=True)
+            return
+        if self.values[0] == "none":
+            await interaction.response.defer()
+            return
+
+        view = self.view
+        if not isinstance(view, StoredOrderManageView):
+            await interaction.response.send_message("存單面板狀態異常，請重新使用 /stored_orders。", ephemeral=True)
+            return
+
+        view.selected_channel_id = int(self.values[0])
+        view.refresh_items()
+        embed = view.build_embed(interaction.guild)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class StoredOrderCancelConfirmView(discord.ui.View):
+    def __init__(self, order_channel_id: int):
+        super().__init__(timeout=60)
+        self.order_channel_id = order_channel_id
+
+    @discord.ui.button(label="確認取消存單", style=discord.ButtonStyle.danger)
+    async def confirm_cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以取消存單。", ephemeral=True)
+            return
+        if interaction.guild is None:
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        channel = interaction.guild.get_channel(self.order_channel_id)
+        await interaction.response.defer(ephemeral=True)
+
+        await delete_dispatch_claim_panel_for_order(interaction.guild, self.order_channel_id)
+
+        if isinstance(channel, discord.TextChannel):
+            try:
+                await channel.send(
+                    f"此存單已由 {interaction.user.mention} 取消，票口將在 3 秒後關閉。",
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+                await asyncio.sleep(3)
+                await channel.delete(reason=f"Stored order cancelled by {interaction.user}")
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+
+        await send_order_log(
+            interaction.guild,
+            title="存單已取消",
+            fields=[
+                ("票口 ID", str(self.order_channel_id), True),
+                ("操作人員", interaction.user.mention, True),
+            ],
+            color=discord.Color.red(),
+        )
+        await interaction.followup.send("已取消存單，並嘗試刪除票口與派單面板。", ephemeral=True)
+
+    @discord.ui.button(label="保留存單", style=discord.ButtonStyle.secondary)
+    async def keep_stored(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="已保留存單。", view=None)
+
+
+class StoredOrderManageView(discord.ui.View):
+    def __init__(self, records: list[tuple[int, dict]]):
+        super().__init__(timeout=300)
+        self.records = records
+        self.selected_channel_id = records[0][0] if records else None
+        self.refresh_items()
+
+    def refresh_items(self):
+        self.clear_items()
+        current_ids = {channel_id for channel_id, _ in self.records}
+        if self.selected_channel_id not in current_ids:
+            self.selected_channel_id = self.records[0][0] if self.records else None
+        self.add_item(StoredOrderSelect(self.records, self.selected_channel_id))
+        self.add_item(StoredOrderResumeButton())
+        self.add_item(StoredOrderEditNoteButton())
+        self.add_item(StoredOrderCancelButton())
+        self.add_item(StoredOrderRefreshButton())
+        disabled = self.selected_channel_id is None
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and child.custom_id != "stored_order_refresh_button":
+                child.disabled = disabled
+
+    def get_selected_data(self) -> tuple[int | None, dict | None]:
+        if self.selected_channel_id is None:
+            return None, None
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(self.selected_channel_id)
+        if not isinstance(data, dict) or str(data.get("status", "")).lower() != "stored":
+            return self.selected_channel_id, None
+        return self.selected_channel_id, data
+
+    def build_embed(self, guild: discord.Guild | None) -> discord.Embed:
+        channel_id, data = self.get_selected_data()
+        return build_stored_order_detail_embed(guild, channel_id, data, len(get_stored_order_records(25)))
+
+    async def refresh_message(self, interaction: discord.Interaction):
+        self.records = get_stored_order_records(25)
+        self.refresh_items()
+        await interaction.response.edit_message(embed=self.build_embed(interaction.guild), view=self)
+
+
+class StoredOrderResumeButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="恢復訂單", style=discord.ButtonStyle.success, custom_id="stored_order_resume_button", row=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以恢復存單。", ephemeral=True)
+            return
+        view = self.view
+        if not isinstance(view, StoredOrderManageView) or view.selected_channel_id is None:
+            await interaction.response.send_message("請先選擇要恢復的存單。", ephemeral=True)
+            return
+        if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+        order_channel = interaction.guild.get_channel(view.selected_channel_id)
+        if not isinstance(order_channel, discord.TextChannel):
+            await interaction.response.send_message("找不到這筆存單的票口，無法恢復。", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await resume_stored_order(interaction.guild, order_channel, interaction.user)
+        except ValueError as e:
+            await interaction.followup.send(str(e), ephemeral=True)
+            return
+
+        await order_channel.send(
+            f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+        await send_order_log(
+            interaction.guild,
+            title="存單已恢復",
+            fields=[("票口", order_channel.mention, True), ("操作人員", interaction.user.mention, True)],
+            color=discord.Color.green(),
+        )
+        await interaction.followup.send("已恢復存單。", ephemeral=True)
+
+
+class StoredOrderEditNoteButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="修改備註", style=discord.ButtonStyle.primary, custom_id="stored_order_edit_note_button", row=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以修改存單。", ephemeral=True)
+            return
+        view = self.view
+        if not isinstance(view, StoredOrderManageView) or view.selected_channel_id is None:
+            await interaction.response.send_message("請先選擇要修改的存單。", ephemeral=True)
+            return
+        await interaction.response.send_modal(StoredOrderNoteModal(view.selected_channel_id, view))
+
+
+class StoredOrderCancelButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="取消存單", style=discord.ButtonStyle.danger, custom_id="stored_order_cancel_button", row=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以取消存單。", ephemeral=True)
+            return
+        view = self.view
+        if not isinstance(view, StoredOrderManageView) or view.selected_channel_id is None:
+            await interaction.response.send_message("請先選擇要取消的存單。", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "確定要取消這筆存單嗎？這會嘗試刪除派單面板與票口，且不會列入已結營收。",
+            view=StoredOrderCancelConfirmView(view.selected_channel_id),
+            ephemeral=True,
+        )
+
+
+class StoredOrderRefreshButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="重新整理", style=discord.ButtonStyle.secondary, custom_id="stored_order_refresh_button", row=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _require_customer_staff_or_manager(interaction):
+            await interaction.response.send_message("只有客服、店長或管理員可以管理存單。", ephemeral=True)
+            return
+        view = self.view
+        if not isinstance(view, StoredOrderManageView):
+            await interaction.response.send_message("存單面板狀態異常，請重新使用 /stored_orders。", ephemeral=True)
+            return
+        await view.refresh_message(interaction)
+
+
+@bot.tree.command(
+    name="stored_orders",
+    description="客服查看與管理目前所有存單",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(limit="最多顯示幾筆存單，預設 25，最多 25")
+async def stored_orders(interaction: discord.Interaction, limit: int = 25):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以查看存單。", ephemeral=True)
+        return
+
+    safe_limit = max(1, min(int(limit or 25), 25))
+    records = get_stored_order_records(safe_limit)
+    view = StoredOrderManageView(records)
+    await interaction.response.send_message(
+        embed=view.build_embed(interaction.guild),
+        view=view,
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
 
 
 @bot.tree.command(
