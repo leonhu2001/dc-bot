@@ -22,6 +22,13 @@ from core.time_utils import (
     _parse_datetime_safe,
 )
 
+from core.config import (
+    _config_int,
+    _config_int_list,
+    _config_str,
+    _config_str_list,
+)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -163,75 +170,8 @@ TEMP_VOICE_CONTROL_PANELS = {}
 
 
 # ========= 外部設定檔覆蓋 =========
-# config.json 可覆蓋下方頻道 / 身分組 / 類別 ID。
-# 沒有 config.json 時會完全沿用上面的預設值，避免部署時漏檔導致 Bot 掛掉。
-CONFIG_FILE = Path(__file__).parent / "config.json"
-
-
-def _load_external_config() -> dict:
-    if not CONFIG_FILE.exists():
-        return {}
-
-    try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"讀取 config.json 失敗，已使用程式內建預設值：{e}")
-        return {}
-
-    if not isinstance(data, dict):
-        print("config.json 格式錯誤，最外層必須是 JSON object，已使用程式內建預設值。")
-        return {}
-
-    return data
-
-
-BOT_CONFIG = _load_external_config()
-
-
-def _config_value(key: str, default):
-    return BOT_CONFIG.get(key, default)
-
-
-def _config_int(key: str, default: int) -> int:
-    value = _config_value(key, default)
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        print(f"config.json 的 {key} 不是有效整數，已使用預設值：{default}")
-        return int(default)
-
-
-def _config_int_list(key: str, default: list[int]) -> list[int]:
-    value = _config_value(key, default)
-
-    if not isinstance(value, list):
-        print(f"config.json 的 {key} 必須是陣列，已使用預設值。")
-        return list(default)
-
-    result = []
-    for item in value:
-        try:
-            result.append(int(item))
-        except (TypeError, ValueError):
-            print(f"config.json 的 {key} 內含無效 ID：{item}，已略過。")
-
-    return result if result else list(default)
-
-
-def _config_str(key: str, default: str) -> str:
-    value = _config_value(key, default)
-    if value is None:
-        return default
-    return str(value)
-
-
-def _config_str_list(key: str, default: list[str]) -> list[str]:
-    value = _config_value(key, default)
-    if not isinstance(value, list):
-        print(f"config.json 的 {key} 必須是字串陣列，已使用預設值。")
-        return list(default)
-    return [str(item) for item in value]
+# config.json 讀取邏輯已搬到 core/config.py。
+# 這裡只保留「把設定套用到預設值」的區塊，降低 bot.py 負擔。
 
 
 # 伺服器 / 類別
