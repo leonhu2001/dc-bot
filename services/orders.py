@@ -123,3 +123,43 @@ def get_order_amount_for_maintenance(data: dict) -> int:
                     return max(0, int(parsed))
 
     return 0
+
+def get_order_amount_for_stats(data: dict) -> int:
+    """Safely parse order amount for sales/statistics reports."""
+    if not isinstance(data, dict):
+        return 0
+
+    for key in ("reward_amount", "amount", "total_amount"):
+        value = data.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            if _PARSE_RECEIPT_AMOUNT is not None:
+                parsed = _PARSE_RECEIPT_AMOUNT(str(value))
+                if parsed is not None:
+                    return int(parsed)
+    return 0
+
+
+def is_closed_order_for_stats(data: dict) -> bool:
+    """Return whether an order should count as completed in sales stats."""
+    if not isinstance(data, dict):
+        return False
+    return bool(data.get("closed")) or str(data.get("status", "")).lower() == "closed"
+
+
+def is_stored_order_for_stats(data: dict) -> bool:
+    """Return whether an order is currently stored/paused."""
+    if not isinstance(data, dict):
+        return False
+    return str(data.get("status", "")).lower() == "stored"
+
+
+def is_cancelled_order_for_stats(data: dict) -> bool:
+    """Return whether an order is cancelled, accepting both spellings."""
+    if not isinstance(data, dict):
+        return False
+    return str(data.get("status", "")).lower() in {"cancelled", "canceled"}
+

@@ -100,6 +100,10 @@ from services.orders import (
     find_order_by_identifier,
     is_order_closed_for_rewards,
     get_order_amount_for_maintenance,
+    get_order_amount_for_stats,
+    is_closed_order_for_stats,
+    is_stored_order_for_stats,
+    is_cancelled_order_for_stats,
 )
 
 import discord
@@ -6126,30 +6130,8 @@ def _get_order_closed_time(data: dict) -> datetime | None:
     )
 
 
-def _get_order_amount_for_stats(data: dict) -> int:
-    for key in ("reward_amount", "amount", "total_amount"):
-        value = data.get(key)
-        if value is None:
-            continue
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            parsed = parse_receipt_amount(str(value))
-            if parsed is not None:
-                return parsed
-    return 0
 
 
-def _is_closed_order_for_stats(data: dict) -> bool:
-    return bool(data.get("closed")) or str(data.get("status", "")).lower() == "closed"
-
-
-def _is_stored_order_for_stats(data: dict) -> bool:
-    return str(data.get("status", "")).lower() == "stored"
-
-
-def _is_cancelled_order_for_stats(data: dict) -> bool:
-    return str(data.get("status", "")).lower() in {"cancelled", "canceled"}
 
 
 def _normalize_stats_datetime_text(value: str | None) -> str | None:
@@ -6206,11 +6188,11 @@ def _get_sales_stats_from_sqlite(start_dt: datetime, end_dt: datetime) -> tuple[
                         if not isinstance(data, dict):
                             continue
 
-                        if _is_stored_order_for_stats(data):
+                        if is_stored_order_for_stats(data):
                             stored_count += 1
-                        if _is_cancelled_order_for_stats(data):
+                        if is_cancelled_order_for_stats(data):
                             cancelled_count += 1
-                        if not _is_closed_order_for_stats(data):
+                        if not is_closed_order_for_stats(data):
                             continue
 
                         closed_text = _normalize_stats_datetime_text(
@@ -6220,7 +6202,7 @@ def _get_sales_stats_from_sqlite(start_dt: datetime, end_dt: datetime) -> tuple[
                             continue
 
                         completed_count += 1
-                        total_revenue += _get_order_amount_for_stats(data)
+                        total_revenue += get_order_amount_for_stats(data)
 
                 # 舊補登或正式 relational orders：orders(... amount/status/closed_at ...)
                 if {"amount", "status"}.issubset(order_columns):
