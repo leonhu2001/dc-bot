@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, MutableMapping
 
 _DB_FILE: Path | None = None
+_DATA_FILE: Path | None = None
 _INIT_DATABASE: Callable[[], None] | None = None
 _BACKUP_DIR: Path | None = None
 _BACKUP_KEEP_DAYS: int = 30
@@ -168,6 +169,60 @@ def _deserialize_customer_data(data: dict) -> dict:
         "vip_downgrade_logs": list(data.get("vip_downgrade_logs", [])) if isinstance(data.get("vip_downgrade_logs", []), list) else [],
     }
 
+def load_bot_data_from_json() -> bool:
+    """從舊版 bot_data.json 載入資料到目前記憶體 dict。
+
+    這是 SQLite 沒資料時的備援 / 遷移入口。
+    """
+    if _DATA_FILE is None:
+        raise RuntimeError("database module 尚未設定 DATA_FILE，請先呼叫 configure_database(..., data_file=DATA_FILE)")
+
+    order_selections, order_claims, customer_rewards, order_counters = _require_all_data_access()
+
+    if not _DATA_FILE.exists():
+        return False
+
+    try:
+        with _DATA_FILE.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"讀取 bot_data.json 失敗：{e}")
+        return False
+
+    order_selections.clear()
+    order_claims.clear()
+    customer_rewards.clear()
+    order_counters.clear()
+
+    for channel_id_text, data in payload.get("orders", {}).items():
+        channel_id = _to_int(channel_id_text)
+        if channel_id is None or not isinstance(data, dict):
+            continue
+        order_selections[channel_id] = data
+
+    for message_id_text, data in payload.get("claims", {}).items():
+        message_id = _to_int(message_id_text)
+        if message_id is None or not isinstance(data, dict):
+            continue
+        order_claims[message_id] = _deserialize_claim_data(data)
+
+    for user_id_text, data in payload.get("customers", {}).items():
+        user_id = _to_int(user_id_text)
+        if user_id is None or not isinstance(data, dict):
+            continue
+        customer_rewards[user_id] = _deserialize_customer_data(data)
+
+    for day_text, count in payload.get("order_counters", {}).items():
+        if not isinstance(day_text, str):
+            continue
+        count_int = _to_int(count)
+        if count_int is None:
+            continue
+        order_counters[day_text] = count_int
+
+    return True
+
+
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     """保存單筆訂單暫存資料並同步到資料庫。"""
@@ -201,10 +256,12 @@ def configure_database(
     *,
     backup_dir: str | Path | None = None,
     backup_keep_days: int = 30,
+    data_file: str | Path | None = None,
 ) -> None:
-    """設定資料庫模組使用的 DB 路徑、初始化函式與備份資料夾。"""
-    global _DB_FILE, _INIT_DATABASE, _BACKUP_DIR, _BACKUP_KEEP_DAYS
+    """設定資料庫模組使用的 DB 路徑、初始化函式、備份資料夾與舊 JSON 檔路徑。"""
+    global _DB_FILE, _DATA_FILE, _INIT_DATABASE, _BACKUP_DIR, _BACKUP_KEEP_DAYS
     _DB_FILE = Path(db_file)
+    _DATA_FILE = Path(data_file) if data_file is not None else _DB_FILE.parent / "bot_data.json"
     _INIT_DATABASE = init_database_func
     _BACKUP_DIR = Path(backup_dir) if backup_dir is not None else _DB_FILE.parent / "backups"
     _BACKUP_KEEP_DAYS = int(backup_keep_days or 30)

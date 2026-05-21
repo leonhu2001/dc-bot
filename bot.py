@@ -43,6 +43,7 @@ from core.database import (
     _serialize_order_counters,
     _deserialize_claim_data,
     _deserialize_customer_data,
+    load_bot_data_from_json,
     delete_order_row_from_db,
     delete_claim_row_from_db,
     remember_order_data,
@@ -2087,51 +2088,6 @@ def load_bot_data_from_sqlite() -> bool:
     return True
 
 
-def load_bot_data_from_json() -> bool:
-    if not DATA_FILE.exists():
-        return False
-
-    try:
-        with DATA_FILE.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"讀取 bot_data.json 失敗：{e}")
-        return False
-
-    SELF_SERVICE_ORDER_SELECTIONS.clear()
-    ORDER_CLAIMS.clear()
-    CUSTOMER_REWARDS.clear()
-    ORDER_COUNTERS.clear()
-
-    for channel_id_text, data in payload.get("orders", {}).items():
-        channel_id = _to_int(channel_id_text)
-        if channel_id is None or not isinstance(data, dict):
-            continue
-        SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
-
-    for message_id_text, data in payload.get("claims", {}).items():
-        message_id = _to_int(message_id_text)
-        if message_id is None or not isinstance(data, dict):
-            continue
-        ORDER_CLAIMS[message_id] = _deserialize_claim_data(data)
-
-    for user_id_text, data in payload.get("customers", {}).items():
-        user_id = _to_int(user_id_text)
-        if user_id is None or not isinstance(data, dict):
-            continue
-        CUSTOMER_REWARDS[user_id] = _deserialize_customer_data(data)
-
-    for day_text, count in payload.get("order_counters", {}).items():
-        if not isinstance(day_text, str):
-            continue
-        count_int = _to_int(count)
-        if count_int is None:
-            continue
-        ORDER_COUNTERS[day_text] = count_int
-
-    return True
-
-
 def load_bot_data() -> None:
     # 先讀 SQLite；若還沒有資料，讀舊 JSON 並立即寫入 SQLite。
     if load_bot_data_from_sqlite():
@@ -3629,7 +3585,7 @@ def save_bot_data() -> None:
 
 
 
-configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS)
+configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
 configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, CUSTOMER_REWARDS, ORDER_COUNTERS, save_bot_data, order_id_prefix=ORDER_ID_PREFIX)
 
 
