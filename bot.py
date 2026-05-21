@@ -3674,15 +3674,23 @@ def delete_order_row_from_db(channel_id: int) -> None:
 
 
 def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: int | None = None) -> None:
-    """明確刪除 claims。可用派單訊息 ID 或來源票口 ID。"""
+    """明確刪除 claims。可用派單訊息 ID 或來源票口 ID。
+
+    同時相容舊版 message_id 欄位與新版 dispatch_message_id 欄位，
+    避免 relational schema 沒有 message_id 時刪除失敗。
+    """
     init_database()
     try:
         with sqlite3.connect(DB_FILE) as conn:
+            cur = conn.cursor()
+            cols = _db_columns(cur, "claims")
             if message_id is not None:
-                conn.execute("DELETE FROM claims WHERE dispatch_message_id=?", (int(message_id),))
-                conn.execute("DELETE FROM claims WHERE message_id=?", (int(message_id),))
-            if source_channel_id is not None:
-                conn.execute("DELETE FROM claims WHERE source_channel_id=?", (int(source_channel_id),))
+                if "dispatch_message_id" in cols:
+                    cur.execute("DELETE FROM claims WHERE dispatch_message_id=?", (int(message_id),))
+                if "message_id" in cols:
+                    cur.execute("DELETE FROM claims WHERE message_id=?", (int(message_id),))
+            if source_channel_id is not None and "source_channel_id" in cols:
+                cur.execute("DELETE FROM claims WHERE source_channel_id=?", (int(source_channel_id),))
             conn.commit()
     except sqlite3.Error as e:
         print(f"刪除 claims 資料失敗：{e}")
@@ -7676,6 +7684,286 @@ async def check_vip_downgrades(interaction: discord.Interaction, force: bool = F
 
     await interaction.followup.send(
         f"VIP 降階檢查完成，已降階 {changed_count} 位會員。\n{preview}",
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+
+def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
+    """用訂單編號或票口 ID 找訂單。"""
+    target = str(identifier).strip()
+    if not target:
+        return None, None
+
+    parsed_channel_id = _to_int(target)
+    if parsed_channel_id is not None and parsed_channel_id in SELF_SERVICE_ORDER_SELECTIONS:
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(parsed_channel_id)
+        if isinstance(data, dict):
+            return parsed_channel_id, data
+
+    for channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items():
+        if not isinstance(data, dict):
+            continue
+        if str(data.get("order_no") or data.get("receipt_id") or "").strip() == target:
+            return int(channel_id), data
+
+    return None, None
+
+
+def order_is_reward_counted(data: dict) -> bool:
+    status = str(data.get("status") or ("closed" if data.get("closed") else "active")).lower()
+    return bool(data.get("reward_counted")) or status == "closed" or bool(data.get("closed"))
+
+
+def adjust_customer_reward_for_deleted_or_changed_order(
+    customer_id: int | None,
+    amount_delta: int,
+    order_delta: int = 0,
+) -> None:
+    """調整會員累積。amount_delta 可正可負；order_delta 可正可負。"""
+    if customer_id is None:
+        return
+
+    data = get_customer_reward_data(int(customer_id))
+    data["total_spent"] = max(0, int(data.get("total_spent", 0) or 0) + int(amount_delta))
+    data["order_count"] = max(0, int(data.get("order_count", 0) or 0) + int(order_delta))
+    data["points"] = get_current_reward_points(data)
+    sync_vip_level_to_cumulative_if_higher(data)
+    CUSTOMER_REWARDS[int(customer_id)] = data
+
+
+def format_order_admin_summary(channel_id: int, data: dict) -> str:
+    order_no = data.get("order_no") or data.get("receipt_id") or "未產生"
+    customer_id = data.get("customer_id")
+    customer_text = f"<@{customer_id}>" if customer_id else "未紀錄"
+    item = data.get("item") or "未紀錄"
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    amount = _compat_order_amount(data)
+    status = str(data.get("status") or ("closed" if data.get("closed") else "active"))
+    ticket_text = f"<#{channel_id}>" if int(channel_id) > 0 else f"歷史資料 {channel_id}"
+    return (
+        f"訂單：{order_no}\n"
+        f"顧客：{customer_text}\n"
+        f"項目：{item} x{quantity}\n"
+        f"金額：{format_t_amount(amount) if amount else '未紀錄'}\n"
+        f"狀態：{status}\n"
+        f"票口：{ticket_text}"
+    )
+
+
+@bot.tree.command(
+    name="delete_order",
+    description="管理員刪除訂單資料，會同步扣回會員累積",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    identifier="訂單編號或票口 ID，例如 MO20260521003",
+    confirm="確認刪除請選 True，預設 False 只預覽"
+)
+async def delete_order(
+    interaction: discord.Interaction,
+    identifier: str,
+    confirm: bool = False,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以刪除訂單。", ephemeral=True)
+        return
+
+    channel_id, data = find_order_by_identifier(identifier)
+    if channel_id is None or data is None:
+        await interaction.response.send_message("找不到這筆訂單，請確認訂單編號或票口 ID。", ephemeral=True)
+        return
+
+    summary = format_order_admin_summary(channel_id, data)
+    customer_id = _to_int(data.get("customer_id"))
+    amount = _compat_order_amount(data)
+    should_deduct_reward = order_is_reward_counted(data)
+
+    if not confirm:
+        await interaction.response.send_message(
+            "找到訂單，但尚未刪除。若確認要刪，請重新執行並把 confirm 設為 True。\n\n"
+            f"```text\n{summary}\n```\n"
+            f"會同步扣回會員累積：{'是' if should_deduct_reward else '否'}",
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return
+
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    if dispatch_message_id is not None:
+        ORDER_CLAIMS.pop(dispatch_message_id, None)
+        delete_claim_row_from_db(message_id=dispatch_message_id)
+
+    delete_claim_row_from_db(source_channel_id=channel_id)
+    SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
+    delete_order_row_from_db(channel_id)
+
+    if should_deduct_reward and customer_id is not None:
+        adjust_customer_reward_for_deleted_or_changed_order(customer_id, -amount, -1)
+
+    save_bot_data()
+
+    await send_order_log(
+        interaction.guild,
+        title="管理員刪除訂單",
+        fields=[
+            ("操作人", interaction.user.mention, True),
+            ("訂單", str(data.get("order_no") or data.get("receipt_id") or identifier), True),
+            ("顧客", f"<@{customer_id}>" if customer_id else "未紀錄", True),
+            ("扣回金額", format_t_amount(amount) if should_deduct_reward else "未扣會員累積", True),
+            ("原始資料", summary, False),
+        ],
+        color=discord.Color.red(),
+    )
+
+    await interaction.response.send_message(
+        f"已刪除訂單。\n```text\n{summary}\n```",
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
+
+
+@bot.tree.command(
+    name="fix_order_amount",
+    description="管理員修正訂單金額，已結單會同步修正會員累積",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    identifier="訂單編號或票口 ID",
+    amount="修正後金額，例如 1275",
+    note="修正原因，可不填"
+)
+async def fix_order_amount(
+    interaction: discord.Interaction,
+    identifier: str,
+    amount: int,
+    note: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以修正訂單金額。", ephemeral=True)
+        return
+
+    if amount < 0:
+        await interaction.response.send_message("金額不能小於 0。", ephemeral=True)
+        return
+
+    channel_id, data = find_order_by_identifier(identifier)
+    if channel_id is None or data is None:
+        await interaction.response.send_message("找不到這筆訂單，請確認訂單編號或票口 ID。", ephemeral=True)
+        return
+
+    old_amount = _compat_order_amount(data)
+    delta = int(amount) - int(old_amount)
+    customer_id = _to_int(data.get("customer_id"))
+    should_adjust_reward = order_is_reward_counted(data)
+
+    data["amount"] = int(amount)
+    data["total_amount"] = int(amount)
+    if data.get("reward_counted") or data.get("reward_amount") is not None:
+        data["reward_amount"] = int(amount)
+    if note:
+        old_note = str(data.get("note") or "")
+        data["note"] = (old_note + ("｜" if old_note else "") + f"修正金額：{note}")[:1000]
+
+    SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
+
+    if should_adjust_reward and customer_id is not None and delta != 0:
+        adjust_customer_reward_for_deleted_or_changed_order(customer_id, delta, 0)
+
+    remember_order_data(channel_id, data)
+    save_bot_data()
+
+    await send_order_log(
+        interaction.guild,
+        title="管理員修正訂單金額",
+        fields=[
+            ("操作人", interaction.user.mention, True),
+            ("訂單", str(data.get("order_no") or data.get("receipt_id") or identifier), True),
+            ("顧客", f"<@{customer_id}>" if customer_id else "未紀錄", True),
+            ("原金額", format_t_amount(old_amount), True),
+            ("新金額", format_t_amount(int(amount)), True),
+            ("會員累積調整", format_t_amount(delta) if should_adjust_reward else "未調整", True),
+            ("原因", note or "未填寫", False),
+        ],
+        color=discord.Color.orange(),
+    )
+
+    await interaction.response.send_message(
+        f"已修正訂單金額：{format_t_amount(old_amount)} → {format_t_amount(int(amount))}。"
+        f"會員累積{'已同步調整' if should_adjust_reward else '未調整，因為此單未結算會員累積'}。",
+        ephemeral=True,
+    )
+
+
+@bot.tree.command(
+    name="fix_order_customer",
+    description="管理員修正訂單顧客，已結單會同步轉移會員累積",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    identifier="訂單編號或票口 ID",
+    customer="新的正確顧客",
+    note="修正原因，可不填"
+)
+async def fix_order_customer(
+    interaction: discord.Interaction,
+    identifier: str,
+    customer: discord.Member,
+    note: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以修正訂單顧客。", ephemeral=True)
+        return
+
+    channel_id, data = find_order_by_identifier(identifier)
+    if channel_id is None or data is None:
+        await interaction.response.send_message("找不到這筆訂單，請確認訂單編號或票口 ID。", ephemeral=True)
+        return
+
+    old_customer_id = _to_int(data.get("customer_id"))
+    new_customer_id = int(customer.id)
+    amount = _compat_order_amount(data)
+    should_transfer_reward = order_is_reward_counted(data)
+
+    if old_customer_id == new_customer_id:
+        await interaction.response.send_message("這筆訂單目前已經是這位顧客，不需要修正。", ephemeral=True)
+        return
+
+    if should_transfer_reward:
+        adjust_customer_reward_for_deleted_or_changed_order(old_customer_id, -amount, -1)
+        adjust_customer_reward_for_deleted_or_changed_order(new_customer_id, amount, 1)
+
+    data["customer_id"] = new_customer_id
+    if note:
+        old_note = str(data.get("note") or "")
+        data["note"] = (old_note + ("｜" if old_note else "") + f"修正顧客：{note}")[:1000]
+
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    if dispatch_message_id is not None and dispatch_message_id in ORDER_CLAIMS:
+        ORDER_CLAIMS[dispatch_message_id]["customer_id"] = new_customer_id
+        remember_claim_data(dispatch_message_id, ORDER_CLAIMS[dispatch_message_id])
+
+    remember_order_data(channel_id, data)
+    save_bot_data()
+
+    await send_order_log(
+        interaction.guild,
+        title="管理員修正訂單顧客",
+        fields=[
+            ("操作人", interaction.user.mention, True),
+            ("訂單", str(data.get("order_no") or data.get("receipt_id") or identifier), True),
+            ("原顧客", f"<@{old_customer_id}>" if old_customer_id else "未紀錄", True),
+            ("新顧客", customer.mention, True),
+            ("金額", format_t_amount(amount), True),
+            ("會員累積轉移", "已轉移" if should_transfer_reward else "未轉移，因為此單未結算會員累積", True),
+            ("原因", note or "未填寫", False),
+        ],
+        color=discord.Color.orange(),
+    )
+
+    await interaction.response.send_message(
+        f"已修正訂單顧客：{f'<@{old_customer_id}>' if old_customer_id else '未紀錄'} → {customer.mention}。"
+        f"會員累積{'已同步轉移' if should_transfer_reward else '未轉移，因為此單未結算會員累積'}。",
         ephemeral=True,
         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
     )
