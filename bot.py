@@ -335,12 +335,6 @@ configure_review_views(
     review_channel_id=REVIEW_CHANNEL_ID,
 )
 
-configure_support_views(
-    complaint_receive_channel_id=COMPLAINT_RECEIVE_CHANNEL_ID,
-    remove_recruit_applicant_role=remove_recruit_applicant_role,
-)
-
-
 # ========= Bot 設定 =========
 
 intents = discord.Intents.default()
@@ -448,6 +442,12 @@ async def remove_recruit_applicant_role(guild: discord.Guild | None, channel: di
         print("Bot 權限不足，無法收回入職申請暫時身分組。請確認 Bot 身分組位置高於該身分組。")
     except discord.HTTPException as e:
         print(f"收回入職申請暫時身分組失敗：{e}")
+
+
+configure_support_views(
+    complaint_receive_channel_id=COMPLAINT_RECEIVE_CHANNEL_ID,
+    remove_recruit_applicant_role=remove_recruit_applicant_role,
+)
 
 
 def get_order_customer_id_from_channel(channel: discord.TextChannel) -> int | None:
