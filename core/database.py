@@ -129,6 +129,46 @@ def _json_default(value: Any):
     return str(value)
 
 
+def _deserialize_claim_data(data: dict) -> dict:
+    return {
+        "companion": {uid for uid in (_to_int(x) for x in data.get("companion", [])) if uid is not None},
+        "booster": {uid for uid in (_to_int(x) for x in data.get("booster", [])) if uid is not None},
+        "locked": bool(data.get("locked", False)),
+        "customer_id": data.get("customer_id"),
+        "category_label": data.get("category_label"),
+        "item": data.get("item"),
+        "quantity": _to_int(data.get("quantity"), 1) or 1,
+        "payment_method": data.get("payment_method"),
+        "source_channel_id": data.get("source_channel_id"),
+        "companion_preference": data.get("companion_preference"),
+        "dispatch_channel_id": data.get("dispatch_channel_id"),
+        "status": data.get("status", "active"),
+        "stored_at": data.get("stored_at"),
+        "stored_by": data.get("stored_by"),
+        "stored_reason": data.get("stored_reason"),
+        "stored_expected_time": data.get("stored_expected_time"),
+        "stored_note": data.get("stored_note"),
+    }
+
+
+def _deserialize_customer_data(data: dict) -> dict:
+    return {
+        "total_spent": _to_int(data.get("total_spent"), 0) or 0,
+        "order_count": _to_int(data.get("order_count"), 0) or 0,
+        "last_order_at": data.get("last_order_at"),
+        "points": _to_int(data.get("points"), 0) or 0,
+        "point_adjustment": _to_int(data.get("point_adjustment"), 0) or 0,
+        "point_adjustment_logs": list(data.get("point_adjustment_logs", [])) if isinstance(data.get("point_adjustment_logs", []), list) else [],
+        "platinum_channel_id": _to_int(data.get("platinum_channel_id")),
+        "manual_purchase_keys": list(data.get("manual_purchase_keys", [])) if isinstance(data.get("manual_purchase_keys", []), list) else [],
+        "notes": list(data.get("notes", [])) if isinstance(data.get("notes", []), list) else [],
+        "vip_level_index": _to_int(data.get("vip_level_index")),
+        "vip_progress_base_total_spent": _to_int(data.get("vip_progress_base_total_spent")),
+        "vip_last_downgrade_check_month": data.get("vip_last_downgrade_check_month"),
+        "vip_downgrade_logs": list(data.get("vip_downgrade_logs", [])) if isinstance(data.get("vip_downgrade_logs", []), list) else [],
+    }
+
+
 def remember_order_data(channel_id: int, data: dict) -> None:
     """保存單筆訂單暫存資料並同步到資料庫。"""
     order_selections, _, save_bot_data = _require_data_access()
