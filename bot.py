@@ -6961,18 +6961,25 @@ async def fix_order_customer(
 
 # ========= 資料庫健康檢查指令 =========
 
+def audit_amount_text(amount) -> str:
+    """Format money for /audit_data.
+
+    This function is intentionally local to the audit block and does not depend on
+    reward-service helpers, so /audit_data will not break during modularization.
+    """
+    try:
+        value = int(amount or 0)
+    except (TypeError, ValueError):
+        return f"{amount}T"
+    return f"{value:,}T"
+
+
 def _audit_order_status(data: dict) -> str:
     return str(data.get("status") or ("closed" if data.get("closed") else "active")).lower()
 
 
-def format_order_amount(amount: int) -> str:
-    """Audit report amount formatter.
-
-    Some older audit report code paths used format_order_amount(), while
-    the rewards module exposes format_t_amount(). Keep this small alias so
-    /audit_data will not fail if either name is referenced.
-    """
-    return format_t_amount(int(amount or 0))
+def _audit_order_amount(data: dict) -> int:
+    return get_order_amount_for_maintenance(data)
 
 
 def _audit_closed_orders_by_customer() -> dict[int, dict]:
@@ -6998,7 +7005,7 @@ def _audit_closed_orders_by_customer() -> dict[int, dict]:
                 "channel_ids": [],
             }
         )
-        bucket["amount"] += get_order_amount_for_maintenance(data)
+        bucket["amount"] += _audit_order_amount(data)
         bucket["quantity"] += _to_int(data.get("quantity"), 1) or 1
         bucket["orders"] += 1
         bucket["channel_ids"].append(channel_id)
@@ -7054,7 +7061,7 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
             continue
 
         status = _audit_order_status(data)
-        amount = get_order_amount_for_maintenance(data)
+        amount = _audit_order_amount(data)
         order_no = str(data.get("order_no") or data.get("receipt_id") or "").strip()
         dispatch_message_id = _to_int(data.get("dispatch_message_id"))
 
@@ -7111,16 +7118,16 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
         customer_id = data.get("customer_id")
         customer_text = f"<@{customer_id}>" if customer_id else "未紀錄"
         item = data.get("item") or "未紀錄"
-        amount = get_order_amount_for_maintenance(data)
+        amount = _audit_order_amount(data)
         status = _audit_order_status(data)
-        return f"{order_no}｜票口 {channel_id}｜{customer_text}｜{item}｜{format_t_amount(amount)}｜{status}"
+        return f"{order_no}｜票口 {channel_id}｜{customer_text}｜{item}｜{audit_amount_text(amount)}｜{status}"
 
     if customer_mismatches:
         detail_lines.append("\n【會員 / 已結訂單對帳異常】")
         for item in customer_mismatches[:safe_limit]:
             detail_lines.append(
-                f"<@{item['customer_id']}>｜會員累積 {format_t_amount(item['customer_total'])} / "
-                f"已結訂單 {format_t_amount(item['closed_amount'])} / 差額 {format_t_amount(item['amount_diff'])}｜"
+                f"<@{item['customer_id']}>｜會員累積 {audit_amount_text(item['customer_total'])} / "
+                f"已結訂單 {audit_amount_text(item['closed_amount'])} / 差額 {audit_amount_text(item['amount_diff'])}｜"
                 f"會員單數 {item['customer_order_count']} / 已結數量 {item['closed_quantity']} / 差 {item['count_diff']}"
             )
         if len(customer_mismatches) > safe_limit:
@@ -7188,69 +7195,55 @@ async def audit_data(interaction: discord.Interaction, limit: int = 10):
         await interaction.response.send_message("只有客服、店長或管理員可以檢查資料庫健康狀態。", ephemeral=True)
         return
 
-    await interaction.response.defer(ephemeral=True, thinking=True)
-
-    started_at = asyncio.get_running_loop().time()
+    await interaction.response.defer(ephemeral=True)
+    started_at = get_taipei_now()
 
     try:
         embed, full_report = build_audit_data_report(limit=limit)
-        elapsed = asyncio.get_running_loop().time() - started_at
-
-        embed.add_field(
-            name="檢查耗時",
-            value=f"{elapsed:.2f} 秒",
-            inline=True,
-        )
-
-        if len(full_report) <= 3500:
-            embed.add_field(
-                name="檢查明細",
-                value=f"```text\n{full_report[:1000]}\n```" if len(full_report) <= 1000 else "明細較長，請看下方文字。",
-                inline=False,
-            )
-            await interaction.followup.send(
-                embed=embed,
-                content=f"```text\n{full_report[:1900]}\n```" if len(full_report) <= 1900 else None,
-                ephemeral=True,
-                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-            )
-        else:
-            report_file = discord.File(
-                io.BytesIO(full_report.encode("utf-8")),
-                filename=f"audit_data_{get_taipei_now().strftime('%Y%m%d_%H%M%S')}.txt",
-            )
-            await interaction.followup.send(
-                embed=embed,
-                file=report_file,
-                ephemeral=True,
-                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-            )
-
-        await send_order_log(
-            interaction.guild,
-            title="資料庫健康檢查",
-            description=f"操作人員：{interaction.user.mention}\n耗時：{elapsed:.2f} 秒\n{embed.description}",
-            color=embed.color,
-        )
     except Exception as e:
-        elapsed = asyncio.get_running_loop().time() - started_at
         error_text = f"/audit_data 執行失敗：{type(e).__name__}: {e}"
-        print(error_text)
-
-        await interaction.followup.send(
-            f"資料庫健康檢查失敗，耗時 {elapsed:.2f} 秒。\n"
-            f"錯誤：`{type(e).__name__}: {str(e)[:300]}`\n"
-            "請到 VPS 查看 journalctl 取得完整 Traceback。",
-            ephemeral=True,
-        )
-
+        await interaction.followup.send(error_text, ephemeral=True)
         await send_order_log(
             interaction.guild,
             title="資料庫健康檢查失敗",
-            description=f"操作人員：{interaction.user.mention}\n耗時：{elapsed:.2f} 秒\n錯誤：{type(e).__name__}: {e}",
+            description=f"操作人員：{interaction.user.mention}\n```text\n{error_text[:1500]}\n```",
             color=discord.Color.red(),
         )
+        return
 
+    elapsed = (get_taipei_now() - started_at).total_seconds()
+    embed.add_field(name="檢查耗時", value=f"{elapsed:.2f} 秒", inline=True)
+
+    if len(full_report) <= 3500:
+        embed.add_field(
+            name="檢查明細",
+            value=f"```text\n{full_report[:1000]}\n```" if len(full_report) <= 1000 else "明細較長，請看下方文字。",
+            inline=False,
+        )
+        await interaction.followup.send(
+            embed=embed,
+            content=f"```text\n{full_report[:1900]}\n```" if len(full_report) <= 1900 else None,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+    else:
+        report_file = discord.File(
+            io.BytesIO(full_report.encode("utf-8")),
+            filename=f"audit_data_{get_taipei_now().strftime('%Y%m%d_%H%M%S')}.txt",
+        )
+        await interaction.followup.send(
+            embed=embed,
+            file=report_file,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+    await send_order_log(
+        interaction.guild,
+        title="資料庫健康檢查",
+        description=f"操作人員：{interaction.user.mention}\n耗時：{elapsed:.2f} 秒\n{embed.description}",
+        color=embed.color,
+    )
 
 
 # ========= 存單管理面板 =========
