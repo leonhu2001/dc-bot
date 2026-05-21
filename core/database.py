@@ -12,29 +12,40 @@ _BACKUP_KEEP_DAYS: int = 30
 
 _ORDER_SELECTIONS: MutableMapping[int, dict] | None = None
 _ORDER_CLAIMS: MutableMapping[int, dict] | None = None
+_ORDER_COUNTERS: MutableMapping[str, int] | None = None
+_ORDER_ID_PREFIX: str = "MO"
 _SAVE_BOT_DATA: Callable[[], None] | None = None
 
 
 def configure_data_access(
     order_selections: MutableMapping[int, dict],
     order_claims: MutableMapping[int, dict],
+    order_counters: MutableMapping[str, int],
     save_bot_data_func: Callable[[], None],
+    *,
+    order_id_prefix: str = "MO",
 ) -> None:
-    """設定記憶體資料入口，供 remember_* helpers 使用。
+    """設定記憶體資料入口，供 remember_* helpers 與訂單編號 helper 使用。
 
     這裡只保存 reference，不複製資料；因此 bot.py 原本的全域 dict 仍是唯一資料來源。
     """
-    global _ORDER_SELECTIONS, _ORDER_CLAIMS, _SAVE_BOT_DATA
+    global _ORDER_SELECTIONS, _ORDER_CLAIMS, _ORDER_COUNTERS, _SAVE_BOT_DATA, _ORDER_ID_PREFIX
     _ORDER_SELECTIONS = order_selections
     _ORDER_CLAIMS = order_claims
+    _ORDER_COUNTERS = order_counters
     _SAVE_BOT_DATA = save_bot_data_func
-
+    _ORDER_ID_PREFIX = str(order_id_prefix or "MO")
 
 def _require_data_access() -> tuple[MutableMapping[int, dict], MutableMapping[int, dict], Callable[[], None]]:
     if _ORDER_SELECTIONS is None or _ORDER_CLAIMS is None or _SAVE_BOT_DATA is None:
         raise RuntimeError("database module 尚未設定資料入口，請先呼叫 configure_data_access()")
     return _ORDER_SELECTIONS, _ORDER_CLAIMS, _SAVE_BOT_DATA
 
+
+def _require_order_counter_access() -> tuple[MutableMapping[str, int], Callable[[], None]]:
+    if _ORDER_COUNTERS is None or _SAVE_BOT_DATA is None:
+        raise RuntimeError("database module 尚未設定訂單編號資料入口，請先呼叫 configure_data_access()")
+    return _ORDER_COUNTERS, _SAVE_BOT_DATA
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     """保存單筆訂單暫存資料並同步到資料庫。"""
@@ -48,6 +59,17 @@ def remember_claim_data(message_id: int, data: dict) -> None:
     _, order_claims, save_bot_data = _require_data_access()
     order_claims[int(message_id)] = data
     save_bot_data()
+
+
+def generate_order_receipt_id() -> str:
+    """自動產生訂單編號，例如 MO20260519001。"""
+    order_counters, save_bot_data = _require_order_counter_access()
+    taipei_tz = timezone(timedelta(hours=8))
+    day_key = datetime.now(taipei_tz).strftime("%Y%m%d")
+    next_number = int(order_counters.get(day_key, 0) or 0) + 1
+    order_counters[day_key] = next_number
+    save_bot_data()
+    return f"{_ORDER_ID_PREFIX}{day_key}{next_number:03d}"
 
 
 

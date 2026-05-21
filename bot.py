@@ -41,6 +41,7 @@ from core.database import (
     remember_order_data,
     remember_claim_data,
     run_daily_backup_once,
+    generate_order_receipt_id,
 )
 
 import discord
@@ -2223,15 +2224,6 @@ def load_bot_data() -> None:
         save_bot_data()
         print("已從 bot_data.json 匯入資料並寫入 bot.db。")
 
-def generate_order_receipt_id() -> str:
-    """自動產生訂單編號，例如 MO20260519001。"""
-    day_key = get_taipei_now().strftime("%Y%m%d")
-    next_number = int(ORDER_COUNTERS.get(day_key, 0) or 0) + 1
-    ORDER_COUNTERS[day_key] = next_number
-    save_bot_data()
-    return f"{ORDER_ID_PREFIX}{day_key}{next_number:03d}"
-
-
 def get_or_create_order_log_channel_sync_hint() -> str:
     return f"{ORDER_LOG_CHANNEL_NAME}（類別 ID：{ORDER_LOG_CATEGORY_ID}）"
 
@@ -3721,7 +3713,7 @@ def save_bot_data() -> None:
 
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS)
-configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, save_bot_data)
+configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, ORDER_COUNTERS, save_bot_data, order_id_prefix=ORDER_ID_PREFIX)
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
