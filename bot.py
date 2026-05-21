@@ -6965,6 +6965,16 @@ def _audit_order_status(data: dict) -> str:
     return str(data.get("status") or ("closed" if data.get("closed") else "active")).lower()
 
 
+def format_order_amount(amount: int) -> str:
+    """Audit report amount formatter.
+
+    Some older audit report code paths used format_order_amount(), while
+    the rewards module exposes format_t_amount(). Keep this small alias so
+    /audit_data will not fail if either name is referenced.
+    """
+    return format_t_amount(int(amount or 0))
+
+
 def _audit_closed_orders_by_customer() -> dict[int, dict]:
     totals: dict[int, dict] = {}
 
