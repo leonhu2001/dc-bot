@@ -9,6 +9,22 @@ _MEMBER_LEVELS: list[dict[str, Any]] = [
 ]
 _REWARD_POINT_DIVISOR: int = 100
 _CUSTOMER_REWARDS: dict[int, dict[str, Any]] = {}
+_SILVER_MEMBER_ROLE_ID: int | None = None
+_PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
+_PLATINUM_CHAT_ROLE_IDS: list[int] = []
+
+
+def configure_reward_benefits(
+    *,
+    silver_member_role_id: int | None = None,
+    platinum_private_category_id: int | None = None,
+    platinum_chat_role_ids: list[int] | None = None,
+) -> None:
+    """設定會員福利需要的身分組 / 類別 ID。"""
+    global _SILVER_MEMBER_ROLE_ID, _PLATINUM_PRIVATE_CATEGORY_ID, _PLATINUM_CHAT_ROLE_IDS
+    _SILVER_MEMBER_ROLE_ID = silver_member_role_id
+    _PLATINUM_PRIVATE_CATEGORY_ID = platinum_private_category_id
+    _PLATINUM_CHAT_ROLE_IDS = list(platinum_chat_role_ids or [])
 
 
 def configure_reward_storage(customer_rewards: dict[int, dict[str, Any]]) -> None:
@@ -273,4 +289,114 @@ def format_customer_notes_for_ticket(user_id: int) -> str:
         lines.append(f"{index}. [{tag}] {note.get('content') or '未填寫'}")
 
     return "\n".join(lines)
+
+async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Member | None:
+    member = guild.get_member(user_id)
+    if member is not None:
+        return member
+    try:
+        return await guild.fetch_member(user_id)
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+        return None
+
+
+async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Member | None, data: dict) -> list[str]:
+    if member is None:
+        return []
+
+    notices = []
+    level = get_effective_member_level(data)
+    level_threshold = int(level.get("threshold", 0) or 0)
+
+    if _SILVER_MEMBER_ROLE_ID is not None:
+        silver_role = guild.get_role(_SILVER_MEMBER_ROLE_ID)
+    else:
+        silver_role = None
+
+    if level_threshold >= 2500:
+        if silver_role is not None and silver_role not in member.roles:
+            try:
+                await member.add_roles(silver_role, reason="累積消費達銀級魔丸門檻")
+                notices.append("已給予銀級魔丸身分組")
+            except discord.Forbidden:
+                notices.append("銀級魔丸身分組給予失敗：Bot 權限不足或身分組位置不夠高")
+            except discord.HTTPException:
+                notices.append("銀級魔丸身分組給予失敗：Discord API 錯誤")
+    else:
+        if silver_role is not None and silver_role in member.roles:
+            try:
+                await member.remove_roles(silver_role, reason="VIP 維持條件未達，降至普通魔丸")
+                notices.append("已收回銀級魔丸身分組")
+            except discord.Forbidden:
+                notices.append("銀級魔丸身分組收回失敗：Bot 權限不足或身分組位置不夠高")
+            except discord.HTTPException:
+                notices.append("銀級魔丸身分組收回失敗：Discord API 錯誤")
+
+    if level_threshold >= 13000:
+        existing_channel_id = _to_int(data.get("platinum_channel_id"))
+        if existing_channel_id is not None and guild.get_channel(existing_channel_id) is not None:
+            return notices
+
+        category = guild.get_channel(_PLATINUM_PRIVATE_CATEGORY_ID) if _PLATINUM_PRIVATE_CATEGORY_ID is not None else None
+        if not isinstance(category, discord.CategoryChannel):
+            notices.append("白金專屬頻道建立失敗：找不到指定類別")
+            return notices
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False,
+                send_messages=False,
+                read_message_history=False,
+            ),
+            member: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+            ),
+        }
+
+        if guild.me is not None:
+            overwrites[guild.me] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                manage_channels=True,
+                read_message_history=True,
+                attach_files=True,
+            )
+
+        for role_id in _PLATINUM_CHAT_ROLE_IDS:
+            role = guild.get_role(role_id)
+            if role is not None:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                )
+
+        clean_name = "".join(c if c.isalnum() else "-" for c in member.display_name.lower())[:40]
+        channel_name = f"白金魔丸-{clean_name}-{member.id}"[:90]
+
+        try:
+            channel = await guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites,
+                topic=f"platinum_customer_id={member.id}",
+                reason="累積消費達白金魔丸門檻，自動建立專屬聊天頻道"
+            )
+            data["platinum_channel_id"] = channel.id
+            notices.append(f"已建立白金專屬聊天頻道：{channel.mention}")
+
+            await channel.send(
+                f"{member.mention} 已達白金魔丸會員，這裡是你的專屬聊天頻道。",
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
+            )
+        except discord.Forbidden:
+            notices.append("白金專屬頻道建立失敗：Bot 權限不足")
+        except discord.HTTPException:
+            notices.append("白金專屬頻道建立失敗：Discord API 錯誤")
+
+    return notices
 
