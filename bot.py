@@ -90,6 +90,12 @@ from services.rewards import (
 
 from services.orders import (
     _to_int,
+    ORDER_CATEGORY_LABELS,
+    ORDER_ITEMS_BY_CATEGORY,
+    ORDER_ITEM_TO_CATEGORY,
+    SPECIAL_COMPANION_ITEMS,
+    QUANTITY_SELECT_ITEMS,
+    QUANTITY_OPTIONS,
 )
 
 import discord
@@ -2446,58 +2452,6 @@ async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: b
 
 load_bot_data()
 cleanup_old_closed_orders()
-
-ORDER_CATEGORY_LABELS = {
-    "basic": "基礎單",
-    "fun": "趣味單",
-    "farm": "代解代肝",
-    "season": "賽季限定活動",
-}
-
-ORDER_ITEMS_BY_CATEGORY = {
-    # 使用者要求「由下到上」，所以下拉式顯示會從體驗單開始往上排到油鍋單
-    "basic": [
-        "體驗單",
-        "娛樂陪",
-        "技術陪",
-        "保底單",
-        "賭約單",
-        "油鍋單",
-    ],
-    "fun": [
-        "豪到你了嗎",
-        "瘋狗嘶咬",
-        "這什麼鳥槍",
-        "想吃自己打",
-    ],
-    "farm": [
-        "賽季3x3",
-        "純綠代肝哈夫幣",
-    ],
-    "season": [
-        "勇敢者行動",
-        "S9炫彩勇敢者行動",
-    ],
-}
-
-ORDER_ITEM_TO_CATEGORY = {
-    item: category
-    for category, items in ORDER_ITEMS_BY_CATEGORY.items()
-    for item in items
-}
-
-SPECIAL_COMPANION_ITEMS = {
-    "娛樂陪",
-    "技術陪",
-    "保底單",
-}
-
-QUANTITY_SELECT_ITEMS = {
-    "娛樂陪",
-    "技術陪",
-}
-
-QUANTITY_OPTIONS = list(range(1, 9))
 
 COMPANION_PREFERENCE_OPTIONS = [
     "不指定陪玩/打手",

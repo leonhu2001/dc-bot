@@ -6,6 +6,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Callable, MutableMapping
 
+from core.time_utils import get_taipei_now_iso
+
 _DB_FILE: Path | None = None
 _DATA_FILE: Path | None = None
 _INIT_DATABASE: Callable[[], None] | None = None
