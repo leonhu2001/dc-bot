@@ -6629,10 +6629,26 @@ def is_order_closed_for_rewards(data: dict) -> bool:
 
 
 def get_order_amount_for_maintenance(data: dict) -> int:
-    amount = _compat_order_amount(data)
-    if amount <= 0:
-        amount = parse_receipt_amount(str(data.get("amount") or data.get("total_amount") or data.get("reward_amount") or "")) or 0
-    return max(0, int(amount or 0))
+    """Safely parse order amount for maintenance commands.
+
+    This stays local to bot.py so maintenance/audit tools do not depend on
+    private database-module helpers during modularization.
+    """
+    if not isinstance(data, dict):
+        return 0
+
+    for key in ("amount", "total_amount", "reward_amount"):
+        value = data.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            parsed = parse_receipt_amount(str(value))
+            if parsed is not None:
+                return max(0, int(parsed))
+
+    return 0
 
 
 def adjust_customer_totals_for_order(customer_id: int | None, amount_delta: int, order_delta: int) -> dict | None:
@@ -6956,6 +6972,174 @@ async def fix_order_customer(
             ("新顧客", customer.mention, True),
         ],
         color=discord.Color.orange(),
+    )
+
+
+
+@bot.tree.command(
+    name="resend_dispatch",
+    description="重新發送指定票口的派單面板"
+)
+@app_commands.describe(
+    order_channel_id="票口頻道 ID，例如 1506962556928131112"
+)
+async def resend_dispatch(interaction: discord.Interaction, order_channel_id: str):
+    """重新建立可操作的派單面板。\n\n    用於派單頻道訊息被刪除、按鈕失效、claims 重複或連結錯亂時。\n    會清除同一票口舊 claims，發一則新的 DispatchClaimView，並把新訊息 ID 寫回資料。\n    """
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not (is_customer_staff(interaction.user) or is_manager_or_admin(interaction.user)):
+        await interaction.response.send_message("只有客服、店長或管理員可以重新派單。", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        return
+
+    try:
+        source_channel_id = int(str(order_channel_id).strip())
+    except ValueError:
+        await interaction.response.send_message("票口 ID 格式錯誤，請輸入純數字。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    source_channel = guild.get_channel(source_channel_id)
+    if source_channel is None:
+        try:
+            fetched_channel = await guild.fetch_channel(source_channel_id)
+            source_channel = fetched_channel if isinstance(fetched_channel, discord.TextChannel) else None
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            source_channel = None
+
+    if source_channel is None or not isinstance(source_channel, discord.TextChannel):
+        await interaction.followup.send("找不到這個票口頻道，請確認票口 ID 是否正確。", ephemeral=True)
+        return
+
+    dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
+    if dispatch_channel is None:
+        try:
+            fetched_dispatch = await guild.fetch_channel(DISPATCH_CHANNEL_ID)
+            dispatch_channel = fetched_dispatch if isinstance(fetched_dispatch, discord.TextChannel) else None
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            dispatch_channel = None
+
+    if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
+        await interaction.followup.send("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。", ephemeral=True)
+        return
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(source_channel_id)
+    if not isinstance(data, dict):
+        await interaction.followup.send("找不到這張票口的訂單資料，無法重新派單。", ephemeral=True)
+        return
+
+    # 清掉同一票口舊 claims，避免一張票口對到多則派單訊息。
+    for message_id, claim_data in list(ORDER_CLAIMS.items()):
+        if _to_int(claim_data.get("source_channel_id")) == source_channel_id:
+            ORDER_CLAIMS.pop(message_id, None)
+            delete_claim_row_from_db(message_id=_to_int(message_id), source_channel_id=source_channel_id)
+
+    old_dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    if old_dispatch_message_id is not None:
+        delete_claim_row_from_db(message_id=old_dispatch_message_id)
+
+    customer_id = _to_int(data.get("customer_id")) or get_order_customer_id_from_channel(source_channel)
+    category = data.get("category")
+    category_label = ORDER_CATEGORY_LABELS.get(category, data.get("category_label") or category or "未紀錄")
+    item = str(data.get("item") or "未紀錄")
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    payment_method = str(data.get("payment_method") or "未紀錄")
+    companion_preference = data.get("companion_preference") or "不指定陪玩/打手"
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+
+    embed = build_self_service_order_embed(
+        customer_mention=customer_mention,
+        category_label=str(category_label),
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        source_channel=source_channel,
+        companion_preference=companion_preference,
+    )
+    embed.add_field(
+        name="重新派單",
+        value=f"由 {interaction.user.mention} 使用 `/resend_dispatch` 重新發送。",
+        inline=False,
+    )
+
+    view = DispatchClaimView(
+        customer_id=customer_id or 0,
+        category_label=str(category_label),
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        source_channel_id=source_channel_id,
+        companion_preference=companion_preference,
+        locked=False,
+        status="active",
+    )
+
+    dispatch_message = await dispatch_channel.send(
+        embed=embed,
+        view=view,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+    claim_data = {
+        "companion": set(),
+        "booster": set(),
+        "locked": False,
+        "status": "active",
+        "customer_id": customer_id,
+        "category_label": str(category_label),
+        "item": item,
+        "quantity": quantity,
+        "payment_method": payment_method,
+        "source_channel_id": source_channel_id,
+        "companion_preference": companion_preference,
+        "dispatch_channel_id": dispatch_channel.id,
+    }
+
+    ORDER_CLAIMS[dispatch_message.id] = claim_data
+
+    data["customer_id"] = customer_id
+    data["item"] = item
+    data["quantity"] = quantity
+    data["payment_method"] = payment_method
+    data["companion_preference"] = companion_preference
+    data["closed"] = False
+    data["status"] = "active"
+    data["closed_at"] = None
+    data["stored_at"] = None
+    data["stored_by"] = None
+    data["stored_reason"] = None
+    data["stored_expected_time"] = None
+    data["stored_note"] = None
+    data["dispatch_channel_id"] = dispatch_channel.id
+    data["dispatch_message_id"] = dispatch_message.id
+
+    remember_order_data(source_channel_id, data)
+    remember_claim_data(dispatch_message.id, claim_data)
+    save_bot_data()
+
+    await send_order_log(
+        guild,
+        title="重新發送派單面板",
+        fields=[
+            ("操作人員", interaction.user.mention, True),
+            ("顧客", customer_mention, True),
+            ("項目", f"{item} x{quantity}", True),
+            ("票口", source_channel.mention, False),
+            ("新派單訊息", dispatch_message.jump_url, False),
+        ],
+        color=discord.Color.orange(),
+    )
+
+    await interaction.followup.send(
+        f"已重新發送可操作派單訊息：{dispatch_message.jump_url}",
+        ephemeral=True,
     )
 
 
