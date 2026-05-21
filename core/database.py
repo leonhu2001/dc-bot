@@ -661,6 +661,175 @@ def save_bot_data() -> None:
     except OSError as e:
         print(f"保存 bot_data.json 快照失敗：{e}")
 
+
+def init_database() -> None:
+    """建立 / 補齊 SQLite 資料表。
+
+    若 VPS 上已經是舊 relational schema，會保留原本欄位並補 data_json / updated_at。
+    若是全新資料庫，直接建立 relational schema，方便用 sqlite3 指令查帳。
+    """
+    db_file = _require_db_file()
+
+    with sqlite3.connect(db_file) as conn:
+        cur = conn.cursor()
+
+        if not _db_table_exists(cur, "orders"):
+            cur.execute("""
+            CREATE TABLE orders (
+                channel_id INTEGER PRIMARY KEY,
+                customer_id INTEGER,
+                order_no TEXT,
+                category TEXT,
+                item TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                companion_preference TEXT,
+                payment_method TEXT,
+                amount INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                dispatch_message_id INTEGER,
+                dispatch_channel_id INTEGER,
+                created_at TEXT,
+                closed_at TEXT,
+                stored_at TEXT,
+                store_reason TEXT,
+                resume_at TEXT,
+                note TEXT,
+                data_json TEXT,
+                updated_at TEXT
+            )
+            """)
+        else:
+            order_cols = _db_columns(cur, "orders")
+            if "channel_id" in order_cols and "data" not in order_cols:
+                for name, typ in [
+                    ("customer_id", "INTEGER"),
+                    ("order_no", "TEXT"),
+                    ("category", "TEXT"),
+                    ("item", "TEXT"),
+                    ("quantity", "INTEGER NOT NULL DEFAULT 1"),
+                    ("companion_preference", "TEXT"),
+                    ("payment_method", "TEXT"),
+                    ("amount", "INTEGER NOT NULL DEFAULT 0"),
+                    ("status", "TEXT NOT NULL DEFAULT 'active'"),
+                    ("dispatch_message_id", "INTEGER"),
+                    ("dispatch_channel_id", "INTEGER"),
+                    ("created_at", "TEXT"),
+                    ("closed_at", "TEXT"),
+                    ("stored_at", "TEXT"),
+                    ("store_reason", "TEXT"),
+                    ("resume_at", "TEXT"),
+                    ("note", "TEXT"),
+                    ("data_json", "TEXT"),
+                    ("updated_at", "TEXT"),
+                ]:
+                    _db_add_column_if_missing(cur, "orders", name, typ)
+
+        if not _db_table_exists(cur, "claims"):
+            cur.execute("""
+            CREATE TABLE claims (
+                dispatch_message_id INTEGER PRIMARY KEY,
+                customer_id INTEGER,
+                source_channel_id INTEGER,
+                dispatch_channel_id INTEGER,
+                category_label TEXT,
+                item TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                payment_method TEXT,
+                companion_preference TEXT,
+                companion_ids TEXT NOT NULL DEFAULT '[]',
+                booster_ids TEXT NOT NULL DEFAULT '[]',
+                locked INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                data_json TEXT,
+                updated_at TEXT
+            )
+            """)
+        else:
+            claim_cols = _db_columns(cur, "claims")
+            if "dispatch_message_id" in claim_cols and "data" not in claim_cols:
+                for name, typ in [
+                    ("customer_id", "INTEGER"),
+                    ("source_channel_id", "INTEGER"),
+                    ("dispatch_channel_id", "INTEGER"),
+                    ("category_label", "TEXT"),
+                    ("item", "TEXT"),
+                    ("quantity", "INTEGER NOT NULL DEFAULT 1"),
+                    ("payment_method", "TEXT"),
+                    ("companion_preference", "TEXT"),
+                    ("companion_ids", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("booster_ids", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("locked", "INTEGER NOT NULL DEFAULT 0"),
+                    ("status", "TEXT NOT NULL DEFAULT 'active'"),
+                    ("data_json", "TEXT"),
+                    ("updated_at", "TEXT"),
+                ]:
+                    _db_add_column_if_missing(cur, "claims", name, typ)
+
+        if not _db_table_exists(cur, "customers"):
+            cur.execute("""
+            CREATE TABLE customers (
+                customer_id INTEGER PRIMARY KEY,
+                total_spent INTEGER NOT NULL DEFAULT 0,
+                points INTEGER NOT NULL DEFAULT 0,
+                completed_orders INTEGER NOT NULL DEFAULT 0,
+                last_order_at TEXT,
+                level TEXT NOT NULL DEFAULT '普通魔丸',
+                platinum_channel_id INTEGER,
+                data_json TEXT,
+                updated_at TEXT
+            )
+            """)
+        else:
+            customer_cols = _db_columns(cur, "customers")
+            if "customer_id" in customer_cols and "data" not in customer_cols:
+                for name, typ in [
+                    ("total_spent", "INTEGER NOT NULL DEFAULT 0"),
+                    ("points", "INTEGER NOT NULL DEFAULT 0"),
+                    ("completed_orders", "INTEGER NOT NULL DEFAULT 0"),
+                    ("last_order_at", "TEXT"),
+                    ("level", "TEXT NOT NULL DEFAULT '普通魔丸'"),
+                    ("platinum_channel_id", "INTEGER"),
+                    ("data_json", "TEXT"),
+                    ("updated_at", "TEXT"),
+                ]:
+                    _db_add_column_if_missing(cur, "customers", name, typ)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS order_counters (
+            day_key TEXT PRIMARY KEY,
+            count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_settings (
+            key TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_entries (
+            period TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            chances INTEGER NOT NULL DEFAULT 0,
+            points_used INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (period, user_id)
+        )
+        """)
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_draws (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period TEXT NOT NULL,
+            prize TEXT NOT NULL,
+            winner_id INTEGER NOT NULL,
+            drawn_by INTEGER NOT NULL,
+            drawn_at TEXT NOT NULL
+        )
+        """)
+        conn.commit()
+
 def configure_database(
     db_file: str | Path,
     init_database_func: Callable[[], None] | None = None,
@@ -673,7 +842,7 @@ def configure_database(
     global _DB_FILE, _DATA_FILE, _INIT_DATABASE, _BACKUP_DIR, _BACKUP_KEEP_DAYS
     _DB_FILE = Path(db_file)
     _DATA_FILE = Path(data_file) if data_file is not None else _DB_FILE.parent / "bot_data.json"
-    _INIT_DATABASE = init_database_func
+    _INIT_DATABASE = init_database_func or init_database
     _BACKUP_DIR = Path(backup_dir) if backup_dir is not None else _DB_FILE.parent / "backups"
     _BACKUP_KEEP_DAYS = int(backup_keep_days or 30)
 
