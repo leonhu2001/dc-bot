@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import sqlite3
 from datetime import datetime, timezone, timedelta
@@ -22,6 +23,7 @@ _MEMBER_LEVELS: list[dict] = []
 _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT: Callable[[int], int] | None = None
 _GET_CURRENT_REWARD_POINTS: Callable[[dict], int] | None = None
 _CALCULATE_REWARD_POINTS: Callable[[int], int] | None = None
+_GET_EFFECTIVE_MEMBER_LEVEL: Callable[[dict], dict] | None = None
 
 
 def configure_data_access(
@@ -36,6 +38,7 @@ def configure_data_access(
     get_member_level_index_by_total_spent_func: Callable[[int], int] | None = None,
     get_current_reward_points_func: Callable[[dict], int] | None = None,
     calculate_reward_points_func: Callable[[int], int] | None = None,
+    get_effective_member_level_func: Callable[[dict], dict] | None = None,
 ) -> None:
     """設定記憶體資料入口，供 load / remember / serialize helpers 使用。
 
@@ -43,7 +46,7 @@ def configure_data_access(
     會員等級與點數相關 callback 只用於 SQLite relational schema 載入相容處理。
     """
     global _ORDER_SELECTIONS, _ORDER_CLAIMS, _CUSTOMER_REWARDS, _ORDER_COUNTERS, _SAVE_BOT_DATA, _ORDER_ID_PREFIX
-    global _MEMBER_LEVELS, _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT, _GET_CURRENT_REWARD_POINTS, _CALCULATE_REWARD_POINTS
+    global _MEMBER_LEVELS, _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT, _GET_CURRENT_REWARD_POINTS, _CALCULATE_REWARD_POINTS, _GET_EFFECTIVE_MEMBER_LEVEL
     _ORDER_SELECTIONS = order_selections
     _ORDER_CLAIMS = order_claims
     _CUSTOMER_REWARDS = customer_rewards
@@ -54,6 +57,7 @@ def configure_data_access(
     _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT = get_member_level_index_by_total_spent_func
     _GET_CURRENT_REWARD_POINTS = get_current_reward_points_func
     _CALCULATE_REWARD_POINTS = calculate_reward_points_func
+    _GET_EFFECTIVE_MEMBER_LEVEL = get_effective_member_level_func
 
 def _require_data_access() -> tuple[MutableMapping[int, dict], MutableMapping[int, dict], Callable[[], None]]:
     if _ORDER_SELECTIONS is None or _ORDER_CLAIMS is None or _SAVE_BOT_DATA is None:
@@ -81,6 +85,30 @@ def _require_all_data_access() -> tuple[
     ):
         raise RuntimeError("database module 尚未設定完整資料入口，請先呼叫 configure_data_access()")
     return _ORDER_SELECTIONS, _ORDER_CLAIMS, _CUSTOMER_REWARDS, _ORDER_COUNTERS
+
+
+def _require_database_file() -> Path:
+    if _DB_FILE is None:
+        raise RuntimeError("database module 尚未設定 DB_FILE，請先呼叫 configure_database()")
+    return _DB_FILE
+
+
+def _require_data_file() -> Path:
+    if _DATA_FILE is None:
+        raise RuntimeError("database module 尚未設定 DATA_FILE，請先呼叫 configure_database(..., data_file=DATA_FILE)")
+    return _DATA_FILE
+
+
+def _require_init_database() -> Callable[[], None]:
+    if _INIT_DATABASE is None:
+        raise RuntimeError("database module 尚未設定 init_database，請先呼叫 configure_database()")
+    return _INIT_DATABASE
+
+
+def _require_customer_callbacks() -> tuple[Callable[[dict], int], Callable[[dict], dict]]:
+    if _GET_CURRENT_REWARD_POINTS is None or _GET_EFFECTIVE_MEMBER_LEVEL is None:
+        raise RuntimeError("database module 尚未設定會員點數 / 等級 callback，請先呼叫 configure_data_access()")
+    return _GET_CURRENT_REWARD_POINTS, _GET_EFFECTIVE_MEMBER_LEVEL
 
 
 def _to_int(value: Any, default: int | None = None) -> int | None:
@@ -433,6 +461,205 @@ def generate_order_receipt_id() -> str:
     return f"{_ORDER_ID_PREFIX}{day_key}{next_number:03d}"
 
 
+
+
+def _parse_receipt_amount_for_db(amount_text: str) -> int | None:
+    """從金額文字擷取金額。與 bot.py 原 parse_receipt_amount 行為保持一致。"""
+    normalized = str(amount_text).replace(",", "").strip()
+    numbers = [int(value) for value in re.findall(r"\d+", normalized)]
+
+    if not numbers:
+        return None
+
+    if "+" in normalized and len(numbers) >= 2:
+        return sum(numbers)
+
+    return numbers[0]
+
+
+def _compat_order_amount(data: dict) -> int:
+    for key in ("amount", "total_amount", "reward_amount"):
+        value = data.get(key)
+        if value is None:
+            continue
+        parsed = _to_int(value)
+        if parsed is not None:
+            return parsed
+        parsed = _parse_receipt_amount_for_db(str(value))
+        if parsed is not None:
+            return parsed
+    return 0
+
+
+def save_bot_data() -> None:
+    """將目前記憶體資料同步到 relational SQLite。
+
+    重要：這版不整表 DELETE 後重寫，避免手動補登、舊營收、存單紀錄被記憶體舊資料洗掉。
+    需要刪除資料時，請使用明確的 DELETE helper 或管理指令。
+    """
+    init_database_func = _require_init_database()
+    db_file = _require_database_file()
+    data_file = _require_data_file()
+    order_selections, order_claims, customer_rewards, order_counters = _require_all_data_access()
+    get_current_reward_points, get_effective_member_level = _require_customer_callbacks()
+
+    init_database_func()
+    now_text = get_taipei_now_iso()
+
+    try:
+        with sqlite3.connect(db_file) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            order_cols = _db_columns(cur, "orders")
+            claim_cols = _db_columns(cur, "claims")
+            customer_cols = _db_columns(cur, "customers")
+
+            if "data" in order_cols:
+                cur.executemany(
+                    "INSERT OR REPLACE INTO orders (channel_id, data, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (int(channel_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                        for channel_id, data in _serialize_orders().items()
+                    ]
+                )
+            else:
+                for channel_id, data in order_selections.items():
+                    if not isinstance(data, dict):
+                        continue
+                    status = str(data.get("status") or ("closed" if data.get("closed") else "active")).lower()
+                    amount = _compat_order_amount(data)
+                    cur.execute(
+                        """
+                        INSERT OR REPLACE INTO orders (
+                            channel_id, customer_id, order_no, category, item, quantity,
+                            companion_preference, payment_method, amount, status,
+                            dispatch_message_id, dispatch_channel_id, created_at, closed_at,
+                            stored_at, store_reason, resume_at, note, data_json, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(channel_id),
+                            _to_int(data.get("customer_id")),
+                            data.get("order_no") or data.get("receipt_id"),
+                            data.get("category"),
+                            data.get("item"),
+                            _to_int(data.get("quantity"), 1) or 1,
+                            data.get("companion_preference"),
+                            data.get("payment_method"),
+                            amount,
+                            status,
+                            _to_int(data.get("dispatch_message_id")),
+                            _to_int(data.get("dispatch_channel_id")),
+                            data.get("created_at"),
+                            data.get("closed_at") or data.get("reward_counted_at"),
+                            data.get("stored_at"),
+                            data.get("stored_reason") or data.get("store_reason"),
+                            data.get("resume_at") or data.get("stored_expected_time"),
+                            data.get("note") or data.get("stored_note"),
+                            json.dumps(data, ensure_ascii=False, default=_json_default),
+                            now_text,
+                        ),
+                    )
+
+            if "data" in claim_cols:
+                cur.executemany(
+                    "INSERT OR REPLACE INTO claims (message_id, data, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (int(message_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                        for message_id, data in _serialize_claims().items()
+                    ]
+                )
+            else:
+                for message_id, data in order_claims.items():
+                    if not isinstance(data, dict):
+                        continue
+                    cur.execute(
+                        """
+                        INSERT OR REPLACE INTO claims (
+                            dispatch_message_id, customer_id, source_channel_id, dispatch_channel_id,
+                            category_label, item, quantity, payment_method, companion_preference,
+                            companion_ids, booster_ids, locked, status, data_json, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(message_id),
+                            _to_int(data.get("customer_id")),
+                            _to_int(data.get("source_channel_id")),
+                            _to_int(data.get("dispatch_channel_id")),
+                            data.get("category_label"),
+                            data.get("item"),
+                            _to_int(data.get("quantity"), 1) or 1,
+                            data.get("payment_method"),
+                            data.get("companion_preference"),
+                            json.dumps(sorted(list(data.get("companion", set()))), ensure_ascii=False),
+                            json.dumps(sorted(list(data.get("booster", set()))), ensure_ascii=False),
+                            1 if data.get("locked") else 0,
+                            str(data.get("status", "active")),
+                            json.dumps(_serialize_claims().get(str(message_id), data), ensure_ascii=False, default=_json_default),
+                            now_text,
+                        ),
+                    )
+
+            if "data" in customer_cols:
+                key_col = "user_id" if "user_id" in customer_cols else "customer_id"
+                cur.executemany(
+                    f"INSERT OR REPLACE INTO customers ({key_col}, data, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (int(user_id), json.dumps(data, ensure_ascii=False, default=_json_default), now_text)
+                        for user_id, data in _serialize_customer_rewards().items()
+                    ]
+                )
+            else:
+                for user_id, data in customer_rewards.items():
+                    if not isinstance(data, dict):
+                        continue
+                    total_spent = int(data.get("total_spent", 0) or 0)
+                    order_count = int(data.get("order_count", 0) or 0)
+                    data["points"] = get_current_reward_points(data)
+                    level_name = get_effective_member_level(data)["name"]
+                    cur.execute(
+                        """
+                        INSERT OR REPLACE INTO customers (
+                            customer_id, total_spent, points, completed_orders, last_order_at,
+                            level, platinum_channel_id, data_json, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(user_id),
+                            total_spent,
+                            int(data.get("points", 0) or 0),
+                            order_count,
+                            data.get("last_order_at"),
+                            level_name,
+                            _to_int(data.get("platinum_channel_id")),
+                            json.dumps(data, ensure_ascii=False, default=_json_default),
+                            now_text,
+                        ),
+                    )
+
+            cur.executemany(
+                "INSERT OR REPLACE INTO order_counters (day_key, count, updated_at) VALUES (?, ?, ?)",
+                [(str(day), int(count), now_text) for day, count in _serialize_order_counters().items()],
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"保存 bot.db 失敗：{e}")
+        return
+
+    # JSON 只保留為人工檢查用快照，不作為主要資料庫。
+    payload = {
+        "orders": _serialize_orders(),
+        "claims": _serialize_claims(),
+        "customers": _serialize_customer_rewards(),
+        "order_counters": _serialize_order_counters(),
+    }
+    tmp_path = data_file.with_suffix(".tmp")
+    try:
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2, default=_json_default)
+        tmp_path.replace(data_file)
+    except OSError as e:
+        print(f"保存 bot_data.json 快照失敗：{e}")
 
 def configure_database(
     db_file: str | Path,
