@@ -7178,40 +7178,69 @@ async def audit_data(interaction: discord.Interaction, limit: int = 10):
         await interaction.response.send_message("只有客服、店長或管理員可以檢查資料庫健康狀態。", ephemeral=True)
         return
 
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=True, thinking=True)
 
-    embed, full_report = build_audit_data_report(limit=limit)
+    started_at = asyncio.get_running_loop().time()
 
-    if len(full_report) <= 3500:
+    try:
+        embed, full_report = build_audit_data_report(limit=limit)
+        elapsed = asyncio.get_running_loop().time() - started_at
+
         embed.add_field(
-            name="檢查明細",
-            value=f"```text\n{full_report[:1000]}\n```" if len(full_report) <= 1000 else "明細較長，請看下方文字。",
-            inline=False,
-        )
-        await interaction.followup.send(
-            embed=embed,
-            content=f"```text\n{full_report[:1900]}\n```" if len(full_report) <= 1900 else None,
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-        )
-    else:
-        report_file = discord.File(
-            io.BytesIO(full_report.encode("utf-8")),
-            filename=f"audit_data_{get_taipei_now().strftime('%Y%m%d_%H%M%S')}.txt",
-        )
-        await interaction.followup.send(
-            embed=embed,
-            file=report_file,
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            name="檢查耗時",
+            value=f"{elapsed:.2f} 秒",
+            inline=True,
         )
 
-    await send_order_log(
-        interaction.guild,
-        title="資料庫健康檢查",
-        description=f"操作人員：{interaction.user.mention}\n{embed.description}",
-        color=embed.color,
-    )
+        if len(full_report) <= 3500:
+            embed.add_field(
+                name="檢查明細",
+                value=f"```text\n{full_report[:1000]}\n```" if len(full_report) <= 1000 else "明細較長，請看下方文字。",
+                inline=False,
+            )
+            await interaction.followup.send(
+                embed=embed,
+                content=f"```text\n{full_report[:1900]}\n```" if len(full_report) <= 1900 else None,
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+        else:
+            report_file = discord.File(
+                io.BytesIO(full_report.encode("utf-8")),
+                filename=f"audit_data_{get_taipei_now().strftime('%Y%m%d_%H%M%S')}.txt",
+            )
+            await interaction.followup.send(
+                embed=embed,
+                file=report_file,
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+
+        await send_order_log(
+            interaction.guild,
+            title="資料庫健康檢查",
+            description=f"操作人員：{interaction.user.mention}\n耗時：{elapsed:.2f} 秒\n{embed.description}",
+            color=embed.color,
+        )
+    except Exception as e:
+        elapsed = asyncio.get_running_loop().time() - started_at
+        error_text = f"/audit_data 執行失敗：{type(e).__name__}: {e}"
+        print(error_text)
+
+        await interaction.followup.send(
+            f"資料庫健康檢查失敗，耗時 {elapsed:.2f} 秒。\n"
+            f"錯誤：`{type(e).__name__}: {str(e)[:300]}`\n"
+            "請到 VPS 查看 journalctl 取得完整 Traceback。",
+            ephemeral=True,
+        )
+
+        await send_order_log(
+            interaction.guild,
+            title="資料庫健康檢查失敗",
+            description=f"操作人員：{interaction.user.mention}\n耗時：{elapsed:.2f} 秒\n錯誤：{type(e).__name__}: {e}",
+            color=discord.Color.red(),
+        )
+
 
 
 # ========= 存單管理面板 =========
