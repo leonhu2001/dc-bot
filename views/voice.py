@@ -325,3 +325,369 @@ def get_room_targets_for_control(
     return get_play_voice_allowed_roles(guild)
 
 
+async def apply_voice_lock_state(
+    voice_channel: discord.VoiceChannel,
+    owner: discord.Member,
+    room_type: str,
+    locked: bool,
+):
+    overwrites = dict(voice_channel.overwrites)
+
+    for target in get_room_targets_for_control(voice_channel.guild, room_type):
+        overwrite = overwrites.get(target, discord.PermissionOverwrite())
+        overwrite.connect = not locked
+        overwrites[target] = overwrite
+
+    owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
+    owner_overwrite.view_channel = True
+    owner_overwrite.connect = True
+    owner_overwrite.speak = True
+    owner_overwrite.stream = True
+    owner_overwrite.use_voice_activation = True
+    overwrites[owner] = owner_overwrite
+
+    bot_member = voice_channel.guild.me
+    if bot_member is not None:
+        bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
+        bot_overwrite.view_channel = True
+        bot_overwrite.connect = True
+        bot_overwrite.manage_channels = True
+        bot_overwrite.move_members = True
+        overwrites[bot_member] = bot_overwrite
+
+    await voice_channel.edit(
+        overwrites=overwrites,
+        reason="Voice room lock state changed by owner"
+    )
+
+
+async def apply_voice_hidden_state(
+    voice_channel: discord.VoiceChannel,
+    owner: discord.Member,
+    room_type: str,
+    hidden: bool,
+):
+    overwrites = dict(voice_channel.overwrites)
+    guild = voice_channel.guild
+
+    # 顯示：讓所有人都看得到。
+    # 隱藏：只有創建者、Bot、指定三個身分組可以看得到。
+    everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+
+    if hidden:
+        everyone_overwrite.view_channel = False
+        overwrites[guild.default_role] = everyone_overwrite
+
+        for role in get_voice_room_hidden_visible_roles(guild):
+            overwrite = overwrites.get(role, discord.PermissionOverwrite())
+            overwrite.view_channel = True
+            overwrite.connect = True
+            overwrite.speak = True
+            overwrite.stream = True
+            overwrite.use_voice_activation = True
+            overwrites[role] = overwrite
+    else:
+        everyone_overwrite.view_channel = True
+        overwrites[guild.default_role] = everyone_overwrite
+
+    owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
+    owner_overwrite.view_channel = True
+    owner_overwrite.connect = True
+    owner_overwrite.speak = True
+    owner_overwrite.stream = True
+    owner_overwrite.use_voice_activation = True
+    overwrites[owner] = owner_overwrite
+
+    bot_member = guild.me
+    if bot_member is not None:
+        bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
+        bot_overwrite.view_channel = True
+        bot_overwrite.connect = True
+        bot_overwrite.manage_channels = True
+        bot_overwrite.move_members = True
+        overwrites[bot_member] = bot_overwrite
+
+    await voice_channel.edit(
+        overwrites=overwrites,
+        reason="Voice room visibility changed by owner"
+    )
+
+
+class VoiceRoomRenameModal(discord.ui.Modal, title="更改語音房名稱"):
+    new_name = discord.ui.TextInput(
+        label="新的頻道名稱",
+        placeholder="請輸入新的語音房名稱",
+        required=True,
+        max_length=95,
+    )
+
+    def __init__(self, voice_channel_id: int, owner_id: int):
+        super().__init__()
+        self.voice_channel_id = voice_channel_id
+        self.owner_id = owner_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("只有語音房創建者可以操作遙控器。", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        voice_channel = guild.get_channel(self.voice_channel_id)
+        if not isinstance(voice_channel, discord.VoiceChannel):
+            await interaction.response.send_message("找不到對應的語音房。", ephemeral=True)
+            return
+
+        try:
+            await voice_channel.edit(
+                name=self.new_name.value.strip()[:95],
+                reason=f"Voice room renamed by {interaction.user}"
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message("Bot 權限不足，無法更改頻道名稱。", ephemeral=True)
+            return
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"更改名稱失敗：{e}", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+
+class VoiceRoomLimitModal(discord.ui.Modal, title="設定語音房人數"):
+    user_limit = discord.ui.TextInput(
+        label="人數上限",
+        placeholder="請輸入 0~99，0 代表不限人數",
+        required=True,
+        max_length=2,
+    )
+
+    def __init__(self, voice_channel_id: int, owner_id: int):
+        super().__init__()
+        self.voice_channel_id = voice_channel_id
+        self.owner_id = owner_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("只有語音房創建者可以操作遙控器。", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        try:
+            limit = int(self.user_limit.value.strip())
+        except ValueError:
+            await interaction.response.send_message("人數上限請輸入 0~99 的數字。", ephemeral=True)
+            return
+
+        if limit < 0 or limit > 99:
+            await interaction.response.send_message("人數上限請輸入 0~99 的數字。", ephemeral=True)
+            return
+
+        voice_channel = guild.get_channel(self.voice_channel_id)
+        if not isinstance(voice_channel, discord.VoiceChannel):
+            await interaction.response.send_message("找不到對應的語音房。", ephemeral=True)
+            return
+
+        try:
+            await voice_channel.edit(
+                user_limit=limit,
+                reason=f"Voice room user limit changed by {interaction.user}"
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message("Bot 權限不足，無法設定人數。", ephemeral=True)
+            return
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"設定人數失敗：{e}", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+
+class VoiceRoomControlView(discord.ui.View):
+    def __init__(self, voice_channel_id: int, owner_id: int, room_type: str):
+        super().__init__(timeout=None)
+        self.voice_channel_id = voice_channel_id
+        self.owner_id = owner_id
+        self.room_type = room_type
+
+    async def get_voice_channel_and_owner(
+        self,
+        interaction: discord.Interaction
+    ) -> tuple[discord.VoiceChannel | None, discord.Member | None]:
+        guild = interaction.guild
+        if guild is None:
+            return None, None
+
+        voice_channel = guild.get_channel(self.voice_channel_id)
+        owner = guild.get_member(self.owner_id)
+
+        if not isinstance(voice_channel, discord.VoiceChannel) or owner is None:
+            return None, None
+
+        return voice_channel, owner
+
+    async def reject_if_not_owner(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("只有語音房創建者可以操作遙控器。", ephemeral=True)
+            return True
+        return False
+
+    @discord.ui.button(
+        label="🔒 鎖定/解鎖",
+        style=discord.ButtonStyle.primary,
+        custom_id="voice_room_lock_toggle",
+        row=0,
+    )
+    async def lock_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self.reject_if_not_owner(interaction):
+            return
+
+        voice_channel, owner = await self.get_voice_channel_and_owner(interaction)
+        if voice_channel is None or owner is None:
+            await interaction.response.send_message("找不到對應的語音房。", ephemeral=True)
+            return
+
+        data = TEMP_VOICE_CONTROL_PANELS.setdefault(
+            self.voice_channel_id,
+            {
+                "owner_id": self.owner_id,
+                "panel_channel_id": interaction.channel.id if interaction.channel else None,
+                "room_type": self.room_type,
+                "locked": False,
+                "hidden": False,
+            }
+        )
+        data["locked"] = not data.get("locked", False)
+
+        try:
+            await apply_voice_lock_state(voice_channel, owner, self.room_type, data["locked"])
+        except discord.Forbidden:
+            await interaction.response.send_message("Bot 權限不足，無法鎖定/解鎖語音房。", ephemeral=True)
+            return
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"鎖定/解鎖失敗：{e}", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+    @discord.ui.button(
+        label="👁️ 隱藏/顯示",
+        style=discord.ButtonStyle.secondary,
+        custom_id="voice_room_visibility_toggle",
+        row=0,
+    )
+    async def visibility_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self.reject_if_not_owner(interaction):
+            return
+
+        voice_channel, owner = await self.get_voice_channel_and_owner(interaction)
+        if voice_channel is None or owner is None:
+            await interaction.response.send_message("找不到對應的語音房。", ephemeral=True)
+            return
+
+        data = TEMP_VOICE_CONTROL_PANELS.setdefault(
+            self.voice_channel_id,
+            {
+                "owner_id": self.owner_id,
+                "panel_channel_id": interaction.channel.id if interaction.channel else None,
+                "room_type": self.room_type,
+                "locked": False,
+                "hidden": False,
+            }
+        )
+        data["hidden"] = not data.get("hidden", False)
+
+        try:
+            await apply_voice_hidden_state(voice_channel, owner, self.room_type, data["hidden"])
+        except discord.Forbidden:
+            await interaction.response.send_message("Bot 權限不足，無法隱藏/顯示語音房。", ephemeral=True)
+            return
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"隱藏/顯示失敗：{e}", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+    @discord.ui.button(
+        label="✏️ 更改名稱",
+        style=discord.ButtonStyle.success,
+        custom_id="voice_room_rename",
+        row=1,
+    )
+    async def rename_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self.reject_if_not_owner(interaction):
+            return
+
+        await interaction.response.send_modal(
+            VoiceRoomRenameModal(
+                voice_channel_id=self.voice_channel_id,
+                owner_id=self.owner_id,
+            )
+        )
+
+    @discord.ui.button(
+        label="👥 設定人數",
+        style=discord.ButtonStyle.danger,
+        custom_id="voice_room_user_limit",
+        row=1,
+    )
+    async def limit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self.reject_if_not_owner(interaction):
+            return
+
+        await interaction.response.send_modal(
+            VoiceRoomLimitModal(
+                voice_channel_id=self.voice_channel_id,
+                owner_id=self.owner_id,
+            )
+        )
+
+
+async def create_voice_control_panel(
+    guild: discord.Guild,
+    category: discord.CategoryChannel,
+    member: discord.Member,
+    voice_channel: discord.VoiceChannel,
+    room_type: str,
+):
+    # 不再額外建立文字頻道，控制面板直接發在語音房內建聊天室。
+    TEMP_VOICE_CONTROL_PANELS[voice_channel.id] = {
+        "owner_id": member.id,
+        "panel_channel_id": voice_channel.id,
+        "panel_message_id": None,
+        "room_type": room_type,
+        "locked": False,
+        "hidden": False,
+    }
+
+    embed = discord.Embed(
+        title="專屬語音房",
+        description=(
+            f"歡迎來到您的專屬包廂！{member.mention}\n"
+            "可以使用遙控器管理頻道。\n\n"
+            "⚠️ 當包廂內無人時，將自動銷毀。"
+        ),
+        color=discord.Color.purple()
+    )
+
+    message = await voice_channel.send(
+        embed=embed,
+        view=VoiceRoomControlView(
+            voice_channel_id=voice_channel.id,
+            owner_id=member.id,
+            room_type=room_type,
+        ),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        )
+    )
+
+    TEMP_VOICE_CONTROL_PANELS[voice_channel.id]["panel_message_id"] = message.id
