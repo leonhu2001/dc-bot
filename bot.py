@@ -90,12 +90,16 @@ from services.rewards import (
 
 from services.orders import (
     _to_int,
+    configure_order_helpers,
     ORDER_CATEGORY_LABELS,
     ORDER_ITEMS_BY_CATEGORY,
     ORDER_ITEM_TO_CATEGORY,
     SPECIAL_COMPANION_ITEMS,
     QUANTITY_SELECT_ITEMS,
     QUANTITY_OPTIONS,
+    find_order_by_identifier,
+    is_order_closed_for_rewards,
+    get_order_amount_for_maintenance,
 )
 
 import discord
@@ -1923,6 +1927,7 @@ class ConfirmCancelOrderView(discord.ui.View):
 ORDER_CONTROL_SELECTIONS = {}
 STAFF_ORDER_OPERATION_SELECTIONS = {}
 SELF_SERVICE_ORDER_SELECTIONS = {}
+configure_order_helpers(SELF_SERVICE_ORDER_SELECTIONS, parse_receipt_amount)
 
 # 派單頻道接單資料
 # message_id 對應該派單訊息目前有哪些陪玩 / 打手接單。
@@ -6496,61 +6501,6 @@ async def order_search(
 # ========= 訂單修正 / 刪除指令 =========
 
 ORDER_MAINTENANCE_BACKUP_PREFIX = "manual_order_maintenance"
-
-
-def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
-    """用訂單編號或票口 ID 從記憶體訂單資料找單。"""
-    key = str(identifier or "").strip()
-    if not key:
-        return None, None
-
-    channel_id = _to_int(key)
-    if channel_id is not None and channel_id in SELF_SERVICE_ORDER_SELECTIONS:
-        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id)
-        if isinstance(data, dict):
-            return channel_id, data
-
-    key_lower = key.lower()
-    for order_channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items():
-        if not isinstance(data, dict):
-            continue
-        candidates = [
-            data.get("order_no"),
-            data.get("receipt_id"),
-            str(order_channel_id),
-        ]
-        if any(str(value or "").strip().lower() == key_lower for value in candidates):
-            return int(order_channel_id), data
-
-    return None, None
-
-
-def is_order_closed_for_rewards(data: dict) -> bool:
-    status = str(data.get("status") or "").lower()
-    return bool(data.get("reward_counted") or data.get("closed") or status == "closed")
-
-
-def get_order_amount_for_maintenance(data: dict) -> int:
-    """Safely parse order amount for maintenance commands.
-
-    This stays local to bot.py so maintenance/audit tools do not depend on
-    private database-module helpers during modularization.
-    """
-    if not isinstance(data, dict):
-        return 0
-
-    for key in ("amount", "total_amount", "reward_amount"):
-        value = data.get(key)
-        if value is None or value == "":
-            continue
-        try:
-            return max(0, int(value))
-        except (TypeError, ValueError):
-            parsed = parse_receipt_amount(str(value))
-            if parsed is not None:
-                return max(0, int(parsed))
-
-    return 0
 
 
 def adjust_customer_totals_for_order(customer_id: int | None, amount_delta: int, order_delta: int) -> dict | None:
