@@ -29,6 +29,13 @@ from core.config import (
     _config_str_list,
 )
 
+from core.database import (
+    _db_table_exists,
+    _db_columns,
+    _db_add_column_if_missing,
+    _json_load_maybe,
+)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -3241,25 +3248,10 @@ def cleanup_old_closed_orders() -> None:
 VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；不檢查 2026/04。
 
 
-def _db_table_exists(cur: sqlite3.Cursor, table_name: str) -> bool:
-    row = cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        (table_name,),
-    ).fetchone()
-    return row is not None
 
 
-def _db_columns(cur: sqlite3.Cursor, table_name: str) -> set[str]:
-    try:
-        return {row[1] for row in cur.execute(f"PRAGMA table_info({table_name})").fetchall()}
-    except sqlite3.Error:
-        return set()
 
 
-def _db_add_column_if_missing(cur: sqlite3.Cursor, table_name: str, column_name: str, column_type: str) -> None:
-    cols = _db_columns(cur, table_name)
-    if column_name not in cols:
-        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
 
 def init_database() -> None:
@@ -3429,13 +3421,6 @@ def init_database() -> None:
         conn.commit()
 
 
-def _json_load_maybe(value, default):
-    if value is None:
-        return default
-    try:
-        return json.loads(value)
-    except (TypeError, json.JSONDecodeError):
-        return default
 
 
 def _level_index_from_name(level_name: str | None) -> int | None:
