@@ -36,6 +36,11 @@ from core.database import (
     _db_columns,
     _db_add_column_if_missing,
     _json_load_maybe,
+    _json_default,
+    _serialize_orders,
+    _serialize_claims,
+    _serialize_customer_rewards,
+    _serialize_order_counters,
     delete_order_row_from_db,
     delete_claim_row_from_db,
     remember_order_data,
@@ -1892,56 +1897,6 @@ def _to_int(value, default: int | None = None) -> int | None:
         return default
 
 
-def _serialize_orders() -> dict:
-    return {
-        str(channel_id): data
-        for channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items()
-    }
-
-
-def _serialize_claims() -> dict:
-    result = {}
-
-    for message_id, data in ORDER_CLAIMS.items():
-        result[str(message_id)] = {
-            "companion": sorted(list(data.get("companion", set()))),
-            "booster": sorted(list(data.get("booster", set()))),
-            "locked": bool(data.get("locked", False)),
-            "customer_id": data.get("customer_id"),
-            "category_label": data.get("category_label"),
-            "item": data.get("item"),
-            "quantity": _to_int(data.get("quantity"), 1) or 1,
-            "payment_method": data.get("payment_method"),
-            "source_channel_id": data.get("source_channel_id"),
-            "companion_preference": data.get("companion_preference"),
-            "dispatch_channel_id": data.get("dispatch_channel_id"),
-            "status": data.get("status", "active"),
-            "stored_at": data.get("stored_at"),
-            "stored_by": data.get("stored_by"),
-            "stored_reason": data.get("stored_reason"),
-            "stored_expected_time": data.get("stored_expected_time"),
-            "stored_note": data.get("stored_note"),
-        }
-
-    return result
-
-
-def _serialize_customer_rewards() -> dict:
-    return {
-        str(user_id): data
-        for user_id, data in CUSTOMER_REWARDS.items()
-    }
-
-
-def _serialize_order_counters() -> dict:
-    return {str(day): int(count) for day, count in ORDER_COUNTERS.items()}
-
-def _json_default(value):
-    if isinstance(value, set):
-        return sorted(value)
-    return str(value)
-
-
 def _deserialize_claim_data(data: dict) -> dict:
     return {
         "companion": {uid for uid in (_to_int(x) for x in data.get("companion", [])) if uid is not None},
@@ -3713,7 +3668,7 @@ def save_bot_data() -> None:
 
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS)
-configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, ORDER_COUNTERS, save_bot_data, order_id_prefix=ORDER_ID_PREFIX)
+configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, CUSTOMER_REWARDS, ORDER_COUNTERS, save_bot_data, order_id_prefix=ORDER_ID_PREFIX)
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:

@@ -12,6 +12,7 @@ _BACKUP_KEEP_DAYS: int = 30
 
 _ORDER_SELECTIONS: MutableMapping[int, dict] | None = None
 _ORDER_CLAIMS: MutableMapping[int, dict] | None = None
+_CUSTOMER_REWARDS: MutableMapping[int, dict] | None = None
 _ORDER_COUNTERS: MutableMapping[str, int] | None = None
 _ORDER_ID_PREFIX: str = "MO"
 _SAVE_BOT_DATA: Callable[[], None] | None = None
@@ -20,18 +21,20 @@ _SAVE_BOT_DATA: Callable[[], None] | None = None
 def configure_data_access(
     order_selections: MutableMapping[int, dict],
     order_claims: MutableMapping[int, dict],
+    customer_rewards: MutableMapping[int, dict],
     order_counters: MutableMapping[str, int],
     save_bot_data_func: Callable[[], None],
     *,
     order_id_prefix: str = "MO",
 ) -> None:
-    """設定記憶體資料入口，供 remember_* helpers 與訂單編號 helper 使用。
+    """設定記憶體資料入口，供 remember_*、serialize helpers 與訂單編號 helper 使用。
 
     這裡只保存 reference，不複製資料；因此 bot.py 原本的全域 dict 仍是唯一資料來源。
     """
-    global _ORDER_SELECTIONS, _ORDER_CLAIMS, _ORDER_COUNTERS, _SAVE_BOT_DATA, _ORDER_ID_PREFIX
+    global _ORDER_SELECTIONS, _ORDER_CLAIMS, _CUSTOMER_REWARDS, _ORDER_COUNTERS, _SAVE_BOT_DATA, _ORDER_ID_PREFIX
     _ORDER_SELECTIONS = order_selections
     _ORDER_CLAIMS = order_claims
+    _CUSTOMER_REWARDS = customer_rewards
     _ORDER_COUNTERS = order_counters
     _SAVE_BOT_DATA = save_bot_data_func
     _ORDER_ID_PREFIX = str(order_id_prefix or "MO")
@@ -46,6 +49,85 @@ def _require_order_counter_access() -> tuple[MutableMapping[str, int], Callable[
     if _ORDER_COUNTERS is None or _SAVE_BOT_DATA is None:
         raise RuntimeError("database module 尚未設定訂單編號資料入口，請先呼叫 configure_data_access()")
     return _ORDER_COUNTERS, _SAVE_BOT_DATA
+
+
+def _require_all_data_access() -> tuple[
+    MutableMapping[int, dict],
+    MutableMapping[int, dict],
+    MutableMapping[int, dict],
+    MutableMapping[str, int],
+]:
+    if (
+        _ORDER_SELECTIONS is None
+        or _ORDER_CLAIMS is None
+        or _CUSTOMER_REWARDS is None
+        or _ORDER_COUNTERS is None
+    ):
+        raise RuntimeError("database module 尚未設定完整資料入口，請先呼叫 configure_data_access()")
+    return _ORDER_SELECTIONS, _ORDER_CLAIMS, _CUSTOMER_REWARDS, _ORDER_COUNTERS
+
+
+def _to_int(value: Any, default: int | None = None) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _serialize_orders() -> dict:
+    order_selections, _, _, _ = _require_all_data_access()
+    return {
+        str(channel_id): data
+        for channel_id, data in order_selections.items()
+    }
+
+
+def _serialize_claims() -> dict:
+    _, order_claims, _, _ = _require_all_data_access()
+    result = {}
+
+    for message_id, data in order_claims.items():
+        result[str(message_id)] = {
+            "companion": sorted(list(data.get("companion", set()))),
+            "booster": sorted(list(data.get("booster", set()))),
+            "locked": bool(data.get("locked", False)),
+            "customer_id": data.get("customer_id"),
+            "category_label": data.get("category_label"),
+            "item": data.get("item"),
+            "quantity": _to_int(data.get("quantity"), 1) or 1,
+            "payment_method": data.get("payment_method"),
+            "source_channel_id": data.get("source_channel_id"),
+            "companion_preference": data.get("companion_preference"),
+            "dispatch_channel_id": data.get("dispatch_channel_id"),
+            "status": data.get("status", "active"),
+            "stored_at": data.get("stored_at"),
+            "stored_by": data.get("stored_by"),
+            "stored_reason": data.get("stored_reason"),
+            "stored_expected_time": data.get("stored_expected_time"),
+            "stored_note": data.get("stored_note"),
+        }
+
+    return result
+
+
+def _serialize_customer_rewards() -> dict:
+    _, _, customer_rewards, _ = _require_all_data_access()
+    return {
+        str(user_id): data
+        for user_id, data in customer_rewards.items()
+    }
+
+
+def _serialize_order_counters() -> dict:
+    _, _, _, order_counters = _require_all_data_access()
+    return {str(day): int(count) for day, count in order_counters.items()}
+
+
+def _json_default(value: Any):
+    if isinstance(value, set):
+        return sorted(value)
+    return str(value)
+
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     """保存單筆訂單暫存資料並同步到資料庫。"""
