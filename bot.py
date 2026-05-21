@@ -6107,14 +6107,22 @@ async def delete_dispatch_message_for_order(guild: discord.Guild | None, data: d
 
     dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
     dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+    if dispatch_channel is None:
+        try:
+            fetched_channel = await asyncio.wait_for(guild.fetch_channel(dispatch_channel_id), timeout=5)
+            dispatch_channel = fetched_channel if isinstance(fetched_channel, discord.TextChannel) else None
+        except (asyncio.TimeoutError, discord.NotFound, discord.Forbidden, discord.HTTPException):
+            dispatch_channel = None
+
     if not isinstance(dispatch_channel, discord.TextChannel):
         return False
 
     try:
-        message = await dispatch_channel.fetch_message(dispatch_message_id)
-        await message.delete(reason="Order manually deleted by staff")
+        message = await asyncio.wait_for(dispatch_channel.fetch_message(dispatch_message_id), timeout=5)
+        await asyncio.wait_for(message.delete(reason="Order manually deleted by staff"), timeout=5)
         return True
-    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+    except (asyncio.TimeoutError, discord.NotFound, discord.Forbidden, discord.HTTPException):
         return False
 
 
@@ -6160,54 +6168,80 @@ async def delete_order(
         return
 
     await interaction.response.defer(ephemeral=True)
-    backup_path = backup_database_for_manual_order_fix()
 
-    old_data = dict(data)
-    customer_id = _to_int(data.get("customer_id"))
-    amount = get_order_amount_for_maintenance(data)
-    order_count_delta = -1 if is_order_closed_for_rewards(data) else 0
+    try:
+        backup_path = backup_database_for_manual_order_fix()
 
-    if adjust_customer and is_order_closed_for_rewards(data):
-        adjust_customer_totals_for_order(customer_id, -amount, order_count_delta)
+        old_data = dict(data)
+        customer_id = _to_int(data.get("customer_id"))
+        amount = get_order_amount_for_maintenance(data)
+        order_count_delta = -1 if is_order_closed_for_rewards(data) else 0
 
-    dispatch_deleted = False
-    if delete_dispatch_panel:
-        dispatch_deleted = await delete_dispatch_message_for_order(interaction.guild, data)
+        if adjust_customer and is_order_closed_for_rewards(data):
+            adjust_customer_totals_for_order(customer_id, -amount, order_count_delta)
 
-    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
-    if dispatch_message_id is not None:
-        ORDER_CLAIMS.pop(dispatch_message_id, None)
-        delete_claim_row_from_db(message_id=dispatch_message_id)
+        dispatch_deleted = False
+        if delete_dispatch_panel:
+            dispatch_deleted = await delete_dispatch_message_for_order(interaction.guild, data)
 
-    SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
-    delete_order_row_from_db(channel_id)
-    save_bot_data()
-    benefit_notices = await refresh_customer_benefits_after_manual_fix(interaction.guild, [customer_id])
+        dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+        if dispatch_message_id is not None:
+            ORDER_CLAIMS.pop(dispatch_message_id, None)
+            delete_claim_row_from_db(message_id=dispatch_message_id)
 
-    description = (
-        f"已刪除訂單資料。\n"
-        f"票口 ID：`{channel_id}`\n"
-        f"會員同步：{'已扣回' if adjust_customer and is_order_closed_for_rewards(old_data) else '未扣回 / 不適用'}\n"
-        f"派單面板：{'已刪除' if dispatch_deleted else '未刪除或找不到'}\n"
-        f"備份：`{backup_path or '建立失敗或無資料庫'}`"
-    )
-    if benefit_notices:
-        description += "\n" + "\n".join(benefit_notices[:5])
+        SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
+        delete_order_row_from_db(channel_id)
+        save_bot_data()
+        benefit_notices = await asyncio.wait_for(
+            refresh_customer_benefits_after_manual_fix(interaction.guild, [customer_id]),
+            timeout=15,
+        )
 
-    embed = build_order_maintenance_result_embed("刪除訂單完成", description, old_data)
-    await interaction.followup.send(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
+        description = (
+            f"已刪除訂單資料。\n"
+            f"票口 ID：`{channel_id}`\n"
+            f"會員同步：{'已扣回' if adjust_customer and is_order_closed_for_rewards(old_data) else '未扣回 / 不適用'}\n"
+            f"派單面板：{'已刪除' if dispatch_deleted else '未刪除或找不到'}\n"
+            f"備份：`{backup_path or '建立失敗或無資料庫'}`"
+        )
+        if benefit_notices:
+            description += "\n" + "\n".join(benefit_notices[:5])
 
-    await send_order_log(
-        interaction.guild,
-        title="手動刪除訂單",
-        description=description,
-        fields=[
-            ("操作人員", interaction.user.mention, True),
-            ("訂單", str(old_data.get("order_no") or order), True),
-            ("顧客", f"<@{customer_id}>" if customer_id else "未紀錄", True),
-        ],
-        color=discord.Color.red(),
-    )
+        embed = build_order_maintenance_result_embed("刪除訂單完成", description, old_data)
+        await interaction.followup.send(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
+
+        await send_order_log(
+            interaction.guild,
+            title="手動刪除訂單",
+            description=description,
+            fields=[
+                ("操作人員", interaction.user.mention, True),
+                ("訂單", str(old_data.get("order_no") or order), True),
+                ("顧客", f"<@{customer_id}>" if customer_id else "未紀錄", True),
+            ],
+            color=discord.Color.red(),
+        )
+    except Exception as e:
+        error_text = f"/delete_order 執行失敗：{type(e).__name__}: {e}"
+        try:
+            await interaction.followup.send(
+                f"刪除訂單失敗：`{type(e).__name__}: {e}`\n請到 VPS 查看 journalctl 取得完整 Traceback。",
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            pass
+        await send_order_log(
+            interaction.guild,
+            title="刪除訂單失敗",
+            description=error_text,
+            fields=[
+                ("操作人員", interaction.user.mention, True),
+                ("輸入訂單", str(order), True),
+                ("票口 ID", str(channel_id), True),
+            ],
+            color=discord.Color.red(),
+        )
+        raise
 
 
 @bot.tree.command(
