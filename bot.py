@@ -83,6 +83,9 @@ from services.rewards import (
     add_customer_reward_from_order,
     add_manual_purchase,
     adjust_customer_points,
+    configure_reward_database,
+    get_previous_calendar_month_range,
+    get_customer_closed_spend_between,
 )
 
 from services.orders import (
@@ -2110,59 +2113,6 @@ async def check_stored_order_reminders_once(guild: discord.Guild | None = None) 
         save_bot_data()
 
 
-def get_previous_calendar_month_range(now: datetime | None = None) -> tuple[datetime, datetime, str]:
-    now = now or get_taipei_now()
-    first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    last_prev_month = first_this_month - timedelta(seconds=1)
-    first_prev_month = last_prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_key = first_this_month.strftime("%Y-%m")
-    return first_prev_month, first_this_month, month_key
-
-def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_dt: datetime) -> int:
-    """直接從 SQLite orders 查會員維持消費，避免只看 Bot 記憶體漏算補登資料。"""
-    init_database()
-    start_text = start_dt.isoformat(timespec="seconds")
-    end_text = end_dt.isoformat(timespec="seconds")
-
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-            cols = _db_columns(cur, "orders")
-            if {"customer_id", "amount", "status", "closed_at"}.issubset(cols):
-                row = cur.execute(
-                    """
-                    SELECT COALESCE(SUM(amount), 0) AS total
-                    FROM orders
-                    WHERE customer_id=?
-                      AND status='closed'
-                      AND closed_at >= ?
-                      AND closed_at < ?
-                    """,
-                    (int(customer_id), start_text, end_text),
-                ).fetchone()
-                return int(row["total"] or 0)
-
-            # 舊 data 欄位資料庫 fallback。
-            total = 0
-            if "data" in cols:
-                for row in cur.execute("SELECT data FROM orders").fetchall():
-                    data = _json_load_maybe(row["data"], {})
-                    if not isinstance(data, dict):
-                        continue
-                    if _to_int(data.get("customer_id")) != customer_id:
-                        continue
-                    if str(data.get("status", "")).lower() != "closed" and not data.get("closed"):
-                        continue
-                    closed_text = _normalize_stats_datetime_text(data.get("closed_at") or data.get("reward_counted_at"))
-                    if closed_text is None or not (start_text <= closed_text < end_text):
-                        continue
-                    total += _to_int(data.get("amount") or data.get("reward_amount"), 0) or 0
-            return total
-    except sqlite3.Error as e:
-        print(f"查詢會員維持消費失敗：{e}")
-        return 0
-
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
     guild = guild or bot.get_guild(GUILD_ID)
     if guild is None:
@@ -2384,6 +2334,7 @@ VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；
 
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
+configure_reward_database(DB_FILE)
 configure_data_access(
     SELF_SERVICE_ORDER_SELECTIONS,
     ORDER_CLAIMS,

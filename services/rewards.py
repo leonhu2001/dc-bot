@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from typing import Any, Callable
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import sqlite3
 
 import hashlib
 import re
 
 import discord
 
-from core.time_utils import get_taipei_now_iso
+from core.time_utils import get_taipei_now, get_taipei_now_iso
+from core.database import init_database, _db_columns, _json_load_maybe
 
 _MEMBER_LEVELS: list[dict[str, Any]] = [
     {"name": "普通魔丸", "threshold": 0},
@@ -20,7 +23,14 @@ _SAVE_BOT_DATA: Callable[[], None] | None = None
 _SILVER_MEMBER_ROLE_ID: int | None = None
 _PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
 _PLATINUM_CHAT_ROLE_IDS: list[int] = []
+_REWARD_DB_FILE: Path | None = None
 
+
+
+def configure_reward_database(db_file: str | Path | None) -> None:
+    """設定會員服務需要查詢的 SQLite 資料庫。"""
+    global _REWARD_DB_FILE
+    _REWARD_DB_FILE = Path(db_file) if db_file is not None else None
 
 def configure_reward_benefits(
     *,
@@ -642,4 +652,88 @@ async def adjust_customer_points(
         f"調整前：{before_points:,} 點\n"
         f"調整後：{after_points:,} 點"
     )
+
+
+def _normalize_reward_datetime_text(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    text = str(value).strip()
+
+    if not text:
+        return None
+
+    # SQLite datetime('now') 會產生空白格式；ISO 格式則含 T。
+    text = text.replace(" ", "T", 1) if " " in text and "T" not in text else text
+
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return str(value)
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
+
+    return dt.isoformat(timespec="seconds")
+
+
+def get_previous_calendar_month_range(now: datetime | None = None) -> tuple[datetime, datetime, str]:
+    """取得上一個完整月份區間，以及本次檢查月份 key。"""
+    now = now or get_taipei_now()
+    first_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_prev_month = first_this_month - timedelta(seconds=1)
+    first_prev_month = last_prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_key = first_this_month.strftime("%Y-%m")
+    return first_prev_month, first_this_month, month_key
+
+
+def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_dt: datetime) -> int:
+    """直接從 SQLite orders 查會員維持消費，避免只看 Bot 記憶體漏算補登資料。"""
+    init_database()
+
+    db_file = _REWARD_DB_FILE or Path("bot.db")
+    start_text = start_dt.isoformat(timespec="seconds")
+    end_text = end_dt.isoformat(timespec="seconds")
+
+    try:
+        with sqlite3.connect(db_file) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cols = _db_columns(cur, "orders")
+
+            if {"customer_id", "amount", "status", "closed_at"}.issubset(cols):
+                row = cur.execute(
+                    """
+                    SELECT COALESCE(SUM(amount), 0) AS total
+                    FROM orders
+                    WHERE customer_id=?
+                      AND status='closed'
+                      AND closed_at >= ?
+                      AND closed_at < ?
+                    """,
+                    (int(customer_id), start_text, end_text),
+                ).fetchone()
+                return int(row["total"] or 0)
+
+            # 舊 data 欄位資料庫 fallback。
+            total = 0
+            if "data" in cols:
+                for row in cur.execute("SELECT data FROM orders").fetchall():
+                    data = _json_load_maybe(row["data"], {})
+                    if not isinstance(data, dict):
+                        continue
+                    if _to_int(data.get("customer_id")) != int(customer_id):
+                        continue
+                    if str(data.get("status", "")).lower() != "closed" and not data.get("closed"):
+                        continue
+                    closed_text = _normalize_reward_datetime_text(
+                        data.get("closed_at") or data.get("reward_counted_at")
+                    )
+                    if closed_text is None or not (start_text <= closed_text < end_text):
+                        continue
+                    total += _to_int(data.get("amount") or data.get("reward_amount"), 0) or 0
+            return total
+    except sqlite3.Error as e:
+        print(f"查詢會員維持消費失敗：{e}")
+        return 0
 
