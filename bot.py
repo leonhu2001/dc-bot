@@ -3956,16 +3956,17 @@ class OrderControlView(discord.ui.View):
         await interaction.response.defer()
 
         await interaction.channel.send(
-            embed=embed,imeout=None)
-
-    @discord.ui.button(
-        label="填寫意見",
-        style=discord.ButtonStyle.primary,
-        custom_id="feedback_form_button"
-    )
-    async def feedback_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(FeedbackModal())
-
+            embed=embed,
+            view=SelfServiceOrderView(
+                customer_id=customer_id,
+                channel_id=interaction.channel.id
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False
+            )
+        )
 
 # ========= 下單 / 入職 Modal =========
 
