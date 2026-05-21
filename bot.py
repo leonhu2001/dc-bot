@@ -5178,6 +5178,23 @@ class PaymentMethodView(discord.ui.View):
             await interaction.response.send_message("請先選擇付款方式，再按送出。", ephemeral=True)
             return
 
+        if data.get("dispatch_message_id") is not None:
+            dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+            dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+            dispatch_channel = guild.get_channel(dispatch_channel_id)
+            if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
+                await interaction.response.send_message(
+                    f"這張單已經送出派單，請不要重複送出。\n派單訊息：https://discord.com/channels/{guild.id}/{dispatch_channel.id}/{dispatch_message_id}",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message("這張單已經送出派單，請不要重複送出。", ephemeral=True)
+            return
+
+        if data.get("dispatch_submitting"):
+            await interaction.response.send_message("這張單正在送出派單，請稍等，不要重複點擊。", ephemeral=True)
+            return
+
         item_category = ORDER_ITEM_TO_CATEGORY.get(item)
 
         if item_category != category:
@@ -5230,23 +5247,32 @@ class PaymentMethodView(discord.ui.View):
             companion_preference=companion_preference
         )
 
-        dispatch_message = await dispatch_channel.send(
-            embed=embed,
-            view=DispatchClaimView(
-                customer_id=self.customer_id,
-                category_label=category_label,
-                item=item,
-                quantity=quantity,
-                payment_method=payment_method,
-                source_channel_id=interaction.channel.id,
-                companion_preference=companion_preference
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
+        data["dispatch_submitting"] = True
+        remember_order_data(self.channel_id, data)
+
+        try:
+            dispatch_message = await dispatch_channel.send(
+                embed=embed,
+                view=DispatchClaimView(
+                    customer_id=self.customer_id,
+                    category_label=category_label,
+                    item=item,
+                    quantity=quantity,
+                    payment_method=payment_method,
+                    source_channel_id=interaction.channel.id,
+                    companion_preference=companion_preference
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False
+                )
             )
-        )
+        except discord.HTTPException as e:
+            data.pop("dispatch_submitting", None)
+            remember_order_data(self.channel_id, data)
+            await interaction.response.send_message(f"派單送出失敗：{e}", ephemeral=True)
+            return
 
         ORDER_CLAIMS[dispatch_message.id] = {
             "companion": set(),
@@ -5265,6 +5291,7 @@ class PaymentMethodView(discord.ui.View):
         data["dispatch_message_id"] = dispatch_message.id
         data["dispatch_channel_id"] = dispatch_channel.id
         data["closed"] = False
+        data.pop("dispatch_submitting", None)
         remember_order_data(interaction.channel.id, data)
         remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
 
