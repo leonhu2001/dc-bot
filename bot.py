@@ -85,6 +85,10 @@ from services.rewards import (
     adjust_customer_points,
 )
 
+from services.orders import (
+    _to_int,
+)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -1936,13 +1940,6 @@ BACKUP_DIR = Path(__file__).parent / "backups"
 CLOSED_ORDER_KEEP_DAYS = 0  # 已結單資料永久保留，不再自動刪除
 CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
 
-
-
-def _to_int(value, default: int | None = None) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
 
 
 
