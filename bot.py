@@ -118,6 +118,12 @@ from services.audit import (
     build_audit_data_report,
 )
 
+from services.logging_service import (
+    configure_order_logging,
+    get_or_create_order_log_channel,
+    send_order_log,
+)
+
 from services.orders import (
     _to_int,
     configure_order_helpers,
@@ -399,6 +405,12 @@ configure_permissions(
     customer_role_id=CUSTOMER_ROLE_ID,
     examiner_role_id=EXAMINER_ROLE_ID,
     manager_role_id=MANAGER_ROLE_ID,
+)
+
+configure_order_logging(
+    order_log_channel_name=ORDER_LOG_CHANNEL_NAME,
+    order_log_category_id=ORDER_LOG_CATEGORY_ID,
+    get_now_func=get_taipei_now,
 )
 
 configure_review_views(
@@ -1033,59 +1045,6 @@ CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
 
 
 
-def get_or_create_order_log_channel_sync_hint() -> str:
-    return f"{ORDER_LOG_CHANNEL_NAME}（類別 ID：{ORDER_LOG_CATEGORY_ID}）"
-
-
-async def get_or_create_order_log_channel(guild: discord.Guild) -> discord.TextChannel | None:
-    category = guild.get_channel(ORDER_LOG_CATEGORY_ID)
-    if not isinstance(category, discord.CategoryChannel):
-        return None
-
-    for channel in category.text_channels:
-        if channel.name == ORDER_LOG_CHANNEL_NAME:
-            return channel
-
-    try:
-        return await guild.create_text_channel(
-            name=ORDER_LOG_CHANNEL_NAME,
-            category=category,
-            reason="Create order log channel"
-        )
-    except (discord.Forbidden, discord.HTTPException) as e:
-        print(f"建立機器人日誌頻道失敗：{e}")
-        return None
-
-
-async def send_order_log(
-    guild: discord.Guild | None,
-    title: str,
-    description: str | None = None,
-    fields: list[tuple[str, str, bool]] | None = None,
-    color: discord.Color | None = None,
-) -> None:
-    if guild is None:
-        return
-
-    channel = await get_or_create_order_log_channel(guild)
-    if channel is None:
-        print(f"找不到或無法建立機器人日誌頻道：{get_or_create_order_log_channel_sync_hint()}")
-        return
-
-    embed = discord.Embed(
-        title=title,
-        description=description or "",
-        color=color or discord.Color.blurple(),
-        timestamp=get_taipei_now(),
-    )
-
-    for name, value, inline in fields or []:
-        embed.add_field(name=name, value=value if value else "未紀錄", inline=inline)
-
-    try:
-        await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
-    except discord.HTTPException as e:
-        print(f"送出機器人日誌失敗：{e}")
 
 
 
