@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+from datetime import datetime, timezone, timedelta
 
+import hashlib
 import re
 
 import discord
+
+from core.time_utils import get_taipei_now_iso
 
 _MEMBER_LEVELS: list[dict[str, Any]] = [
     {"name": "普通魔丸", "threshold": 0},
@@ -455,8 +459,6 @@ async def add_customer_reward_from_order(
     data["total_spent"] = old_total_spent + amount
     data["order_count"] = int(data.get("order_count", 0) or 0) + 1
 
-    from core.time_utils import get_taipei_now_iso
-
     data["last_order_at"] = get_taipei_now_iso()
     data["points"] = get_current_reward_points(data)
     sync_vip_level_to_cumulative_if_higher(data)
@@ -496,4 +498,104 @@ async def add_customer_reward_from_order(
         result += "\n" + "\n".join(f"- {notice}" for notice in benefit_notices)
 
     return result
+
+def parse_manual_purchase_date(date_text: str) -> tuple[str, str] | tuple[None, None]:
+    """支援 20260512、2026/05/12、2026-05-12，回傳 ISO 與顯示文字。"""
+    text = date_text.strip()
+
+    for fmt in ("%Y%m%d", "%Y/%m/%d", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(text, fmt)
+            taipei_tz = timezone(timedelta(hours=8))
+            dt = dt.replace(tzinfo=taipei_tz)
+            return dt.isoformat(timespec="seconds"), dt.strftime("%Y/%m/%d")
+        except ValueError:
+            pass
+
+    return None, None
+
+
+def build_manual_purchase_key(customer_id: int, amount: int, date_iso: str, note: str | None = None) -> str:
+    clean_note = (note or "").strip()
+    return f"manual:{customer_id}:{amount}:{date_iso}:{clean_note}"
+
+
+async def add_manual_purchase(
+    guild: discord.Guild,
+    customer_id: int,
+    amount: int,
+    date_text: str,
+    operator_id: int,
+    note: str | None = None,
+) -> tuple[bool, str]:
+    if amount <= 0:
+        return False, "金額必須大於 0。"
+
+    date_iso, display_date = parse_manual_purchase_date(date_text)
+    if date_iso is None or display_date is None:
+        return False, "日期格式錯誤，請用 20260512、2026/05/12 或 2026-05-12。"
+
+    data = get_customer_reward_data(customer_id)
+    old_level = get_effective_member_level(data)
+    manual_keys = data.setdefault("manual_purchase_keys", [])
+    purchase_key = build_manual_purchase_key(customer_id, amount, date_iso, note)
+
+    if purchase_key in manual_keys:
+        return False, f"已跳過重複補登：<@{customer_id}> {format_t_amount(amount)} {display_date}。"
+
+    data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
+    data["order_count"] = int(data.get("order_count", 0) or 0) + 1
+    data["points"] = get_current_reward_points(data)
+
+    old_last = data.get("last_order_at")
+    if not old_last or str(date_iso) > str(old_last):
+        data["last_order_at"] = date_iso
+
+    manual_keys.append(purchase_key)
+    data["last_manual_added_at"] = get_taipei_now_iso()
+    data["last_manual_added_by"] = operator_id
+    sync_vip_level_to_cumulative_if_higher(data)
+    _CUSTOMER_REWARDS[customer_id] = data
+
+    # 補登也寫入 orders，讓 /stats_today、/stats_month、VIP 維持消費都查得到。
+    # 使用 deterministic negative channel_id，避免重複補登與 Discord 真實頻道 ID 撞到。
+    manual_hash = int(hashlib.sha1(purchase_key.encode("utf-8")).hexdigest()[:14], 16)
+    manual_channel_id = -manual_hash
+    _ORDER_SELECTIONS[manual_channel_id] = {
+        "customer_id": customer_id,
+        "order_no": f"MANUAL{date_iso[:10].replace('-', '')}{str(customer_id)[-4:]}",
+        "category": "manual_purchase",
+        "item": (note or "手動補登"),
+        "quantity": 1,
+        "payment_method": "補登",
+        "amount": amount,
+        "total_amount": amount,
+        "status": "closed",
+        "closed": True,
+        "created_at": date_iso,
+        "closed_at": date_iso,
+        "note": note or "手動補登",
+        "reward_counted": True,
+        "reward_amount": amount,
+        "reward_counted_at": date_iso,
+    }
+
+    member = await fetch_member_safely(guild, customer_id)
+    benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+
+    if _SAVE_BOT_DATA is not None:
+        _SAVE_BOT_DATA()
+
+    level = get_effective_member_level(data)
+    if level["threshold"] > old_level["threshold"]:
+        benefit_notices.insert(0, f"恭喜 <@{customer_id}> 升級為 **{level['name']}**！目前累積消費：{format_t_amount(int(data['total_spent']))}")
+
+    msg = (
+        f"已補登 <@{customer_id}>：+{format_t_amount(amount)}，日期 {display_date}。"
+        f"目前累積 {format_t_amount(int(data['total_spent']))}，"
+        f"完成訂單 {int(data['order_count'])} 單，等級：{level['name']}。"
+    )
+    if benefit_notices:
+        msg += "\n" + "\n".join(f"- {notice}" for notice in benefit_notices)
+    return True, msg
 
