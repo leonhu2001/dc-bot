@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
+
+import re
 
 import discord
 
@@ -9,6 +11,8 @@ _MEMBER_LEVELS: list[dict[str, Any]] = [
 ]
 _REWARD_POINT_DIVISOR: int = 100
 _CUSTOMER_REWARDS: dict[int, dict[str, Any]] = {}
+_ORDER_SELECTIONS: dict[int, dict[str, Any]] = {}
+_SAVE_BOT_DATA: Callable[[], None] | None = None
 _SILVER_MEMBER_ROLE_ID: int | None = None
 _PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
 _PLATINUM_CHAT_ROLE_IDS: list[int] = []
@@ -36,6 +40,17 @@ def configure_reward_storage(customer_rewards: dict[int, dict[str, Any]]) -> Non
     global _CUSTOMER_REWARDS
     _CUSTOMER_REWARDS = customer_rewards
 
+
+
+
+def configure_reward_order_context(
+    order_selections: dict[int, dict[str, Any]],
+    save_bot_data_func: Callable[[], None],
+) -> None:
+    """設定訂單資料與保存函式，供結單累積會員消費使用。"""
+    global _ORDER_SELECTIONS, _SAVE_BOT_DATA
+    _ORDER_SELECTIONS = order_selections
+    _SAVE_BOT_DATA = save_bot_data_func
 
 def configure_rewards(*, member_levels: list[dict] | None = None, reward_point_divisor: int = 100) -> None:
     """設定會員等級與點數換算。
@@ -399,4 +414,86 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
             notices.append("白金專屬頻道建立失敗：Discord API 錯誤")
 
     return notices
+
+
+def parse_receipt_amount(amount_text: str) -> int | None:
+    """從收據金額欄位擷取金額。
+    支援：1275、NT$1,275、1275T、750+595。
+    若有加號，會把所有數字相加；否則取第一組數字。
+    """
+    normalized = amount_text.replace(",", "").strip()
+    numbers = [int(value) for value in re.findall(r"\d+", normalized)]
+
+    if not numbers:
+        return None
+
+    if "+" in normalized and len(numbers) >= 2:
+        return sum(numbers)
+
+    return numbers[0]
+
+
+async def add_customer_reward_from_order(
+    guild: discord.Guild,
+    order_channel_id: int,
+    customer_id: int,
+    amount_text: str,
+    notify_channel: discord.abc.Messageable | None = None,
+) -> str:
+    order_data = _ORDER_SELECTIONS.get(order_channel_id, {})
+
+    if order_data.get("reward_counted"):
+        return "此訂單已累積過會員消費，未重複累積。"
+
+    amount = parse_receipt_amount(amount_text)
+    if amount is None or amount <= 0:
+        return "會員消費未累積：收據金額欄位沒有可辨識的數字。"
+
+    data = get_customer_reward_data(customer_id)
+    old_total_spent = int(data.get("total_spent", 0) or 0)
+    old_level = get_effective_member_level(data)
+    data["total_spent"] = old_total_spent + amount
+    data["order_count"] = int(data.get("order_count", 0) or 0) + 1
+
+    from core.time_utils import get_taipei_now_iso
+
+    data["last_order_at"] = get_taipei_now_iso()
+    data["points"] = get_current_reward_points(data)
+    sync_vip_level_to_cumulative_if_higher(data)
+
+    order_data["reward_counted"] = True
+    order_data["reward_amount"] = amount
+    order_data["reward_counted_at"] = get_taipei_now_iso()
+    _ORDER_SELECTIONS[order_channel_id] = order_data
+
+    member = await fetch_member_safely(guild, customer_id)
+    benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+
+    level = get_effective_member_level(data)
+    if level["threshold"] > old_level["threshold"]:
+        upgrade_notice = f"恭喜 <@{customer_id}> 升級為 **{level['name']}**！目前累積消費：{format_t_amount(int(data['total_spent']))}"
+        benefit_notices.insert(0, upgrade_notice)
+        if notify_channel is not None:
+            try:
+                await notify_channel.send(
+                    upgrade_notice,
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
+                )
+            except discord.HTTPException:
+                pass
+
+    if _SAVE_BOT_DATA is not None:
+        _SAVE_BOT_DATA()
+
+    result = (
+        f"會員累積已更新：+{format_t_amount(amount)}，"
+        f"目前累積 {format_t_amount(int(data['total_spent']))}，"
+        f"完成訂單 {int(data['order_count'])} 單，"
+        f"等級：{level['name']}。"
+    )
+
+    if benefit_notices:
+        result += "\n" + "\n".join(f"- {notice}" for notice in benefit_notices)
+
+    return result
 
