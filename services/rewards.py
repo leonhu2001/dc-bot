@@ -737,3 +737,109 @@ def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_
         print(f"查詢會員維持消費失敗：{e}")
         return 0
 
+
+
+async def run_vip_downgrade_check(
+    guild: discord.Guild | None,
+    *,
+    force: bool = False,
+    maintain_min_monthly_spend: int = 500,
+    first_check_month: str = "2026-06",
+    send_log_func: Callable[..., Any] | None = None,
+) -> tuple[int, list[str]]:
+    """檢查並執行 VIP 自動降階。
+
+    這個函式保留原本邏輯，只把主流程搬到 rewards service：
+    - 低於第一個檢查月份時不處理。
+    - 每位會員每個檢查月份只檢查一次，除非 force=True。
+    - 未達月消費門檻時降一階，並重置下一級進度基準。
+    - 套用會員福利並保存資料。
+    """
+    if guild is None:
+        return 0, ["找不到伺服器，無法檢查 VIP 降階。"]
+
+    start_dt, end_dt, check_month_key = get_previous_calendar_month_range()
+
+    if check_month_key < first_check_month:
+        return 0, [
+            f"VIP 降階尚未啟用。第一次檢查月份為 {first_check_month}，"
+            f"本次 {check_month_key} 不檢查，避免 2026/04 未營運資料造成誤降階。"
+        ]
+
+    changed_count = 0
+    messages: list[str] = []
+
+    for user_id, data in list(_CUSTOMER_REWARDS.items()):
+        if not isinstance(data, dict):
+            continue
+
+        current_index = get_effective_member_level_index(data)
+        if current_index <= 0:
+            data["vip_last_downgrade_check_month"] = check_month_key
+            _CUSTOMER_REWARDS[user_id] = data
+            continue
+
+        if not force and data.get("vip_last_downgrade_check_month") == check_month_key:
+            continue
+
+        monthly_spend = get_customer_closed_spend_between(int(user_id), start_dt, end_dt)
+        data["vip_last_downgrade_check_month"] = check_month_key
+
+        if monthly_spend >= int(maintain_min_monthly_spend or 0):
+            _CUSTOMER_REWARDS[user_id] = data
+            continue
+
+        old_level = get_member_level_by_index(current_index)
+        new_index = max(0, current_index - 1)
+        new_level = get_member_level_by_index(new_index)
+        data["vip_level_index"] = new_index
+        data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+
+        log = {
+            "checked_month": check_month_key,
+            "previous_month_start": start_dt.isoformat(timespec="seconds"),
+            "previous_month_end": end_dt.isoformat(timespec="seconds"),
+            "previous_month_spend": monthly_spend,
+            "required_spend": int(maintain_min_monthly_spend or 0),
+            "old_level": old_level["name"],
+            "new_level": new_level["name"],
+            "progress_reset_total_spent": data["vip_progress_base_total_spent"],
+            "created_at": get_taipei_now_iso(),
+        }
+        logs = data.setdefault("vip_downgrade_logs", [])
+        if isinstance(logs, list):
+            logs.append(log)
+            data["vip_downgrade_logs"] = logs[-24:]
+        else:
+            data["vip_downgrade_logs"] = [log]
+
+        member = await fetch_member_safely(guild, int(user_id))
+        benefit_notices = await ensure_reward_member_benefits(guild, member, data)
+        _CUSTOMER_REWARDS[user_id] = data
+        changed_count += 1
+
+        message = (
+            f"<@{user_id}>：{old_level['name']} → {new_level['name']}｜"
+            f"上月消費 {format_t_amount(monthly_spend)}，未達 {format_t_amount(int(maintain_min_monthly_spend or 0))}"
+        )
+        if benefit_notices:
+            message += "｜" + "、".join(benefit_notices)
+        messages.append(message)
+
+    if _SAVE_BOT_DATA is not None:
+        _SAVE_BOT_DATA()
+
+    if changed_count and send_log_func is not None:
+        await send_log_func(
+            guild,
+            title="VIP 會員自動降階",
+            description=(
+                f"檢查月份：{check_month_key}\n"
+                f"統計區間：{start_dt.strftime('%Y/%m/%d')} ～ {end_dt.strftime('%Y/%m/%d')}\n"
+                f"維持條件：上月消費滿 {format_t_amount(int(maintain_min_monthly_spend or 0))}\n\n"
+                + "\n".join(messages[:20])
+            ),
+            color=discord.Color.orange(),
+        )
+
+    return changed_count, messages
