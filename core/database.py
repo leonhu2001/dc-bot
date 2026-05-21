@@ -3,12 +3,52 @@ import shutil
 import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, MutableMapping
 
 _DB_FILE: Path | None = None
 _INIT_DATABASE: Callable[[], None] | None = None
 _BACKUP_DIR: Path | None = None
 _BACKUP_KEEP_DAYS: int = 30
+
+_ORDER_SELECTIONS: MutableMapping[int, dict] | None = None
+_ORDER_CLAIMS: MutableMapping[int, dict] | None = None
+_SAVE_BOT_DATA: Callable[[], None] | None = None
+
+
+def configure_data_access(
+    order_selections: MutableMapping[int, dict],
+    order_claims: MutableMapping[int, dict],
+    save_bot_data_func: Callable[[], None],
+) -> None:
+    """設定記憶體資料入口，供 remember_* helpers 使用。
+
+    這裡只保存 reference，不複製資料；因此 bot.py 原本的全域 dict 仍是唯一資料來源。
+    """
+    global _ORDER_SELECTIONS, _ORDER_CLAIMS, _SAVE_BOT_DATA
+    _ORDER_SELECTIONS = order_selections
+    _ORDER_CLAIMS = order_claims
+    _SAVE_BOT_DATA = save_bot_data_func
+
+
+def _require_data_access() -> tuple[MutableMapping[int, dict], MutableMapping[int, dict], Callable[[], None]]:
+    if _ORDER_SELECTIONS is None or _ORDER_CLAIMS is None or _SAVE_BOT_DATA is None:
+        raise RuntimeError("database module 尚未設定資料入口，請先呼叫 configure_data_access()")
+    return _ORDER_SELECTIONS, _ORDER_CLAIMS, _SAVE_BOT_DATA
+
+
+def remember_order_data(channel_id: int, data: dict) -> None:
+    """保存單筆訂單暫存資料並同步到資料庫。"""
+    order_selections, _, save_bot_data = _require_data_access()
+    order_selections[int(channel_id)] = data
+    save_bot_data()
+
+
+def remember_claim_data(message_id: int, data: dict) -> None:
+    """保存派單接單資料並同步到資料庫。"""
+    _, order_claims, save_bot_data = _require_data_access()
+    order_claims[int(message_id)] = data
+    save_bot_data()
+
 
 
 def configure_database(

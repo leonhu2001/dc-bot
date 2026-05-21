@@ -31,12 +31,15 @@ from core.config import (
 
 from core.database import (
     configure_database,
+    configure_data_access,
     _db_table_exists,
     _db_columns,
     _db_add_column_if_missing,
     _json_load_maybe,
     delete_order_row_from_db,
     delete_claim_row_from_db,
+    remember_order_data,
+    remember_claim_data,
     run_daily_backup_once,
 )
 
@@ -2220,16 +2223,6 @@ def load_bot_data() -> None:
         save_bot_data()
         print("已從 bot_data.json 匯入資料並寫入 bot.db。")
 
-def remember_order_data(channel_id: int, data: dict) -> None:
-    SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
-    save_bot_data()
-
-
-def remember_claim_data(message_id: int, data: dict) -> None:
-    ORDER_CLAIMS[message_id] = data
-    save_bot_data()
-
-
 def generate_order_receipt_id() -> str:
     """自動產生訂單編號，例如 MO20260519001。"""
     day_key = get_taipei_now().strftime("%Y%m%d")
@@ -3728,6 +3721,7 @@ def save_bot_data() -> None:
 
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS)
+configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, save_bot_data)
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
