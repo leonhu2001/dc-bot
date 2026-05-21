@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -6,7 +6,7 @@ import py_compile
 import sqlite3
 from pathlib import Path
 
-DEFAULT_EXPECTED_COMMANDS = 37
+DEFAULT_EXPECTED_COMMANDS = 38
 COMMAND_PATTERNS = ("@bot.tree.command", "@app_commands.command")
 EXCLUDE_DIRS = {"venv", ".venv", "__pycache__", ".git", "backups"}
 SYNTAX_DIRS = ("core", "services", "views", "cogs", "scripts")
