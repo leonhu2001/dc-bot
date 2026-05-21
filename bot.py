@@ -27,6 +27,16 @@ from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
 
+from core.permissions import (
+    configure_permissions,
+    has_role,
+    is_customer_staff,
+    is_exam_staff,
+    is_complaint_staff,
+    is_manager_or_admin,
+    can_operate_self_service_order,
+)
+
 
 # ========= 讀取 .env =========
 
@@ -268,6 +278,11 @@ ORDER_ID_PREFIX = _config_str("ORDER_ID_PREFIX", ORDER_ID_PREFIX)
 BACKUP_KEEP_DAYS = _config_int("BACKUP_KEEP_DAYS", BACKUP_KEEP_DAYS)
 REWARD_POINT_DIVISOR = _config_int("REWARD_POINT_DIVISOR", REWARD_POINT_DIVISOR)
 
+configure_permissions(
+    customer_role_id=CUSTOMER_ROLE_ID,
+    examiner_role_id=EXAMINER_ROLE_ID,
+    manager_role_id=MANAGER_ROLE_ID,
+)
 
 
 # ========= Bot 設定 =========
@@ -310,23 +325,6 @@ def is_agree_answer(text: str) -> bool:
 
     return answer in agree_words
 
-
-def is_customer_staff(member: discord.Member) -> bool:
-    return any(role.id == CUSTOMER_ROLE_ID for role in member.roles)
-
-
-def is_exam_staff(member: discord.Member) -> bool:
-    return any(
-        role.id in [EXAMINER_ROLE_ID, MANAGER_ROLE_ID]
-        for role in member.roles
-    )
-
-
-def is_complaint_staff(member: discord.Member) -> bool:
-    return any(
-        role.id in [CUSTOMER_ROLE_ID, MANAGER_ROLE_ID]
-        for role in member.roles
-    )
 
 
 def get_recruit_info_from_channel(channel: discord.TextChannel) -> tuple[str, str]:
@@ -2635,8 +2633,6 @@ async def stored_order_reminder_loop():
         await asyncio.sleep(21600)
 
 
-def is_manager_or_admin(member: discord.Member) -> bool:
-    return has_role(member, MANAGER_ROLE_ID) or member.guild_permissions.administrator
 
 def parse_receipt_amount(amount_text: str) -> int | None:
     """從收據金額欄位擷取金額。
@@ -4392,30 +4388,6 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
         await interaction.response.defer()
-
-def has_role(member: discord.Member, role_id: int) -> bool:
-    return any(role.id == role_id for role in member.roles)
-
-
-def can_operate_self_service_order(user, customer_id: int) -> bool:
-    """允許開票老闆本人、客服、店長或管理員代操作自助下單。
-
-    客服代操作時，訂單仍會記在原本 customer_id 身上，
-    不會把客服當成下單顧客。
-    """
-    if user.id == customer_id:
-        return True
-
-    if not isinstance(user, discord.Member):
-        return False
-
-    return (
-        is_customer_staff(user)
-        or has_role(user, MANAGER_ROLE_ID)
-        or user.guild_permissions.administrator
-    )
-
-
 
 
 async def log_self_service_proxy_action(
