@@ -82,6 +82,7 @@ from services.rewards import (
     parse_manual_purchase_date,
     add_customer_reward_from_order,
     add_manual_purchase,
+    adjust_customer_points,
 )
 
 import discord
@@ -2263,52 +2264,6 @@ async def stored_order_reminder_loop():
         await asyncio.sleep(21600)
 
 
-
-
-
-
-async def adjust_customer_points(
-    customer_id: int,
-    delta_points: int,
-    operator_id: int,
-    reason: str | None = None,
-) -> tuple[bool, str]:
-    if delta_points == 0:
-        return False, "調整點數不能是 0。"
-
-    data = get_customer_reward_data(customer_id)
-    before_points = get_current_reward_points(data)
-
-    if before_points + delta_points < 0:
-        return False, f"扣點失敗：<@{customer_id}> 目前只有 {before_points:,} 點，不足扣除 {abs(delta_points):,} 點。"
-
-    data["point_adjustment"] = int(data.get("point_adjustment", 0) or 0) + delta_points
-    after_points = get_current_reward_points(data)
-    data["points"] = after_points
-
-    logs = data.setdefault("point_adjustment_logs", [])
-    logs.append({
-        "delta": delta_points,
-        "before": before_points,
-        "after": after_points,
-        "operator_id": operator_id,
-        "reason": (reason or "").strip(),
-        "created_at": get_taipei_now_iso(),
-    })
-    # 避免 JSON 檔越來越肥，先保留最近 100 筆點數調整紀錄。
-    if len(logs) > 100:
-        data["point_adjustment_logs"] = logs[-100:]
-
-    CUSTOMER_REWARDS[customer_id] = data
-    save_bot_data()
-
-    action = "增加" if delta_points > 0 else "扣除"
-    reason_text = f"，原因：{reason}" if reason else ""
-    return True, (
-        f"已為 <@{customer_id}> {action} {abs(delta_points):,} 點{reason_text}。\n"
-        f"調整前：{before_points:,} 點\n"
-        f"調整後：{after_points:,} 點"
-    )
 
 
 def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | None":
