@@ -44,6 +44,7 @@ from core.database import (
     _deserialize_claim_data,
     _deserialize_customer_data,
     load_bot_data_from_json,
+    load_bot_data_from_sqlite,
     delete_order_row_from_db,
     delete_claim_row_from_db,
     remember_order_data,
@@ -2033,61 +2034,6 @@ def save_bot_data() -> None:
         print(f"保存 bot_data.json 快照失敗：{e}")
 
 
-def load_bot_data_from_sqlite() -> bool:
-    if not DB_FILE.exists():
-        return False
-
-    init_database()
-
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-
-            orders_rows = cur.execute("SELECT channel_id, data FROM orders").fetchall()
-            claims_rows = cur.execute("SELECT message_id, data FROM claims").fetchall()
-            customers_rows = cur.execute("SELECT user_id, data FROM customers").fetchall()
-            counter_rows = cur.execute("SELECT day_key, count FROM order_counters").fetchall()
-    except sqlite3.Error as e:
-        print(f"讀取 bot.db 失敗：{e}")
-        return False
-
-    # 如果 bot.db 存在但還沒有任何資料，就回頭讀舊 JSON。
-    if not orders_rows and not claims_rows and not customers_rows and not counter_rows:
-        return False
-
-    SELF_SERVICE_ORDER_SELECTIONS.clear()
-    ORDER_CLAIMS.clear()
-    CUSTOMER_REWARDS.clear()
-    ORDER_COUNTERS.clear()
-
-    for row in orders_rows:
-        try:
-            data = json.loads(row["data"])
-        except json.JSONDecodeError:
-            continue
-        SELF_SERVICE_ORDER_SELECTIONS[int(row["channel_id"])] = data
-
-    for row in claims_rows:
-        try:
-            data = json.loads(row["data"])
-        except json.JSONDecodeError:
-            continue
-        ORDER_CLAIMS[int(row["message_id"])] = _deserialize_claim_data(data)
-
-    for row in customers_rows:
-        try:
-            data = json.loads(row["data"])
-        except json.JSONDecodeError:
-            continue
-        CUSTOMER_REWARDS[int(row["user_id"])] = _deserialize_customer_data(data)
-
-    for row in counter_rows:
-        ORDER_COUNTERS[str(row["day_key"])] = int(row["count"] or 0)
-
-    return True
-
-
 def load_bot_data() -> None:
     # 先讀 SQLite；若還沒有資料，讀舊 JSON 並立即寫入 SQLite。
     if load_bot_data_from_sqlite():
@@ -3258,26 +3204,6 @@ def init_database() -> None:
 
 
 
-def _level_index_from_name(level_name: str | None) -> int | None:
-    if not level_name:
-        return None
-    for index, level in enumerate(MEMBER_LEVELS):
-        if level["name"] == level_name:
-            return index
-    return None
-
-
-def _normalize_customer_after_load(data: dict) -> dict:
-    data = _deserialize_customer_data(data)
-    total_spent = int(data.get("total_spent", 0) or 0)
-    stored_index = _to_int(data.get("vip_level_index"))
-    if stored_index is None:
-        # 舊資料 level 可能是「無會員」，那就以累積消費重算。
-        data["vip_level_index"] = get_member_level_index_by_total_spent(total_spent)
-    data["points"] = get_current_reward_points(data)
-    return data
-
-
 def _compat_order_amount(data: dict) -> int:
     for key in ("amount", "total_amount", "reward_amount"):
         value = data.get(key)
@@ -3290,133 +3216,6 @@ def _compat_order_amount(data: dict) -> int:
         if parsed is not None:
             return parsed
     return 0
-
-
-def _order_data_from_normalized_row(row: sqlite3.Row) -> dict:
-    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
-    if not isinstance(data, dict):
-        data = {}
-    for key in [
-        "customer_id", "order_no", "category", "item", "quantity", "companion_preference",
-        "payment_method", "amount", "status", "dispatch_message_id", "dispatch_channel_id",
-        "created_at", "closed_at", "stored_at", "store_reason", "resume_at", "note",
-    ]:
-        if key in row.keys() and row[key] is not None:
-            data[key] = row[key]
-    if "store_reason" in data and "stored_reason" not in data:
-        data["stored_reason"] = data.get("store_reason")
-    if "resume_at" in data and "stored_expected_time" not in data:
-        data["stored_expected_time"] = data.get("resume_at")
-    if str(data.get("status", "")).lower() == "closed":
-        data["closed"] = True
-    return data
-
-
-def _claim_data_from_normalized_row(row: sqlite3.Row) -> dict:
-    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
-    if not isinstance(data, dict):
-        data = {}
-    companion_ids = _json_load_maybe(row["companion_ids"] if "companion_ids" in row.keys() else None, [])
-    booster_ids = _json_load_maybe(row["booster_ids"] if "booster_ids" in row.keys() else None, [])
-    data.update({
-        "companion": {uid for uid in (_to_int(x) for x in companion_ids) if uid is not None},
-        "booster": {uid for uid in (_to_int(x) for x in booster_ids) if uid is not None},
-        "locked": bool(row["locked"] if "locked" in row.keys() and row["locked"] is not None else data.get("locked", False)),
-    })
-    for key in [
-        "customer_id", "source_channel_id", "dispatch_channel_id", "category_label", "item",
-        "quantity", "payment_method", "companion_preference", "status",
-    ]:
-        if key in row.keys() and row[key] is not None:
-            data[key] = row[key]
-    return _deserialize_claim_data(data)
-
-
-def _customer_data_from_normalized_row(row: sqlite3.Row) -> dict:
-    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
-    if not isinstance(data, dict):
-        data = {}
-    if "total_spent" in row.keys() and row["total_spent"] is not None:
-        data["total_spent"] = int(row["total_spent"] or 0)
-    if "completed_orders" in row.keys() and row["completed_orders"] is not None:
-        data["order_count"] = int(row["completed_orders"] or 0)
-    if "last_order_at" in row.keys() and row["last_order_at"] is not None:
-        data["last_order_at"] = row["last_order_at"]
-    if "platinum_channel_id" in row.keys() and row["platinum_channel_id"] is not None:
-        data["platinum_channel_id"] = row["platinum_channel_id"]
-    if "level" in row.keys():
-        level_index = _level_index_from_name(row["level"])
-        if level_index is not None and _to_int(data.get("vip_level_index")) is None:
-            data["vip_level_index"] = level_index
-    # relational customers.points 是「目前可用點數」。
-    # 讀回記憶體時要轉成 point_adjustment，避免 get_current_reward_points() 又用累積消費重新算，
-    # 導致抽獎扣點、手動扣點後的點數被洗回來。
-    if "points" in row.keys() and row["points"] is not None:
-        saved_points = int(row["points"] or 0)
-        base_points = calculate_reward_points(int(data.get("total_spent", 0) or 0))
-        data["point_adjustment"] = saved_points - base_points
-        data["points"] = saved_points
-    return _normalize_customer_after_load(data)
-
-
-def load_bot_data_from_sqlite() -> bool:
-    if not DB_FILE.exists():
-        return False
-
-    init_database()
-
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-            order_cols = _db_columns(cur, "orders")
-            claim_cols = _db_columns(cur, "claims")
-            customer_cols = _db_columns(cur, "customers")
-            counter_rows = cur.execute("SELECT day_key, count FROM order_counters").fetchall()
-
-            SELF_SERVICE_ORDER_SELECTIONS.clear()
-            ORDER_CLAIMS.clear()
-            CUSTOMER_REWARDS.clear()
-            ORDER_COUNTERS.clear()
-
-            if "data" in order_cols:
-                for row in cur.execute("SELECT channel_id, data FROM orders").fetchall():
-                    data = _json_load_maybe(row["data"], None)
-                    if isinstance(data, dict):
-                        SELF_SERVICE_ORDER_SELECTIONS[int(row["channel_id"])] = data
-            else:
-                for row in cur.execute("SELECT * FROM orders").fetchall():
-                    SELF_SERVICE_ORDER_SELECTIONS[int(row["channel_id"])] = _order_data_from_normalized_row(row)
-
-            if "data" in claim_cols:
-                for row in cur.execute("SELECT message_id, data FROM claims").fetchall():
-                    data = _json_load_maybe(row["data"], None)
-                    if isinstance(data, dict):
-                        ORDER_CLAIMS[int(row["message_id"])] = _deserialize_claim_data(data)
-            else:
-                for row in cur.execute("SELECT * FROM claims").fetchall():
-                    message_id = row["dispatch_message_id"] if "dispatch_message_id" in row.keys() else None
-                    if message_id is not None:
-                        ORDER_CLAIMS[int(message_id)] = _claim_data_from_normalized_row(row)
-
-            if "data" in customer_cols:
-                key_col = "user_id" if "user_id" in customer_cols else "customer_id"
-                for row in cur.execute(f"SELECT {key_col} AS uid, data FROM customers").fetchall():
-                    data = _json_load_maybe(row["data"], None)
-                    if isinstance(data, dict):
-                        CUSTOMER_REWARDS[int(row["uid"])] = _normalize_customer_after_load(data)
-            else:
-                for row in cur.execute("SELECT * FROM customers").fetchall():
-                    CUSTOMER_REWARDS[int(row["customer_id"])] = _customer_data_from_normalized_row(row)
-
-            for row in counter_rows:
-                ORDER_COUNTERS[str(row["day_key"])] = int(row["count"] or 0)
-
-    except sqlite3.Error as e:
-        print(f"讀取 bot.db 失敗：{e}")
-        return False
-
-    return bool(SELF_SERVICE_ORDER_SELECTIONS or ORDER_CLAIMS or CUSTOMER_REWARDS or ORDER_COUNTERS)
 
 
 def save_bot_data() -> None:
@@ -3586,7 +3385,18 @@ def save_bot_data() -> None:
 
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
-configure_data_access(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, CUSTOMER_REWARDS, ORDER_COUNTERS, save_bot_data, order_id_prefix=ORDER_ID_PREFIX)
+configure_data_access(
+    SELF_SERVICE_ORDER_SELECTIONS,
+    ORDER_CLAIMS,
+    CUSTOMER_REWARDS,
+    ORDER_COUNTERS,
+    save_bot_data,
+    order_id_prefix=ORDER_ID_PREFIX,
+    member_levels=MEMBER_LEVELS,
+    get_member_level_index_by_total_spent_func=get_member_level_index_by_total_spent,
+    get_current_reward_points_func=get_current_reward_points,
+    calculate_reward_points_func=calculate_reward_points,
+)
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:

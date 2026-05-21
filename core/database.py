@@ -18,6 +18,11 @@ _ORDER_COUNTERS: MutableMapping[str, int] | None = None
 _ORDER_ID_PREFIX: str = "MO"
 _SAVE_BOT_DATA: Callable[[], None] | None = None
 
+_MEMBER_LEVELS: list[dict] = []
+_GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT: Callable[[int], int] | None = None
+_GET_CURRENT_REWARD_POINTS: Callable[[dict], int] | None = None
+_CALCULATE_REWARD_POINTS: Callable[[int], int] | None = None
+
 
 def configure_data_access(
     order_selections: MutableMapping[int, dict],
@@ -27,18 +32,28 @@ def configure_data_access(
     save_bot_data_func: Callable[[], None],
     *,
     order_id_prefix: str = "MO",
+    member_levels: list[dict] | None = None,
+    get_member_level_index_by_total_spent_func: Callable[[int], int] | None = None,
+    get_current_reward_points_func: Callable[[dict], int] | None = None,
+    calculate_reward_points_func: Callable[[int], int] | None = None,
 ) -> None:
-    """設定記憶體資料入口，供 remember_*、serialize helpers 與訂單編號 helper 使用。
+    """設定記憶體資料入口，供 load / remember / serialize helpers 使用。
 
     這裡只保存 reference，不複製資料；因此 bot.py 原本的全域 dict 仍是唯一資料來源。
+    會員等級與點數相關 callback 只用於 SQLite relational schema 載入相容處理。
     """
     global _ORDER_SELECTIONS, _ORDER_CLAIMS, _CUSTOMER_REWARDS, _ORDER_COUNTERS, _SAVE_BOT_DATA, _ORDER_ID_PREFIX
+    global _MEMBER_LEVELS, _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT, _GET_CURRENT_REWARD_POINTS, _CALCULATE_REWARD_POINTS
     _ORDER_SELECTIONS = order_selections
     _ORDER_CLAIMS = order_claims
     _CUSTOMER_REWARDS = customer_rewards
     _ORDER_COUNTERS = order_counters
     _SAVE_BOT_DATA = save_bot_data_func
     _ORDER_ID_PREFIX = str(order_id_prefix or "MO")
+    _MEMBER_LEVELS = list(member_levels or [])
+    _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT = get_member_level_index_by_total_spent_func
+    _GET_CURRENT_REWARD_POINTS = get_current_reward_points_func
+    _CALCULATE_REWARD_POINTS = calculate_reward_points_func
 
 def _require_data_access() -> tuple[MutableMapping[int, dict], MutableMapping[int, dict], Callable[[], None]]:
     if _ORDER_SELECTIONS is None or _ORDER_CLAIMS is None or _SAVE_BOT_DATA is None:
@@ -223,6 +238,175 @@ def load_bot_data_from_json() -> bool:
     return True
 
 
+
+
+def _require_reward_callbacks() -> tuple[
+    Callable[[int], int],
+    Callable[[dict], int],
+    Callable[[int], int],
+]:
+    if (
+        _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT is None
+        or _GET_CURRENT_REWARD_POINTS is None
+        or _CALCULATE_REWARD_POINTS is None
+    ):
+        raise RuntimeError("database module 尚未設定會員資料 callback，請在 configure_data_access() 傳入相關函式")
+    return (
+        _GET_MEMBER_LEVEL_INDEX_BY_TOTAL_SPENT,
+        _GET_CURRENT_REWARD_POINTS,
+        _CALCULATE_REWARD_POINTS,
+    )
+
+
+def _level_index_from_name(level_name: str | None) -> int | None:
+    if not level_name:
+        return None
+    for index, level in enumerate(_MEMBER_LEVELS):
+        if level.get("name") == level_name:
+            return index
+    return None
+
+
+def _normalize_customer_after_load(data: dict) -> dict:
+    get_member_level_index_by_total_spent, get_current_reward_points, _ = _require_reward_callbacks()
+    data = _deserialize_customer_data(data)
+    total_spent = int(data.get("total_spent", 0) or 0)
+    stored_index = _to_int(data.get("vip_level_index"))
+    if stored_index is None:
+        # 舊資料 level 可能是「無會員」，那就以累積消費重算。
+        data["vip_level_index"] = get_member_level_index_by_total_spent(total_spent)
+    data["points"] = get_current_reward_points(data)
+    return data
+
+
+def _order_data_from_normalized_row(row: sqlite3.Row) -> dict:
+    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
+    if not isinstance(data, dict):
+        data = {}
+    for key in [
+        "customer_id", "order_no", "category", "item", "quantity", "companion_preference",
+        "payment_method", "amount", "status", "dispatch_message_id", "dispatch_channel_id",
+        "created_at", "closed_at", "stored_at", "store_reason", "resume_at", "note",
+    ]:
+        if key in row.keys() and row[key] is not None:
+            data[key] = row[key]
+    if "store_reason" in data and "stored_reason" not in data:
+        data["stored_reason"] = data.get("store_reason")
+    if "resume_at" in data and "stored_expected_time" not in data:
+        data["stored_expected_time"] = data.get("resume_at")
+    if str(data.get("status", "")).lower() == "closed":
+        data["closed"] = True
+    return data
+
+
+def _claim_data_from_normalized_row(row: sqlite3.Row) -> dict:
+    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
+    if not isinstance(data, dict):
+        data = {}
+    companion_ids = _json_load_maybe(row["companion_ids"] if "companion_ids" in row.keys() else None, [])
+    booster_ids = _json_load_maybe(row["booster_ids"] if "booster_ids" in row.keys() else None, [])
+    data.update({
+        "companion": {uid for uid in (_to_int(x) for x in companion_ids) if uid is not None},
+        "booster": {uid for uid in (_to_int(x) for x in booster_ids) if uid is not None},
+        "locked": bool(row["locked"] if "locked" in row.keys() and row["locked"] is not None else data.get("locked", False)),
+    })
+    for key in [
+        "customer_id", "source_channel_id", "dispatch_channel_id", "category_label", "item",
+        "quantity", "payment_method", "companion_preference", "status",
+    ]:
+        if key in row.keys() and row[key] is not None:
+            data[key] = row[key]
+    return _deserialize_claim_data(data)
+
+
+def _customer_data_from_normalized_row(row: sqlite3.Row) -> dict:
+    _, _, calculate_reward_points = _require_reward_callbacks()
+    data = _json_load_maybe(row["data_json"] if "data_json" in row.keys() else None, {})
+    if not isinstance(data, dict):
+        data = {}
+    if "total_spent" in row.keys() and row["total_spent"] is not None:
+        data["total_spent"] = int(row["total_spent"] or 0)
+    if "completed_orders" in row.keys() and row["completed_orders"] is not None:
+        data["order_count"] = int(row["completed_orders"] or 0)
+    if "last_order_at" in row.keys() and row["last_order_at"] is not None:
+        data["last_order_at"] = row["last_order_at"]
+    if "platinum_channel_id" in row.keys() and row["platinum_channel_id"] is not None:
+        data["platinum_channel_id"] = row["platinum_channel_id"]
+    if "level" in row.keys():
+        level_index = _level_index_from_name(row["level"])
+        if level_index is not None and _to_int(data.get("vip_level_index")) is None:
+            data["vip_level_index"] = level_index
+    # relational customers.points 是「目前可用點數」。
+    # 讀回記憶體時要轉成 point_adjustment，避免 get_current_reward_points() 又用累積消費重新算，
+    # 導致抽獎扣點、手動扣點後的點數被洗回來。
+    if "points" in row.keys() and row["points"] is not None:
+        saved_points = int(row["points"] or 0)
+        base_points = calculate_reward_points(int(data.get("total_spent", 0) or 0))
+        data["point_adjustment"] = saved_points - base_points
+        data["points"] = saved_points
+    return _normalize_customer_after_load(data)
+
+
+def load_bot_data_from_sqlite() -> bool:
+    db_file = _require_db_file()
+    if not db_file.exists():
+        return False
+
+    _ensure_database_ready()
+    order_selections, order_claims, customer_rewards, order_counters = _require_all_data_access()
+
+    try:
+        with sqlite3.connect(db_file) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            order_cols = _db_columns(cur, "orders")
+            claim_cols = _db_columns(cur, "claims")
+            customer_cols = _db_columns(cur, "customers")
+            counter_rows = cur.execute("SELECT day_key, count FROM order_counters").fetchall()
+
+            order_selections.clear()
+            order_claims.clear()
+            customer_rewards.clear()
+            order_counters.clear()
+
+            if "data" in order_cols:
+                for row in cur.execute("SELECT channel_id, data FROM orders").fetchall():
+                    data = _json_load_maybe(row["data"], None)
+                    if isinstance(data, dict):
+                        order_selections[int(row["channel_id"])] = data
+            else:
+                for row in cur.execute("SELECT * FROM orders").fetchall():
+                    order_selections[int(row["channel_id"])] = _order_data_from_normalized_row(row)
+
+            if "data" in claim_cols:
+                for row in cur.execute("SELECT message_id, data FROM claims").fetchall():
+                    data = _json_load_maybe(row["data"], None)
+                    if isinstance(data, dict):
+                        order_claims[int(row["message_id"])] = _deserialize_claim_data(data)
+            else:
+                for row in cur.execute("SELECT * FROM claims").fetchall():
+                    message_id = row["dispatch_message_id"] if "dispatch_message_id" in row.keys() else None
+                    if message_id is not None:
+                        order_claims[int(message_id)] = _claim_data_from_normalized_row(row)
+
+            if "data" in customer_cols:
+                key_col = "user_id" if "user_id" in customer_cols else "customer_id"
+                for row in cur.execute(f"SELECT {key_col} AS uid, data FROM customers").fetchall():
+                    data = _json_load_maybe(row["data"], None)
+                    if isinstance(data, dict):
+                        customer_rewards[int(row["uid"])] = _normalize_customer_after_load(data)
+            else:
+                for row in cur.execute("SELECT * FROM customers").fetchall():
+                    customer_rewards[int(row["customer_id"])] = _customer_data_from_normalized_row(row)
+
+            for row in counter_rows:
+                order_counters[str(row["day_key"])] = int(row["count"] or 0)
+
+    except sqlite3.Error as e:
+        print(f"讀取 bot.db 失敗：{e}")
+        return False
+
+    return bool(order_selections or order_claims or customer_rewards or order_counters)
 
 def remember_order_data(channel_id: int, data: dict) -> None:
     """保存單筆訂單暫存資料並同步到資料庫。"""
