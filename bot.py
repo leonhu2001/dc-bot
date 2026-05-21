@@ -45,6 +45,7 @@ from core.database import (
     _deserialize_customer_data,
     load_bot_data_from_json,
     load_bot_data_from_sqlite,
+    load_bot_data,
     delete_order_row_from_db,
     delete_claim_row_from_db,
     remember_order_data,
@@ -2033,15 +2034,6 @@ def save_bot_data() -> None:
     except OSError as e:
         print(f"保存 bot_data.json 快照失敗：{e}")
 
-
-def load_bot_data() -> None:
-    # 先讀 SQLite；若還沒有資料，讀舊 JSON 並立即寫入 SQLite。
-    if load_bot_data_from_sqlite():
-        return
-
-    if load_bot_data_from_json():
-        save_bot_data()
-        print("已從 bot_data.json 匯入資料並寫入 bot.db。")
 
 def get_or_create_order_log_channel_sync_hint() -> str:
     return f"{ORDER_LOG_CHANNEL_NAME}（類別 ID：{ORDER_LOG_CATEGORY_ID}）"

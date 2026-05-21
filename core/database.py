@@ -565,3 +565,19 @@ def run_daily_backup_once() -> str | None:
                 pass
 
     return str(backup_path)
+
+def load_bot_data() -> None:
+    """讀取 Bot 資料。
+
+    優先讀 SQLite；若 SQLite 還沒有資料，讀舊 bot_data.json 並立即寫回 SQLite。
+    這只是把原本 bot.py 的流程搬進 core.database，行為不變。
+    """
+    if load_bot_data_from_sqlite():
+        return
+
+    if load_bot_data_from_json():
+        if _SAVE_BOT_DATA is None:
+            raise RuntimeError("database module 尚未設定 save_bot_data，請先呼叫 configure_data_access()")
+        _SAVE_BOT_DATA()
+        print("已從 bot_data.json 匯入資料並寫入 bot.db。")
+
