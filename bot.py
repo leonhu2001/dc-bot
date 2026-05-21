@@ -30,10 +30,13 @@ from core.config import (
 )
 
 from core.database import (
+    configure_database,
     _db_table_exists,
     _db_columns,
     _db_add_column_if_missing,
     _json_load_maybe,
+    delete_order_row_from_db,
+    delete_claim_row_from_db,
 )
 
 import discord
@@ -3749,38 +3752,8 @@ def save_bot_data() -> None:
         print(f"保存 bot_data.json 快照失敗：{e}")
 
 
-def delete_order_row_from_db(channel_id: int) -> None:
-    """明確刪除單筆 orders；避免 save_bot_data 不整表重寫後留下取消單殘影。"""
-    init_database()
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            conn.execute("DELETE FROM orders WHERE channel_id=?", (int(channel_id),))
-            conn.commit()
-    except sqlite3.Error as e:
-        print(f"刪除 orders 資料失敗：{e}")
 
-
-def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: int | None = None) -> None:
-    """明確刪除 claims。可用派單訊息 ID 或來源票口 ID。
-
-    兼容舊版 JSON blob schema 的 message_id 欄位，以及新版 relational schema 的
-    dispatch_message_id 欄位，避免刪除存單 / 取消訂單時因缺欄位噴錯。
-    """
-    init_database()
-    try:
-        with sqlite3.connect(DB_FILE) as conn:
-            cur = conn.cursor()
-            cols = _db_columns(cur, "claims")
-            if message_id is not None:
-                if "dispatch_message_id" in cols:
-                    conn.execute("DELETE FROM claims WHERE dispatch_message_id=?", (int(message_id),))
-                if "message_id" in cols:
-                    conn.execute("DELETE FROM claims WHERE message_id=?", (int(message_id),))
-            if source_channel_id is not None and "source_channel_id" in cols:
-                conn.execute("DELETE FROM claims WHERE source_channel_id=?", (int(source_channel_id),))
-            conn.commit()
-    except sqlite3.Error as e:
-        print(f"刪除 claims 資料失敗：{e}")
+configure_database(DB_FILE, init_database)
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
