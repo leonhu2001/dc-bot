@@ -4072,6 +4072,12 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         data.pop("companion_preference", None)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "選擇訂單類別",
+            ORDER_CATEGORY_LABELS.get(selected_category, selected_category),
+        )
 
         await interaction.response.edit_message(
             view=SelfServiceOrderView(
@@ -4145,6 +4151,12 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         else:
             data["companion_preference"] = "不指定陪玩/打手"
         remember_order_data(self.channel_id, data)
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "選擇訂單項目",
+            selected_item,
+        )
 
         await interaction.response.edit_message(
             view=SelfServiceOrderView(
@@ -4230,6 +4242,12 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         data["companion_preference"] = self.values[0]
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "選擇指定選項",
+            self.values[0],
+        )
 
         await interaction.response.defer()
 
@@ -4319,6 +4337,12 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         data["quantity"] = quantity
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "選擇訂單數量",
+            f"{quantity} 單",
+        )
 
         await interaction.response.defer()
 
@@ -4343,6 +4367,40 @@ def can_operate_self_service_order(user, customer_id: int) -> bool:
         or has_role(user, MANAGER_ROLE_ID)
         or user.guild_permissions.administrator
     )
+
+
+
+
+async def log_self_service_proxy_action(
+    interaction: discord.Interaction,
+    customer_id: int,
+    action: str,
+    detail: str | None = None,
+) -> None:
+    """客服 / 店長 / 管理員代操作自助下單時，寫入機器人日誌。"""
+    if interaction.user.id == customer_id:
+        return
+
+    channel_text = interaction.channel.mention if isinstance(interaction.channel, discord.TextChannel) else "未紀錄"
+    fields = [
+        ("操作人員", interaction.user.mention, True),
+        ("原下單顧客", f"<@{customer_id}>", True),
+        ("票口", channel_text, False),
+        ("操作", action, True),
+    ]
+
+    if detail:
+        fields.append(("內容", detail, False))
+
+    try:
+        await send_order_log(
+            interaction.guild,
+            title="自助下單代操作",
+            fields=fields,
+            color=discord.Color.teal(),
+        )
+    except Exception as e:
+        print(f"寫入自助下單代操作日誌失敗：{e}")
 
 
 def build_self_service_order_embed(
@@ -5237,6 +5295,12 @@ class PaymentMethodSelect(discord.ui.Select):
         selected_method = self.values[0]
         data["payment_method"] = selected_method
         remember_order_data(self.channel_id, data)
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "選擇付款方式",
+            selected_method,
+        )
 
         payment_info = {
             "轉帳": (
@@ -5422,6 +5486,13 @@ class PaymentMethodView(discord.ui.View):
         remember_order_data(interaction.channel.id, data)
         remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
 
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "送出派單",
+            f"{category_label}｜{item} x{quantity}｜{payment_method}",
+        )
+
         await send_order_log(
             guild,
             title="新自助下單已派單",
@@ -5432,6 +5503,8 @@ class PaymentMethodView(discord.ui.View):
                 ("數量", f"{quantity} 單", True),
                 ("付款方式", payment_method, True),
                 ("指定選項", companion_preference, True),
+                ("送出人員", interaction.user.mention, True),
+                ("是否代操作", "是" if interaction.user.id != self.customer_id else "否", True),
                 ("票口", interaction.channel.mention, False),
                 ("派單訊息", dispatch_message.jump_url, False),
             ],
@@ -5556,6 +5629,12 @@ class SelfServiceOrderView(discord.ui.View):
                 roles=False,
                 everyone=False
             )
+        )
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "前往付款",
+            f"{category_label}｜{item} x{quantity}｜{companion_preference}",
         )
 
 class StaffOrderOperationSelect(discord.ui.Select):
