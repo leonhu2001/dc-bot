@@ -37,6 +37,7 @@ from core.database import (
     _json_load_maybe,
     delete_order_row_from_db,
     delete_claim_row_from_db,
+    run_daily_backup_once,
 )
 
 import discord
@@ -2331,33 +2332,6 @@ async def send_lottery_announcement(
         return False
 
 
-def run_daily_backup_once() -> str | None:
-    """若今天還沒有備份，複製 bot.db 到 backups/，並清掉過舊備份。"""
-    if not DB_FILE.exists():
-        return None
-
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    day_key = get_taipei_now().strftime("%Y%m%d")
-    backup_path = BACKUP_DIR / f"bot_{day_key}.db"
-
-    if not backup_path.exists():
-        shutil.copy2(DB_FILE, backup_path)
-
-    cutoff = get_taipei_now() - timedelta(days=BACKUP_KEEP_DAYS)
-    for old_file in BACKUP_DIR.glob("bot_*.db"):
-        try:
-            date_part = old_file.stem.replace("bot_", "")
-            file_date = datetime.strptime(date_part, "%Y%m%d").replace(tzinfo=timezone(timedelta(hours=8)))
-        except ValueError:
-            continue
-        if file_date < cutoff:
-            try:
-                old_file.unlink()
-            except OSError:
-                pass
-
-    return str(backup_path)
-
 
 async def daily_backup_loop():
     await bot.wait_until_ready()
@@ -3753,7 +3727,7 @@ def save_bot_data() -> None:
 
 
 
-configure_database(DB_FILE, init_database)
+configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS)
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:

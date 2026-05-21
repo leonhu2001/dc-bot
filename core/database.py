@@ -1,23 +1,42 @@
 import json
+import shutil
 import sqlite3
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Callable
 
 _DB_FILE: Path | None = None
 _INIT_DATABASE: Callable[[], None] | None = None
+_BACKUP_DIR: Path | None = None
+_BACKUP_KEEP_DAYS: int = 30
 
 
-def configure_database(db_file: str | Path, init_database_func: Callable[[], None] | None = None) -> None:
-    """設定資料庫模組使用的 DB 路徑與初始化函式。"""
-    global _DB_FILE, _INIT_DATABASE
+def configure_database(
+    db_file: str | Path,
+    init_database_func: Callable[[], None] | None = None,
+    *,
+    backup_dir: str | Path | None = None,
+    backup_keep_days: int = 30,
+) -> None:
+    """設定資料庫模組使用的 DB 路徑、初始化函式與備份資料夾。"""
+    global _DB_FILE, _INIT_DATABASE, _BACKUP_DIR, _BACKUP_KEEP_DAYS
     _DB_FILE = Path(db_file)
     _INIT_DATABASE = init_database_func
+    _BACKUP_DIR = Path(backup_dir) if backup_dir is not None else _DB_FILE.parent / "backups"
+    _BACKUP_KEEP_DAYS = int(backup_keep_days or 30)
 
 
 def _require_db_file() -> Path:
     if _DB_FILE is None:
         raise RuntimeError("database module 尚未設定 DB_FILE，請先呼叫 configure_database()")
     return _DB_FILE
+
+
+def _require_backup_dir() -> Path:
+    if _BACKUP_DIR is None:
+        db_file = _require_db_file()
+        return db_file.parent / "backups"
+    return _BACKUP_DIR
 
 
 def _ensure_database_ready() -> None:
@@ -87,3 +106,37 @@ def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: i
             conn.commit()
     except sqlite3.Error as e:
         print(f"刪除 claims 資料失敗：{e}")
+
+
+def run_daily_backup_once() -> str | None:
+    """若今天還沒有備份，複製 bot.db 到 backups/，並清掉過舊備份。"""
+    db_file = _require_db_file()
+    if not db_file.exists():
+        return None
+
+    backup_dir = _require_backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    taipei_tz = timezone(timedelta(hours=8))
+    now = datetime.now(taipei_tz)
+    day_key = now.strftime("%Y%m%d")
+    backup_path = backup_dir / f"bot_{day_key}.db"
+
+    if not backup_path.exists():
+        shutil.copy2(db_file, backup_path)
+
+    cutoff = now - timedelta(days=_BACKUP_KEEP_DAYS)
+    for old_file in backup_dir.glob("bot_*.db"):
+        try:
+            date_part = old_file.stem.replace("bot_", "")
+            file_date = datetime.strptime(date_part, "%Y%m%d").replace(tzinfo=taipei_tz)
+        except ValueError:
+            continue
+
+        if file_date < cutoff:
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+
+    return str(backup_path)
