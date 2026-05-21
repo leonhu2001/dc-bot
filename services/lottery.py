@@ -13,6 +13,17 @@ from core.time_utils import get_taipei_now, get_taipei_now_iso
 _DB_FILE: Path | None = None
 _init_database: Callable[[], None] | None = None
 
+_LOTTERY_ANNOUNCE_CHANNEL_ID: int | None = None
+
+
+def configure_lottery_runtime(lottery_announce_channel_id: int) -> None:
+    global _LOTTERY_ANNOUNCE_CHANNEL_ID
+    _LOTTERY_ANNOUNCE_CHANNEL_ID = int(lottery_announce_channel_id)
+
+
+def _get_lottery_announce_channel_id() -> int | None:
+    return _LOTTERY_ANNOUNCE_CHANNEL_ID
+
 
 def configure_lottery_storage(db_file: Path, init_database_func: Callable[[], None]) -> None:
     global _DB_FILE, _init_database
@@ -270,3 +281,46 @@ def pick_weighted_lottery_winners(entries: list[dict], winners: int) -> list[int
 
     return picked
 
+
+
+async def send_lottery_announcement(
+    guild: discord.Guild | None,
+    content: str,
+    embed: discord.Embed | None = None,
+    channel: discord.TextChannel | None = None,
+) -> bool:
+    if guild is None:
+        return False
+
+    target_channel = channel
+
+    if target_channel is None:
+        channel_id = _get_lottery_announce_channel_id()
+        if channel_id is None:
+            print("抽獎公告頻道尚未設定。")
+            return False
+
+        fetched_channel = guild.get_channel(channel_id)
+        if fetched_channel is None:
+            try:
+                fetched_channel = await guild.fetch_channel(channel_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
+                print(f"找不到抽獎公告頻道：{e}")
+                return False
+
+        if not isinstance(fetched_channel, discord.TextChannel):
+            print("抽獎公告頻道不是文字頻道。")
+            return False
+
+        target_channel = fetched_channel
+
+    try:
+        await target_channel.send(
+            content=content,
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(everyone=True, users=True, roles=False),
+        )
+        return True
+    except discord.HTTPException as e:
+        print(f"送出抽獎公告失敗：{e}")
+        return False

@@ -104,6 +104,8 @@ from services.lottery import (
     build_lottery_info_embed,
     build_lottery_status_embed,
     pick_weighted_lottery_winners,
+    configure_lottery_runtime,
+    send_lottery_announcement,
 )
 
 from services.stats import (
@@ -1080,43 +1082,6 @@ async def send_order_log(
         print(f"送出機器人日誌失敗：{e}")
 
 
-async def send_lottery_announcement(
-    guild: discord.Guild | None,
-    content: str,
-    embed: discord.Embed | None = None,
-    channel: discord.TextChannel | None = None,
-) -> bool:
-    if guild is None:
-        return False
-
-    target_channel = channel
-
-    if target_channel is None:
-        fetched_channel = guild.get_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
-        if fetched_channel is None:
-            try:
-                fetched_channel = await guild.fetch_channel(LOTTERY_ANNOUNCE_CHANNEL_ID)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as e:
-                print(f"找不到抽獎公告頻道：{e}")
-                return False
-
-        if not isinstance(fetched_channel, discord.TextChannel):
-            print("抽獎公告頻道不是文字頻道。")
-            return False
-
-        target_channel = fetched_channel
-
-    try:
-        await target_channel.send(
-            content=content,
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(everyone=True, users=True, roles=False),
-        )
-        return True
-    except discord.HTTPException as e:
-        print(f"送出抽獎公告失敗：{e}")
-        return False
-
 
 
 async def daily_backup_loop():
@@ -1336,6 +1301,7 @@ VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；
 
 configure_database(DB_FILE, init_database, backup_dir=BACKUP_DIR, backup_keep_days=BACKUP_KEEP_DAYS, data_file=DATA_FILE)
 configure_lottery_storage(DB_FILE, init_database)
+configure_lottery_runtime(lottery_announce_channel_id=LOTTERY_ANNOUNCE_CHANNEL_ID)
 configure_stats(DB_FILE, init_database)
 configure_reward_database(DB_FILE)
 configure_data_access(
