@@ -147,6 +147,11 @@ from views.voice import (
     create_voice_control_panel,
 )
 
+from views.panels import (
+    configure_panel_views,
+    MainPanelView,
+)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -3362,188 +3367,22 @@ class OrderControlView(discord.ui.View):
             )
         )
 
-# ========= 下單 / 入職 Modal =========
+# ========= 主面板 / 下單入口 View 設定 =========
 
-class OrderModal(discord.ui.Modal, title="我要下單"):
-    rule_confirm = discord.ui.TextInput(
-        label="是否已詳閱規章內容",
-        placeholder="請輸入：是",
-        required=True,
-        max_length=20
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if not is_agree_answer(self.rule_confirm.value):
-            await interaction.response.send_message(
-                "你尚未詳閱規章內容，暫時無法下單。請詳閱規章後再重新開單。",
-                ephemeral=True
-            )
-            return
-
-        guild = interaction.guild
-        member = interaction.user
-
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        customer_role = guild.get_role(CUSTOMER_ROLE_ID)
-
-        intro = (
-            f"這裡有闆闆開單。\n\n"
-            f"開單人：{member.mention}\n"
-            f"狀態：已確認詳閱規章內容"
-            f"{format_customer_notes_for_ticket(member.id)}"
-        )
-
-        await create_private_channel(
-            interaction=interaction,
-            category_id=CUSTOMER_CATEGORY_ID,
-            channel_name=safe_channel_name("下單", member),
-            allowed_roles=[customer_role],
-            intro_message=intro,
-            view=OrderControlView(),
-            topic=f"order_customer_id={member.id}"
-        )
-
-
-class RecruitModal(discord.ui.Modal, title="我要入職"):
-    nickname = discord.ui.TextInput(
-        label="暱稱",
-        placeholder="請輸入你的暱稱",
-        required=True,
-        max_length=50
-    )
-
-    age = discord.ui.TextInput(
-        label="年齡",
-        placeholder="請輸入你的年齡",
-        required=True,
-        max_length=20
-    )
-
-    play_time = discord.ui.TextInput(
-        label="可遊玩時段",
-        placeholder="例如：平日晚上、假日整天",
-        required=True,
-        max_length=100
-    )
-
-    position = discord.ui.TextInput(
-        label="應徵職位",
-        placeholder="例如：陪玩、接待、客服、其他",
-        required=True,
-        max_length=100
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        member = interaction.user
-
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        examiner_role = guild.get_role(EXAMINER_ROLE_ID)
-        manager_role = guild.get_role(MANAGER_ROLE_ID)
-        customer_role = guild.get_role(CUSTOMER_ROLE_ID)
-        applicant_role = guild.get_role(RECRUIT_APPLICANT_ROLE_ID)
-
-        if applicant_role is not None and isinstance(member, discord.Member):
-            try:
-                await member.add_roles(applicant_role, reason="Recruit ticket opened")
-            except discord.Forbidden:
-                print("Bot 權限不足，無法給予入職申請暫時身分組。請確認 Bot 身分組位置高於該身分組。")
-            except discord.HTTPException as e:
-                print(f"給予入職申請暫時身分組失敗：{e}")
-
-        intro = (
-            f"這裡有人想入職。\n\n"
-            f"申請人：{member.mention}\n"
-            f"暱稱：{self.nickname.value}\n"
-            f"年齡：{self.age.value}\n"
-            f"可遊玩時段：{self.play_time.value}\n"
-            f"應徵職位：{self.position.value}"
-        )
-
-        await create_private_channel(
-            interaction=interaction,
-            category_id=EXAM_CATEGORY_ID,
-            channel_name=safe_channel_name("入職", member),
-            allowed_roles=[examiner_role, manager_role, customer_role],
-            intro_message=intro,
-            view=RecruitControlView(),
-            topic=f"recruit_member_id={member.id};recruit_nickname={self.nickname.value};recruit_position={self.position.value}"
-        )
-
-
-# ========= 主面板下拉式清單 / 確認按鈕 =========
-
-PANEL_SELECTIONS = {}
-
-
-class MainPanelSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(
-                label="我要下單",
-                value="order",
-                description="開啟下單票口"
-            ),
-            discord.SelectOption(
-                label="我要入職",
-                value="recruit",
-                description="開啟入職申請票口"
-            ),
-        ]
-
-        super().__init__(
-            placeholder="請選擇你要辦理的項目",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="mawan_main_panel_select",
-            row=0
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        PANEL_SELECTIONS[interaction.user.id] = self.values[0]
-
-        await interaction.response.defer()
-
-
-class MainPanelView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(MainPanelSelect())
-
-    @discord.ui.button(
-        label="確認",
-        style=discord.ButtonStyle.success,
-        custom_id="mawan_main_panel_confirm",
-        row=1
-    )
-    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        selected = PANEL_SELECTIONS.get(interaction.user.id)
-
-        if selected is None:
-            await interaction.response.send_message(
-                "請先從下拉式清單選擇項目，再按確認。",
-                ephemeral=True
-            )
-            return
-
-        PANEL_SELECTIONS.pop(interaction.user.id, None)
-
-        if selected == "order":
-            await interaction.response.send_modal(OrderModal())
-        elif selected == "recruit":
-            await interaction.response.send_modal(RecruitModal())
-        else:
-            await interaction.response.send_message(
-                "選擇項目異常，請重新選擇一次。",
-                ephemeral=True
-            )
+configure_panel_views(
+    customer_category_id=CUSTOMER_CATEGORY_ID,
+    exam_category_id=EXAM_CATEGORY_ID,
+    customer_role_id=CUSTOMER_ROLE_ID,
+    examiner_role_id=EXAMINER_ROLE_ID,
+    manager_role_id=MANAGER_ROLE_ID,
+    recruit_applicant_role_id=RECRUIT_APPLICANT_ROLE_ID,
+    safe_channel_name=safe_channel_name,
+    is_agree_answer=is_agree_answer,
+    format_customer_notes_for_ticket=format_customer_notes_for_ticket,
+    create_private_channel=create_private_channel,
+    order_control_view_factory=OrderControlView,
+    recruit_control_view_factory=RecruitControlView,
+)
 
 
 # ========= Bot 事件 =========
