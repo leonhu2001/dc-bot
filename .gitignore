@@ -4,4 +4,6 @@ node_modules/
 Code.exe
 data/
 database/
-*.log
+*.log__pycache__/
+**/__pycache__/
+config.json
