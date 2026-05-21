@@ -14,6 +14,14 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from core.time_utils import (
+    get_taipei_now,
+    get_taipei_now_iso,
+    get_taipei_now_text,
+    parse_datetime_safe,
+    _parse_datetime_safe,
+)
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -1653,11 +1661,6 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
     return "｜".join(parts), payment_method
 
 
-def get_taipei_now_text() -> str:
-    taipei_tz = timezone(timedelta(hours=8))
-    return datetime.now(taipei_tz).strftime("%Y/%m/%d %H:%M")
-
-
 class ReceiptModal(discord.ui.Modal, title="已結單收據"):
     payee = discord.ui.TextInput(
         label="收款人",
@@ -2418,18 +2421,6 @@ async def daily_backup_loop():
         except Exception as e:
             print(f"每日備份 bot.db 失敗：{e}")
         await asyncio.sleep(3600)
-
-
-def _parse_datetime_safe(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(str(value))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
-    return dt
 
 
 async def check_stored_order_reminders_once(guild: discord.Guild | None = None) -> None:
@@ -3230,15 +3221,6 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
         locked=bool(data.get("locked", False)),
         status=str(data.get("status", "active")),
     )
-
-
-def get_taipei_now() -> datetime:
-    taipei_tz = timezone(timedelta(hours=8))
-    return datetime.now(taipei_tz)
-
-
-def get_taipei_now_iso() -> str:
-    return get_taipei_now().isoformat(timespec="seconds")
 
 
 def cleanup_old_closed_orders() -> None:
