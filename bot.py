@@ -58,6 +58,7 @@ from core.database import (
 
 from services.rewards import (
     configure_rewards,
+    configure_reward_storage,
     get_member_level,
     get_next_member_level,
     get_member_level_index_by_total_spent,
@@ -69,6 +70,11 @@ from services.rewards import (
     format_t_amount,
     calculate_reward_points,
     get_current_reward_points,
+    get_customer_reward_data,
+    build_member_info_embed,
+    get_customer_notes,
+    format_customer_notes_for_staff,
+    format_customer_notes_for_ticket,
 )
 
 import discord
@@ -1899,6 +1905,7 @@ ORDER_CLAIMS = {}
 # 顧客會員 / 獎勵資料
 # user_id -> {total_spent, order_count, last_order_at, points, platinum_channel_id}
 CUSTOMER_REWARDS = {}
+configure_reward_storage(CUSTOMER_REWARDS)
 
 # 訂單編號計數器：YYYYMMDD -> 當日最後流水號
 ORDER_COUNTERS = {}
@@ -2260,124 +2267,6 @@ def parse_receipt_amount(amount_text: str) -> int | None:
 
     return numbers[0]
 
-def get_customer_reward_data(user_id: int) -> dict:
-    data = CUSTOMER_REWARDS.setdefault(
-        user_id,
-        {
-            "total_spent": 0,
-            "order_count": 0,
-            "last_order_at": None,
-            "points": 0,
-            "point_adjustment": 0,
-            "point_adjustment_logs": [],
-            "platinum_channel_id": None,
-            "manual_purchase_keys": [],
-            "vip_level_index": None,
-            "vip_progress_base_total_spent": None,
-            "vip_last_downgrade_check_month": None,
-            "vip_downgrade_logs": [],
-        }
-    )
-    data.setdefault("total_spent", 0)
-    data.setdefault("order_count", 0)
-    data.setdefault("last_order_at", None)
-    data.setdefault("points", 0)
-    data.setdefault("point_adjustment", 0)
-    data.setdefault("point_adjustment_logs", [])
-    data.setdefault("platinum_channel_id", None)
-    data.setdefault("manual_purchase_keys", [])
-    data.setdefault("notes", [])
-    data.setdefault("vip_level_index", None)
-    data.setdefault("vip_progress_base_total_spent", None)
-    data.setdefault("vip_last_downgrade_check_month", None)
-    data.setdefault("vip_downgrade_logs", [])
-    if not isinstance(data["manual_purchase_keys"], list):
-        data["manual_purchase_keys"] = []
-    if not isinstance(data["point_adjustment_logs"], list):
-        data["point_adjustment_logs"] = []
-    if not isinstance(data["notes"], list):
-        data["notes"] = []
-    if not isinstance(data["vip_downgrade_logs"], list):
-        data["vip_downgrade_logs"] = []
-    return data
-
-def build_member_info_embed(member: discord.abc.User, data: dict, show_points: bool = True) -> discord.Embed:
-    total_spent = int(data.get("total_spent", 0) or 0)
-    order_count = int(data.get("order_count", 0) or 0)
-    points = get_current_reward_points(data)
-    level = get_effective_member_level(data)
-    next_level, next_level_gap = get_next_member_level_for_data(data)
-
-    embed = discord.Embed(
-        title="你的會員資料" if show_points else "顧客會員資料",
-        color=discord.Color.purple()
-    )
-    embed.add_field(name="顧客", value=member.mention, inline=False)
-    embed.add_field(name="累積消費", value=format_t_amount(total_spent), inline=True)
-    if show_points:
-        embed.add_field(name="目前點數", value=f"{points:,} 點", inline=True)
-    embed.add_field(name="完成訂單", value=f"{order_count:,} 單", inline=True)
-    embed.add_field(name="會員等級", value=level["name"], inline=True)
-
-    if next_level is None:
-        embed.add_field(name="距離下一級還差", value="已達最高等級", inline=False)
-    else:
-        embed.add_field(
-            name="距離下一級還差",
-            value=f"{format_t_amount(next_level_gap)}（下一級：{next_level['name']}）",
-            inline=False
-        )
-
-    return embed
-
-
-def get_customer_notes(user_id: int) -> list[dict]:
-    data = get_customer_reward_data(user_id)
-    notes = data.setdefault("notes", [])
-    if not isinstance(notes, list):
-        data["notes"] = []
-        notes = data["notes"]
-    return notes
-
-
-def format_customer_notes_for_staff(user_id: int, limit: int = 8) -> str:
-    notes = get_customer_notes(user_id)
-    if not notes:
-        return "無備註"
-
-    lines = []
-    for index, note in enumerate(notes[:limit], start=1):
-        tag = "🚫 黑名單" if note.get("is_blacklist") else "📝 備註"
-        created_at = note.get("created_at") or "未紀錄時間"
-        operator_id = note.get("operator_id")
-        operator_text = f"<@{operator_id}>" if operator_id else "未紀錄"
-        content = str(note.get("content") or "未填寫")
-        lines.append(f"{index}. {tag}｜{content}\n　建立：{created_at}｜人員：{operator_text}")
-
-    if len(notes) > limit:
-        lines.append(f"…還有 {len(notes) - limit} 筆")
-
-    return "\n".join(lines)
-
-
-def format_customer_notes_for_ticket(user_id: int) -> str:
-    notes = get_customer_notes(user_id)
-    if not notes:
-        return ""
-
-    blacklist_notes = [n for n in notes if n.get("is_blacklist")]
-    normal_notes = [n for n in notes if not n.get("is_blacklist")]
-    picked = blacklist_notes[:3] + normal_notes[:3]
-
-    lines = ["\n\n⚠️ 客服注意：此顧客有備註紀錄"]
-    if blacklist_notes:
-        lines.append("🚫 含黑名單 / 高風險備註")
-
-    for index, note in enumerate(picked[:5], start=1):
-        tag = "黑名單" if note.get("is_blacklist") else "備註"
-        lines.append(f"{index}. [{tag}] {note.get('content') or '未填寫'}")
-
-    return "\n".join(lines)
 
 async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Member | None:
     member = guild.get_member(user_id)
