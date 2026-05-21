@@ -104,6 +104,12 @@ from services.orders import (
     is_closed_order_for_stats,
     is_stored_order_for_stats,
     is_cancelled_order_for_stats,
+    get_order_summary_from_channel,
+    build_self_service_order_embed,
+    get_stored_order_records,
+    format_stored_order_option_label,
+    format_stored_order_option_description,
+    build_stored_order_detail_embed,
 )
 
 import discord
@@ -1657,36 +1663,6 @@ class DispatchModal(discord.ui.Modal, title="派單"):
 
 # ========= 收據 Modal =========
 
-def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
-    """
-    從自助下單暫存資料取得收據內容與付款方式。
-    內容會沿用闆闆在自助下單面板選的類別、項目與指定選項。
-    """
-    data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
-
-    category = data.get("category")
-    item = data.get("item")
-    quantity = _to_int(data.get("quantity"), 1) or 1
-    companion_preference = data.get("companion_preference")
-    payment_method = data.get("payment_method", "未紀錄")
-
-    if item is None:
-        return "未紀錄自助下單內容", payment_method
-
-    parts = []
-
-    if category is not None:
-        parts.append(ORDER_CATEGORY_LABELS.get(category, category))
-
-    parts.append(item)
-    parts.append(f"數量：{quantity} 單")
-
-    if companion_preference is not None:
-        parts.append(companion_preference)
-
-    return "｜".join(parts), payment_method
-
-
 class ReceiptModal(discord.ui.Modal, title="已結單收據"):
     payee = discord.ui.TextInput(
         label="收款人",
@@ -1931,7 +1907,14 @@ class ConfirmCancelOrderView(discord.ui.View):
 ORDER_CONTROL_SELECTIONS = {}
 STAFF_ORDER_OPERATION_SELECTIONS = {}
 SELF_SERVICE_ORDER_SELECTIONS = {}
-configure_order_helpers(SELF_SERVICE_ORDER_SELECTIONS, parse_receipt_amount)
+configure_order_helpers(
+    SELF_SERVICE_ORDER_SELECTIONS,
+    parse_receipt_amount,
+    guild_id=GUILD_ID,
+    dispatch_channel_id=DISPATCH_CHANNEL_ID,
+    format_amount_func=format_t_amount,
+    get_now_func=get_taipei_now,
+)
 
 # 派單頻道接單資料
 # message_id 對應該派單訊息目前有哪些陪玩 / 打手接單。
@@ -2876,74 +2859,6 @@ async def log_self_service_proxy_action(
         )
     except Exception as e:
         print(f"寫入自助下單代操作日誌失敗：{e}")
-
-
-def build_self_service_order_embed(
-    customer_mention: str,
-    category_label: str,
-    item: str,
-    quantity: int,
-    payment_method: str,
-    source_channel: discord.TextChannel,
-    companion_preference: str | None = None,
-    receiver_text: str | None = None,
-) -> discord.Embed:
-    embed = discord.Embed(
-        title="新自助下單",
-        color=discord.Color.blue()
-    )
-
-    embed.add_field(
-        name="下單用戶",
-        value=customer_mention,
-        inline=False
-    )
-
-    embed.add_field(
-        name="訂單類別",
-        value=category_label,
-        inline=True
-    )
-
-    embed.add_field(
-        name="訂單項目",
-        value=item,
-        inline=True
-    )
-
-    embed.add_field(
-        name="數量",
-        value=f"{quantity} 單",
-        inline=True
-    )
-
-    embed.add_field(
-        name="付款方式",
-        value=payment_method,
-        inline=True
-    )
-
-    if companion_preference is not None:
-        embed.add_field(
-            name="指定選項",
-            value=companion_preference,
-            inline=False
-        )
-
-    if receiver_text is not None:
-        embed.add_field(
-            name="接單人員",
-            value=receiver_text,
-            inline=False
-        )
-
-    embed.add_field(
-        name="來源票口",
-        value=source_channel.mention,
-        inline=False
-    )
-
-    return embed
 
 
 class DispatchCancelClaimButton(discord.ui.Button):
@@ -7265,91 +7180,6 @@ async def audit_data(interaction: discord.Interaction, limit: int = 10):
 
 
 # ========= 存單管理面板 =========
-
-def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
-    """回傳目前記憶體中的存單，依存單時間新到舊排序。"""
-    records: list[tuple[int, dict]] = []
-
-    for channel_id, data in SELF_SERVICE_ORDER_SELECTIONS.items():
-        if not isinstance(data, dict):
-            continue
-        if str(data.get("status", "")).lower() != "stored":
-            continue
-        records.append((int(channel_id), data))
-
-    records.sort(
-        key=lambda item: str(item[1].get("stored_at") or item[1].get("created_at") or ""),
-        reverse=True,
-    )
-    return records[:max(1, min(int(limit or 25), 25))]
-
-
-def format_stored_order_option_label(channel_id: int, data: dict) -> str:
-    item = str(data.get("item") or "未紀錄")[:30]
-    customer_id = data.get("customer_id") or "未紀錄"
-    amount = _to_int(data.get("amount"), 0) or 0
-    amount_text = f"{amount}T" if amount else "未紀錄金額"
-    return f"{item}｜{customer_id}｜{amount_text}"[:100]
-
-
-def format_stored_order_option_description(channel_id: int, data: dict) -> str:
-    quantity = _to_int(data.get("quantity"), 1) or 1
-    stored_at = str(data.get("stored_at") or "未紀錄時間")[:19]
-    reason = str(data.get("stored_reason") or data.get("store_reason") or "未填寫原因")[:35]
-    return f"{quantity} 單｜{stored_at}｜{reason}"[:100]
-
-
-def build_stored_order_detail_embed(
-    guild: discord.Guild | None,
-    channel_id: int | None,
-    data: dict | None,
-    total_count: int,
-) -> discord.Embed:
-    embed = discord.Embed(
-        title="存單管理面板",
-        color=discord.Color.gold(),
-        timestamp=get_taipei_now(),
-    )
-
-    if channel_id is None or not data:
-        embed.description = "目前沒有存單。"
-        embed.add_field(name="存單數量", value="0 筆", inline=True)
-        return embed
-
-    customer_id = data.get("customer_id")
-    ticket_channel = guild.get_channel(channel_id) if guild is not None else None
-    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
-    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
-    dispatch_channel = guild.get_channel(dispatch_channel_id) if guild is not None else None
-
-    ticket_text = ticket_channel.mention if isinstance(ticket_channel, discord.TextChannel) else f"票口 ID：{channel_id}"
-    if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
-        dispatch_text = f"https://discord.com/channels/{GUILD_ID}/{dispatch_channel.id}/{dispatch_message_id}"
-    elif dispatch_message_id is not None:
-        dispatch_text = f"派單訊息 ID：{dispatch_message_id}"
-    else:
-        dispatch_text = "未紀錄"
-
-    amount = _to_int(data.get("amount"), 0) or 0
-    quantity = _to_int(data.get("quantity"), 1) or 1
-    item = data.get("item") or "未紀錄"
-    category = data.get("category")
-    category_label = ORDER_CATEGORY_LABELS.get(category, data.get("category_label") or category or "未紀錄")
-
-    embed.description = f"目前共有 **{total_count}** 筆存單。請先選擇存單，再按下方按鈕操作。"
-    embed.add_field(name="顧客", value=f"<@{customer_id}>" if customer_id else "未紀錄", inline=True)
-    embed.add_field(name="票口", value=ticket_text, inline=True)
-    embed.add_field(name="狀態", value=str(data.get("status") or "stored"), inline=True)
-    embed.add_field(name="訂單", value=f"{category_label}｜{item} x{quantity}", inline=False)
-    embed.add_field(name="金額", value=format_t_amount(amount) if amount else "未紀錄", inline=True)
-    embed.add_field(name="付款方式", value=str(data.get("payment_method") or "未紀錄"), inline=True)
-    embed.add_field(name="存單時間", value=str(data.get("stored_at") or "未紀錄"), inline=False)
-    embed.add_field(name="存單原因", value=str(data.get("stored_reason") or data.get("store_reason") or "未填寫"), inline=False)
-    embed.add_field(name="預計恢復", value=str(data.get("stored_expected_time") or data.get("resume_at") or "未填寫"), inline=True)
-    embed.add_field(name="存單備註", value=str(data.get("stored_note") or data.get("note") or "無")[:1024], inline=False)
-    embed.add_field(name="派單訊息", value=dispatch_text, inline=False)
-    return embed
-
 
 async def update_stored_order_note_and_panel(
     guild: discord.Guild,
