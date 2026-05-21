@@ -5327,11 +5327,19 @@ class PaymentMethodSelect(discord.ui.Select):
 
 
 class PaymentMethodView(discord.ui.View):
-    def __init__(self, customer_id: int, channel_id: int):
+    def __init__(self, customer_id: int, channel_id: int, submitted: bool = False):
         super().__init__(timeout=86400)
         self.customer_id = customer_id
         self.channel_id = channel_id
+        self.submitted = submitted
         self.add_item(PaymentMethodSelect(customer_id, channel_id))
+
+        if submitted:
+            for child in self.children:
+                child.disabled = True
+                if isinstance(child, discord.ui.Button) and child.custom_id == "payment_method_submit_button":
+                    child.label = "已送出"
+                    child.style = discord.ButtonStyle.secondary
 
     @discord.ui.button(
         label="送出",
@@ -5441,6 +5449,8 @@ class PaymentMethodView(discord.ui.View):
         data["dispatch_submitting"] = True
         remember_order_data(self.channel_id, data)
 
+        await interaction.response.defer(ephemeral=True)
+
         try:
             dispatch_message = await dispatch_channel.send(
                 embed=embed,
@@ -5462,7 +5472,7 @@ class PaymentMethodView(discord.ui.View):
         except discord.HTTPException as e:
             data.pop("dispatch_submitting", None)
             remember_order_data(self.channel_id, data)
-            await interaction.response.send_message(f"派單送出失敗：{e}", ephemeral=True)
+            await interaction.followup.send(f"派單送出失敗：{e}", ephemeral=True)
             return
 
         ORDER_CLAIMS[dispatch_message.id] = {
@@ -5482,6 +5492,8 @@ class PaymentMethodView(discord.ui.View):
         data["dispatch_message_id"] = dispatch_message.id
         data["dispatch_channel_id"] = dispatch_channel.id
         data["closed"] = False
+        data["payment_submitted_at"] = get_taipei_now_iso()
+        data["payment_submitted_by"] = interaction.user.id
         data.pop("dispatch_submitting", None)
         remember_order_data(interaction.channel.id, data)
         remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
@@ -5511,7 +5523,48 @@ class PaymentMethodView(discord.ui.View):
             color=discord.Color.blue(),
         )
 
-        await interaction.response.defer()
+        submitted_embed = discord.Embed(
+            title="付款方式",
+            description=(
+                f"下單用戶：<@{self.customer_id}>\n\n"
+                f"訂單類別：{category_label}\n"
+                f"訂單項目：{item}\n"
+                f"數量：{quantity} 單\n"
+                f"付款方式：{payment_method}\n\n"
+                "✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"
+                f"派單訊息：{dispatch_message.jump_url}"
+            ),
+            color=discord.Color.green()
+        )
+
+        if companion_preference is not None:
+            submitted_embed.add_field(
+                name="指定選項",
+                value=companion_preference,
+                inline=False
+            )
+
+        try:
+            await interaction.message.edit(
+                embed=submitted_embed,
+                view=PaymentMethodView(
+                    customer_id=self.customer_id,
+                    channel_id=self.channel_id,
+                    submitted=True,
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False
+                )
+            )
+        except discord.HTTPException:
+            pass
+
+        await interaction.followup.send(
+            f"已送出派單：{dispatch_message.jump_url}",
+            ephemeral=True
+        )
 
         operation_embed = discord.Embed(
             title="訂單操作",
