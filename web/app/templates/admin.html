@@ -1,40 +1,225 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
-</head>
-<body>
-    <main class="page">
-        <section class="card wide">
-            <div class="topbar">
-                <div>
-                    <h1>總控後台</h1>
-                    <p>歡迎，{{ user.global_name or user.username }}</p>
-                </div>
-                <a class="button secondary" href="/auth/logout">登出</a>
+{% extends "layout.html" %}
+
+{% block page_title %}總控後台{% endblock %}
+
+{% block content %}
+    {% if message %}
+        <div class="notice success-box">
+            {{ message }}
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <div class="notice error-box">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <div class="grid">
+        <div class="panel">
+            <h2>訂單數量</h2>
+            <p class="big-number">{{ orders | length }}</p>
+            <p>目前網站資料庫內的訂單。</p>
+        </div>
+
+        <div class="panel">
+            <h2>打手基本分潤</h2>
+            <p class="big-number">80%</p>
+            <p>依訂單人數平均後計算。</p>
+        </div>
+
+        <div class="panel">
+            <h2>客服分潤</h2>
+            <p class="big-number">5%</p>
+            <p>每單獨立計算。</p>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>訂單列表</h2>
+
+        {% if orders %}
+            <div class="admin-order-list">
+                {% for order in orders %}
+                    {% set active_assignments = [] %}
+                    {% for assignment in order.assignments %}
+                        {% if assignment.is_active %}
+                            {% set _ = active_assignments.append(assignment) %}
+                        {% endif %}
+                    {% endfor %}
+
+                    <article class="admin-order-card">
+                        <div class="order-card-header">
+                            <div>
+                                <p class="order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
+                                <h3>{{ order.category }}｜{{ order.item }}</h3>
+                            </div>
+
+                            <span class="badge">{{ order.status }}</span>
+                        </div>
+
+                        <div class="order-meta">
+                            <div>
+                                <span>老闆</span>
+                                <strong>{{ order.customer_display_name or order.customer_discord_id or "未記錄" }}</strong>
+                            </div>
+
+                            <div>
+                                <span>金額</span>
+                                <strong>{{ order.amount }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>數量</span>
+                                <strong>{{ order.quantity }} 單</strong>
+                            </div>
+
+                            <div>
+                                <span>客服</span>
+                                <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未記錄" }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="admin-section">
+                            <h4>接單打手</h4>
+
+                            {% if active_assignments %}
+                                <div class="admin-worker-list">
+                                    {% for assignment in active_assignments %}
+                                        {% set payout_for_worker = none %}
+                                        {% for payout in order.payouts %}
+                                            {% if payout.worker_discord_id == assignment.worker_discord_id %}
+                                                {% set payout_for_worker = payout %}
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        <div class="admin-worker-card">
+                                            <div>
+                                                <strong>{{ assignment.worker_display_name or assignment.worker_discord_id }}</strong>
+                                                <p class="muted-text">
+                                                    ID：{{ assignment.worker_discord_id }}
+                                                </p>
+                                            </div>
+
+                                            <div class="worker-payout-line">
+                                                {% if payout_for_worker %}
+                                                    <span>基本 {{ payout_for_worker.base_payout }}T</span>
+                                                    <span>掛名 {{ payout_for_worker.named_bonus_amount }}T</span>
+                                                    <strong>實拿 {{ payout_for_worker.final_payout }}T</strong>
+                                                    {% if payout_for_worker.note %}
+                                                        <p class="warning">{{ payout_for_worker.note }}</p>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span>尚未產生分潤</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="admin-actions">
+                                                <form method="post" action="/admin/assignments/{{ assignment.id }}/named-bonus">
+                                                    <label class="checkbox-line">
+                                                        <input
+                                                            type="checkbox"
+                                                            name="enabled"
+                                                            value="on"
+                                                            {% if assignment.has_named_bonus %}checked{% endif %}
+                                                        >
+                                                        掛名 +5%
+                                                    </label>
+
+                                                    <button class="button secondary" type="submit">
+                                                        更新掛名
+                                                    </button>
+                                                </form>
+
+                                                <form method="post" action="/admin/orders/{{ order.id }}/manual-payout" class="inline-form">
+                                                    <input type="hidden" name="worker_discord_id" value="{{ assignment.worker_discord_id }}">
+                                                    <input type="hidden" name="worker_display_name" value="{{ assignment.worker_display_name or assignment.worker_discord_id }}">
+
+                                                    <input
+                                                        class="input"
+                                                        type="number"
+                                                        name="manual_final_payout"
+                                                        min="0"
+                                                        placeholder="手動實拿金額"
+                                                        required
+                                                    >
+
+                                                    <input
+                                                        class="input"
+                                                        type="text"
+                                                        name="reason"
+                                                        placeholder="原因，例如中途換打手"
+                                                    >
+
+                                                    <button class="button secondary" type="submit">
+                                                        手動改分潤
+                                                    </button>
+                                                </form>
+
+                                                <form method="post" action="/admin/assignments/{{ assignment.id }}/remove">
+                                                    <input
+                                                        class="input"
+                                                        type="text"
+                                                        name="reason"
+                                                        placeholder="移除原因，例如中途換人"
+                                                    >
+
+                                                    <button class="button danger" type="submit">
+                                                        移除此打手
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="empty-state">目前沒有 active 打手。</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="admin-section">
+                            <h4>新增 / 更換打手</h4>
+
+                            <form method="post" action="/admin/orders/{{ order.id }}/add-worker" class="admin-add-worker-form">
+                                <input
+                                    class="input"
+                                    type="text"
+                                    name="worker_discord_id"
+                                    placeholder="打手 Discord ID"
+                                    required
+                                >
+
+                                <input
+                                    class="input"
+                                    type="text"
+                                    name="worker_display_name"
+                                    placeholder="打手顯示名稱"
+                                    required
+                                >
+
+                                <input
+                                    class="input"
+                                    type="text"
+                                    name="reason"
+                                    placeholder="原因，例如中途換打手"
+                                >
+
+                                <button class="button" type="submit">
+                                    新增打手
+                                </button>
+                            </form>
+                        </div>
+
+                        {% if order.note %}
+                            <p class="order-note">{{ order.note }}</p>
+                        {% endif %}
+                    </article>
+                {% endfor %}
             </div>
-
-            <div class="grid">
-                <div class="panel">
-                    <h2>訂單管理</h2>
-                    <p>之後會顯示所有訂單、狀態、金額、接單人。</p>
-                </div>
-
-                <div class="panel">
-                    <h2>打手分潤</h2>
-                    <p>之後會顯示本月分潤、未發放、已發放紀錄。</p>
-                </div>
-
-                <div class="panel">
-                    <h2>派單同步</h2>
-                    <p>之後會顯示 Discord bot 同步狀態。</p>
-                </div>
+        {% else %}
+            <div class="empty-state">
+                目前沒有訂單。
             </div>
-
-            <a class="button" href="/dispatch">前往派單頁</a>
-        </section>
-    </main>
-</body>
-</html>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -14,6 +14,7 @@ from shared.models import (
     SyncEventType,
     WebOrder,
     WorkerPayout,
+    WorkerPayoutOverride,
 )
 from shared.payout import calculate_order_payout
 
@@ -91,6 +92,17 @@ def list_active_orders(db: Session) -> list[WebOrder]:
     return list(db.scalars(statement).all())
 
 
+def list_admin_orders(db: Session) -> list[WebOrder]:
+    statement = (
+        select(WebOrder)
+        .options(selectinload(WebOrder.assignments))
+        .options(selectinload(WebOrder.payouts))
+        .order_by(WebOrder.created_at.desc())
+    )
+
+    return list(db.scalars(statement).all())
+
+
 def get_worker_active_assignments(db: Session, worker_discord_id: str) -> list[OrderAssignment]:
     statement = (
         select(OrderAssignment)
@@ -115,14 +127,6 @@ def get_worker_active_order_ids(db: Session, worker_discord_id: str) -> set[int]
     }
 
 
-def get_active_assignments_for_order(order: WebOrder) -> list[OrderAssignment]:
-    return [
-        assignment
-        for assignment in order.assignments
-        if assignment.is_active
-    ]
-
-
 def create_sync_event(
     db: Session,
     *,
@@ -137,6 +141,20 @@ def create_sync_event(
             order_id=order_id,
             payload_json=json.dumps(payload, ensure_ascii=False),
         )
+    )
+
+
+def get_payout_override(
+    db: Session,
+    *,
+    order_id: int,
+    worker_discord_id: str,
+) -> WorkerPayoutOverride | None:
+    return db.scalar(
+        select(WorkerPayoutOverride)
+        .where(WorkerPayoutOverride.order_id == order_id)
+        .where(WorkerPayoutOverride.worker_discord_id == str(worker_discord_id))
+        .limit(1)
     )
 
 
@@ -172,6 +190,14 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         named_bonus_worker_ids=named_bonus_worker_ids,
     )
 
+    overrides = {
+        override.worker_discord_id: override
+        for override in db.scalars(
+            select(WorkerPayoutOverride)
+            .where(WorkerPayoutOverride.order_id == order_id)
+        ).all()
+    }
+
     db.execute(delete(WorkerPayout).where(WorkerPayout.order_id == order_id))
     db.execute(delete(CustomerServicePayout).where(CustomerServicePayout.order_id == order_id))
 
@@ -181,6 +207,16 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
     }
 
     for worker_payout in payout_result.worker_payouts:
+        override = overrides.get(worker_payout.worker_discord_id)
+        final_payout = worker_payout.final_payout
+        note = None
+
+        if override is not None:
+            final_payout = int(override.manual_final_payout or 0)
+            note = f"手動指定分潤：{final_payout}T"
+            if override.reason:
+                note += f"｜原因：{override.reason}"
+
         db.add(
             WorkerPayout(
                 order_id=order_id,
@@ -192,8 +228,9 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
                 named_bonus_rate=worker_payout.named_bonus_rate,
                 named_bonus_amount=worker_payout.named_bonus_amount,
                 has_named_bonus=worker_payout.has_named_bonus,
-                final_payout=worker_payout.final_payout,
+                final_payout=final_payout,
                 payout_status=PayoutStatus.UNPAID.value,
+                note=note,
             )
         )
 

@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from shared.db import create_all_tables
 from web.app.config import config
+from web.app.routers.admin import router as admin_router
 from web.app.routers.auth import router as auth_router
 from web.app.routers.dispatch import router as dispatch_router
 
@@ -28,6 +29,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(dispatch_router)
 
 
@@ -48,44 +50,6 @@ async def index(request: Request):
         context={
             "title": "魔丸打手系統",
             "user": get_current_user(request),
-        },
-    )
-
-
-@app.get("/admin")
-async def admin_dashboard(request: Request):
-    user = get_current_user(request)
-
-    if not user:
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "請先登入",
-                "message": "請先使用 Discord 登入。",
-                "user": None,
-            },
-            status_code=401,
-        )
-
-    if not user.get("is_admin"):
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "沒有權限",
-                "message": "你沒有總控後台權限。",
-                "user": user,
-            },
-            status_code=403,
-        )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin.html",
-        context={
-            "title": "總控後台",
-            "user": user,
         },
     )
 

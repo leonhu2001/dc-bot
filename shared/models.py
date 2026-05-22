@@ -151,6 +151,29 @@ class WorkerPayout(Base):
     order: Mapped["WebOrder"] = relationship(back_populates="payouts")
 
 
+class WorkerPayoutOverride(Base):
+    __tablename__ = "worker_payout_overrides"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+    worker_discord_id: Mapped[str] = mapped_column(String(32), index=True)
+    worker_display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    manual_final_payout: Mapped[int] = mapped_column(Integer, default=0)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_by_discord_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_by_display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+
 class CustomerServicePayout(Base):
     __tablename__ = "customer_service_payouts"
 

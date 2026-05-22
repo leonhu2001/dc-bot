@@ -27,7 +27,7 @@ body {
 }
 
 .card.wide {
-    max-width: 1120px;
+    max-width: 1180px;
 }
 
 .topbar {
@@ -93,6 +93,11 @@ h3 {
     font-size: 20px;
 }
 
+h4 {
+    margin: 0 0 12px;
+    font-size: 17px;
+}
+
 p {
     line-height: 1.7;
     color: #d1d5db;
@@ -131,7 +136,8 @@ form {
     margin-top: 18px;
 }
 
-.actions {
+.actions,
+.admin-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
@@ -173,6 +179,16 @@ form {
 
 .button.danger:hover {
     background: #991b1b;
+}
+
+.input {
+    width: 100%;
+    min-width: 180px;
+    border: 1px solid #4b5563;
+    border-radius: 10px;
+    background: #111827;
+    color: #f9fafb;
+    padding: 11px 12px;
 }
 
 .hint {
@@ -233,13 +249,15 @@ form {
     color: #fecaca;
 }
 
-.order-list {
+.order-list,
+.admin-order-list {
     display: grid;
     gap: 16px;
     margin-top: 18px;
 }
 
-.order-card {
+.order-card,
+.admin-order-card {
     border: 1px solid #374151;
     border-radius: 16px;
     padding: 18px;
@@ -324,6 +342,32 @@ form {
     font-weight: 800;
 }
 
+.payout-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.payout-preview div {
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(22, 163, 74, .12);
+    border: 1px solid rgba(134, 239, 172, .22);
+}
+
+.payout-preview span {
+    display: block;
+    color: #9ca3af;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.payout-preview strong {
+    color: #86efac;
+    font-size: 18px;
+}
+
 .order-footer {
     display: flex;
     justify-content: space-between;
@@ -341,9 +385,64 @@ form {
     border: 1px solid rgba(88, 101, 242, .25);
 }
 
+.admin-section {
+    margin-top: 18px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid #374151;
+    background: rgba(17, 24, 39, .72);
+}
+
+.admin-worker-list {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-worker-card {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid #4b5563;
+    background: #111827;
+}
+
+.worker-payout-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.worker-payout-line span,
+.worker-payout-line strong {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #1f2937;
+    border: 1px solid #374151;
+}
+
+.checkbox-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #d1d5db;
+    margin-bottom: 8px;
+}
+
+.inline-form,
+.admin-add-worker-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+}
+
 @media (max-width: 840px) {
     .grid,
-    .order-meta {
+    .order-meta,
+    .payout-preview,
+    .inline-form,
+    .admin-add-worker-form {
         grid-template-columns: 1fr;
     }
 
