@@ -109,3 +109,46 @@ def upsert_web_order_from_dispatch(
         raise
     finally:
         db.close()
+
+
+def update_web_order_status_by_ticket_channel(
+    *,
+    ticket_channel_id,
+    status: str,
+    dispatch_message_id=None,
+    note: str | None = None,
+) -> bool:
+    """Update dashboard order status from Discord bot lifecycle actions."""
+    ticket_channel_id_text = _to_text_id(ticket_channel_id)
+
+    if ticket_channel_id_text is None:
+        raise ValueError("ticket_channel_id is required")
+
+    db = SessionLocal()
+
+    try:
+        order = db.scalar(
+            select(WebOrder)
+            .where(WebOrder.ticket_channel_id == ticket_channel_id_text)
+            .limit(1)
+        )
+
+        if order is None:
+            return False
+
+        order.status = str(status or "active")
+
+        dispatch_message_id_text = _to_text_id(dispatch_message_id)
+        if dispatch_message_id_text:
+            order.dispatch_message_id = dispatch_message_id_text
+
+        if note:
+            order.note = note
+
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()

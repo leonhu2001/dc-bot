@@ -148,7 +148,10 @@ from services.orders import (
     build_stored_order_detail_embed,
 )
 
-from shared.web_order_sync import upsert_web_order_from_dispatch
+from shared.web_order_sync import (
+    update_web_order_status_by_ticket_channel,
+    upsert_web_order_from_dispatch,
+)
 from shared.web_sync_events import (
     fetch_pending_web_sync_events,
     get_web_order_sync_payload,
@@ -1229,6 +1232,30 @@ def sync_dispatch_to_web_dashboard(
         )
     except Exception as e:
         print(f"同步派單到網站資料庫失敗：{e}")
+
+
+
+
+def sync_order_status_to_web_dashboard(
+    *,
+    order_channel: discord.TextChannel | None,
+    status: str,
+    note: str | None = None,
+    dispatch_message_id: int | None = None,
+) -> None:
+    """把 DC bot 的存單 / 結單 / 取消狀態同步到網站資料庫。"""
+    if order_channel is None:
+        return
+
+    try:
+        update_web_order_status_by_ticket_channel(
+            ticket_channel_id=order_channel.id,
+            status=status,
+            dispatch_message_id=dispatch_message_id,
+            note=note,
+        )
+    except Exception as e:
+        print(f"同步訂單狀態到網站資料庫失敗：{e}")
 
 
 def cleanup_old_closed_orders() -> None:
@@ -2394,6 +2421,12 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             data["dispatch_message_id"] = newest_existing_message_id
         remember_order_data(order_channel_id, data)
         save_bot_data()
+        sync_order_status_to_web_dashboard(
+            order_channel=source_channel,
+            status="closed",
+            note="由 DC bot 結單同步。",
+            dispatch_message_id=data.get("dispatch_message_id"),
+        )
 
 async def store_dispatch_claim_panel(
     guild: discord.Guild,
@@ -2531,6 +2564,12 @@ async def store_dispatch_claim_panel(
             roles=False,
             everyone=False
         )
+    )
+    sync_order_status_to_web_dashboard(
+        order_channel=order_channel,
+        status="stored",
+        note=f"由 DC bot 存單同步。存單原因：{reason}",
+        dispatch_message_id=dispatch_message_id,
     )
 
 
@@ -2689,6 +2728,19 @@ async def resume_stored_order(
     remember_order_data(order_channel.id, data)
     remember_claim_data(new_message.id, claim_data)
     save_bot_data()
+
+    sync_dispatch_to_web_dashboard(
+        guild=guild,
+        source_channel=order_channel,
+        dispatch_channel_id=dispatch_channel.id,
+        dispatch_message_id=new_message.id,
+        data=data,
+        category_label=str(category_label),
+        item=str(item),
+        quantity=quantity,
+        payment_method=str(payment_method),
+        status="active",
+    )
 
 
 class StoreOrderModal(discord.ui.Modal, title="存單"):
@@ -4980,6 +5032,13 @@ class StoredOrderCancelConfirmView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
 
         await delete_dispatch_claim_panel_for_order(interaction.guild, self.order_channel_id)
+
+        if isinstance(channel, discord.TextChannel):
+            sync_order_status_to_web_dashboard(
+                order_channel=channel,
+                status="cancelled",
+                note="由 DC bot 取消存單同步。",
+            )
 
         if isinstance(channel, discord.TextChannel):
             try:
