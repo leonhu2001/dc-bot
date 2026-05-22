@@ -1,0 +1,180 @@
+{% extends "layout.html" %}
+
+{% block page_title %}我的分潤{% endblock %}
+
+{% block content %}
+    <div class="grid">
+        <div class="panel">
+            <h2>未發放分潤</h2>
+            <p class="big-number">{{ summary.unpaid_total }}T</p>
+            <p>包含打手分潤與客服分潤。</p>
+        </div>
+
+        <div class="panel">
+            <h2>已發放分潤</h2>
+            <p class="big-number">{{ summary.paid_total }}T</p>
+            <p>已由總控標記為已發放。</p>
+        </div>
+
+        <div class="panel">
+            <h2>累計分潤</h2>
+            <p class="big-number">{{ summary.all_total }}T</p>
+            <p>目前網站資料庫內的全部紀錄。</p>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="panel">
+            <h2>打手未發放</h2>
+            <p class="big-number">{{ summary.worker_unpaid_total }}T</p>
+            <p>共 {{ summary.worker_count }} 筆打手分潤紀錄。</p>
+        </div>
+
+        <div class="panel">
+            <h2>客服未發放</h2>
+            <p class="big-number">{{ summary.customer_service_unpaid_total }}T</p>
+            <p>共 {{ summary.customer_service_count }} 筆客服分潤紀錄。</p>
+        </div>
+
+        <div class="panel">
+            <h2>身份</h2>
+            <p>
+                {% if user.is_admin %}
+                    總控 / 客服
+                {% endif %}
+
+                {% if user.is_worker %}
+                    打手
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>打手分潤明細</h2>
+
+        {% if worker_rows %}
+            <div class="admin-order-list">
+                {% for payout, order in worker_rows %}
+                    <article class="admin-order-card">
+                        <div class="order-card-header">
+                            <div>
+                                <p class="order-no">
+                                    {% if order %}
+                                        {{ order.bot_order_no or ("WEB-" ~ order.id) }}
+                                    {% else %}
+                                        訂單 #{{ payout.order_id }}
+                                    {% endif %}
+                                </p>
+
+                                <h3>
+                                    {% if order %}
+                                        {{ order.category }}｜{{ order.item }}
+                                    {% else %}
+                                        找不到訂單資料
+                                    {% endif %}
+                                </h3>
+                            </div>
+
+                            <span class="badge">{{ payout.payout_status }}</span>
+                        </div>
+
+                        <div class="order-meta">
+                            <div>
+                                <span>分攤金額</span>
+                                <strong>{{ payout.gross_share }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>基本分潤</span>
+                                <strong>{{ payout.base_payout }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>掛名加成</span>
+                                <strong>{{ payout.named_bonus_amount }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>最後實拿</span>
+                                <strong>{{ payout.final_payout }}T</strong>
+                            </div>
+                        </div>
+
+                        {% if payout.note %}
+                            <p class="order-note">{{ payout.note }}</p>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                目前沒有打手分潤紀錄。
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h2>客服分潤明細</h2>
+
+        {% if customer_service_rows %}
+            <div class="admin-order-list">
+                {% for payout, order in customer_service_rows %}
+                    <article class="admin-order-card">
+                        <div class="order-card-header">
+                            <div>
+                                <p class="order-no">
+                                    {% if order %}
+                                        {{ order.bot_order_no or ("WEB-" ~ order.id) }}
+                                    {% else %}
+                                        訂單 #{{ payout.order_id }}
+                                    {% endif %}
+                                </p>
+
+                                <h3>
+                                    {% if order %}
+                                        {{ order.category }}｜{{ order.item }}
+                                    {% else %}
+                                        找不到訂單資料
+                                    {% endif %}
+                                </h3>
+                            </div>
+
+                            <span class="badge">{{ payout.payout_status }}</span>
+                        </div>
+
+                        <div class="order-meta">
+                            <div>
+                                <span>客服</span>
+                                <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
+                            </div>
+
+                            <div>
+                                <span>比例</span>
+                                <strong>{{ (payout.rate * 100) | int }}%</strong>
+                            </div>
+
+                            <div>
+                                <span>分潤</span>
+                                <strong>{{ payout.payout_amount }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>狀態</span>
+                                <strong>{{ payout.payout_status }}</strong>
+                            </div>
+                        </div>
+
+                        {% if payout.note %}
+                            <p class="order-note">{{ payout.note }}</p>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                目前沒有客服分潤紀錄。
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

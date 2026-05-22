@@ -10,6 +10,7 @@ from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.auth import router as auth_router
 from web.app.routers.dispatch import router as dispatch_router
+from web.app.routers.payouts import router as payouts_router
 
 APP_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -31,6 +32,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(dispatch_router)
+app.include_router(payouts_router)
 
 
 @app.on_event("startup")
@@ -50,44 +52,6 @@ async def index(request: Request):
         context={
             "title": "魔丸打手系統",
             "user": get_current_user(request),
-        },
-    )
-
-
-@app.get("/my/payouts")
-async def my_payouts(request: Request):
-    user = get_current_user(request)
-
-    if not user:
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "請先登入",
-                "message": "請先使用 Discord 登入。",
-                "user": None,
-            },
-            status_code=401,
-        )
-
-    if not user.get("is_worker") and not user.get("is_admin"):
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "沒有權限",
-                "message": "你沒有查看分潤頁面的權限。",
-                "user": user,
-            },
-            status_code=403,
-        )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="my_payouts.html",
-        context={
-            "title": "我的分潤",
-            "user": user,
         },
     )
 
