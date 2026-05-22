@@ -641,3 +641,17 @@ p {
     font-size: 13px;
 }
 
+/* Compact navigation polish */
+.topbar { align-items: center; }
+.nav { max-width: 720px; }
+.nav-link { padding: 8px 11px; font-size: 13px; line-height: 1.2; }
+.card.wide { max-width: 1280px; }
+.panel { padding: 14px; margin-bottom: 12px; }
+.order-card, .admin-order-card { padding: 14px; }
+.admin-section { padding: 12px; margin-top: 12px; }
+.order-meta { gap: 8px; margin-bottom: 12px; }
+.order-meta div { padding: 9px; }
+.admin-actions { gap: 8px; }
+.button { padding: 9px 12px; border-radius: 10px; font-size: 13px; }
+.input { padding: 9px 10px; }
+
