@@ -1,18 +1,18 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
-</head>
-<body>
-    <main class="page">
-        <section class="card">
-            <h1>{{ title }}</h1>
-            <p>{{ message }}</p>
+{% extends "layout.html" %}
 
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <h2>{{ title }}</h2>
+        <p>{{ message }}</p>
+
+        <div class="actions">
             <a class="button" href="/">回登入頁</a>
-        </section>
-    </main>
-</body>
-</html>
+
+            {% if user %}
+                <a class="button secondary" href="/auth/logout">登出</a>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

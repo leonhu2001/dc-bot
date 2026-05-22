@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <main class="page">
+        <section class="card wide">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">MW Dashboard</p>
+                    <h1>{% block page_title %}{{ title }}{% endblock %}</h1>
+
+                    {% if user %}
+                        <p class="muted">
+                            歡迎，{{ user.global_name or user.username }}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <nav class="nav">
+                    {% if user %}
+                        {% if user.is_admin %}
+                            <a class="nav-link" href="/admin">總控後台</a>
+                        {% endif %}
+
+                        {% if user.is_worker or user.is_admin %}
+                            <a class="nav-link" href="/dispatch">派單頁面</a>
+                            <a class="nav-link" href="/my/payouts">我的分潤</a>
+                        {% endif %}
+
+                        <a class="nav-link danger" href="/auth/logout">登出</a>
+                    {% else %}
+                        <a class="nav-link" href="/">登入</a>
+                    {% endif %}
+                </nav>
+            </header>
+
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+</body>
+</html>

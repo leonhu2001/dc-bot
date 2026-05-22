@@ -8,16 +8,36 @@
 <body>
     <main class="page">
         <section class="card">
+            <p class="eyebrow">MW Dashboard</p>
             <h1>魔丸打手系統</h1>
-            <p>使用 Discord 登入後，可依身分組進入總控或派單頁面。</p>
+            <p>使用 Discord 登入後，可依身分組進入總控、派單頁面與分潤查詢。</p>
 
-            <a class="button" href="/auth/discord/login">
-                Discord 登入
-            </a>
+            {% if user %}
+                <div class="panel compact">
+                    <h2>已登入</h2>
+                    <p>目前登入：{{ user.global_name or user.username }}</p>
 
-            <p class="hint">
-                Discord OAuth 下一步接上。
-            </p>
+                    <div class="actions">
+                        {% if user.is_admin %}
+                            <a class="button" href="/admin">進入總控後台</a>
+                        {% endif %}
+
+                        {% if user.is_worker or user.is_admin %}
+                            <a class="button secondary" href="/dispatch">進入派單頁面</a>
+                        {% endif %}
+
+                        <a class="button danger" href="/auth/logout">登出</a>
+                    </div>
+                </div>
+            {% else %}
+                <a class="button" href="/auth/discord/login">
+                    Discord 登入
+                </a>
+
+                <p class="hint">
+                    登入後會自動檢查你的 Discord 身分組。
+                </p>
+            {% endif %}
         </section>
     </main>
 </body>

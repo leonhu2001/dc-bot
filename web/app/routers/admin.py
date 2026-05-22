@@ -18,6 +18,13 @@ from web.app.services.admin_service import (
     toggle_named_bonus_for_assignment,
 )
 from web.app.services.order_service import create_demo_orders_if_empty, list_admin_orders
+from web.app.services.staff_service import (
+    get_staff_display_name,
+    get_staff_member_by_id,
+    list_customer_service_members,
+    list_worker_members,
+    sync_staff_members_from_discord,
+)
 
 router = APIRouter(tags=["admin"])
 
@@ -94,6 +101,8 @@ async def admin_dashboard(
     try:
         create_demo_orders_if_empty(db)
         orders = list_admin_orders(db)
+        customer_service_members = list_customer_service_members(db)
+        worker_members = list_worker_members(db)
 
         customer_service_payout_rows = list(
             db.scalars(
@@ -115,6 +124,8 @@ async def admin_dashboard(
             "title": "總控後台",
             "user": user,
             "orders": orders,
+            "customer_service_members": customer_service_members,
+            "worker_members": worker_members,
             "customer_service_payouts_by_order": customer_service_payouts_by_order,
             "paid_status": PayoutStatus.PAID.value,
             "unpaid_status": PayoutStatus.UNPAID.value,
@@ -124,12 +135,33 @@ async def admin_dashboard(
     )
 
 
+@router.post("/admin/staff/sync")
+async def admin_sync_staff(request: Request):
+    user = require_admin_user(request)
+
+    if not user:
+        return redirect_to_admin(error="你沒有總控後台權限，或登入狀態已過期。")
+
+    db = SessionLocal()
+
+    try:
+        result = sync_staff_members_from_discord(db)
+    except Exception as e:
+        db.rollback()
+        return redirect_to_admin(error=f"同步成員失敗：{e}")
+    finally:
+        db.close()
+
+    return redirect_to_admin(
+        message=f"成員同步完成：掃描 {result['total_seen']} 人，寫入 {result['synced_count']} 人。"
+    )
+
+
 @router.post("/admin/orders/{order_id}/customer-service")
 async def admin_set_customer_service(
     request: Request,
     order_id: int,
     customer_service_discord_id: str = Form(...),
-    customer_service_display_name: str = Form(...),
     reason: str | None = Form(default=None),
 ):
     user = require_admin_user(request)
@@ -140,6 +172,13 @@ async def admin_set_customer_service(
     db = SessionLocal()
 
     try:
+        staff_member = get_staff_member_by_id(db, discord_id=customer_service_discord_id)
+        customer_service_display_name = (
+            get_staff_display_name(staff_member)
+            if staff_member is not None
+            else customer_service_discord_id
+        )
+
         set_customer_service_for_order(
             db,
             order_id=order_id,
@@ -220,7 +259,6 @@ async def admin_add_worker(
     request: Request,
     order_id: int,
     worker_discord_id: str = Form(...),
-    worker_display_name: str = Form(...),
     reason: str | None = Form(default=None),
 ):
     user = require_admin_user(request)
@@ -231,6 +269,13 @@ async def admin_add_worker(
     db = SessionLocal()
 
     try:
+        staff_member = get_staff_member_by_id(db, discord_id=worker_discord_id)
+        worker_display_name = (
+            get_staff_display_name(staff_member)
+            if staff_member is not None
+            else worker_discord_id
+        )
+
         add_worker_to_order(
             db,
             order_id=order_id,

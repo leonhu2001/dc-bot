@@ -15,6 +15,21 @@
         </div>
     {% endif %}
 
+    <div class="panel">
+        <h2>成員同步</h2>
+        <p>使用 DC bot 讀取伺服器成員，更新客服、打手、陪玩下拉選單。</p>
+
+        <form method="post" action="/admin/staff/sync">
+            <button class="button" type="submit">
+                立即同步 Discord 成員
+            </button>
+        </form>
+
+        <p class="muted-text">
+            目前客服選單 {{ customer_service_members | length }} 人，打手/陪玩選單 {{ worker_members | length }} 人。
+        </p>
+    </div>
+
     <div class="grid">
         <div class="panel">
             <h2>訂單數量</h2>
@@ -82,45 +97,38 @@
 
                         <div class="admin-section">
                             <h4>指定對接客服</h4>
-                            <p class="muted-text">
-                                這張單的客服 5% 會發給這裡指定的客服。
-                            </p>
+                            <p class="muted-text">這張單的客服 5% 會發給這裡指定的客服。</p>
 
-                            <form method="post" action="/admin/orders/{{ order.id }}/customer-service" class="admin-add-worker-form">
-                                <input
-                                    class="input"
-                                    type="text"
-                                    name="customer_service_discord_id"
-                                    placeholder="客服 Discord ID"
-                                    value="{{ order.customer_service_discord_id or '' }}"
-                                    required
-                                >
+                            {% if customer_service_members %}
+                                <form method="post" action="/admin/orders/{{ order.id }}/customer-service" class="admin-add-worker-form">
+                                    <select class="input" name="customer_service_discord_id" required>
+                                        <option value="">選擇客服</option>
+                                        {% for staff in customer_service_members %}
+                                            <option
+                                                value="{{ staff.discord_id }}"
+                                                {% if order.customer_service_discord_id == staff.discord_id %}selected{% endif %}
+                                            >
+                                                {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
 
-                                <input
-                                    class="input"
-                                    type="text"
-                                    name="customer_service_display_name"
-                                    placeholder="客服顯示名稱"
-                                    value="{{ order.customer_service_display_name or '' }}"
-                                    required
-                                >
+                                    <input
+                                        class="input"
+                                        type="text"
+                                        name="reason"
+                                        placeholder="原因，例如更換對接客服"
+                                    >
 
-                                <input
-                                    class="input"
-                                    type="text"
-                                    name="reason"
-                                    placeholder="原因，例如更換對接客服"
-                                >
-
-                                <button class="button" type="submit">
-                                    更新客服
-                                </button>
-                            </form>
+                                    <button class="button" type="submit">更新客服</button>
+                                </form>
+                            {% else %}
+                                <div class="empty-state">尚未同步客服名單，請先按上方「立即同步 Discord 成員」。</div>
+                            {% endif %}
                         </div>
 
                         <div class="admin-section">
                             <h4>客服分潤</h4>
-
                             {% set service_payouts = customer_service_payouts_by_order.get(order.id, []) %}
 
                             {% if service_payouts %}
@@ -129,9 +137,7 @@
                                         <div class="admin-worker-card">
                                             <div>
                                                 <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
-                                                <p class="muted-text">
-                                                    ID：{{ payout.customer_service_discord_id }}
-                                                </p>
+                                                <p class="muted-text">ID：{{ payout.customer_service_discord_id }}</p>
                                             </div>
 
                                             <div class="worker-payout-line">
@@ -144,16 +150,12 @@
                                                 {% if payout.payout_status == paid_status %}
                                                     <form method="post" action="/admin/customer-service-payouts/{{ payout.id }}/status">
                                                         <input type="hidden" name="status" value="{{ unpaid_status }}">
-                                                        <button class="button secondary" type="submit">
-                                                            改回未發放
-                                                        </button>
+                                                        <button class="button secondary" type="submit">改回未發放</button>
                                                     </form>
                                                 {% else %}
                                                     <form method="post" action="/admin/customer-service-payouts/{{ payout.id }}/status">
                                                         <input type="hidden" name="status" value="{{ paid_status }}">
-                                                        <button class="button" type="submit">
-                                                            標記已發放
-                                                        </button>
+                                                        <button class="button" type="submit">標記已發放</button>
                                                     </form>
                                                 {% endif %}
                                             </div>
@@ -181,9 +183,7 @@
                                         <div class="admin-worker-card">
                                             <div>
                                                 <strong>{{ assignment.worker_display_name or assignment.worker_discord_id }}</strong>
-                                                <p class="muted-text">
-                                                    ID：{{ assignment.worker_discord_id }}
-                                                </p>
+                                                <p class="muted-text">ID：{{ assignment.worker_discord_id }}</p>
                                             </div>
 
                                             <div class="worker-payout-line">
@@ -212,9 +212,7 @@
                                                         掛名 +5%
                                                     </label>
 
-                                                    <button class="button secondary" type="submit">
-                                                        更新掛名
-                                                    </button>
+                                                    <button class="button secondary" type="submit">更新掛名</button>
                                                 </form>
 
                                                 <form method="post" action="/admin/orders/{{ order.id }}/manual-payout" class="inline-form">
@@ -237,25 +235,19 @@
                                                         placeholder="原因，例如中途換打手"
                                                     >
 
-                                                    <button class="button secondary" type="submit">
-                                                        手動改分潤
-                                                    </button>
+                                                    <button class="button secondary" type="submit">手動改分潤</button>
                                                 </form>
 
                                                 {% if payout_for_worker %}
                                                     {% if payout_for_worker.payout_status == paid_status %}
                                                         <form method="post" action="/admin/worker-payouts/{{ payout_for_worker.id }}/status">
                                                             <input type="hidden" name="status" value="{{ unpaid_status }}">
-                                                            <button class="button secondary" type="submit">
-                                                                改回未發放
-                                                            </button>
+                                                            <button class="button secondary" type="submit">改回未發放</button>
                                                         </form>
                                                     {% else %}
                                                         <form method="post" action="/admin/worker-payouts/{{ payout_for_worker.id }}/status">
                                                             <input type="hidden" name="status" value="{{ paid_status }}">
-                                                            <button class="button" type="submit">
-                                                                標記已發放
-                                                            </button>
+                                                            <button class="button" type="submit">標記已發放</button>
                                                         </form>
                                                     {% endif %}
                                                 {% endif %}
@@ -268,9 +260,7 @@
                                                         placeholder="移除原因，例如中途換人"
                                                     >
 
-                                                    <button class="button danger" type="submit">
-                                                        移除此打手
-                                                    </button>
+                                                    <button class="button danger" type="submit">移除此打手</button>
                                                 </form>
                                             </div>
                                         </div>
@@ -284,34 +274,31 @@
                         <div class="admin-section">
                             <h4>新增 / 更換打手</h4>
 
-                            <form method="post" action="/admin/orders/{{ order.id }}/add-worker" class="admin-add-worker-form">
-                                <input
-                                    class="input"
-                                    type="text"
-                                    name="worker_discord_id"
-                                    placeholder="打手 Discord ID"
-                                    required
-                                >
+                            {% if worker_members %}
+                                <form method="post" action="/admin/orders/{{ order.id }}/add-worker" class="admin-add-worker-form">
+                                    <select class="input" name="worker_discord_id" required>
+                                        <option value="">選擇打手 / 陪玩</option>
+                                        {% for staff in worker_members %}
+                                            <option value="{{ staff.discord_id }}">
+                                                {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
+                                                {% if staff.is_companion %}｜陪玩{% endif %}
+                                                {% if staff.is_worker and not staff.is_companion %}｜打手{% endif %}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
 
-                                <input
-                                    class="input"
-                                    type="text"
-                                    name="worker_display_name"
-                                    placeholder="打手顯示名稱"
-                                    required
-                                >
+                                    <input
+                                        class="input"
+                                        type="text"
+                                        name="reason"
+                                        placeholder="原因，例如中途換打手"
+                                    >
 
-                                <input
-                                    class="input"
-                                    type="text"
-                                    name="reason"
-                                    placeholder="原因，例如中途換打手"
-                                >
-
-                                <button class="button" type="submit">
-                                    新增打手
-                                </button>
-                            </form>
+                                    <button class="button" type="submit">新增打手</button>
+                                </form>
+                            {% else %}
+                                <div class="empty-state">尚未同步打手 / 陪玩名單，請先按上方「立即同步 Discord 成員」。</div>
+                            {% endif %}
                         </div>
 
                         {% if order.note %}
@@ -321,9 +308,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">
-                目前沒有訂單。
-            </div>
+            <div class="empty-state">目前沒有訂單。</div>
         {% endif %}
     </div>
 {% endblock %}

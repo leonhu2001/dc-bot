@@ -35,5 +35,6 @@ def get_db_session() -> Generator[Session, None, None]:
 
 def create_all_tables() -> None:
     import shared.models  # noqa: F401
+    import shared.staff_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

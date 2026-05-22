@@ -50,6 +50,13 @@
 
                     {% set user_claimed_this_order = order.id in claimed_order_ids %}
 
+                    {% set my_payout = none %}
+                    {% for payout in order.payouts %}
+                        {% if payout.worker_discord_id == user.id %}
+                            {% set my_payout = payout %}
+                        {% endif %}
+                    {% endfor %}
+
                     <article class="order-card">
                         <div class="order-card-header">
                             <div>
@@ -94,6 +101,9 @@
                                     {% for assignment in active_assignments %}
                                         <span class="chip">
                                             {{ assignment.worker_display_name or assignment.worker_discord_id }}
+                                            {% if assignment.has_named_bonus %}
+                                                +掛名
+                                            {% endif %}
                                         </span>
                                     {% endfor %}
                                 </div>
@@ -101,6 +111,29 @@
                                 <p class="muted-text">尚未有人接單</p>
                             {% endif %}
                         </div>
+
+                        {% if user_claimed_this_order %}
+                            {% for payout in order.payouts %}
+                                {% if payout.worker_discord_id == user.id %}
+                                    <div class="payout-preview">
+                                        <div>
+                                            <span>你的基本分潤</span>
+                                            <strong>{{ payout.base_payout }}T</strong>
+                                        </div>
+
+                                        <div>
+                                            <span>掛名加成</span>
+                                            <strong>{{ payout.named_bonus_amount }}T</strong>
+                                        </div>
+
+                                        <div>
+                                            <span>你的預估可得</span>
+                                            <strong>{{ payout.final_payout }}T</strong>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
 
                         <div class="order-footer">
                             <div>
