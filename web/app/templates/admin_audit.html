@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+
+{% block page_title %}操作紀錄{% endblock %}
+
+{% block content %}
+    <div class="panel compact-panel">
+        <h2>操作紀錄</h2>
+        <p class="muted-text">最近 300 筆後台操作。可用來查誰改了分潤、誰換了打手、誰改了客服。</p>
+
+        <form method="get" action="/admin/audit" class="admin-add-worker-form">
+            <select class="input" name="action">
+                <option value="">全部操作</option>
+                {% for action in actions %}
+                    <option value="{{ action }}" {% if selected_action == action %}selected{% endif %}>
+                        {{ action }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <input
+                class="input"
+                type="text"
+                name="admin_id"
+                value="{{ admin_id }}"
+                placeholder="管理員 Discord ID"
+            >
+
+            <button class="button" type="submit">篩選</button>
+            <a class="button secondary" href="/admin/audit">清除</a>
+        </form>
+    </div>
+
+    <div class="panel compact-panel">
+        <h2>紀錄列表</h2>
+
+        {% if logs %}
+            <div class="admin-order-list compact-list">
+                {% for log in logs %}
+                    <article class="admin-order-card compact-order-card">
+                        <div class="order-card-header">
+                            <div>
+                                <p class="order-no">#{{ log.id }}｜{{ log.created_at }}</p>
+                                <h3>{{ log.action }}</h3>
+                            </div>
+                            <span class="badge">{{ log.target_type }}</span>
+                        </div>
+
+                        <div class="order-meta compact-meta">
+                            <div>
+                                <span>管理員</span>
+                                <strong>{{ log.admin_discord_id }}</strong>
+                            </div>
+
+                            <div>
+                                <span>目標</span>
+                                <strong>{{ log.target_id or "-" }}</strong>
+                            </div>
+
+                            <div>
+                                <span>操作</span>
+                                <strong>{{ log.action }}</strong>
+                            </div>
+
+                            <div>
+                                <span>時間</span>
+                                <strong>{{ log.created_at }}</strong>
+                            </div>
+                        </div>
+
+                        {% if log.before_json or log.after_json %}
+                            <details class="audit-details">
+                                <summary>查看修改前後資料</summary>
+
+                                <div class="audit-json-grid">
+                                    <div>
+                                        <h4>修改前</h4>
+                                        <pre>{{ parse_json_text(log.before_json) }}</pre>
+                                    </div>
+                                    <div>
+                                        <h4>修改後</h4>
+                                        <pre>{{ parse_json_text(log.after_json) }}</pre>
+                                    </div>
+                                </div>
+                            </details>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">目前沒有操作紀錄。</div>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -655,3 +655,44 @@ p {
 .button { padding: 9px 12px; border-radius: 10px; font-size: 13px; }
 .input { padding: 9px 10px; }
 
+
+
+/* Admin audit log page */
+.audit-details {
+    margin-top: 12px;
+    border-top: 1px solid #374151;
+    padding-top: 12px;
+}
+
+.audit-details summary {
+    cursor: pointer;
+    color: #93c5fd;
+    font-weight: 800;
+}
+
+.audit-json-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.audit-json-grid pre {
+    margin: 0;
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 12px;
+    border-radius: 12px;
+    background: #020617;
+    border: 1px solid #374151;
+    color: #d1d5db;
+    font-size: 12px;
+}
+
+@media (max-width: 840px) {
+    .audit-json-grid {
+        grid-template-columns: 1fr;
+    }
+}
