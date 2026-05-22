@@ -6,9 +6,12 @@ from sqlalchemy.orm import Session
 
 from shared.models import (
     AdminAuditLog,
+    CustomerServicePayout,
     OrderAssignment,
+    PayoutStatus,
     SyncEventType,
     WebOrder,
+    WorkerPayout,
     WorkerPayoutOverride,
 )
 from web.app.services.order_service import create_sync_event, recalculate_order_payouts
@@ -372,6 +375,92 @@ def set_manual_worker_payout(
             "worker_discord_id": str(worker_discord_id),
             "manual_final_payout": int(manual_final_payout),
             "reason": reason or "",
+        },
+    )
+
+    db.commit()
+
+
+def set_worker_payout_status(
+    db: Session,
+    *,
+    payout_id: int,
+    status: str,
+    admin_user: dict,
+) -> None:
+    payout = db.get(WorkerPayout, payout_id)
+
+    if payout is None:
+        raise ValueError("找不到這筆打手分潤。")
+
+    if status not in {PayoutStatus.UNPAID.value, PayoutStatus.PAID.value}:
+        raise ValueError("分潤狀態不正確。")
+
+    before = {
+        "payout_id": payout.id,
+        "order_id": payout.order_id,
+        "worker_discord_id": payout.worker_discord_id,
+        "payout_status": payout.payout_status,
+        "paid_at": payout.paid_at.isoformat() if payout.paid_at else None,
+    }
+
+    payout.payout_status = status
+    payout.paid_at = datetime.utcnow() if status == PayoutStatus.PAID.value else None
+
+    write_admin_audit_log(
+        db,
+        admin_user=admin_user,
+        action="set_worker_payout_status",
+        target_type="worker_payout",
+        target_id=str(payout.id),
+        before=before,
+        after={
+            **before,
+            "payout_status": payout.payout_status,
+            "paid_at": payout.paid_at.isoformat() if payout.paid_at else None,
+        },
+    )
+
+    db.commit()
+
+
+def set_customer_service_payout_status(
+    db: Session,
+    *,
+    payout_id: int,
+    status: str,
+    admin_user: dict,
+) -> None:
+    payout = db.get(CustomerServicePayout, payout_id)
+
+    if payout is None:
+        raise ValueError("找不到這筆客服分潤。")
+
+    if status not in {PayoutStatus.UNPAID.value, PayoutStatus.PAID.value}:
+        raise ValueError("分潤狀態不正確。")
+
+    before = {
+        "payout_id": payout.id,
+        "order_id": payout.order_id,
+        "customer_service_discord_id": payout.customer_service_discord_id,
+        "payout_status": payout.payout_status,
+        "paid_at": payout.paid_at.isoformat() if payout.paid_at else None,
+    }
+
+    payout.payout_status = status
+    payout.paid_at = datetime.utcnow() if status == PayoutStatus.PAID.value else None
+
+    write_admin_audit_log(
+        db,
+        admin_user=admin_user,
+        action="set_customer_service_payout_status",
+        target_type="customer_service_payout",
+        target_id=str(payout.id),
+        before=before,
+        after={
+            **before,
+            "payout_status": payout.payout_status,
+            "paid_at": payout.paid_at.isoformat() if payout.paid_at else None,
         },
     )
 

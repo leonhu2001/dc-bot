@@ -4,13 +4,17 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 
 from shared.db import SessionLocal
+from shared.models import CustomerServicePayout, PayoutStatus
 from web.app.services.admin_service import (
     add_worker_to_order,
     remove_worker_from_order,
     set_customer_service_for_order,
+    set_customer_service_payout_status,
     set_manual_worker_payout,
+    set_worker_payout_status,
     toggle_named_bonus_for_assignment,
 )
 from web.app.services.order_service import create_demo_orders_if_empty, list_admin_orders
@@ -90,6 +94,17 @@ async def admin_dashboard(
     try:
         create_demo_orders_if_empty(db)
         orders = list_admin_orders(db)
+
+        customer_service_payout_rows = list(
+            db.scalars(
+                select(CustomerServicePayout).order_by(CustomerServicePayout.id.asc())
+            ).all()
+        )
+
+        customer_service_payouts_by_order: dict[int, list[CustomerServicePayout]] = {}
+
+        for payout in customer_service_payout_rows:
+            customer_service_payouts_by_order.setdefault(payout.order_id, []).append(payout)
     finally:
         db.close()
 
@@ -100,6 +115,9 @@ async def admin_dashboard(
             "title": "總控後台",
             "user": user,
             "orders": orders,
+            "customer_service_payouts_by_order": customer_service_payouts_by_order,
+            "paid_status": PayoutStatus.PAID.value,
+            "unpaid_status": PayoutStatus.UNPAID.value,
             "message": message,
             "error": error,
         },
@@ -263,3 +281,61 @@ async def admin_manual_payout(
         db.close()
 
     return redirect_to_admin(message="已手動更新打手分潤金額。")
+
+
+@router.post("/admin/worker-payouts/{payout_id}/status")
+async def admin_set_worker_payout_status(
+    request: Request,
+    payout_id: int,
+    status: str = Form(...),
+):
+    user = require_admin_user(request)
+
+    if not user:
+        return redirect_to_admin(error="你沒有總控後台權限，或登入狀態已過期。")
+
+    db = SessionLocal()
+
+    try:
+        set_worker_payout_status(
+            db,
+            payout_id=payout_id,
+            status=status,
+            admin_user=user,
+        )
+    except ValueError as e:
+        db.rollback()
+        return redirect_to_admin(error=str(e))
+    finally:
+        db.close()
+
+    return redirect_to_admin(message="打手分潤狀態已更新。")
+
+
+@router.post("/admin/customer-service-payouts/{payout_id}/status")
+async def admin_set_customer_service_payout_status(
+    request: Request,
+    payout_id: int,
+    status: str = Form(...),
+):
+    user = require_admin_user(request)
+
+    if not user:
+        return redirect_to_admin(error="你沒有總控後台權限，或登入狀態已過期。")
+
+    db = SessionLocal()
+
+    try:
+        set_customer_service_payout_status(
+            db,
+            payout_id=payout_id,
+            status=status,
+            admin_user=user,
+        )
+    except ValueError as e:
+        db.rollback()
+        return redirect_to_admin(error=str(e))
+    finally:
+        db.close()
+
+    return redirect_to_admin(message="客服分潤狀態已更新。")

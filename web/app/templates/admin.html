@@ -119,6 +119,53 @@
                         </div>
 
                         <div class="admin-section">
+                            <h4>客服分潤</h4>
+
+                            {% set service_payouts = customer_service_payouts_by_order.get(order.id, []) %}
+
+                            {% if service_payouts %}
+                                <div class="admin-worker-list">
+                                    {% for payout in service_payouts %}
+                                        <div class="admin-worker-card">
+                                            <div>
+                                                <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
+                                                <p class="muted-text">
+                                                    ID：{{ payout.customer_service_discord_id }}
+                                                </p>
+                                            </div>
+
+                                            <div class="worker-payout-line">
+                                                <span>比例 {{ (payout.rate * 100) | int }}%</span>
+                                                <strong>分潤 {{ payout.payout_amount }}T</strong>
+                                                <span>狀態 {{ payout.payout_status }}</span>
+                                            </div>
+
+                                            <div class="admin-actions">
+                                                {% if payout.payout_status == paid_status %}
+                                                    <form method="post" action="/admin/customer-service-payouts/{{ payout.id }}/status">
+                                                        <input type="hidden" name="status" value="{{ unpaid_status }}">
+                                                        <button class="button secondary" type="submit">
+                                                            改回未發放
+                                                        </button>
+                                                    </form>
+                                                {% else %}
+                                                    <form method="post" action="/admin/customer-service-payouts/{{ payout.id }}/status">
+                                                        <input type="hidden" name="status" value="{{ paid_status }}">
+                                                        <button class="button" type="submit">
+                                                            標記已發放
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="empty-state">目前沒有客服分潤紀錄。</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="admin-section">
                             <h4>接單打手</h4>
 
                             {% if active_assignments %}
@@ -144,6 +191,7 @@
                                                     <span>基本 {{ payout_for_worker.base_payout }}T</span>
                                                     <span>掛名 {{ payout_for_worker.named_bonus_amount }}T</span>
                                                     <strong>實拿 {{ payout_for_worker.final_payout }}T</strong>
+                                                    <span>狀態 {{ payout_for_worker.payout_status }}</span>
                                                     {% if payout_for_worker.note %}
                                                         <p class="warning">{{ payout_for_worker.note }}</p>
                                                     {% endif %}
@@ -193,6 +241,24 @@
                                                         手動改分潤
                                                     </button>
                                                 </form>
+
+                                                {% if payout_for_worker %}
+                                                    {% if payout_for_worker.payout_status == paid_status %}
+                                                        <form method="post" action="/admin/worker-payouts/{{ payout_for_worker.id }}/status">
+                                                            <input type="hidden" name="status" value="{{ unpaid_status }}">
+                                                            <button class="button secondary" type="submit">
+                                                                改回未發放
+                                                            </button>
+                                                        </form>
+                                                    {% else %}
+                                                        <form method="post" action="/admin/worker-payouts/{{ payout_for_worker.id }}/status">
+                                                            <input type="hidden" name="status" value="{{ paid_status }}">
+                                                            <button class="button" type="submit">
+                                                                標記已發放
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                {% endif %}
 
                                                 <form method="post" action="/admin/assignments/{{ assignment.id }}/remove">
                                                     <input
