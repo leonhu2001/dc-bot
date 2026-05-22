@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from shared.db import create_all_tables
 from web.app.config import config
 from web.app.routers.auth import router as auth_router
+from web.app.routers.dispatch import router as dispatch_router
 
 APP_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -27,6 +28,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
+app.include_router(dispatch_router)
 
 
 @app.on_event("startup")
@@ -83,44 +85,6 @@ async def admin_dashboard(request: Request):
         name="admin.html",
         context={
             "title": "總控後台",
-            "user": user,
-        },
-    )
-
-
-@app.get("/dispatch")
-async def dispatch_dashboard(request: Request):
-    user = get_current_user(request)
-
-    if not user:
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "請先登入",
-                "message": "請先使用 Discord 登入。",
-                "user": None,
-            },
-            status_code=401,
-        )
-
-    if not user.get("is_worker") and not user.get("is_admin"):
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "沒有權限",
-                "message": "你沒有派單頁面權限。",
-                "user": user,
-            },
-            status_code=403,
-        )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="dispatch.html",
-        context={
-            "title": "派單頁面",
             "user": user,
         },
     )

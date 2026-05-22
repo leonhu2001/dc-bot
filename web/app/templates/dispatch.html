@@ -1,31 +1,91 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
-</head>
-<body>
-    <main class="page">
-        <section class="card wide">
-            <div class="topbar">
-                <div>
-                    <h1>派單頁面</h1>
-                    <p>歡迎，{{ user.global_name or user.username }}</p>
-                </div>
-                <a class="button secondary" href="/auth/logout">登出</a>
-            </div>
+{% extends "layout.html" %}
 
-            <div class="panel">
-                <h2>目前可接訂單</h2>
-                <p>下一步會接上 Discord bot 派單資料。</p>
-            </div>
+{% block page_title %}派單頁面{% endblock %}
 
-            <div class="panel">
-                <h2>我的接單狀態</h2>
-                <p>之後會限制同一位打手一次只能接一張 active 訂單。</p>
+{% block content %}
+    <div class="panel">
+        <h2>我的接單狀態</h2>
+
+        <div class="status-row">
+            <span>目前 active 訂單</span>
+            <strong>{{ active_order_count }}</strong>
+        </div>
+
+        {% if active_order_count > 0 %}
+            <p class="warning">
+                你目前已有 active 訂單，之後接單功能會禁止你再接新的 active 單。
+            </p>
+        {% else %}
+            <p class="success">
+                你目前沒有 active 訂單，可以接新單。
+            </p>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h2>目前可接訂單</h2>
+        <p>這裡目前先顯示網站資料庫測試訂單，下一步會改成 Discord bot 派單後自動寫入。</p>
+
+        {% if orders %}
+            <div class="order-list">
+                {% for order in orders %}
+                    <article class="order-card">
+                        <div class="order-card-header">
+                            <div>
+                                <p class="order-no">
+                                    {{ order.bot_order_no or ("WEB-" ~ order.id) }}
+                                </p>
+                                <h3>{{ order.category }}｜{{ order.item }}</h3>
+                            </div>
+
+                            <span class="badge">
+                                {{ order.status }}
+                            </span>
+                        </div>
+
+                        <div class="order-meta">
+                            <div>
+                                <span>老闆</span>
+                                <strong>{{ order.customer_display_name or "未記錄" }}</strong>
+                            </div>
+
+                            <div>
+                                <span>數量</span>
+                                <strong>{{ order.quantity }} 單</strong>
+                            </div>
+
+                            <div>
+                                <span>金額</span>
+                                <strong>{{ order.amount }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>付款</span>
+                                <strong>{{ order.payment_method or "未記錄" }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="order-footer">
+                            <div>
+                                <span class="muted-text">目前接單人數</span>
+                                <strong>{{ order.assignments | length }}</strong>
+                            </div>
+
+                            <button class="button" disabled>
+                                接單功能下一步開放
+                            </button>
+                        </div>
+
+                        {% if order.note %}
+                            <p class="order-note">{{ order.note }}</p>
+                        {% endif %}
+                    </article>
+                {% endfor %}
             </div>
-        </section>
-    </main>
-</body>
-</html>
+        {% else %}
+            <div class="empty-state">
+                目前沒有 active 訂單。
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
