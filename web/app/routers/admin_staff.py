@@ -73,7 +73,11 @@ async def admin_staff_page(
         if role == "customer_service":
             statement = statement.where(WebStaffMember.is_customer_service.is_(True))
         elif role == "worker":
-            statement = statement.where(WebStaffMember.is_worker.is_(True))
+            statement = (
+                statement
+                .where(WebStaffMember.is_worker.is_(True))
+                .where(WebStaffMember.is_companion.is_(False))
+            )
         elif role == "companion":
             statement = statement.where(WebStaffMember.is_companion.is_(True))
 
@@ -88,12 +92,13 @@ async def admin_staff_page(
         )
 
         all_members = list(db.scalars(select(WebStaffMember)).all())
+        active_members = [member for member in all_members if member.is_active]
         stats = {
             "total": len(all_members),
-            "active": sum(1 for member in all_members if member.is_active),
-            "customer_service": sum(1 for member in all_members if member.is_active and member.is_customer_service),
-            "worker": sum(1 for member in all_members if member.is_active and member.is_worker),
-            "companion": sum(1 for member in all_members if member.is_active and member.is_companion),
+            "active": len(active_members),
+            "customer_service": sum(1 for member in active_members if member.is_customer_service),
+            "worker": sum(1 for member in active_members if member.is_worker and not member.is_companion),
+            "companion": sum(1 for member in active_members if member.is_companion),
         }
     finally:
         db.close()

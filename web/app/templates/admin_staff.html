@@ -15,7 +15,7 @@
         <div class="order-card-header">
             <div>
                 <h2>人員名單</h2>
-                <p class="muted-text">從 Discord 身分組同步客服、打手、陪玩，後台下拉選單會用這份名單。</p>
+                <p class="muted-text">從 Discord 身分組同步客服、打手、陪玩；打手和陪玩會分開顯示。</p>
             </div>
 
             <form method="post" action="/admin/staff/sync-now">
@@ -34,8 +34,12 @@
             <p class="big-number">{{ stats.customer_service }}</p>
         </div>
         <div class="panel">
-            <h2>打手 / 陪玩</h2>
+            <h2>打手</h2>
             <p class="big-number">{{ stats.worker }}</p>
+        </div>
+        <div class="panel">
+            <h2>陪玩</h2>
+            <p class="big-number">{{ stats.companion }}</p>
         </div>
     </div>
 
@@ -45,7 +49,7 @@
             <select class="input" name="role">
                 <option value="all" {% if role == 'all' %}selected{% endif %}>全部身份</option>
                 <option value="customer_service" {% if role == 'customer_service' %}selected{% endif %}>客服 / 總控</option>
-                <option value="worker" {% if role == 'worker' %}selected{% endif %}>打手 / 陪玩</option>
+                <option value="worker" {% if role == 'worker' %}selected{% endif %}>打手</option>
                 <option value="companion" {% if role == 'companion' %}selected{% endif %}>陪玩</option>
             </select>
 
@@ -76,13 +80,11 @@
 
                         <div class="chip-list">
                             {% if member.is_customer_service %}<span class="chip">客服 / 總控</span>{% endif %}
-                            {% if member.is_worker %}<span class="chip">打手</span>{% endif %}
+                            {% if member.is_worker and not member.is_companion %}<span class="chip">打手</span>{% endif %}
                             {% if member.is_companion %}<span class="chip">陪玩</span>{% endif %}
                         </div>
 
-                        <p class="muted-text">
-                            最後同步：{{ member.last_synced_at or "未記錄" }}
-                        </p>
+                        <p class="muted-text">最後同步：{{ member.last_synced_at or "未記錄" }}</p>
                     </article>
                 {% endfor %}
             </div>

@@ -44,6 +44,18 @@ def list_worker_members(db: Session) -> list[WebStaffMember]:
         select(WebStaffMember)
         .where(WebStaffMember.is_active.is_(True))
         .where(WebStaffMember.is_worker.is_(True))
+        .where(WebStaffMember.is_companion.is_(False))
+        .order_by(WebStaffMember.display_name.asc(), WebStaffMember.username.asc())
+    )
+
+    return list(db.scalars(statement).all())
+
+
+def list_companion_members(db: Session) -> list[WebStaffMember]:
+    statement = (
+        select(WebStaffMember)
+        .where(WebStaffMember.is_active.is_(True))
+        .where(WebStaffMember.is_companion.is_(True))
         .order_by(WebStaffMember.display_name.asc(), WebStaffMember.username.asc())
     )
 
@@ -99,7 +111,9 @@ def sync_staff_members_from_discord(db: Session) -> dict:
     worker_role_ids = {str(role_id) for role_id in config.WORKER_ROLE_IDS}
     companion_role_ids = {str(role_id) for role_id in config.COMPANION_ROLE_IDS}
 
-    all_target_role_ids = customer_service_role_ids | worker_role_ids | companion_role_ids
+    # 陪玩不要混進打手。即使 .env 的 WORKER_ROLE_IDS 不小心包含陪玩身分組，這裡也會自動排除。
+    pure_worker_role_ids = worker_role_ids - companion_role_ids
+    all_target_role_ids = customer_service_role_ids | pure_worker_role_ids | companion_role_ids
 
     synced_at = datetime.utcnow()
     after = "0"
@@ -110,13 +124,8 @@ def sync_staff_members_from_discord(db: Session) -> dict:
     while True:
         response = requests.get(
             f"{DISCORD_API_BASE}/guilds/{config.DISCORD_GUILD_ID}/members",
-            headers={
-                "Authorization": f"Bot {config.DISCORD_BOT_TOKEN}",
-            },
-            params={
-                "limit": 1000,
-                "after": after,
-            },
+            headers={"Authorization": f"Bot {config.DISCORD_BOT_TOKEN}"},
+            params={"limit": 1000, "after": after},
             timeout=30,
         )
 
@@ -130,7 +139,6 @@ def sync_staff_members_from_discord(db: Session) -> dict:
 
         for member_data in members:
             total_seen += 1
-
             user_data = member_data.get("user") or {}
             discord_id = str(user_data.get("id") or "")
 
@@ -145,7 +153,7 @@ def sync_staff_members_from_discord(db: Session) -> dict:
 
             is_customer_service = bool(role_set & customer_service_role_ids)
             is_companion = bool(role_set & companion_role_ids)
-            is_worker = bool(role_set & worker_role_ids) or is_companion
+            is_worker = bool(role_set & pure_worker_role_ids)
 
             display_name = (
                 member_data.get("nick")
