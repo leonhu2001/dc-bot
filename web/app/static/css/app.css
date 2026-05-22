@@ -1,0 +1,58 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Microsoft JhengHei", system-ui, sans-serif;
+    background: #111827;
+    color: #f9fafb;
+}
+
+.page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+}
+
+.card {
+    width: 100%;
+    max-width: 520px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 18px;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+}
+
+h1 {
+    margin-top: 0;
+    font-size: 32px;
+}
+
+p {
+    line-height: 1.7;
+    color: #d1d5db;
+}
+
+.button {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: #5865f2;
+    color: white;
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.button:hover {
+    background: #4752c4;
+}
+
+.hint {
+    margin-top: 16px;
+    font-size: 14px;
+    color: #9ca3af;
+}
