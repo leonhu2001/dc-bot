@@ -29,8 +29,9 @@ def get_display_name(user: dict) -> str:
 
 
 def create_demo_orders_if_empty(db: Session) -> None:
-    """Production dashboard no longer creates demo orders automatically."""
+    # 正式環境不再自動建立 DEMO 測試訂單。
     return
+
 
 def list_active_orders(db: Session) -> list[WebOrder]:
     statement = (
@@ -44,19 +45,16 @@ def list_active_orders(db: Session) -> list[WebOrder]:
     return list(db.scalars(statement).all())
 
 
-def list_admin_orders(db: Session) -> list[WebOrder]:
-    """Admin default list only shows active orders.
-
-    Closed / stored / cancelled orders stay in web_dashboard.db for payout history,
-    but they no longer occupy the main admin page.
-    """
+def list_admin_orders(db: Session, status_filter: str | None = "active") -> list[WebOrder]:
     statement = (
         select(WebOrder)
-        .where(WebOrder.status == OrderStatus.ACTIVE.value)
         .options(selectinload(WebOrder.assignments))
         .options(selectinload(WebOrder.payouts))
         .order_by(WebOrder.created_at.desc())
     )
+
+    if status_filter and status_filter != "all":
+        statement = statement.where(WebOrder.status == str(status_filter))
 
     return list(db.scalars(statement).all())
 
