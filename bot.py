@@ -3482,6 +3482,7 @@ async def on_ready():
                 "cogs.reward_commands",
                 "cogs.stats_commands",
                 "cogs.setup_commands",
+                "cogs.customer_commands",
             ):
                 await bot.load_extension(extension_name)
             bot.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
@@ -4713,118 +4714,7 @@ async def check_stored_orders(interaction: discord.Interaction):
     await interaction.followup.send("已檢查存單提醒，若有逾期存單會發到機器人日誌。", ephemeral=True)
 
 
-@bot.tree.command(
-    name="add_customer_note",
-    description="客服新增顧客備註或黑名單紀錄",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(
-    customer="要新增備註的顧客",
-    note="備註內容",
-    blacklist="是否標記為黑名單 / 高風險備註"
-)
-async def add_customer_note(
-    interaction: discord.Interaction,
-    customer: discord.Member,
-    note: str,
-    blacklist: bool = False,
-):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以新增顧客備註。", ephemeral=True)
-        return
-
-    content = note.strip()[:500]
-    if not content:
-        await interaction.response.send_message("備註內容不能空白。", ephemeral=True)
-        return
-
-    data = get_customer_reward_data(customer.id)
-    notes = data.setdefault("notes", [])
-    notes.append({
-        "content": content,
-        "is_blacklist": bool(blacklist),
-        "operator_id": interaction.user.id,
-        "created_at": get_taipei_now_iso(),
-    })
-    CUSTOMER_REWARDS[customer.id] = data
-    save_bot_data()
-
-    await send_order_log(
-        interaction.guild,
-        title="新增顧客備註",
-        fields=[
-            ("顧客", customer.mention, True),
-            ("類型", "黑名單 / 高風險" if blacklist else "一般備註", True),
-            ("操作人員", interaction.user.mention, True),
-            ("內容", content, False),
-        ],
-        color=discord.Color.red() if blacklist else discord.Color.blue(),
-    )
-
-    await interaction.response.send_message(
-        f"已新增 {'黑名單 / 高風險' if blacklist else '一般'}備註給 {customer.mention}。",
-        ephemeral=True,
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-    )
-
-
-@bot.tree.command(
-    name="customer_notes",
-    description="客服查詢顧客備註 / 黑名單紀錄",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(customer="要查詢備註的顧客")
-async def customer_notes(interaction: discord.Interaction, customer: discord.Member):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以查詢顧客備註。", ephemeral=True)
-        return
-
-    embed = discord.Embed(
-        title="顧客備註 / 黑名單紀錄",
-        description=format_customer_notes_for_staff(customer.id, limit=15),
-        color=discord.Color.red() if any(n.get("is_blacklist") for n in get_customer_notes(customer.id)) else discord.Color.blue(),
-        timestamp=get_taipei_now(),
-    )
-    embed.add_field(name="顧客", value=customer.mention, inline=False)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-@bot.tree.command(
-    name="remove_customer_note",
-    description="客服刪除顧客備註，index 請看 /customer_notes 的編號",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(
-    customer="要刪除備註的顧客",
-    index="要刪除第幾筆備註，從 1 開始"
-)
-async def remove_customer_note(interaction: discord.Interaction, customer: discord.Member, index: int):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以刪除顧客備註。", ephemeral=True)
-        return
-
-    data = get_customer_reward_data(customer.id)
-    notes = data.setdefault("notes", [])
-    if index < 1 or index > len(notes):
-        await interaction.response.send_message("找不到這個備註編號，請先用 /customer_notes 查看。", ephemeral=True)
-        return
-
-    removed = notes.pop(index - 1)
-    CUSTOMER_REWARDS[customer.id] = data
-    save_bot_data()
-
-    await send_order_log(
-        interaction.guild,
-        title="刪除顧客備註",
-        fields=[
-            ("顧客", customer.mention, True),
-            ("操作人員", interaction.user.mention, True),
-            ("刪除內容", str(removed.get("content") or "未填寫"), False),
-        ],
-        color=discord.Color.dark_grey(),
-    )
-
-    await interaction.response.send_message(f"已刪除 {customer.mention} 的第 {index} 筆備註。", ephemeral=True)
+# 顧客備註 slash 指令已搬到 cogs/customer_commands.py
 
 
 @bot.tree.command(
