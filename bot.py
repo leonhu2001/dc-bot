@@ -2313,12 +2313,29 @@ async def resume_stored_order(
     order_channel: discord.TextChannel,
     staff_member: discord.Member,
 ):
-    """恢復已存單的訂單，保留原本接單人員，並把派單面板重新發到派單頻道最下面。"""
+    """恢復已存單的訂單，保留原本接單人員，重新發派單面板，並清掉舊派單訊息。"""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
-    old_dispatch_message_id = data.get("dispatch_message_id")
-    dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
+    old_dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
 
-    if old_dispatch_message_id is None:
+    # 收集這張票口所有舊派單訊息，避免同一張存單恢復後派單頻道殘留舊面板。
+    old_dispatch_message_ids: set[int] = set()
+
+    if old_dispatch_message_id:
+        old_dispatch_message_ids.add(old_dispatch_message_id)
+
+    for message_id, claim in list(ORDER_CLAIMS.items()):
+        if not isinstance(claim, dict):
+            continue
+
+        claim_source_channel_id = _to_int(claim.get("source_channel_id"))
+
+        if claim_source_channel_id == order_channel.id:
+            parsed_message_id = _to_int(message_id)
+            if parsed_message_id:
+                old_dispatch_message_ids.add(parsed_message_id)
+
+    if not old_dispatch_message_ids:
         raise ValueError("找不到這張訂單對應的派單訊息，無法恢復。")
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
@@ -2326,19 +2343,15 @@ async def resume_stored_order(
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
         raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
 
-    old_message = None
+    # 優先取原本 dispatch_message_id 的 claim；沒有的話，找同票口任一 claim。
+    claim_data = ORDER_CLAIMS.get(old_dispatch_message_id) if old_dispatch_message_id else None
 
-    try:
-        old_message = await dispatch_channel.fetch_message(old_dispatch_message_id)
-    except discord.NotFound:
-        # 舊訊息不見時仍可用保存資料重新發一則，只要 bot_data.json 還有接單資料。
-        old_message = None
-    except discord.Forbidden as exc:
-        raise ValueError("Bot 權限不足，無法讀取派單訊息。") from exc
-    except discord.HTTPException as exc:
-        raise ValueError(f"讀取派單訊息失敗：{exc}") from exc
-
-    claim_data = ORDER_CLAIMS.get(old_dispatch_message_id)
+    if not claim_data:
+        for message_id in old_dispatch_message_ids:
+            possible_claim = ORDER_CLAIMS.get(message_id)
+            if isinstance(possible_claim, dict):
+                claim_data = possible_claim
+                break
 
     if not claim_data:
         raise ValueError("找不到已保存的接單資料，請重新派單。")
@@ -2362,11 +2375,16 @@ async def resume_stored_order(
     claim_data["companion_preference"] = companion_preference
     claim_data["dispatch_channel_id"] = dispatch_channel.id
 
-    # 存單相關資料保留在 bot_data.json 裡當紀錄，但不再顯示為已存單。
+    # 存單相關資料保留在資料中當紀錄，但狀態改回 active。
     data["closed"] = False
     data["status"] = "active"
     data["quantity"] = quantity
     data["dispatch_channel_id"] = dispatch_channel.id
+    data["stored_at"] = None
+    data["stored_by"] = None
+    data["stored_reason"] = None
+    data["stored_expected_time"] = None
+    data["stored_note"] = None
 
     companion_ids = sorted(claim_data.get("companion", set()))
     booster_ids = sorted(claim_data.get("booster", set()))
@@ -2416,17 +2434,31 @@ async def resume_stored_order(
         )
     )
 
-    # 刪除舊的存單面板，避免同一張單在派單頻道出現兩個面板。
-    if old_message is not None:
+    # 刪除同一張票口的所有舊派單訊息，避免存單恢復後殘留不能操作的舊面板。
+    for message_id in old_dispatch_message_ids:
+        if message_id == new_message.id:
+            continue
+
         try:
-            await old_message.delete(reason=f"Stored order resumed by {staff_member}")
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
+            old_message = await dispatch_channel.fetch_message(message_id)
+        except discord.NotFound:
+            old_message = None
+        except (discord.Forbidden, discord.HTTPException):
+            old_message = None
+
+        if old_message is not None:
+            try:
+                await old_message.delete()
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError):
+                pass
+
+        ORDER_CLAIMS.pop(message_id, None)
+        delete_claim_row_from_db(message_id=message_id, source_channel_id=order_channel.id)
 
     # 把接單資料移到新的 message_id，保留原本陪玩/打手接單人員。
-    ORDER_CLAIMS.pop(old_dispatch_message_id, None)
     ORDER_CLAIMS[new_message.id] = claim_data
     data["dispatch_message_id"] = new_message.id
+    data["dispatch_channel_id"] = dispatch_channel.id
 
     remember_order_data(order_channel.id, data)
     remember_claim_data(new_message.id, claim_data)
