@@ -148,6 +148,8 @@ from services.orders import (
     build_stored_order_detail_embed,
 )
 
+from shared.web_order_sync import upsert_web_order_from_dispatch
+
 from views.review import (
     configure_review_views,
     ReviewButtonView,
@@ -1166,6 +1168,59 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
         locked=bool(data.get("locked", False)),
         status=str(data.get("status", "active")),
     )
+
+
+def sync_dispatch_to_web_dashboard(
+    *,
+    guild: discord.Guild | None,
+    source_channel: discord.TextChannel | None,
+    dispatch_channel_id: int | None,
+    dispatch_message_id: int | None,
+    data: dict,
+    category_label: str,
+    item: str,
+    quantity: int,
+    payment_method: str,
+    status: str = "active",
+) -> None:
+    """把 DC bot 的派單資料同步到網站資料庫 web_orders。"""
+    if source_channel is None or dispatch_message_id is None:
+        return
+
+    try:
+        customer_id = _to_int(data.get("customer_id")) or get_order_customer_id_from_channel(source_channel)
+        customer_display_name = None
+        if guild is not None and customer_id is not None:
+            customer_member = guild.get_member(customer_id)
+            if customer_member is not None:
+                customer_display_name = customer_member.display_name
+
+        customer_service_id = _to_int(data.get("amount_set_by")) or _to_int(data.get("payment_submitted_by"))
+        customer_service_display_name = None
+        if guild is not None and customer_service_id is not None:
+            staff_member = guild.get_member(customer_service_id)
+            if staff_member is not None:
+                customer_service_display_name = staff_member.display_name
+
+        upsert_web_order_from_dispatch(
+            ticket_channel_id=source_channel.id,
+            dispatch_channel_id=dispatch_channel_id,
+            dispatch_message_id=dispatch_message_id,
+            customer_discord_id=customer_id,
+            customer_display_name=customer_display_name,
+            category=str(category_label or data.get("category_label") or data.get("category") or "未紀錄"),
+            item=str(item or data.get("item") or "未紀錄"),
+            quantity=quantity,
+            amount=_to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0,
+            payment_method=str(payment_method or data.get("payment_method") or "未紀錄"),
+            status=status,
+            customer_service_discord_id=customer_service_id,
+            customer_service_display_name=customer_service_display_name,
+            bot_order_no=data.get("order_no"),
+            note=f"由 DC bot 派單同步。票口：#{source_channel.name}",
+        )
+    except Exception as e:
+        print(f"同步派單到網站資料庫失敗：{e}")
 
 
 def cleanup_old_closed_orders() -> None:
@@ -2967,6 +3022,19 @@ async def finalize_payment_and_dispatch(
     remember_order_data(interaction.channel.id, data)
     remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
 
+    sync_dispatch_to_web_dashboard(
+        guild=guild,
+        source_channel=interaction.channel,
+        dispatch_channel_id=dispatch_channel.id,
+        dispatch_message_id=dispatch_message.id,
+        data=data,
+        category_label=category_label,
+        item=str(item),
+        quantity=quantity,
+        payment_method=str(payment_method),
+        status="active",
+    )
+
     await log_self_service_proxy_action(
         interaction,
         customer_id,
@@ -4486,6 +4554,19 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     remember_order_data(source_channel_id, data)
     remember_claim_data(dispatch_message.id, claim_data)
     save_bot_data()
+
+    sync_dispatch_to_web_dashboard(
+        guild=guild,
+        source_channel=source_channel,
+        dispatch_channel_id=dispatch_channel.id,
+        dispatch_message_id=dispatch_message.id,
+        data=data,
+        category_label=str(category_label),
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        status="active",
+    )
 
     await send_order_log(
         guild,
