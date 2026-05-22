@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <main class="page">
+        <section class="card wide">
+            <div class="topbar">
+                <div>
+                    <h1>總控後台</h1>
+                    <p>歡迎，{{ user.global_name or user.username }}</p>
+                </div>
+                <a class="button secondary" href="/auth/logout">登出</a>
+            </div>
+
+            <div class="grid">
+                <div class="panel">
+                    <h2>訂單管理</h2>
+                    <p>之後會顯示所有訂單、狀態、金額、接單人。</p>
+                </div>
+
+                <div class="panel">
+                    <h2>打手分潤</h2>
+                    <p>之後會顯示本月分潤、未發放、已發放紀錄。</p>
+                </div>
+
+                <div class="panel">
+                    <h2>派單同步</h2>
+                    <p>之後會顯示 Discord bot 同步狀態。</p>
+                </div>
+            </div>
+
+            <a class="button" href="/dispatch">前往派單頁</a>
+        </section>
+    </main>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>魔丸打手系統</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <main class="page">
+        <section class="card dashboard-card">
+            <h1>魔丸打手系統</h1>
+
+            <p>
+                歡迎，<strong>{{ global_name or username }}</strong>
+            </p>
+
+            <p class="hint">
+                Discord ID：{{ discord_id }}
+            </p>
+
+            <div class="panel-list">
+                {% if is_admin %}
+                    <a class="panel-link" href="/admin">
+                        總控後台
+                        <span>管理訂單、打手、分潤與後台資料</span>
+                    </a>
+                {% endif %}
+
+                {% if is_worker %}
+                    <a class="panel-link" href="/dispatch">
+                        派單頁面
+                        <span>查看可接訂單與我的接單狀態</span>
+                    </a>
+                {% endif %}
+
+                {% if not is_admin and not is_worker %}
+                    <div class="no-access">
+                        你目前沒有網站權限，請確認 Discord 身分組。
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

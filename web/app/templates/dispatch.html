@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <main class="page">
+        <section class="card wide">
+            <div class="topbar">
+                <div>
+                    <h1>派單頁面</h1>
+                    <p>歡迎，{{ user.global_name or user.username }}</p>
+                </div>
+                <a class="button secondary" href="/auth/logout">登出</a>
+            </div>
+
+            <div class="panel">
+                <h2>目前可接訂單</h2>
+                <p>下一步會接上 Discord bot 派單資料。</p>
+            </div>
+
+            <div class="panel">
+                <h2>我的接單狀態</h2>
+                <p>之後會限制同一位打手一次只能接一張 active 訂單。</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
