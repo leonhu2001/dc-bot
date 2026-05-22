@@ -62,6 +62,7 @@ SPECIAL_COMPANION_ITEMS = {
     "娛樂陪",
     "技術陪",
     "保底單",
+    "陪打",
 }
 
 QUANTITY_SELECT_ITEMS = {

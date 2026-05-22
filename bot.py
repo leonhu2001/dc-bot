@@ -911,7 +911,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         await lock_dispatch_claim_panel(guild, order_channel.id)
 
-        reward_result = "會員累積已在訂單價格確認時處理。" if order_data.get("reward_counted") else "提醒：這張單尚未標記會員累積，請確認付款面板是否已完成價格結算。"
+        reward_result = "會員累積已在顧客送出付款方式時處理。" if order_data.get("reward_counted") else "提醒：這張單尚未標記會員累積，請確認顧客是否已送出付款方式。"
 
         await send_order_log(
             guild,
@@ -1528,22 +1528,39 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             disabled = True
             placeholder = "請先選擇訂單項目"
         elif selected_item in SPECIAL_COMPANION_ITEMS:
-            options = [
-                discord.SelectOption(
-                    label="不指定陪玩/打手",
-                    value="不指定陪玩/打手",
-                    description="由客服安排合適人選",
-                    default=selected_preference == "不指定陪玩/打手"
-                ),
-                discord.SelectOption(
-                    label="指定陪玩/打手",
-                    value="指定陪玩/打手",
-                    description="由下單用戶指定人選",
-                    default=selected_preference == "指定陪玩/打手"
-                ),
-            ]
+            if selected_item == "陪打":
+                options = [
+                    discord.SelectOption(
+                        label="不指定打手",
+                        value="不指定打手",
+                        description="由客服安排合適人選",
+                        default=selected_preference in {"不指定打手", "不指定陪玩/打手", None}
+                    ),
+                    discord.SelectOption(
+                        label="指定打手",
+                        value="指定打手",
+                        description="由下單用戶指定人選",
+                        default=selected_preference in {"指定打手", "指定陪玩/打手"}
+                    ),
+                ]
+                placeholder = "請選擇是否指定打手"
+            else:
+                options = [
+                    discord.SelectOption(
+                        label="不指定陪玩/打手",
+                        value="不指定陪玩/打手",
+                        description="由客服安排合適人選",
+                        default=selected_preference == "不指定陪玩/打手"
+                    ),
+                    discord.SelectOption(
+                        label="指定陪玩/打手",
+                        value="指定陪玩/打手",
+                        description="由下單用戶指定人選",
+                        default=selected_preference == "指定陪玩/打手"
+                    ),
+                ]
+                placeholder = "請選擇是否指定陪玩/打手"
             disabled = False
-            placeholder = "請選擇是否指定陪玩/打手"
         else:
             options = [
                 discord.SelectOption(
@@ -1587,7 +1604,13 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             self.values[0],
         )
 
-        await interaction.response.defer()
+        await interaction.response.edit_message(
+            view=SelfServiceOrderView(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+                selected_category=data.get("category")
+            )
+        )
 
 class SelfServiceOrderQuantitySelect(discord.ui.Select):
     def __init__(
@@ -1682,7 +1705,13 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             f"{quantity} 單",
         )
 
-        await interaction.response.defer()
+        await interaction.response.edit_message(
+            view=SelfServiceOrderView(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+                selected_category=data.get("category")
+            )
+        )
 
 
 async def log_self_service_proxy_action(
@@ -2587,9 +2616,9 @@ def build_payment_method_embed(
         description += "\n✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"
         description += f"派單訊息：{dispatch_url}"
     elif amount and payment_info:
-        description += "\n請闆闆確認總價後付款，付款完成再通知客服。"
+        description += "\n請闆闆確認總價與付款資訊，選擇付款方式後按「送出」。"
     else:
-        description += "\n請先選擇付款方式，完成後按「送出」。送出後會請客服填寫本次訂單價格。"
+        description += "\n請選擇付款方式，完成後按「送出」。"
 
     embed = discord.Embed(
         title="付款方式",
@@ -2649,14 +2678,6 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
         data["amount_set_by"] = interaction.user.id
         remember_order_data(self.channel_id, data)
 
-        reward_result = await add_customer_reward_from_order(
-            guild=interaction.guild,
-            order_channel_id=self.channel_id,
-            customer_id=self.customer_id,
-            amount_text=str(parsed_amount),
-            notify_channel=interaction.channel,
-        )
-
         await send_order_log(
             interaction.guild,
             title="訂單價格已確認",
@@ -2669,12 +2690,46 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
             color=discord.Color.gold(),
         )
 
-        await finalize_payment_and_dispatch(
-            interaction=interaction,
+        category = data.get("category")
+        item = data.get("item")
+        quantity = _to_int(data.get("quantity"), 1) or 1
+        companion_preference = data.get("companion_preference")
+        if category is None or item is None:
+            await interaction.response.send_message(
+                "找不到訂單資料，請回到自助下單面板重新選擇。",
+                ephemeral=True,
+            )
+            return
+
+        payment_embed = build_payment_method_embed(
             customer_id=self.customer_id,
-            channel_id=self.channel_id,
-            reward_result=reward_result,
+            category_label=ORDER_CATEGORY_LABELS.get(category, str(category)),
+            item=str(item),
+            quantity=quantity,
+            companion_preference=companion_preference,
+            amount=parsed_amount,
         )
+
+        await interaction.response.send_message(
+            f"已填寫訂單金額：{format_t_amount(parsed_amount)}\n請闆闆選擇付款方式。",
+            ephemeral=True,
+        )
+
+        payment_message = await interaction.channel.send(
+            embed=payment_embed,
+            view=PaymentMethodView(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+        data["payment_channel_id"] = interaction.channel.id
+        data["payment_message_id"] = payment_message.id
+        remember_order_data(self.channel_id, data)
 
 
 class StaffOrderAmountView(discord.ui.View):
@@ -2684,7 +2739,7 @@ class StaffOrderAmountView(discord.ui.View):
         self.channel_id = channel_id
 
     @discord.ui.button(
-        label="填寫訂單價格",
+        label="填寫",
         style=discord.ButtonStyle.primary,
         custom_id="staff_order_amount_button",
     )
@@ -2716,10 +2771,11 @@ async def send_staff_amount_panel(
         return
 
     embed = discord.Embed(
-        title="等待客服填寫訂單價格",
+        title="請客服填寫訂單金額",
         description=(
             f"下單用戶：<@{customer_id}>\n"
-            "請客服確認本次訂單總價。填寫後會更新付款面板、結算 VIP / 點數，並送出派單。"
+            "請客服確認本次訂單總價，按下方「填寫」輸入金額。\n"
+            "客服送出金額後，才會出現付款方式面板。"
         ),
         color=discord.Color.gold(),
     )
@@ -2730,7 +2786,7 @@ async def send_staff_amount_panel(
     )
     data["amount_panel_message_id"] = message.id
     remember_order_data(channel_id, data)
-    await interaction.followup.send("已送出訂單價格面板，請客服填寫本次訂單總價。", ephemeral=True)
+    await interaction.followup.send("已送出訂單金額面板，請客服填寫本次訂單總價。", ephemeral=True)
 
 
 async def finalize_payment_and_dispatch(
@@ -2840,6 +2896,14 @@ async def finalize_payment_and_dispatch(
     data["total_amount"] = parsed_amount
     data["amount_text"] = format_t_amount(parsed_amount)
     remember_order_data(channel_id, data)
+
+    reward_result = await add_customer_reward_from_order(
+        guild=guild,
+        order_channel_id=channel_id,
+        customer_id=customer_id,
+        amount_text=str(parsed_amount),
+        notify_channel=interaction.channel,
+    )
 
     embed = build_self_service_order_embed(
         customer_mention=f"<@{customer_id}>",
@@ -3087,7 +3151,7 @@ class SelfServiceOrderView(discord.ui.View):
         self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
 
     @discord.ui.button(
-        label="前往付款",
+        label="取得訂單金額",
         style=discord.ButtonStyle.success,
         custom_id="self_service_order_go_payment_button",
         row=4
@@ -3108,7 +3172,7 @@ class SelfServiceOrderView(discord.ui.View):
         companion_preference = data.get("companion_preference")
 
         if category is None or item is None:
-            await interaction.response.send_message("請先選擇訂單類別與訂單項目，再前往付款。", ephemeral=True)
+            await interaction.response.send_message("請先選擇訂單類別與訂單項目，再取得訂單金額。", ephemeral=True)
             return
 
         item_category = ORDER_ITEM_TO_CATEGORY.get(item)
@@ -3122,7 +3186,7 @@ class SelfServiceOrderView(discord.ui.View):
 
         if item in SPECIAL_COMPANION_ITEMS and companion_preference is None:
             await interaction.response.send_message(
-                "這個項目請先選擇「不指定陪玩/打手」或「指定陪玩/打手」，再前往付款。",
+                "這個項目請先選擇「不指定陪玩/打手」或「指定陪玩/打手」，再取得訂單金額。",
                 ephemeral=True
             )
             return
@@ -3141,36 +3205,26 @@ class SelfServiceOrderView(discord.ui.View):
             remember_order_data(self.channel_id, data)
 
         category_label = ORDER_CATEGORY_LABELS[category]
-        payment_embed = build_payment_method_embed(
+
+        await interaction.response.defer(ephemeral=True)
+
+        await send_staff_amount_panel(
+            interaction=interaction,
             customer_id=self.customer_id,
-            category_label=category_label,
-            item=item,
-            quantity=quantity,
-            companion_preference=data.get("companion_preference"),
+            channel_id=self.channel_id,
         )
 
-        await interaction.response.defer()
-
-        payment_message = await interaction.channel.send(
-            embed=payment_embed,
-            view=PaymentMethodView(
-                customer_id=self.customer_id,
-                channel_id=self.channel_id
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
-        )
-        data["payment_channel_id"] = interaction.channel.id
-        data["payment_message_id"] = payment_message.id
-        remember_order_data(self.channel_id, data)
+        button.disabled = True
+        button.label = "已送出，等待客服填價"
+        try:
+            await interaction.message.edit(view=self)
+        except discord.HTTPException:
+            pass
 
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "前往付款",
+            "取得訂單金額",
             f"{category_label}｜{item} x{quantity}｜{companion_preference}",
         )
 
@@ -3381,9 +3435,9 @@ class OrderControlView(discord.ui.View):
             title="自助下單",
             description=(
                 f"下單用戶：{customer_mention}\n\n"
-                "請下單用戶選擇訂單類別與訂單項目，完成後按「前往付款」。\n"
-                "如果選擇娛樂陪、技術陪，數量欄位可選擇 1～8 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
-                "如果選擇娛樂陪、技術陪、保底單，請額外選擇是否指定陪玩/打手。"
+                "請下單用戶選擇訂單類別與訂單項目，完成後按「取得訂單金額」。\n"
+                "如果選擇娛樂陪、技術陪、Valorant 陪打、Valorant 代打，數量欄位可選擇 1～8 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
+                "如果選擇娛樂陪、技術陪、保底單，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
             ),
             color=discord.Color.purple()
         )
