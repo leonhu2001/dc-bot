@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -22,14 +24,14 @@ TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+@dataclass
 class PayoutTotals:
-    def __init__(self) -> None:
-        self.worker_unpaid = 0
-        self.worker_paid = 0
-        self.customer_service_unpaid = 0
-        self.customer_service_paid = 0
-        self.worker_count = 0
-        self.customer_service_count = 0
+    worker_unpaid: int = 0
+    worker_paid: int = 0
+    customer_service_unpaid: int = 0
+    customer_service_paid: int = 0
+    worker_count: int = 0
+    customer_service_count: int = 0
 
     @property
     def unpaid_total(self) -> int:
@@ -76,18 +78,69 @@ def redirect_to_admin_payouts(**params) -> RedirectResponse:
     return RedirectResponse(url="/admin/payouts", status_code=303)
 
 
-def list_worker_payout_rows(db: Session) -> list[tuple[WorkerPayout, WebOrder | None]]:
+def _parse_month(month: str | None) -> tuple[datetime, datetime] | None:
+    if not month:
+        return None
+
+    try:
+        year_str, month_str = month.split("-", 1)
+        year = int(year_str)
+        month_number = int(month_str)
+        start = datetime(year, month_number, 1)
+        if month_number == 12:
+            end = datetime(year + 1, 1, 1)
+        else:
+            end = datetime(year, month_number + 1, 1)
+        return start, end
+    except Exception:
+        return None
+
+
+def _matches_month(created_at: datetime | None, month_range: tuple[datetime, datetime] | None) -> bool:
+    if month_range is None:
+        return True
+
+    if created_at is None:
+        return False
+
+    start, end = month_range
+    return start <= created_at < end
+
+
+def list_worker_payout_rows(
+    db: Session,
+    *,
+    month: str | None,
+    status: str,
+) -> list[tuple[WorkerPayout, WebOrder | None]]:
     statement = (
         select(WorkerPayout, WebOrder)
         .join(WebOrder, WebOrder.id == WorkerPayout.order_id, isouter=True)
         .order_by(WorkerPayout.updated_at.desc(), WorkerPayout.id.desc())
     )
 
-    return list(db.execute(statement).all())
+    rows = list(db.execute(statement).all())
+    month_range = _parse_month(month)
+
+    filtered_rows: list[tuple[WorkerPayout, WebOrder | None]] = []
+
+    for payout, order in rows:
+        if status != "all" and payout.payout_status != status:
+            continue
+
+        if not _matches_month(payout.created_at, month_range):
+            continue
+
+        filtered_rows.append((payout, order))
+
+    return filtered_rows
 
 
 def list_customer_service_payout_rows(
     db: Session,
+    *,
+    month: str | None,
+    status: str,
 ) -> list[tuple[CustomerServicePayout, WebOrder | None]]:
     statement = (
         select(CustomerServicePayout, WebOrder)
@@ -95,7 +148,21 @@ def list_customer_service_payout_rows(
         .order_by(CustomerServicePayout.updated_at.desc(), CustomerServicePayout.id.desc())
     )
 
-    return list(db.execute(statement).all())
+    rows = list(db.execute(statement).all())
+    month_range = _parse_month(month)
+
+    filtered_rows: list[tuple[CustomerServicePayout, WebOrder | None]] = []
+
+    for payout, order in rows:
+        if status != "all" and payout.payout_status != status:
+            continue
+
+        if not _matches_month(payout.created_at, month_range):
+            continue
+
+        filtered_rows.append((payout, order))
+
+    return filtered_rows
 
 
 def build_totals(
@@ -127,6 +194,9 @@ def build_totals(
 @router.get("/admin/payouts")
 async def admin_payouts(
     request: Request,
+    month: str | None = None,
+    status: str = "all",
+    role: str = "all",
     message: str | None = None,
     error: str | None = None,
 ):
@@ -156,11 +226,24 @@ async def admin_payouts(
             status_code=403,
         )
 
+    if status not in {"all", PayoutStatus.UNPAID.value, PayoutStatus.PAID.value}:
+        status = "all"
+
+    if role not in {"all", "worker", "customer_service"}:
+        role = "all"
+
     db = SessionLocal()
 
     try:
-        worker_rows = list_worker_payout_rows(db)
-        customer_service_rows = list_customer_service_payout_rows(db)
+        worker_rows = []
+        customer_service_rows = []
+
+        if role in {"all", "worker"}:
+            worker_rows = list_worker_payout_rows(db, month=month, status=status)
+
+        if role in {"all", "customer_service"}:
+            customer_service_rows = list_customer_service_payout_rows(db, month=month, status=status)
+
         totals = build_totals(
             worker_rows=worker_rows,
             customer_service_rows=customer_service_rows,
@@ -179,6 +262,9 @@ async def admin_payouts(
             "totals": totals,
             "paid_status": PayoutStatus.PAID.value,
             "unpaid_status": PayoutStatus.UNPAID.value,
+            "selected_month": month or "",
+            "selected_status": status,
+            "selected_role": role,
             "message": message,
             "error": error,
         },
@@ -190,6 +276,9 @@ async def admin_set_worker_payout_status_from_payouts(
     request: Request,
     payout_id: int,
     status: str = Form(...),
+    month: str | None = Form(default=None),
+    current_status: str = Form(default="all"),
+    role: str = Form(default="all"),
 ):
     user = require_admin_user(request)
 
@@ -207,11 +296,16 @@ async def admin_set_worker_payout_status_from_payouts(
         )
     except ValueError as e:
         db.rollback()
-        return redirect_to_admin_payouts(error=str(e))
+        return redirect_to_admin_payouts(error=str(e), month=month, status=current_status, role=role)
     finally:
         db.close()
 
-    return redirect_to_admin_payouts(message="打手分潤狀態已更新。")
+    return redirect_to_admin_payouts(
+        message="打手分潤狀態已更新。",
+        month=month,
+        status=current_status,
+        role=role,
+    )
 
 
 @router.post("/admin/payouts/customer-service/{payout_id}/status")
@@ -219,6 +313,9 @@ async def admin_set_customer_service_payout_status_from_payouts(
     request: Request,
     payout_id: int,
     status: str = Form(...),
+    month: str | None = Form(default=None),
+    current_status: str = Form(default="all"),
+    role: str = Form(default="all"),
 ):
     user = require_admin_user(request)
 
@@ -236,8 +333,81 @@ async def admin_set_customer_service_payout_status_from_payouts(
         )
     except ValueError as e:
         db.rollback()
-        return redirect_to_admin_payouts(error=str(e))
+        return redirect_to_admin_payouts(error=str(e), month=month, status=current_status, role=role)
     finally:
         db.close()
 
-    return redirect_to_admin_payouts(message="客服分潤狀態已更新。")
+    return redirect_to_admin_payouts(
+        message="客服分潤狀態已更新。",
+        month=month,
+        status=current_status,
+        role=role,
+    )
+
+
+@router.post("/admin/payouts/bulk-status")
+async def admin_bulk_set_payout_status(
+    request: Request,
+    target_status: str = Form(...),
+    payout_type: str = Form(default="all"),
+    month: str | None = Form(default=None),
+    current_status: str = Form(default="all"),
+    role: str = Form(default="all"),
+):
+    user = require_admin_user(request)
+
+    if not user:
+        return redirect_to_admin_payouts(error="你沒有總控後台權限，或登入狀態已過期。")
+
+    if target_status not in {PayoutStatus.UNPAID.value, PayoutStatus.PAID.value}:
+        return redirect_to_admin_payouts(error="分潤狀態不正確。", month=month, status=current_status, role=role)
+
+    if payout_type not in {"all", "worker", "customer_service"}:
+        payout_type = "all"
+
+    db = SessionLocal()
+
+    try:
+        changed_count = 0
+
+        if payout_type in {"all", "worker"}:
+            worker_rows = list_worker_payout_rows(
+                db,
+                month=month,
+                status=PayoutStatus.UNPAID.value if target_status == PayoutStatus.PAID.value else PayoutStatus.PAID.value,
+            )
+            for payout, _order in worker_rows:
+                set_worker_payout_status(
+                    db,
+                    payout_id=payout.id,
+                    status=target_status,
+                    admin_user=user,
+                )
+                changed_count += 1
+
+        if payout_type in {"all", "customer_service"}:
+            customer_service_rows = list_customer_service_payout_rows(
+                db,
+                month=month,
+                status=PayoutStatus.UNPAID.value if target_status == PayoutStatus.PAID.value else PayoutStatus.PAID.value,
+            )
+            for payout, _order in customer_service_rows:
+                set_customer_service_payout_status(
+                    db,
+                    payout_id=payout.id,
+                    status=target_status,
+                    admin_user=user,
+                )
+                changed_count += 1
+    except ValueError as e:
+        db.rollback()
+        return redirect_to_admin_payouts(error=str(e), month=month, status=current_status, role=role)
+    finally:
+        db.close()
+
+    return redirect_to_admin_payouts(
+        message=f"批量更新完成，共 {changed_count} 筆。",
+        month=month,
+        status="all",
+        role=role,
+    )

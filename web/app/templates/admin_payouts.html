@@ -18,6 +18,27 @@
         </div>
     </div>
 
+    <div class="panel compact-panel">
+        <h2>篩選</h2>
+        <form class="admin-add-worker-form" method="get" action="/admin/payouts">
+            <input class="input" type="month" name="month" value="{{ selected_month }}">
+
+            <select class="input" name="status">
+                <option value="all" {% if selected_status == "all" %}selected{% endif %}>全部狀態</option>
+                <option value="unpaid" {% if selected_status == "unpaid" %}selected{% endif %}>未發放</option>
+                <option value="paid" {% if selected_status == "paid" %}selected{% endif %}>已發放</option>
+            </select>
+
+            <select class="input" name="role">
+                <option value="all" {% if selected_role == "all" %}selected{% endif %}>全部身份</option>
+                <option value="worker" {% if selected_role == "worker" %}selected{% endif %}>只看打手</option>
+                <option value="customer_service" {% if selected_role == "customer_service" %}selected{% endif %}>只看客服</option>
+            </select>
+
+            <button class="button" type="submit">套用篩選</button>
+        </form>
+    </div>
+
     <div class="grid compact-grid">
         <div class="panel compact-panel">
             <h2>未發放總額</h2>
@@ -36,6 +57,30 @@
             <p class="big-number compact-number">{{ totals.all_total }}T</p>
             <p>打手 {{ totals.worker_count }} 筆｜客服 {{ totals.customer_service_count }} 筆</p>
         </div>
+    </div>
+
+    <div class="panel compact-panel">
+        <h2>批量操作</h2>
+        <div class="page-actions">
+            <form method="post" action="/admin/payouts/bulk-status">
+                <input type="hidden" name="target_status" value="paid">
+                <input type="hidden" name="payout_type" value="{{ selected_role }}">
+                <input type="hidden" name="month" value="{{ selected_month }}">
+                <input type="hidden" name="current_status" value="{{ selected_status }}">
+                <input type="hidden" name="role" value="{{ selected_role }}">
+                <button class="button" type="submit">將目前月份未發放批量改已發放</button>
+            </form>
+
+            <form method="post" action="/admin/payouts/bulk-status">
+                <input type="hidden" name="target_status" value="unpaid">
+                <input type="hidden" name="payout_type" value="{{ selected_role }}">
+                <input type="hidden" name="month" value="{{ selected_month }}">
+                <input type="hidden" name="current_status" value="{{ selected_status }}">
+                <input type="hidden" name="role" value="{{ selected_role }}">
+                <button class="button secondary" type="submit">將目前月份已發放批量改未發放</button>
+            </form>
+        </div>
+        <p class="muted-text">批量操作會依照目前選擇的月份與身份執行；狀態會自動挑相反狀態更新。</p>
     </div>
 
     <div class="panel compact-panel">
@@ -82,11 +127,17 @@
                                     {% if payout.payout_status == paid_status %}
                                         <form method="post" action="/admin/payouts/worker/{{ payout.id }}/status">
                                             <input type="hidden" name="status" value="{{ unpaid_status }}">
+                                            <input type="hidden" name="month" value="{{ selected_month }}">
+                                            <input type="hidden" name="current_status" value="{{ selected_status }}">
+                                            <input type="hidden" name="role" value="{{ selected_role }}">
                                             <button class="button secondary small-button" type="submit">改未發放</button>
                                         </form>
                                     {% else %}
                                         <form method="post" action="/admin/payouts/worker/{{ payout.id }}/status">
                                             <input type="hidden" name="status" value="{{ paid_status }}">
+                                            <input type="hidden" name="month" value="{{ selected_month }}">
+                                            <input type="hidden" name="current_status" value="{{ selected_status }}">
+                                            <input type="hidden" name="role" value="{{ selected_role }}">
                                             <button class="button small-button" type="submit">標記已發放</button>
                                         </form>
                                     {% endif %}
@@ -143,11 +194,17 @@
                                     {% if payout.payout_status == paid_status %}
                                         <form method="post" action="/admin/payouts/customer-service/{{ payout.id }}/status">
                                             <input type="hidden" name="status" value="{{ unpaid_status }}">
+                                            <input type="hidden" name="month" value="{{ selected_month }}">
+                                            <input type="hidden" name="current_status" value="{{ selected_status }}">
+                                            <input type="hidden" name="role" value="{{ selected_role }}">
                                             <button class="button secondary small-button" type="submit">改未發放</button>
                                         </form>
                                     {% else %}
                                         <form method="post" action="/admin/payouts/customer-service/{{ payout.id }}/status">
                                             <input type="hidden" name="status" value="{{ paid_status }}">
+                                            <input type="hidden" name="month" value="{{ selected_month }}">
+                                            <input type="hidden" name="current_status" value="{{ selected_status }}">
+                                            <input type="hidden" name="role" value="{{ selected_role }}">
                                             <button class="button small-button" type="submit">標記已發放</button>
                                         </form>
                                     {% endif %}
