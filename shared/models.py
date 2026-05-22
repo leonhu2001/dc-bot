@@ -1,5 +1,5 @@
-from datetime import datetime
-from enum import StrEnum
+﻿from datetime import datetime
+from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,27 +7,27 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from shared.db import Base
 
 
-class OrderStatus(StrEnum):
+class OrderStatus(str, Enum):
     ACTIVE = "active"
     STORED = "stored"
     CLOSED = "closed"
     CANCELLED = "cancelled"
 
 
-class PayoutStatus(StrEnum):
+class PayoutStatus(str, Enum):
     UNPAID = "unpaid"
     PAID = "paid"
     VOID = "void"
 
 
-class SyncEventStatus(StrEnum):
+class SyncEventStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     DONE = "done"
     FAILED = "failed"
 
 
-class SyncEventType(StrEnum):
+class SyncEventType(str, Enum):
     ORDER_CREATED = "order_created"
     ORDER_CLAIMED = "order_claimed"
     ORDER_UNCLAIMED = "order_unclaimed"
