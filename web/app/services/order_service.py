@@ -45,8 +45,14 @@ def list_active_orders(db: Session) -> list[WebOrder]:
 
 
 def list_admin_orders(db: Session) -> list[WebOrder]:
+    """Admin default list only shows active orders.
+
+    Closed / stored / cancelled orders stay in web_dashboard.db for payout history,
+    but they no longer occupy the main admin page.
+    """
     statement = (
         select(WebOrder)
+        .where(WebOrder.status == OrderStatus.ACTIVE.value)
         .options(selectinload(WebOrder.assignments))
         .options(selectinload(WebOrder.payouts))
         .order_by(WebOrder.created_at.desc())
