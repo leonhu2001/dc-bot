@@ -241,6 +241,11 @@ def get_customer_reward_data(user_id: int) -> dict:
         data["vip_downgrade_logs"] = []
     return data
 
+
+def iter_customer_reward_items():
+    """Return a snapshot of customer reward data items for reports/cogs."""
+    return list(_CUSTOMER_REWARDS.items())
+
 def build_member_info_embed(member: discord.abc.User, data: dict, show_points: bool = True) -> discord.Embed:
     total_spent = int(data.get("total_spent", 0) or 0)
     order_count = int(data.get("order_count", 0) or 0)

@@ -3478,6 +3478,7 @@ async def on_ready():
             for extension_name in (
                 "cogs.lottery_commands",
                 "cogs.reward_commands",
+                "cogs.stats_commands",
             ):
                 await bot.load_extension(extension_name)
             bot.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
@@ -3591,117 +3592,7 @@ def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool
     )
 
 
-@bot.tree.command(
-    name="stats_today",
-    description="客服查詢今日營運統計",
-    guild=discord.Object(id=GUILD_ID)
-)
-async def stats_today(interaction: discord.Interaction):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以查詢營運統計。", ephemeral=True)
-        return
-
-    now = get_taipei_now()
-    start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_dt = start_dt + timedelta(days=1)
-    embed = build_sales_stats_embed("今日營運統計", start_dt, end_dt)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-@bot.tree.command(
-    name="stats_month",
-    description="客服查詢本月營運統計",
-    guild=discord.Object(id=GUILD_ID)
-)
-async def stats_month(interaction: discord.Interaction):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以查詢營運統計。", ephemeral=True)
-        return
-
-    now = get_taipei_now()
-    start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    if start_dt.month == 12:
-        end_dt = start_dt.replace(year=start_dt.year + 1, month=1)
-    else:
-        end_dt = start_dt.replace(month=start_dt.month + 1)
-    embed = build_sales_stats_embed("本月營運統計", start_dt, end_dt)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-@bot.tree.command(
-    name="top_customers",
-    description="客服查詢顧客累積消費排行前 10 名",
-    guild=discord.Object(id=GUILD_ID)
-)
-async def top_customers(interaction: discord.Interaction):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以查詢顧客排行。", ephemeral=True)
-        return
-
-    ranked = []
-    for user_id, data in CUSTOMER_REWARDS.items():
-        if not isinstance(data, dict):
-            continue
-        total_spent = int(data.get("total_spent", 0) or 0)
-        if total_spent <= 0:
-            continue
-        ranked.append((user_id, total_spent, int(data.get("order_count", 0) or 0), get_effective_member_level(data)["name"]))
-
-    ranked.sort(key=lambda row: row[1], reverse=True)
-    top_rows = ranked[:10]
-
-    embed = discord.Embed(
-        title="顧客消費排行 TOP 10",
-        color=discord.Color.gold(),
-        timestamp=get_taipei_now(),
-    )
-
-    if not top_rows:
-        embed.description = "目前還沒有可排行的顧客消費資料。"
-    else:
-        lines = []
-        medals = ["🥇", "🥈", "🥉"]
-        for index, (user_id, total_spent, order_count, level_name) in enumerate(top_rows, start=1):
-            prefix = medals[index - 1] if index <= 3 else f"#{index}"
-            lines.append(
-                f"{prefix} <@{user_id}>｜{format_t_amount(total_spent)}｜{order_count:,} 單｜{level_name}"
-            )
-        embed.description = "\n".join(lines)
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-
-@bot.tree.command(
-    name="check_vip_downgrades",
-    description="管理員手動檢查 VIP 維持條件並執行降階",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(force="是否強制重新檢查本月，預設否")
-async def check_vip_downgrades(interaction: discord.Interaction, force: bool = False):
-    if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以檢查 VIP 降階。", ephemeral=True)
-        return
-
-    await interaction.response.defer(ephemeral=True)
-    changed_count, messages = await check_vip_downgrades_once(interaction.guild, force=force)
-
-    if changed_count == 0:
-        await interaction.followup.send(
-            f"檢查完成，目前沒有需要降階的會員。維持條件：上月消費滿 {format_t_amount(VIP_MAINTAIN_MIN_MONTHLY_SPEND)}。",
-            ephemeral=True
-        )
-        return
-
-    preview = "\n".join(messages[:10])
-    if len(messages) > 10:
-        preview += f"\n…還有 {len(messages) - 10} 位"
-
-    await interaction.followup.send(
-        f"VIP 降階檢查完成，已降階 {changed_count} 位會員。\n{preview}",
-        ephemeral=True,
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-    )
+# 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py
 
 
 @bot.tree.command(
