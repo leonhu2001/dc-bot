@@ -149,6 +149,13 @@ from services.orders import (
 )
 
 from shared.web_order_sync import upsert_web_order_from_dispatch
+from shared.web_sync_events import (
+    fetch_pending_web_sync_events,
+    get_web_order_sync_payload,
+    mark_web_sync_event_done,
+    mark_web_sync_event_failed,
+    mark_web_sync_event_processing,
+)
 
 from views.review import (
     configure_review_views,
@@ -1029,6 +1036,7 @@ ORDER_COUNTERS = {}
 BACKUP_TASK_STARTED = False
 STORED_REMINDER_TASK_STARTED = False
 VIP_DOWNGRADE_TASK_STARTED = False
+WEB_SYNC_EVENTS_TASK_STARTED = False
 STORED_ORDER_REMINDER_DAYS = [3, 7]
 VIP_MAINTAIN_MIN_MONTHLY_SPEND = 500
 
@@ -1332,6 +1340,145 @@ configure_data_access(
     get_effective_member_level_func=get_effective_member_level,
 )
 configure_reward_order_context(SELF_SERVICE_ORDER_SELECTIONS, save_bot_data)
+
+
+async def web_sync_events_loop():
+    await bot.wait_until_ready()
+
+    while not bot.is_closed():
+        try:
+            events = fetch_pending_web_sync_events(limit=20)
+
+            for event in events:
+                try:
+                    mark_web_sync_event_processing(event["id"])
+                    await apply_web_sync_event_to_dispatch(event)
+                    mark_web_sync_event_done(event["id"])
+                except Exception as event_error:
+                    print(f"處理網站同步事件失敗 event_id={event.get('id')}：{event_error}")
+                    mark_web_sync_event_failed(event["id"], str(event_error))
+        except Exception as e:
+            print(f"網站同步事件輪詢失敗：{e}")
+
+        await asyncio.sleep(5)
+
+
+async def apply_web_sync_event_to_dispatch(event: dict) -> None:
+    order_id = event.get("order_id")
+
+    if order_id is None:
+        raise ValueError("sync event missing order_id")
+
+    order_data = get_web_order_sync_payload(int(order_id))
+
+    dispatch_channel_id = _to_int(order_data.get("dispatch_channel_id"), 0)
+    dispatch_message_id = _to_int(order_data.get("dispatch_message_id"), 0)
+    source_channel_id = _to_int(order_data.get("ticket_channel_id"), 0)
+    customer_id = _to_int(order_data.get("customer_discord_id"), 0)
+
+    if not dispatch_channel_id or not dispatch_message_id:
+        raise ValueError("web order missing dispatch channel/message id")
+
+    guild = bot.get_guild(GUILD_ID)
+    if guild is None:
+        raise ValueError("guild not found")
+
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+    if dispatch_channel is None:
+        dispatch_channel = await guild.fetch_channel(dispatch_channel_id)
+
+    if not isinstance(dispatch_channel, discord.TextChannel):
+        raise ValueError("dispatch channel is not a text channel")
+
+    source_channel = guild.get_channel(source_channel_id) if source_channel_id else None
+    if source_channel is None and source_channel_id:
+        try:
+            source_channel = await guild.fetch_channel(source_channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            source_channel = None
+
+    if not isinstance(source_channel, discord.TextChannel):
+        # 派單訊息主要需要 mention；找不到票口時用派單頻道避免整個同步失敗。
+        source_channel = dispatch_channel
+
+    message = await dispatch_channel.fetch_message(dispatch_message_id)
+
+    companion_ids = {int(user_id) for user_id in order_data.get("companion_ids", []) if _to_int(user_id, 0)}
+    booster_ids = {int(user_id) for user_id in order_data.get("booster_ids", []) if _to_int(user_id, 0)}
+
+    claim_data = ORDER_CLAIMS.setdefault(
+        dispatch_message_id,
+        {
+            "companion": set(),
+            "booster": set(),
+            "locked": False,
+        },
+    )
+
+    claim_data["companion"] = companion_ids
+    claim_data["booster"] = booster_ids
+    claim_data["locked"] = bool(order_data.get("locked", False))
+    claim_data["status"] = str(order_data.get("status") or "active")
+    claim_data["customer_id"] = customer_id
+    claim_data["category_label"] = str(order_data.get("category") or "未紀錄")
+    claim_data["item"] = str(order_data.get("item") or "未紀錄")
+    claim_data["quantity"] = _to_int(order_data.get("quantity"), 1) or 1
+    claim_data["payment_method"] = str(order_data.get("payment_method") or "未紀錄")
+    claim_data["amount"] = _to_int(order_data.get("amount"), 0) or 0
+    claim_data["total_amount"] = _to_int(order_data.get("amount"), 0) or 0
+    claim_data["source_channel_id"] = source_channel_id
+    claim_data["dispatch_channel_id"] = dispatch_channel_id
+    claim_data["companion_preference"] = order_data.get("companion_preference") or "不指定陪玩/打手"
+
+    remember_claim_data(dispatch_message_id, claim_data)
+
+    receiver_lines = []
+    if companion_ids:
+        receiver_lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in sorted(companion_ids)))
+    if booster_ids:
+        receiver_lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in sorted(booster_ids)))
+
+    receiver_text = "\n".join(receiver_lines) if receiver_lines else None
+
+    embed = build_self_service_order_embed(
+        customer_mention=f"<@{customer_id}>" if customer_id else str(order_data.get("customer_display_name") or "未紀錄"),
+        category_label=str(order_data.get("category") or "未紀錄"),
+        item=str(order_data.get("item") or "未紀錄"),
+        quantity=_to_int(order_data.get("quantity"), 1) or 1,
+        payment_method=str(order_data.get("payment_method") or "未紀錄"),
+        source_channel=source_channel,
+        companion_preference=order_data.get("companion_preference") or "不指定陪玩/打手",
+        receiver_text=receiver_text,
+    )
+
+    amount = _to_int(order_data.get("amount"), 0) or 0
+    if amount:
+        embed.add_field(name="訂單總價", value=format_t_amount(amount), inline=True)
+
+    status = str(order_data.get("status") or "active").lower()
+    if status == "stored":
+        embed.add_field(name="接單狀態", value="已存單，接單面板已鎖定", inline=False)
+    elif status in {"closed", "cancelled", "canceled"} or claim_data.get("locked"):
+        embed.add_field(name="接單狀態", value="已結單或已取消，接單面板已鎖定", inline=False)
+
+    locked = status in {"stored", "closed", "cancelled", "canceled"} or bool(claim_data.get("locked"))
+
+    await message.edit(
+        embed=embed,
+        view=DispatchClaimView(
+            customer_id=customer_id,
+            category_label=str(order_data.get("category") or "未紀錄"),
+            item=str(order_data.get("item") or "未紀錄"),
+            quantity=_to_int(order_data.get("quantity"), 1) or 1,
+            payment_method=str(order_data.get("payment_method") or "未紀錄"),
+            source_channel_id=source_channel_id or 0,
+            companion_preference=order_data.get("companion_preference") or "不指定陪玩/打手",
+            locked=locked,
+            status=status,
+        ),
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
@@ -3785,7 +3932,7 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
-    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
+    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED, WEB_SYNC_EVENTS_TASK_STARTED
     bot.add_view(MainPanelView())
     bot.add_view(OrderControlView())
     bot.add_view(StaffOrderOperationView())
@@ -3821,6 +3968,9 @@ async def on_ready():
         if not VIP_DOWNGRADE_TASK_STARTED:
             VIP_DOWNGRADE_TASK_STARTED = True
             asyncio.create_task(vip_downgrade_loop())
+        if not WEB_SYNC_EVENTS_TASK_STARTED:
+            WEB_SYNC_EVENTS_TASK_STARTED = True
+            asyncio.create_task(web_sync_events_loop())
         try:
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
