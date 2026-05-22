@@ -9,6 +9,7 @@ from shared.db import create_all_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
+from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
 from web.app.routers.auth import router as auth_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
@@ -34,6 +35,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(admin_payouts_router)
+app.include_router(admin_payout_exports_router)
 app.include_router(dispatch_router)
 app.include_router(payouts_router)
 app.include_router(order_history_router)

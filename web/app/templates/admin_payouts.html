@@ -3,6 +3,16 @@
 {% block page_title %}分潤總表{% endblock %}
 
 {% block content %}
+
+    <div class="panel compact-panel">
+        <h2>匯出分潤 CSV</h2>
+        <p class="muted-text">會依目前網址上的 month / status / role 參數匯出。沒有篩選時就是全部。</p>
+        <div class="actions compact-actions">
+            <a class="button" href="/admin/payouts/export.csv?month={{ month or '' }}&status={{ status or '' }}&role={{ role or 'all' }}">匯出目前篩選</a>
+            <a class="button secondary" href="/admin/payouts/export.csv?role=worker">只匯出打手</a>
+            <a class="button secondary" href="/admin/payouts/export.csv?role=customer_service">只匯出客服</a>
+        </div>
+    </div>
     {% if message %}
         <div class="notice success-box">{{ message }}</div>
     {% endif %}
