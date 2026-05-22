@@ -1,17 +1,21 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from shared.models import (
+    CustomerServicePayout,
     OrderAssignment,
     OrderStatus,
+    PayoutStatus,
     SyncEvent,
     SyncEventStatus,
     SyncEventType,
     WebOrder,
+    WorkerPayout,
 )
+from shared.payout import calculate_order_payout
 
 
 def get_display_name(user: dict) -> str:
@@ -39,6 +43,7 @@ def create_demo_orders_if_empty(db: Session) -> None:
             amount=1000,
             payment_method="街口",
             status=OrderStatus.ACTIVE.value,
+            customer_service_discord_id="demo_customer_service",
             customer_service_display_name="測試客服",
             note="這是測試派單，之後會改成由 Discord bot 寫入。",
         ),
@@ -51,6 +56,7 @@ def create_demo_orders_if_empty(db: Session) -> None:
             amount=800,
             payment_method="轉帳",
             status=OrderStatus.ACTIVE.value,
+            customer_service_discord_id="demo_customer_service",
             customer_service_display_name="測試客服",
             note="測試用 active 訂單。",
         ),
@@ -63,6 +69,7 @@ def create_demo_orders_if_empty(db: Session) -> None:
             amount=1200,
             payment_method="街口",
             status=OrderStatus.ACTIVE.value,
+            customer_service_discord_id="demo_customer_service",
             customer_service_display_name="測試客服",
             note="測試用派單卡片。",
         ),
@@ -77,6 +84,7 @@ def list_active_orders(db: Session) -> list[WebOrder]:
         select(WebOrder)
         .where(WebOrder.status == OrderStatus.ACTIVE.value)
         .options(selectinload(WebOrder.assignments))
+        .options(selectinload(WebOrder.payouts))
         .order_by(WebOrder.created_at.desc())
     )
 
@@ -132,6 +140,85 @@ def create_sync_event(
     )
 
 
+def recalculate_order_payouts(db: Session, order_id: int) -> None:
+    order = db.get(WebOrder, order_id)
+
+    if order is None:
+        raise ValueError("找不到這張訂單，無法計算分潤。")
+
+    assignments = list(
+        db.scalars(
+            select(OrderAssignment)
+            .where(OrderAssignment.order_id == order_id)
+            .where(OrderAssignment.is_active.is_(True))
+            .order_by(OrderAssignment.assigned_at.asc())
+        ).all()
+    )
+
+    worker_ids = [
+        assignment.worker_discord_id
+        for assignment in assignments
+    ]
+
+    named_bonus_worker_ids = [
+        assignment.worker_discord_id
+        for assignment in assignments
+        if assignment.has_named_bonus
+    ]
+
+    payout_result = calculate_order_payout(
+        total_amount=int(order.amount or 0),
+        worker_discord_ids=worker_ids,
+        named_bonus_worker_ids=named_bonus_worker_ids,
+    )
+
+    db.execute(delete(WorkerPayout).where(WorkerPayout.order_id == order_id))
+    db.execute(delete(CustomerServicePayout).where(CustomerServicePayout.order_id == order_id))
+
+    assignment_name_map = {
+        assignment.worker_discord_id: assignment.worker_display_name
+        for assignment in assignments
+    }
+
+    for worker_payout in payout_result.worker_payouts:
+        db.add(
+            WorkerPayout(
+                order_id=order_id,
+                worker_discord_id=worker_payout.worker_discord_id,
+                worker_display_name=assignment_name_map.get(worker_payout.worker_discord_id),
+                gross_share=worker_payout.gross_share,
+                base_rate=worker_payout.base_rate,
+                base_payout=worker_payout.base_payout,
+                named_bonus_rate=worker_payout.named_bonus_rate,
+                named_bonus_amount=worker_payout.named_bonus_amount,
+                has_named_bonus=worker_payout.has_named_bonus,
+                final_payout=worker_payout.final_payout,
+                payout_status=PayoutStatus.UNPAID.value,
+            )
+        )
+
+    customer_service_discord_id = (
+        str(order.customer_service_discord_id)
+        if order.customer_service_discord_id
+        else "demo_customer_service"
+    )
+    customer_service_display_name = (
+        order.customer_service_display_name
+        or "測試客服"
+    )
+
+    db.add(
+        CustomerServicePayout(
+            order_id=order_id,
+            customer_service_discord_id=customer_service_discord_id,
+            customer_service_display_name=customer_service_display_name,
+            rate=payout_result.customer_service_rate,
+            payout_amount=payout_result.customer_service_payout,
+            payout_status=PayoutStatus.UNPAID.value,
+        )
+    )
+
+
 def claim_order_for_worker(
     db: Session,
     *,
@@ -175,6 +262,9 @@ def claim_order_for_worker(
     )
 
     db.add(assignment)
+    db.flush()
+
+    recalculate_order_payouts(db, order_id)
 
     create_sync_event(
         db,
@@ -188,9 +278,18 @@ def claim_order_for_worker(
     )
 
     db.commit()
-    db.refresh(order)
 
-    return order
+    refreshed_order = db.scalar(
+        select(WebOrder)
+        .where(WebOrder.id == order_id)
+        .options(selectinload(WebOrder.assignments))
+        .options(selectinload(WebOrder.payouts))
+    )
+
+    if refreshed_order is None:
+        raise ValueError("接單成功，但重新讀取訂單失敗。")
+
+    return refreshed_order
 
 
 def unclaim_order_for_worker(
@@ -223,6 +322,11 @@ def unclaim_order_for_worker(
 
     assignment.is_active = False
     assignment.removed_at = datetime.utcnow()
+    assignment.has_named_bonus = False
+
+    db.flush()
+
+    recalculate_order_payouts(db, order_id)
 
     create_sync_event(
         db,
@@ -236,6 +340,15 @@ def unclaim_order_for_worker(
     )
 
     db.commit()
-    db.refresh(order)
 
-    return order
+    refreshed_order = db.scalar(
+        select(WebOrder)
+        .where(WebOrder.id == order_id)
+        .options(selectinload(WebOrder.assignments))
+        .options(selectinload(WebOrder.payouts))
+    )
+
+    if refreshed_order is None:
+        raise ValueError("取消接單成功，但重新讀取訂單失敗。")
+
+    return refreshed_order
