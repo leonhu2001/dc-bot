@@ -9,42 +9,43 @@
 <body>
     <main class="page">
         <section class="card wide">
-            <header class="topbar">
+            <div class="topbar compact-topbar">
                 <div>
-                    <p class="eyebrow">MW Worker Dashboard</p>
+                    <p class="eyebrow">MW Dashboard</p>
                     <h1>{% block page_title %}魔丸打手系統{% endblock %}</h1>
                     {% if user %}
-                        <p class="muted">
-                            已登入：{{ user.global_name or user.username or user.id }}
+                        <p class="muted compact-user">
+                            {{ user.global_name or user.username or user.id }}
                         </p>
-                    {% else %}
-                        <p class="muted">請使用 Discord 登入。</p>
                     {% endif %}
                 </div>
 
-                <nav class="nav">
-                    <a class="nav-link" href="/">首頁</a>
+                {% if user %}
+                    <nav class="nav role-nav">
+                        {% if user.is_worker %}
+                            <div class="nav-group">
+                                <span class="nav-label">打手</span>
+                                <a class="nav-link" href="/dispatch">派單頁</a>
+                                <a class="nav-link" href="/my/payouts">我的分潤</a>
+                            </div>
+                        {% endif %}
 
-                    {% if user %}
                         {% if user.is_admin %}
-                            <a class="nav-link" href="/admin">總控</a>
-                            <a class="nav-link" href="/admin/orders/history">歷史訂單</a>
-                            <a class="nav-link" href="/admin/payouts">分潤明細</a>
-                            <a class="nav-link" href="/admin/payouts/summary">人員總表</a>
-                    <a class="nav-link" href="/admin/staff">人員名單</a>
+                            <div class="nav-group admin-only-nav">
+                                <span class="nav-label">客服</span>
+                                <a class="nav-link" href="/admin">總控</a>
+                                <a class="nav-link" href="/admin/orders/history">歷史訂單</a>
+                                <a class="nav-link" href="/admin/payouts">分潤總表</a>
+                                <a class="nav-link" href="/admin/staff">人員名單</a>
+                            </div>
                         {% endif %}
 
-                        {% if user.is_worker or user.is_admin %}
-                            <a class="nav-link" href="/dispatch">派單頁</a>
-                            <a class="nav-link" href="/my/payouts">我的分潤</a>
-                        {% endif %}
-
-                        <a class="nav-link danger" href="/auth/logout">登出</a>
-                    {% else %}
-                        <a class="nav-link" href="/auth/discord/login">Discord 登入</a>
-                    {% endif %}
-                </nav>
-            </header>
+                        <div class="nav-group">
+                            <a class="nav-link danger" href="/auth/logout">登出</a>
+                        </div>
+                    </nav>
+                {% endif %}
+            </div>
 
             {% block content %}{% endblock %}
         </section>
