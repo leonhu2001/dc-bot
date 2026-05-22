@@ -3771,6 +3771,7 @@ async def on_ready():
                 "cogs.setup_commands",
                 "cogs.customer_commands",
                 "cogs.audit_commands",
+                "cogs.staff_sync",
             ):
                 await bot.load_extension(extension_name)
             bot.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
