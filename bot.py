@@ -428,6 +428,8 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 bot.guild_id_value = GUILD_ID
 bot.manager_role_id_value = MANAGER_ROLE_ID
+bot.complaint_panel_channel_id_value = COMPLAINT_PANEL_CHANNEL_ID
+bot.feedback_panel_channel_id_value = FEEDBACK_PANEL_CHANNEL_ID
 bot._extensions_loaded = False
 
 
@@ -3479,6 +3481,7 @@ async def on_ready():
                 "cogs.lottery_commands",
                 "cogs.reward_commands",
                 "cogs.stats_commands",
+                "cogs.setup_commands",
             ):
                 await bot.load_extension(extension_name)
             bot.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
@@ -4825,200 +4828,6 @@ async def remove_customer_note(interaction: discord.Interaction, customer: disco
 
 
 @bot.tree.command(
-    name="setup_panel",
-    description="建立魔丸娛樂客服面板",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_panel(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="魔丸娛樂客服中心",
-        description="歡迎來到魔丸娛樂，點擊下方按鈕聯絡客服",
-        color=discord.Color.purple()
-    )
-
-    await interaction.channel.send(
-        embed=embed,
-        view=MainPanelView()
-    )
-
-    await interaction.response.send_message(
-        "客服面板已建立。",
-        ephemeral=True
-    )
-
-
-@bot.tree.command(
-    name="setup_complaint_panel",
-    description="建立客訴表單面板",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_complaint_panel(interaction: discord.Interaction):
-    guild = interaction.guild
-
-    if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-        return
-
-    panel_channel = guild.get_channel(COMPLAINT_PANEL_CHANNEL_ID)
-
-    if panel_channel is None or not isinstance(panel_channel, discord.TextChannel):
-        await interaction.response.send_message(
-            "找不到客訴面板頻道，請確認 COMPLAINT_PANEL_CHANNEL_ID 是否正確。",
-            ephemeral=True
-        )
-        return
-
-    embed = discord.Embed(
-        title="我要客訴!!",
-        description="如有任何客訴內容，請點擊下方按鈕填寫客訴單。",
-        color=discord.Color.red()
-    )
-
-    embed.set_footer(text="魔丸娛樂｜客訴表單")
-
-    await panel_channel.send(
-        embed=embed,
-        view=ComplaintPanelView()
-    )
-
-    await interaction.response.send_message(
-        f"客訴表單面板已建立在 {panel_channel.mention}。",
-        ephemeral=True
-    )
-
-
-@bot.tree.command(
-    name="setup_feedback_panel",
-    description="建立顧客意見箱面板",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_feedback_panel(interaction: discord.Interaction):
-    guild = interaction.guild
-
-    if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-        return
-
-    panel_channel = guild.get_channel(FEEDBACK_PANEL_CHANNEL_ID)
-
-    if panel_channel is None or not isinstance(panel_channel, discord.TextChannel):
-        await interaction.response.send_message(
-            "找不到顧客意見箱面板頻道，請確認 FEEDBACK_PANEL_CHANNEL_ID 是否正確。",
-            ephemeral=True
-        )
-        return
-
-    embed = discord.Embed(
-        title="顧客意見箱",
-        description="如有任何意見或建議，請點擊下方按鈕填寫。",
-        color=discord.Color.blue()
-    )
-
-    embed.set_footer(text="魔丸娛樂｜顧客意見箱")
-
-    await panel_channel.send(
-        embed=embed,
-        view=FeedbackPanelView()
-    )
-
-    await interaction.response.send_message(
-        f"顧客意見箱面板已建立在 {panel_channel.mention}。",
-        ephemeral=True
-    )
-
-
-@bot.tree.command(
-    name="setup_play_voice",
-    description="建立陪玩語音入口頻道",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_play_voice(interaction: discord.Interaction):
-    guild = interaction.guild
-
-    if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-        return
-
-    lobby_channel = await get_or_create_play_voice_lobby(guild)
-
-    if lobby_channel is None:
-        await interaction.response.send_message(
-            "建立失敗，請確認 PLAY_VOICE_CATEGORY_ID 是否正確。",
-            ephemeral=True
-        )
-        return
-
-    await interaction.response.send_message(
-        f"陪玩語音入口已建立 / 確認存在：{lobby_channel.mention}",
-        ephemeral=True
-    )
-
-
-
-
-@bot.tree.command(
-    name="setup_vip_voice",
-    description="建立 VIP 語音入口頻道",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_vip_voice(interaction: discord.Interaction):
-    guild = interaction.guild
-
-    if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-        return
-
-    lobby_channel = await get_or_create_vip_voice_lobby(guild)
-
-    if lobby_channel is None:
-        await interaction.response.send_message(
-            "建立失敗，請確認 PLAY_VOICE_CATEGORY_ID 是否正確。",
-            ephemeral=True
-        )
-        return
-
-    await interaction.response.send_message(
-        f"VIP 語音入口已建立 / 確認存在：{lobby_channel.mention}",
-        ephemeral=True
-    )
-
-
-
-@bot.tree.command(
-    name="setup_public_voice",
-    description="建立公共語音入口頻道",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.checks.has_permissions(administrator=True)
-async def setup_public_voice(interaction: discord.Interaction):
-    guild = interaction.guild
-
-    if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-        return
-
-    lobby_channel = await get_or_create_public_voice_lobby(guild)
-
-    if lobby_channel is None:
-        await interaction.response.send_message(
-            "建立失敗，請確認 PLAY_VOICE_CATEGORY_ID 是否正確。",
-            ephemeral=True
-        )
-        return
-
-    await interaction.response.send_message(
-        f"公共語音入口已建立 / 確認存在：{lobby_channel.mention}",
-        ephemeral=True
-    )
-
-
-
-@bot.tree.command(
     name="delete_dispatch_panel",
     description="刪除派單頻道中已取消訂單的接單面板",
     guild=discord.Object(id=GUILD_ID)
@@ -5104,37 +4913,5 @@ async def delete_dispatch_panel(
         ),
         color=discord.Color.red()
     )
-
-@setup_panel.error
-@setup_complaint_panel.error
-@setup_feedback_panel.error
-@setup_play_voice.error
-@setup_vip_voice.error
-@setup_public_voice.error
-async def command_error(
-    interaction: discord.Interaction,
-    error: app_commands.AppCommandError
-):
-    if interaction.response.is_done():
-        send = interaction.followup.send
-    else:
-        send = interaction.response.send_message
-
-    if isinstance(error, app_commands.MissingPermissions):
-        await send(
-            "你需要管理員權限才能使用這個指令。",
-            ephemeral=True
-        )
-    elif isinstance(error, discord.Forbidden):
-        await send(
-            "Bot 權限不足。請確認 Bot 有檢視頻道、傳送訊息、嵌入連結、管理頻道、管理身分組等必要權限。",
-            ephemeral=True
-        )
-    else:
-        await send(
-            f"發生錯誤：{error}",
-            ephemeral=True
-        )
-
 
 bot.run(TOKEN)
