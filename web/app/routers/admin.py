@@ -9,6 +9,7 @@ from shared.db import SessionLocal
 from web.app.services.admin_service import (
     add_worker_to_order,
     remove_worker_from_order,
+    set_customer_service_for_order,
     set_manual_worker_payout,
     toggle_named_bonus_for_assignment,
 )
@@ -103,6 +104,39 @@ async def admin_dashboard(
             "error": error,
         },
     )
+
+
+@router.post("/admin/orders/{order_id}/customer-service")
+async def admin_set_customer_service(
+    request: Request,
+    order_id: int,
+    customer_service_discord_id: str = Form(...),
+    customer_service_display_name: str = Form(...),
+    reason: str | None = Form(default=None),
+):
+    user = require_admin_user(request)
+
+    if not user:
+        return redirect_to_admin(error="你沒有總控後台權限，或登入狀態已過期。")
+
+    db = SessionLocal()
+
+    try:
+        set_customer_service_for_order(
+            db,
+            order_id=order_id,
+            customer_service_discord_id=customer_service_discord_id,
+            customer_service_display_name=customer_service_display_name,
+            admin_user=user,
+            reason=reason,
+        )
+    except ValueError as e:
+        db.rollback()
+        return redirect_to_admin(error=str(e))
+    finally:
+        db.close()
+
+    return redirect_to_admin(message="已更新此單對接客服，客服 5% 分潤已重新計算。")
 
 
 @router.post("/admin/assignments/{assignment_id}/named-bonus")

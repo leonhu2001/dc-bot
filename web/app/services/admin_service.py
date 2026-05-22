@@ -45,6 +45,70 @@ def write_admin_audit_log(
     )
 
 
+def set_customer_service_for_order(
+    db: Session,
+    *,
+    order_id: int,
+    customer_service_discord_id: str,
+    customer_service_display_name: str,
+    admin_user: dict,
+    reason: str | None = None,
+) -> None:
+    order = db.get(WebOrder, order_id)
+
+    if order is None:
+        raise ValueError("找不到這張訂單。")
+
+    customer_service_discord_id = str(customer_service_discord_id).strip()
+    customer_service_display_name = str(customer_service_display_name or customer_service_discord_id).strip()
+
+    if not customer_service_discord_id:
+        raise ValueError("請輸入客服 Discord ID。")
+
+    before = {
+        "order_id": order.id,
+        "customer_service_discord_id": order.customer_service_discord_id,
+        "customer_service_display_name": order.customer_service_display_name,
+    }
+
+    order.customer_service_discord_id = customer_service_discord_id
+    order.customer_service_display_name = customer_service_display_name
+
+    db.flush()
+
+    recalculate_order_payouts(db, order_id)
+
+    create_sync_event(
+        db,
+        event_type=SyncEventType.ORDER_UPDATED,
+        order_id=order_id,
+        payload={
+            "reason": "customer_service_updated",
+            "customer_service_discord_id": customer_service_discord_id,
+            "customer_service_display_name": customer_service_display_name,
+            "admin_discord_id": str(admin_user["id"]),
+            "admin_display_name": get_admin_display_name(admin_user),
+        },
+    )
+
+    write_admin_audit_log(
+        db,
+        admin_user=admin_user,
+        action="set_customer_service_for_order",
+        target_type="web_order",
+        target_id=str(order_id),
+        before=before,
+        after={
+            "order_id": order.id,
+            "customer_service_discord_id": customer_service_discord_id,
+            "customer_service_display_name": customer_service_display_name,
+            "reason": reason or "",
+        },
+    )
+
+    db.commit()
+
+
 def toggle_named_bonus_for_assignment(
     db: Session,
     *,

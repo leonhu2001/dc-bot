@@ -31,7 +31,7 @@
         <div class="panel">
             <h2>客服分潤</h2>
             <p class="big-number">5%</p>
-            <p>每單獨立計算。</p>
+            <p>發給每單指定的對接客服。</p>
         </div>
     </div>
 
@@ -75,9 +75,47 @@
                             </div>
 
                             <div>
-                                <span>客服</span>
-                                <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未記錄" }}</strong>
+                                <span>對接客服</span>
+                                <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong>
                             </div>
+                        </div>
+
+                        <div class="admin-section">
+                            <h4>指定對接客服</h4>
+                            <p class="muted-text">
+                                這張單的客服 5% 會發給這裡指定的客服。
+                            </p>
+
+                            <form method="post" action="/admin/orders/{{ order.id }}/customer-service" class="admin-add-worker-form">
+                                <input
+                                    class="input"
+                                    type="text"
+                                    name="customer_service_discord_id"
+                                    placeholder="客服 Discord ID"
+                                    value="{{ order.customer_service_discord_id or '' }}"
+                                    required
+                                >
+
+                                <input
+                                    class="input"
+                                    type="text"
+                                    name="customer_service_display_name"
+                                    placeholder="客服顯示名稱"
+                                    value="{{ order.customer_service_display_name or '' }}"
+                                    required
+                                >
+
+                                <input
+                                    class="input"
+                                    type="text"
+                                    name="reason"
+                                    placeholder="原因，例如更換對接客服"
+                                >
+
+                                <button class="button" type="submit">
+                                    更新客服
+                                </button>
+                            </form>
                         </div>
 
                         <div class="admin-section">
