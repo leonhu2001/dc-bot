@@ -19,6 +19,7 @@ ORDER_CATEGORY_LABELS = {
     "fun": "趣味單",
     "farm": "代解代肝",
     "season": "賽季限定活動",
+    "valorant": "Valorant",
 }
 
 ORDER_ITEMS_BY_CATEGORY = {
@@ -45,6 +46,10 @@ ORDER_ITEMS_BY_CATEGORY = {
         "勇敢者行動",
         "S9炫彩勇敢者行動",
     ],
+    "valorant": [
+        "陪打",
+        "代打",
+    ],
 }
 
 ORDER_ITEM_TO_CATEGORY = {
@@ -62,6 +67,8 @@ SPECIAL_COMPANION_ITEMS = {
 QUANTITY_SELECT_ITEMS = {
     "娛樂陪",
     "技術陪",
+    "陪打",
+    "代打",
 }
 
 QUANTITY_OPTIONS = list(range(1, 9))

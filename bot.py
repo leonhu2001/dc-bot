@@ -776,13 +776,6 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         max_length=100
     )
 
-    amount = discord.ui.TextInput(
-        label="金額",
-        placeholder="例如：1275",
-        required=True,
-        max_length=100
-    )
-
     staff = discord.ui.TextInput(
         label="對接客服",
         placeholder="請輸入對接客服名稱",
@@ -841,18 +834,20 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         order_content, payment_method = get_order_summary_from_channel(order_channel.id)
         date_text = get_taipei_now_text()
 
-        parsed_amount = parse_receipt_amount(self.amount.value)
-        if parsed_amount is None or parsed_amount <= 0:
+        order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+        parsed_amount = _to_int(order_data.get("amount"), 0) or _to_int(order_data.get("total_amount"), 0) or 0
+        if parsed_amount <= 0:
             await interaction.response.send_message(
-                "金額欄位無法辨識，請輸入可辨識的數字，例如：1275、NT$1275、1275T。",
+                "這張單還沒有訂單價格，請先在付款面板按「填寫訂單價格」讓客服輸入金額。",
                 ephemeral=True
             )
             return
 
+        amount_text = str(order_data.get("amount_text") or format_t_amount(parsed_amount))
+
         receipt_id = generate_order_receipt_id()
         closed_at_text = get_taipei_now_iso()
 
-        order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
         order_data["receipt_id"] = receipt_id
         order_data["order_no"] = receipt_id
         order_data["receipt_created_at"] = closed_at_text
@@ -876,7 +871,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             "\n"
             f"內容：{order_content}\n"
             "\n"
-            f"金額：{self.amount.value}\n"
+            f"金額：{amount_text}\n"
             f"付款方式：{payment_method}\n"
             "```"
         )
@@ -916,13 +911,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         await lock_dispatch_claim_panel(guild, order_channel.id)
 
-        reward_result = await add_customer_reward_from_order(
-            guild=guild,
-            order_channel_id=order_channel.id,
-            customer_id=customer_id,
-            amount_text=self.amount.value,
-            notify_channel=interaction.channel,
-        )
+        reward_result = "會員累積已在訂單價格確認時處理。" if order_data.get("reward_counted") else "提醒：這張單尚未標記會員累積，請確認付款面板是否已完成價格結算。"
 
         await send_order_log(
             guild,
@@ -931,7 +920,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
                 ("訂單編號", receipt_id, True),
                 ("顧客", f"<@{customer_id}>", True),
                 ("客服", interaction.user.mention, True),
-                ("金額", self.amount.value, True),
+                ("金額", amount_text, True),
                 ("付款方式", payment_method, True),
                 ("票口", order_channel.mention, False),
                 ("內容", order_content, False),
@@ -1388,6 +1377,12 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
                 value="season",
                 description="勇敢者行動、S9炫彩勇敢者行動",
                 default=selected_category == "season"
+            ),
+            discord.SelectOption(
+                label="Valorant",
+                value="valorant",
+                description="陪打、代打",
+                default=selected_category == "valorant"
             ),
         ]
 
@@ -2549,6 +2544,442 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
         await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
 
 
+
+def get_payment_method_info(method: str | None) -> str | None:
+    return {
+        "轉帳": (
+            "銀行轉帳-國泰\n"
+            "代碼：013\n"
+            "帳號：135700021419"
+        ),
+        "街口": (
+            "街口支付\n"
+            "代碼：396\n"
+            "帳號：900884222"
+        ),
+    }.get(str(method or ""))
+
+
+def build_payment_method_embed(
+    *,
+    customer_id: int,
+    category_label: str,
+    item: str,
+    quantity: int,
+    payment_method: str | None = None,
+    companion_preference: str | None = None,
+    amount: int | None = None,
+    submitted: bool = False,
+    dispatch_url: str | None = None,
+) -> discord.Embed:
+    payment_info = get_payment_method_info(payment_method)
+    amount_text = format_t_amount(amount) if amount else "待客服填寫"
+    description = (
+        f"下單用戶：<@{customer_id}>\n\n"
+        f"訂單類別：{category_label}\n"
+        f"訂單項目：{item}\n"
+        f"數量：{quantity} 單\n"
+        f"訂單總價：{amount_text}\n"
+        f"付款方式：{payment_method or '尚未選擇'}\n"
+    )
+
+    if submitted and dispatch_url:
+        description += "\n✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"
+        description += f"派單訊息：{dispatch_url}"
+    elif amount and payment_info:
+        description += "\n請闆闆確認總價後付款，付款完成再通知客服。"
+    else:
+        description += "\n請先選擇付款方式，完成後按「送出」。送出後會請客服填寫本次訂單價格。"
+
+    embed = discord.Embed(
+        title="付款方式",
+        description=description,
+        color=discord.Color.green() if submitted else discord.Color.gold(),
+    )
+
+    if companion_preference is not None:
+        embed.add_field(name="指定選項", value=companion_preference, inline=False)
+
+    if amount and payment_info:
+        embed.add_field(name="付款資訊", value=f"```text\n{payment_info}\n```", inline=False)
+
+    return embed
+
+
+class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
+    amount = discord.ui.TextInput(
+        label="本次訂單總價",
+        placeholder="例如：1275、NT$1,275、750+595",
+        required=True,
+        max_length=100,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int):
+        super().__init__()
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            return
+
+        if not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以填寫訂單價格。", ephemeral=True)
+            return
+
+        if interaction.guild is None or not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            return
+
+        parsed_amount = parse_receipt_amount(str(self.amount.value))
+        if parsed_amount is None or parsed_amount <= 0:
+            await interaction.response.send_message(
+                "金額欄位無法辨識，請輸入可辨識的數字，例如：1275、NT$1275、1275T。",
+                ephemeral=True,
+            )
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data["customer_id"] = self.customer_id
+        data["amount"] = parsed_amount
+        data["total_amount"] = parsed_amount
+        data["amount_text"] = format_t_amount(parsed_amount)
+        data["amount_set_at"] = get_taipei_now_iso()
+        data["amount_set_by"] = interaction.user.id
+        remember_order_data(self.channel_id, data)
+
+        reward_result = await add_customer_reward_from_order(
+            guild=interaction.guild,
+            order_channel_id=self.channel_id,
+            customer_id=self.customer_id,
+            amount_text=str(parsed_amount),
+            notify_channel=interaction.channel,
+        )
+
+        await send_order_log(
+            interaction.guild,
+            title="訂單價格已確認",
+            fields=[
+                ("顧客", f"<@{self.customer_id}>", True),
+                ("金額", format_t_amount(parsed_amount), True),
+                ("填寫人員", interaction.user.mention, True),
+                ("票口", interaction.channel.mention, False),
+            ],
+            color=discord.Color.gold(),
+        )
+
+        await finalize_payment_and_dispatch(
+            interaction=interaction,
+            customer_id=self.customer_id,
+            channel_id=self.channel_id,
+            reward_result=reward_result,
+        )
+
+
+class StaffOrderAmountView(discord.ui.View):
+    def __init__(self, customer_id: int, channel_id: int):
+        super().__init__(timeout=86400)
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+
+    @discord.ui.button(
+        label="填寫訂單價格",
+        style=discord.ButtonStyle.primary,
+        custom_id="staff_order_amount_button",
+    )
+    async def fill_amount(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            return
+
+        if not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以填寫訂單價格。", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(OrderAmountModal(self.customer_id, self.channel_id))
+
+
+async def send_staff_amount_panel(
+    interaction: discord.Interaction,
+    customer_id: int,
+    channel_id: int,
+) -> None:
+    if not isinstance(interaction.channel, discord.TextChannel):
+        await interaction.followup.send("無法確認目前票口頻道。", ephemeral=True)
+        return
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(channel_id, {})
+    panel_message_id = _to_int(data.get("amount_panel_message_id"))
+    if panel_message_id is not None:
+        await interaction.followup.send("已通知客服填寫訂單價格，請不要重複送出。", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="等待客服填寫訂單價格",
+        description=(
+            f"下單用戶：<@{customer_id}>\n"
+            "請客服確認本次訂單總價。填寫後會更新付款面板、結算 VIP / 點數，並送出派單。"
+        ),
+        color=discord.Color.gold(),
+    )
+    message = await interaction.channel.send(
+        embed=embed,
+        view=StaffOrderAmountView(customer_id, channel_id),
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+    data["amount_panel_message_id"] = message.id
+    remember_order_data(channel_id, data)
+    await interaction.followup.send("已送出訂單價格面板，請客服填寫本次訂單總價。", ephemeral=True)
+
+
+async def finalize_payment_and_dispatch(
+    *,
+    interaction: discord.Interaction,
+    customer_id: int,
+    channel_id: int,
+    reward_result: str | None = None,
+) -> None:
+    guild = interaction.guild
+
+    if guild is None:
+        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not isinstance(interaction.channel, discord.TextChannel):
+        await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+        return
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+    category = data.get("category")
+    item = data.get("item")
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    companion_preference = data.get("companion_preference")
+    payment_method = data.get("payment_method")
+    parsed_amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
+
+    if category is None or item is None:
+        await interaction.response.send_message("找不到訂單資料，請回到自助下單面板重新選擇。", ephemeral=True)
+        return
+
+    if payment_method is None:
+        await interaction.response.send_message("請先選擇付款方式，再按送出。", ephemeral=True)
+        return
+
+    if parsed_amount <= 0:
+        if isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user):
+            await interaction.response.send_modal(OrderAmountModal(customer_id, channel_id))
+        else:
+            await interaction.response.defer(ephemeral=True)
+            await send_staff_amount_panel(interaction, customer_id, channel_id)
+        return
+
+    if data.get("dispatch_message_id") is not None:
+        dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+        dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+        dispatch_channel = guild.get_channel(dispatch_channel_id)
+        if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
+            message = f"這張單已經送出派單，請不要重複送出。\n派單訊息：https://discord.com/channels/{guild.id}/{dispatch_channel.id}/{dispatch_message_id}"
+        else:
+            message = "這張單已經送出派單，請不要重複送出。"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+        return
+
+    if data.get("dispatch_submitting"):
+        message = "這張單正在送出派單，請稍等，不要重複點擊。"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+        return
+
+    item_category = ORDER_ITEM_TO_CATEGORY.get(item)
+
+    if item_category != category:
+        await interaction.response.send_message(
+            "你選擇的訂單類別與訂單項目不一致，請回到自助下單面板重新選擇。",
+            ephemeral=True,
+        )
+        return
+
+    if item in SPECIAL_COMPANION_ITEMS and companion_preference is None:
+        await interaction.response.send_message(
+            "這個項目請先回到自助下單面板選擇「不指定陪玩/打手」或「指定陪玩/打手」。",
+            ephemeral=True,
+        )
+        return
+
+    if item not in QUANTITY_SELECT_ITEMS:
+        quantity = 1
+        data["quantity"] = 1
+        remember_order_data(channel_id, data)
+    elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
+        await interaction.response.send_message("數量選擇異常，請回到自助下單面板重新選擇。", ephemeral=True)
+        return
+
+    if companion_preference is None:
+        companion_preference = "不指定陪玩/打手"
+        data["companion_preference"] = companion_preference
+        remember_order_data(channel_id, data)
+
+    dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
+
+    if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
+        await interaction.response.send_message(
+            "找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。",
+            ephemeral=True,
+        )
+        return
+
+    category_label = ORDER_CATEGORY_LABELS[category]
+    data["customer_id"] = customer_id
+    data["amount"] = parsed_amount
+    data["total_amount"] = parsed_amount
+    data["amount_text"] = format_t_amount(parsed_amount)
+    remember_order_data(channel_id, data)
+
+    embed = build_self_service_order_embed(
+        customer_mention=f"<@{customer_id}>",
+        category_label=category_label,
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        source_channel=interaction.channel,
+        companion_preference=companion_preference,
+    )
+    embed.add_field(name="訂單總價", value=format_t_amount(parsed_amount), inline=True)
+
+    data["dispatch_submitting"] = True
+    remember_order_data(channel_id, data)
+
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True)
+
+    try:
+        dispatch_message = await dispatch_channel.send(
+            embed=embed,
+            view=DispatchClaimView(
+                customer_id=customer_id,
+                category_label=category_label,
+                item=item,
+                quantity=quantity,
+                payment_method=payment_method,
+                source_channel_id=interaction.channel.id,
+                companion_preference=companion_preference,
+            ),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+    except discord.HTTPException as e:
+        data.pop("dispatch_submitting", None)
+        remember_order_data(channel_id, data)
+        await interaction.followup.send(f"派單送出失敗：{e}", ephemeral=True)
+        return
+
+    ORDER_CLAIMS[dispatch_message.id] = {
+        "companion": set(),
+        "booster": set(),
+        "locked": False,
+        "customer_id": customer_id,
+        "category_label": category_label,
+        "item": item,
+        "quantity": quantity,
+        "payment_method": payment_method,
+        "amount": parsed_amount,
+        "total_amount": parsed_amount,
+        "source_channel_id": interaction.channel.id,
+        "companion_preference": companion_preference,
+        "dispatch_channel_id": dispatch_channel.id,
+    }
+    data["quantity"] = quantity
+    data["dispatch_message_id"] = dispatch_message.id
+    data["dispatch_channel_id"] = dispatch_channel.id
+    data["closed"] = False
+    data["payment_submitted_at"] = get_taipei_now_iso()
+    data["payment_submitted_by"] = interaction.user.id
+    data.pop("dispatch_submitting", None)
+    remember_order_data(interaction.channel.id, data)
+    remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
+
+    await log_self_service_proxy_action(
+        interaction,
+        customer_id,
+        "送出派單",
+        f"{category_label}｜{item} x{quantity}｜{payment_method}｜{format_t_amount(parsed_amount)}",
+    )
+
+    await send_order_log(
+        guild,
+        title="新自助下單已派單",
+        fields=[
+            ("顧客", f"<@{customer_id}>", True),
+            ("訂單類別", category_label, True),
+            ("訂單項目", item, True),
+            ("數量", f"{quantity} 單", True),
+            ("訂單總價", format_t_amount(parsed_amount), True),
+            ("付款方式", payment_method, True),
+            ("指定選項", companion_preference, True),
+            ("送出人員", interaction.user.mention, True),
+            ("是否代操作", "是" if interaction.user.id != customer_id else "否", True),
+            ("票口", interaction.channel.mention, False),
+            ("派單訊息", dispatch_message.jump_url, False),
+        ],
+        color=discord.Color.blue(),
+    )
+
+    submitted_embed = build_payment_method_embed(
+        customer_id=customer_id,
+        category_label=category_label,
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        companion_preference=companion_preference,
+        amount=parsed_amount,
+        submitted=True,
+        dispatch_url=dispatch_message.jump_url,
+    )
+
+    payment_channel_id = _to_int(data.get("payment_channel_id"), interaction.channel.id) or interaction.channel.id
+    payment_message_id = _to_int(data.get("payment_message_id"))
+    payment_channel = guild.get_channel(payment_channel_id)
+
+    if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
+        try:
+            payment_message = await payment_channel.fetch_message(payment_message_id)
+            await payment_message.edit(
+                embed=submitted_embed,
+                view=PaymentMethodView(customer_id=customer_id, channel_id=channel_id, submitted=True),
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+        except discord.HTTPException:
+            pass
+
+    amount_panel_message_id = _to_int(data.get("amount_panel_message_id"))
+    if amount_panel_message_id is not None:
+        try:
+            panel_message = await interaction.channel.fetch_message(amount_panel_message_id)
+            await panel_message.edit(view=None)
+        except discord.HTTPException:
+            pass
+        data.pop("amount_panel_message_id", None)
+        remember_order_data(interaction.channel.id, data)
+
+    response_text = f"已確認訂單總價 {format_t_amount(parsed_amount)}，並送出派單：{dispatch_message.jump_url}"
+    if reward_result:
+        response_text += f"\n\n{reward_result}"
+    await interaction.followup.send(response_text, ephemeral=True)
+
+    operation_embed = discord.Embed(
+        title="訂單操作",
+        description="請客服從下拉式清單選擇後，按下確認。",
+        color=discord.Color.green(),
+    )
+
+    await interaction.channel.send(embed=operation_embed, view=StaffOrderOperationView())
+
+
 class PaymentMethodSelect(discord.ui.Select):
     def __init__(self, customer_id: int, channel_id: int):
         self.customer_id = customer_id
@@ -2585,26 +3016,23 @@ class PaymentMethodSelect(discord.ui.Select):
             selected_method,
         )
 
-        payment_info = {
-            "轉帳": (
-                "銀行轉帳-國泰\n"
-                "代碼：013\n"
-                "帳號：135700021419"
-            ),
-            "街口": (
-                "街口支付\n"
-                "代碼：396\n"
-                "帳號：900884222"
-            ),
-        }.get(selected_method)
+        category = data.get("category")
+        item = data.get("item")
+        quantity = _to_int(data.get("quantity"), 1) or 1
+        companion_preference = data.get("companion_preference")
+        amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
 
-        if payment_info is not None:
-            await interaction.response.send_message(
-                f"已選擇付款方式：{selected_method}\n"
-                f"請闆闆先付款再幫我們按送出喔~\n\n"
-                f"```text\n{payment_info}\n```",
-                ephemeral=True
+        if category is not None and item is not None:
+            payment_embed = build_payment_method_embed(
+                customer_id=self.customer_id,
+                category_label=ORDER_CATEGORY_LABELS.get(category, str(category)),
+                item=str(item),
+                quantity=quantity,
+                payment_method=selected_method,
+                companion_preference=companion_preference,
+                amount=amount or None,
             )
+            await interaction.response.edit_message(embed=payment_embed, view=self.view)
         else:
             await interaction.response.defer()
 
@@ -2635,231 +3063,11 @@ class PaymentMethodView(discord.ui.View):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以送出付款方式。", ephemeral=True)
             return
 
-        guild = interaction.guild
-
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
-            return
-
-        data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
-        category = data.get("category")
-        item = data.get("item")
-        quantity = _to_int(data.get("quantity"), 1) or 1
-        companion_preference = data.get("companion_preference")
-        payment_method = data.get("payment_method")
-
-        if category is None or item is None:
-            await interaction.response.send_message("找不到訂單資料，請回到自助下單面板重新選擇。", ephemeral=True)
-            return
-
-        if payment_method is None:
-            await interaction.response.send_message("請先選擇付款方式，再按送出。", ephemeral=True)
-            return
-
-        if data.get("dispatch_message_id") is not None:
-            dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
-            dispatch_message_id = _to_int(data.get("dispatch_message_id"))
-            dispatch_channel = guild.get_channel(dispatch_channel_id)
-            if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
-                await interaction.response.send_message(
-                    f"這張單已經送出派單，請不要重複送出。\n派單訊息：https://discord.com/channels/{guild.id}/{dispatch_channel.id}/{dispatch_message_id}",
-                    ephemeral=True
-                )
-            else:
-                await interaction.response.send_message("這張單已經送出派單，請不要重複送出。", ephemeral=True)
-            return
-
-        if data.get("dispatch_submitting"):
-            await interaction.response.send_message("這張單正在送出派單，請稍等，不要重複點擊。", ephemeral=True)
-            return
-
-        item_category = ORDER_ITEM_TO_CATEGORY.get(item)
-
-        if item_category != category:
-            await interaction.response.send_message(
-                "你選擇的訂單類別與訂單項目不一致，請回到自助下單面板重新選擇。",
-                ephemeral=True
-            )
-            return
-
-        if item in SPECIAL_COMPANION_ITEMS and companion_preference is None:
-            await interaction.response.send_message(
-                "這個項目請先回到自助下單面板選擇「不指定陪玩/打手」或「指定陪玩/打手」。",
-                ephemeral=True
-            )
-            return
-
-        if item not in QUANTITY_SELECT_ITEMS:
-            quantity = 1
-            data["quantity"] = 1
-            remember_order_data(self.channel_id, data)
-        elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-            await interaction.response.send_message("數量選擇異常，請回到自助下單面板重新選擇。", ephemeral=True)
-            return
-
-        if companion_preference is None:
-            companion_preference = "不指定陪玩/打手"
-            data["companion_preference"] = companion_preference
-            remember_order_data(self.channel_id, data)
-
-        dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
-
-        if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。",
-                ephemeral=True
-            )
-            return
-
-        category_label = ORDER_CATEGORY_LABELS[category]
-        data["customer_id"] = self.customer_id
-        remember_order_data(self.channel_id, data)
-
-        embed = build_self_service_order_embed(
-            customer_mention=f"<@{self.customer_id}>",
-            category_label=category_label,
-            item=item,
-            quantity=quantity,
-            payment_method=payment_method,
-            source_channel=interaction.channel,
-            companion_preference=companion_preference
+        await finalize_payment_and_dispatch(
+            interaction=interaction,
+            customer_id=self.customer_id,
+            channel_id=self.channel_id,
         )
-
-        data["dispatch_submitting"] = True
-        remember_order_data(self.channel_id, data)
-
-        await interaction.response.defer(ephemeral=True)
-
-        try:
-            dispatch_message = await dispatch_channel.send(
-                embed=embed,
-                view=DispatchClaimView(
-                    customer_id=self.customer_id,
-                    category_label=category_label,
-                    item=item,
-                    quantity=quantity,
-                    payment_method=payment_method,
-                    source_channel_id=interaction.channel.id,
-                    companion_preference=companion_preference
-                ),
-                allowed_mentions=discord.AllowedMentions(
-                    users=True,
-                    roles=False,
-                    everyone=False
-                )
-            )
-        except discord.HTTPException as e:
-            data.pop("dispatch_submitting", None)
-            remember_order_data(self.channel_id, data)
-            await interaction.followup.send(f"派單送出失敗：{e}", ephemeral=True)
-            return
-
-        ORDER_CLAIMS[dispatch_message.id] = {
-            "companion": set(),
-            "booster": set(),
-            "locked": False,
-            "customer_id": self.customer_id,
-            "category_label": category_label,
-            "item": item,
-            "quantity": quantity,
-            "payment_method": payment_method,
-            "source_channel_id": interaction.channel.id,
-            "companion_preference": companion_preference,
-            "dispatch_channel_id": dispatch_channel.id,
-        }
-        data["quantity"] = quantity
-        data["dispatch_message_id"] = dispatch_message.id
-        data["dispatch_channel_id"] = dispatch_channel.id
-        data["closed"] = False
-        data["payment_submitted_at"] = get_taipei_now_iso()
-        data["payment_submitted_by"] = interaction.user.id
-        data.pop("dispatch_submitting", None)
-        remember_order_data(interaction.channel.id, data)
-        remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
-
-        await log_self_service_proxy_action(
-            interaction,
-            self.customer_id,
-            "送出派單",
-            f"{category_label}｜{item} x{quantity}｜{payment_method}",
-        )
-
-        await send_order_log(
-            guild,
-            title="新自助下單已派單",
-            fields=[
-                ("顧客", f"<@{self.customer_id}>", True),
-                ("訂單類別", category_label, True),
-                ("訂單項目", item, True),
-                ("數量", f"{quantity} 單", True),
-                ("付款方式", payment_method, True),
-                ("指定選項", companion_preference, True),
-                ("送出人員", interaction.user.mention, True),
-                ("是否代操作", "是" if interaction.user.id != self.customer_id else "否", True),
-                ("票口", interaction.channel.mention, False),
-                ("派單訊息", dispatch_message.jump_url, False),
-            ],
-            color=discord.Color.blue(),
-        )
-
-        submitted_embed = discord.Embed(
-            title="付款方式",
-            description=(
-                f"下單用戶：<@{self.customer_id}>\n\n"
-                f"訂單類別：{category_label}\n"
-                f"訂單項目：{item}\n"
-                f"數量：{quantity} 單\n"
-                f"付款方式：{payment_method}\n\n"
-                "✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"
-                f"派單訊息：{dispatch_message.jump_url}"
-            ),
-            color=discord.Color.green()
-        )
-
-        if companion_preference is not None:
-            submitted_embed.add_field(
-                name="指定選項",
-                value=companion_preference,
-                inline=False
-            )
-
-        try:
-            await interaction.message.edit(
-                embed=submitted_embed,
-                view=PaymentMethodView(
-                    customer_id=self.customer_id,
-                    channel_id=self.channel_id,
-                    submitted=True,
-                ),
-                allowed_mentions=discord.AllowedMentions(
-                    users=True,
-                    roles=False,
-                    everyone=False
-                )
-            )
-        except discord.HTTPException:
-            pass
-
-        await interaction.followup.send(
-            f"已送出派單：{dispatch_message.jump_url}",
-            ephemeral=True
-        )
-
-        operation_embed = discord.Embed(
-            title="訂單操作",
-            description="請客服從下拉式清單選擇後，按下確認。",
-            color=discord.Color.green()
-        )
-
-        await interaction.channel.send(
-            embed=operation_embed,
-            view=StaffOrderOperationView()
-        )
-
 
 class SelfServiceOrderView(discord.ui.View):
     def __init__(self, customer_id: int, channel_id: int, selected_category: str | None = None):
@@ -2933,28 +3141,17 @@ class SelfServiceOrderView(discord.ui.View):
             remember_order_data(self.channel_id, data)
 
         category_label = ORDER_CATEGORY_LABELS[category]
-        payment_embed = discord.Embed(
-            title="付款方式",
-            description=(
-                f"下單用戶：<@{self.customer_id}>\n\n"
-                f"訂單類別：{category_label}\n"
-                f"訂單項目：{item}\n"
-                f"數量：{quantity} 單\n"
-                "請選擇付款方式，完成後按「送出」。"
-            ),
-            color=discord.Color.gold()
+        payment_embed = build_payment_method_embed(
+            customer_id=self.customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            companion_preference=data.get("companion_preference"),
         )
-
-        if data.get("companion_preference") is not None:
-            payment_embed.add_field(
-                name="指定選項",
-                value=data["companion_preference"],
-                inline=False
-            )
 
         await interaction.response.defer()
 
-        await interaction.channel.send(
+        payment_message = await interaction.channel.send(
             embed=payment_embed,
             view=PaymentMethodView(
                 customer_id=self.customer_id,
@@ -2966,6 +3163,10 @@ class SelfServiceOrderView(discord.ui.View):
                 everyone=False
             )
         )
+        data["payment_channel_id"] = interaction.channel.id
+        data["payment_message_id"] = payment_message.id
+        remember_order_data(self.channel_id, data)
+
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
