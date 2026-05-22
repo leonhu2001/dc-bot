@@ -1,0 +1,101 @@
+{% extends "layout.html" %}
+
+{% block page_title %}歷史訂單{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <h2>歷史訂單</h2>
+        <p>這裡顯示 stored / closed / cancelled 訂單。主要後台只保留 active 訂單，歷史資料不刪除。</p>
+
+        <div class="actions">
+            <a class="button secondary" href="/admin">回總控後台</a>
+            <a class="button {% if selected_status == 'all' %}secondary{% endif %}" href="/admin/orders/history">全部</a>
+            <a class="button {% if selected_status == stored_status %}secondary{% endif %}" href="/admin/orders/history?status={{ stored_status }}">存單</a>
+            <a class="button {% if selected_status == closed_status %}secondary{% endif %}" href="/admin/orders/history?status={{ closed_status }}">已結單</a>
+            <a class="button {% if selected_status == cancelled_status %}secondary{% endif %}" href="/admin/orders/history?status={{ cancelled_status }}">已取消</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>訂單列表</h2>
+
+        {% if orders %}
+            <div class="admin-order-list">
+                {% for order in orders %}
+                    <article class="admin-order-card">
+                        <div class="order-card-header">
+                            <div>
+                                <p class="order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
+                                <h3>{{ order.category }}｜{{ order.item }}</h3>
+                            </div>
+
+                            <span class="badge">{{ order.status }}</span>
+                        </div>
+
+                        <div class="order-meta">
+                            <div>
+                                <span>老闆</span>
+                                <strong>{{ order.customer_display_name or order.customer_discord_id or "未記錄" }}</strong>
+                            </div>
+
+                            <div>
+                                <span>金額</span>
+                                <strong>{{ order.amount }}T</strong>
+                            </div>
+
+                            <div>
+                                <span>數量</span>
+                                <strong>{{ order.quantity }} 單</strong>
+                            </div>
+
+                            <div>
+                                <span>對接客服</span>
+                                <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="admin-section">
+                            <h4>接單紀錄</h4>
+
+                            {% if order.assignments %}
+                                <div class="chip-list">
+                                    {% for assignment in order.assignments %}
+                                        <span class="chip">
+                                            {{ assignment.worker_display_name or assignment.worker_discord_id }}
+                                            {% if assignment.is_active %}｜active{% else %}｜已移除{% endif %}
+                                            {% if assignment.has_named_bonus %}｜掛名{% endif %}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="muted-text">沒有接單紀錄。</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="admin-section">
+                            <h4>分潤紀錄</h4>
+
+                            {% if order.payouts %}
+                                <div class="chip-list">
+                                    {% for payout in order.payouts %}
+                                        <span class="chip">
+                                            {{ payout.worker_display_name or payout.worker_discord_id }}｜{{ payout.final_payout }}T｜{{ payout.payout_status }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="muted-text">沒有打手分潤紀錄。</p>
+                            {% endif %}
+                        </div>
+
+                        {% if order.note %}
+                            <p class="order-note">{{ order.note }}</p>
+                        {% endif %}
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">目前沒有符合條件的歷史訂單。</div>
+        {% endif %}
+    </div>
+{% endblock %}

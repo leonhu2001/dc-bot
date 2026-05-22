@@ -11,6 +11,7 @@ from web.app.routers.admin import router as admin_router
 from web.app.routers.auth import router as auth_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
+from web.app.routers.order_history import router as order_history_router
 
 APP_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -33,6 +34,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(dispatch_router)
 app.include_router(payouts_router)
+app.include_router(order_history_router)
 
 
 @app.on_event("startup")
