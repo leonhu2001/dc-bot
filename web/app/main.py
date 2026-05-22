@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from shared.db import create_all_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
+from web.app.routers.admin_staff import router as admin_staff_router
 from web.app.routers.admin_audit import router as admin_audit_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
 from web.app.routers.admin_payout_summary import router as admin_payout_summary_router
@@ -36,6 +37,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(admin_staff_router)
 app.include_router(admin_audit_router)
 app.include_router(admin_payouts_router)
 app.include_router(admin_payout_summary_router)
