@@ -589,3 +589,55 @@ p {
     font-size: 12px;
 }
 /* === compact admin layout override end === */
+
+/* Compact payout pages */
+.compact-panel {
+    padding: 14px;
+    margin-bottom: 12px;
+}
+
+.compact-grid {
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.compact-number {
+    font-size: 26px;
+    margin: 4px 0;
+}
+
+.page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.payout-table-wrap {
+    overflow-x: auto;
+}
+
+.payout-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.payout-table th,
+.payout-table td {
+    border-bottom: 1px solid #374151;
+    padding: 10px 8px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.payout-table th {
+    color: #93c5fd;
+    font-size: 13px;
+}
+
+.small-button {
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 13px;
+}
+
