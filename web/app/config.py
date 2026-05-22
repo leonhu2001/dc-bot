@@ -10,11 +10,13 @@ load_dotenv(ENV_PATH)
 
 
 class WebConfig:
+    BASE_DIR = BASE_DIR
+
     DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", "")
     DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "")
     DISCORD_REDIRECT_URI = os.getenv(
         "DISCORD_REDIRECT_URI",
-        "http://178.128.85.16:8000/auth/discord/callback",
+        "http://127.0.0.1:8000/auth/discord/callback",
     )
     DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
     DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
@@ -37,7 +39,11 @@ class WebConfig:
         if role_id.strip()
     }
 
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///../bot.db")
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        f"sqlite:///{BASE_DIR / 'web_dashboard.db'}",
+    )
+
     WEB_SECRET_KEY = os.getenv("WEB_SECRET_KEY", "change-this-secret")
 
 
