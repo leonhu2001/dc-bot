@@ -65,12 +65,8 @@ async def admin_staff_page(
             member for member in active_members if member.is_companion
         ]
 
-        members = all_members
-
-        if status == "active":
-            members = [member for member in members if member.is_active]
-        elif status == "inactive":
-            members = [member for member in members if not member.is_active]
+        # 人員名單頁只顯示目前啟用/可接單的人員；停用人員不放在日常篩選中。
+        members = [member for member in all_members if member.is_active]
 
         if role == "customer_service":
             members = [member for member in members if member.is_customer_service]
@@ -89,10 +85,7 @@ async def admin_staff_page(
             ]
 
         members.sort(
-            key=lambda member: (
-                not bool(member.is_active),
-                str(member.display_name or member.username or member.discord_id),
-            )
+            key=lambda member: str(member.display_name or member.username or member.discord_id)
         )
 
         stats = {

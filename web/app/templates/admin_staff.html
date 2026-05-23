@@ -3,6 +3,69 @@
 {% block page_title %}人員名單{% endblock %}
 
 {% block content %}
+<style>
+    .staff-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .staff-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin: 14px 0;
+    }
+
+    .staff-stat-card {
+        min-width: 0;
+    }
+
+    .staff-stat-card h2 {
+        margin-bottom: 8px;
+    }
+
+    .staff-filter-form {
+        display: grid;
+        grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr) auto;
+        gap: 12px;
+        align-items: end;
+    }
+
+    .staff-role-chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    @media (max-width: 980px) {
+        .staff-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .staff-filter-form {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .staff-stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .staff-page-header {
+            display: block;
+        }
+
+        .staff-page-header form {
+            margin-top: 12px;
+        }
+    }
+</style>
+
     {% if message %}
         <div class="notice success-box">{{ message }}</div>
     {% endif %}
@@ -12,12 +75,11 @@
     {% endif %}
 
     <div class="panel">
-        <div class="order-card-header">
+        <div class="staff-page-header">
             <div>
                 <h2>人員名單</h2>
                 <p class="muted-text">
-                    分類完全依照 Discord 身分組：打手 1503701170504339458，陪玩 1503706721883783218。
-                    同一個人同時有兩個身分組時，打手和陪玩都會計入。
+                    分類完全依照 Discord 身分組：客服、打手、陪玩。同一個人同時有多個身分組時，會在對應分類中計入。
                 </p>
             </div>
             <form method="post" action="/admin/staff/sync">
@@ -26,26 +88,26 @@
         </div>
     </div>
 
-    <div class="grid">
-        <div class="panel">
-            <h2>啟用人員</h2>
+    <div class="staff-stats-grid">
+        <div class="panel staff-stat-card">
+            <h2>可接單人員</h2>
             <p class="big-number">{{ stats.active }}</p>
-            <p>目前 active 的同步人員。</p>
+            <p>目前可接單的同步人員。</p>
         </div>
 
-        <div class="panel">
-            <h2>客服 / 總控</h2>
+        <div class="panel staff-stat-card">
+            <h2>客服</h2>
             <p class="big-number">{{ stats.customer_service }}</p>
-            <p>有客服或總控身分組。</p>
+            <p>有客服身分組。</p>
         </div>
 
-        <div class="panel">
+        <div class="panel staff-stat-card">
             <h2>打手</h2>
             <p class="big-number">{{ stats.worker }}</p>
             <p>有打手身分組。</p>
         </div>
 
-        <div class="panel">
+        <div class="panel staff-stat-card">
             <h2>陪玩</h2>
             <p class="big-number">{{ stats.companion }}</p>
             <p>有陪玩身分組。</p>
@@ -55,18 +117,12 @@
     <div class="panel">
         <h2>篩選</h2>
 
-        <form class="admin-add-worker-form" method="get" action="/admin/staff">
+        <form class="staff-filter-form" method="get" action="/admin/staff">
             <select class="input" name="role">
-                <option value="all" {% if role == "all" %}selected{% endif %}>全部身份</option>
-                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服 / 總控</option>
+                <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
+                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
                 <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
                 <option value="companion" {% if role == "companion" %}selected{% endif %}>陪玩</option>
-            </select>
-
-            <select class="input" name="status">
-                <option value="active" {% if status == "active" %}selected{% endif %}>啟用</option>
-                <option value="inactive" {% if status == "inactive" %}selected{% endif %}>停用</option>
-                <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
             </select>
 
             <input class="input" type="text" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
@@ -88,11 +144,10 @@
                                 <p class="muted-text">ID：{{ member.discord_id }}</p>
                             </div>
 
-                            <div class="chip-list">
-                                {% if member.is_customer_service %}<span class="chip">客服 / 總控</span>{% endif %}
+                            <div class="staff-role-chips">
+                                {% if member.is_customer_service %}<span class="chip">客服</span>{% endif %}
                                 {% if member.is_worker %}<span class="chip">打手</span>{% endif %}
                                 {% if member.is_companion %}<span class="chip">陪玩</span>{% endif %}
-                                {% if member.is_active %}<span class="chip">啟用</span>{% else %}<span class="chip">停用</span>{% endif %}
                             </div>
                         </div>
 
