@@ -1,21 +1,35 @@
 from __future__ import annotations
 
-from datetime import datetime
+import csv
+import io
+import sqlite3
 from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
 
-from shared.db import SessionLocal
-from shared.models import CustomerServicePayout, PayoutStatus, WebOrder, WorkerPayout
+try:
+    from web.app.config import config
+except Exception:
+    config = None
 
-router = APIRouter(tags=["admin-payout-summary"])
+
+router = APIRouter(tags=["admin_payout_summary"])
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def get_db_path() -> str:
+    if config is not None:
+        url = getattr(config, "DATABASE_URL", "")
+
+        if isinstance(url, str) and url.startswith("sqlite:///"):
+            return url.replace("sqlite:///", "", 1)
+
+    return str(Path.cwd() / "web_dashboard.db")
 
 
 def get_current_user(request: Request) -> dict | None:
@@ -34,39 +48,26 @@ def require_admin_user(request: Request) -> dict | None:
     return user
 
 
-def parse_month_range(month: str | None) -> tuple[datetime | None, datetime | None]:
+def normalize_role(role: str | None) -> str:
+    if role in {"all", "worker", "customer_service"}:
+        return role
+
+    return "all"
+
+
+def build_month_sql(month: str | None, alias: str) -> tuple[str, list[str]]:
+    month = (month or "").strip()
+
     if not month:
-        return None, None
+        return "", []
 
-    try:
-        start = datetime.strptime(month, "%Y-%m")
-    except ValueError:
-        return None, None
-
-    if start.month == 12:
-        end = datetime(start.year + 1, 1, 1)
-    else:
-        end = datetime(start.year, start.month + 1, 1)
-
-    return start, end
+    return f" AND strftime('%Y-%m', {alias}.created_at) = ? ", [month]
 
 
-def apply_month_filter(statement, payout_model, month: str | None):
-    start, end = parse_month_range(month)
-
-    if start is not None:
-        statement = statement.where(payout_model.created_at >= start)
-
-    if end is not None:
-        statement = statement.where(payout_model.created_at < end)
-
-    return statement
-
-
-def empty_person_row(discord_id: str, display_name: str) -> dict:
+def empty_person(discord_id: str, display_name: str) -> dict:
     return {
-        "discord_id": str(discord_id or ""),
-        "display_name": display_name or str(discord_id or ""),
+        "discord_id": discord_id,
+        "display_name": display_name or discord_id,
         "roles": set(),
         "role_label": "人員",
         "unpaid_total": 0,
@@ -75,123 +76,166 @@ def empty_person_row(discord_id: str, display_name: str) -> dict:
     }
 
 
-def add_person_item(rows_by_id: dict[str, dict], *, discord_id, display_name, role, amount, order, created_at):
+def add_person(
+    people: dict[str, dict],
+    *,
+    discord_id,
+    display_name,
+    role: str,
+    amount,
+    order_no,
+    category,
+    item,
+):
     discord_id = str(discord_id or "").strip()
 
     if not discord_id:
         return
 
-    row = rows_by_id.setdefault(
+    person = people.setdefault(
         discord_id,
-        empty_person_row(discord_id=discord_id, display_name=display_name or discord_id),
+        empty_person(discord_id, display_name or discord_id),
     )
 
-    if display_name and row["display_name"] == discord_id:
-        row["display_name"] = display_name
+    if display_name and person["display_name"] == discord_id:
+        person["display_name"] = display_name
 
-    row["roles"].add(role)
-    row["unpaid_total"] += int(amount or 0)
-    row["unpaid_count"] += 1
+    amount = int(amount or 0)
 
-    row["items"].append(
+    person["roles"].add(role)
+    person["unpaid_total"] += amount
+    person["unpaid_count"] += 1
+    person["items"].append(
         {
-            "order_no": getattr(order, "bot_order_no", None) or f"WEB-{getattr(order, 'id', '')}",
-            "category": getattr(order, "category", "") or "",
-            "item": getattr(order, "item", "") or "",
-            "amount": int(amount or 0),
-            "created_at": created_at,
+            "order_no": order_no,
+            "category": category or "",
+            "item": item or "",
             "role": "打手" if role == "worker" else "客服",
+            "amount": amount,
         }
     )
 
 
-def finalize_rows(rows_by_id: dict[str, dict], q: str | None) -> list[dict]:
+def finalize_people(people: dict[str, dict], q: str | None) -> list[dict]:
     keyword = (q or "").strip().lower()
     rows = []
 
-    for row in rows_by_id.values():
-        roles = row.pop("roles", set())
+    for person in people.values():
+        roles = person.pop("roles", set())
 
         if roles == {"worker"}:
-            row["role_label"] = "打手"
+            person["role_label"] = "打手"
         elif roles == {"customer_service"}:
-            row["role_label"] = "客服"
+            person["role_label"] = "客服"
         elif roles:
-            row["role_label"] = "混合"
+            person["role_label"] = "混合"
 
-        row["items"].sort(
-            key=lambda item: str(item.get("created_at") or ""),
+        person["items"].sort(
+            key=lambda item: str(item["order_no"]),
             reverse=True,
         )
 
         if keyword:
-            haystack = f'{row["display_name"]} {row["discord_id"]}'.lower()
+            haystack = f'{person["display_name"]} {person["discord_id"]}'.lower()
 
             if keyword not in haystack:
                 continue
 
-        rows.append(row)
+        rows.append(person)
 
     return sorted(
         rows,
-        key=lambda item: (-int(item["unpaid_total"] or 0), str(item["display_name"] or "")),
+        key=lambda row: (-int(row["unpaid_total"] or 0), str(row["display_name"] or "")),
     )
 
 
-def build_summary_rows(*, month: str | None, role: str | None, q: str | None) -> tuple[list[dict], dict]:
-    rows_by_id: dict[str, dict] = {}
+def fetch_summary_rows(*, month: str | None, role: str | None, q: str | None) -> tuple[list[dict], dict]:
+    role = normalize_role(role)
+    people: dict[str, dict] = {}
 
-    db = SessionLocal()
+    conn = sqlite3.connect(get_db_path())
+    conn.row_factory = sqlite3.Row
 
     try:
-        if role in {None, "", "all", "worker"}:
-            statement = (
-                select(WorkerPayout, WebOrder)
-                .join(WebOrder, WebOrder.id == WorkerPayout.order_id)
-                .where(WebOrder.status == "closed")
-                .where(WorkerPayout.payout_status == PayoutStatus.UNPAID.value)
-            )
-            statement = apply_month_filter(statement, WorkerPayout, month)
+        if role in {"all", "worker"}:
+            month_sql, params = build_month_sql(month, "p")
 
-            for payout, order in db.execute(statement).all():
-                add_person_item(
-                    rows_by_id,
-                    discord_id=payout.worker_discord_id,
-                    display_name=payout.worker_display_name or str(payout.worker_discord_id),
+            rows = conn.execute(
+                f"""
+                SELECT
+                    p.worker_discord_id AS discord_id,
+                    p.worker_display_name AS display_name,
+                    p.final_payout AS amount,
+                    w.bot_order_no,
+                    w.id AS web_order_id,
+                    w.category,
+                    w.item
+                FROM worker_payouts p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE w.status = 'closed'
+                  AND p.payout_status = 'unpaid'
+                  {month_sql}
+                ORDER BY p.id DESC
+                """,
+                params,
+            ).fetchall()
+
+            for row in rows:
+                add_person(
+                    people,
+                    discord_id=row["discord_id"],
+                    display_name=row["display_name"],
                     role="worker",
-                    amount=payout.final_payout,
-                    order=order,
-                    created_at=payout.created_at,
+                    amount=row["amount"],
+                    order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
+                    category=row["category"],
+                    item=row["item"],
                 )
 
-        if role in {None, "", "all", "customer_service"}:
-            statement = (
-                select(CustomerServicePayout, WebOrder)
-                .join(WebOrder, WebOrder.id == CustomerServicePayout.order_id)
-                .where(WebOrder.status == "closed")
-                .where(CustomerServicePayout.payout_status == PayoutStatus.UNPAID.value)
-            )
-            statement = apply_month_filter(statement, CustomerServicePayout, month)
+        if role in {"all", "customer_service"}:
+            month_sql, params = build_month_sql(month, "p")
 
-            for payout, order in db.execute(statement).all():
-                add_person_item(
-                    rows_by_id,
-                    discord_id=payout.customer_service_discord_id,
-                    display_name=payout.customer_service_display_name or str(payout.customer_service_discord_id),
+            rows = conn.execute(
+                f"""
+                SELECT
+                    p.customer_service_discord_id AS discord_id,
+                    p.customer_service_display_name AS display_name,
+                    p.payout_amount AS amount,
+                    w.bot_order_no,
+                    w.id AS web_order_id,
+                    w.category,
+                    w.item
+                FROM customer_service_payouts p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE w.status = 'closed'
+                  AND p.payout_status = 'unpaid'
+                  {month_sql}
+                ORDER BY p.id DESC
+                """,
+                params,
+            ).fetchall()
+
+            for row in rows:
+                add_person(
+                    people,
+                    discord_id=row["discord_id"],
+                    display_name=row["display_name"],
                     role="customer_service",
-                    amount=payout.payout_amount,
-                    order=order,
-                    created_at=payout.created_at,
+                    amount=row["amount"],
+                    order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
+                    category=row["category"],
+                    item=row["item"],
                 )
-    finally:
-        db.close()
 
-    rows = finalize_rows(rows_by_id, q=q)
+    finally:
+        conn.close()
+
+    rows = finalize_people(people, q=q)
 
     totals = {
-        "unpaid_total": sum(row["unpaid_total"] for row in rows),
-        "unpaid_count": sum(row["unpaid_count"] for row in rows),
         "person_count": len(rows),
+        "unpaid_total": sum(int(row["unpaid_total"] or 0) for row in rows),
+        "unpaid_count": sum(int(row["unpaid_count"] or 0) for row in rows),
     }
 
     return rows, totals
@@ -200,7 +244,7 @@ def build_summary_rows(*, month: str | None, role: str | None, q: str | None) ->
 @router.get("/admin/payouts/summary")
 async def admin_payout_summary(
     request: Request,
-    month: str | None = None,
+    month: str | None = "",
     role: str | None = "all",
     q: str | None = "",
 ):
@@ -218,11 +262,11 @@ async def admin_payout_summary(
             status_code=403,
         )
 
-    role = role if role in {"all", "worker", "customer_service"} else "all"
+    role = normalize_role(role)
     month = month or ""
     q = q or ""
 
-    rows, totals = build_summary_rows(month=month, role=role, q=q)
+    rows, totals = fetch_summary_rows(month=month, role=role, q=q)
 
     return templates.TemplateResponse(
         request=request,
@@ -242,7 +286,7 @@ async def admin_payout_summary(
 @router.get("/admin/payouts/summary.csv")
 async def admin_payout_summary_csv(
     request: Request,
-    month: str | None = None,
+    month: str | None = "",
     role: str | None = "all",
     q: str | None = "",
 ):
@@ -251,33 +295,28 @@ async def admin_payout_summary_csv(
     if not user:
         return RedirectResponse(url="/no-access", status_code=303)
 
-    role = role if role in {"all", "worker", "customer_service"} else "all"
-    rows, totals = build_summary_rows(month=month, role=role, q=q)
+    rows, totals = fetch_summary_rows(month=month, role=role, q=q)
 
-    lines = [
-        "身份,Discord ID,名稱,未支付總額,未支付筆數"
-    ]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["身份", "名稱", "Discord ID", "未支付", "筆數"])
 
     for row in rows:
-        values = [
+        writer.writerow([
             row["role_label"],
-            row["discord_id"],
             row["display_name"],
-            str(row["unpaid_total"]),
-            str(row["unpaid_count"]),
-        ]
-        safe_values = [value.replace('"', '""') for value in values]
-        lines.append(",".join(f'"{value}"' for value in safe_values))
+            row["discord_id"],
+            row["unpaid_total"],
+            row["unpaid_count"],
+        ])
 
-    lines.append(
-        f'"合計","","","{totals["unpaid_total"]}","{totals["unpaid_count"]}"'
-    )
+    writer.writerow(["合計", "", "", totals["unpaid_total"], totals["unpaid_count"]])
 
-    csv_text = "\ufeff" + "\n".join(lines) + "\n"
+    data = "\ufeff" + output.getvalue()
     filename = f"payout_unpaid_summary_{month or 'all'}_{role or 'all'}.csv"
 
     return StreamingResponse(
-        iter([csv_text.encode("utf-8-sig")]),
+        iter([data.encode("utf-8-sig")]),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
