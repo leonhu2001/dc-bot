@@ -2,6 +2,8 @@ import asyncio
 
 import discord
 
+from core.permissions import is_customer_staff
+
 
 _REVIEW_CHANNEL_ID: int | None = None
 
@@ -391,8 +393,11 @@ class ReviewButtonView(discord.ui.View):
         row=1,
     )
     async def close_without_review(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有這張票口的點單顧客可以關閉票口。", ephemeral=True)
+        is_customer = interaction.user.id == self.customer_id
+        is_staff = isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user)
+
+        if not is_customer and not is_staff:
+            await interaction.response.send_message("只有這張票口的點單顧客或客服可以關閉票口。", ephemeral=True)
             return
 
         channel = interaction.channel
