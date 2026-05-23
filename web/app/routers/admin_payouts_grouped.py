@@ -145,16 +145,17 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
 
 
 def group_rows(rows: list[dict]) -> list[dict]:
-    """依 Discord ID 合併分潤，不再把客服/打手身份拆成兩列。"""
+    """同一 Discord ID 合併統計，不分客服/打手拆列。"""
     grouped: dict[str, dict] = {}
 
     for row in rows:
-        person_id = str(row["person_id"] or "")
-        key = person_id or str(row["person_name"] or "")
+        person_id = str(row["person_id"] or "").strip()
+        key = person_id or str(row["person_name"] or "").strip()
 
         if key not in grouped:
             grouped[key] = {
                 "payout_role": "person",
+                "role_label": "人員",
                 "roles": set(),
                 "person_id": row["person_id"],
                 "person_name": row["person_name"],
@@ -192,8 +193,6 @@ def group_rows(rows: list[dict]) -> list[dict]:
             group["role_label"] = "客服"
         elif roles:
             group["role_label"] = "混合"
-        else:
-            group["role_label"] = "人員"
 
         result.append(group)
 
@@ -201,6 +200,7 @@ def group_rows(rows: list[dict]) -> list[dict]:
         result,
         key=lambda item: str(item["person_name"] or ""),
     )
+
 
 def build_summary(groups: list[dict]) -> dict:
     return {

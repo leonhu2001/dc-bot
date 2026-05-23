@@ -159,7 +159,7 @@
                                         <div class="amount-cell">{{ row.final_amount }}T</div>
                                         <div>
                                             <span class="status-chip {% if row.payout_status == 'paid' %}is-paid{% else %}is-unpaid{% endif %}">
-                                                {{ row.payout_status }}
+                                                {{ {'unpaid': '未支付', 'paid': '已支付'}.get(row.payout_status, row.payout_status) }}
                                             </span>
                                         </div>
                                     </div>
