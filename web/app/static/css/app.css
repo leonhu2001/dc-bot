@@ -1236,3 +1236,31 @@ p {
         gap: 12px !important;
     }
 }
+
+/* admin staff page */
+@media (min-width: 900px) {
+  .staff-stats,
+  .staff-summary,
+  .staff-summary-grid,
+  .admin-staff-stats,
+  .summary-grid,
+  .stats-grid,
+  .metric-grid,
+  .dashboard-stats {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    align-items: stretch !important;
+  }
+}
+
+/* 如果篩選列是 grid，也盡量維持一排 */
+.staff-filters,
+.filters-grid,
+.filter-grid,
+.admin-filters {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto !important;
+  gap: 12px !important;
+  align-items: end !important;
+}
