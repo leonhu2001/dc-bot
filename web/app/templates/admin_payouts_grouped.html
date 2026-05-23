@@ -91,9 +91,7 @@
                             <div class="person-left">
                                 <div class="person-avatar">{{ (group.person_name or '?')[:1] }}</div>
                                 <div>
-                                    <div class="person-role">
-                                        {% if group.payout_role == "worker" %}打手{% else %}客服{% endif %}
-                                    </div>
+                                    <div class="person-role">{{ group.role_label }}</div>
                                     <h3>{{ group.person_name }}</h3>
                                     <p>ID：{{ group.person_id }}</p>
                                 </div>

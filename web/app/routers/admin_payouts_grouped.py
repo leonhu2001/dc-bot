@@ -103,7 +103,7 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
                 p.created_at AS created_at
             FROM worker_payouts p
             LEFT JOIN web_orders o ON o.id = p.order_id
-            WHERE 1 = 1
+            WHERE o.status = 'closed'
             {month_sql}
             {status_sql}
             ORDER BY person_name ASC, p.created_at DESC, p.id DESC
@@ -133,7 +133,7 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
                 p.created_at AS created_at
             FROM customer_service_payouts p
             LEFT JOIN web_orders o ON o.id = p.order_id
-            WHERE 1 = 1
+            WHERE o.status = 'closed'
             {month_sql}
             {status_sql}
             ORDER BY person_name ASC, p.created_at DESC, p.id DESC
@@ -145,14 +145,17 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
 
 
 def group_rows(rows: list[dict]) -> list[dict]:
-    grouped: dict[tuple[str, str], dict] = {}
+    """依 Discord ID 合併分潤，不再把客服/打手身份拆成兩列。"""
+    grouped: dict[str, dict] = {}
 
     for row in rows:
-        key = (str(row["payout_role"]), str(row["person_id"] or ""))
+        person_id = str(row["person_id"] or "")
+        key = person_id or str(row["person_name"] or "")
 
         if key not in grouped:
             grouped[key] = {
-                "payout_role": row["payout_role"],
+                "payout_role": "person",
+                "roles": set(),
                 "person_id": row["person_id"],
                 "person_name": row["person_name"],
                 "unpaid_total": 0,
@@ -163,6 +166,11 @@ def group_rows(rows: list[dict]) -> list[dict]:
             }
 
         group = grouped[key]
+        group["roles"].add(row["payout_role"])
+
+        if not group.get("person_name") or str(group["person_name"]) == person_id:
+            group["person_name"] = row["person_name"]
+
         amount = int(row["final_amount"] or 0)
         group["all_total"] += amount
         group["count"] += 1
@@ -173,11 +181,26 @@ def group_rows(rows: list[dict]) -> list[dict]:
         else:
             group["unpaid_total"] += amount
 
-    return sorted(
-        grouped.values(),
-        key=lambda item: (item["payout_role"], str(item["person_name"] or "")),
-    )
+    result = []
 
+    for group in grouped.values():
+        roles = set(group.pop("roles", set()))
+
+        if roles == {"worker"}:
+            group["role_label"] = "打手"
+        elif roles == {"customer_service"}:
+            group["role_label"] = "客服"
+        elif roles:
+            group["role_label"] = "混合"
+        else:
+            group["role_label"] = "人員"
+
+        result.append(group)
+
+    return sorted(
+        result,
+        key=lambda item: str(item["person_name"] or ""),
+    )
 
 def build_summary(groups: list[dict]) -> dict:
     return {
@@ -257,39 +280,53 @@ async def update_group_status(
     if not user:
         return redirect_to_grouped(error="你沒有總控後台權限。")
 
-    payout_role = normalize_filter(payout_role, {"worker", "customer_service"}, "worker")
+    payout_role = normalize_filter(payout_role, {"person", "worker", "customer_service"}, "person")
     new_status = normalize_filter(new_status, {"unpaid", "paid"}, "unpaid")
     status = normalize_filter(status, {"all", "unpaid", "paid"}, "unpaid")
     role = normalize_filter(role, {"all", "worker", "customer_service"}, "all")
     month = (month or "").strip()
 
-    table = "worker_payouts" if payout_role == "worker" else "customer_service_payouts"
-    person_col = "worker_discord_id" if payout_role == "worker" else "customer_service_discord_id"
-
-    conditions = [f"{person_col} = ?"]
-    params: list[str] = [person_id]
-
-    if month:
-        conditions.append("strftime('%Y-%m', created_at) = ?")
-        params.append(month)
-
-    if status != "all":
-        conditions.append("payout_status = ?")
-        params.append(status)
-
     set_paid_at = "CURRENT_TIMESTAMP" if new_status == "paid" else "NULL"
-    sql = f"""
-        UPDATE {table}
-        SET payout_status = ?, paid_at = {set_paid_at}
-        WHERE {' AND '.join(conditions)}
-    """
+
+    def build_update_sql(table: str, person_col: str) -> tuple[str, list[str]]:
+        conditions = [f"{person_col} = ?"]
+        params: list[str] = [person_id]
+
+        if month:
+            conditions.append("strftime('%Y-%m', created_at) = ?")
+            params.append(month)
+
+        if status != "all":
+            conditions.append("payout_status = ?")
+            params.append(status)
+
+        sql = f"""
+            UPDATE {table}
+            SET payout_status = ?, paid_at = {set_paid_at}
+            WHERE {' AND '.join(conditions)}
+        """
+
+        return sql, params
+
+    targets: list[tuple[str, str]] = []
+
+    if payout_role in {"person", "worker"}:
+        targets.append(("worker_payouts", "worker_discord_id"))
+
+    if payout_role in {"person", "customer_service"}:
+        targets.append(("customer_service_payouts", "customer_service_discord_id"))
 
     conn = connect_db()
 
     try:
-        cur = conn.execute(sql, [new_status, *params])
+        changed = 0
+
+        for table, person_col in targets:
+            sql, params = build_update_sql(table, person_col)
+            cur = conn.execute(sql, [new_status, *params])
+            changed += cur.rowcount
+
         conn.commit()
-        changed = cur.rowcount
     finally:
         conn.close()
 
