@@ -92,6 +92,7 @@ async def dispatch_dashboard(
         orders = list_active_orders(db)
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
+        claimed_orders = [order for order in orders if order.id in claimed_order_ids]
     finally:
         db.close()
 
@@ -104,6 +105,7 @@ async def dispatch_dashboard(
             "orders": orders,
             "active_order_count": active_order_count,
             "claimed_order_ids": claimed_order_ids,
+            "claimed_orders": claimed_orders,
             "message": message,
             "error": error,
         },

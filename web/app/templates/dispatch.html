@@ -1,8 +1,6 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 
-{% block page_title %}派單頁面
-<script src="/static/js/dispatch_alerts.js"></script>
-{% endblock %}
+{% block page_title %}派單頁面{% endblock %}
 
 {% block content %}
     {% if message %}
@@ -21,18 +19,22 @@
         <h2>我的接單狀態</h2>
 
         <div class="status-row">
-            <span>目前 active 訂單</span>
-            <strong>{{ active_order_count }}</strong>
+            <span>目前已接訂單</span>
+            <strong>{{ claimed_orders | length }}</strong>
         </div>
 
-        {% if active_order_count > 0 %}
-            <p class="warning">
-                你目前已有 active 訂單，不能再接新的 active 單。取消目前接單後才能接新單。
-            </p>
+        {% if claimed_orders %}
+            <div class="claimed-order-list">
+                {% for claimed_order in claimed_orders %}
+                    <div class="claimed-order-item">
+                        <strong>{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</strong>
+                        <span>{{ claimed_order.category }}｜{{ claimed_order.item }}</span>
+                        <span>{{ claimed_order.amount }}T</span>
+                    </div>
+                {% endfor %}
+            </div>
         {% else %}
-            <p class="success">
-                你目前沒有 active 訂單，可以接新單。
-            </p>
+            <p class="muted-text">目前尚未接任何訂單。</p>
         {% endif %}
     </div>
 
@@ -149,10 +151,6 @@
                                         取消接單
                                     </button>
                                 </form>
-                            {% elif active_order_count > 0 %}
-                                <button class="button" disabled>
-                                    已有 active 單
-                                </button>
                             {% else %}
                                 <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
                                     <button class="button" type="submit">
