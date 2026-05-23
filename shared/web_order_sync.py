@@ -513,3 +513,147 @@ def sync_dispatch_claims_to_web(
     finally:
         db.close()
 
+def apply_discord_claim_event_to_web(
+    *,
+    dispatch_message_id,
+    worker_discord_id,
+    worker_display_name,
+    role_type="booster",
+    action="claim",
+) -> bool:
+    """Discord 按接單/取消接單時，同步到網站。
+
+    重點：這裡只新增/移除「目前操作的這個人」。
+    不會用 DC 當下名單覆蓋網站，避免網站接單的人被吃掉。
+    """
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from shared.db import SessionLocal
+    from shared.models import OrderAssignment, PayoutStatus, WebOrder, WorkerPayout
+
+    dispatch_message_id_text = _to_text_id(dispatch_message_id)
+    worker_discord_id_text = _to_text_id(worker_discord_id)
+
+    if dispatch_message_id_text is None or worker_discord_id_text is None:
+        return False
+
+    db = SessionLocal()
+
+    try:
+        order = db.scalar(
+            select(WebOrder)
+            .where(WebOrder.dispatch_message_id == dispatch_message_id_text)
+            .limit(1)
+        )
+
+        if order is None:
+            return False
+
+        assignment = db.scalar(
+            select(OrderAssignment)
+            .where(OrderAssignment.order_id == order.id)
+            .where(OrderAssignment.worker_discord_id == worker_discord_id_text)
+            .limit(1)
+        )
+
+        if action == "claim":
+            if assignment is None:
+                assignment = OrderAssignment(
+                    order_id=order.id,
+                    worker_discord_id=worker_discord_id_text,
+                    worker_display_name=worker_display_name or worker_discord_id_text,
+                    role_type=role_type or "booster",
+                    is_active=True,
+                    has_named_bonus=False,
+                )
+                db.add(assignment)
+            else:
+                assignment.worker_display_name = worker_display_name or assignment.worker_display_name or worker_discord_id_text
+                assignment.role_type = role_type or assignment.role_type or "booster"
+                assignment.is_active = True
+                assignment.removed_at = None
+
+        elif action == "unclaim":
+            if assignment is not None:
+                assignment.is_active = False
+                assignment.removed_at = datetime.utcnow()
+
+        else:
+            raise ValueError(f"unknown action: {action}")
+
+        db.flush()
+
+        active_assignments = list(
+            db.scalars(
+                select(OrderAssignment)
+                .where(OrderAssignment.order_id == order.id)
+                .where(OrderAssignment.is_active.is_(True))
+                .order_by(OrderAssignment.id.asc())
+            ).all()
+        )
+
+        previous_payouts = list(
+            db.scalars(
+                select(WorkerPayout)
+                .where(WorkerPayout.order_id == order.id)
+            ).all()
+        )
+
+        previous_status = {
+            payout.worker_discord_id: (
+                payout.payout_status,
+                payout.paid_at,
+                payout.note,
+            )
+            for payout in previous_payouts
+        }
+
+        for payout in previous_payouts:
+            db.delete(payout)
+
+        amount = int(order.amount or 0)
+        count = len(active_assignments)
+
+        if count > 0:
+            gross_share = amount // count
+
+            for active_assignment in active_assignments:
+                has_named_bonus = bool(active_assignment.has_named_bonus)
+
+                base_payout = round(gross_share * 0.80)
+                named_bonus_amount = round(gross_share * 0.05) if has_named_bonus else 0
+                final_payout = base_payout + named_bonus_amount
+
+                payout_status, paid_at, note = previous_status.get(
+                    active_assignment.worker_discord_id,
+                    (PayoutStatus.UNPAID.value, None, None),
+                )
+
+                db.add(
+                    WorkerPayout(
+                        order_id=order.id,
+                        worker_discord_id=active_assignment.worker_discord_id,
+                        worker_display_name=active_assignment.worker_display_name,
+                        gross_share=gross_share,
+                        base_rate=0.80,
+                        base_payout=base_payout,
+                        named_bonus_rate=0.05,
+                        named_bonus_amount=named_bonus_amount,
+                        has_named_bonus=has_named_bonus,
+                        final_payout=final_payout,
+                        payout_status=payout_status or PayoutStatus.UNPAID.value,
+                        paid_at=paid_at,
+                        note=note,
+                    )
+                )
+
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+

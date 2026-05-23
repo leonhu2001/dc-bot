@@ -1767,6 +1767,39 @@ class DispatchCancelClaimButton(discord.ui.Button):
         await view.cancel_claim(interaction)
 
 
+
+
+def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action: str) -> None:
+    """把 Discord 接單按鈕單一操作同步到網站。
+
+    action:
+    - claim：只新增目前這個人
+    - unclaim：只移除目前這個人
+    """
+    try:
+        from shared.web_order_sync import apply_discord_claim_event_to_web
+
+        if interaction.message is None:
+            return
+
+        role_type = "companion" if claim_type == "companion" else "booster"
+
+        apply_discord_claim_event_to_web(
+            dispatch_message_id=interaction.message.id,
+            worker_discord_id=interaction.user.id,
+            worker_display_name=getattr(interaction.user, "display_name", None) or getattr(interaction.user, "name", None) or str(interaction.user.id),
+            role_type=role_type,
+            action=action,
+        )
+    except Exception as exc:
+        print(
+            f"[web-sync] Discord 接單事件同步網站失敗 "
+            f"message_id={getattr(getattr(interaction, 'message', None), 'id', None)} "
+            f"user_id={getattr(getattr(interaction, 'user', None), 'id', None)} "
+            f"claim_type={claim_type} action={action}: {exc}"
+        )
+
+
 class DispatchClaimView(discord.ui.View):
     def __init__(
         self,
@@ -1949,7 +1982,7 @@ class DispatchClaimView(discord.ui.View):
 
         claim_data[claim_type].add(interaction.user.id)
         remember_claim_data(interaction.message.id, claim_data)
-        _sync_dispatch_claims_to_web_from_bot(interaction.message.id, claim_data, interaction.guild)
+        sync_single_discord_claim_event_to_web(interaction, claim_type, "claim")
 
         try:
             sync_web_worker_claim_from_dispatch(
@@ -2002,18 +2035,9 @@ class DispatchClaimView(discord.ui.View):
             return
 
         remember_claim_data(interaction.message.id, claim_data)
-        _sync_dispatch_claims_to_web_from_bot(interaction.message.id, claim_data, interaction.guild)
+        sync_single_discord_claim_event_to_web(interaction, "booster", "unclaim")
+        sync_single_discord_claim_event_to_web(interaction, "companion", "unclaim")
 
-        try:
-            sync_web_worker_claim_from_dispatch(
-                dispatch_message_id=interaction.message.id,
-                worker_discord_id=interaction.user.id,
-                worker_display_name=getattr(interaction.user, "display_name", None) or getattr(interaction.user, "name", None),
-                role_type="booster",
-                claimed=False,
-            )
-        except Exception as e:
-            print(f"同步 Discord 取消接單到網站失敗：{e}")
 
         await send_order_log(
             interaction.guild,
