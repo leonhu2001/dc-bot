@@ -4,19 +4,6 @@
 
 {% block content %}
 <style>
-    .summary-hero {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: center;
-    }
-
-    .summary-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
     .summary-filter-form {
         display: grid;
         grid-template-columns: 180px 180px 1fr auto auto;
@@ -35,14 +22,21 @@
         gap: 12px;
     }
 
-    .summary-stat-card {
+    .summary-stat-card,
+    .summary-person-card {
         border: 1px solid rgba(148, 163, 184, 0.25);
-        background: rgba(15, 23, 42, 0.55);
-        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.48);
+        border-radius: 16px;
+    }
+
+    .summary-stat-card {
         padding: 16px;
     }
 
-    .summary-stat-card span {
+    .summary-stat-card span,
+    .summary-id,
+    .summary-role,
+    .summary-money-box span {
         color: #9ca3af;
         font-size: 13px;
     }
@@ -59,9 +53,6 @@
     }
 
     .summary-person-card {
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        background: rgba(15, 23, 42, 0.48);
-        border-radius: 16px;
         overflow: hidden;
     }
 
@@ -100,12 +91,6 @@
         font-weight: 800;
     }
 
-    .summary-role {
-        color: #93c5fd;
-        font-size: 13px;
-        margin-bottom: 3px;
-    }
-
     .summary-name {
         margin: 0;
         font-size: 18px;
@@ -113,8 +98,6 @@
 
     .summary-id {
         margin: 4px 0 0;
-        color: #9ca3af;
-        font-size: 13px;
         word-break: break-all;
     }
 
@@ -130,12 +113,6 @@
         background: rgba(2, 6, 23, 0.45);
         padding: 10px 12px;
         text-align: right;
-    }
-
-    .summary-money-box span {
-        display: block;
-        color: #9ca3af;
-        font-size: 12px;
     }
 
     .summary-money-box strong {
@@ -158,10 +135,6 @@
         align-items: center;
     }
 
-    .summary-order-row:last-child {
-        border-bottom: 0;
-    }
-
     .summary-order-head {
         color: #9ca3af;
         font-size: 13px;
@@ -174,46 +147,32 @@
     }
 
     @media (max-width: 900px) {
-        .summary-hero,
-        .summary-person-head {
-            grid-template-columns: 1fr;
-            display: grid;
-        }
-
         .summary-filter-form,
-        .summary-stat-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .summary-person-money {
-            justify-content: stretch;
-        }
-
-        .summary-money-box {
-            flex: 1;
-            text-align: left;
-        }
-
+        .summary-stat-grid,
+        .summary-person-head,
         .summary-order-row {
             grid-template-columns: 1fr;
         }
 
-        .summary-amount {
+        .summary-amount,
+        .summary-money-box {
             text-align: left;
         }
     }
 </style>
 
-<section class="panel summary-hero">
-    <div>
-        <p class="order-no">UNPAID SUMMARY</p>
-        <h2>人員總表</h2>
-        <p class="muted-text">只顯示未支付分潤，只統計已結單訂單。同一 Discord ID 會合併成一張卡。</p>
-    </div>
+<section class="panel">
+    <div class="section-title-row">
+        <div>
+            <p class="order-no">UNPAID SUMMARY</p>
+            <h2>人員總表</h2>
+            <p class="muted-text">只顯示未支付分潤，只統計已結單訂單。同一 Discord ID 會合併成一張卡。</p>
+        </div>
 
-    <div class="summary-actions">
-        <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
-        <a class="button secondary" href="/admin">回總控</a>
+        <div class="summary-actions">
+            <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
+            <a class="button secondary" href="/admin">回總控</a>
+        </div>
     </div>
 </section>
 

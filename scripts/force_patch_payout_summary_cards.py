@@ -1,3 +1,9 @@
+﻿from pathlib import Path
+
+router_path = Path("web/app/routers/admin_payout_summary.py")
+template_path = Path("web/app/templates/admin_payout_summary.html")
+
+router_path.write_text(r'''
 from __future__ import annotations
 
 import csv
@@ -320,3 +326,292 @@ async def admin_payout_summary_csv(
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+'''.strip() + "\n", encoding="utf-8")
+
+
+template_path.write_text(r'''
+{% extends "layout.html" %}
+
+{% block page_title %}人員總表{% endblock %}
+
+{% block content %}
+<style>
+    .summary-filter-form {
+        display: grid;
+        grid-template-columns: 180px 180px 1fr auto auto;
+        gap: 10px;
+        align-items: end;
+    }
+
+    .summary-filter-form label {
+        display: grid;
+        gap: 6px;
+    }
+
+    .summary-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .summary-stat-card,
+    .summary-person-card {
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.48);
+        border-radius: 16px;
+    }
+
+    .summary-stat-card {
+        padding: 16px;
+    }
+
+    .summary-stat-card span,
+    .summary-id,
+    .summary-role,
+    .summary-money-box span {
+        color: #9ca3af;
+        font-size: 13px;
+    }
+
+    .summary-stat-card strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 28px;
+    }
+
+    .summary-person-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .summary-person-card {
+        overflow: hidden;
+    }
+
+    .summary-person-card summary {
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .summary-person-card summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .summary-person-head {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        padding: 16px;
+        align-items: center;
+    }
+
+    .summary-person-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .summary-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: rgba(99, 102, 241, 0.22);
+        border: 1px solid rgba(129, 140, 248, 0.4);
+        font-weight: 800;
+    }
+
+    .summary-name {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .summary-id {
+        margin: 4px 0 0;
+        word-break: break-all;
+    }
+
+    .summary-person-money {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .summary-money-box {
+        min-width: 100px;
+        border-radius: 12px;
+        background: rgba(2, 6, 23, 0.45);
+        padding: 10px 12px;
+        text-align: right;
+    }
+
+    .summary-money-box strong {
+        display: block;
+        margin-top: 3px;
+        font-size: 20px;
+    }
+
+    .summary-detail {
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+        padding: 0 16px 16px;
+    }
+
+    .summary-order-row {
+        display: grid;
+        grid-template-columns: 150px 1fr 80px 100px;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        align-items: center;
+    }
+
+    .summary-order-head {
+        color: #9ca3af;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .summary-amount {
+        text-align: right;
+        font-weight: 800;
+    }
+
+    @media (max-width: 900px) {
+        .summary-filter-form,
+        .summary-stat-grid,
+        .summary-person-head,
+        .summary-order-row {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-amount,
+        .summary-money-box {
+            text-align: left;
+        }
+    }
+</style>
+
+<section class="panel">
+    <div class="section-title-row">
+        <div>
+            <p class="order-no">UNPAID SUMMARY</p>
+            <h2>人員總表</h2>
+            <p class="muted-text">只顯示未支付分潤，只統計已結單訂單。同一 Discord ID 會合併成一張卡。</p>
+        </div>
+
+        <div class="summary-actions">
+            <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
+            <a class="button secondary" href="/admin">回總控</a>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <form method="get" action="/admin/payouts/summary" class="summary-filter-form">
+        <label>
+            <span>月份</span>
+            <input class="input" type="month" name="month" value="{{ month }}">
+        </label>
+
+        <label>
+            <span>身份</span>
+            <select class="input" name="role">
+                <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
+                <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
+                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+            </select>
+        </label>
+
+        <label>
+            <span>搜尋</span>
+            <input class="input" type="text" name="q" value="{{ q }}" placeholder="名稱或 Discord ID">
+        </label>
+
+        <button class="button" type="submit">套用篩選</button>
+        <a class="button secondary" href="/admin/payouts/summary.csv?month={{ month }}&role={{ role }}&q={{ q }}">匯出 CSV</a>
+    </form>
+</section>
+
+<section class="summary-stat-grid">
+    <div class="summary-stat-card">
+        <span>未支付總額</span>
+        <strong>{{ totals.unpaid_total }}T</strong>
+    </div>
+
+    <div class="summary-stat-card">
+        <span>未支付人數</span>
+        <strong>{{ totals.person_count }}</strong>
+    </div>
+
+    <div class="summary-stat-card">
+        <span>未支付筆數</span>
+        <strong>{{ totals.unpaid_count }}</strong>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="section-title-row">
+        <div>
+            <h2>未支付名單</h2>
+            <p class="muted-text">依未支付金額由高到低排列。點開可以看明細。</p>
+        </div>
+    </div>
+
+    {% if rows %}
+        <div class="summary-person-list">
+            {% for row in rows %}
+                <details class="summary-person-card" open>
+                    <summary class="summary-person-head">
+                        <div class="summary-person-main">
+                            <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
+
+                            <div>
+                                <div class="summary-role">{{ row.role_label }}</div>
+                                <h3 class="summary-name">{{ row.display_name }}</h3>
+                                <p class="summary-id">ID：{{ row.discord_id }}</p>
+                            </div>
+                        </div>
+
+                        <div class="summary-person-money">
+                            <div class="summary-money-box">
+                                <span>未支付</span>
+                                <strong>{{ row.unpaid_total }}T</strong>
+                            </div>
+
+                            <div class="summary-money-box">
+                                <span>筆數</span>
+                                <strong>{{ row.unpaid_count }}</strong>
+                            </div>
+                        </div>
+                    </summary>
+
+                    <div class="summary-detail">
+                        <div class="summary-order-row summary-order-head">
+                            <div>訂單</div>
+                            <div>項目</div>
+                            <div>身份</div>
+                            <div class="summary-amount">金額</div>
+                        </div>
+
+                        {% for item in row.items %}
+                            <div class="summary-order-row">
+                                <div>{{ item.order_no }}</div>
+                                <div>{{ item.category }}｜{{ item.item }}</div>
+                                <div>{{ item.role }}</div>
+                                <div class="summary-amount">{{ item.amount }}T</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">目前沒有未支付分潤。</div>
+    {% endif %}
+</section>
+{% endblock %}
+'''.strip() + "\n", encoding="utf-8")
+
+print("patched exact admin_payout_summary.py and admin_payout_summary.html")
