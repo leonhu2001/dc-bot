@@ -1,0 +1,145 @@
+{% extends "layout.html" %}
+
+{% block page_title %}月結分潤{% endblock %}
+
+{% block content %}
+    {% if message %}
+        <div class="notice success-box">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+        <div class="notice error-box">{{ error }}</div>
+    {% endif %}
+
+    <div class="panel compact-panel">
+        <div class="order-card-header">
+            <div>
+                <p class="order-no">MONTHLY PAYOUTS</p>
+                <h2>月結分潤</h2>
+                <p class="muted-text">依同一位人員分組，適合月底一次匯款。</p>
+            </div>
+
+            <a class="button secondary" href="/admin/payouts">回分潤明細</a>
+        </div>
+
+        <form method="get" action="/admin/payouts/grouped" class="admin-add-worker-form">
+            <input class="input" type="month" name="month" value="{{ month }}">
+
+            <select class="input" name="status">
+                <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>未發放</option>
+                <option value="paid" {% if status == "paid" %}selected{% endif %}>已發放</option>
+                <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
+            </select>
+
+            <select class="input" name="role">
+                <option value="all" {% if role == "all" %}selected{% endif %}>全部身份</option>
+                <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
+                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+            </select>
+
+            <button class="button" type="submit">套用篩選</button>
+        </form>
+    </div>
+
+    <div class="grid">
+        <div class="panel compact-panel">
+            <h3>人員數</h3>
+            <p class="big-number">{{ summary.people_count }}</p>
+        </div>
+
+        <div class="panel compact-panel">
+            <h3>未發放</h3>
+            <p class="big-number">{{ summary.unpaid_total }}T</p>
+        </div>
+
+        <div class="panel compact-panel">
+            <h3>已發放</h3>
+            <p class="big-number">{{ summary.paid_total }}T</p>
+        </div>
+
+        <div class="panel compact-panel">
+            <h3>累計</h3>
+            <p class="big-number">{{ summary.all_total }}T</p>
+        </div>
+    </div>
+
+    <div class="panel compact-panel">
+        <h2>人員月結列表</h2>
+
+        {% if groups %}
+            <div class="admin-order-list compact-list">
+                {% for group in groups %}
+                    <details class="admin-order-card compact-order-card" open>
+                        <summary class="group-summary-line">
+                            <div>
+                                <p class="order-no">
+                                    {% if group.payout_role == "worker" %}打手{% else %}客服{% endif %}
+                                </p>
+                                <h3>{{ group.person_name }}</h3>
+                                <p class="muted-text">ID：{{ group.person_id }}</p>
+                            </div>
+
+                            <div class="payout-summary-pills">
+                                <span class="badge">{{ group.count }} 筆</span>
+                                <span class="badge">未發 {{ group.unpaid_total }}T</span>
+                                <span class="badge">已發 {{ group.paid_total }}T</span>
+                                <strong>{{ group.all_total }}T</strong>
+                            </div>
+                        </summary>
+
+                        <div class="admin-actions compact-actions">
+                            <form method="post" action="/admin/payouts/grouped/status">
+                                <input type="hidden" name="payout_role" value="{{ group.payout_role }}">
+                                <input type="hidden" name="person_id" value="{{ group.person_id }}">
+                                <input type="hidden" name="new_status" value="paid">
+                                <input type="hidden" name="month" value="{{ month }}">
+                                <input type="hidden" name="status" value="{{ status }}">
+                                <input type="hidden" name="role" value="{{ role }}">
+                                <button class="button" type="submit">整組標記已發放</button>
+                            </form>
+
+                            <form method="post" action="/admin/payouts/grouped/status">
+                                <input type="hidden" name="payout_role" value="{{ group.payout_role }}">
+                                <input type="hidden" name="person_id" value="{{ group.person_id }}">
+                                <input type="hidden" name="new_status" value="unpaid">
+                                <input type="hidden" name="month" value="{{ month }}">
+                                <input type="hidden" name="status" value="{{ status }}">
+                                <input type="hidden" name="role" value="{{ role }}">
+                                <button class="button secondary" type="submit">整組改回未發放</button>
+                            </form>
+                        </div>
+
+                        <div class="table-wrap">
+                            <table class="data-table compact-table">
+                                <thead>
+                                    <tr>
+                                        <th>訂單</th>
+                                        <th>項目</th>
+                                        <th>基本</th>
+                                        <th>加成</th>
+                                        <th>實拿</th>
+                                        <th>狀態</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in group.rows %}
+                                        <tr>
+                                            <td>{{ row.order_no }}</td>
+                                            <td>{{ row.category }}｜{{ row.item }}</td>
+                                            <td>{{ row.base_amount }}T</td>
+                                            <td>{{ row.bonus_amount }}T</td>
+                                            <td><strong>{{ row.final_amount }}T</strong></td>
+                                            <td>{{ row.payout_status }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">目前沒有符合條件的分潤。</div>
+        {% endif %}
+    </div>
+{% endblock %}
