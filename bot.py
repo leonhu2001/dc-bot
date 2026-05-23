@@ -768,6 +768,24 @@ class DispatchModal(discord.ui.Modal, title="派單"):
             )
 
 
+
+
+def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) -> None:
+    """DC bot 結單後，把網站訂單狀態同步成 closed。"""
+    try:
+        from shared.web_order_sync import update_web_order_status_by_ticket_channel
+
+        ok = update_web_order_status_by_ticket_channel(
+            ticket_channel_id=ticket_channel_id,
+            status="closed",
+            dispatch_message_id=dispatch_message_id,
+            note="由 DC bot 結單同步。",
+        )
+        print(f"[web-sync] close order ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} ok={ok}")
+    except Exception as exc:
+        print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
+
+
 # ========= 收據 Modal =========
 
 class ReceiptModal(discord.ui.Modal, title="已結單收據"):
@@ -860,6 +878,10 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         order_data["total_amount"] = parsed_amount
         order_data["payment_method"] = payment_method
         remember_order_data(order_channel.id, order_data)
+        sync_web_order_closed_from_bot(
+            ticket_channel_id=order_channel.id,
+            dispatch_message_id=order_data.get("dispatch_message_id"),
+        )
 
         receipt_text = (
             "```text\n"
