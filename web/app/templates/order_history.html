@@ -3,99 +3,219 @@
 {% block page_title %}歷史訂單{% endblock %}
 
 {% block content %}
-    <div class="panel">
-        <h2>歷史訂單</h2>
-        <p>這裡顯示 stored / closed / cancelled 訂單。主要後台只保留 active 訂單，歷史資料不刪除。</p>
+    {% if message %}
+        <div class="notice success-box">{{ message }}</div>
+    {% endif %}
 
-        <div class="actions">
+    {% if error %}
+        <div class="notice error-box">{{ error }}</div>
+    {% endif %}
+
+    <div class="panel compact-panel">
+        <div class="order-card-header">
+            <div>
+                <h2>歷史訂單</h2>
+                <p class="muted-text">已結單、存單、取消單會保留在這裡，也可以修改人員與分潤。</p>
+            </div>
             <a class="button secondary" href="/admin">回總控後台</a>
-            <a class="button {% if selected_status == 'all' %}secondary{% endif %}" href="/admin/orders/history">全部</a>
-            <a class="button {% if selected_status == stored_status %}secondary{% endif %}" href="/admin/orders/history?status={{ stored_status }}">存單</a>
-            <a class="button {% if selected_status == closed_status %}secondary{% endif %}" href="/admin/orders/history?status={{ closed_status }}">已結單</a>
-            <a class="button {% if selected_status == cancelled_status %}secondary{% endif %}" href="/admin/orders/history?status={{ cancelled_status }}">已取消</a>
         </div>
+
+        <form method="get" action="/admin/orders/history" class="history-filter-bar">
+            <input class="input" type="text" name="keyword" value="{{ keyword }}" placeholder="搜尋訂單 / 老闆 / 類別 / 項目">
+
+            <select class="input" name="status">
+                {% for value, label in status_options %}
+                    <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <button class="button" type="submit">搜尋</button>
+            <a class="button secondary" href="/admin/orders/history">清除</a>
+        </form>
     </div>
 
-    <div class="panel">
+    <div class="panel compact-panel">
         <h2>訂單列表</h2>
 
         {% if orders %}
-            <div class="admin-order-list">
+            <div class="admin-order-list compact-order-list">
                 {% for order in orders %}
-                    <article class="admin-order-card">
+                    {% set active_assignments = [] %}
+                    {% for assignment in order.assignments %}
+                        {% if assignment.is_active %}
+                            {% set _ = active_assignments.append(assignment) %}
+                        {% endif %}
+                    {% endfor %}
+
+                    <article class="admin-order-card compact-order-card">
                         <div class="order-card-header">
                             <div>
                                 <p class="order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
                                 <h3>{{ order.category }}｜{{ order.item }}</h3>
                             </div>
-
                             <span class="badge">{{ order.status }}</span>
                         </div>
 
-                        <div class="order-meta">
-                            <div>
-                                <span>老闆</span>
-                                <strong>{{ order.customer_display_name or order.customer_discord_id or "未記錄" }}</strong>
-                            </div>
-
-                            <div>
-                                <span>金額</span>
-                                <strong>{{ order.amount }}T</strong>
-                            </div>
-
-                            <div>
-                                <span>數量</span>
-                                <strong>{{ order.quantity }} 單</strong>
-                            </div>
-
-                            <div>
-                                <span>對接客服</span>
-                                <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong>
-                            </div>
+                        <div class="order-meta compact-meta">
+                            <div><span>老闆</span><strong>{{ order.customer_display_name or order.customer_discord_id or "未記錄" }}</strong></div>
+                            <div><span>金額</span><strong>{{ order.amount }}T</strong></div>
+                            <div><span>數量</span><strong>{{ order.quantity }} 單</strong></div>
+                            <div><span>客服</span><strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong></div>
                         </div>
 
-                        <div class="admin-section">
-                            <h4>接單紀錄</h4>
+                        <details class="history-edit-block">
+                            <summary>修改客服 / 人員 / 分潤</summary>
 
-                            {% if order.assignments %}
-                                <div class="chip-list">
-                                    {% for assignment in order.assignments %}
-                                        <span class="chip">
-                                            {{ assignment.worker_display_name or assignment.worker_discord_id }}
-                                            {% if assignment.is_active %}｜active{% else %}｜已移除{% endif %}
-                                            {% if assignment.has_named_bonus %}｜掛名{% endif %}
-                                        </span>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="muted-text">沒有接單紀錄。</p>
-                            {% endif %}
-                        </div>
+                            <div class="admin-section compact-section">
+                                <h4>指定對接客服</h4>
+                                {% if customer_service_members %}
+                                    <form method="post" action="/admin/orders/history/{{ order.id }}/customer-service" class="admin-add-worker-form">
+                                        <select class="input" name="customer_service_discord_id" required>
+                                            <option value="">選擇客服</option>
+                                            {% for staff in customer_service_members %}
+                                                <option value="{{ staff.discord_id }}" {% if order.customer_service_discord_id == staff.discord_id %}selected{% endif %}>
+                                                    {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <input class="input" type="text" name="reason" placeholder="原因，例如補舊單客服">
+                                        <button class="button" type="submit">更新客服</button>
+                                    </form>
+                                {% else %}
+                                    <div class="empty-state">尚未同步客服名單。</div>
+                                {% endif %}
+                            </div>
 
-                        <div class="admin-section">
-                            <h4>分潤紀錄</h4>
+                            <div class="admin-section compact-section">
+                                <h4>客服分潤</h4>
+                                {% set service_payouts = customer_service_payouts_by_order.get(order.id, []) %}
+                                {% if service_payouts %}
+                                    <div class="admin-worker-list">
+                                        {% for payout in service_payouts %}
+                                            <div class="admin-worker-card compact-worker-card">
+                                                <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
+                                                <div class="worker-payout-line">
+                                                    <span>{{ (payout.rate * 100) | int }}%</span>
+                                                    <strong>{{ payout.payout_amount }}T</strong>
+                                                    <span>{{ payout.payout_status }}</span>
+                                                </div>
+                                                <div class="admin-actions">
+                                                    {% if payout.payout_status == paid_status %}
+                                                        <form method="post" action="/admin/orders/history/customer-service-payouts/{{ payout.id }}/status">
+                                                            <input type="hidden" name="status" value="{{ unpaid_status }}">
+                                                            <button class="button secondary" type="submit">改回未發放</button>
+                                                        </form>
+                                                    {% else %}
+                                                        <form method="post" action="/admin/orders/history/customer-service-payouts/{{ payout.id }}/status">
+                                                            <input type="hidden" name="status" value="{{ paid_status }}">
+                                                            <button class="button" type="submit">標記已發放</button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="empty-state">目前沒有客服分潤紀錄。</div>
+                                {% endif %}
+                            </div>
 
-                            {% if order.payouts %}
-                                <div class="chip-list">
-                                    {% for payout in order.payouts %}
-                                        <span class="chip">
-                                            {{ payout.worker_display_name or payout.worker_discord_id }}｜{{ payout.final_payout }}T｜{{ payout.payout_status }}
-                                        </span>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="muted-text">沒有打手分潤紀錄。</p>
-                            {% endif %}
-                        </div>
+                            <div class="admin-section compact-section">
+                                <h4>打手 / 陪玩</h4>
+                                {% if active_assignments %}
+                                    <div class="admin-worker-list">
+                                        {% for assignment in active_assignments %}
+                                            {% set payout_for_worker = none %}
+                                            {% for payout in order.payouts %}
+                                                {% if payout.worker_discord_id == assignment.worker_discord_id %}
+                                                    {% set payout_for_worker = payout %}
+                                                {% endif %}
+                                            {% endfor %}
 
-                        {% if order.note %}
-                            <p class="order-note">{{ order.note }}</p>
-                        {% endif %}
+                                            <div class="admin-worker-card compact-worker-card">
+                                                <strong>{{ assignment.worker_display_name or assignment.worker_discord_id }}</strong>
+                                                <p class="muted-text">ID：{{ assignment.worker_discord_id }}</p>
+
+                                                <div class="worker-payout-line">
+                                                    {% if payout_for_worker %}
+                                                        <span>基本 {{ payout_for_worker.base_payout }}T</span>
+                                                        <span>掛名 {{ payout_for_worker.named_bonus_amount }}T</span>
+                                                        <strong>實拿 {{ payout_for_worker.final_payout }}T</strong>
+                                                        <span>{{ payout_for_worker.payout_status }}</span>
+                                                    {% else %}
+                                                        <span>尚未產生分潤</span>
+                                                    {% endif %}
+                                                </div>
+
+                                                <div class="admin-actions">
+                                                    <form method="post" action="/admin/orders/history/assignments/{{ assignment.id }}/named-bonus">
+                                                        <label class="checkbox-line">
+                                                            <input type="checkbox" name="enabled" value="on" {% if assignment.has_named_bonus %}checked{% endif %}>
+                                                            掛名 +5%
+                                                        </label>
+                                                        <button class="button secondary" type="submit">更新掛名</button>
+                                                    </form>
+
+                                                    <form method="post" action="/admin/orders/history/{{ order.id }}/manual-payout" class="inline-form">
+                                                        <input type="hidden" name="worker_discord_id" value="{{ assignment.worker_discord_id }}">
+                                                        <input type="hidden" name="worker_display_name" value="{{ assignment.worker_display_name or assignment.worker_discord_id }}">
+                                                        <input class="input" type="number" name="manual_final_payout" min="0" placeholder="手動實拿" required>
+                                                        <input class="input" type="text" name="reason" placeholder="原因">
+                                                        <button class="button secondary" type="submit">改分潤</button>
+                                                    </form>
+
+                                                    {% if payout_for_worker %}
+                                                        {% if payout_for_worker.payout_status == paid_status %}
+                                                            <form method="post" action="/admin/orders/history/worker-payouts/{{ payout_for_worker.id }}/status">
+                                                                <input type="hidden" name="status" value="{{ unpaid_status }}">
+                                                                <button class="button secondary" type="submit">改回未發放</button>
+                                                            </form>
+                                                        {% else %}
+                                                            <form method="post" action="/admin/orders/history/worker-payouts/{{ payout_for_worker.id }}/status">
+                                                                <input type="hidden" name="status" value="{{ paid_status }}">
+                                                                <button class="button" type="submit">標記已發放</button>
+                                                            </form>
+                                                        {% endif %}
+                                                    {% endif %}
+
+                                                    <form method="post" action="/admin/orders/history/assignments/{{ assignment.id }}/remove">
+                                                        <input class="input" type="text" name="reason" placeholder="原因">
+                                                        <button class="button danger" type="submit">移除</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="empty-state">目前沒有打手 / 陪玩。</div>
+                                {% endif %}
+
+                                <h4>新增打手 / 陪玩</h4>
+                                {% if worker_members %}
+                                    <form method="post" action="/admin/orders/history/{{ order.id }}/add-worker" class="admin-add-worker-form">
+                                        <select class="input" name="worker_discord_id" required>
+                                            <option value="">選擇打手 / 陪玩</option>
+                                            {% for staff in worker_members %}
+                                                <option value="{{ staff.discord_id }}">
+                                                    {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
+                                                    {% if staff.is_worker %}｜打手{% endif %}
+                                                    {% if staff.is_companion %}｜陪玩{% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                        <input class="input" type="text" name="reason" placeholder="原因，例如補舊單打手">
+                                        <button class="button" type="submit">新增人員</button>
+                                    </form>
+                                {% else %}
+                                    <div class="empty-state">尚未同步打手 / 陪玩名單。</div>
+                                {% endif %}
+                            </div>
+                        </details>
                     </article>
                 {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">目前沒有符合條件的歷史訂單。</div>
+            <div class="empty-state">目前沒有歷史訂單。</div>
         {% endif %}
     </div>
 {% endblock %}
