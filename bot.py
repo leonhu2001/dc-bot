@@ -4255,6 +4255,31 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
     return embed
 
 
+
+
+def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
+    """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled。"""
+    try:
+        from shared.web_order_sync import update_web_order_status_by_ticket_channel
+
+        ok = update_web_order_status_by_ticket_channel(
+            ticket_channel_id=ticket_channel_id,
+            status="cancelled",
+            dispatch_message_id=dispatch_message_id,
+            note=note or "由 DC bot 刪除/取消訂單同步。",
+        )
+        print(
+            f"[web-sync] cancel order "
+            f"ticket_channel_id={ticket_channel_id} "
+            f"dispatch_message_id={dispatch_message_id} ok={ok}"
+        )
+    except Exception as exc:
+        print(
+            f"[web-sync] 刪除/取消訂單同步網站失敗 "
+            f"ticket_channel_id={ticket_channel_id}: {exc}"
+        )
+
+
 @bot.tree.command(
     name="delete_order",
     description="客服刪除訂單資料，支援訂單編號或票口 ID",
@@ -4301,6 +4326,12 @@ async def delete_order(
         if dispatch_message_id is not None:
             ORDER_CLAIMS.pop(dispatch_message_id, None)
             delete_claim_row_from_db(message_id=dispatch_message_id)
+
+        sync_web_order_cancelled_from_bot(
+            ticket_channel_id=channel_id,
+            dispatch_message_id=dispatch_message_id,
+            note="由 /delete_order 刪除訂單同步。",
+        )
 
         SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
         delete_order_row_from_db(channel_id)
