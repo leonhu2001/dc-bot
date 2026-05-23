@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 
+from shared.web_order_sync import sync_web_worker_claim_from_dispatch
+
 load_dotenv()
 import os
 import json
@@ -146,18 +148,6 @@ from services.orders import (
     format_stored_order_option_label,
     format_stored_order_option_description,
     build_stored_order_detail_embed,
-)
-
-from shared.web_order_sync import (
-    update_web_order_status_by_ticket_channel,
-    upsert_web_order_from_dispatch,
-)
-from shared.web_sync_events import (
-    fetch_pending_web_sync_events,
-    get_web_order_sync_payload,
-    mark_web_sync_event_done,
-    mark_web_sync_event_failed,
-    mark_web_sync_event_processing,
 )
 
 from views.review import (
@@ -1039,7 +1029,6 @@ ORDER_COUNTERS = {}
 BACKUP_TASK_STARTED = False
 STORED_REMINDER_TASK_STARTED = False
 VIP_DOWNGRADE_TASK_STARTED = False
-WEB_SYNC_EVENTS_TASK_STARTED = False
 STORED_ORDER_REMINDER_DAYS = [3, 7]
 VIP_MAINTAIN_MIN_MONTHLY_SPEND = 500
 
@@ -1181,105 +1170,6 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
     )
 
 
-def sync_dispatch_to_web_dashboard(
-    *,
-    guild: discord.Guild | None,
-    source_channel: discord.TextChannel | None,
-    dispatch_channel_id: int | None,
-    dispatch_message_id: int | None,
-    data: dict,
-    category_label: str,
-    item: str,
-    quantity: int,
-    payment_method: str,
-    status: str = "active",
-) -> None:
-    """把 DC bot 的派單資料同步到網站資料庫 web_orders。"""
-    if source_channel is None or dispatch_message_id is None:
-        return
-
-    try:
-        customer_id = _to_int(data.get("customer_id")) or get_order_customer_id_from_channel(source_channel)
-        customer_display_name = None
-        if guild is not None and customer_id is not None:
-            customer_member = guild.get_member(customer_id)
-            if customer_member is not None:
-                customer_display_name = customer_member.display_name
-
-        customer_service_id = _to_int(data.get("amount_set_by")) or _to_int(data.get("payment_submitted_by"))
-        customer_service_display_name = None
-        if guild is not None and customer_service_id is not None:
-            staff_member = guild.get_member(customer_service_id)
-            if staff_member is not None:
-                customer_service_display_name = staff_member.display_name
-
-        upsert_web_order_from_dispatch(
-            ticket_channel_id=source_channel.id,
-            dispatch_channel_id=dispatch_channel_id,
-            dispatch_message_id=dispatch_message_id,
-            customer_discord_id=customer_id,
-            customer_display_name=customer_display_name,
-            category=str(category_label or data.get("category_label") or data.get("category") or "未紀錄"),
-            item=str(item or data.get("item") or "未紀錄"),
-            quantity=quantity,
-            amount=_to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0,
-            payment_method=str(payment_method or data.get("payment_method") or "未紀錄"),
-            status=status,
-            customer_service_discord_id=customer_service_id,
-            customer_service_display_name=customer_service_display_name,
-            bot_order_no=data.get("order_no"),
-            note=f"由 DC bot 派單同步。票口：#{source_channel.name}",
-        )
-    except Exception as e:
-        print(f"同步派單到網站資料庫失敗：{e}")
-
-
-
-
-def sync_order_status_to_web_dashboard(
-    *,
-    order_channel: discord.TextChannel | None,
-    status: str,
-    note: str | None = None,
-    dispatch_message_id: int | None = None,
-) -> None:
-    """把 DC bot 的存單 / 結單 / 取消狀態同步到網站資料庫。"""
-    if order_channel is None:
-        return
-
-    try:
-        update_web_order_status_by_ticket_channel(
-            ticket_channel_id=order_channel.id,
-            status=status,
-            dispatch_message_id=dispatch_message_id,
-            note=note,
-        )
-    except Exception as e:
-        print(f"同步訂單狀態到網站資料庫失敗：{e}")
-
-
-
-
-def sync_cancelled_order_to_web_dashboard_by_channel_id(
-    *,
-    order_channel_id: int | str | None,
-    dispatch_message_id: int | str | None = None,
-    note: str | None = None,
-) -> None:
-    """把取消 / 刪除票口同步到網站，避免 /admin 留下 active 殭屍訂單。"""
-    if order_channel_id is None:
-        return
-
-    try:
-        update_web_order_status_by_ticket_channel(
-            ticket_channel_id=order_channel_id,
-            status="cancelled",
-            dispatch_message_id=dispatch_message_id,
-            note=note or "由 DC bot 取消訂單同步。",
-        )
-    except Exception as e:
-        print(f"同步取消訂單到網站資料庫失敗：{e}")
-
 def cleanup_old_closed_orders() -> None:
     """
     清理過期的非必要暫存資料。
@@ -1389,145 +1279,6 @@ configure_data_access(
     get_effective_member_level_func=get_effective_member_level,
 )
 configure_reward_order_context(SELF_SERVICE_ORDER_SELECTIONS, save_bot_data)
-
-
-async def web_sync_events_loop():
-    await bot.wait_until_ready()
-
-    while not bot.is_closed():
-        try:
-            events = fetch_pending_web_sync_events(limit=20)
-
-            for event in events:
-                try:
-                    mark_web_sync_event_processing(event["id"])
-                    await apply_web_sync_event_to_dispatch(event)
-                    mark_web_sync_event_done(event["id"])
-                except Exception as event_error:
-                    print(f"處理網站同步事件失敗 event_id={event.get('id')}：{event_error}")
-                    mark_web_sync_event_failed(event["id"], str(event_error))
-        except Exception as e:
-            print(f"網站同步事件輪詢失敗：{e}")
-
-        await asyncio.sleep(5)
-
-
-async def apply_web_sync_event_to_dispatch(event: dict) -> None:
-    order_id = event.get("order_id")
-
-    if order_id is None:
-        raise ValueError("sync event missing order_id")
-
-    order_data = get_web_order_sync_payload(int(order_id))
-
-    dispatch_channel_id = _to_int(order_data.get("dispatch_channel_id"), 0)
-    dispatch_message_id = _to_int(order_data.get("dispatch_message_id"), 0)
-    source_channel_id = _to_int(order_data.get("ticket_channel_id"), 0)
-    customer_id = _to_int(order_data.get("customer_discord_id"), 0)
-
-    if not dispatch_channel_id or not dispatch_message_id:
-        raise ValueError("web order missing dispatch channel/message id")
-
-    guild = bot.get_guild(GUILD_ID)
-    if guild is None:
-        raise ValueError("guild not found")
-
-    dispatch_channel = guild.get_channel(dispatch_channel_id)
-    if dispatch_channel is None:
-        dispatch_channel = await guild.fetch_channel(dispatch_channel_id)
-
-    if not isinstance(dispatch_channel, discord.TextChannel):
-        raise ValueError("dispatch channel is not a text channel")
-
-    source_channel = guild.get_channel(source_channel_id) if source_channel_id else None
-    if source_channel is None and source_channel_id:
-        try:
-            source_channel = await guild.fetch_channel(source_channel_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            source_channel = None
-
-    if not isinstance(source_channel, discord.TextChannel):
-        # 派單訊息主要需要 mention；找不到票口時用派單頻道避免整個同步失敗。
-        source_channel = dispatch_channel
-
-    message = await dispatch_channel.fetch_message(dispatch_message_id)
-
-    companion_ids = {int(user_id) for user_id in order_data.get("companion_ids", []) if _to_int(user_id, 0)}
-    booster_ids = {int(user_id) for user_id in order_data.get("booster_ids", []) if _to_int(user_id, 0)}
-
-    claim_data = ORDER_CLAIMS.setdefault(
-        dispatch_message_id,
-        {
-            "companion": set(),
-            "booster": set(),
-            "locked": False,
-        },
-    )
-
-    claim_data["companion"] = companion_ids
-    claim_data["booster"] = booster_ids
-    claim_data["locked"] = bool(order_data.get("locked", False))
-    claim_data["status"] = str(order_data.get("status") or "active")
-    claim_data["customer_id"] = customer_id
-    claim_data["category_label"] = str(order_data.get("category") or "未紀錄")
-    claim_data["item"] = str(order_data.get("item") or "未紀錄")
-    claim_data["quantity"] = _to_int(order_data.get("quantity"), 1) or 1
-    claim_data["payment_method"] = str(order_data.get("payment_method") or "未紀錄")
-    claim_data["amount"] = _to_int(order_data.get("amount"), 0) or 0
-    claim_data["total_amount"] = _to_int(order_data.get("amount"), 0) or 0
-    claim_data["source_channel_id"] = source_channel_id
-    claim_data["dispatch_channel_id"] = dispatch_channel_id
-    claim_data["companion_preference"] = order_data.get("companion_preference") or "不指定陪玩/打手"
-
-    remember_claim_data(dispatch_message_id, claim_data)
-
-    receiver_lines = []
-    if companion_ids:
-        receiver_lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in sorted(companion_ids)))
-    if booster_ids:
-        receiver_lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in sorted(booster_ids)))
-
-    receiver_text = "\n".join(receiver_lines) if receiver_lines else None
-
-    embed = build_self_service_order_embed(
-        customer_mention=f"<@{customer_id}>" if customer_id else str(order_data.get("customer_display_name") or "未紀錄"),
-        category_label=str(order_data.get("category") or "未紀錄"),
-        item=str(order_data.get("item") or "未紀錄"),
-        quantity=_to_int(order_data.get("quantity"), 1) or 1,
-        payment_method=str(order_data.get("payment_method") or "未紀錄"),
-        source_channel=source_channel,
-        companion_preference=order_data.get("companion_preference") or "不指定陪玩/打手",
-        receiver_text=receiver_text,
-    )
-
-    amount = _to_int(order_data.get("amount"), 0) or 0
-    if amount:
-        embed.add_field(name="訂單總價", value=format_t_amount(amount), inline=True)
-
-    status = str(order_data.get("status") or "active").lower()
-    if status == "stored":
-        embed.add_field(name="接單狀態", value="已存單，接單面板已鎖定", inline=False)
-    elif status in {"closed", "cancelled", "canceled"} or claim_data.get("locked"):
-        embed.add_field(name="接單狀態", value="已結單或已取消，接單面板已鎖定", inline=False)
-
-    locked = status in {"stored", "closed", "cancelled", "canceled"} or bool(claim_data.get("locked"))
-
-    await message.edit(
-        embed=embed,
-        view=DispatchClaimView(
-            customer_id=customer_id,
-            category_label=str(order_data.get("category") or "未紀錄"),
-            item=str(order_data.get("item") or "未紀錄"),
-            quantity=_to_int(order_data.get("quantity"), 1) or 1,
-            payment_method=str(order_data.get("payment_method") or "未紀錄"),
-            source_channel_id=source_channel_id or 0,
-            companion_preference=order_data.get("companion_preference") or "不指定陪玩/打手",
-            locked=locked,
-            status=status,
-        ),
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-    )
-
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
@@ -2199,6 +1950,17 @@ class DispatchClaimView(discord.ui.View):
         claim_data[claim_type].add(interaction.user.id)
         remember_claim_data(interaction.message.id, claim_data)
 
+        try:
+            sync_web_worker_claim_from_dispatch(
+                dispatch_message_id=interaction.message.id,
+                worker_discord_id=interaction.user.id,
+                worker_display_name=getattr(interaction.user, "display_name", None) or getattr(interaction.user, "name", None),
+                role_type=claim_type,
+                claimed=True,
+            )
+        except Exception as e:
+            print(f"同步 Discord 接單到網站失敗：{e}")
+
         await send_order_log(
             interaction.guild,
             title=f"{receiver_label}",
@@ -2240,6 +2002,17 @@ class DispatchClaimView(discord.ui.View):
 
         remember_claim_data(interaction.message.id, claim_data)
 
+        try:
+            sync_web_worker_claim_from_dispatch(
+                dispatch_message_id=interaction.message.id,
+                worker_discord_id=interaction.user.id,
+                worker_display_name=getattr(interaction.user, "display_name", None) or getattr(interaction.user, "name", None),
+                role_type="booster",
+                claimed=False,
+            )
+        except Exception as e:
+            print(f"同步 Discord 取消接單到網站失敗：{e}")
+
         await send_order_log(
             interaction.guild,
             title="取消接單",
@@ -2275,12 +2048,6 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
     dispatch_message_id = _to_int(data.get("dispatch_message_id"))
     dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
-
-    sync_cancelled_order_to_web_dashboard_by_channel_id(
-        order_channel_id=order_channel_id,
-        dispatch_message_id=dispatch_message_id,
-        note="由 DC bot 取消訂單同步。",
-    )
 
     if dispatch_message_id is not None:
         dispatch_channel = guild.get_channel(dispatch_channel_id)
@@ -2449,12 +2216,6 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             data["dispatch_message_id"] = newest_existing_message_id
         remember_order_data(order_channel_id, data)
         save_bot_data()
-        sync_order_status_to_web_dashboard(
-            order_channel=source_channel,
-            status="closed",
-            note="由 DC bot 結單同步。",
-            dispatch_message_id=data.get("dispatch_message_id"),
-        )
 
 async def store_dispatch_claim_panel(
     guild: discord.Guild,
@@ -2592,12 +2353,6 @@ async def store_dispatch_claim_panel(
             roles=False,
             everyone=False
         )
-    )
-    sync_order_status_to_web_dashboard(
-        order_channel=order_channel,
-        status="stored",
-        note=f"由 DC bot 存單同步。存單原因：{reason}",
-        dispatch_message_id=dispatch_message_id,
     )
 
 
@@ -2756,19 +2511,6 @@ async def resume_stored_order(
     remember_order_data(order_channel.id, data)
     remember_claim_data(new_message.id, claim_data)
     save_bot_data()
-
-    sync_dispatch_to_web_dashboard(
-        guild=guild,
-        source_channel=order_channel,
-        dispatch_channel_id=dispatch_channel.id,
-        dispatch_message_id=new_message.id,
-        data=data,
-        category_label=str(category_label),
-        item=str(item),
-        quantity=quantity,
-        payment_method=str(payment_method),
-        status="active",
-    )
 
 
 class StoreOrderModal(discord.ui.Modal, title="存單"):
@@ -3248,19 +2990,6 @@ async def finalize_payment_and_dispatch(
     data.pop("dispatch_submitting", None)
     remember_order_data(interaction.channel.id, data)
     remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
-
-    sync_dispatch_to_web_dashboard(
-        guild=guild,
-        source_channel=interaction.channel,
-        dispatch_channel_id=dispatch_channel.id,
-        dispatch_message_id=dispatch_message.id,
-        data=data,
-        category_label=category_label,
-        item=str(item),
-        quantity=quantity,
-        payment_method=str(payment_method),
-        status="active",
-    )
 
     await log_self_service_proxy_action(
         interaction,
@@ -3818,19 +3547,6 @@ async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
     # 如果入職票口被手動刪除，也嘗試收回申請人暫時身分組。
     await remove_recruit_applicant_role(channel.guild, channel)
 
-    if isinstance(channel, discord.TextChannel):
-        dispatch_message_id = None
-        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel.id, {})
-
-        if isinstance(data, dict):
-            dispatch_message_id = data.get("dispatch_message_id")
-
-        sync_cancelled_order_to_web_dashboard_by_channel_id(
-            order_channel_id=channel.id,
-            dispatch_message_id=dispatch_message_id,
-            note="票口頻道被刪除，自動同步取消。",
-        )
-
 
 
 @bot.event
@@ -4025,7 +3741,7 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
-    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED, WEB_SYNC_EVENTS_TASK_STARTED
+    global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
     bot.add_view(MainPanelView())
     bot.add_view(OrderControlView())
     bot.add_view(StaffOrderOperationView())
@@ -4061,9 +3777,6 @@ async def on_ready():
         if not VIP_DOWNGRADE_TASK_STARTED:
             VIP_DOWNGRADE_TASK_STARTED = True
             asyncio.create_task(vip_downgrade_loop())
-        if not WEB_SYNC_EVENTS_TASK_STARTED:
-            WEB_SYNC_EVENTS_TASK_STARTED = True
-            asyncio.create_task(web_sync_events_loop())
         try:
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
@@ -4798,19 +4511,6 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     remember_claim_data(dispatch_message.id, claim_data)
     save_bot_data()
 
-    sync_dispatch_to_web_dashboard(
-        guild=guild,
-        source_channel=source_channel,
-        dispatch_channel_id=dispatch_channel.id,
-        dispatch_message_id=dispatch_message.id,
-        data=data,
-        category_label=str(category_label),
-        item=item,
-        quantity=quantity,
-        payment_method=payment_method,
-        status="active",
-    )
-
     await send_order_log(
         guild,
         title="重新發送派單面板",
@@ -5073,13 +4773,6 @@ class StoredOrderCancelConfirmView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
 
         await delete_dispatch_claim_panel_for_order(interaction.guild, self.order_channel_id)
-
-        if isinstance(channel, discord.TextChannel):
-            sync_order_status_to_web_dashboard(
-                order_channel=channel,
-                status="cancelled",
-                note="由 DC bot 取消存單同步。",
-            )
 
         if isinstance(channel, discord.TextChannel):
             try:
