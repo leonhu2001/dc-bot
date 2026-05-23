@@ -15,11 +15,13 @@
         <div class="order-card-header">
             <div>
                 <h2>人員名單</h2>
-                <p class="muted-text">從 Discord 身分組同步客服、打手、陪玩；打手和陪玩會分開顯示。</p>
+                <p class="muted-text">
+                    分類完全依照 Discord 身分組：打手 1503701170504339458，陪玩 1503706721883783218。
+                    同一個人同時有兩個身分組時，打手和陪玩都會計入。
+                </p>
             </div>
-
-            <form method="post" action="/admin/staff/sync-now">
-                <button class="button" type="submit">立即同步</button>
+            <form method="post" action="/admin/staff/sync">
+                <button class="button" type="submit">立即同步 Discord 成員</button>
             </form>
         </div>
     </div>
@@ -28,38 +30,48 @@
         <div class="panel">
             <h2>啟用人員</h2>
             <p class="big-number">{{ stats.active }}</p>
+            <p>目前 active 的同步人員。</p>
         </div>
+
         <div class="panel">
-            <h2>客服</h2>
+            <h2>客服 / 總控</h2>
             <p class="big-number">{{ stats.customer_service }}</p>
+            <p>有客服或總控身分組。</p>
         </div>
+
         <div class="panel">
             <h2>打手</h2>
             <p class="big-number">{{ stats.worker }}</p>
+            <p>有打手身分組。</p>
         </div>
+
         <div class="panel">
             <h2>陪玩</h2>
             <p class="big-number">{{ stats.companion }}</p>
+            <p>有陪玩身分組。</p>
         </div>
     </div>
 
     <div class="panel">
         <h2>篩選</h2>
-        <form method="get" action="/admin/staff" class="admin-add-worker-form">
+
+        <form class="admin-add-worker-form" method="get" action="/admin/staff">
             <select class="input" name="role">
-                <option value="all" {% if role == 'all' %}selected{% endif %}>全部身份</option>
-                <option value="customer_service" {% if role == 'customer_service' %}selected{% endif %}>客服 / 總控</option>
-                <option value="worker" {% if role == 'worker' %}selected{% endif %}>打手</option>
-                <option value="companion" {% if role == 'companion' %}selected{% endif %}>陪玩</option>
+                <option value="all" {% if role == "all" %}selected{% endif %}>全部身份</option>
+                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服 / 總控</option>
+                <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
+                <option value="companion" {% if role == "companion" %}selected{% endif %}>陪玩</option>
             </select>
 
-            <select class="input" name="active">
-                <option value="active" {% if active == 'active' %}selected{% endif %}>只看啟用</option>
-                <option value="inactive" {% if active == 'inactive' %}selected{% endif %}>只看停用</option>
-                <option value="all" {% if active == 'all' %}selected{% endif %}>全部狀態</option>
+            <select class="input" name="status">
+                <option value="active" {% if status == "active" %}selected{% endif %}>啟用</option>
+                <option value="inactive" {% if status == "inactive" %}selected{% endif %}>停用</option>
+                <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
             </select>
 
-            <button class="button secondary" type="submit">套用篩選</button>
+            <input class="input" type="text" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
+
+            <button class="button" type="submit">套用篩選</button>
         </form>
     </div>
 
@@ -75,16 +87,19 @@
                                 <strong>{{ member.display_name or member.global_name or member.username or member.discord_id }}</strong>
                                 <p class="muted-text">ID：{{ member.discord_id }}</p>
                             </div>
-                            <span class="badge">{% if member.is_active %}active{% else %}inactive{% endif %}</span>
+
+                            <div class="chip-list">
+                                {% if member.is_customer_service %}<span class="chip">客服 / 總控</span>{% endif %}
+                                {% if member.is_worker %}<span class="chip">打手</span>{% endif %}
+                                {% if member.is_companion %}<span class="chip">陪玩</span>{% endif %}
+                                {% if member.is_active %}<span class="chip">啟用</span>{% else %}<span class="chip">停用</span>{% endif %}
+                            </div>
                         </div>
 
-                        <div class="chip-list">
-                            {% if member.is_customer_service %}<span class="chip">客服 / 總控</span>{% endif %}
-                            {% if member.is_worker and not member.is_companion %}<span class="chip">打手</span>{% endif %}
-                            {% if member.is_companion %}<span class="chip">陪玩</span>{% endif %}
-                        </div>
-
-                        <p class="muted-text">最後同步：{{ member.last_synced_at or "未記錄" }}</p>
+                        <p class="muted-text">
+                            Discord：{{ member.username or "未記錄" }}
+                            ｜最後同步：{{ member.last_synced_at or "未記錄" }}
+                        </p>
                     </article>
                 {% endfor %}
             </div>
