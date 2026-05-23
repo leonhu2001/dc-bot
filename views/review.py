@@ -69,7 +69,9 @@ class ReviewSubmitView(discord.ui.View):
 
     @discord.ui.button(
         label="送出好評",
-        style=discord.ButtonStyle.success
+        style=discord.ButtonStyle.success,
+        custom_id="review_submit_button",
+        row=0,
     )
     async def submit_review(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.customer_id:
@@ -291,7 +293,10 @@ class ReviewSubmitView(discord.ui.View):
 
         await asyncio.sleep(3)
 
-        await channel.delete(reason=f"Review completed by {interaction.user}")
+        try:
+            await channel.delete(reason=f"Review completed by {interaction.user}")
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
 
 
 class ReviewModal(discord.ui.Modal, title="留下好評"):
@@ -371,7 +376,9 @@ class ReviewButtonView(discord.ui.View):
 
     @discord.ui.button(
         label="留下好評",
-        style=discord.ButtonStyle.success
+        style=discord.ButtonStyle.success,
+        custom_id="review_leave_button",
+        row=0,
     )
     async def leave_review(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.customer_id:
@@ -384,7 +391,9 @@ class ReviewButtonView(discord.ui.View):
 
     @discord.ui.button(
         label="不留下好評，直接關閉票口",
-        style=discord.ButtonStyle.secondary
+        style=discord.ButtonStyle.danger,
+        custom_id="review_skip_close_ticket_button",
+        row=1,
     )
     async def close_without_review(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.customer_id:
@@ -417,6 +426,9 @@ class ReviewButtonView(discord.ui.View):
 
         await asyncio.sleep(3)
 
-        await channel.delete(reason=f"Review skipped by {interaction.user}")
+        try:
+            await channel.delete(reason=f"Review skipped by {interaction.user}")
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
 
 
