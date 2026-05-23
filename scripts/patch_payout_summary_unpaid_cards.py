@@ -1,3 +1,12 @@
+﻿from pathlib import Path
+
+ROUTER = Path("web/app/routers/admin_payout_summary.py")
+TEMPLATE = Path("web/app/templates/admin_payout_summary.html")
+
+ROUTER.parent.mkdir(parents=True, exist_ok=True)
+TEMPLATE.parent.mkdir(parents=True, exist_ok=True)
+
+ROUTER.write_text(r'''
 from __future__ import annotations
 
 from datetime import datetime
@@ -283,3 +292,140 @@ async def admin_payout_summary_csv(
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+'''.strip() + "\n", encoding="utf-8")
+
+
+TEMPLATE.write_text(r'''
+{% extends "layout.html" %}
+
+{% block page_title %}人員總表{% endblock %}
+
+{% block content %}
+    <section class="payout-hero panel">
+        <div class="payout-hero-main">
+            <p class="order-no">UNPAID SUMMARY</p>
+            <h2>人員總表</h2>
+            <p class="muted-text">只顯示未支付分潤，且只統計已結單訂單。同一個 Discord ID 會合併顯示。</p>
+        </div>
+
+        <div class="payout-hero-actions">
+            <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
+            <a class="button secondary" href="/admin/payouts">分潤明細</a>
+            <a class="button secondary" href="/admin">回總控</a>
+        </div>
+    </section>
+
+    <section class="panel payout-filter-panel">
+        <form method="get" action="/admin/payouts/summary" class="payout-filter-form">
+            <label>
+                <span>月份</span>
+                <input class="input" type="month" name="month" value="{{ month }}">
+            </label>
+
+            <label>
+                <span>身份</span>
+                <select class="input" name="role">
+                    <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
+                    <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
+                    <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+                </select>
+            </label>
+
+            <label>
+                <span>搜尋</span>
+                <input class="input" type="text" name="q" value="{{ q }}" placeholder="名稱或 Discord ID">
+            </label>
+
+            <button class="button" type="submit">套用篩選</button>
+
+            <a
+                class="button secondary"
+                href="/admin/payouts/summary.csv?month={{ month }}&role={{ role }}&q={{ q }}"
+            >
+                匯出 CSV
+            </a>
+        </form>
+    </section>
+
+    <section class="payout-stat-grid">
+        <div class="payout-stat-card highlight-unpaid">
+            <span>未支付總額</span>
+            <strong>{{ totals.unpaid_total }}T</strong>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>未支付人數</span>
+            <strong>{{ totals.person_count }}</strong>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>未支付筆數</span>
+            <strong>{{ totals.unpaid_count }}</strong>
+        </div>
+    </section>
+
+    <section class="panel payout-group-panel">
+        <div class="section-title-row">
+            <div>
+                <h2>未支付名單</h2>
+                <p class="muted-text">依金額由高到低排列。點開人員可以看明細。</p>
+            </div>
+        </div>
+
+        {% if rows %}
+            <div class="payout-person-list">
+                {% for row in rows %}
+                    <details class="payout-person-card" open>
+                        <summary class="payout-person-summary">
+                            <div class="person-left">
+                                <div class="person-avatar">{{ (row.display_name or '?')[:1] }}</div>
+                                <div>
+                                    <div class="person-role">{{ row.role_label }}</div>
+                                    <h3>{{ row.display_name }}</h3>
+                                    <p>ID：{{ row.discord_id }}</p>
+                                </div>
+                            </div>
+
+                            <div class="person-totals">
+                                <div>
+                                    <span>未支付</span>
+                                    <strong class="text-unpaid">{{ row.unpaid_total }}T</strong>
+                                </div>
+
+                                <div>
+                                    <span>筆數</span>
+                                    <strong>{{ row.unpaid_count }}</strong>
+                                </div>
+                            </div>
+                        </summary>
+
+                        <div class="payout-person-body">
+                            <div class="payout-order-list">
+                                <div class="payout-order-header">
+                                    <span>訂單</span>
+                                    <span>項目</span>
+                                    <span>身份</span>
+                                    <span>金額</span>
+                                </div>
+
+                                {% for item in row.items %}
+                                    <div class="payout-order-row">
+                                        <div class="order-no-cell">{{ item.order_no }}</div>
+                                        <div>{{ item.category }}｜{{ item.item }}</div>
+                                        <div>{{ item.role }}</div>
+                                        <div class="amount-cell">{{ item.amount }}T</div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </details>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">目前沒有未支付分潤。</div>
+        {% endif %}
+    </section>
+{% endblock %}
+'''.strip() + "\n", encoding="utf-8")
+
+print("patched admin payout summary: unpaid only + card layout + merged Discord ID")

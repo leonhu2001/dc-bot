@@ -1,98 +1,130 @@
 {% extends "layout.html" %}
 
-{% block page_title %}分潤人員總表{% endblock %}
+{% block page_title %}人員總表{% endblock %}
 
 {% block content %}
-    <div class="panel compact-panel">
-        <div class="page-actions">
-            <a class="button secondary" href="/admin/payouts">返回分潤明細</a>
-            <a class="button secondary" href="/admin">返回總控後台</a>
+    <section class="payout-hero panel">
+        <div class="payout-hero-main">
+            <p class="order-no">UNPAID SUMMARY</p>
+            <h2>人員總表</h2>
+            <p class="muted-text">只顯示未支付分潤，且只統計已結單訂單。同一個 Discord ID 會合併顯示。</p>
         </div>
-    </div>
 
-    <div class="panel compact-panel">
-        <h2>篩選</h2>
+        <div class="payout-hero-actions">
+            <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
+            <a class="button secondary" href="/admin/payouts">分潤明細</a>
+            <a class="button secondary" href="/admin">回總控</a>
+        </div>
+    </section>
 
-        <form method="get" action="/admin/payouts/summary" class="filter-form">
-            <input class="input" type="month" name="month" value="{{ month }}">
+    <section class="panel payout-filter-panel">
+        <form method="get" action="/admin/payouts/summary" class="payout-filter-form">
+            <label>
+                <span>月份</span>
+                <input class="input" type="month" name="month" value="{{ month }}">
+            </label>
 
-            <select class="input" name="status">
-                <option value="all" {% if status == 'all' %}selected{% endif %}>全部狀態</option>
-                <option value="unpaid" {% if status == 'unpaid' %}selected{% endif %}>未發放</option>
-                <option value="paid" {% if status == 'paid' %}selected{% endif %}>已發放</option>
-            </select>
+            <label>
+                <span>身份</span>
+                <select class="input" name="role">
+                    <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
+                    <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
+                    <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+                </select>
+            </label>
 
-            <select class="input" name="role">
-                <option value="all" {% if role == 'all' %}selected{% endif %}>全部身份</option>
-                <option value="worker" {% if role == 'worker' %}selected{% endif %}>打手</option>
-                <option value="customer_service" {% if role == 'customer_service' %}selected{% endif %}>客服</option>
-            </select>
+            <label>
+                <span>搜尋</span>
+                <input class="input" type="text" name="q" value="{{ q }}" placeholder="名稱或 Discord ID">
+            </label>
 
             <button class="button" type="submit">套用篩選</button>
 
             <a
                 class="button secondary"
-                href="/admin/payouts/summary.csv?month={{ month }}&status={{ status }}&role={{ role }}"
+                href="/admin/payouts/summary.csv?month={{ month }}&role={{ role }}&q={{ q }}"
             >
-                匯出總表 CSV
+                匯出 CSV
             </a>
         </form>
-    </div>
+    </section>
 
-    <div class="grid compact-grid">
-        <div class="panel compact-panel">
-            <h2>未發放</h2>
-            <p class="big-number">{{ totals.unpaid_total }}T</p>
-            <p>{{ totals.unpaid_count }} 筆</p>
+    <section class="payout-stat-grid">
+        <div class="payout-stat-card highlight-unpaid">
+            <span>未支付總額</span>
+            <strong>{{ totals.unpaid_total }}T</strong>
         </div>
 
-        <div class="panel compact-panel">
-            <h2>已發放</h2>
-            <p class="big-number">{{ totals.paid_total }}T</p>
-            <p>{{ totals.paid_count }} 筆</p>
+        <div class="payout-stat-card">
+            <span>未支付人數</span>
+            <strong>{{ totals.person_count }}</strong>
         </div>
 
-        <div class="panel compact-panel">
-            <h2>累計</h2>
-            <p class="big-number">{{ totals.all_total }}T</p>
-            <p>{{ totals.person_count }} 人，{{ totals.all_count }} 筆</p>
+        <div class="payout-stat-card">
+            <span>未支付筆數</span>
+            <strong>{{ totals.unpaid_count }}</strong>
         </div>
-    </div>
+    </section>
 
-    <div class="panel compact-panel">
-        <h2>人員總表</h2>
+    <section class="panel payout-group-panel">
+        <div class="section-title-row">
+            <div>
+                <h2>未支付名單</h2>
+                <p class="muted-text">依金額由高到低排列。點開人員可以看明細。</p>
+            </div>
+        </div>
 
         {% if rows %}
-            <div class="table-wrap">
-                <table class="data-table compact-table">
-                    <thead>
-                        <tr>
-                            <th>身份</th>
-                            <th>名稱</th>
-                            <th>Discord ID</th>
-                            <th>未發放</th>
-                            <th>已發放</th>
-                            <th>累計</th>
-                            <th>筆數</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in rows %}
-                            <tr>
-                                <td>{{ row.role }}</td>
-                                <td>{{ row.display_name }}</td>
-                                <td>{{ row.discord_id }}</td>
-                                <td>{{ row.unpaid_total }}T</td>
-                                <td>{{ row.paid_total }}T</td>
-                                <td>{{ row.all_total }}T</td>
-                                <td>{{ row.all_count }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="payout-person-list">
+                {% for row in rows %}
+                    <details class="payout-person-card" open>
+                        <summary class="payout-person-summary">
+                            <div class="person-left">
+                                <div class="person-avatar">{{ (row.display_name or '?')[:1] }}</div>
+                                <div>
+                                    <div class="person-role">{{ row.role_label }}</div>
+                                    <h3>{{ row.display_name }}</h3>
+                                    <p>ID：{{ row.discord_id }}</p>
+                                </div>
+                            </div>
+
+                            <div class="person-totals">
+                                <div>
+                                    <span>未支付</span>
+                                    <strong class="text-unpaid">{{ row.unpaid_total }}T</strong>
+                                </div>
+
+                                <div>
+                                    <span>筆數</span>
+                                    <strong>{{ row.unpaid_count }}</strong>
+                                </div>
+                            </div>
+                        </summary>
+
+                        <div class="payout-person-body">
+                            <div class="payout-order-list">
+                                <div class="payout-order-header">
+                                    <span>訂單</span>
+                                    <span>項目</span>
+                                    <span>身份</span>
+                                    <span>金額</span>
+                                </div>
+
+                                {% for item in row.items %}
+                                    <div class="payout-order-row">
+                                        <div class="order-no-cell">{{ item.order_no }}</div>
+                                        <div>{{ item.category }}｜{{ item.item }}</div>
+                                        <div>{{ item.role }}</div>
+                                        <div class="amount-cell">{{ item.amount }}T</div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </details>
+                {% endfor %}
             </div>
         {% else %}
-            <div class="empty-state">目前沒有符合條件的分潤資料。</div>
+            <div class="empty-state">目前沒有未支付分潤。</div>
         {% endif %}
-    </div>
+    </section>
 {% endblock %}
