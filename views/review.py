@@ -382,4 +382,41 @@ class ReviewButtonView(discord.ui.View):
             ReviewModal(customer_id=self.customer_id)
         )
 
+    @discord.ui.button(
+        label="不留下好評，直接關閉票口",
+        style=discord.ButtonStyle.secondary
+    )
+    async def close_without_review(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message("只有這張票口的點單顧客可以關閉票口。", ephemeral=True)
+            return
+
+        channel = interaction.channel
+
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            return
+
+        for child in self.children:
+            child.disabled = True
+
+        try:
+            await interaction.message.edit(view=self)
+        except discord.HTTPException:
+            pass
+
+        await interaction.response.send_message(
+            "已選擇不留下好評，票口將在 3 秒後關閉。",
+            ephemeral=True
+        )
+
+        await channel.send(
+            f"{interaction.user.mention} 選擇不留下好評，票口將在 3 秒後關閉。",
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
+        )
+
+        await asyncio.sleep(3)
+
+        await channel.delete(reason=f"Review skipped by {interaction.user}")
+
 
