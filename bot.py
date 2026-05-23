@@ -2265,6 +2265,33 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         remember_order_data(order_channel_id, data)
         save_bot_data()
 
+
+
+def sync_web_order_status_from_bot(ticket_channel_id, status: str, dispatch_message_id=None, note: str | None = None) -> None:
+    """DC bot 訂單狀態變更後，同步網站 web_orders.status。"""
+    try:
+        from shared.web_order_sync import update_web_order_status_by_ticket_channel
+
+        ok = update_web_order_status_by_ticket_channel(
+            ticket_channel_id=ticket_channel_id,
+            status=status,
+            dispatch_message_id=dispatch_message_id,
+            note=note,
+        )
+        print(
+            f"[web-sync] order status sync "
+            f"ticket_channel_id={ticket_channel_id} "
+            f"dispatch_message_id={dispatch_message_id} "
+            f"status={status} ok={ok}"
+        )
+    except Exception as exc:
+        print(
+            f"[web-sync] 訂單狀態同步網站失敗 "
+            f"ticket_channel_id={ticket_channel_id} "
+            f"status={status}: {exc}"
+        )
+
+
 async def store_dispatch_claim_panel(
     guild: discord.Guild,
     order_channel: discord.TextChannel,
@@ -2342,6 +2369,12 @@ async def store_dispatch_claim_panel(
     data["stored_reminders_sent"] = []
 
     remember_order_data(order_channel.id, data)
+    sync_web_order_status_from_bot(
+        ticket_channel_id=order_channel.id,
+        status="stored",
+        dispatch_message_id=dispatch_message_id,
+        note="由 DC bot 存單同步。",
+    )
     remember_claim_data(dispatch_message_id, claim_data)
 
     companion_ids = sorted(claim_data.get("companion", set()))
@@ -2557,6 +2590,12 @@ async def resume_stored_order(
     data["dispatch_channel_id"] = dispatch_channel.id
 
     remember_order_data(order_channel.id, data)
+    sync_web_order_status_from_bot(
+        ticket_channel_id=order_channel.id,
+        status="active",
+        dispatch_message_id=data.get("dispatch_message_id"),
+        note="由 DC bot 恢復存單同步。",
+    )
     remember_claim_data(new_message.id, claim_data)
     save_bot_data()
 
