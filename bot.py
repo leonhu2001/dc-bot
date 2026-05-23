@@ -1,4 +1,4 @@
-import os
+﻿import os
 from dotenv import load_dotenv
 
 from shared.web_order_sync import sync_web_worker_claim_from_dispatch
@@ -206,7 +206,7 @@ from core.permissions import (
 )
 
 
-# ========= 讀取 .env =========
+# ========= 霈??.env =========
 
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
@@ -214,39 +214,39 @@ load_dotenv(dotenv_path=env_path)
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if TOKEN is None:
-    raise RuntimeError("讀不到 DISCORD_TOKEN，請確認 .env 檔案在 bot.py 同一個資料夾")
+    raise RuntimeError("霈銝 DISCORD_TOKEN嚗?蝣箄? .env 瑼???bot.py ?????冗")
 
 
-# ========= 固定 ID =========
+# ========= ?箏? ID =========
 
 GUILD_ID = 1129474191226306672
 
-# 類別 ID
+# 憿 ID
 CUSTOMER_CATEGORY_ID = 1483895536938651809
 EXAM_CATEGORY_ID = 1483873316702781471
 PLAY_VOICE_CATEGORY_ID = 1482016208638447699
 
-# 陪玩語音入口頻道名稱
-PLAY_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建陪玩頻道"
-OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES = ["🎮┃陪玩點我創建頻道"]
+# ?芰隤?亙?駁??迂
+PLAY_VOICE_CREATE_CHANNEL_NAME = "??暺??萄遣?芰?駁?"
+OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES = ["???拚??撱粹??]
 
-# VIP 語音入口頻道名稱
-VIP_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建VIP頻道"
-OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = ["👑┃𝙑𝙄𝙋專用點我創建頻道"]
+# VIP 隤?亙?駁??迂
+VIP_VOICE_CREATE_CHANNEL_NAME = "??暺??萄遣VIP?駁?"
+OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = ["????????券??撱粹??]
 
-# 公共語音入口頻道名稱
-PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
+# ?砍隤?亙?駁??迂
+PUBLIC_VOICE_CREATE_CHANNEL_NAME = "??暺??萄遣?砍?駁?"
 
-# VIP 語音入口可見 / 可進入身分組 ID
+# VIP 隤?亙?航? / ?舫脣頨怠?蝯?ID
 VIP_VOICE_LOBBY_ROLE_ID = 1482080566760177706
 
-# 身分組 ID
+# 頨怠?蝯?ID
 CUSTOMER_ROLE_ID = 1482084782031638548
 EXAMINER_ROLE_ID = 1497427024644411543
 MANAGER_ROLE_ID = 1131128849443328030
-RECRUIT_APPLICANT_ROLE_ID = 1498829171042943057  # 入職票口開啟期間身分組
+RECRUIT_APPLICANT_ROLE_ID = 1498829171042943057  # ?亥蟡典????頨怠?蝯?
 
-# 會員制度 ID / 設定
+# ??嗅漲 ID / 閮剖?
 SILVER_MEMBER_ROLE_ID = 1482080566760177706
 PLATINUM_PRIVATE_CATEGORY_ID = 1483871504419520654
 PLATINUM_CHAT_ROLE_IDS = [
@@ -255,87 +255,87 @@ PLATINUM_CHAT_ROLE_IDS = [
 ]
 REWARD_POINT_DIVISOR = 100
 MEMBER_LEVELS = [
-    {"name": "普通魔丸", "threshold": 0},
-    {"name": "銀級魔丸", "threshold": 2500},
-    {"name": "金級魔丸", "threshold": 7000},
-    {"name": "白金魔丸", "threshold": 13000},
-    {"name": "鑽石魔丸", "threshold": 30000},
-    {"name": "頂級魔丸", "threshold": 77777},
+    {"name": "?桅?銝?, "threshold": 0},
+    {"name": "?蝝?銝?, "threshold": 2500},
+    {"name": "??擳虜", "threshold": 7000},
+    {"name": "?賡?擳虜", "threshold": 13000},
+    {"name": "?賜擳虜", "threshold": 30000},
+    {"name": "??擳虜", "threshold": 77777},
 ]
 
-# 訂單日誌 / 備份設定
+# 閮?亥? / ?遢閮剖?
 ORDER_LOG_CATEGORY_ID = 1483895536938651809
-ORDER_LOG_CHANNEL_NAME = "🤖┃機器人日誌"
+ORDER_LOG_CHANNEL_NAME = "?????其犖?亥?"
 LOTTERY_ANNOUNCE_CHANNEL_ID = 1482079302739693739
 BACKUP_KEEP_DAYS = 30
 ORDER_ID_PREFIX = "MO"
 
-# 接單身分組 ID
-COMPANION_RECEIVER_ROLE_ID = 1503706721883783218  # 陪玩接單
-BOOSTER_RECEIVER_ROLE_ID = 1503701170504339458    # 打手接單
+# ?亙頨怠?蝯?ID
+COMPANION_RECEIVER_ROLE_ID = 1503706721883783218  # ?芰?亙
+BOOSTER_RECEIVER_ROLE_ID = 1503701170504339458    # ???亙
 
-# 收據頻道 ID
+# ?嗆??駁? ID
 RECEIPT_CHANNEL_ID = 1497623878619627682
 
-# 考核通知頻道 ID
+# ???駁? ID
 EXAM_NOTICE_CHANNEL_ID = 1482083066531942563
 
-# 客訴面板頻道 ID
+# 摰Ｚ迄?Ｘ?駁? ID
 COMPLAINT_PANEL_CHANNEL_ID = 1497653883948765344
 
-# 顧客意見箱面板頻道 ID
+# 憿批恥??蝞梢?輸??ID
 FEEDBACK_PANEL_CHANNEL_ID = 1504345505633927178
 
-# 客訴送出頻道 ID
+# 摰Ｚ迄??駁? ID
 COMPLAINT_RECEIVE_CHANNEL_ID = 1502040302649872394
 
-# 派單頻道 ID
+# 瘣曉?駁? ID
 DISPATCH_CHANNEL_ID = 1483868763446186036
 
-# 評價頻道 ID
+# 閰?駁? ID
 REVIEW_CHANNEL_ID = 1482998033091268691
 
-# 歡迎頻道 ID
+# 甇∟??駁? ID
 WELCOME_CHANNEL_ID = 1482080953353375752
 
-# 新成員自動給予身分組 ID
+# ?唳??∟?策鈭澈?? ID
 NEW_MEMBER_ROLE_ID = 1483872591457550494
 
-# 陪玩語音入口 / 陪玩語音房可見與可進入身分組 ID
-# 目前只開放：陪玩接單、打手接單、客服
+# ?芰隤?亙 / ?芰隤?踹閬??舫脣頨怠?蝯?ID
+# ?桀??芷??橘??芰?亙????柴恥??
 PLAY_VOICE_ALLOWED_ROLE_IDS = [
     1503706721883783218,
     1503701170504339458,
     1482084782031638548,
 ]
 
-# 語音房按「隱藏」後，仍可看見房間的身分組 ID
+# 隤?踵????嚗??舐?閬??頨怠?蝯?ID
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [
     1503706721883783218,
     1503701170504339458,
     1482084782031638548,
 ]
 
-# 暫存由機器人建立的陪玩語音房 ID
+# ?怠??望??其犖撱箇???抵??單 ID
 TEMP_PLAY_VOICE_CHANNEL_IDS = set()
 
-# 暫存由機器人建立的 VIP 語音房 ID
+# ?怠??望??其犖撱箇???VIP 隤??ID
 TEMP_VIP_VOICE_CHANNEL_IDS = set()
 
-# 暫存由機器人建立的公共語音房 ID
+# ?怠??望??其犖撱箇???梯??單 ID
 TEMP_PUBLIC_VOICE_CHANNEL_IDS = set()
 
-# 暫存語音房控制面板資料
+# ?怠?隤?踵?園?輯???
 # voice_channel_id -> {owner_id, panel_channel_id, room_type, locked, hidden}
 TEMP_VOICE_CONTROL_PANELS = {}
 
 
-# ========= 外部設定檔覆蓋 =========
-# config.json 讀取邏輯已搬到 core/config.py。
-# 這裡只保留「把設定套用到預設值」的區塊，降低 bot.py 負擔。
+# ========= 憭閮剖?瑼???=========
+# config.json 霈??頛臬歇?砍 core/config.py??
+# ?ㄐ?芯???閮剖?憟?圈?閮剖潦??憛??? bot.py 鞎???
 
 
-# 伺服器 / 類別
+# 隡箸???/ 憿
 GUILD_ID = _config_int("GUILD_ID", GUILD_ID)
 CUSTOMER_CATEGORY_ID = _config_int("CUSTOMER_CATEGORY_ID", CUSTOMER_CATEGORY_ID)
 EXAM_CATEGORY_ID = _config_int("EXAM_CATEGORY_ID", EXAM_CATEGORY_ID)
@@ -343,7 +343,7 @@ PLAY_VOICE_CATEGORY_ID = _config_int("PLAY_VOICE_CATEGORY_ID", PLAY_VOICE_CATEGO
 PLATINUM_PRIVATE_CATEGORY_ID = _config_int("PLATINUM_PRIVATE_CATEGORY_ID", PLATINUM_PRIVATE_CATEGORY_ID)
 ORDER_LOG_CATEGORY_ID = _config_int("ORDER_LOG_CATEGORY_ID", ORDER_LOG_CATEGORY_ID)
 
-# 頻道
+# ?駁?
 LOTTERY_ANNOUNCE_CHANNEL_ID = _config_int("LOTTERY_ANNOUNCE_CHANNEL_ID", LOTTERY_ANNOUNCE_CHANNEL_ID)
 RECEIPT_CHANNEL_ID = _config_int("RECEIPT_CHANNEL_ID", RECEIPT_CHANNEL_ID)
 EXAM_NOTICE_CHANNEL_ID = _config_int("EXAM_NOTICE_CHANNEL_ID", EXAM_NOTICE_CHANNEL_ID)
@@ -354,7 +354,7 @@ DISPATCH_CHANNEL_ID = _config_int("DISPATCH_CHANNEL_ID", DISPATCH_CHANNEL_ID)
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
 
-# 身分組
+# 頨怠?蝯?
 VIP_VOICE_LOBBY_ROLE_ID = _config_int("VIP_VOICE_LOBBY_ROLE_ID", VIP_VOICE_LOBBY_ROLE_ID)
 CUSTOMER_ROLE_ID = _config_int("CUSTOMER_ROLE_ID", CUSTOMER_ROLE_ID)
 EXAMINER_ROLE_ID = _config_int("EXAMINER_ROLE_ID", EXAMINER_ROLE_ID)
@@ -368,7 +368,7 @@ PLATINUM_CHAT_ROLE_IDS = _config_int_list("PLATINUM_CHAT_ROLE_IDS", PLATINUM_CHA
 PLAY_VOICE_ALLOWED_ROLE_IDS = _config_int_list("PLAY_VOICE_ALLOWED_ROLE_IDS", PLAY_VOICE_ALLOWED_ROLE_IDS)
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = _config_int_list("VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS", VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS)
 
-# 名稱 / 其他設定
+# ?迂 / ?嗡?閮剖?
 PLAY_VOICE_CREATE_CHANNEL_NAME = _config_str("PLAY_VOICE_CREATE_CHANNEL_NAME", PLAY_VOICE_CREATE_CHANNEL_NAME)
 OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES = _config_str_list("OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES", OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES)
 VIP_VOICE_CREATE_CHANNEL_NAME = _config_str("VIP_VOICE_CREATE_CHANNEL_NAME", VIP_VOICE_CREATE_CHANNEL_NAME)
@@ -419,7 +419,7 @@ configure_review_views(
     review_channel_id=REVIEW_CHANNEL_ID,
 )
 
-# ========= Bot 設定 =========
+# ========= Bot 閮剖? =========
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -435,7 +435,7 @@ bot.feedback_panel_channel_id_value = FEEDBACK_PANEL_CHANNEL_ID
 bot._extensions_loaded = False
 
 
-# ========= 工具函式 =========
+# ========= 撌亙?賢? =========
 
 def safe_channel_name(prefix: str, member: discord.Member) -> str:
     name = member.name.lower()
@@ -447,15 +447,15 @@ def is_agree_answer(text: str) -> bool:
     answer = text.strip().lower()
 
     agree_words = {
-        "是",
-        "有",
-        "已詳閱",
-        "已詳讀",
-        "已閱讀",
-        "我已詳閱",
-        "我已詳讀",
-        "我已閱讀",
-        "同意",
+        "??,
+        "??,
+        "撌脰底??,
+        "撌脰底霈",
+        "撌脤霈",
+        "?歇閰喲",
+        "?歇閰唾?",
+        "?歇?梯?",
+        "??",
         "yes",
         "y",
         "ok",
@@ -468,7 +468,7 @@ def is_agree_answer(text: str) -> bool:
 
 def get_recruit_info_from_channel(channel: discord.TextChannel) -> tuple[str, str]:
     if not channel.topic:
-        return "未紀錄暱稱", "未紀錄職位"
+        return "?芰??蝔?, "?芰??雿?
 
     data = {}
 
@@ -477,14 +477,14 @@ def get_recruit_info_from_channel(channel: discord.TextChannel) -> tuple[str, st
             key, value = part.split("=", 1)
             data[key.strip()] = value.strip()
 
-    nickname = data.get("recruit_nickname", "未紀錄暱稱")
-    position = data.get("recruit_position", "未紀錄職位")
+    nickname = data.get("recruit_nickname", "?芰??蝔?)
+    position = data.get("recruit_position", "?芰??雿?)
 
     return nickname, position
 
 
 def get_recruit_member_id_from_channel(channel: discord.TextChannel) -> int | None:
-    """從入職票口 topic 讀取申請人 ID。"""
+    """敺?瑞巨??topic 霈?隢犖 ID??""
     if not channel.topic:
         return None
 
@@ -507,7 +507,7 @@ def get_recruit_member_id_from_channel(channel: discord.TextChannel) -> int | No
 
 
 async def remove_recruit_applicant_role(guild: discord.Guild | None, channel: discord.abc.GuildChannel | None):
-    """入職票口關閉時收回申請人暫時身分組。"""
+    """?亥蟡典????隢犖?急?頨怠?蝯?""
     if guild is None or not isinstance(channel, discord.TextChannel):
         return
 
@@ -528,9 +528,9 @@ async def remove_recruit_applicant_role(guild: discord.Guild | None, channel: di
     try:
         await member.remove_roles(role, reason="Recruit ticket closed")
     except discord.Forbidden:
-        print("Bot 權限不足，無法收回入職申請暫時身分組。請確認 Bot 身分組位置高於該身分組。")
+        print("Bot 甈?銝雲嚗瘜??瑞隢?澈????蝣箄? Bot 頨怠?蝯?蝵桅??潸府頨怠?蝯?)
     except discord.HTTPException as e:
-        print(f"收回入職申請暫時身分組失敗：{e}")
+        print(f"?嗅??亥?唾??急?頨怠?蝯仃??{e}")
 
 
 configure_support_views(
@@ -541,9 +541,9 @@ configure_support_views(
 
 def get_order_customer_id_from_channel(channel: discord.TextChannel) -> int | None:
     """
-    優先從頻道 topic 讀取點單顧客 ID。
-    若是舊票口沒有 topic，會嘗試從頻道名稱最後一段讀取 ID。
-    頻道名稱格式通常會是：下單-名字-使用者ID
+    ?芸?敺??topic 霈???桅“摰?ID??
+    ?交?巨?????topic嚗??岫敺??蝔望?敺?畾菔???ID??
+    ?駁??迂?澆??虜?嚗?????-雿輻?D
     """
     if channel.topic:
         data = {}
@@ -584,7 +584,7 @@ async def create_private_channel(
 
     if guild is None:
         await interaction.response.send_message(
-            "這個功能只能在伺服器內使用。",
+            "???賢?賢隡箸??典雿輻??,
             ephemeral=True
         )
         return
@@ -593,7 +593,7 @@ async def create_private_channel(
 
     if category is None or not isinstance(category, discord.CategoryChannel):
         await interaction.response.send_message(
-            "找不到指定類別，請確認你填的是「類別 ID」，不是頻道 ID。",
+            "?曆??唳?摰??伐?隢Ⅱ隤?憛怎??胯???ID??銝?駁? ID??,
             ephemeral=True
         )
         return
@@ -654,11 +654,11 @@ async def create_private_channel(
     if topic and "order_customer_id=" in topic:
         await send_order_log(
             guild,
-            title="新票口已建立",
+            title="?啁巨??歇撱箇?",
             fields=[
-                ("開單人", member.mention, True),
-                ("票口", channel.mention, True),
-                ("狀態", "已確認詳閱規章內容", False),
+                ("?鈭?, member.mention, True),
+                ("蟡典", channel.mention, True),
+                ("???, "撌脩Ⅱ隤底?梯?蝡摰?, False),
             ],
             color=discord.Color.purple(),
         )
@@ -671,77 +671,77 @@ async def create_private_channel(
         pass
 
 
-# ========= 評價 Modal / 按鈕 =========
+# ========= 閰 Modal / ?? =========
 # Review modal/button views moved to views/review.py
 
-# ========= 派單 Modal =========
+# ========= 瘣曉 Modal =========
 
-class DispatchModal(discord.ui.Modal, title="派單"):
+class DispatchModal(discord.ui.Modal, title="瘣曉"):
     order_name = discord.ui.TextInput(
-        label="單子名稱",
-        placeholder="請輸入單子名稱",
+        label="?桀??迂",
+        placeholder="隢撓?亙摮?蝔?,
         required=True,
         max_length=100
     )
 
     receiver = discord.ui.TextInput(
-        label="接單打手/陪玩",
-        placeholder="請輸入接單打手/陪玩名稱",
+        label="?亙??/?芰",
+        placeholder="隢撓?交?格????芰?迂",
         required=True,
         max_length=100
     )
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以派單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑瘣曉??, ephemeral=True)
             return
 
         guild = interaction.guild
 
         if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
 
         dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
 
         if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
             await interaction.response.send_message(
-                "找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。",
+                "?曆??唳晷?桅??隢Ⅱ隤?DISPATCH_CHANNEL_ID ?臬甇?Ⅱ??,
                 ephemeral=True
             )
             return
 
-        source_channel = interaction.channel.mention if isinstance(interaction.channel, discord.TextChannel) else "未知頻道"
+        source_channel = interaction.channel.mention if isinstance(interaction.channel, discord.TextChannel) else "?芰?駁?"
 
         embed = discord.Embed(
-            title="新派單",
+            title="?唳晷??,
             color=discord.Color.blue()
         )
 
         embed.add_field(
-            name="單子名稱",
+            name="?桀??迂",
             value=self.order_name.value,
             inline=False
         )
 
         embed.add_field(
-            name="接單打手/陪玩",
+            name="?亙??/?芰",
             value=self.receiver.value,
             inline=False
         )
 
         embed.add_field(
-            name="派單客服",
+            name="瘣曉摰Ｘ?",
             value=interaction.user.mention,
             inline=False
         )
 
         embed.add_field(
-            name="來源頻道",
+            name="靘??駁?",
             value=source_channel,
             inline=False
         )
@@ -756,22 +756,22 @@ class DispatchModal(discord.ui.Modal, title="派單"):
         )
 
         await interaction.response.send_message(
-            f"已派單，派單資訊已送到 {dispatch_channel.mention}。",
+            f"撌脫晷?殷?瘣曉鞈?撌脤 {dispatch_channel.mention}??,
             ephemeral=True
         )
 
         if isinstance(interaction.channel, discord.TextChannel):
             await interaction.channel.send(
-                f"此單已由 {interaction.user.mention} 派單。\n"
-                f"單子名稱：{self.order_name.value}\n"
-                f"接單打手/陪玩：{self.receiver.value}"
+                f"甇文撌脩 {interaction.user.mention} 瘣曉?n"
+                f"?桀??迂嚗self.order_name.value}\n"
+                f"?亙??/?芰嚗self.receiver.value}"
             )
 
 
 
 
 def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) -> None:
-    """DC bot 結單後，把網站訂單狀態同步成 closed。"""
+    """DC bot 蝯敺??雯蝡??桃???甇交? closed??""
     try:
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
@@ -779,61 +779,61 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
             ticket_channel_id=ticket_channel_id,
             status="closed",
             dispatch_message_id=dispatch_message_id,
-            note="由 DC bot 結單同步。",
+            note="??DC bot 蝯?郊??,
         )
         print(f"[web-sync] close order ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} ok={ok}")
     except Exception as exc:
-        print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
+        print(f"[web-sync] 蝯?郊蝬脩?憭望? ticket_channel_id={ticket_channel_id}: {exc}")
 
 
-# ========= 收據 Modal =========
+# ========= ?嗆? Modal =========
 
-class ReceiptModal(discord.ui.Modal, title="已結單收據"):
+class ReceiptModal(discord.ui.Modal, title="撌脩??格??):
     payee = discord.ui.TextInput(
-        label="收款人",
-        placeholder="例如：zYao或客服暱稱(代收)",
+        label="?嗆狡鈭?,
+        placeholder="靘?嚗Yao?恥?蝔?隞?)",
         required=True,
         max_length=100
     )
 
     staff = discord.ui.TextInput(
-        label="對接客服",
-        placeholder="請輸入對接客服名稱",
+        label="撠摰Ｘ?",
+        placeholder="隢撓?亙??亙恥??蝔?,
         required=True,
         max_length=100
     )
 
     receiver = discord.ui.TextInput(
-        label="接單打手/陪玩",
-        placeholder="請輸入接單打手/陪玩名稱",
+        label="?亙??/?芰",
+        placeholder="隢撓?交?格????芰?迂",
         required=True,
         max_length=100
     )
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作已結單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑??撌脩??柴?, ephemeral=True)
             return
 
         guild = interaction.guild
 
         if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄??桀?蟡典?駁???, ephemeral=True)
             return
 
         receipt_channel = guild.get_channel(RECEIPT_CHANNEL_ID)
 
         if receipt_channel is None or not isinstance(receipt_channel, discord.TextChannel):
             await interaction.response.send_message(
-                "找不到收據頻道，請確認 RECEIPT_CHANNEL_ID 是否正確。",
+                "?曆??唳???隢Ⅱ隤?RECEIPT_CHANNEL_ID ?臬甇?Ⅱ??,
                 ephemeral=True
             )
             return
@@ -843,7 +843,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         if customer_id is None:
             await interaction.response.send_message(
-                "無法辨識這張票口的下單顧客，因此無法自動帶入付款人。",
+                "?⊥?颲刻??撐蟡典???桅“摰ｇ??迨?⊥??芸?撣嗅隞狡鈭箝?,
                 ephemeral=True
             )
             return
@@ -858,7 +858,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         parsed_amount = _to_int(order_data.get("amount"), 0) or _to_int(order_data.get("total_amount"), 0) or 0
         if parsed_amount <= 0:
             await interaction.response.send_message(
-                "這張單還沒有訂單價格，請先在付款面板按「填寫訂單價格」讓客服輸入金額。",
+                "?撐?桅?瘝?閮?寞嚗??隞狡?Ｘ?‵撖怨??桀?潦?摰Ｘ?頛詨????,
                 ephemeral=True
             )
             return
@@ -885,41 +885,41 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         receipt_text = (
             "```text\n"
-            "收據\n"
+            "?嗆?\n"
             "\n"
-            f"編號：{receipt_id}\n"
-            f"日期：{date_text}\n"
+            f"蝺刻?嚗receipt_id}\n"
+            f"?交?嚗date_text}\n"
             "\n"
-            f"收款人：{self.payee.value}\n"
-            f"付款人：{payer_text}\n"
+            f"?嗆狡鈭綽?{self.payee.value}\n"
+            f"隞狡鈭綽?{payer_text}\n"
             "\n"
-            f"內容：{order_content}\n"
+            f"?批捆嚗order_content}\n"
             "\n"
-            f"金額：{amount_text}\n"
-            f"付款方式：{payment_method}\n"
+            f"??嚗amount_text}\n"
+            f"隞狡?孵?嚗payment_method}\n"
             "```"
         )
 
         embed = discord.Embed(
-            title="收據",
+            title="?嗆?",
             description=receipt_text,
             color=discord.Color.green()
         )
 
         embed.add_field(
-            name="付款人",
+            name="隞狡鈭?,
             value=payer_text,
             inline=False
         )
 
         embed.add_field(
-            name="對接客服",
+            name="撠摰Ｘ?",
             value=self.staff.value,
             inline=False
         )
 
         embed.add_field(
-            name="接單打手/陪玩",
+            name="?亙??/?芰",
             value=self.receiver.value,
             inline=False
         )
@@ -935,27 +935,27 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         await lock_dispatch_claim_panel(guild, order_channel.id)
 
-        reward_result = "會員累積已在顧客送出付款方式時處理。" if order_data.get("reward_counted") else "提醒：這張單尚未標記會員累積，請確認顧客是否已送出付款方式。"
+        reward_result = "?蝝舐?撌脣憿批恥?隞狡?孵????? if order_data.get("reward_counted") else "??嚗撐?桀??芣?閮??∠敞蝛?隢Ⅱ隤“摰Ｘ?血歇?隞狡?孵???
 
         await send_order_log(
             guild,
-            title="訂單已結單",
+            title="閮撌脩???,
             fields=[
-                ("訂單編號", receipt_id, True),
-                ("顧客", f"<@{customer_id}>", True),
-                ("客服", interaction.user.mention, True),
-                ("金額", amount_text, True),
-                ("付款方式", payment_method, True),
-                ("票口", order_channel.mention, False),
-                ("內容", order_content, False),
+                ("閮蝺刻?", receipt_id, True),
+                ("憿批恥", f"<@{customer_id}>", True),
+                ("摰Ｘ?", interaction.user.mention, True),
+                ("??", amount_text, True),
+                ("隞狡?孵?", payment_method, True),
+                ("蟡典", order_channel.mention, False),
+                ("?批捆", order_content, False),
             ],
             color=discord.Color.green(),
         )
 
         await interaction.response.send_message(
-            f"此單已由 {interaction.user.mention} 結單，收據已送出。\n\n"
+            f"甇文撌脩 {interaction.user.mention} 蝯嚗?歇??n\n"
             f"{reward_result}\n\n"
-            f"請闆闆留下評論",
+            f"隢???銝?隢?,
             view=ReviewButtonView(customer_id=customer_id),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -965,24 +965,24 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         )
 
 
-# ========= 下單操作按鈕 =========
+# ========= 銝???? =========
 
 class ConfirmCancelOrderView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
 
     @discord.ui.button(
-        label="是，取消訂單",
+        label="?荔???閮",
         style=discord.ButtonStyle.danger,
         custom_id="confirm_cancel_order_yes"
     )
     async def confirm_cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以取消訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑??閮??, ephemeral=True)
             return
 
         channel = interaction.channel
@@ -994,7 +994,7 @@ class ConfirmCancelOrderView(discord.ui.View):
             )
 
         await interaction.response.send_message(
-            "已確認取消訂單，這個頻道將在 3 秒後關閉，對應的派單訊息也會一併刪除。",
+            "撌脩Ⅱ隤?瘨??殷??????3 蝘???嚗???瘣曉閮銋?銝雿萄?扎?,
             ephemeral=False
         )
 
@@ -1004,23 +1004,23 @@ class ConfirmCancelOrderView(discord.ui.View):
             await channel.delete(reason=f"Order cancelled by {interaction.user}")
 
     @discord.ui.button(
-        label="否，保留訂單",
+        label="?佗?靽?閮",
         style=discord.ButtonStyle.secondary,
         custom_id="confirm_cancel_order_no"
     )
     async def keep_order(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑????, ephemeral=True)
             return
 
-        await interaction.response.send_message("已保留訂單。", ephemeral=True)
+        await interaction.response.send_message("撌脖????柴?, ephemeral=True)
 
 
-# ========= 自助下單資料 =========
+# ========= ?芸銝鞈? =========
 
 ORDER_CONTROL_SELECTIONS = {}
 STAFF_ORDER_OPERATION_SELECTIONS = {}
@@ -1034,18 +1034,18 @@ configure_order_helpers(
     get_now_func=get_taipei_now,
 )
 
-# 派單頻道接單資料
-# message_id 對應該派單訊息目前有哪些陪玩 / 打手接單。
-# 重要訂單資料會保存到 bot_data.json，Bot 重啟後會自動讀回。
+# 瘣曉?駁??亙鞈?
+# message_id 撠?閰脫晷?株??舐???芯??芰 / ???亙??
+# ??閮鞈???摮 bot_data.json嚗ot ??敺??芸?霈??
 ORDER_CLAIMS = {}
 
-# 顧客會員 / 獎勵資料
+# 憿批恥? / ?鞈?
 # user_id -> {total_spent, order_count, last_order_at, points, platinum_channel_id}
 CUSTOMER_REWARDS = {}
 configure_reward_storage(CUSTOMER_REWARDS)
 configure_audit_service(SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, CUSTOMER_REWARDS)
 
-# 訂單編號計數器：YYYYMMDD -> 當日最後流水號
+# 閮蝺刻?閮?剁?YYYYMMDD -> ?嗆?敺?瘞渲?
 ORDER_COUNTERS = {}
 
 BACKUP_TASK_STARTED = False
@@ -1054,11 +1054,11 @@ VIP_DOWNGRADE_TASK_STARTED = False
 STORED_ORDER_REMINDER_DAYS = [3, 7]
 VIP_MAINTAIN_MIN_MONTHLY_SPEND = 500
 
-DATA_FILE = Path(__file__).parent / "bot_data.json"  # 舊版 JSON 備援/遷移用
+DATA_FILE = Path(__file__).parent / "bot_data.json"  # ?? JSON ?/?瑞宏??
 DB_FILE = Path(__file__).parent / "bot.db"
 BACKUP_DIR = Path(__file__).parent / "backups"
-CLOSED_ORDER_KEEP_DAYS = 0  # 已結單資料永久保留，不再自動刪除
-CANCELLED_ORDER_KEEP_DAYS = 60  # 只清理超過 60 天的取消單暫存
+CLOSED_ORDER_KEEP_DAYS = 0  # 撌脩??株??偶銋???銝??芸??芷
+CANCELLED_ORDER_KEEP_DAYS = 60  # ?芣?????60 憭拍????格摮?
 
 
 
@@ -1075,7 +1075,7 @@ async def daily_backup_loop():
             if backup_path:
                 print(f"bot.db backup checked: {backup_path}")
         except Exception as e:
-            print(f"每日備份 bot.db 失敗：{e}")
+            print(f"瘥?遢 bot.db 憭望?嚗e}")
         await asyncio.sleep(3600)
 
 
@@ -1109,26 +1109,26 @@ async def check_stored_order_reminders_once(guild: discord.Guild | None = None) 
             sent.append(day)
 
             customer_id = data.get("customer_id") or get_order_customer_id_from_channel(guild.get_channel(channel_id)) if isinstance(guild.get_channel(channel_id), discord.TextChannel) else data.get("customer_id")
-            item = data.get("item") or "未紀錄"
+            item = data.get("item") or "?芰???
             quantity = _to_int(data.get("quantity"), 1) or 1
             amount = _to_int(data.get("amount"), 0) or 0
-            order_no = data.get("order_no") or "未產生"
+            order_no = data.get("order_no") or "?芰??
             ticket_channel = guild.get_channel(channel_id)
-            ticket_text = ticket_channel.mention if isinstance(ticket_channel, discord.TextChannel) else f"票口 ID：{channel_id}"
+            ticket_text = ticket_channel.mention if isinstance(ticket_channel, discord.TextChannel) else f"蟡典 ID嚗channel_id}"
 
             description = (
-                f"有一筆存單已經超過 **{day} 天**，請客服確認是否需要恢復、取消或聯絡顧客。\n\n"
-                f"顧客：{f'<@{customer_id}>' if customer_id else '未紀錄'}\n"
-                f"票口：{ticket_text}\n"
-                f"訂單編號：{order_no}\n"
-                f"項目：{item} x{quantity}\n"
-                f"金額：{format_t_amount(amount) if amount else '未紀錄'}\n"
-                f"存單原因：{data.get('stored_reason') or '未填寫'}\n"
-                f"預計恢復：{data.get('stored_expected_time') or '未填寫'}"
+                f"??蝑??桀歇蝬???**{day} 憭?*嚗?摰Ｘ?蝣箄??臬?閬敺押?瘨??舐窗憿批恥?n\n"
+                f"憿批恥嚗f'<@{customer_id}>' if customer_id else '?芰???}\n"
+                f"蟡典嚗ticket_text}\n"
+                f"閮蝺刻?嚗order_no}\n"
+                f"?嚗item} x{quantity}\n"
+                f"??嚗format_t_amount(amount) if amount else '?芰???}\n"
+                f"摮??嚗data.get('stored_reason') or '?芸‵撖?}\n"
+                f"???Ｗ儔嚗data.get('stored_expected_time') or '?芸‵撖?}"
             )
             await send_order_log(
                 guild,
-                title=f"存單提醒｜已超過 {day} 天",
+                title=f"摮??嚚歇頞? {day} 憭?,
                 description=description,
                 color=discord.Color.orange(),
             )
@@ -1146,7 +1146,7 @@ async def vip_downgrade_loop():
         try:
             await check_vip_downgrades_once()
         except Exception as e:
-            print(f"VIP 自動降階檢查失敗：{e}")
+            print(f"VIP ?芸???瑼Ｘ憭望?嚗e}")
         await asyncio.sleep(21600)
 
 
@@ -1156,7 +1156,7 @@ async def stored_order_reminder_loop():
         try:
             await check_stored_order_reminders_once()
         except Exception as e:
-            print(f"存單提醒檢查失敗：{e}")
+            print(f"摮??瑼Ｘ憭望?嚗e}")
         await asyncio.sleep(21600)
 
 
@@ -1194,13 +1194,13 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
 
 def cleanup_old_closed_orders() -> None:
     """
-    清理過期的非必要暫存資料。
+    皜?????敹??怠?鞈???
 
-    重要規則：
-    - 已結單 closed：永久保留，因為營收、會員累積、統計都會用到。
-    - 存單 stored：永久保留，避免存單被誤刪。
-    - 取消單 cancelled/canceled：超過 CANCELLED_ORDER_KEEP_DAYS 天後清理。
-    - 備份檔：由 run_daily_backup_once() 依 BACKUP_KEEP_DAYS 清理。
+    ??閬?嚗?
+    - 撌脩???closed嚗偶銋????????∠敞蝛絞閮??啜?
+    - 摮 stored嚗偶銋????踹?摮鋡怨炊?芥?
+    - ????cancelled/canceled嚗???CANCELLED_ORDER_KEEP_DAYS 憭拙?皜???
+    - ?遢瑼???run_daily_backup_once() 靘?BACKUP_KEEP_DAYS 皜???
     """
     if CANCELLED_ORDER_KEEP_DAYS <= 0:
         return
@@ -1216,11 +1216,11 @@ def cleanup_old_closed_orders() -> None:
 
         status = str(data.get("status", "")).lower()
 
-        # closed / stored 都是營運重要紀錄，不自動刪。
+        # closed / stored ?賣????蝝??銝???
         if status in {"closed", "stored"} or data.get("closed"):
             continue
 
-        # 只清理取消單。
+        # ?芣???瘨??
         if status not in {"cancelled", "canceled"}:
             continue
 
@@ -1258,20 +1258,20 @@ def cleanup_old_closed_orders() -> None:
     if order_channel_ids_to_remove or dispatch_message_ids_to_remove:
         save_bot_data()
         print(
-            f"已清理 {len(order_channel_ids_to_remove)} 筆超過 "
-            f"{CANCELLED_ORDER_KEEP_DAYS} 天的取消單暫存資料。"
+            f"撌脫???{len(order_channel_ids_to_remove)} 蝑???"
+            f"{CANCELLED_ORDER_KEEP_DAYS} 憭拍????格摮???
         )
 
 
-# ========= SQLite 相容修正版：正式支援 relational bot.db =========
-# 這段會覆蓋上方舊的 JSON blob 版 init / save / load。
-# 用途：
-# 1. 讓 /add_purchase、/import_purchases、/set_customer_rewards 寫進 customers 表。
-# 2. 保留直接 SQL 查詢用欄位：customer_id / total_spent / points / completed_orders / last_order_at / level。
-# 3. 會員降階從 2026/06 才開始檢查，避免 2026/05 開店時被 4 月資料誤降級。
-# 4. 降階後把 vip_progress_base_total_spent 設為當下累積消費，下一級進度從降階後重新開始。
+# ========= SQLite ?詨捆靽格迤??甇???舀 relational bot.db =========
+# ?挾?????寡???JSON blob ??init / save / load??
+# ?券?
+# 1. 霈?/add_purchase??import_purchases??set_customer_rewards 撖恍?customers 銵具?
+# 2. 靽??湔 SQL ?亥岷?冽?雿?customer_id / total_spent / points / completed_orders / last_order_at / level??
+# 3. ???敺?2026/06 ??憪炎?伐??踹? 2026/05 ???◤ 4 ???炊????
+# 4. ??敺? vip_progress_base_total_spent 閮剔?嗡?蝝舐?瘨祥嚗?銝蝝脣漲敺????????
 
-VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 第一次檢查 2026/05 消費；不檢查 2026/04。
+VIP_DOWNGRADE_FIRST_CHECK_MONTH = "2026-06"  # 蝚砌?甈⊥炎??2026/05 瘨祥嚗?瑼Ｘ 2026/04??
 
 
 
@@ -1320,13 +1320,13 @@ load_bot_data()
 cleanup_old_closed_orders()
 
 COMPANION_PREFERENCE_OPTIONS = [
-    "不指定陪玩/打手",
-    "指定陪玩/打手",
+    "銝?摰????",
+    "???芰/??",
 ]
 
 PAYMENT_METHOD_OPTIONS = [
-    "街口",
-    "轉帳",
+    "銵",
+    "頧董",
 ]
 
 
@@ -1334,19 +1334,19 @@ class OrderControlSelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(
-                label="派單",
+                label="瘣曉",
                 value="dispatch",
-                description="開啟自助下單面板給開單用戶填寫"
+                description="???芸銝?Ｘ蝯阡??桃?嗅‵撖?
             ),
             discord.SelectOption(
-                label="取消訂單",
+                label="??閮",
                 value="cancel",
-                description="取消並關閉這張下單票口"
+                description="??銝阡??撐銝蟡典"
             ),
         ]
 
         super().__init__(
-            placeholder="客服操作選項",
+            placeholder="摰Ｘ????賊?",
             min_values=1,
             max_values=1,
             options=options,
@@ -1356,15 +1356,15 @@ class OrderControlSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑??閮??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢銝蟡典?找蝙?具?, ephemeral=True)
             return
 
         ORDER_CONTROL_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]
@@ -1379,39 +1379,39 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
 
         options = [
             discord.SelectOption(
-                label="基礎單",
+                label="?箇???,
                 value="basic",
-                description="油鍋單、賭約單、保底單、技術陪、娛樂陪、體驗單",
+                description="瘝寥??柴陪蝝??摨??銵??璅??撽",
                 default=selected_category == "basic"
             ),
             discord.SelectOption(
-                label="趣味單",
+                label="頞???,
                 value="fun",
-                description="豪到你了嗎、瘋狗嘶咬、這什麼鳥槍、想吃自己打",
+                description="鞊芸雿?????研?暻潮野瑽?撌望?",
                 default=selected_category == "fun"
             ),
             discord.SelectOption(
-                label="代解代肝",
+                label="隞?圾隞??",
                 value="farm",
-                description="賽季3x3、純綠代肝哈夫幣",
+                description="鞈賢迤3x3??蝬誨??憭怠馳",
                 default=selected_category == "farm"
             ),
             discord.SelectOption(
-                label="賽季限定活動",
+                label="鞈賢迤??瘣餃?",
                 value="season",
-                description="勇敢者行動、S9炫彩勇敢者行動",
+                description="????9?怠蔗?????,
                 default=selected_category == "season"
             ),
             discord.SelectOption(
                 label="Valorant",
                 value="valorant",
-                description="陪打、代打",
+                description="?芣??誨??,
                 default=selected_category == "valorant"
             ),
         ]
 
         super().__init__(
-            placeholder="請選擇訂單類別",
+            placeholder="隢???桅???,
             min_values=1,
             max_values=1,
             options=options,
@@ -1421,7 +1421,7 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑?豢?閮??, ephemeral=True)
             return
 
         selected_category = self.values[0]
@@ -1437,7 +1437,7 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "選擇訂單類別",
+            "?豢?閮憿",
             ORDER_CATEGORY_LABELS.get(selected_category, selected_category),
         )
 
@@ -1465,13 +1465,13 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         if selected_category is None:
             options = [
                 discord.SelectOption(
-                    label="請先選擇訂單類別",
+                    label="隢??豢?閮憿",
                     value="need_category",
-                    description="選完上方類別後，這裡會自動更新項目"
+                    description="?詨?銝憿敺??ㄐ???圈???
                 )
             ]
             disabled = True
-            placeholder = "請先選擇訂單類別"
+            placeholder = "隢??豢?閮憿"
         else:
             options = [
                 discord.SelectOption(
@@ -1483,7 +1483,7 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
                 for item in ORDER_ITEMS_BY_CATEGORY[selected_category]
             ]
             disabled = False
-            placeholder = "請選擇訂單項目"
+            placeholder = "隢???桅???
 
         super().__init__(
             placeholder=placeholder,
@@ -1497,7 +1497,7 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑?豢?閮??, ephemeral=True)
             return
 
         selected_item = self.values[0]
@@ -1511,12 +1511,12 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         if selected_item in SPECIAL_COMPANION_ITEMS:
             data.pop("companion_preference", None)
         else:
-            data["companion_preference"] = "不指定陪玩/打手"
+            data["companion_preference"] = "銝?摰????"
         remember_order_data(self.channel_id, data)
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "選擇訂單項目",
+            "?豢?閮?",
             selected_item,
         )
 
@@ -1544,58 +1544,58 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         if selected_item is None:
             options = [
                 discord.SelectOption(
-                    label="請先選擇訂單項目",
+                    label="隢??豢?閮?",
                     value="need_item",
-                    description="選完上方項目後，這裡會自動更新"
+                    description="?詨?銝?敺??ㄐ????
                 )
             ]
             disabled = True
-            placeholder = "請先選擇訂單項目"
+            placeholder = "隢??豢?閮?"
         elif selected_item in SPECIAL_COMPANION_ITEMS:
-            if selected_item == "陪打":
+            if selected_item == "?芣?":
                 options = [
                     discord.SelectOption(
-                        label="不指定打手",
-                        value="不指定打手",
-                        description="由客服安排合適人選",
-                        default=selected_preference in {"不指定打手", "不指定陪玩/打手", None}
+                        label="銝?摰???,
+                        value="銝?摰???,
+                        description="?勗恥?????拐犖??,
+                        default=selected_preference in {"銝?摰???, "銝?摰????", None}
                     ),
                     discord.SelectOption(
-                        label="指定打手",
-                        value="指定打手",
-                        description="由下單用戶指定人選",
-                        default=selected_preference in {"指定打手", "指定陪玩/打手"}
+                        label="????",
+                        value="????",
+                        description="?曹??桃?嗆?摰犖??,
+                        default=selected_preference in {"????", "???芰/??"}
                     ),
                 ]
-                placeholder = "請選擇是否指定打手"
+                placeholder = "隢??行?摰???
             else:
                 options = [
                     discord.SelectOption(
-                        label="不指定陪玩/打手",
-                        value="不指定陪玩/打手",
-                        description="由客服安排合適人選",
-                        default=selected_preference == "不指定陪玩/打手"
+                        label="銝?摰????",
+                        value="銝?摰????",
+                        description="?勗恥?????拐犖??,
+                        default=selected_preference == "銝?摰????"
                     ),
                     discord.SelectOption(
-                        label="指定陪玩/打手",
-                        value="指定陪玩/打手",
-                        description="由下單用戶指定人選",
-                        default=selected_preference == "指定陪玩/打手"
+                        label="???芰/??",
+                        value="???芰/??",
+                        description="?曹??桃?嗆?摰犖??,
+                        default=selected_preference == "???芰/??"
                     ),
                 ]
-                placeholder = "請選擇是否指定陪玩/打手"
+                placeholder = "隢??行?摰????"
             disabled = False
         else:
             options = [
                 discord.SelectOption(
-                    label="不指定陪玩/打手",
-                    value="不指定陪玩/打手",
-                    description="此項目不開放指定",
+                    label="銝?摰????",
+                    value="銝?摰????",
+                    description="甇日??桐????",
                     default=True
                 )
             ]
             disabled = False
-            placeholder = "不指定陪玩/打手"
+            placeholder = "銝?摰????"
 
         super().__init__(
             placeholder=placeholder,
@@ -1609,7 +1609,7 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑?豢?閮??, ephemeral=True)
             return
 
         if self.values[0] == "need_item":
@@ -1624,7 +1624,7 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "選擇指定選項",
+            "?豢????賊?",
             self.values[0],
         )
 
@@ -1652,36 +1652,36 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         if selected_item is None:
             options = [
                 discord.SelectOption(
-                    label="請先選擇訂單項目",
+                    label="隢??豢?閮?",
                     value="need_item",
-                    description="選完上方項目後，這裡會自動更新"
+                    description="?詨?銝?敺??ㄐ????
                 )
             ]
             disabled = True
-            placeholder = "請先選擇訂單項目"
+            placeholder = "隢??豢?閮?"
         elif selected_item in QUANTITY_SELECT_ITEMS:
             options = [
                 discord.SelectOption(
-                    label=f"{num} 單",
+                    label=f"{num} ??,
                     value=str(num),
-                    description=f"{num} 單 = 約 {num} 小時",
+                    description=f"{num} ??= 蝝?{num} 撠?",
                     default=quantity == num
                 )
                 for num in QUANTITY_OPTIONS
             ]
             disabled = False
-            placeholder = "請選擇數量"
+            placeholder = "隢???
         else:
             options = [
                 discord.SelectOption(
-                    label="1 單",
+                    label="1 ??,
                     value="1",
-                    description="此項目數量固定為 1 單",
+                    description="甇日??格?摰 1 ??,
                     default=True
                 )
             ]
             disabled = False
-            placeholder = "數量固定為 1 單"
+            placeholder = "?賊??箏???1 ??
 
         super().__init__(
             placeholder=placeholder,
@@ -1695,7 +1695,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單數量。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑?豢?閮?賊???, ephemeral=True)
             return
 
         if self.values[0] == "need_item":
@@ -1708,14 +1708,14 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         try:
             quantity = int(self.values[0])
         except ValueError:
-            await interaction.response.send_message("數量選擇異常，請重新選擇。", ephemeral=True)
+            await interaction.response.send_message("?賊??豢??啣虜嚗???豢???, ephemeral=True)
             return
 
         if selected_item not in QUANTITY_SELECT_ITEMS:
             quantity = 1
 
         if quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-            await interaction.response.send_message("數量請選擇 1 到 8 單。", ephemeral=True)
+            await interaction.response.send_message("?賊?隢??1 ??8 ?柴?, ephemeral=True)
             return
 
         data["customer_id"] = self.customer_id
@@ -1725,8 +1725,8 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "選擇訂單數量",
-            f"{quantity} 單",
+            "?豢?閮?賊?",
+            f"{quantity} ??,
         )
 
         await interaction.response.edit_message(
@@ -1744,36 +1744,36 @@ async def log_self_service_proxy_action(
     action: str,
     detail: str | None = None,
 ) -> None:
-    """客服 / 店長 / 管理員代操作自助下單時，寫入機器人日誌。"""
+    """摰Ｘ? / 摨 / 蝞∠??∩誨???芸銝??撖怠璈鈭箸隤?""
     if interaction.user.id == customer_id:
         return
 
-    channel_text = interaction.channel.mention if isinstance(interaction.channel, discord.TextChannel) else "未紀錄"
+    channel_text = interaction.channel.mention if isinstance(interaction.channel, discord.TextChannel) else "?芰???
     fields = [
-        ("操作人員", interaction.user.mention, True),
-        ("原下單顧客", f"<@{customer_id}>", True),
-        ("票口", channel_text, False),
-        ("操作", action, True),
+        ("??鈭箏", interaction.user.mention, True),
+        ("???桅“摰?, f"<@{customer_id}>", True),
+        ("蟡典", channel_text, False),
+        ("??", action, True),
     ]
 
     if detail:
-        fields.append(("內容", detail, False))
+        fields.append(("?批捆", detail, False))
 
     try:
         await send_order_log(
             interaction.guild,
-            title="自助下單代操作",
+            title="?芸銝隞??雿?,
             fields=fields,
             color=discord.Color.teal(),
         )
     except Exception as e:
-        print(f"寫入自助下單代操作日誌失敗：{e}")
+        print(f"撖怠?芸銝隞??雿隤仃??{e}")
 
 
 class DispatchCancelClaimButton(discord.ui.Button):
     def __init__(self, disabled: bool = False):
         super().__init__(
-            label="取消接單",
+            label="???亙",
             style=discord.ButtonStyle.danger,
             custom_id="dispatch_cancel_claim",
             disabled=disabled
@@ -1783,7 +1783,7 @@ class DispatchCancelClaimButton(discord.ui.Button):
         view = self.view
 
         if not isinstance(view, DispatchClaimView):
-            await interaction.response.send_message("接單面板狀態異常，請重新派單。", ephemeral=True)
+            await interaction.response.send_message("?亙?Ｘ??撣賂?隢??唳晷?柴?, ephemeral=True)
             return
 
         await view.cancel_claim(interaction)
@@ -1792,11 +1792,11 @@ class DispatchCancelClaimButton(discord.ui.Button):
 
 
 def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action: str) -> None:
-    """把 Discord 接單按鈕單一操作同步到網站。
+    """??Discord ?亙???桐????郊?啁雯蝡?
 
     action:
-    - claim：只新增目前這個人
-    - unclaim：只移除目前這個人
+    - claim嚗?啣??桀??犖
+    - unclaim嚗蝘駁?桀??犖
     """
     try:
         from shared.web_order_sync import apply_discord_claim_event_to_web
@@ -1815,7 +1815,7 @@ def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action:
         )
     except Exception as exc:
         print(
-            f"[web-sync] Discord 接單事件同步網站失敗 "
+            f"[web-sync] Discord ?亙鈭辣?郊蝬脩?憭望? "
             f"message_id={getattr(getattr(interaction, 'message', None), 'id', None)} "
             f"user_id={getattr(getattr(interaction, 'user', None), 'id', None)} "
             f"claim_type={claim_type} action={action}: {exc}"
@@ -1854,8 +1854,8 @@ class DispatchClaimView(discord.ui.View):
 
     def get_receiver_label(self, claim_type: str) -> str:
         if claim_type == "companion":
-            return "陪玩接單"
-        return "打手接單"
+            return "?芰?亙"
+        return "???亙"
 
     def get_required_role_id(self, claim_type: str) -> int:
         if claim_type == "companion":
@@ -1891,10 +1891,10 @@ class DispatchClaimView(discord.ui.View):
         lines = []
 
         if companion_ids:
-            lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+            lines.append("?芰?亙嚗? + " ".join(f"<@{user_id}>" for user_id in companion_ids))
 
         if booster_ids:
-            lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+            lines.append("???亙嚗? + " ".join(f"<@{user_id}>" for user_id in booster_ids))
 
         if not lines:
             return None
@@ -1905,17 +1905,17 @@ class DispatchClaimView(discord.ui.View):
         guild = interaction.guild
 
         if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在派單文字頻道使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢瘣曉???駁?雿輻??, ephemeral=True)
             return
 
         source_channel = guild.get_channel(self.source_channel_id)
 
         if source_channel is None or not isinstance(source_channel, discord.TextChannel):
-            await interaction.response.send_message("找不到來源票口。", ephemeral=True)
+            await interaction.response.send_message("?曆??唬?皞巨???, ephemeral=True)
             return
 
         claim_data = self.get_claim_data(interaction.message.id)
@@ -1942,18 +1942,18 @@ class DispatchClaimView(discord.ui.View):
 
         if status == "stored":
             new_embed.add_field(
-                name="接單狀態",
+                name="?亙???,
                 value=(
-                    "已存單，接單面板已鎖定\n"
-                    f"存單原因：{claim_data.get('stored_reason') or '未填寫'}\n"
-                    f"預計恢復：{claim_data.get('stored_expected_time') or '未填寫'}"
+                    "撌脣??殷??亙?Ｘ撌脤?摰n"
+                    f"摮??嚗claim_data.get('stored_reason') or '?芸‵撖?}\n"
+                    f"???Ｗ儔嚗claim_data.get('stored_expected_time') or '?芸‵撖?}"
                 ),
                 inline=False
             )
         elif claim_data.get("locked"):
             new_embed.add_field(
-                name="接單狀態",
-                value="已結單，接單面板已鎖定",
+                name="?亙???,
+                value="撌脩??殷??亙?Ｘ撌脤?摰?,
                 inline=False
             )
 
@@ -1979,11 +1979,11 @@ class DispatchClaimView(discord.ui.View):
 
     async def claim_order(self, interaction: discord.Interaction, claim_type: str):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if self.locked:
-            await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
+            await interaction.response.send_message("甇文撌脩??殷??亙?Ｘ撌脤?摰?, ephemeral=True)
             return
 
         required_role_id = self.get_required_role_id(claim_type)
@@ -1991,7 +1991,7 @@ class DispatchClaimView(discord.ui.View):
 
         if not has_role(interaction.user, required_role_id):
             await interaction.response.send_message(
-                f"你沒有「{receiver_label}」權限。",
+                f"雿??receiver_label}????,
                 ephemeral=True
             )
             return
@@ -1999,7 +1999,7 @@ class DispatchClaimView(discord.ui.View):
         claim_data = self.get_claim_data(interaction.message.id)
 
         if claim_data.get("locked"):
-            await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
+            await interaction.response.send_message("甇文撌脩??殷??亙?Ｘ撌脤?摰?, ephemeral=True)
             return
 
         claim_data[claim_type].add(interaction.user.id)
@@ -2015,15 +2015,15 @@ class DispatchClaimView(discord.ui.View):
                 claimed=True,
             )
         except Exception as e:
-            print(f"同步 Discord 接單到網站失敗：{e}")
+            print(f"?郊 Discord ?亙?啁雯蝡仃??{e}")
 
         await send_order_log(
             interaction.guild,
             title=f"{receiver_label}",
             fields=[
-                ("接單人", interaction.user.mention, True),
-                ("顧客", f"<@{self.customer_id}>", True),
-                ("訂單", f"{self.category_label}｜{self.item} x{self.quantity}", False),
+                ("?亙鈭?, interaction.user.mention, True),
+                ("憿批恥", f"<@{self.customer_id}>", True),
+                ("閮", f"{self.category_label}嚚self.item} x{self.quantity}", False),
             ],
             color=discord.Color.green(),
         )
@@ -2032,17 +2032,17 @@ class DispatchClaimView(discord.ui.View):
 
     async def cancel_claim(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if self.locked:
-            await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
+            await interaction.response.send_message("甇文撌脩??殷??亙?Ｘ撌脤?摰?, ephemeral=True)
             return
 
         claim_data = self.get_claim_data(interaction.message.id)
 
         if claim_data.get("locked"):
-            await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
+            await interaction.response.send_message("甇文撌脩??殷??亙?Ｘ撌脤?摰?, ephemeral=True)
             return
 
         removed = False
@@ -2053,7 +2053,7 @@ class DispatchClaimView(discord.ui.View):
                 removed = True
 
         if not removed:
-            await interaction.response.send_message("你目前沒有接這張單。", ephemeral=True)
+            await interaction.response.send_message("雿????撐?柴?, ephemeral=True)
             return
 
         remember_claim_data(interaction.message.id, claim_data)
@@ -2063,11 +2063,11 @@ class DispatchClaimView(discord.ui.View):
 
         await send_order_log(
             interaction.guild,
-            title="取消接單",
+            title="???亙",
             fields=[
-                ("操作人", interaction.user.mention, True),
-                ("顧客", f"<@{self.customer_id}>", True),
-                ("訂單", f"{self.category_label}｜{self.item} x{self.quantity}", False),
+                ("??鈭?, interaction.user.mention, True),
+                ("憿批恥", f"<@{self.customer_id}>", True),
+                ("閮", f"{self.category_label}嚚self.item} x{self.quantity}", False),
             ],
             color=discord.Color.orange(),
         )
@@ -2075,7 +2075,7 @@ class DispatchClaimView(discord.ui.View):
         await self.refresh_panel(interaction)
 
     @discord.ui.button(
-        label="陪玩接單",
+        label="?芰?亙",
         style=discord.ButtonStyle.success,
         custom_id="dispatch_claim_companion"
     )
@@ -2083,7 +2083,7 @@ class DispatchClaimView(discord.ui.View):
         await self.claim_order(interaction, "companion")
 
     @discord.ui.button(
-        label="打手接單",
+        label="???亙",
         style=discord.ButtonStyle.primary,
         custom_id="dispatch_claim_booster"
     )
@@ -2092,7 +2092,7 @@ class DispatchClaimView(discord.ui.View):
 
 
 async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_channel_id: int):
-    """取消票口時，一併刪除派單頻道對應的接單面板，並清除保存資料。"""
+    """??蟡典??銝雿萄?斗晷?桅?????亙?Ｘ嚗蒂皜靽?鞈???""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
     dispatch_message_id = _to_int(data.get("dispatch_message_id"))
     dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
@@ -2107,9 +2107,9 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
             except discord.NotFound:
                 pass
             except discord.Forbidden:
-                print("Bot 權限不足，無法刪除派單接單面板。")
+                print("Bot 甈?銝雲嚗瘜?斗晷?格?桅?踴?)
             except discord.HTTPException as e:
-                print(f"刪除派單接單面板失敗：{e}")
+                print(f"?芷瘣曉?亙?Ｘ憭望?嚗e}")
 
         ORDER_CLAIMS.pop(dispatch_message_id, None)
         delete_claim_row_from_db(message_id=dispatch_message_id)
@@ -2123,11 +2123,11 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
 
 
 async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int):
-    """客服結單後，鎖定派單頻道對應的陪玩 / 打手接單面板。
+    """摰Ｘ?蝯敺???瘣曉?駁?撠????/ ???亙?Ｘ??
 
-    這版會同時處理「恢復訂單後重新發派單面板」的情況：
-    如果 orders 裡記到的是舊 dispatch_message_id，會再從 ORDER_CLAIMS 裡找同一張票口的派單訊息，
-    並把找到的派單面板全部鎖定，避免最新那則恢復訂單面板還能繼續被按。
+    ???????敺抵??桀???潭晷?桅?踴???嚗?
+    憒? orders 鋆∟??啁??航? dispatch_message_id嚗??? ORDER_CLAIMS 鋆⊥??撘萇巨???瘣曉閮嚗?
+    銝行??曉?晷?桅?踹?券?摰??踹???圈?敺抵??桅?輸??賜匱蝥◤??
     """
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
     dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
@@ -2142,7 +2142,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
         return
 
-    # 優先鎖 orders 目前記錄的派單訊息，同時補抓所有 claims 裡來源票口相同的派單訊息。
+    # ?芸???orders ?桀?閮??晷?株??荔???鋆????claims 鋆∩?皞巨????瘣曉閮??
     candidate_message_ids: list[int] = []
 
     first_dispatch_message_id = _to_int(data.get("dispatch_message_id"))
@@ -2161,12 +2161,12 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
 
     customer_id = data.get("customer_id")
     category = data.get("category")
-    item = data.get("item", "未紀錄")
+    item = data.get("item", "?芰???)
     quantity = _to_int(data.get("quantity"), 1) or 1
-    payment_method = data.get("payment_method", "未紀錄")
+    payment_method = data.get("payment_method", "?芰???)
     companion_preference = data.get("companion_preference")
-    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
-    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "?芰???)
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "?芰???
 
     data["closed"] = True
     data["status"] = "closed"
@@ -2192,7 +2192,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             }
         )
 
-        # 若是舊資料，補齊缺少欄位。
+        # ?交????鋆?蝻箏?甈???
         claim_data["customer_id"] = claim_data.get("customer_id") or customer_id
         claim_data["category_label"] = claim_data.get("category_label") or category_label
         claim_data["item"] = claim_data.get("item") or item
@@ -2209,10 +2209,10 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         lines = []
 
         if companion_ids:
-            lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+            lines.append("?芰?亙嚗? + " ".join(f"<@{user_id}>" for user_id in companion_ids))
 
         if booster_ids:
-            lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+            lines.append("???亙嚗? + " ".join(f"<@{user_id}>" for user_id in booster_ids))
 
         receiver_text = "\n".join(lines) if lines else None
 
@@ -2227,8 +2227,8 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             receiver_text=receiver_text
         )
         embed.add_field(
-            name="接單狀態",
-            value="已結單，接單面板已鎖定",
+            name="?亙???,
+            value="撌脩??殷??亙?Ｘ撌脤?摰?,
             inline=False
         )
 
@@ -2259,7 +2259,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             continue
 
     if locked_any:
-        # 用實際成功鎖定的最新派單訊息覆蓋，避免之後再找到舊面板。
+        # ?典祕????摰???唳晷?株??航????踹?銋???啗??Ｘ??
         if newest_existing_message_id is not None:
             data["dispatch_message_id"] = newest_existing_message_id
         remember_order_data(order_channel_id, data)
@@ -2268,7 +2268,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
 
 
 def sync_web_order_status_from_bot(ticket_channel_id, status: str, dispatch_message_id=None, note: str | None = None) -> None:
-    """DC bot 訂單狀態變更後，同步網站 web_orders.status。"""
+    """DC bot 閮????游?嚗?甇亦雯蝡?web_orders.status??""
     try:
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
@@ -2286,7 +2286,7 @@ def sync_web_order_status_from_bot(ticket_channel_id, status: str, dispatch_mess
         )
     except Exception as exc:
         print(
-            f"[web-sync] 訂單狀態同步網站失敗 "
+            f"[web-sync] 閮???甇亦雯蝡仃??"
             f"ticket_channel_id={ticket_channel_id} "
             f"status={status}: {exc}"
         )
@@ -2300,36 +2300,36 @@ async def store_dispatch_claim_panel(
     expected_time: str | None = None,
     note: str | None = None,
 ):
-    """將訂單標記為存單，鎖定派單接單面板但保留票口。"""
+    """撠??格?閮摮嚗?摰晷?格?桅?蹂?靽?蟡典??""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
     dispatch_message_id = data.get("dispatch_message_id")
     dispatch_channel_id = data.get("dispatch_channel_id", DISPATCH_CHANNEL_ID)
 
     if dispatch_message_id is None:
-        raise ValueError("找不到這張訂單對應的派單訊息，請確認顧客是否已完成付款方式並送出派單。")
+        raise ValueError("?曆??圈撐閮撠??晷?株??荔?隢Ⅱ隤“摰Ｘ?血歇摰?隞狡?孵?銝阡瘣曉??)
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
 
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
-        raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
+        raise ValueError("?曆??唳晷?桅??隢Ⅱ隤?DISPATCH_CHANNEL_ID ?臬甇?Ⅱ??)
 
     try:
         message = await dispatch_channel.fetch_message(dispatch_message_id)
     except discord.NotFound as exc:
-        raise ValueError("找不到派單訊息，可能已被刪除。") from exc
+        raise ValueError("?曆??唳晷?株??荔??航撌脰◤?芷??) from exc
     except discord.Forbidden as exc:
-        raise ValueError("Bot 權限不足，無法讀取派單訊息。") from exc
+        raise ValueError("Bot 甈?銝雲嚗瘜??晷?株??胯?) from exc
     except discord.HTTPException as exc:
-        raise ValueError(f"讀取派單訊息失敗：{exc}") from exc
+        raise ValueError(f"霈?晷?株??臬仃??{exc}") from exc
 
     customer_id = data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
     category = data.get("category")
-    item = data.get("item", "未紀錄")
+    item = data.get("item", "?芰???)
     quantity = _to_int(data.get("quantity"), 1) or 1
-    payment_method = data.get("payment_method", "未紀錄")
+    payment_method = data.get("payment_method", "?芰???)
     companion_preference = data.get("companion_preference")
-    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
-    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "?芰???)
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "?芰???
 
     claim_data = ORDER_CLAIMS.setdefault(
         dispatch_message_id,
@@ -2373,7 +2373,7 @@ async def store_dispatch_claim_panel(
         ticket_channel_id=order_channel.id,
         status="stored",
         dispatch_message_id=dispatch_message_id,
-        note="由 DC bot 存單同步。",
+        note="??DC bot 摮?郊??,
     )
     remember_claim_data(dispatch_message_id, claim_data)
 
@@ -2382,10 +2382,10 @@ async def store_dispatch_claim_panel(
     lines = []
 
     if companion_ids:
-        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+        lines.append("?芰?亙嚗? + " ".join(f"<@{user_id}>" for user_id in companion_ids))
 
     if booster_ids:
-        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+        lines.append("???亙嚗? + " ".join(f"<@{user_id}>" for user_id in booster_ids))
 
     receiver_text = "\n".join(lines) if lines else None
 
@@ -2400,18 +2400,18 @@ async def store_dispatch_claim_panel(
         receiver_text=receiver_text
     )
     embed.add_field(
-        name="接單狀態",
+        name="?亙???,
         value=(
-            "已存單，接單面板已鎖定\n"
-            f"存單原因：{reason}\n"
-            f"預計恢復：{expected_time or '未填寫'}"
+            "撌脣??殷??亙?Ｘ撌脤?摰n"
+            f"摮??嚗reason}\n"
+            f"???Ｗ儔嚗expected_time or '?芸‵撖?}"
         ),
         inline=False
     )
 
     if note:
         embed.add_field(
-            name="存單備註",
+            name="摮?酉",
             value=note,
             inline=False
         )
@@ -2442,12 +2442,12 @@ async def resume_stored_order(
     order_channel: discord.TextChannel,
     staff_member: discord.Member,
 ):
-    """恢復已存單的訂單，保留原本接單人員，重新發派單面板，並清掉舊派單訊息。"""
+    """?Ｗ儔撌脣??桃?閮嚗????祆?桐犖?∴???潭晷?桅?選?銝行???瘣曉閮??""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel.id, {})
     old_dispatch_message_id = _to_int(data.get("dispatch_message_id"))
     dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
 
-    # 收集這張票口所有舊派單訊息，避免同一張存單恢復後派單頻道殘留舊面板。
+    # ?園??撐蟡典???瘣曉閮嚗??銝撘萄??格敺拙?瘣曉?駁?畾???踴?
     old_dispatch_message_ids: set[int] = set()
 
     if old_dispatch_message_id:
@@ -2465,14 +2465,14 @@ async def resume_stored_order(
                 old_dispatch_message_ids.add(parsed_message_id)
 
     if not old_dispatch_message_ids:
-        raise ValueError("找不到這張訂單對應的派單訊息，無法恢復。")
+        raise ValueError("?曆??圈撐閮撠??晷?株??荔??⊥??Ｗ儔??)
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
 
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
-        raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
+        raise ValueError("?曆??唳晷?桅??隢Ⅱ隤?DISPATCH_CHANNEL_ID ?臬甇?Ⅱ??)
 
-    # 優先取原本 dispatch_message_id 的 claim；沒有的話，找同票口任一 claim。
+    # ?芸?????dispatch_message_id ??claim嚗???閰梧??曉?蟡典隞颱? claim??
     claim_data = ORDER_CLAIMS.get(old_dispatch_message_id) if old_dispatch_message_id else None
 
     if not claim_data:
@@ -2483,15 +2483,15 @@ async def resume_stored_order(
                 break
 
     if not claim_data:
-        raise ValueError("找不到已保存的接單資料，請重新派單。")
+        raise ValueError("?曆??啣歇靽???株???隢??唳晷?柴?)
 
     customer_id = claim_data.get("customer_id") or data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
-    category_label = claim_data.get("category_label") or ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "未紀錄")
-    item = claim_data.get("item") or data.get("item", "未紀錄")
+    category_label = claim_data.get("category_label") or ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "?芰???)
+    item = claim_data.get("item") or data.get("item", "?芰???)
     quantity = _to_int(claim_data.get("quantity"), _to_int(data.get("quantity"), 1)) or 1
-    payment_method = claim_data.get("payment_method") or data.get("payment_method", "未紀錄")
+    payment_method = claim_data.get("payment_method") or data.get("payment_method", "?芰???)
     companion_preference = claim_data.get("companion_preference") or data.get("companion_preference")
-    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "?芰???
 
     claim_data["locked"] = False
     claim_data["status"] = "active"
@@ -2504,7 +2504,7 @@ async def resume_stored_order(
     claim_data["companion_preference"] = companion_preference
     claim_data["dispatch_channel_id"] = dispatch_channel.id
 
-    # 存單相關資料保留在資料中當紀錄，但狀態改回 active。
+    # 摮?賊?鞈?靽??刻??葉?嗥???雿????active??
     data["closed"] = False
     data["status"] = "active"
     data["quantity"] = quantity
@@ -2520,10 +2520,10 @@ async def resume_stored_order(
     lines = []
 
     if companion_ids:
-        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+        lines.append("?芰?亙嚗? + " ".join(f"<@{user_id}>" for user_id in companion_ids))
 
     if booster_ids:
-        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+        lines.append("???亙嚗? + " ".join(f"<@{user_id}>" for user_id in booster_ids))
 
     receiver_text = "\n".join(lines) if lines else None
 
@@ -2538,8 +2538,8 @@ async def resume_stored_order(
         receiver_text=receiver_text
     )
     embed.add_field(
-        name="接單狀態",
-        value=f"已由 {staff_member.mention} 恢復訂單，接單面板已重新發到最新位置。",
+        name="?亙???,
+        value=f"撌脩 {staff_member.mention} ?Ｗ儔閮嚗?桅?踹歇??澆??唬?蝵柴?,
         inline=False
     )
 
@@ -2563,7 +2563,7 @@ async def resume_stored_order(
         )
     )
 
-    # 刪除同一張票口的所有舊派單訊息，避免存單恢復後殘留不能操作的舊面板。
+    # ?芷??撘萇巨??????瘣曉閮嚗???格敺拙?畾?銝?????Ｘ??
     for message_id in old_dispatch_message_ids:
         if message_id == new_message.id:
             continue
@@ -2584,7 +2584,7 @@ async def resume_stored_order(
         ORDER_CLAIMS.pop(message_id, None)
         delete_claim_row_from_db(message_id=message_id, source_channel_id=order_channel.id)
 
-    # 把接單資料移到新的 message_id，保留原本陪玩/打手接單人員。
+    # ??株??宏?唳??message_id嚗????祇?????亙鈭箏??
     ORDER_CLAIMS[new_message.id] = claim_data
     data["dispatch_message_id"] = new_message.id
     data["dispatch_channel_id"] = dispatch_channel.id
@@ -2594,30 +2594,30 @@ async def resume_stored_order(
         ticket_channel_id=order_channel.id,
         status="active",
         dispatch_message_id=data.get("dispatch_message_id"),
-        note="由 DC bot 恢復存單同步。",
+        note="??DC bot ?Ｗ儔摮?郊??,
     )
     remember_claim_data(new_message.id, claim_data)
     save_bot_data()
 
 
-class StoreOrderModal(discord.ui.Modal, title="存單"):
+class StoreOrderModal(discord.ui.Modal, title="摮"):
     reason = discord.ui.TextInput(
-        label="存單原因",
-        placeholder="例如：顧客暫時無法遊玩、改約時間、等待活動開啟",
+        label="摮??",
+        placeholder="靘?嚗“摰Ｘ?瘜??押蝝???敺暑????,
         required=True,
         max_length=200
     )
 
     expected_time = discord.ui.TextInput(
-        label="預計恢復時間",
-        placeholder="例如：今晚 20:00、明天、未定",
+        label="???Ｗ儔??",
+        placeholder="靘?嚗???20:00??憭押摰?,
         required=False,
         max_length=100
     )
 
     note = discord.ui.TextInput(
-        label="備註",
-        placeholder="可填寫付款狀態、注意事項或客服備註",
+        label="?酉",
+        placeholder="?臬‵撖思?甈曄??釣????摰Ｘ??酉",
         style=discord.TextStyle.paragraph,
         required=False,
         max_length=800
@@ -2625,21 +2625,21 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑摮??, ephemeral=True)
             return
 
         guild = interaction.guild
 
         if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢銝蟡典?找蝙?具?, ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -2655,13 +2655,13 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             )
             await send_order_log(
                 guild,
-                title="訂單已存單",
+                title="閮撌脣???,
                 fields=[
-                    ("票口", interaction.channel.mention, True),
-                    ("操作人員", interaction.user.mention, True),
-                    ("存單原因", self.reason.value.strip(), False),
-                    ("預計恢復", self.expected_time.value.strip() or "未填寫", True),
-                    ("備註", self.note.value.strip() or "未填寫", False),
+                    ("蟡典", interaction.channel.mention, True),
+                    ("??鈭箏", interaction.user.mention, True),
+                    ("摮??", self.reason.value.strip(), False),
+                    ("???Ｗ儔", self.expected_time.value.strip() or "?芸‵撖?, True),
+                    ("?酉", self.note.value.strip() or "?芸‵撖?, False),
                 ],
                 color=discord.Color.gold(),
             )
@@ -2670,10 +2670,10 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             return
 
         await interaction.channel.send(
-            f"此訂單已由 {interaction.user.mention} 存單。\n\n"
-            f"存單原因：{self.reason.value.strip()}\n"
-            f"預計恢復：{self.expected_time.value.strip() or '未填寫'}\n"
-            f"備註：{self.note.value.strip() or '無'}",
+            f"甇方??桀歇??{interaction.user.mention} 摮?n\n"
+            f"摮??嚗self.reason.value.strip()}\n"
+            f"???Ｗ儔嚗self.expected_time.value.strip() or '?芸‵撖?}\n"
+            f"?酉嚗self.note.value.strip() or '??}",
             allowed_mentions=discord.AllowedMentions(
                 users=True,
                 roles=False,
@@ -2681,21 +2681,21 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             )
         )
 
-        await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
+        await interaction.followup.send("撌脣??殷?瘣曉?駁??亙?Ｘ撌脤?摰?, ephemeral=True)
 
 
 
 def get_payment_method_info(method: str | None) -> str | None:
     return {
-        "轉帳": (
-            "銀行轉帳-國泰\n"
-            "代碼：013\n"
-            "帳號：135700021419"
+        "頧董": (
+            "?銵?撣??陸\n"
+            "隞?Ⅳ嚗?13\n"
+            "撣唾?嚗?35700021419"
         ),
-        "街口": (
-            "街口支付\n"
-            "代碼：396\n"
-            "帳號：900884222"
+        "銵": (
+            "銵?臭?\n"
+            "隞?Ⅳ嚗?96\n"
+            "撣唾?嚗?00884222"
         ),
     }.get(str(method or ""))
 
@@ -2713,43 +2713,43 @@ def build_payment_method_embed(
     dispatch_url: str | None = None,
 ) -> discord.Embed:
     payment_info = get_payment_method_info(payment_method)
-    amount_text = format_t_amount(amount) if amount else "待客服填寫"
+    amount_text = format_t_amount(amount) if amount else "敺恥?‵撖?
     description = (
-        f"下單用戶：<@{customer_id}>\n\n"
-        f"訂單類別：{category_label}\n"
-        f"訂單項目：{item}\n"
-        f"數量：{quantity} 單\n"
-        f"訂單總價：{amount_text}\n"
-        f"付款方式：{payment_method or '尚未選擇'}\n"
+        f"銝?冽嚗?@{customer_id}>\n\n"
+        f"閮憿嚗category_label}\n"
+        f"閮?嚗item}\n"
+        f"?賊?嚗quantity} ?娉n"
+        f"閮蝮賢嚗amount_text}\n"
+        f"隞狡?孵?嚗payment_method or '撠?豢?'}\n"
     )
 
     if submitted and dispatch_url:
-        description += "\n✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"
-        description += f"派單訊息：{dispatch_url}"
+        description += "\n??撌脤瘣曉嚗迨隞狡?Ｘ撌脤?摰?隢?????n"
+        description += f"瘣曉閮嚗dispatch_url}"
     elif amount and payment_info:
-        description += "\n請闆闆確認總價與付款資訊，選擇付款方式後按「送出」。"
+        description += "\n隢??Ⅱ隤蜇?寡?隞狡鞈?嚗??甈暹撘????
     else:
-        description += "\n請選擇付款方式，完成後按「送出」。"
+        description += "\n隢??甈暹撘?摰?敺????
 
     embed = discord.Embed(
-        title="付款方式",
+        title="隞狡?孵?",
         description=description,
         color=discord.Color.green() if submitted else discord.Color.gold(),
     )
 
     if companion_preference is not None:
-        embed.add_field(name="指定選項", value=companion_preference, inline=False)
+        embed.add_field(name="???賊?", value=companion_preference, inline=False)
 
     if amount and payment_info:
-        embed.add_field(name="付款資訊", value=f"```text\n{payment_info}\n```", inline=False)
+        embed.add_field(name="隞狡鞈?", value=f"```text\n{payment_info}\n```", inline=False)
 
     return embed
 
 
-class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
+class OrderAmountModal(discord.ui.Modal, title="憛怠神閮?寞"):
     amount = discord.ui.TextInput(
-        label="本次訂單總價",
-        placeholder="例如：1275、NT$1,275、750+595",
+        label="?祆活閮蝮賢",
+        placeholder="靘?嚗?275?T$1,275??50+595",
         required=True,
         max_length=100,
     )
@@ -2761,21 +2761,21 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以填寫訂單價格。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑憛怠神閮?寞??, ephemeral=True)
             return
 
         if interaction.guild is None or not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢銝蟡典?找蝙?具?, ephemeral=True)
             return
 
         parsed_amount = parse_receipt_amount(str(self.amount.value))
         if parsed_amount is None or parsed_amount <= 0:
             await interaction.response.send_message(
-                "金額欄位無法辨識，請輸入可辨識的數字，例如：1275、NT$1275、1275T。",
+                "??甈??⊥?颲刻?嚗?頛詨?航儘霅??詨?嚗?憒?1275?T$1275??275T??,
                 ephemeral=True,
             )
             return
@@ -2791,12 +2791,12 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
 
         await send_order_log(
             interaction.guild,
-            title="訂單價格已確認",
+            title="閮?寞撌脩Ⅱ隤?,
             fields=[
-                ("顧客", f"<@{self.customer_id}>", True),
-                ("金額", format_t_amount(parsed_amount), True),
-                ("填寫人員", interaction.user.mention, True),
-                ("票口", interaction.channel.mention, False),
+                ("憿批恥", f"<@{self.customer_id}>", True),
+                ("??", format_t_amount(parsed_amount), True),
+                ("憛怠神鈭箏", interaction.user.mention, True),
+                ("蟡典", interaction.channel.mention, False),
             ],
             color=discord.Color.gold(),
         )
@@ -2807,7 +2807,7 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
         companion_preference = data.get("companion_preference")
         if category is None or item is None:
             await interaction.response.send_message(
-                "找不到訂單資料，請回到自助下單面板重新選擇。",
+                "?曆??啗??株???隢??啗?拐??桅?輸??圈??,
                 ephemeral=True,
             )
             return
@@ -2822,7 +2822,7 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
         )
 
         await interaction.response.send_message(
-            f"已填寫訂單金額：{format_t_amount(parsed_amount)}\n請闆闆選擇付款方式。",
+            f"撌脣‵撖怨??桅?憿?{format_t_amount(parsed_amount)}\n隢????甈暹撘?,
             ephemeral=True,
         )
 
@@ -2850,17 +2850,17 @@ class StaffOrderAmountView(discord.ui.View):
         self.channel_id = channel_id
 
     @discord.ui.button(
-        label="填寫",
+        label="憛怠神",
         style=discord.ButtonStyle.primary,
         custom_id="staff_order_amount_button",
     )
     async def fill_amount(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以填寫訂單價格。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑憛怠神閮?寞??, ephemeral=True)
             return
 
         await interaction.response.send_modal(OrderAmountModal(self.customer_id, self.channel_id))
@@ -2872,21 +2872,21 @@ async def send_staff_amount_panel(
     channel_id: int,
 ) -> None:
     if not isinstance(interaction.channel, discord.TextChannel):
-        await interaction.followup.send("無法確認目前票口頻道。", ephemeral=True)
+        await interaction.followup.send("?⊥?蝣箄??桀?蟡典?駁???, ephemeral=True)
         return
 
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(channel_id, {})
     panel_message_id = _to_int(data.get("amount_panel_message_id"))
     if panel_message_id is not None:
-        await interaction.followup.send("已通知客服填寫訂單價格，請不要重複送出。", ephemeral=True)
+        await interaction.followup.send("撌脤摰Ｘ?憛怠神閮?寞嚗?銝??????, ephemeral=True)
         return
 
     embed = discord.Embed(
-        title="請客服填寫訂單金額",
+        title="隢恥?‵撖怨??桅?憿?,
         description=(
-            f"下單用戶：<@{customer_id}>\n"
-            "請客服確認本次訂單總價，按下方「填寫」輸入金額。\n"
-            "客服送出金額後，才會出現付款方式面板。"
+            f"銝?冽嚗?@{customer_id}>\n"
+            "隢恥?Ⅱ隤甈∟??桃蜇?對????嫘‵撖怒撓?仿?憿n"
+            "摰Ｘ????敺????箇隞狡?孵??Ｘ??
         ),
         color=discord.Color.gold(),
     )
@@ -2897,7 +2897,7 @@ async def send_staff_amount_panel(
     )
     data["amount_panel_message_id"] = message.id
     remember_order_data(channel_id, data)
-    await interaction.followup.send("已送出訂單金額面板，請客服填寫本次訂單總價。", ephemeral=True)
+    await interaction.followup.send("撌脤閮???Ｘ嚗?摰Ｘ?憛怠神?祆活閮蝮賢??, ephemeral=True)
 
 
 async def finalize_payment_and_dispatch(
@@ -2910,11 +2910,11 @@ async def finalize_payment_and_dispatch(
     guild = interaction.guild
 
     if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
         return
 
     if not isinstance(interaction.channel, discord.TextChannel):
-        await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+        await interaction.response.send_message("?⊥?蝣箄??桀?蟡典?駁???, ephemeral=True)
         return
 
     data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
@@ -2926,11 +2926,11 @@ async def finalize_payment_and_dispatch(
     parsed_amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
 
     if category is None or item is None:
-        await interaction.response.send_message("找不到訂單資料，請回到自助下單面板重新選擇。", ephemeral=True)
+        await interaction.response.send_message("?曆??啗??株???隢??啗?拐??桅?輸??圈??, ephemeral=True)
         return
 
     if payment_method is None:
-        await interaction.response.send_message("請先選擇付款方式，再按送出。", ephemeral=True)
+        await interaction.response.send_message("隢??豢?隞狡?孵?嚗????, ephemeral=True)
         return
 
     if parsed_amount <= 0:
@@ -2946,9 +2946,9 @@ async def finalize_payment_and_dispatch(
         dispatch_message_id = _to_int(data.get("dispatch_message_id"))
         dispatch_channel = guild.get_channel(dispatch_channel_id)
         if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
-            message = f"這張單已經送出派單，請不要重複送出。\n派單訊息：https://discord.com/channels/{guild.id}/{dispatch_channel.id}/{dispatch_message_id}"
+            message = f"?撐?桀歇蝬瘣曉嚗?銝?????n瘣曉閮嚗ttps://discord.com/channels/{guild.id}/{dispatch_channel.id}/{dispatch_message_id}"
         else:
-            message = "這張單已經送出派單，請不要重複送出。"
+            message = "?撐?桀歇蝬瘣曉嚗?銝??????
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:
@@ -2956,7 +2956,7 @@ async def finalize_payment_and_dispatch(
         return
 
     if data.get("dispatch_submitting"):
-        message = "這張單正在送出派單，請稍等，不要重複點擊。"
+        message = "?撐?格迤?券瘣曉嚗?蝔?嚗?閬?銴???
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:
@@ -2967,14 +2967,14 @@ async def finalize_payment_and_dispatch(
 
     if item_category != category:
         await interaction.response.send_message(
-            "你選擇的訂單類別與訂單項目不一致，請回到自助下單面板重新選擇。",
+            "雿??閮憿???桅??桐?銝?湛?隢??啗?拐??桅?輸??圈??,
             ephemeral=True,
         )
         return
 
     if item in SPECIAL_COMPANION_ITEMS and companion_preference is None:
         await interaction.response.send_message(
-            "這個項目請先回到自助下單面板選擇「不指定陪玩/打手」或「指定陪玩/打手」。",
+            "???株????啗?拐??桅?輸?????芰/??????摰??????,
             ephemeral=True,
         )
         return
@@ -2984,11 +2984,11 @@ async def finalize_payment_and_dispatch(
         data["quantity"] = 1
         remember_order_data(channel_id, data)
     elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-        await interaction.response.send_message("數量選擇異常，請回到自助下單面板重新選擇。", ephemeral=True)
+        await interaction.response.send_message("?賊??豢??啣虜嚗???芸銝?Ｘ??豢???, ephemeral=True)
         return
 
     if companion_preference is None:
-        companion_preference = "不指定陪玩/打手"
+        companion_preference = "銝?摰????"
         data["companion_preference"] = companion_preference
         remember_order_data(channel_id, data)
 
@@ -2996,7 +2996,7 @@ async def finalize_payment_and_dispatch(
 
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
         await interaction.response.send_message(
-            "找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。",
+            "?曆??唳晷?桅??隢Ⅱ隤?DISPATCH_CHANNEL_ID ?臬甇?Ⅱ??,
             ephemeral=True,
         )
         return
@@ -3025,7 +3025,7 @@ async def finalize_payment_and_dispatch(
         source_channel=interaction.channel,
         companion_preference=companion_preference,
     )
-    embed.add_field(name="訂單總價", value=format_t_amount(parsed_amount), inline=True)
+    embed.add_field(name="閮蝮賢", value=format_t_amount(parsed_amount), inline=True)
 
     data["dispatch_submitting"] = True
     remember_order_data(channel_id, data)
@@ -3050,7 +3050,7 @@ async def finalize_payment_and_dispatch(
     except discord.HTTPException as e:
         data.pop("dispatch_submitting", None)
         remember_order_data(channel_id, data)
-        await interaction.followup.send(f"派單送出失敗：{e}", ephemeral=True)
+        await interaction.followup.send(f"瘣曉?憭望?嚗e}", ephemeral=True)
         return
 
     ORDER_CLAIMS[dispatch_message.id] = {
@@ -3097,25 +3097,25 @@ async def finalize_payment_and_dispatch(
     await log_self_service_proxy_action(
         interaction,
         customer_id,
-        "送出派單",
-        f"{category_label}｜{item} x{quantity}｜{payment_method}｜{format_t_amount(parsed_amount)}",
+        "?瘣曉",
+        f"{category_label}嚚item} x{quantity}嚚payment_method}嚚format_t_amount(parsed_amount)}",
     )
 
     await send_order_log(
         guild,
-        title="新自助下單已派單",
+        title="?啗?拐??桀歇瘣曉",
         fields=[
-            ("顧客", f"<@{customer_id}>", True),
-            ("訂單類別", category_label, True),
-            ("訂單項目", item, True),
-            ("數量", f"{quantity} 單", True),
-            ("訂單總價", format_t_amount(parsed_amount), True),
-            ("付款方式", payment_method, True),
-            ("指定選項", companion_preference, True),
-            ("送出人員", interaction.user.mention, True),
-            ("是否代操作", "是" if interaction.user.id != customer_id else "否", True),
-            ("票口", interaction.channel.mention, False),
-            ("派單訊息", dispatch_message.jump_url, False),
+            ("憿批恥", f"<@{customer_id}>", True),
+            ("閮憿", category_label, True),
+            ("閮?", item, True),
+            ("?賊?", f"{quantity} ??, True),
+            ("閮蝮賢", format_t_amount(parsed_amount), True),
+            ("隞狡?孵?", payment_method, True),
+            ("???賊?", companion_preference, True),
+            ("?鈭箏", interaction.user.mention, True),
+            ("?臬隞??雿?, "?? if interaction.user.id != customer_id else "??, True),
+            ("蟡典", interaction.channel.mention, False),
+            ("瘣曉閮", dispatch_message.jump_url, False),
         ],
         color=discord.Color.blue(),
     )
@@ -3157,14 +3157,14 @@ async def finalize_payment_and_dispatch(
         data.pop("amount_panel_message_id", None)
         remember_order_data(interaction.channel.id, data)
 
-    response_text = f"已確認訂單總價 {format_t_amount(parsed_amount)}，並送出派單：{dispatch_message.jump_url}"
+    response_text = f"撌脩Ⅱ隤??桃蜇??{format_t_amount(parsed_amount)}嚗蒂?瘣曉嚗dispatch_message.jump_url}"
     if reward_result:
         response_text += f"\n\n{reward_result}"
     await interaction.followup.send(response_text, ephemeral=True)
 
     operation_embed = discord.Embed(
-        title="訂單操作",
-        description="請客服從下拉式清單選擇後，按下確認。",
+        title="閮??",
+        description="隢恥??銝?撘??桅??嚗?銝Ⅱ隤?,
         color=discord.Color.green(),
     )
 
@@ -3188,7 +3188,7 @@ def sync_web_order_active_from_dispatch_from_bot(
     customer_service_member=None,
     bot_order_no=None,
 ) -> None:
-    """DC bot 新派單後，把 active 訂單寫進網站資料庫。"""
+    """DC bot ?唳晷?桀?嚗? active 閮撖恍脩雯蝡??澈??""
     try:
         from shared.web_order_sync import upsert_web_order_from_dispatch
 
@@ -3207,7 +3207,7 @@ def sync_web_order_active_from_dispatch_from_bot(
             customer_service_discord_id=getattr(customer_service_member, "id", None),
             customer_service_display_name=getattr(customer_service_member, "display_name", None),
             bot_order_no=bot_order_no,
-            note="由 DC bot 派單同步。",
+            note="??DC bot 瘣曉?郊??,
         )
 
         print(
@@ -3234,7 +3234,7 @@ class PaymentMethodSelect(discord.ui.Select):
         ]
 
         super().__init__(
-            placeholder="請選擇付款方式",
+            placeholder="隢??甈暹撘?,
             min_values=1,
             max_values=1,
             options=options,
@@ -3244,7 +3244,7 @@ class PaymentMethodSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇付款方式。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑?豢?隞狡?孵???, ephemeral=True)
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
@@ -3255,7 +3255,7 @@ class PaymentMethodSelect(discord.ui.Select):
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "選擇付款方式",
+            "?豢?隞狡?孵?",
             selected_method,
         )
 
@@ -3292,18 +3292,18 @@ class PaymentMethodView(discord.ui.View):
             for child in self.children:
                 child.disabled = True
                 if isinstance(child, discord.ui.Button) and child.custom_id == "payment_method_submit_button":
-                    child.label = "已送出"
+                    child.label = "撌脤"
                     child.style = discord.ButtonStyle.secondary
 
     @discord.ui.button(
-        label="送出",
+        label="?",
         style=discord.ButtonStyle.success,
         custom_id="payment_method_submit_button",
         row=1
     )
     async def submit_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以送出付款方式。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑?隞狡?孵???, ephemeral=True)
             return
 
         await finalize_payment_and_dispatch(
@@ -3330,18 +3330,18 @@ class SelfServiceOrderView(discord.ui.View):
         self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
 
     @discord.ui.button(
-        label="取得訂單金額",
+        label="??閮??",
         style=discord.ButtonStyle.success,
         custom_id="self_service_order_go_payment_button",
         row=4
     )
     async def go_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以操作訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣??撐蟡典??嗆?摰Ｘ??臭誑??閮??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄??桀?蟡典?駁???, ephemeral=True)
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
@@ -3351,21 +3351,21 @@ class SelfServiceOrderView(discord.ui.View):
         companion_preference = data.get("companion_preference")
 
         if category is None or item is None:
-            await interaction.response.send_message("請先選擇訂單類別與訂單項目，再取得訂單金額。", ephemeral=True)
+            await interaction.response.send_message("隢??豢?閮憿???桅??殷???敺??桅?憿?, ephemeral=True)
             return
 
         item_category = ORDER_ITEM_TO_CATEGORY.get(item)
 
         if item_category != category:
             await interaction.response.send_message(
-                "你選擇的訂單類別與訂單項目不一致，請重新選擇。",
+                "雿??閮憿???桅??桐?銝?湛?隢??圈??,
                 ephemeral=True
             )
             return
 
         if item in SPECIAL_COMPANION_ITEMS and companion_preference is None:
             await interaction.response.send_message(
-                "這個項目請先選擇「不指定陪玩/打手」或「指定陪玩/打手」，再取得訂單金額。",
+                "???株???????芰/??????摰????????敺??桅?憿?,
                 ephemeral=True
             )
             return
@@ -3375,11 +3375,11 @@ class SelfServiceOrderView(discord.ui.View):
             data["quantity"] = 1
             remember_order_data(self.channel_id, data)
         elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-            await interaction.response.send_message("請重新選擇正確的數量。", ephemeral=True)
+            await interaction.response.send_message("隢??圈?迤蝣箇??賊???, ephemeral=True)
             return
 
         if companion_preference is None:
-            companion_preference = "不指定陪玩/打手"
+            companion_preference = "銝?摰????"
             data["companion_preference"] = companion_preference
             remember_order_data(self.channel_id, data)
 
@@ -3394,7 +3394,7 @@ class SelfServiceOrderView(discord.ui.View):
         )
 
         button.disabled = True
-        button.label = "已送出，等待客服填價"
+        button.label = "撌脤嚗?敺恥?‵??
         try:
             await interaction.message.edit(view=self)
         except discord.HTTPException:
@@ -3403,37 +3403,37 @@ class SelfServiceOrderView(discord.ui.View):
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "取得訂單金額",
-            f"{category_label}｜{item} x{quantity}｜{companion_preference}",
+            "??閮??",
+            f"{category_label}嚚item} x{quantity}嚚companion_preference}",
         )
 
 class StaffOrderOperationSelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(
-                label="已結單",
+                label="撌脩???,
                 value="done",
-                description="填寫收據並送出評論按鈕"
+                description="憛怠神?嗆?銝阡閰???"
             ),
             discord.SelectOption(
-                label="存單",
+                label="摮",
                 value="store",
-                description="保留票口並鎖定派單接單面板"
+                description="靽?蟡典銝阡?摰晷?格?桅??
             ),
             discord.SelectOption(
-                label="恢復訂單",
+                label="?Ｗ儔閮",
                 value="resume",
-                description="恢復已存單訂單，重新開放接單面板"
+                description="?Ｗ儔撌脣??株??殷????亙?Ｘ"
             ),
             discord.SelectOption(
-                label="取消訂單",
+                label="??閮",
                 value="cancel",
-                description="取消並關閉這張下單票口"
+                description="??銝阡??撐銝蟡典"
             ),
         ]
 
         super().__init__(
-            placeholder="訂單操作選項",
+            placeholder="閮???賊?",
             min_values=1,
             max_values=1,
             options=options,
@@ -3443,15 +3443,15 @@ class StaffOrderOperationSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑??閮??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢銝蟡典?找蝙?具?, ephemeral=True)
             return
 
         STAFF_ORDER_OPERATION_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]
@@ -3465,29 +3465,29 @@ class StaffOrderOperationView(discord.ui.View):
         self.add_item(StaffOrderOperationSelect())
 
     @discord.ui.button(
-        label="確認",
+        label="蝣箄?",
         style=discord.ButtonStyle.success,
         custom_id="staff_order_operation_confirm",
         row=1
     )
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑??閮??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢銝蟡典?找蝙?具?, ephemeral=True)
             return
 
         selected = STAFF_ORDER_OPERATION_SELECTIONS.get((interaction.channel.id, interaction.user.id))
 
         if selected is None:
             await interaction.response.send_message(
-                "請先從下拉式清單選擇操作，再按確認。",
+                "隢?敺???皜?豢???嚗??Ⅱ隤?,
                 ephemeral=True
             )
             return
@@ -3502,7 +3502,7 @@ class StaffOrderOperationView(discord.ui.View):
             guild = interaction.guild
 
             if guild is None:
-                await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+                await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
                 return
 
             await interaction.response.defer(ephemeral=True)
@@ -3515,10 +3515,10 @@ class StaffOrderOperationView(discord.ui.View):
                 )
                 await send_order_log(
                     guild,
-                    title="訂單已恢復",
+                    title="閮撌脫敺?,
                     fields=[
-                        ("票口", interaction.channel.mention, True),
-                        ("操作人員", interaction.user.mention, True),
+                        ("蟡典", interaction.channel.mention, True),
+                        ("??鈭箏", interaction.user.mention, True),
                     ],
                     color=discord.Color.green(),
                 )
@@ -3527,23 +3527,23 @@ class StaffOrderOperationView(discord.ui.View):
                 return
 
             await interaction.channel.send(
-                f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
+                f"甇方??桀歇??{interaction.user.mention} ?Ｗ儔嚗晷?桅??桅?踹歇????,
                 allowed_mentions=discord.AllowedMentions(
                     users=True,
                     roles=False,
                     everyone=False
                 )
             )
-            await interaction.followup.send("已恢復訂單。", ephemeral=True)
+            await interaction.followup.send("撌脫敺抵??柴?, ephemeral=True)
         elif selected == "cancel":
             await interaction.response.send_message(
-                "是否確定要取消這筆訂單？",
+                "?臬蝣箏?閬?瘨?閮嚗?,
                 view=ConfirmCancelOrderView(),
                 ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                "選擇項目異常，請重新選擇一次。",
+                "?豢???啣虜嚗???豢?銝甈～?,
                 ephemeral=True
             )
 
@@ -3554,29 +3554,29 @@ class OrderControlView(discord.ui.View):
         self.add_item(OrderControlSelect())
 
     @discord.ui.button(
-        label="確認",
+        label="蝣箄?",
         style=discord.ButtonStyle.success,
         custom_id="order_control_confirm",
         row=1
     )
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
             return
 
         if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ??臭誑??閮??, ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢銝蟡典?找蝙?具?, ephemeral=True)
             return
 
         selected = ORDER_CONTROL_SELECTIONS.get((interaction.channel.id, interaction.user.id))
 
         if selected is None:
             await interaction.response.send_message(
-                "請先從下拉式清單選擇操作，再按確認。",
+                "隢?敺???皜?豢???嚗??Ⅱ隤?,
                 ephemeral=True
             )
             return
@@ -3585,7 +3585,7 @@ class OrderControlView(discord.ui.View):
 
         if selected == "cancel":
             await interaction.response.send_message(
-                "是否確定要取消這筆訂單？",
+                "?臬蝣箏?閬?瘨?閮嚗?,
                 view=ConfirmCancelOrderView(),
                 ephemeral=True
             )
@@ -3593,7 +3593,7 @@ class OrderControlView(discord.ui.View):
 
         if selected != "dispatch":
             await interaction.response.send_message(
-                "選擇項目異常，請重新選擇一次。",
+                "?豢???啣虜嚗???豢?銝甈～?,
                 ephemeral=True
             )
             return
@@ -3602,7 +3602,7 @@ class OrderControlView(discord.ui.View):
 
         if customer_id is None:
             await interaction.response.send_message(
-                "無法辨識開單用戶，請確認這張票口是不是由下單功能建立。",
+                "?⊥?颲刻???冽嚗?蝣箄??撐蟡典?臭??舐銝?撱箇???,
                 ephemeral=True
             )
             return
@@ -3611,12 +3611,12 @@ class OrderControlView(discord.ui.View):
         customer_mention = customer.mention if customer is not None else f"<@{customer_id}>"
 
         embed = discord.Embed(
-            title="自助下單",
+            title="?芸銝",
             description=(
-                f"下單用戶：{customer_mention}\n\n"
-                "請下單用戶選擇訂單類別與訂單項目，完成後按「取得訂單金額」。\n"
-                "如果選擇娛樂陪、技術陪、Valorant 陪打、Valorant 代打，數量欄位可選擇 1～8 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
-                "如果選擇娛樂陪、技術陪、保底單，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
+                f"銝?冽嚗customer_mention}\n\n"
+                "隢??桃?園???桅??亥?閮?嚗?????敺??桅?憿n"
+                "憒??豢?憡??芥?銵?alorant ?芣??alorant 隞??嚗??雿?豢? 1嚚? ?殷?1 ??= 1 撠?嚗? ??= 2 撠?嚗?甇日??具n"
+                "憒??豢?憡??芥?銵??摨嚗?憿??豢??臬???芰/??嚗alorant ?芣??舫??摰?銝?摰???
             ),
             color=discord.Color.purple()
         )
@@ -3636,7 +3636,7 @@ class OrderControlView(discord.ui.View):
             )
         )
 
-# ========= 主面板 / 下單入口 View 設定 =========
+# ========= 銝駁??/ 銝?亙 View 閮剖? =========
 
 configure_panel_views(
     customer_category_id=CUSTOMER_CATEGORY_ID,
@@ -3654,7 +3654,7 @@ configure_panel_views(
 )
 
 
-# ========= Bot 事件 =========
+# ========= Bot 鈭辣 =========
 
 @bot.event
 async def on_member_join(member: discord.Member):
@@ -3662,25 +3662,25 @@ async def on_member_join(member: discord.Member):
 
     if role is not None:
         try:
-            await member.add_roles(role, reason="新成員加入自動給予身分組")
+            await member.add_roles(role, reason="?唳??∪??亥?策鈭澈??")
         except discord.Forbidden:
-            print("Bot 權限不足，無法給予新成員身分組。請確認 Bot 身分組位置高於要給的身分組。")
+            print("Bot 甈?銝雲嚗瘜策鈭?頨怠?蝯?蝣箄? Bot 頨怠?蝯?蝵桅??潸?蝯衣?頨怠?蝯?)
         except discord.HTTPException as e:
-            print(f"給予新成員身分組失敗：{e}")
+            print(f"蝯虫??唳??∟澈??憭望?嚗e}")
     else:
-        print("找不到新成員身分組，請確認 NEW_MEMBER_ROLE_ID 是否正確")
+        print("?曆??唳?頨怠?蝯?隢Ⅱ隤?NEW_MEMBER_ROLE_ID ?臬甇?Ⅱ")
 
     channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
 
     if channel is None or not isinstance(channel, discord.TextChannel):
-        print("找不到歡迎頻道，請確認 WELCOME_CHANNEL_ID 是否正確")
+        print("?曆??唳迭餈??隢Ⅱ隤?WELCOME_CHANNEL_ID ?臬甇?Ⅱ")
         return
 
     embed = discord.Embed(
         description=(
-            f"**歡迎 {member.mention} 來到魔丸娛樂!**\n\n"
-            f"歡迎闆闆光臨!\n"
-            f"有任何問題都可以透過機器人開票口聯絡客服歐!"
+            f"**甇∟? {member.mention} 靘擳虜憡?!**\n\n"
+            f"甇∟????!\n"
+            f"?遙雿?憿?臭誑??璈鈭粹?蟡典?舐窗摰Ｘ?甇?"
         ),
         color=discord.Color.green()
     )
@@ -3699,7 +3699,7 @@ async def on_member_join(member: discord.Member):
 
 @bot.event
 async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
-    # 如果入職票口被手動刪除，也嘗試收回申請人暫時身分組。
+    # 憒??亥蟡典鋡急???歹?銋?閰行?隢犖?急?頨怠?蝯?
     await remove_recruit_applicant_role(channel.guild, channel)
 
 
@@ -3712,15 +3712,15 @@ async def on_voice_state_update(
 ):
     guild = member.guild
 
-    # 離開機器人建立的陪玩 / VIP / 公共語音房後，如果房間沒人就自動刪除
-    # 這裡除了看暫存 ID，也會用頻道名稱判斷，避免 Bot 重開後忘記之前建立的臨時房。
+    # ?ａ?璈鈭箏遣蝡??芰 / VIP / ?砍隤?踹?嚗????鈭箏停?芸??芷
+    # ?ㄐ?支??摮?ID嚗???駁??迂?斗嚗??Bot ??敺?閮??遣蝡??冽??踴?
     if before.channel is not None:
         is_temp_play_voice_room = (
             before.channel.id in TEMP_PLAY_VOICE_CHANNEL_IDS
             or (
                 before.channel.category_id == PLAY_VOICE_CATEGORY_ID
-                and before.channel.name.startswith("🎮┃")
-                and before.channel.name.endswith("的陪玩頻道")
+                and before.channel.name.startswith("???)
+                and before.channel.name.endswith("??拚??)
                 and before.channel.name != PLAY_VOICE_CREATE_CHANNEL_NAME
             )
         )
@@ -3729,8 +3729,8 @@ async def on_voice_state_update(
             before.channel.id in TEMP_VIP_VOICE_CHANNEL_IDS
             or (
                 before.channel.category_id == PLAY_VOICE_CATEGORY_ID
-                and before.channel.name.startswith("👑┃")
-                and before.channel.name.endswith("的𝙑𝙄𝙋頻道")
+                and before.channel.name.startswith("????)
+                and before.channel.name.endswith("??????)
                 and before.channel.name != VIP_VOICE_CREATE_CHANNEL_NAME
             )
         )
@@ -3739,8 +3739,8 @@ async def on_voice_state_update(
             before.channel.id in TEMP_PUBLIC_VOICE_CHANNEL_IDS
             or (
                 before.channel.category_id == PLAY_VOICE_CATEGORY_ID
-                and before.channel.name.startswith("➕┃")
-                and before.channel.name.endswith("的公共房間")
+                and before.channel.name.startswith("??")
+                and before.channel.name.endswith("??望??)
                 and before.channel.name != PUBLIC_VOICE_CREATE_CHANNEL_NAME
             )
         )
@@ -3753,9 +3753,9 @@ async def on_voice_state_update(
             except discord.NotFound:
                 pass
             except discord.Forbidden:
-                print("Bot 權限不足，無法刪除陪玩語音房。")
+                print("Bot 甈?銝雲嚗瘜?日?抵??單??)
             except discord.HTTPException as e:
-                print(f"刪除陪玩語音房失敗：{e}")
+                print(f"?芷?芰隤?踹仃??{e}")
             return
 
         if is_temp_vip_voice_room and len(before.channel.members) == 0:
@@ -3766,9 +3766,9 @@ async def on_voice_state_update(
             except discord.NotFound:
                 pass
             except discord.Forbidden:
-                print("Bot 權限不足，無法刪除 VIP 語音房。")
+                print("Bot 甈?銝雲嚗瘜??VIP 隤?踴?)
             except discord.HTTPException as e:
-                print(f"刪除 VIP 語音房失敗：{e}")
+                print(f"?芷 VIP 隤?踹仃??{e}")
             return
 
         if is_temp_public_voice_room and len(before.channel.members) == 0:
@@ -3779,12 +3779,12 @@ async def on_voice_state_update(
             except discord.NotFound:
                 pass
             except discord.Forbidden:
-                print("Bot 權限不足，無法刪除公共語音房。")
+                print("Bot 甈?銝雲嚗瘜?文?梯??單??)
             except discord.HTTPException as e:
-                print(f"刪除公共語音房失敗：{e}")
+                print(f"?芷?砍隤?踹仃??{e}")
             return
 
-    # 沒有加入新語音頻道就不用處理
+    # 瘝???啗??喲?停銝??
     if after.channel is None:
         return
 
@@ -3793,12 +3793,12 @@ async def on_voice_state_update(
     if category is None or not isinstance(category, discord.CategoryChannel):
         return
 
-    # 取得或建立兩種入口語音頻道
+    # ???遣蝡蝔桀????喲??
     play_lobby_channel = await get_or_create_play_voice_lobby(guild)
     vip_lobby_channel = await get_or_create_vip_voice_lobby(guild)
     public_lobby_channel = await get_or_create_public_voice_lobby(guild)
 
-    # 進入一般陪玩入口：建立一般陪玩語音房
+    # ?脣銝?祇?拙???撱箇?銝?祇?抵??單
     if play_lobby_channel is not None and after.channel.id == play_lobby_channel.id:
         try:
             overwrites = build_play_voice_overwrites(guild)
@@ -3825,13 +3825,13 @@ async def on_voice_state_update(
                 reason="Move member to created play voice room"
             )
         except discord.Forbidden:
-            print("Bot 權限不足，無法建立或移動陪玩語音房。")
+            print("Bot 甈?銝雲嚗瘜遣蝡?蝘餃??芰隤?踴?)
         except discord.HTTPException as e:
-            print(f"建立或移動陪玩語音房失敗：{e}")
+            print(f"撱箇??宏??抵??單憭望?嚗e}")
 
         return
 
-    # 進入 VIP 入口：建立 VIP 專用語音房
+    # ?脣 VIP ?亙嚗遣蝡?VIP 撠隤??
     if vip_lobby_channel is not None and after.channel.id == vip_lobby_channel.id:
         try:
             new_channel = await guild.create_voice_channel(
@@ -3855,13 +3855,13 @@ async def on_voice_state_update(
                 reason="Move member to created VIP voice room"
             )
         except discord.Forbidden:
-            print("Bot 權限不足，無法建立或移動 VIP 語音房。")
+            print("Bot 甈?銝雲嚗瘜遣蝡?蝘餃? VIP 隤?踴?)
         except discord.HTTPException as e:
-            print(f"建立或移動 VIP 語音房失敗：{e}")
+            print(f"撱箇??宏??VIP 隤?踹仃??{e}")
 
         return
 
-    # 進入公共入口：建立所有人可見 / 可加入的公共語音房
+    # ?脣?砍?亙嚗遣蝡??犖?航? / ?臬??亦??砍隤??
     if public_lobby_channel is not None and after.channel.id == public_lobby_channel.id:
         try:
             overwrites = build_public_voice_overwrites(guild)
@@ -3888,9 +3888,9 @@ async def on_voice_state_update(
                 reason="Move member to created public voice room"
             )
         except discord.Forbidden:
-            print("Bot 權限不足，無法建立或移動公共語音房。")
+            print("Bot 甈?銝雲嚗瘜遣蝡?蝘餃??砍隤?踴?)
         except discord.HTTPException as e:
-            print(f"建立或移動公共語音房失敗：{e}")
+            print(f"撱箇??宏??梯??單憭望?嚗e}")
 
         return
 
@@ -3937,9 +3937,9 @@ async def on_ready():
             await get_or_create_vip_voice_lobby(guild_for_voice)
             await get_or_create_public_voice_lobby(guild_for_voice)
         except discord.Forbidden:
-            print("Bot 權限不足，無法建立陪玩 / VIP / 公共語音入口。")
+            print("Bot 甈?銝雲嚗瘜遣蝡??/ VIP / ?砍隤?亙??)
         except discord.HTTPException as e:
-            print(f"建立陪玩 / VIP / 公共語音入口失敗：{e}")
+            print(f"撱箇??芰 / VIP / ?砍隤?亙憭望?嚗e}")
 
     if not getattr(bot, "_extensions_loaded", False):
         try:
@@ -3968,16 +3968,16 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
 
 
-# ========= Slash 指令 =========
+# ========= Slash ?誘 =========
 
 
 
-# ========= 點數抽獎系統 =========
+# ========= 暺?賜?蝟餌絞 =========
 
-# 抽獎 slash 指令已搬到 cogs/lottery_commands.py
+# ?賜? slash ?誘撌脫??cogs/lottery_commands.py
 
 
-# 會員點數 / 補登 slash 指令已搬到 cogs/reward_commands.py
+# ?暺 / 鋆 slash ?誘撌脫??cogs/reward_commands.py
 
 
 VIP_LEVEL_NAME_TO_INDEX = {level["name"]: index for index, level in enumerate(MEMBER_LEVELS)}
@@ -3989,13 +3989,13 @@ VIP_LEVEL_CHOICES = [
 
 @bot.tree.command(
     name="set_customer_level",
-    description="管理員直接指定顧客 VIP 等級",
+    description="蝞∠??∠?交?摰“摰?VIP 蝑?",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    customer="要調整 VIP 等級的顧客",
-    level="要指定的會員等級",
-    reason="調整原因，可不填"
+    customer="閬矽??VIP 蝑??“摰?,
+    level="閬?摰??蝑?",
+    reason="隤踵??嚗銝‵"
 )
 @app_commands.choices(level=VIP_LEVEL_CHOICES)
 async def set_customer_level(
@@ -4005,23 +4005,23 @@ async def set_customer_level(
     reason: str | None = None,
 ):
     if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
         return
 
     if not is_manager_or_admin(interaction.user):
-        await interaction.response.send_message("只有管理員或店長可以直接調整顧客 VIP 等級。", ephemeral=True)
+        await interaction.response.send_message("?芣?蝞∠??⊥?摨?臭誑?湔隤踵憿批恥 VIP 蝑???, ephemeral=True)
         return
 
     target_index = VIP_LEVEL_NAME_TO_INDEX.get(level.value)
     if target_index is None:
-        await interaction.response.send_message("會員等級不存在，請重新選擇。", ephemeral=True)
+        await interaction.response.send_message("?蝑?銝??剁?隢??圈??, ephemeral=True)
         return
 
     data = get_customer_reward_data(customer.id)
     old_level = get_effective_member_level(data)
 
     data["vip_level_index"] = target_index
-    # 直接調整 / 降階後，都從目前等級的 0 開始重新累積下一級進度。
+    # ?湔隤踵 / ??敺??賢??桀?蝑???0 ???蝝舐?銝?蝝脣漲??
     data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
     data["last_level_manual_fixed_at"] = get_taipei_now_iso()
     data["last_level_manual_fixed_by"] = interaction.user.id
@@ -4032,23 +4032,23 @@ async def set_customer_level(
     save_bot_data()
 
     embed = build_member_info_embed(customer, data, show_points=True)
-    embed.title = "顧客 VIP 等級已調整"
-    embed.add_field(name="原等級", value=old_level["name"], inline=True)
-    embed.add_field(name="新等級", value=get_effective_member_level(data)["name"], inline=True)
+    embed.title = "憿批恥 VIP 蝑?撌脰矽??
+    embed.add_field(name="??蝝?, value=old_level["name"], inline=True)
+    embed.add_field(name="?啁?蝝?, value=get_effective_member_level(data)["name"], inline=True)
     if reason:
-        embed.add_field(name="調整原因", value=reason, inline=False)
+        embed.add_field(name="隤踵??", value=reason, inline=False)
     if benefit_notices:
-        embed.add_field(name="會員權益處理", value="\n".join(benefit_notices), inline=False)
+        embed.add_field(name="?甈???", value="\n".join(benefit_notices), inline=False)
 
     await send_order_log(
         interaction.guild,
-        title="顧客 VIP 等級已手動調整",
+        title="憿批恥 VIP 蝑?撌脫??矽??,
         fields=[
-            ("顧客", customer.mention, True),
-            ("操作人員", interaction.user.mention, True),
-            ("原等級", old_level["name"], True),
-            ("新等級", get_effective_member_level(data)["name"], True),
-            ("原因", reason or "未填寫", False),
+            ("憿批恥", customer.mention, True),
+            ("??鈭箏", interaction.user.mention, True),
+            ("??蝝?, old_level["name"], True),
+            ("?啁?蝝?, get_effective_member_level(data)["name"], True),
+            ("??", reason or "?芸‵撖?, False),
         ],
         color=discord.Color.orange(),
     )
@@ -4064,18 +4064,18 @@ def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool
     )
 
 
-# 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py
+# ??蝯梯? / VIP ???亥岷 slash ?誘撌脫??cogs/stats_commands.py
 
 
 @bot.tree.command(
     name="order_search",
-    description="客服搜尋訂單，可用訂單編號、顧客 ID、項目或狀態查詢",
+    description="摰Ｘ???閮嚗?刻??桃楊?“摰?ID???格???閰?,
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    keyword="關鍵字：訂單編號、顧客ID、項目名稱，可不填",
-    status="狀態：active / stored / closed / cancelled，可不填",
-    limit="最多顯示幾筆，預設 10，最多 20"
+    keyword="?摮?閮蝺刻??“摰＠D???桀?蝔梧??臭?憛?,
+    status="???active / stored / closed / cancelled嚗銝‵",
+    limit="?憭＊蝷箏嗾蝑??身 10嚗?憭?20"
 )
 async def order_search(
     interaction: discord.Interaction,
@@ -4084,7 +4084,7 @@ async def order_search(
     limit: int = 10,
 ):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以搜尋訂單。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞交?撠??柴?, ephemeral=True)
         return
 
     limit = max(1, min(int(limit or 10), 20))
@@ -4124,43 +4124,43 @@ async def order_search(
     shown = matches[:limit]
 
     embed = discord.Embed(
-        title="訂單搜尋結果",
+        title="閮??蝯?",
         color=discord.Color.blurple(),
         timestamp=get_taipei_now(),
     )
 
     if not shown:
-        embed.description = "沒有找到符合條件的訂單。"
+        embed.description = "瘝??曉蝚血?璇辣???柴?
     else:
         lines = []
         for channel_id, data in shown:
-            order_no = data.get("order_no") or "未產生"
+            order_no = data.get("order_no") or "?芰??
             customer_id = data.get("customer_id")
-            customer_text = f"<@{customer_id}>" if customer_id else "未紀錄"
-            item = data.get("item") or "未紀錄"
+            customer_text = f"<@{customer_id}>" if customer_id else "?芰???
+            item = data.get("item") or "?芰???
             quantity = _to_int(data.get("quantity"), 1) or 1
             amount = _to_int(data.get("amount"), 0) or 0
             order_status = str(data.get("status") or ("closed" if data.get("closed") else "active"))
-            ticket_text = f"<#{channel_id}>" if int(channel_id) > 0 else f"歷史資料 {channel_id}"
+            ticket_text = f"<#{channel_id}>" if int(channel_id) > 0 else f"甇瑕鞈? {channel_id}"
             lines.append(
-                f"**{order_no}**｜{order_status}\n"
-                f"顧客：{customer_text}｜項目：{item} x{quantity}｜金額：{format_t_amount(amount) if amount else '未紀錄'}\n"
-                f"票口：{ticket_text}"
+                f"**{order_no}**嚚order_status}\n"
+                f"憿批恥嚗customer_text}嚚??殷?{item} x{quantity}嚚?憿?{format_t_amount(amount) if amount else '?芰???}\n"
+                f"蟡典嚗ticket_text}"
             )
         embed.description = "\n\n".join(lines)
         if len(matches) > limit:
-            embed.set_footer(text=f"只顯示前 {limit} 筆，共找到 {len(matches)} 筆")
+            embed.set_footer(text=f"?芷＊蝷箏? {limit} 蝑??望??{len(matches)} 蝑?)
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-# ========= 訂單修正 / 刪除指令 =========
+# ========= 閮靽格迤 / ?芷?誘 =========
 
 ORDER_MAINTENANCE_BACKUP_PREFIX = "manual_order_maintenance"
 
 
 def adjust_customer_totals_for_order(customer_id: int | None, amount_delta: int, order_delta: int) -> dict | None:
-    """手動修單時同步 customers 記憶體資料；amount_delta 可正可負。"""
+    """??靽桀??甇?customers 閮擃???amount_delta ?舀迤?航???""
     parsed_customer_id = _to_int(customer_id)
     if parsed_customer_id is None:
         return None
@@ -4193,7 +4193,7 @@ async def refresh_customer_benefits_after_manual_fix(guild: discord.Guild | None
         member = await fetch_member_safely(guild, customer_id)
         benefit_notices = await ensure_reward_member_benefits(guild, member, data)
         if benefit_notices:
-            notices.extend([f"<@{customer_id}>：{notice}" for notice in benefit_notices])
+            notices.extend([f"<@{customer_id}>嚗notice}" for notice in benefit_notices])
     return notices
 
 
@@ -4206,7 +4206,7 @@ def backup_database_for_manual_order_fix() -> str | None:
         shutil.copy2(DB_FILE, backup_path)
         return str(backup_path)
     except OSError as e:
-        print(f"建立手動修單備份失敗：{e}")
+        print(f"撱箇???靽桀?遢憭望?嚗e}")
         return None
 
 
@@ -4247,18 +4247,18 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
         timestamp=get_taipei_now(),
     )
     if data:
-        embed.add_field(name="訂單編號", value=str(data.get("order_no") or data.get("receipt_id") or "未產生"), inline=True)
-        embed.add_field(name="顧客", value=f"<@{data.get('customer_id')}>" if data.get("customer_id") else "未紀錄", inline=True)
-        embed.add_field(name="項目", value=str(data.get("item") or "未紀錄"), inline=True)
-        embed.add_field(name="金額", value=format_t_amount(get_order_amount_for_maintenance(data)), inline=True)
-        embed.add_field(name="狀態", value=str(data.get("status") or ("closed" if data.get("closed") else "active")), inline=True)
+        embed.add_field(name="閮蝺刻?", value=str(data.get("order_no") or data.get("receipt_id") or "?芰??), inline=True)
+        embed.add_field(name="憿批恥", value=f"<@{data.get('customer_id')}>" if data.get("customer_id") else "?芰???, inline=True)
+        embed.add_field(name="?", value=str(data.get("item") or "?芰???), inline=True)
+        embed.add_field(name="??", value=format_t_amount(get_order_amount_for_maintenance(data)), inline=True)
+        embed.add_field(name="???, value=str(data.get("status") or ("closed" if data.get("closed") else "active")), inline=True)
     return embed
 
 
 
 
 def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
-    """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled。"""
+    """DC bot ?芷/??閮敺??雯蝡??桃???甇交? cancelled??""
     try:
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
@@ -4266,7 +4266,7 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
             ticket_channel_id=ticket_channel_id,
             status="cancelled",
             dispatch_message_id=dispatch_message_id,
-            note=note or "由 DC bot 刪除/取消訂單同步。",
+            note=note or "??DC bot ?芷/??閮?郊??,
         )
         print(
             f"[web-sync] cancel order "
@@ -4275,7 +4275,7 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
         )
     except Exception as exc:
         print(
-            f"[web-sync] 刪除/取消訂單同步網站失敗 "
+            f"[web-sync] ?芷/??閮?郊蝬脩?憭望? "
             f"ticket_channel_id={ticket_channel_id}: {exc}"
         )
 
@@ -4283,7 +4283,7 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
 
 
 def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
-    """DC bot 刪除訂單後，從網站資料庫直接刪除對應 web_order。"""
+    """DC bot ?芷閮敺?敺雯蝡??澈?湔?芷撠? web_order??""
     try:
         from shared.web_order_sync import delete_web_order_by_ticket_channel
 
@@ -4299,7 +4299,7 @@ def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None,
         )
     except Exception as exc:
         print(
-            f"[web-sync] 刪除網站訂單失敗 "
+            f"[web-sync] ?芷蝬脩?閮憭望? "
             f"ticket_channel_id={ticket_channel_id} "
             f"dispatch_message_id={dispatch_message_id}: {exc}"
         )
@@ -4307,13 +4307,13 @@ def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None,
 
 @bot.tree.command(
     name="delete_order",
-    description="客服刪除訂單資料，支援訂單編號或票口 ID",
+    description="摰Ｘ??芷閮鞈?嚗?渲??桃楊??蟡典 ID",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    order="訂單編號或票口 ID，例如 MO20260521003 或 1506712687458123917",
-    adjust_customer="若訂單已結單，是否同步扣回會員累積與完成單數，預設是",
-    delete_dispatch_panel="是否嘗試刪除派單頻道接單面板，預設是"
+    order="閮蝺刻??巨??ID嚗?憒?MO20260521003 ??1506712687458123917",
+    adjust_customer="?亥??桀歇蝯嚗?血?甇交???∠敞蝛?摰??格嚗?閮剜",
+    delete_dispatch_panel="?臬?岫?芷瘣曉?駁??亙?Ｘ嚗?閮剜"
 )
 async def delete_order(
     interaction: discord.Interaction,
@@ -4322,12 +4322,12 @@ async def delete_order(
     delete_dispatch_panel: bool = True,
 ):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以刪除訂單。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞亙?方??柴?, ephemeral=True)
         return
 
     channel_id, data = find_order_by_identifier(order)
     if channel_id is None or data is None:
-        await interaction.response.send_message("找不到這筆訂單，請確認訂單編號或票口 ID 是否正確。", ephemeral=True)
+        await interaction.response.send_message("?曆??圈?閮嚗?蝣箄?閮蝺刻??巨??ID ?臬甇?Ⅱ??, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -4355,7 +4355,7 @@ async def delete_order(
         sync_web_order_deleted_from_bot(
             ticket_channel_id=channel_id,
             dispatch_message_id=dispatch_message_id,
-            note="由 /delete_order 刪除網站訂單。",
+            note="??/delete_order ?芷蝬脩?閮??,
         )
 
         SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
@@ -4367,46 +4367,46 @@ async def delete_order(
         )
 
         description = (
-            f"已刪除訂單資料。\n"
-            f"票口 ID：`{channel_id}`\n"
-            f"會員同步：{'已扣回' if adjust_customer and is_order_closed_for_rewards(old_data) else '未扣回 / 不適用'}\n"
-            f"派單面板：{'已刪除' if dispatch_deleted else '未刪除或找不到'}\n"
-            f"備份：`{backup_path or '建立失敗或無資料庫'}`"
+            f"撌脣?方??株??n"
+            f"蟡典 ID嚗{channel_id}`\n"
+            f"??郊嚗'撌脫?? if adjust_customer and is_order_closed_for_rewards(old_data) else '?芣??/ 銝??}\n"
+            f"瘣曉?Ｘ嚗'撌脣?? if dispatch_deleted else '?芸?斗??曆???}\n"
+            f"?遢嚗{backup_path or '撱箇?憭望??鞈?摨?}`"
         )
         if benefit_notices:
             description += "\n" + "\n".join(benefit_notices[:5])
 
-        embed = build_order_maintenance_result_embed("刪除訂單完成", description, old_data)
+        embed = build_order_maintenance_result_embed("?芷閮摰?", description, old_data)
         await interaction.followup.send(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
 
         await send_order_log(
             interaction.guild,
-            title="手動刪除訂單",
+            title="???芷閮",
             description=description,
             fields=[
-                ("操作人員", interaction.user.mention, True),
-                ("訂單", str(old_data.get("order_no") or order), True),
-                ("顧客", f"<@{customer_id}>" if customer_id else "未紀錄", True),
+                ("??鈭箏", interaction.user.mention, True),
+                ("閮", str(old_data.get("order_no") or order), True),
+                ("憿批恥", f"<@{customer_id}>" if customer_id else "?芰???, True),
             ],
             color=discord.Color.red(),
         )
     except Exception as e:
-        error_text = f"/delete_order 執行失敗：{type(e).__name__}: {e}"
+        error_text = f"/delete_order ?瑁?憭望?嚗type(e).__name__}: {e}"
         try:
             await interaction.followup.send(
-                f"刪除訂單失敗：`{type(e).__name__}: {e}`\n請到 VPS 查看 journalctl 取得完整 Traceback。",
+                f"?芷閮憭望?嚗{type(e).__name__}: {e}`\n隢 VPS ?亦? journalctl ??摰 Traceback??,
                 ephemeral=True,
             )
         except discord.HTTPException:
             pass
         await send_order_log(
             interaction.guild,
-            title="刪除訂單失敗",
+            title="?芷閮憭望?",
             description=error_text,
             fields=[
-                ("操作人員", interaction.user.mention, True),
-                ("輸入訂單", str(order), True),
-                ("票口 ID", str(channel_id), True),
+                ("??鈭箏", interaction.user.mention, True),
+                ("頛詨閮", str(order), True),
+                ("蟡典 ID", str(channel_id), True),
             ],
             color=discord.Color.red(),
         )
@@ -4415,13 +4415,13 @@ async def delete_order(
 
 @bot.tree.command(
     name="fix_order_amount",
-    description="客服修正訂單金額，可同步調整會員累積",
+    description="摰Ｘ?靽格迤閮??嚗?郊隤踵?蝝舐?",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    order="訂單編號或票口 ID",
-    amount="新的金額，只能輸入數字，例如 1275",
-    adjust_customer="若訂單已結單，是否同步調整會員累積，預設是"
+    order="閮蝺刻??巨??ID",
+    amount="?啁???嚗?質撓?交摮?靘? 1275",
+    adjust_customer="?亥??桀歇蝯嚗?血?甇亥矽?湔??∠敞蝛??身??
 )
 async def fix_order_amount(
     interaction: discord.Interaction,
@@ -4430,16 +4430,16 @@ async def fix_order_amount(
     adjust_customer: bool = True,
 ):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以修正訂單金額。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞乩耨甇???桅?憿?, ephemeral=True)
         return
 
     if amount < 0:
-        await interaction.response.send_message("金額不能小於 0。", ephemeral=True)
+        await interaction.response.send_message("??銝撠 0??, ephemeral=True)
         return
 
     channel_id, data = find_order_by_identifier(order)
     if channel_id is None or data is None:
-        await interaction.response.send_message("找不到這筆訂單，請確認訂單編號或票口 ID 是否正確。", ephemeral=True)
+        await interaction.response.send_message("?曆??圈?閮嚗?蝣箄?閮蝺刻??巨??ID ?臬甇?Ⅱ??, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -4455,7 +4455,7 @@ async def fix_order_amount(
         data["reward_amount"] = int(amount)
     data["manual_fixed_at"] = get_taipei_now_iso()
     data["manual_fixed_by"] = interaction.user.id
-    data["manual_fix_note"] = f"金額由 {old_amount} 修正為 {amount}"
+    data["manual_fix_note"] = f"????{old_amount} 靽格迤??{amount}"
     SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
 
     if adjust_customer and is_order_closed_for_rewards(data) and delta != 0:
@@ -4466,28 +4466,28 @@ async def fix_order_amount(
     benefit_notices = await refresh_customer_benefits_after_manual_fix(interaction.guild, [customer_id])
 
     description = (
-        f"已修正訂單金額。\n"
-        f"票口 ID：`{channel_id}`\n"
-        f"原金額：{format_t_amount(old_amount)}\n"
-        f"新金額：{format_t_amount(int(amount))}\n"
-        f"差額：{format_t_amount(delta)}\n"
-        f"會員同步：{'已同步' if adjust_customer and is_order_closed_for_rewards(data) else '未同步 / 不適用'}\n"
-        f"備份：`{backup_path or '建立失敗或無資料庫'}`"
+        f"撌脖耨甇???桅?憿n"
+        f"蟡典 ID嚗{channel_id}`\n"
+        f"??憿?{format_t_amount(old_amount)}\n"
+        f"?圈?憿?{format_t_amount(int(amount))}\n"
+        f"撌桅?嚗format_t_amount(delta)}\n"
+        f"??郊嚗'撌脣?甇? if adjust_customer and is_order_closed_for_rewards(data) else '?芸?甇?/ 銝??}\n"
+        f"?遢嚗{backup_path or '撱箇?憭望??鞈?摨?}`"
     )
     if benefit_notices:
         description += "\n" + "\n".join(benefit_notices[:5])
 
-    embed = build_order_maintenance_result_embed("修正訂單金額完成", description, data)
+    embed = build_order_maintenance_result_embed("靽格迤閮??摰?", description, data)
     await interaction.followup.send(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
 
     await send_order_log(
         interaction.guild,
-        title="手動修正訂單金額",
+        title="??靽格迤閮??",
         description=description,
         fields=[
-            ("操作人員", interaction.user.mention, True),
-            ("訂單", str(data.get("order_no") or order), True),
-            ("顧客", f"<@{customer_id}>" if customer_id else "未紀錄", True),
+            ("??鈭箏", interaction.user.mention, True),
+            ("閮", str(data.get("order_no") or order), True),
+            ("憿批恥", f"<@{customer_id}>" if customer_id else "?芰???, True),
         ],
         color=discord.Color.orange(),
     )
@@ -4495,13 +4495,13 @@ async def fix_order_amount(
 
 @bot.tree.command(
     name="fix_order_customer",
-    description="客服修正訂單顧客，可同步搬移會員累積",
+    description="摰Ｘ?靽格迤閮憿批恥嚗?郊?祉宏?蝝舐?",
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    order="訂單編號或票口 ID",
-    customer="正確的顧客",
-    adjust_customer="若訂單已結單，是否把會員累積從舊顧客搬到新顧客，預設是"
+    order="閮蝺刻??巨??ID",
+    customer="甇?Ⅱ?“摰?,
+    adjust_customer="?亥??桀歇蝯嚗?行??蝝舐?敺?憿批恥?砍?圈“摰ｇ??身??
 )
 async def fix_order_customer(
     interaction: discord.Interaction,
@@ -4510,12 +4510,12 @@ async def fix_order_customer(
     adjust_customer: bool = True,
 ):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以修正訂單顧客。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞乩耨甇???桅“摰Ｕ?, ephemeral=True)
         return
 
     channel_id, data = find_order_by_identifier(order)
     if channel_id is None or data is None:
-        await interaction.response.send_message("找不到這筆訂單，請確認訂單編號或票口 ID 是否正確。", ephemeral=True)
+        await interaction.response.send_message("?曆??圈?閮嚗?蝣箄?閮蝺刻??巨??ID ?臬甇?Ⅱ??, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -4529,7 +4529,7 @@ async def fix_order_customer(
     data["customer_id"] = new_customer_id
     data["manual_fixed_at"] = get_taipei_now_iso()
     data["manual_fixed_by"] = interaction.user.id
-    data["manual_fix_note"] = f"顧客由 {old_customer_id or '未紀錄'} 修正為 {new_customer_id}"
+    data["manual_fix_note"] = f"憿批恥??{old_customer_id or '?芰???} 靽格迤??{new_customer_id}"
     SELF_SERVICE_ORDER_SELECTIONS[channel_id] = data
 
     dispatch_message_id = _to_int(data.get("dispatch_message_id"))
@@ -4546,28 +4546,28 @@ async def fix_order_customer(
     benefit_notices = await refresh_customer_benefits_after_manual_fix(interaction.guild, [old_customer_id, new_customer_id])
 
     description = (
-        f"已修正訂單顧客。\n"
-        f"票口 ID：`{channel_id}`\n"
-        f"原顧客：{f'<@{old_customer_id}>' if old_customer_id else '未紀錄'}\n"
-        f"新顧客：{customer.mention}\n"
-        f"金額：{format_t_amount(amount)}\n"
-        f"會員同步：{'已搬移' if adjust_customer and closed and old_customer_id != new_customer_id else '未搬移 / 不適用'}\n"
-        f"備份：`{backup_path or '建立失敗或無資料庫'}`"
+        f"撌脖耨甇???桅“摰Ｕn"
+        f"蟡典 ID嚗{channel_id}`\n"
+        f"?“摰ｇ?{f'<@{old_customer_id}>' if old_customer_id else '?芰???}\n"
+        f"?圈“摰ｇ?{customer.mention}\n"
+        f"??嚗format_t_amount(amount)}\n"
+        f"??郊嚗'撌脫蝘? if adjust_customer and closed and old_customer_id != new_customer_id else '?芣蝘?/ 銝??}\n"
+        f"?遢嚗{backup_path or '撱箇?憭望??鞈?摨?}`"
     )
     if benefit_notices:
         description += "\n" + "\n".join(benefit_notices[:5])
 
-    embed = build_order_maintenance_result_embed("修正訂單顧客完成", description, data)
+    embed = build_order_maintenance_result_embed("靽格迤閮憿批恥摰?", description, data)
     await interaction.followup.send(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False))
 
     await send_order_log(
         interaction.guild,
-        title="手動修正訂單顧客",
+        title="??靽格迤閮憿批恥",
         description=description,
         fields=[
-            ("操作人員", interaction.user.mention, True),
-            ("訂單", str(data.get("order_no") or order), True),
-            ("新顧客", customer.mention, True),
+            ("??鈭箏", interaction.user.mention, True),
+            ("閮", str(data.get("order_no") or order), True),
+            ("?圈“摰?, customer.mention, True),
         ],
         color=discord.Color.orange(),
     )
@@ -4576,30 +4576,30 @@ async def fix_order_customer(
 
 @bot.tree.command(
     name="resend_dispatch",
-    description="重新發送指定票口的派單面板"
+    description="??潮?摰巨???瘣曉?Ｘ"
 )
 @app_commands.describe(
-    order_channel_id="票口頻道 ID，例如 1506962556928131112"
+    order_channel_id="蟡典?駁? ID嚗?憒?1506962556928131112"
 )
 async def resend_dispatch(interaction: discord.Interaction, order_channel_id: str):
-    """重新建立可操作的派單面板。\n\n    用於派單頻道訊息被刪除、按鈕失效、claims 重複或連結錯亂時。\n    會清除同一票口舊 claims，發一則新的 DispatchClaimView，並把新訊息 ID 寫回資料。\n    """
+    """?撱箇??舀?雿?瘣曉?Ｘ?n\n    ?冽瘣曉?駁?閮鋡怠?扎??仃?laims ??????臭??n    ???文?銝蟡典??claims嚗銝???DispatchClaimView嚗蒂?閮 ID 撖怠?鞈??n    """
     if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
         return
 
     if not (is_customer_staff(interaction.user) or is_manager_or_admin(interaction.user)):
-        await interaction.response.send_message("只有客服、店長或管理員可以重新派單。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞仿??唳晷?柴?, ephemeral=True)
         return
 
     guild = interaction.guild
     if guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
         return
 
     try:
         source_channel_id = int(str(order_channel_id).strip())
     except ValueError:
-        await interaction.response.send_message("票口 ID 格式錯誤，請輸入純數字。", ephemeral=True)
+        await interaction.response.send_message("蟡典 ID ?澆??航炊嚗?頛詨蝝摮?, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -4613,7 +4613,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
             source_channel = None
 
     if source_channel is None or not isinstance(source_channel, discord.TextChannel):
-        await interaction.followup.send("找不到這個票口頻道，請確認票口 ID 是否正確。", ephemeral=True)
+        await interaction.followup.send("?曆??圈巨????隢Ⅱ隤巨??ID ?臬甇?Ⅱ??, ephemeral=True)
         return
 
     dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
@@ -4625,15 +4625,15 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
             dispatch_channel = None
 
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
-        await interaction.followup.send("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。", ephemeral=True)
+        await interaction.followup.send("?曆??唳晷?桅??隢Ⅱ隤?DISPATCH_CHANNEL_ID ?臬甇?Ⅱ??, ephemeral=True)
         return
 
     data = SELF_SERVICE_ORDER_SELECTIONS.get(source_channel_id)
     if not isinstance(data, dict):
-        await interaction.followup.send("找不到這張票口的訂單資料，無法重新派單。", ephemeral=True)
+        await interaction.followup.send("?曆??圈撐蟡典???株????⊥??瘣曉??, ephemeral=True)
         return
 
-    # 清掉同一票口舊 claims，避免一張票口對到多則派單訊息。
+    # 皜???蟡典??claims嚗??撘萇巨????啣??晷?株??胯?
     for message_id, claim_data in list(ORDER_CLAIMS.items()):
         if _to_int(claim_data.get("source_channel_id")) == source_channel_id:
             ORDER_CLAIMS.pop(message_id, None)
@@ -4645,12 +4645,12 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
 
     customer_id = _to_int(data.get("customer_id")) or get_order_customer_id_from_channel(source_channel)
     category = data.get("category")
-    category_label = ORDER_CATEGORY_LABELS.get(category, data.get("category_label") or category or "未紀錄")
-    item = str(data.get("item") or "未紀錄")
+    category_label = ORDER_CATEGORY_LABELS.get(category, data.get("category_label") or category or "?芰???)
+    item = str(data.get("item") or "?芰???)
     quantity = _to_int(data.get("quantity"), 1) or 1
-    payment_method = str(data.get("payment_method") or "未紀錄")
-    companion_preference = data.get("companion_preference") or "不指定陪玩/打手"
-    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+    payment_method = str(data.get("payment_method") or "?芰???)
+    companion_preference = data.get("companion_preference") or "銝?摰????"
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "?芰???
 
     embed = build_self_service_order_embed(
         customer_mention=customer_mention,
@@ -4662,8 +4662,8 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
         companion_preference=companion_preference,
     )
     embed.add_field(
-        name="重新派單",
-        value=f"由 {interaction.user.mention} 使用 `/resend_dispatch` 重新發送。",
+        name="?瘣曉",
+        value=f"??{interaction.user.mention} 雿輻 `/resend_dispatch` ??潮?,
         inline=False,
     )
 
@@ -4724,19 +4724,19 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
 
     await send_order_log(
         guild,
-        title="重新發送派單面板",
+        title="??潮晷?桅??,
         fields=[
-            ("操作人員", interaction.user.mention, True),
-            ("顧客", customer_mention, True),
-            ("項目", f"{item} x{quantity}", True),
-            ("票口", source_channel.mention, False),
-            ("新派單訊息", dispatch_message.jump_url, False),
+            ("??鈭箏", interaction.user.mention, True),
+            ("憿批恥", customer_mention, True),
+            ("?", f"{item} x{quantity}", True),
+            ("蟡典", source_channel.mention, False),
+            ("?唳晷?株???, dispatch_message.jump_url, False),
         ],
         color=discord.Color.orange(),
     )
 
     await interaction.followup.send(
-        f"已重新發送可操作派單訊息：{dispatch_message.jump_url}",
+        f"撌脤??啁???瘣曉閮嚗dispatch_message.jump_url}",
         ephemeral=True,
     )
 
@@ -4884,26 +4884,26 @@ def _web_sync_build_receiver_text(assignments: list[dict]) -> str:
     parts = []
 
     if boosters:
-        parts.append("打手：" + "、".join(boosters))
+        parts.append("??嚗? + "??.join(boosters))
 
     if companions:
-        parts.append("陪玩：" + "、".join(companions))
+        parts.append("?芰嚗? + "??.join(companions))
 
     if not parts:
-        return "尚未有人接單"
+        return "撠?犖?亙"
 
     return "\n".join(parts)
 
 
 def _web_sync_embed_without_receiver_fields(embed):
     blocked_names = {
-        "目前接單",
-        "目前接單人",
-        "接單狀態",
-        "接單人員",
-        "打手接單",
-        "陪玩接單",
-        "已接人員",
+        "?桀??亙",
+        "?桀??亙鈭?,
+        "?亙???,
+        "?亙鈭箏",
+        "???亙",
+        "?芰?亙",
+        "撌脫鈭箏",
     }
 
     old_fields = list(embed.fields)
@@ -4946,11 +4946,11 @@ async def process_one_web_sync_event(event: dict) -> None:
         if message.embeds:
             embed = message.embeds[0].copy()
         else:
-            embed = discord.Embed(title="派單訊息", color=discord.Color.blue())
+            embed = discord.Embed(title="瘣曉閮", color=discord.Color.blue())
 
         embed = _web_sync_embed_without_receiver_fields(embed)
         embed.add_field(
-            name="目前接單",
+            name="?桀??亙",
             value=receiver_text,
             inline=False,
         )
@@ -4965,7 +4965,7 @@ async def process_one_web_sync_event(event: dict) -> None:
 
     except Exception as exc:
         _web_sync_mark_event_failed(event_id, str(exc), retry_count)
-        print(f"處理網站同步事件失敗 event_id={event_id}：{exc}")
+        print(f"??蝬脩??郊鈭辣憭望? event_id={event_id}嚗exc}")
 
 
 async def web_sync_event_worker() -> None:
@@ -4979,7 +4979,7 @@ async def web_sync_event_worker() -> None:
                 await process_one_web_sync_event(event)
 
         except Exception as exc:
-            print(f"[web-sync] 背景處理器失敗：{exc}")
+            print(f"[web-sync] ????典仃??{exc}")
 
         await asyncio.sleep(5)
 
@@ -4991,15 +4991,15 @@ def ensure_web_sync_event_worker_started() -> None:
         return
 
     WEB_SYNC_EVENT_TASK = bot.loop.create_task(web_sync_event_worker())
-    print("[web-sync] 背景同步事件處理器已啟動")
+    print("[web-sync] ??郊鈭辣???典歇??")
 
 
-# ========= 資料庫健康檢查指令 =========
+# ========= 鞈?摨怠摨瑟炎?交?隞?=========
 
-# /audit_data 已搬到 cogs/audit_commands.py
+# /audit_data 撌脫??cogs/audit_commands.py
 
 
-# ========= 存單管理面板 =========
+# ========= 摮蝞∠??Ｘ =========
 
 async def update_stored_order_note_and_panel(
     guild: discord.Guild,
@@ -5011,7 +5011,7 @@ async def update_stored_order_note_and_panel(
 ) -> None:
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id)
     if not isinstance(data, dict) or str(data.get("status", "")).lower() != "stored":
-        raise ValueError("找不到這筆存單，可能已被恢復、取消或結單。")
+        raise ValueError("?曆??圈?摮嚗?賢歇鋡急敺押?瘨?蝯??)
 
     data["stored_reason"] = reason
     data["stored_expected_time"] = expected_time or None
@@ -5049,21 +5049,21 @@ async def update_stored_order_note_and_panel(
 
     customer_id = data.get("customer_id") or get_order_customer_id_from_channel(order_channel)
     category = data.get("category")
-    item = data.get("item", "未紀錄")
+    item = data.get("item", "?芰???)
     quantity = _to_int(data.get("quantity"), 1) or 1
-    payment_method = data.get("payment_method", "未紀錄")
+    payment_method = data.get("payment_method", "?芰???)
     companion_preference = data.get("companion_preference")
-    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "未紀錄")
-    customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
+    category_label = ORDER_CATEGORY_LABELS.get(category, category or data.get("category_label") or "?芰???)
+    customer_mention = f"<@{customer_id}>" if customer_id is not None else "?芰???
 
     claim_data = ORDER_CLAIMS.get(dispatch_message_id, {})
     companion_ids = sorted(claim_data.get("companion", set())) if isinstance(claim_data, dict) else []
     booster_ids = sorted(claim_data.get("booster", set())) if isinstance(claim_data, dict) else []
     receiver_lines = []
     if companion_ids:
-        receiver_lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+        receiver_lines.append("?芰?亙嚗? + " ".join(f"<@{user_id}>" for user_id in companion_ids))
     if booster_ids:
-        receiver_lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+        receiver_lines.append("???亙嚗? + " ".join(f"<@{user_id}>" for user_id in booster_ids))
 
     embed = build_self_service_order_embed(
         customer_mention=customer_mention,
@@ -5076,16 +5076,16 @@ async def update_stored_order_note_and_panel(
         receiver_text="\n".join(receiver_lines) if receiver_lines else None,
     )
     embed.add_field(
-        name="接單狀態",
+        name="?亙???,
         value=(
-            "已存單，接單面板已鎖定\n"
-            f"存單原因：{reason}\n"
-            f"預計恢復：{expected_time or '未填寫'}"
+            "撌脣??殷??亙?Ｘ撌脤?摰n"
+            f"摮??嚗reason}\n"
+            f"???Ｗ儔嚗expected_time or '?芸‵撖?}"
         ),
         inline=False,
     )
     if note:
-        embed.add_field(name="存單備註", value=note[:1024], inline=False)
+        embed.add_field(name="摮?酉", value=note[:1024], inline=False)
 
     await message.edit(
         embed=embed,
@@ -5104,22 +5104,22 @@ async def update_stored_order_note_and_panel(
     )
 
 
-class StoredOrderNoteModal(discord.ui.Modal, title="修改存單備註"):
+class StoredOrderNoteModal(discord.ui.Modal, title="靽格摮?酉"):
     reason = discord.ui.TextInput(
-        label="存單原因",
-        placeholder="例如：顧客改約、等待活動、暫停服務",
+        label="摮??",
+        placeholder="靘?嚗“摰Ｘ蝝?敺暑?????,
         required=True,
         max_length=200,
     )
     expected_time = discord.ui.TextInput(
-        label="預計恢復時間",
-        placeholder="例如：今晚 20:00、明天、未定",
+        label="???Ｗ儔??",
+        placeholder="靘?嚗???20:00??憭押摰?,
         required=False,
         max_length=100,
     )
     note = discord.ui.TextInput(
-        label="備註",
-        placeholder="可填寫付款狀態、注意事項或客服備註",
+        label="?酉",
+        placeholder="?臬‵撖思?甈曄??釣????摰Ｘ??酉",
         style=discord.TextStyle.paragraph,
         required=False,
         max_length=800,
@@ -5136,10 +5136,10 @@ class StoredOrderNoteModal(discord.ui.Modal, title="修改存單備註"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以修改存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞乩耨?孵??柴?, ephemeral=True)
             return
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -5158,17 +5158,17 @@ class StoredOrderNoteModal(discord.ui.Modal, title="修改存單備註"):
 
         await send_order_log(
             interaction.guild,
-            title="修改存單備註",
+            title="靽格摮?酉",
             fields=[
-                ("票口 ID", str(self.order_channel_id), True),
-                ("操作人員", interaction.user.mention, True),
-                ("存單原因", self.reason.value.strip(), False),
-                ("預計恢復", self.expected_time.value.strip() or "未填寫", True),
-                ("備註", self.note.value.strip() or "未填寫", False),
+                ("蟡典 ID", str(self.order_channel_id), True),
+                ("??鈭箏", interaction.user.mention, True),
+                ("摮??", self.reason.value.strip(), False),
+                ("???Ｗ儔", self.expected_time.value.strip() or "?芸‵撖?, True),
+                ("?酉", self.note.value.strip() or "?芸‵撖?, False),
             ],
             color=discord.Color.gold(),
         )
-        await interaction.followup.send("已更新存單備註。", ephemeral=True)
+        await interaction.followup.send("撌脫?啣??桀?閮颯?, ephemeral=True)
 
 
 class StoredOrderSelect(discord.ui.Select):
@@ -5185,13 +5185,13 @@ class StoredOrderSelect(discord.ui.Select):
             )
 
         if not options:
-            options = [discord.SelectOption(label="目前沒有存單", value="none", description="沒有可管理的存單")]
+            options = [discord.SelectOption(label="?桀?瘝?摮", value="none", description="瘝??舐恣??摮")]
             disabled = True
         else:
             disabled = False
 
         super().__init__(
-            placeholder="選擇要管理的存單",
+            placeholder="?豢?閬恣??摮",
             min_values=1,
             max_values=1,
             options=options,
@@ -5202,7 +5202,7 @@ class StoredOrderSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以管理存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞亦恣???柴?, ephemeral=True)
             return
         if self.values[0] == "none":
             await interaction.response.defer()
@@ -5210,7 +5210,7 @@ class StoredOrderSelect(discord.ui.Select):
 
         view = self.view
         if not isinstance(view, StoredOrderManageView):
-            await interaction.response.send_message("存單面板狀態異常，請重新使用 /stored_orders。", ephemeral=True)
+            await interaction.response.send_message("摮?Ｘ??撣賂?隢??唬蝙??/stored_orders??, ephemeral=True)
             return
 
         view.selected_channel_id = int(self.values[0])
@@ -5224,13 +5224,13 @@ class StoredOrderCancelConfirmView(discord.ui.View):
         super().__init__(timeout=60)
         self.order_channel_id = order_channel_id
 
-    @discord.ui.button(label="確認取消存單", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="蝣箄???摮", style=discord.ButtonStyle.danger)
     async def confirm_cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以取消存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞亙?瘨??柴?, ephemeral=True)
             return
         if interaction.guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
 
         channel = interaction.guild.get_channel(self.order_channel_id)
@@ -5241,7 +5241,7 @@ class StoredOrderCancelConfirmView(discord.ui.View):
         if isinstance(channel, discord.TextChannel):
             try:
                 await channel.send(
-                    f"此存單已由 {interaction.user.mention} 取消，票口將在 3 秒後關閉。",
+                    f"甇文??桀歇??{interaction.user.mention} ??嚗巨?????3 蝘?????,
                     allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
                 )
                 await asyncio.sleep(3)
@@ -5251,18 +5251,18 @@ class StoredOrderCancelConfirmView(discord.ui.View):
 
         await send_order_log(
             interaction.guild,
-            title="存單已取消",
+            title="摮撌脣?瘨?,
             fields=[
-                ("票口 ID", str(self.order_channel_id), True),
-                ("操作人員", interaction.user.mention, True),
+                ("蟡典 ID", str(self.order_channel_id), True),
+                ("??鈭箏", interaction.user.mention, True),
             ],
             color=discord.Color.red(),
         )
-        await interaction.followup.send("已取消存單，並嘗試刪除票口與派單面板。", ephemeral=True)
+        await interaction.followup.send("撌脣?瘨??殷?銝血?閰血?斤巨???瘣曉?Ｘ??, ephemeral=True)
 
-    @discord.ui.button(label="保留存單", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="靽?摮", style=discord.ButtonStyle.secondary)
     async def keep_stored(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="已保留存單。", view=None)
+        await interaction.response.edit_message(content="撌脖????柴?, view=None)
 
 
 class StoredOrderManageView(discord.ui.View):
@@ -5307,22 +5307,22 @@ class StoredOrderManageView(discord.ui.View):
 
 class StoredOrderResumeButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="恢復訂單", style=discord.ButtonStyle.success, custom_id="stored_order_resume_button", row=1)
+        super().__init__(label="?Ｗ儔閮", style=discord.ButtonStyle.success, custom_id="stored_order_resume_button", row=1)
 
     async def callback(self, interaction: discord.Interaction):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以恢復存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞交敺拙??柴?, ephemeral=True)
             return
         view = self.view
         if not isinstance(view, StoredOrderManageView) or view.selected_channel_id is None:
-            await interaction.response.send_message("請先選擇要恢復的存單。", ephemeral=True)
+            await interaction.response.send_message("隢??豢?閬敺拍?摮??, ephemeral=True)
             return
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await interaction.response.send_message("???賢?賢隡箸??典雿輻??, ephemeral=True)
             return
         order_channel = interaction.guild.get_channel(view.selected_channel_id)
         if not isinstance(order_channel, discord.TextChannel):
-            await interaction.response.send_message("找不到這筆存單的票口，無法恢復。", ephemeral=True)
+            await interaction.response.send_message("?曆??圈?摮?巨????⊥??Ｗ儔??, ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -5333,47 +5333,47 @@ class StoredOrderResumeButton(discord.ui.Button):
             return
 
         await order_channel.send(
-            f"此訂單已由 {interaction.user.mention} 恢復，派單頻道接單面板已重新開放。",
+            f"甇方??桀歇??{interaction.user.mention} ?Ｗ儔嚗晷?桅??桅?踹歇????,
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
         await send_order_log(
             interaction.guild,
-            title="存單已恢復",
-            fields=[("票口", order_channel.mention, True), ("操作人員", interaction.user.mention, True)],
+            title="摮撌脫敺?,
+            fields=[("蟡典", order_channel.mention, True), ("??鈭箏", interaction.user.mention, True)],
             color=discord.Color.green(),
         )
-        await interaction.followup.send("已恢復存單。", ephemeral=True)
+        await interaction.followup.send("撌脫敺拙??柴?, ephemeral=True)
 
 
 class StoredOrderEditNoteButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="修改備註", style=discord.ButtonStyle.primary, custom_id="stored_order_edit_note_button", row=1)
+        super().__init__(label="靽格?酉", style=discord.ButtonStyle.primary, custom_id="stored_order_edit_note_button", row=1)
 
     async def callback(self, interaction: discord.Interaction):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以修改存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞乩耨?孵??柴?, ephemeral=True)
             return
         view = self.view
         if not isinstance(view, StoredOrderManageView) or view.selected_channel_id is None:
-            await interaction.response.send_message("請先選擇要修改的存單。", ephemeral=True)
+            await interaction.response.send_message("隢??豢?閬耨?寧?摮??, ephemeral=True)
             return
         await interaction.response.send_modal(StoredOrderNoteModal(view.selected_channel_id, view))
 
 
 class StoredOrderCancelButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="取消存單", style=discord.ButtonStyle.danger, custom_id="stored_order_cancel_button", row=1)
+        super().__init__(label="??摮", style=discord.ButtonStyle.danger, custom_id="stored_order_cancel_button", row=1)
 
     async def callback(self, interaction: discord.Interaction):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以取消存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞亙?瘨??柴?, ephemeral=True)
             return
         view = self.view
         if not isinstance(view, StoredOrderManageView) or view.selected_channel_id is None:
-            await interaction.response.send_message("請先選擇要取消的存單。", ephemeral=True)
+            await interaction.response.send_message("隢??豢?閬?瘨?摮??, ephemeral=True)
             return
         await interaction.response.send_message(
-            "確定要取消這筆存單嗎？這會嘗試刪除派單面板與票口，且不會列入已結營收。",
+            "蝣箏?閬?瘨?摮?????岫?芷瘣曉?Ｘ?巨???銝????亙歇蝯??嗚?,
             view=StoredOrderCancelConfirmView(view.selected_channel_id),
             ephemeral=True,
         )
@@ -5381,28 +5381,28 @@ class StoredOrderCancelButton(discord.ui.Button):
 
 class StoredOrderRefreshButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="重新整理", style=discord.ButtonStyle.secondary, custom_id="stored_order_refresh_button", row=1)
+        super().__init__(label="??渡?", style=discord.ButtonStyle.secondary, custom_id="stored_order_refresh_button", row=1)
 
     async def callback(self, interaction: discord.Interaction):
         if not _require_customer_staff_or_manager(interaction):
-            await interaction.response.send_message("只有客服、店長或管理員可以管理存單。", ephemeral=True)
+            await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞亦恣???柴?, ephemeral=True)
             return
         view = self.view
         if not isinstance(view, StoredOrderManageView):
-            await interaction.response.send_message("存單面板狀態異常，請重新使用 /stored_orders。", ephemeral=True)
+            await interaction.response.send_message("摮?Ｘ??撣賂?隢??唬蝙??/stored_orders??, ephemeral=True)
             return
         await view.refresh_message(interaction)
 
 
 @bot.tree.command(
     name="stored_orders",
-    description="客服查看與管理目前所有存單",
+    description="摰Ｘ??亦??恣???????,
     guild=discord.Object(id=GUILD_ID)
 )
-@app_commands.describe(limit="最多顯示幾筆存單，預設 25，最多 25")
+@app_commands.describe(limit="?憭＊蝷箏嗾蝑??殷??身 25嚗?憭?25")
 async def stored_orders(interaction: discord.Interaction, limit: int = 25):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以查看存單。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞交???柴?, ephemeral=True)
         return
 
     safe_limit = max(1, min(int(limit or 25), 25))
@@ -5419,30 +5419,30 @@ async def stored_orders(interaction: discord.Interaction, limit: int = 25):
 
 @bot.tree.command(
     name="check_stored_orders",
-    description="客服手動檢查是否有超過 3/7 天的存單提醒",
+    description="摰Ｘ???瑼Ｘ?臬????3/7 憭拍?摮??",
     guild=discord.Object(id=GUILD_ID)
 )
 async def check_stored_orders(interaction: discord.Interaction):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以檢查存單提醒。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ????瑟?蝞∠??∪隞交炎?亙??格???, ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
     await check_stored_order_reminders_once(interaction.guild)
-    await interaction.followup.send("已檢查存單提醒，若有逾期存單會發到機器人日誌。", ephemeral=True)
+    await interaction.followup.send("撌脫炎?亙??格????交??暹?摮??唳??其犖?亥???, ephemeral=True)
 
 
-# 顧客備註 slash 指令已搬到 cogs/customer_commands.py
+# 憿批恥?酉 slash ?誘撌脫??cogs/customer_commands.py
 
 
 @bot.tree.command(
     name="delete_dispatch_panel",
-    description="刪除派單頻道中已取消訂單的接單面板",
+    description="?芷瘣曉?駁?銝剖歇??閮??桅??,
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(
-    message_id="要刪除的派單訊息 ID",
-    channel="派單訊息所在頻道；不填則使用目前頻道"
+    message_id="閬?斤?瘣曉閮 ID",
+    channel="瘣曉閮??券??銝‵?蝙?函???
 )
 async def delete_dispatch_panel(
     interaction: discord.Interaction,
@@ -5450,44 +5450,44 @@ async def delete_dispatch_panel(
     channel: discord.TextChannel | None = None,
 ):
     if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        await interaction.response.send_message("?⊥?蝣箄?雿?頨怠?蝯?, ephemeral=True)
         return
 
     if not is_customer_staff(interaction.user) and not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("只有客服或管理員可以刪除派單面板。", ephemeral=True)
+        await interaction.response.send_message("?芣?摰Ｘ??恣??臭誑?芷瘣曉?Ｘ??, ephemeral=True)
         return
 
     target_channel = channel or interaction.channel
 
     if not isinstance(target_channel, discord.TextChannel):
-        await interaction.response.send_message("請在文字頻道使用，或指定派單訊息所在頻道。", ephemeral=True)
+        await interaction.response.send_message("隢???駁?雿輻嚗???瘣曉閮??券??, ephemeral=True)
         return
 
     try:
         target_message_id = int(message_id.strip())
     except ValueError:
-        await interaction.response.send_message("訊息 ID 格式錯誤，請貼純數字訊息 ID。", ephemeral=True)
+        await interaction.response.send_message("閮 ID ?澆??航炊嚗?鞎潛??詨?閮 ID??, ephemeral=True)
         return
 
     try:
         message = await target_channel.fetch_message(target_message_id)
     except discord.NotFound:
-        await interaction.response.send_message("找不到這則派單訊息，可能已經被刪除了。", ephemeral=True)
+        await interaction.response.send_message("?曆??圈?瘣曉閮嚗?賢歇蝬◤?芷鈭?, ephemeral=True)
         return
     except discord.Forbidden:
-        await interaction.response.send_message("Bot 權限不足，無法讀取該頻道訊息。", ephemeral=True)
+        await interaction.response.send_message("Bot 甈?銝雲嚗瘜??府?駁?閮??, ephemeral=True)
         return
     except discord.HTTPException as e:
-        await interaction.response.send_message(f"讀取派單訊息失敗：{e}", ephemeral=True)
+        await interaction.response.send_message(f"霈?晷?株??臬仃??{e}", ephemeral=True)
         return
 
     try:
         await message.delete()
     except discord.Forbidden:
-        await interaction.response.send_message("Bot 權限不足，無法刪除該派單訊息。", ephemeral=True)
+        await interaction.response.send_message("Bot 甈?銝雲嚗瘜?方府瘣曉閮??, ephemeral=True)
         return
     except discord.HTTPException as e:
-        await interaction.response.send_message(f"刪除派單訊息失敗：{e}", ephemeral=True)
+        await interaction.response.send_message(f"?芷瘣曉閮憭望?嚗e}", ephemeral=True)
         return
 
     ORDER_CLAIMS.pop(target_message_id, None)
@@ -5506,18 +5506,18 @@ async def delete_dispatch_panel(
     save_bot_data()
 
     await interaction.response.send_message(
-        f"已刪除派單面板，並清理相關接單暫存資料。關聯訂單：{removed_order_links} 筆。",
+        f"撌脣?斗晷?桅?選?銝行????格摮????航??殷?{removed_order_links} 蝑?,
         ephemeral=True
     )
 
     await send_order_log(
         interaction.guild,
-        "刪除派單面板",
+        "?芷瘣曉?Ｘ",
         (
-            f"操作人員：{interaction.user.mention}\n"
-            f"派單頻道：{target_channel.mention}\n"
-            f"訊息 ID：{target_message_id}\n"
-            f"關聯訂單：{removed_order_links} 筆"
+            f"??鈭箏嚗interaction.user.mention}\n"
+            f"瘣曉?駁?嚗target_channel.mention}\n"
+            f"閮 ID嚗target_message_id}\n"
+            f"?閮嚗removed_order_links} 蝑?
         ),
         color=discord.Color.red()
     )
@@ -5525,7 +5525,7 @@ async def delete_dispatch_panel(
 bot.run(TOKEN)
 
 def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild):
-    """Discord 派單訊息按接單/取消接單後，同步寫回網站資料庫。"""
+    """Discord 瘣曉閮??????亙敺??郊撖怠?蝬脩?鞈?摨怒?""
     try:
         from shared.web_order_sync import sync_dispatch_claims_to_web
 
@@ -5549,5 +5549,6 @@ def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild
             worker_display_names=display_names,
         )
     except Exception as exc:
-        print(f"[web-sync] Discord 接單同步網站失敗 dispatch_message_id={dispatch_message_id}: {exc}")
+        print(f"[web-sync] Discord ?亙?郊蝬脩?憭望? dispatch_message_id={dispatch_message_id}: {exc}")
+
 
