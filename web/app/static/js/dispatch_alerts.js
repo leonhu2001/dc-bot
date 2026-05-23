@@ -1,7 +1,8 @@
 ﻿(function () {
   const REFRESH_INTERVAL_MS = 5000;
   const ENABLED_KEY = "mw_dispatch_alert_enabled";
-  const LAST_KEYS_KEY = "mw_dispatch_last_order_keys";
+  const LAST_KEYS_KEY = "mw_dispatch_state_keys_v1";
+  const LAST_SIGNATURE_KEY = "mw_dispatch_state_signature_v1";
 
   let enabled = localStorage.getItem(ENABLED_KEY) === "1";
   let audioContext = null;
@@ -11,27 +12,37 @@
     return window.location.pathname === "/dispatch";
   }
 
-  function getOrderKeys(doc) {
-    const text = (doc.body && doc.body.innerText) || "";
-    const matches = text.match(/\b(?:MO\d{8,}|WEB-\d+)\b/g) || [];
-    return Array.from(new Set(matches.map(x => x.trim()))).sort();
-  }
-
-  function getStoredKeys() {
+  function readJson(key, fallback) {
     try {
-      return JSON.parse(sessionStorage.getItem(LAST_KEYS_KEY) || "[]");
+      return JSON.parse(sessionStorage.getItem(key) || JSON.stringify(fallback));
     } catch (_) {
-      return [];
+      return fallback;
     }
   }
 
-  function setStoredKeys(keys) {
-    sessionStorage.setItem(LAST_KEYS_KEY, JSON.stringify(keys));
+  function writeJson(key, value) {
+    sessionStorage.setItem(key, JSON.stringify(value));
   }
 
-  function hasNewOrder(oldKeys, newKeys) {
-    const oldSet = new Set(oldKeys);
-    return newKeys.some(key => !oldSet.has(key));
+  function getOldKeys() {
+    return readJson(LAST_KEYS_KEY, []);
+  }
+
+  function setOldKeys(keys) {
+    writeJson(LAST_KEYS_KEY, keys || []);
+  }
+
+  function getOldSignature() {
+    return sessionStorage.getItem(LAST_SIGNATURE_KEY) || "";
+  }
+
+  function setOldSignature(signature) {
+    sessionStorage.setItem(LAST_SIGNATURE_KEY, signature || "");
+  }
+
+  function getAddedKeys(oldKeys, newKeys) {
+    const oldSet = new Set(oldKeys || []);
+    return (newKeys || []).filter(key => !oldSet.has(key));
   }
 
   function getAudioContext() {
@@ -79,6 +90,8 @@
   }
 
   function makeButton() {
+    if (document.querySelector(".dispatch-alert-toggle")) return;
+
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "dispatch-alert-toggle";
@@ -105,43 +118,87 @@
     return ["input", "textarea", "select"].includes(el.tagName.toLowerCase());
   }
 
+  async function fetchState() {
+    const res = await fetch("/dispatch/state?t=" + Date.now(), {
+      cache: "no-store",
+      credentials: "same-origin"
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+
+    if (!data || !data.ok) return null;
+
+    return data;
+  }
+
   async function check() {
     if (checking || !isDispatchPage()) return;
     checking = true;
 
     try {
-      const res = await fetch(window.location.pathname + window.location.search, {
-        cache: "no-store",
-        credentials: "same-origin"
-      });
+      const data = await fetchState();
 
-      if (!res.ok) return;
+      if (!data) return;
 
-      const html = await res.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const newKeys = getOrderKeys(doc);
-      const oldKeys = getStoredKeys();
+      const oldKeys = getOldKeys();
+      const oldSignature = getOldSignature();
 
-      if (oldKeys.length > 0 && hasNewOrder(oldKeys, newKeys)) {
+      const newKeys = data.keys || [];
+      const newSignature = data.signature || "";
+      const addedKeys = getAddedKeys(oldKeys, newKeys);
+
+      if (oldKeys.length === 0 && !oldSignature) {
+        setOldKeys(newKeys);
+        setOldSignature(newSignature);
+        return;
+      }
+
+      if (addedKeys.length > 0) {
         dingDong();
+
+        setOldKeys(newKeys);
+        setOldSignature(newSignature);
 
         if (!skipReload()) {
           setTimeout(() => window.location.reload(), 450);
         }
+
+        return;
       }
 
-      setStoredKeys(newKeys);
+      if (oldSignature && newSignature && oldSignature !== newSignature) {
+        setOldKeys(newKeys);
+        setOldSignature(newSignature);
+
+        if (!skipReload()) {
+          setTimeout(() => window.location.reload(), 450);
+        }
+
+        return;
+      }
+
+      setOldKeys(newKeys);
+      setOldSignature(newSignature);
     } catch (_) {
     } finally {
       checking = false;
     }
   }
 
-  function init() {
+  async function init() {
     if (!isDispatchPage()) return;
 
     makeButton();
-    setStoredKeys(getOrderKeys(document));
+
+    const data = await fetchState();
+
+    if (data) {
+      setOldKeys(data.keys || []);
+      setOldSignature(data.signature || "");
+    }
+
     setInterval(check, REFRESH_INTERVAL_MS);
   }
 

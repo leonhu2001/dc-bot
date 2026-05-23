@@ -90,3 +90,6 @@ async def health():
         "ok": True,
         "service": "mw-worker-dashboard",
     }
+
+from web.app.routers import dispatch_state
+app.include_router(dispatch_state.router)
