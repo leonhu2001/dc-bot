@@ -10,6 +10,9 @@ from web.app.config import config
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
 
+WORKER_ROLE_ID = "1503701170504339458"
+COMPANION_ROLE_ID = "1503706721883783218"
+
 
 def get_staff_display_name(member: WebStaffMember) -> str:
     return str(
@@ -44,7 +47,6 @@ def list_worker_members(db: Session) -> list[WebStaffMember]:
         select(WebStaffMember)
         .where(WebStaffMember.is_active.is_(True))
         .where(WebStaffMember.is_worker.is_(True))
-        .where(WebStaffMember.is_companion.is_(False))
         .order_by(WebStaffMember.display_name.asc(), WebStaffMember.username.asc())
     )
 
@@ -62,6 +64,24 @@ def list_companion_members(db: Session) -> list[WebStaffMember]:
     return list(db.scalars(statement).all())
 
 
+def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
+    role_set = {str(role_id) for role_id in role_ids}
+
+    customer_service_role_ids = {
+        str(role_id)
+        for role_id in (
+            getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
+            or getattr(config, "ADMIN_ROLE_IDS", set())
+        )
+    }
+
+    is_customer_service = bool(role_set & customer_service_role_ids)
+    is_worker = WORKER_ROLE_ID in role_set
+    is_companion = COMPANION_ROLE_ID in role_set
+
+    return is_customer_service, is_worker, is_companion
+
+
 def upsert_staff_member(
     db: Session,
     *,
@@ -71,14 +91,13 @@ def upsert_staff_member(
     global_name: str | None,
     avatar: str | None,
     role_ids: list[str],
-    is_customer_service: bool,
-    is_worker: bool,
-    is_companion: bool,
     synced_at: datetime | None = None,
 ) -> WebStaffMember:
     synced_at = synced_at or datetime.utcnow()
     discord_id = str(discord_id)
     role_ids = [str(role_id) for role_id in role_ids]
+
+    is_customer_service, is_worker, is_companion = classify_roles(role_ids)
 
     member = db.get(WebStaffMember, discord_id)
 
@@ -94,7 +113,7 @@ def upsert_staff_member(
     member.is_customer_service = bool(is_customer_service)
     member.is_worker = bool(is_worker)
     member.is_companion = bool(is_companion)
-    member.is_active = True
+    member.is_active = bool(is_customer_service or is_worker or is_companion)
     member.last_synced_at = synced_at
 
     return member
@@ -107,13 +126,14 @@ def sync_staff_members_from_discord(db: Session) -> dict:
     if not config.DISCORD_GUILD_ID:
         raise RuntimeError("DISCORD_GUILD_ID is not configured")
 
-    customer_service_role_ids = {str(role_id) for role_id in config.ADMIN_ROLE_IDS}
-    worker_role_ids = {str(role_id) for role_id in config.WORKER_ROLE_IDS}
-    companion_role_ids = {str(role_id) for role_id in config.COMPANION_ROLE_IDS}
-
-    # 陪玩不要混進打手。即使 .env 的 WORKER_ROLE_IDS 不小心包含陪玩身分組，這裡也會自動排除。
-    pure_worker_role_ids = worker_role_ids - companion_role_ids
-    all_target_role_ids = customer_service_role_ids | pure_worker_role_ids | companion_role_ids
+    customer_service_role_ids = {
+        str(role_id)
+        for role_id in (
+            getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
+            or getattr(config, "ADMIN_ROLE_IDS", set())
+        )
+    }
+    all_target_role_ids = customer_service_role_ids | {WORKER_ROLE_ID, COMPANION_ROLE_ID}
 
     synced_at = datetime.utcnow()
     after = "0"
@@ -151,10 +171,6 @@ def sync_staff_members_from_discord(db: Session) -> dict:
             if not (role_set & all_target_role_ids):
                 continue
 
-            is_customer_service = bool(role_set & customer_service_role_ids)
-            is_companion = bool(role_set & companion_role_ids)
-            is_worker = bool(role_set & pure_worker_role_ids)
-
             display_name = (
                 member_data.get("nick")
                 or user_data.get("global_name")
@@ -170,9 +186,6 @@ def sync_staff_members_from_discord(db: Session) -> dict:
                 global_name=user_data.get("global_name"),
                 avatar=user_data.get("avatar"),
                 role_ids=role_ids,
-                is_customer_service=is_customer_service,
-                is_worker=is_worker,
-                is_companion=is_companion,
                 synced_at=synced_at,
             )
 
