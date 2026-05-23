@@ -53,7 +53,7 @@
                                 <p class="order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
                                 <h3>{{ order.category }}｜{{ order.item }}</h3>
                             </div>
-                            <span class="badge">{{ order.status }}</span>
+                            <span class="badge">{{ {'stored': '存單', 'closed': '結單', 'active': '可接單'}.get(order.status, order.status) }}</span>
                         </div>
 
                         <div class="order-meta compact-meta">
