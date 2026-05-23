@@ -364,17 +364,18 @@ class ReviewModal(discord.ui.Modal, title="留下好評"):
         )
 
 
-class LeaveReviewButton(discord.ui.Button):
+class ReviewButtonView(discord.ui.View):
     def __init__(self, customer_id: int):
-        super().__init__(
-            label="留下好評",
-            style=discord.ButtonStyle.success,
-            custom_id="review_leave_button",
-            row=0,
-        )
+        super().__init__(timeout=86400)
         self.customer_id = customer_id
 
-    async def callback(self, interaction: discord.Interaction):
+    @discord.ui.button(
+        label="留下好評",
+        style=discord.ButtonStyle.success,
+        custom_id="review_leave_button",
+        row=0,
+    )
+    async def leave_review(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.customer_id:
             await interaction.response.send_message("只有這張票口的點單顧客可以留下評論。", ephemeral=True)
             return
@@ -383,18 +384,13 @@ class LeaveReviewButton(discord.ui.Button):
             ReviewModal(customer_id=self.customer_id)
         )
 
-
-class SkipReviewCloseTicketButton(discord.ui.Button):
-    def __init__(self, customer_id: int):
-        super().__init__(
-            label="不寄送好評",
-            style=discord.ButtonStyle.danger,
-            custom_id="review_skip_close_ticket_button",
-            row=1,
-        )
-        self.customer_id = customer_id
-
-    async def callback(self, interaction: discord.Interaction):
+    @discord.ui.button(
+        label="不寄送好評",
+        style=discord.ButtonStyle.danger,
+        custom_id="review_skip_close_ticket_button",
+        row=1,
+    )
+    async def close_without_review(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.customer_id:
             await interaction.response.send_message("只有這張票口的點單顧客可以關閉票口。", ephemeral=True)
             return
@@ -405,15 +401,13 @@ class SkipReviewCloseTicketButton(discord.ui.Button):
             await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
             return
 
-        view = self.view
-        if isinstance(view, discord.ui.View):
-            for child in view.children:
-                child.disabled = True
+        for child in self.children:
+            child.disabled = True
 
-            try:
-                await interaction.message.edit(view=view)
-            except discord.HTTPException:
-                pass
+        try:
+            await interaction.message.edit(view=self)
+        except discord.HTTPException:
+            pass
 
         await interaction.response.send_message(
             "已選擇不寄送好評，票口將在 3 秒後關閉。",
@@ -430,9 +424,3 @@ class SkipReviewCloseTicketButton(discord.ui.Button):
         await channel.delete(reason=f"Review skipped by {interaction.user}")
 
 
-class ReviewButtonView(discord.ui.View):
-    def __init__(self, customer_id: int):
-        super().__init__(timeout=86400)
-        self.customer_id = customer_id
-        self.add_item(LeaveReviewButton(customer_id))
-        self.add_item(SkipReviewCloseTicketButton(customer_id))
