@@ -4,161 +4,137 @@
 
 {% block content %}
 <style>
-    .summary-filter-form {
-        display: grid;
-        grid-template-columns: 180px 180px 1fr auto auto;
-        gap: 10px;
-        align-items: end;
-    }
-
-    .summary-filter-form label {
-        display: grid;
-        gap: 6px;
-    }
-
-    .summary-stat-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-    }
-
-    .summary-stat-card,
-    .summary-person-card {
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        background: rgba(15, 23, 42, 0.48);
-        border-radius: 16px;
-    }
-
-    .summary-stat-card {
-        padding: 16px;
-    }
-
-    .summary-stat-card span,
-    .summary-id,
-    .summary-role,
-    .summary-money-box span {
-        color: #9ca3af;
-        font-size: 13px;
-    }
-
-    .summary-stat-card strong {
-        display: block;
-        margin-top: 6px;
-        font-size: 28px;
-    }
-
-    .summary-person-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .summary-person-card {
-        overflow: hidden;
-    }
-
-    .summary-person-card summary {
-        cursor: pointer;
-        list-style: none;
-    }
-
-    .summary-person-card summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .summary-person-head {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 16px;
-        padding: 16px;
-        align-items: center;
-    }
-
-    .summary-person-main {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        min-width: 0;
-    }
-
-    .summary-avatar {
-        width: 44px;
-        height: 44px;
-        border-radius: 999px;
-        display: grid;
-        place-items: center;
-        background: rgba(99, 102, 241, 0.22);
-        border: 1px solid rgba(129, 140, 248, 0.4);
-        font-weight: 800;
-    }
-
-    .summary-name {
-        margin: 0;
-        font-size: 18px;
-    }
-
-    .summary-id {
-        margin: 4px 0 0;
-        word-break: break-all;
-    }
-
-    .summary-person-money {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-    }
-
-    .summary-money-box {
-        min-width: 100px;
-        border-radius: 12px;
-        background: rgba(2, 6, 23, 0.45);
-        padding: 10px 12px;
-        text-align: right;
-    }
-
-    .summary-money-box strong {
-        display: block;
-        margin-top: 3px;
-        font-size: 20px;
-    }
-
-    .summary-detail {
-        border-top: 1px solid rgba(148, 163, 184, 0.18);
-        padding: 0 16px 16px;
-    }
-
+.summary-filter-form {
+    display: grid;
+    grid-template-columns: 180px 180px 1fr auto auto;
+    gap: 10px;
+    align-items: end;
+}
+.summary-filter-form label {
+    display: grid;
+    gap: 6px;
+}
+.summary-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+.summary-stat-card,
+.summary-person-card {
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(15, 23, 42, 0.48);
+    border-radius: 16px;
+}
+.summary-stat-card {
+    padding: 16px;
+}
+.summary-stat-card span,
+.summary-id,
+.summary-role,
+.summary-money-box span {
+    color: #9ca3af;
+    font-size: 13px;
+}
+.summary-stat-card strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 28px;
+}
+.summary-person-list {
+    display: grid;
+    gap: 12px;
+}
+.summary-person-card {
+    overflow: hidden;
+}
+.summary-person-card summary {
+    cursor: pointer;
+    list-style: none;
+}
+.summary-person-card summary::-webkit-details-marker {
+    display: none;
+}
+.summary-person-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    padding: 16px;
+    align-items: center;
+}
+.summary-person-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.summary-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: rgba(99, 102, 241, 0.22);
+    border: 1px solid rgba(129, 140, 248, 0.4);
+    font-weight: 800;
+}
+.summary-name {
+    margin: 0;
+    font-size: 18px;
+}
+.summary-id {
+    margin: 4px 0 0;
+    word-break: break-all;
+}
+.summary-person-money {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.summary-money-box {
+    min-width: 100px;
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.45);
+    padding: 10px 12px;
+    text-align: right;
+}
+.summary-money-box strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 20px;
+}
+.summary-detail {
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    padding: 0 16px 16px;
+}
+.summary-order-row {
+    display: grid;
+    grid-template-columns: 150px 1fr 80px 100px;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    align-items: center;
+}
+.summary-order-head {
+    color: #9ca3af;
+    font-size: 13px;
+    font-weight: 700;
+}
+.summary-amount {
+    text-align: right;
+    font-weight: 800;
+}
+@media (max-width: 900px) {
+    .summary-filter-form,
+    .summary-stat-grid,
+    .summary-person-head,
     .summary-order-row {
-        display: grid;
-        grid-template-columns: 150px 1fr 80px 100px;
-        gap: 10px;
-        padding: 10px 0;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-        align-items: center;
+        grid-template-columns: 1fr;
     }
-
-    .summary-order-head {
-        color: #9ca3af;
-        font-size: 13px;
-        font-weight: 700;
+    .summary-amount,
+    .summary-money-box {
+        text-align: left;
     }
-
-    .summary-amount {
-        text-align: right;
-        font-weight: 800;
-    }
-
-    @media (max-width: 900px) {
-        .summary-filter-form,
-        .summary-stat-grid,
-        .summary-person-head,
-        .summary-order-row {
-            grid-template-columns: 1fr;
-        }
-
-        .summary-amount,
-        .summary-money-box {
-            text-align: left;
-        }
-    }
+}
 </style>
 
 <section class="panel">
@@ -169,7 +145,7 @@
             <p class="muted-text">只顯示未支付分潤，只統計已結單訂單。同一 Discord ID 會合併成一張卡。</p>
         </div>
 
-        <div class="summary-actions">
+        <div>
             <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
             <a class="button secondary" href="/admin">回總控</a>
         </div>
