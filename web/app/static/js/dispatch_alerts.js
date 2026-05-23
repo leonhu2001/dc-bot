@@ -1,48 +1,13 @@
-﻿(function () {
+(function () {
   const REFRESH_INTERVAL_MS = 5000;
-  const ENABLED_KEY = "mw_dispatch_alert_enabled";
-  const LAST_KEYS_KEY = "mw_dispatch_state_keys_v1";
-  const LAST_SIGNATURE_KEY = "mw_dispatch_state_signature_v1";
-
-  let enabled = localStorage.getItem(ENABLED_KEY) === "1";
-  let audioContext = null;
+  const ENABLED_KEY = 'mw_dispatch_alert_enabled';
+  let enabled = localStorage.getItem(ENABLED_KEY) === '1';
   let checking = false;
+  let audioContext = null;
+  let lastCount = null;
 
   function isDispatchPage() {
-    return window.location.pathname === "/dispatch";
-  }
-
-  function readJson(key, fallback) {
-    try {
-      return JSON.parse(sessionStorage.getItem(key) || JSON.stringify(fallback));
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  function writeJson(key, value) {
-    sessionStorage.setItem(key, JSON.stringify(value));
-  }
-
-  function getOldKeys() {
-    return readJson(LAST_KEYS_KEY, []);
-  }
-
-  function setOldKeys(keys) {
-    writeJson(LAST_KEYS_KEY, keys || []);
-  }
-
-  function getOldSignature() {
-    return sessionStorage.getItem(LAST_SIGNATURE_KEY) || "";
-  }
-
-  function setOldSignature(signature) {
-    sessionStorage.setItem(LAST_SIGNATURE_KEY, signature || "");
-  }
-
-  function getAddedKeys(oldKeys, newKeys) {
-    const oldSet = new Set(oldKeys || []);
-    return (newKeys || []).filter(key => !oldSet.has(key));
+    return window.location.pathname === '/dispatch';
   }
 
   function getAudioContext() {
@@ -53,7 +18,7 @@
       audioContext = new AudioClass();
     }
 
-    if (audioContext.state === "suspended") {
+    if (audioContext.state === 'suspended') {
       audioContext.resume().catch(() => {});
     }
 
@@ -64,7 +29,7 @@
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    osc.type = "sine";
+    osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, start);
 
     gain.gain.setValueAtTime(0.0001, start);
@@ -85,43 +50,37 @@
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    tone(ctx, 880, now, 0.22, 0.18);
+    tone(ctx, 880, now, 0.2, 0.18);
     tone(ctx, 660, now + 0.18, 0.28, 0.16);
   }
 
   function makeButton() {
-    if (document.querySelector(".dispatch-alert-toggle")) return;
+    if (document.querySelector('.dispatch-alert-toggle')) return;
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "dispatch-alert-toggle";
-    btn.textContent = enabled ? "🔔 新單提示已開" : "🔕 開啟新單提示";
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dispatch-alert-toggle';
+    btn.textContent = enabled ? '🔔 新單提示已開' : '🔕 開啟新單提示';
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener('click', () => {
       enabled = !enabled;
-      localStorage.setItem(ENABLED_KEY, enabled ? "1" : "0");
+      localStorage.setItem(ENABLED_KEY, enabled ? '1' : '0');
 
       if (enabled) {
         getAudioContext();
         dingDong();
       }
 
-      btn.textContent = enabled ? "🔔 新單提示已開" : "🔕 開啟新單提示";
+      btn.textContent = enabled ? '🔔 新單提示已開' : '🔕 開啟新單提示';
     });
 
     document.body.appendChild(btn);
   }
 
-  function skipReload() {
-    const el = document.activeElement;
-    if (!el) return false;
-    return ["input", "textarea", "select"].includes(el.tagName.toLowerCase());
-  }
-
   async function fetchState() {
-    const res = await fetch("/dispatch/state?t=" + Date.now(), {
-      cache: "no-store",
-      credentials: "same-origin"
+    const res = await fetch('/dispatch/state?t=' + Date.now(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
     });
 
     if (!res.ok) return null;
@@ -133,6 +92,34 @@
     return data;
   }
 
+  function getPageWebKeys() {
+    const text = document.body.innerText || '';
+    const matches = text.match(/WEB-\\d+/g) || [];
+
+    return Array.from(new Set(matches.map((value) => value.replace('WEB-', '')))).sort();
+  }
+
+  function normalizeKeys(keys) {
+    return (keys || []).map(String).sort();
+  }
+
+  function sameKeys(a, b) {
+    if (a.length !== b.length) return false;
+
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+
+    return true;
+  }
+
+  function shouldSkipReload() {
+    const el = document.activeElement;
+    if (!el) return false;
+
+    return ['input', 'textarea', 'select'].includes(el.tagName.toLowerCase());
+  }
+
   async function check() {
     if (checking || !isDispatchPage()) return;
     checking = true;
@@ -142,46 +129,31 @@
 
       if (!data) return;
 
-      const oldKeys = getOldKeys();
-      const oldSignature = getOldSignature();
+      const apiKeys = normalizeKeys(data.keys || []);
+      const pageKeys = getPageWebKeys();
 
-      const newKeys = data.keys || [];
-      const newSignature = data.signature || "";
-      const addedKeys = getAddedKeys(oldKeys, newKeys);
+      console.log('[dispatch-alert] poll', {
+        apiKeys,
+        pageKeys,
+        count: data.count,
+        signature: data.signature
+      });
 
-      if (oldKeys.length === 0 && !oldSignature) {
-        setOldKeys(newKeys);
-        setOldSignature(newSignature);
-        return;
-      }
-
-      if (addedKeys.length > 0) {
+      if (lastCount !== null && Number(data.count || 0) > lastCount) {
         dingDong();
-
-        setOldKeys(newKeys);
-        setOldSignature(newSignature);
-
-        if (!skipReload()) {
-          setTimeout(() => window.location.reload(), 450);
-        }
-
-        return;
       }
 
-      if (oldSignature && newSignature && oldSignature !== newSignature) {
-        setOldKeys(newKeys);
-        setOldSignature(newSignature);
+      lastCount = Number(data.count || 0);
 
-        if (!skipReload()) {
-          setTimeout(() => window.location.reload(), 450);
+      if (!sameKeys(apiKeys, pageKeys)) {
+        console.log('[dispatch-alert] page mismatch, reloading');
+
+        if (!shouldSkipReload()) {
+          window.location.reload();
         }
-
-        return;
       }
-
-      setOldKeys(newKeys);
-      setOldSignature(newSignature);
-    } catch (_) {
+    } catch (err) {
+      console.warn('[dispatch-alert] check failed', err);
     } finally {
       checking = false;
     }
@@ -193,17 +165,18 @@
     makeButton();
 
     const data = await fetchState();
-
     if (data) {
-      setOldKeys(data.keys || []);
-      setOldSignature(data.signature || "");
+      lastCount = Number(data.count || 0);
     }
 
     setInterval(check, REFRESH_INTERVAL_MS);
+    setTimeout(check, 1000);
+
+    console.log('[dispatch-alert] started v4');
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
