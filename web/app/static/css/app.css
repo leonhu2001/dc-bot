@@ -1220,3 +1220,19 @@ p {
     transform: translateY(-1px);
     filter: brightness(1.08);
 }
+
+/* Staff page compact stats */
+@media (min-width: 900px) {
+    .staff-stats,
+    .staff-summary,
+    .staff-summary-grid,
+    .admin-staff-stats,
+    .summary-grid,
+    .stats-grid,
+    .metric-grid,
+    .dashboard-stats {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+    }
+}
