@@ -1199,3 +1199,24 @@ p {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* Dispatch auto-refresh and new-order sound toggle */
+.dispatch-alert-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9999;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 999px;
+    padding: 10px 14px;
+    color: #f8fafc;
+    background: linear-gradient(135deg, #4f46e5, #2563eb);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.35);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.dispatch-alert-toggle:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+}
