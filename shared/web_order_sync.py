@@ -657,3 +657,68 @@ def apply_discord_claim_event_to_web(
     finally:
         db.close()
 
+def delete_web_order_by_ticket_channel(*, ticket_channel_id=None, dispatch_message_id=None) -> bool:
+    """從網站資料庫刪除對應 web_order 與相關分潤/接單資料。
+
+    用於 DC bot /delete_order：
+    - 網站不保留 cancelled/deleted 訂單
+    - 只保留 active / stored / closed
+    """
+    from sqlalchemy import text
+
+    from shared.db import SessionLocal
+
+    ticket_channel_id_text = _to_text_id(ticket_channel_id)
+    dispatch_message_id_text = _to_text_id(dispatch_message_id)
+
+    if not ticket_channel_id_text and not dispatch_message_id_text:
+        return False
+
+    db = SessionLocal()
+
+    try:
+        conditions = []
+        params = {}
+
+        if ticket_channel_id_text:
+            conditions.append("ticket_channel_id = :ticket_channel_id")
+            params["ticket_channel_id"] = ticket_channel_id_text
+
+        if dispatch_message_id_text:
+            conditions.append("dispatch_message_id = :dispatch_message_id")
+            params["dispatch_message_id"] = dispatch_message_id_text
+
+        sql = "SELECT id FROM web_orders WHERE " + " OR ".join(conditions) + " LIMIT 1"
+        row = db.execute(text(sql), params).first()
+
+        if row is None:
+            db.commit()
+            return False
+
+        order_id = int(row[0])
+
+        for table_name in (
+            "worker_payouts",
+            "customer_service_payouts",
+            "order_assignments",
+            "sync_events",
+        ):
+            db.execute(
+                text(f"DELETE FROM {table_name} WHERE order_id = :order_id"),
+                {"order_id": order_id},
+            )
+
+        db.execute(
+            text("DELETE FROM web_orders WHERE id = :order_id"),
+            {"order_id": order_id},
+        )
+
+        db.commit()
+        return True
+
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
