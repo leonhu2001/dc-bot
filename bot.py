@@ -1949,6 +1949,7 @@ class DispatchClaimView(discord.ui.View):
 
         claim_data[claim_type].add(interaction.user.id)
         remember_claim_data(interaction.message.id, claim_data)
+        _sync_dispatch_claims_to_web_from_bot(interaction.message.id, claim_data, interaction.guild)
 
         try:
             sync_web_worker_claim_from_dispatch(
@@ -2001,6 +2002,7 @@ class DispatchClaimView(discord.ui.View):
             return
 
         remember_claim_data(interaction.message.id, claim_data)
+        _sync_dispatch_claims_to_web_from_bot(interaction.message.id, claim_data, interaction.guild)
 
         try:
             sync_web_worker_claim_from_dispatch(
@@ -5059,3 +5061,31 @@ async def delete_dispatch_panel(
     )
 
 bot.run(TOKEN)
+
+def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild):
+    """Discord 派單訊息按接單/取消接單後，同步寫回網站資料庫。"""
+    try:
+        from shared.web_order_sync import sync_dispatch_claims_to_web
+
+        companion_ids = sorted(int(user_id) for user_id in claim_data.get("companion", set()))
+        booster_ids = sorted(int(user_id) for user_id in claim_data.get("booster", set()))
+
+        display_names = {}
+
+        for user_id in companion_ids + booster_ids:
+            member = guild.get_member(user_id) if guild is not None else None
+            display_names[str(user_id)] = (
+                getattr(member, "display_name", None)
+                or getattr(member, "name", None)
+                or str(user_id)
+            )
+
+        sync_dispatch_claims_to_web(
+            dispatch_message_id=dispatch_message_id,
+            companion_ids=companion_ids,
+            booster_ids=booster_ids,
+            worker_display_names=display_names,
+        )
+    except Exception as exc:
+        print(f"[web-sync] Discord 接單同步網站失敗 dispatch_message_id={dispatch_message_id}: {exc}")
+
