@@ -120,12 +120,6 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
     if order is None:
         raise ValueError("找不到這張訂單，無法計算分潤。")
 
-    db.execute(delete(WorkerPayout).where(WorkerPayout.order_id == order_id))
-    db.execute(delete(CustomerServicePayout).where(CustomerServicePayout.order_id == order_id))
-
-    if str(order.status) != "closed":
-        return
-
     assignments = list(
         db.scalars(
             select(OrderAssignment)
