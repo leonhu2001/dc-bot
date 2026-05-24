@@ -611,19 +611,6 @@ async def bulk_update_order_history(request: Request):
 
     # 先按訂單狀態與金額重新計算一次分潤。
     # active / stored 不產生分潤；closed 才會產生。
-    try:
-        from shared.db import SessionLocal
-        from web.app.services.order_service import recalculate_order_payouts
-
-        db = SessionLocal()
-
-        try:
-            for order_id in order_ids:
-                recalculate_order_payouts(db, order_id)
-
-            db.commit()
-        finally:
-            db.close()
     except Exception as exc:
         print(f"[order-history] recalculate payouts failed: {exc}")
 
@@ -640,10 +627,14 @@ async def bulk_update_order_history(request: Request):
                     conn.execute(
                         """
                         UPDATE worker_payouts
-                        SET final_payout = ?
+                        SET
+                            gross_share = ?,
+                            base_payout = ?,
+                            named_bonus_amount = 0,
+                            final_payout = ?
                         WHERE id = ?
                         """,
-                        (amount, payout_id),
+                        (amount, amount, amount, payout_id),
                     )
 
             if key.startswith("cs_payout_"):
