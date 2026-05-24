@@ -1,258 +1,337 @@
+
 {% extends "layout.html" %}
 
 {% block page_title %}人員總表{% endblock %}
 
 {% block content %}
 <style>
-.summary-filter-form {
-    display: grid;
-    grid-template-columns: 180px 180px 1fr auto auto;
-    gap: 10px;
-    align-items: end;
-}
-.summary-filter-form label {
-    display: grid;
-    gap: 6px;
-}
-.summary-stat-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-}
-.summary-stat-card,
-.summary-person-card {
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(15, 23, 42, 0.48);
-    border-radius: 16px;
-}
-.summary-stat-card {
-    padding: 16px;
-}
-.summary-stat-card span,
-.summary-id,
-.summary-role,
-.summary-money-box span {
+.summary-top-note {
     color: #9ca3af;
-    font-size: 13px;
-}
-.summary-stat-card strong {
-    display: block;
     margin-top: 6px;
-    font-size: 28px;
 }
-.summary-person-list {
+
+.summary-list {
     display: grid;
-    gap: 12px;
+    gap: 14px;
 }
+
 .summary-person-card {
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.44);
     overflow: hidden;
 }
-.summary-person-card summary {
-    cursor: pointer;
-    list-style: none;
-}
-.summary-person-card summary::-webkit-details-marker {
-    display: none;
-}
+
 .summary-person-head {
+    padding: 16px;
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 16px;
-    padding: 16px;
     align-items: center;
 }
-.summary-person-main {
+
+.summary-person-title {
     display: flex;
     align-items: center;
     gap: 12px;
     min-width: 0;
 }
+
 .summary-avatar {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     border-radius: 999px;
     display: grid;
     place-items: center;
     background: rgba(99, 102, 241, 0.22);
-    border: 1px solid rgba(129, 140, 248, 0.4);
+    border: 1px solid rgba(129, 140, 248, 0.38);
     font-weight: 800;
 }
+
 .summary-name {
     margin: 0;
     font-size: 18px;
 }
+
 .summary-id {
     margin: 4px 0 0;
+    color: #9ca3af;
+    font-size: 13px;
     word-break: break-all;
 }
-.summary-person-money {
+
+.summary-person-meta {
     display: flex;
     gap: 10px;
-    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
-.summary-money-box {
-    min-width: 100px;
+
+.summary-pill {
     border-radius: 12px;
-    background: rgba(2, 6, 23, 0.45);
-    padding: 10px 12px;
+    background: rgba(2, 6, 23, 0.42);
+    padding: 8px 12px;
+    min-width: 86px;
     text-align: right;
 }
-.summary-money-box strong {
+
+.summary-pill span {
+    display: block;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+.summary-pill strong {
     display: block;
     margin-top: 3px;
-    font-size: 20px;
+    font-size: 18px;
 }
-.summary-detail {
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding: 0 16px 16px;
-}
-.summary-order-row {
-    display: grid;
-    grid-template-columns: 150px 1fr 80px 100px;
+
+.summary-person-actions {
+    display: flex;
     gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-    align-items: center;
+    flex-wrap: wrap;
+    padding: 0 16px 12px;
 }
-.summary-order-head {
-    color: #9ca3af;
+
+.summary-person-actions form {
+    margin: 0;
+}
+
+.summary-person-actions .button {
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 700;
 }
-.summary-amount {
+
+.summary-items {
+    padding: 0 16px 16px;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.summary-table th,
+.summary-table td {
+    padding: 10px 8px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+    text-align: left;
+}
+
+.summary-table th {
+    color: #93c5fd;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.summary-table td:last-child,
+.summary-table th:last-child {
     text-align: right;
+}
+
+.summary-status-paid {
+    color: #86efac;
     font-weight: 800;
 }
-@media (max-width: 900px) {
-    .summary-filter-form,
-    .summary-stat-grid,
-    .summary-person-head,
-    .summary-order-row {
+
+.summary-status-unpaid {
+    color: #67e8f9;
+    font-weight: 800;
+}
+
+.summary-list-title {
+    margin: 18px 0 12px;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.summary-empty {
+    border: 1px dashed rgba(148, 163, 184, 0.28);
+    border-radius: 14px;
+    padding: 18px;
+    color: #9ca3af;
+}
+
+@media (max-width: 800px) {
+    .summary-person-head {
         grid-template-columns: 1fr;
     }
-    .summary-amount,
-    .summary-money-box {
+
+    .summary-person-meta {
+        justify-content: flex-start;
+    }
+
+    .summary-pill {
         text-align: left;
     }
+
+    .summary-table {
+        font-size: 13px;
+    }
 }
+
+.payout-summary-filter {
+    display: grid;
+    grid-template-columns: 180px 180px minmax(260px, 1fr) auto auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.payout-summary-filter .button {
+    min-height: 40px;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .payout-summary-filter {
+        grid-template-columns: 1fr;
+    }
+}
+
 </style>
 
 <section class="panel">
     <div class="section-title-row">
         <div>
-            <p class="order-no">UNPAID SUMMARY</p>
+            <p class="order-no">PAYOUT SUMMARY</p>
             <h2>人員總表</h2>
-            <p class="muted-text">只顯示未支付分潤，只統計已結單訂單。同一 Discord ID 會合併成一張卡。</p>
-        </div>
-
-        <div>
-            <a class="button secondary" href="/admin/payouts/grouped">月結分潤</a>
-            <a class="button secondary" href="/admin">回總控</a>
+            <p class="summary-top-note">依未支付 / 已支付分類顯示，只統計已結單訂單。同一 Discord ID 會合併成一張卡。</p>
         </div>
     </div>
 </section>
 
 <section class="panel">
-    <form method="get" action="/admin/payouts/summary" class="summary-filter-form">
-        <label>
-            <span>月份</span>
-            <input class="input" type="month" name="month" value="{{ month }}">
-        </label>
-
-        <label>
-            <span>身份</span>
-            <select class="input" name="role">
-                <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
-                <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
-                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
-            </select>
-        </label>
-
-        <label>
-            <span>搜尋</span>
-            <input class="input" type="text" name="q" value="{{ q }}" placeholder="名稱或 Discord ID">
-        </label>
-
+    <form method="get" action="/admin/payouts/summary" class="filter-form payout-summary-filter">
+        <input class="input" type="month" name="month" value="{{ month }}">
+        <select class="input" name="role">
+            <option value="all" {% if role == "all" %}selected{% endif %}>全部身份</option>
+            <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
+            <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+        </select>
+        <input class="input" type="text" name="q" placeholder="搜尋名稱或 Discord ID" value="{{ q or '' }}">
         <button class="button" type="submit">套用篩選</button>
-        <a class="button secondary" href="/admin/payouts/summary.csv?month={{ month }}&role={{ role }}&q={{ q }}">匯出 CSV</a>
+        <a class="button secondary" href="/admin/payouts/summary">清除</a>
     </form>
 </section>
 
-<section class="summary-stat-grid">
-    <div class="summary-stat-card">
-        <span>未支付總額</span>
-        <strong>{{ totals.unpaid_total }}T</strong>
-    </div>
+{% macro person_card(row, list_status) %}
+<article class="summary-person-card">
+    <div class="summary-person-head">
+        <div class="summary-person-title">
+            <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
+            <div>
+                <p class="order-no">{{ row.role_label }}</p>
+                <h3 class="summary-name">{{ row.display_name }}</h3>
+                <p class="summary-id">ID：{{ row.discord_id }}</p>
+            </div>
+        </div>
 
-    <div class="summary-stat-card">
-        <span>未支付人數</span>
-        <strong>{{ totals.person_count }}</strong>
-    </div>
-
-    <div class="summary-stat-card">
-        <span>未支付筆數</span>
-        <strong>{{ totals.unpaid_count }}</strong>
-    </div>
-</section>
-
-<section class="panel">
-    <div class="section-title-row">
-        <div>
-            <h2>未支付名單</h2>
-            <p class="muted-text">依未支付金額由高到低排列。點開可以看明細。</p>
+        <div class="summary-person-meta">
+            <div class="summary-pill">
+                <span>{% if list_status == "paid" %}已支付{% else %}未支付{% endif %}</span>
+                <strong>
+                    {% if list_status == "paid" %}
+                        {{ row.paid_total }}T
+                    {% else %}
+                        {{ row.unpaid_total }}T
+                    {% endif %}
+                </strong>
+            </div>
+            <div class="summary-pill">
+                <span>筆數</span>
+                <strong>
+                    {% if list_status == "paid" %}
+                        {{ row.paid_count }}
+                    {% else %}
+                        {{ row.unpaid_count }}
+                    {% endif %}
+                </strong>
+            </div>
         </div>
     </div>
 
-    {% if rows %}
-        <div class="summary-person-list">
-            {% for row in rows %}
-                <details class="summary-person-card" open>
-                    <summary class="summary-person-head">
-                        <div class="summary-person-main">
-                            <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
+    <div class="summary-person-actions">
+        <form method="post" action="/admin/payouts/summary/person-status">
+            <input type="hidden" name="month" value="{{ month }}">
+            <input type="hidden" name="current_role" value="{{ role }}">
+            <input type="hidden" name="person_role" value="{{ row.role }}">
+            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
+            <button class="button" type="submit" name="target_status" value="paid">標記此人已發放</button>
+        </form>
 
-                            <div>
-                                <div class="summary-role">{{ row.role_label }}</div>
-                                <h3 class="summary-name">{{ row.display_name }}</h3>
-                                <p class="summary-id">ID：{{ row.discord_id }}</p>
-                            </div>
-                        </div>
+        <form method="post" action="/admin/payouts/summary/person-status">
+            <input type="hidden" name="month" value="{{ month }}">
+            <input type="hidden" name="current_role" value="{{ role }}">
+            <input type="hidden" name="person_role" value="{{ row.role }}">
+            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
+            <button class="button secondary" type="submit" name="target_status" value="unpaid">改回此人未發放</button>
+        </form>
+    </div>
 
-                        <div class="summary-person-money">
-                            <div class="summary-money-box">
-                                <span>未支付</span>
-                                <strong>{{ row.unpaid_total }}T</strong>
-                            </div>
+    <div class="summary-items">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>訂單</th>
+                    <th>項目</th>
+                    <th>身份</th>
+                    <th>狀態</th>
+                    <th>金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in row["items"] %}
+                    {% if item.payout_status == list_status %}
+                        <tr>
+                            <td>{{ item.order_no }}</td>
+                            <td>{{ item.category }}｜{{ item.item }}</td>
+                            <td>{{ item.role }}</td>
+                            <td>
+                                {% if item.payout_status == "paid" %}
+                                    <span class="summary-status-paid">已支付</span>
+                                {% else %}
+                                    <span class="summary-status-unpaid">未支付</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.amount }}T</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</article>
+{% endmacro %}
 
-                            <div class="summary-money-box">
-                                <span>筆數</span>
-                                <strong>{{ row.unpaid_count }}</strong>
-                            </div>
-                        </div>
-                    </summary>
+<section class="panel payout-summary-list-section">
+    <h2 class="summary-list-title">未支付名單</h2>
 
-                    <div class="summary-detail">
-                        <div class="summary-order-row summary-order-head">
-                            <div>訂單</div>
-                            <div>項目</div>
-                            <div>身份</div>
-                            <div class="summary-amount">金額</div>
-                        </div>
-
-                        {% for item in row.items %}
-                            <div class="summary-order-row">
-                                <div>{{ item.order_no }}</div>
-                                <div>{{ item.category }}｜{{ item.item }}</div>
-                                <div>{{ item.role }}</div>
-                                <div class="summary-amount">{{ item.amount }}T</div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </details>
+    {% if unpaid_rows %}
+        <div class="summary-list">
+            {% for row in unpaid_rows %}
+                {{ person_card(row, "unpaid") }}
             {% endfor %}
         </div>
     {% else %}
-        <div class="empty-state">目前沒有未支付分潤。</div>
+        <div class="summary-empty">目前沒有未支付分潤。</div>
+    {% endif %}
+</section>
+
+<section class="panel payout-summary-list-section">
+    <h2 class="summary-list-title">已支付名單</h2>
+
+    {% if paid_rows %}
+        <div class="summary-list">
+            {% for row in paid_rows %}
+                {{ person_card(row, "paid") }}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="summary-empty">目前沒有已支付分潤。</div>
     {% endif %}
 </section>
 {% endblock %}
