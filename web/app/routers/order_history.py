@@ -453,6 +453,138 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
     return result
 
 
+
+
+
+
+
+
+def build_customer_options_from_db():
+    """從 web_orders 建立老闆下拉選項；同 Discord ID 自動合併名稱，選項只顯示名稱。"""
+    by_key = {}
+
+    conn = sqlite3.connect(history_db_path() if "history_db_path" in globals() else str(Path.cwd() / "web_dashboard.db"))
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                customer_discord_id,
+                customer_display_name
+            FROM web_orders
+            WHERE COALESCE(customer_discord_id, '') <> ''
+               OR COALESCE(customer_display_name, '') <> ''
+            ORDER BY customer_display_name COLLATE NOCASE, customer_discord_id
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    name_by_id = {}
+
+    for row in rows:
+        customer_id = str(row["customer_discord_id"] or "").strip()
+        customer_name = str(row["customer_display_name"] or "").strip()
+
+        if customer_id and customer_name and customer_name != customer_id:
+            name_by_id[customer_id] = customer_name
+
+    for row in rows:
+        customer_id = str(row["customer_discord_id"] or "").strip()
+        customer_name = str(row["customer_display_name"] or "").strip()
+
+        key = customer_id or customer_name
+
+        if not key:
+            continue
+
+        label = name_by_id.get(customer_id) or customer_name or customer_id or "未知老闆"
+
+        if key not in by_key:
+            by_key[key] = {
+                "value": key,
+                "label": label,
+                "customer_id": customer_id,
+            }
+
+    options = list(by_key.values())
+    options.sort(key=lambda item: str(item["label"] or ""))
+
+    return options
+
+
+def filter_orders_by_customer(orders, customer_key: str | None):
+    customer_key = str(customer_key or "").strip()
+
+    if not customer_key:
+        return orders
+
+    return [
+        order
+        for order in orders
+        if str(getattr(order, "customer_discord_id", "") or "").strip() == customer_key
+        or str(getattr(order, "customer_display_name", "") or "").strip() == customer_key
+    ]
+
+
+
+
+
+def ensure_manual_payout_override_table() -> None:
+    conn = sqlite3.connect(history_db_path())
+
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS manual_payout_overrides (
+                order_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                person_id TEXT NOT NULL,
+                amount INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (order_id, kind, person_id)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def history_manual_payout_overrides(order_ids: list[int]) -> dict[str, int]:
+    """只回傳後台手動指定的分潤；沒有紀錄就代表走公式。"""
+    if not order_ids:
+        return {}
+
+    ensure_manual_payout_override_table()
+
+    placeholders = ",".join("?" for _ in order_ids)
+    overrides: dict[str, int] = {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT order_id, kind, person_id, amount
+            FROM manual_payout_overrides
+            WHERE order_id IN ({placeholders})
+              AND amount > 0
+            """,
+            order_ids,
+        ).fetchall()
+
+        for row in rows:
+            key = f"{row['kind']}:{int(row['order_id'])}:{str(row['person_id'])}"
+            overrides[key] = int(row["amount"] or 0)
+    finally:
+        conn.close()
+
+    return overrides
+
+
 def snapshot_payout_status(order_ids: list[int]) -> dict[tuple[str, int, str], tuple[str, str | None]]:
     if not order_ids:
         return {}
@@ -527,30 +659,157 @@ def restore_payout_status(snapshot: dict[tuple[str, int, str], tuple[str, str | 
         conn.close()
 
 
+def recalculate_history_orders(order_ids: list[int]) -> None:
+    """歷史訂單保存後先重算公式，再套用手動覆蓋。"""
+    if not order_ids:
+        return
+
+    try:
+        from shared.db import SessionLocal
+        from shared.models import WebOrder
+        from web.app.services.order_service import recalculate_order_payouts
+
+        db = SessionLocal()
+
+        try:
+            for order_id in order_ids:
+                order = db.get(WebOrder, order_id)
+
+                if order is None:
+                    continue
+
+                if str(order.status) == "closed":
+                    recalculate_order_payouts(db, order_id)
+                else:
+                    conn = sqlite3.connect(history_db_path())
+
+                    try:
+conn.commit()
+                    finally:
+                        conn.close()
+
+            db.commit()
+        finally:
+            db.close()
+    except Exception as exc:
+        print(f"[order-history] recalculate history orders failed: {exc}")
+
+
 def apply_manual_payout_edits(form, order_ids: list[int]) -> None:
-    """有改且不是 0 → 手動實拿；沒動或 0 → 保留系統公式。"""
+    """
+    歷史訂單分潤規則：
+    - 空白 / 0：刪除手動覆蓋，強制重建公式分潤
+    - 非 0：寫入手動覆蓋，最後實拿就是這個數字
+    """
+    ensure_manual_payout_override_table()
+
+    clean_order_ids = [int(order_id) for order_id in order_ids if int(order_id) > 0]
+
+    if not clean_order_ids:
+        return
+
+    # 先記住已發放狀態，避免重建分潤後變回未支付。
+    status_snapshot = snapshot_payout_status(clean_order_ids)
+
     conn = sqlite3.connect(history_db_path())
 
     try:
+        # 先更新 manual_payout_overrides。
         for key, value in form.multi_items():
             if key.startswith("manual_worker_"):
-                parts = key.split("_", 3)
+                raw = key.replace("manual_worker_", "", 1)
 
-                if len(parts) < 4:
+                if "_" not in raw:
                     continue
 
-                raw = parts[3]
-                order_id_text, person_id = raw.split("_", 1) if "_" in raw else ("0", "")
+                order_id_text, person_id = raw.split("_", 1)
                 order_id = history_to_int(order_id_text)
-                new_amount = history_to_int(value)
-                original_amount = history_to_int(form.get(f"original_worker_{order_id}_{person_id}"))
+                person_id = str(person_id or "").strip()
+                amount = history_to_int(value)
 
                 if order_id <= 0 or not person_id:
                     continue
 
-                if new_amount <= 0 or new_amount == original_amount:
+                if amount <= 0:
+                    conn.execute(
+                        """
+                        DELETE FROM manual_payout_overrides
+                        WHERE order_id = ? AND kind = 'worker' AND person_id = ?
+                        """,
+                        (order_id, person_id),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO manual_payout_overrides (order_id, kind, person_id, amount, updated_at)
+                        VALUES (?, 'worker', ?, ?, datetime('now'))
+                        ON CONFLICT(order_id, kind, person_id)
+                        DO UPDATE SET amount = excluded.amount, updated_at = datetime('now')
+                        """,
+                        (order_id, person_id, amount),
+                    )
+
+            elif key.startswith("manual_cs_"):
+                raw = key.replace("manual_cs_", "", 1)
+
+                if "_" not in raw:
                     continue
 
+                order_id_text, person_id = raw.split("_", 1)
+                order_id = history_to_int(order_id_text)
+                person_id = str(person_id or "").strip()
+                amount = history_to_int(value)
+
+                if order_id <= 0 or not person_id:
+                    continue
+
+                if amount <= 0:
+                    conn.execute(
+                        """
+                        DELETE FROM manual_payout_overrides
+                        WHERE order_id = ? AND kind = 'customer_service' AND person_id = ?
+                        """,
+                        (order_id, person_id),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO manual_payout_overrides (order_id, kind, person_id, amount, updated_at)
+                        VALUES (?, 'customer_service', ?, ?, datetime('now'))
+                        ON CONFLICT(order_id, kind, person_id)
+                        DO UPDATE SET amount = excluded.amount, updated_at = datetime('now')
+                        """,
+                        (order_id, person_id, amount),
+                    )
+
+        conn.commit()
+
+        # 重點：先刪掉舊分潤 rows。
+        # 否則舊的手動 final_payout 可能被保留下來，導致填 0 也不回公式。
+        for order_id in clean_order_ids:
+conn.commit()
+    finally:
+        conn.close()
+
+    # 刪完舊分潤後重新跑公式。
+    recalculate_history_orders(clean_order_ids)
+
+    # 回復已發放狀態。
+    restore_payout_status(status_snapshot)
+
+    # 最後再套用目前仍存在的手動覆蓋。
+    overrides = history_manual_payout_overrides(clean_order_ids)
+    conn = sqlite3.connect(history_db_path())
+
+    try:
+        for key, amount in overrides.items():
+            kind, order_id_text, person_id = key.split(":", 2)
+            order_id = history_to_int(order_id_text)
+
+            if order_id <= 0 or amount <= 0 or not person_id:
+                continue
+
+            if kind == "worker":
                 conn.execute(
                     """
                     UPDATE worker_payouts
@@ -561,39 +820,23 @@ def apply_manual_payout_edits(form, order_ids: list[int]) -> None:
                         final_payout = ?
                     WHERE order_id = ? AND worker_discord_id = ?
                     """,
-                    (new_amount, new_amount, new_amount, order_id, person_id),
+                    (amount, amount, amount, order_id, person_id),
                 )
-
-            if key.startswith("manual_cs_"):
-                parts = key.split("_", 3)
-
-                if len(parts) < 4:
-                    continue
-
-                raw = parts[3]
-                order_id_text, person_id = raw.split("_", 1) if "_" in raw else ("0", "")
-                order_id = history_to_int(order_id_text)
-                new_amount = history_to_int(value)
-                original_amount = history_to_int(form.get(f"original_cs_{order_id}_{person_id}"))
-
-                if order_id <= 0 or not person_id:
-                    continue
-
-                if new_amount <= 0 or new_amount == original_amount:
-                    continue
-
+            else:
                 conn.execute(
                     """
                     UPDATE customer_service_payouts
                     SET payout_amount = ?
                     WHERE order_id = ? AND customer_service_discord_id = ?
                     """,
-                    (new_amount, order_id, person_id),
+                    (amount, order_id, person_id),
                 )
 
         conn.commit()
     finally:
         conn.close()
+
+    print(f"[order-history] rebuilt payouts for orders={clean_order_ids}, overrides={len(overrides)}")
 
 
 def build_customer_groups(orders):
@@ -648,6 +891,7 @@ async def admin_order_history(
     keyword: str | None = None,
     message: str | None = None,
     error: str | None = None,
+    customer: str | None = "",
 ):
     user = get_current_user(request)
 
@@ -679,6 +923,9 @@ async def admin_order_history(
 
     try:
         orders = list_history_orders(status_filter=status, keyword=keyword)
+        customer = request.query_params.get("customer", customer or "")
+        customer_options = build_customer_options_from_db()
+        orders = filter_orders_by_customer(orders, customer)
         customer_service_members = list_customer_service_members(db)
         worker_members = list_worker_members(db)
 
@@ -707,9 +954,12 @@ async def admin_order_history(
             "user": user,
             "orders": orders,
             "customer_groups": build_customer_groups(orders),
+            "customer_options": customer_options,
+            "customer": customer or "",
             "history_staff_options": history_staff_options(),
             "assignments_by_order_id": history_assignments_by_order([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
+            "manual_payout_overrides": history_manual_payout_overrides([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "current_status": status,
             "keyword": keyword or "",
@@ -1125,9 +1375,7 @@ async def bulk_update_order_history(request: Request):
                     conn = sqlite3.connect(history_db_path())
 
                     try:
-                        conn.execute("DELETE FROM worker_payouts WHERE order_id = ?", (order_id,))
-                        conn.execute("DELETE FROM customer_service_payouts WHERE order_id = ?", (order_id,))
-                        conn.commit()
+conn.commit()
                     finally:
                         conn.close()
 
