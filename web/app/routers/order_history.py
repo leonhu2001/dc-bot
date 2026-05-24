@@ -795,6 +795,25 @@ conn.commit()
     recalculate_history_orders(clean_order_ids)
 
     # 回復已發放狀態。
+    
+    # 客服選「無」或測試客服時，不計客服分潤
+    conn = sqlite3.connect(history_db_path())
+    try:
+        for order_id in order_ids:
+            cs_id = str(form.get(f"customer_service_{order_id}") or "").strip()
+
+            if not cs_id or cs_id == "demo_customer_service":
+                conn.execute(
+                    """
+                    DELETE FROM customer_service_payouts
+                    WHERE order_id = ?
+                    """,
+                    (order_id,),
+                )
+        conn.commit()
+    finally:
+        conn.close()
+
     restore_payout_status(status_snapshot)
 
     # 最後再套用目前仍存在的手動覆蓋。

@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 try:
@@ -130,7 +130,9 @@ def fetch_rows(month: str | None, role: str | None, q: str | None):
                     w.item
                 FROM worker_payouts p
                 JOIN web_orders w ON w.id = p.order_id
-                WHERE w.status = 'closed'
+                WHERE COALESCE(customer_service_discord_id, '') <> 'demo_customer_service'
+              AND COALESCE(customer_service_display_name, '') <> '測試客服'
+              AND w.status = 'closed'
                   AND p.payout_status = 'unpaid'
                   AND COALESCE(p.final_payout, 0) > 0
                   {month_sql}
@@ -252,3 +254,63 @@ async def admin_payout_summary_csv(request: Request, month: str | None = "", rol
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="payout_unpaid_summary.csv"'},
     )
+
+
+
+@router.get("/admin/month-options")
+async def admin_month_options(request: Request):
+    """回傳有訂單資料的月份，給所有後台月份欄位改成下拉選單。"""
+    user = require_admin(request) if "require_admin" in globals() else require_admin_user(request)
+
+    if not user:
+        return JSONResponse({"ok": False, "months": []}, status_code=403)
+
+    conn = sqlite3.connect(db_path() if "db_path" in globals() else get_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT month_value
+            FROM (
+                SELECT substr(COALESCE(NULLIF(created_at, ''), NULLIF(updated_at, '')), 1, 7) AS month_value
+                FROM web_orders
+
+                UNION
+
+                SELECT substr(COALESCE(NULLIF(updated_at, ''), NULLIF(created_at, '')), 1, 7) AS month_value
+                FROM web_orders
+            )
+            WHERE month_value GLOB '????-??'
+            ORDER BY month_value DESC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    months = []
+
+    for row in rows:
+        value = str(row["month_value"] or "").strip()
+
+        if not value:
+            continue
+
+        try:
+            year, month = value.split("-", 1)
+            label = f"{int(year)}年{int(month)}月"
+        except Exception:
+            label = value
+
+        months.append(
+            {
+                "value": value,
+                "label": label,
+            }
+        )
+
+    return {
+        "ok": True,
+        "months": months,
+    }
+
