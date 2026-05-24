@@ -22,9 +22,9 @@
 
                 {% if user %}
                     <nav class="nav role-nav">
-                        {% if user.is_worker %}
+                        {% if user.is_worker or user.is_companion %}
                             <div class="nav-group">
-                                <span class="nav-label">打手</span>
+                                <span class="nav-label">打手 / 陪玩</span>
                                 <a class="nav-link" href="/dispatch">派單頁</a>
                                 <a class="nav-link" href="/my/payouts">我的分潤</a>
                             </div>
