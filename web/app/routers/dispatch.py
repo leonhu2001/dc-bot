@@ -17,6 +17,42 @@ from web.app.services.order_service import (
 
 router = APIRouter(tags=["dispatch"])
 
+
+def can_use_dispatch_page(user: dict | None) -> bool:
+    """打手 / 陪玩 / 客服 / 總控 都可以使用派單頁。"""
+    if not user:
+        return False
+
+    roles = user.get("roles") or []
+
+    return bool(
+        user.get("is_admin")
+        or user.get("is_worker")
+        or user.get("is_companion")
+        or user.get("is_customer_service")
+        or "admin" in roles
+        or "worker" in roles
+        or "companion" in roles
+        or "customer_service" in roles
+        or "打手" in roles
+        or "陪玩" in roles
+        or "客服" in roles
+    )
+
+
+def get_dispatch_claim_role(user: dict | None) -> str:
+    """決定網站接單時的身份。陪玩優先記陪玩；其他可操作人員預設記打手。"""
+    if not user:
+        return "worker"
+
+    roles = user.get("roles") or []
+
+    if user.get("is_companion") or "companion" in roles or "陪玩" in roles:
+        return "companion"
+
+    return "worker"
+
+
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
