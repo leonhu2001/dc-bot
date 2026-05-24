@@ -240,10 +240,6 @@ def claim_order_for_worker(
     if existing_same_order is not None:
         raise ValueError("你已經接了這張單。")
 
-    active_order_count = get_worker_active_order_count(db, worker_discord_id)
-
-    if active_order_count > 0:
-        raise ValueError("你目前已經有 active 訂單，不能再接新的 active 單。")
 
     assignment = OrderAssignment(
         order_id=order_id,
