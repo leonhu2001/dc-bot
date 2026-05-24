@@ -303,6 +303,123 @@ def build_voice_control_panel_overwrites(
     }
 
 
+
+def is_temp_play_voice_room(channel: discord.abc.GuildChannel | None) -> bool:
+    """判斷頻道是否為 Bot 建立的一般陪玩語音房。"""
+    if not isinstance(channel, discord.VoiceChannel):
+        return False
+
+    panel_data = TEMP_VOICE_CONTROL_PANELS.get(channel.id)
+    if isinstance(panel_data, dict) and panel_data.get("room_type") == "play":
+        return True
+
+    return (
+        channel.category_id == PLAY_VOICE_CATEGORY_ID
+        and channel.name.startswith("🎮┃")
+        and channel.name.endswith("的陪玩頻道")
+        and channel.name != PLAY_VOICE_CREATE_CHANNEL_NAME
+    )
+
+
+def member_has_play_voice_role(member: discord.Member) -> bool:
+    return any(role.id in PLAY_VOICE_ALLOWED_ROLE_IDS for role in member.roles)
+
+
+def _overwrite_has_any_explicit_value(overwrite: discord.PermissionOverwrite) -> bool:
+    values = getattr(overwrite, "_values", None)
+    if isinstance(values, dict):
+        return bool(values)
+
+    # 保底：discord.py 版本差異時，檢查常見欄位是否仍有明確設定。
+    for attr in (
+        "view_channel",
+        "send_messages",
+        "read_message_history",
+        "attach_files",
+        "add_reactions",
+        "connect",
+        "speak",
+        "stream",
+        "use_voice_activation",
+        "move_members",
+        "manage_channels",
+    ):
+        if getattr(overwrite, attr, None) is not None:
+            return True
+    return False
+
+
+async def grant_play_voice_room_chat_access(
+    voice_channel: discord.VoiceChannel | None,
+    member: discord.Member,
+) -> None:
+    """成員進入陪玩語音房時，給他這間語音房內建聊天室的臨時權限。"""
+    if member.bot or not is_temp_play_voice_room(voice_channel):
+        return
+
+    overwrite = voice_channel.overwrites_for(member)
+    overwrite.view_channel = True
+    overwrite.send_messages = True
+    overwrite.read_message_history = True
+    overwrite.attach_files = True
+    overwrite.add_reactions = True
+
+    try:
+        await voice_channel.set_permissions(
+            member,
+            overwrite=overwrite,
+            reason="Grant temporary play voice room chat access",
+        )
+    except discord.Forbidden:
+        print("Bot 權限不足，無法給予陪玩房聊天室臨時權限。")
+    except discord.HTTPException as e:
+        print(f"給予陪玩房聊天室臨時權限失敗：{e}")
+
+
+async def revoke_play_voice_room_chat_access(
+    voice_channel: discord.VoiceChannel | None,
+    member: discord.Member,
+) -> None:
+    """成員離開陪玩語音房時，收回他在該房內建聊天室的臨時個人權限。"""
+    if member.bot or not is_temp_play_voice_room(voice_channel):
+        return
+
+    panel_data = TEMP_VOICE_CONTROL_PANELS.get(voice_channel.id, {})
+    if isinstance(panel_data, dict) and int(panel_data.get("owner_id") or 0) == member.id:
+        return
+
+    if member_has_play_voice_role(member):
+        return
+
+    if member in voice_channel.members:
+        return
+
+    overwrite = voice_channel.overwrites_for(member)
+    overwrite.view_channel = None
+    overwrite.send_messages = None
+    overwrite.read_message_history = None
+    overwrite.attach_files = None
+    overwrite.add_reactions = None
+
+    try:
+        if _overwrite_has_any_explicit_value(overwrite):
+            await voice_channel.set_permissions(
+                member,
+                overwrite=overwrite,
+                reason="Revoke temporary play voice room chat access",
+            )
+        else:
+            await voice_channel.set_permissions(
+                member,
+                overwrite=None,
+                reason="Revoke temporary play voice room chat access",
+            )
+    except discord.Forbidden:
+        print("Bot 權限不足，無法收回陪玩房聊天室臨時權限。")
+    except discord.HTTPException as e:
+        print(f"收回陪玩房聊天室臨時權限失敗：{e}")
+
+
 def safe_voice_control_panel_name(member: discord.Member) -> str:
     display_name = member.display_name.strip() or member.name
     clean = "".join(c if c.isalnum() else "-" for c in display_name.lower())
