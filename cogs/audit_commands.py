@@ -13,6 +13,8 @@ from services.logging_service import send_order_log
 
 
 class AuditCommands(commands.Cog):
+    audit = app_commands.Group(name="audit", description="資料稽核")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -26,8 +28,8 @@ class AuditCommands(commands.Cog):
             or member.guild_permissions.administrator
         )
 
-    @app_commands.command(
-        name="audit_data",
+    @audit.command(
+        name="data",
         description="客服檢查訂單、會員累積、存單與接單面板資料是否異常",
     )
     @app_commands.describe(limit="每一類最多顯示幾筆明細，預設 10，最高 25")

@@ -31,6 +31,8 @@ def _is_admin_member(member: discord.Member) -> bool:
 
 
 class StaffSyncCog(commands.Cog):
+    staff = app_commands.Group(name="staff", description="人員同步")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.sync_staff_members_loop.change_interval(minutes=_get_sync_interval_minutes())
@@ -70,8 +72,8 @@ class StaffSyncCog(commands.Cog):
     async def before_sync_staff_members_loop(self) -> None:
         await self.bot.wait_until_ready()
 
-    @app_commands.command(
-        name="sync_staff_members",
+    @staff.command(
+        name="sync_members",
         description="手動同步網站後台的客服 / 打手 / 陪玩下拉選單名單",
     )
     @app_commands.default_permissions(manage_messages=True)

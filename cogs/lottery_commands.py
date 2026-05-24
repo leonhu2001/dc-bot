@@ -30,6 +30,8 @@ from services.rewards import (
 
 
 class LotteryCommands(commands.Cog):
+    lottery = app_commands.Group(name="lottery", description="魔丸點數抽獎")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -37,16 +39,16 @@ class LotteryCommands(commands.Cog):
         manager_role_id = int(getattr(self.bot, "manager_role_id_value", 0) or 0)
         return is_customer_staff(member) or has_role(member, manager_role_id) or member.guild_permissions.administrator
 
-    @app_commands.command(
-        name="lottery_info",
+    @lottery.command(
+        name="info",
         description="查看目前魔丸點數抽獎活動",
     )
     async def lottery_info(self, interaction: discord.Interaction):
         settings = get_lottery_settings()
         await interaction.response.send_message(embed=build_lottery_info_embed(settings), ephemeral=True)
 
-    @app_commands.command(
-        name="join_lottery",
+    @lottery.command(
+        name="join",
         description="使用魔丸點數參加抽獎，5 點 = 1 次抽獎機會",
     )
     @app_commands.describe(chances="要參加幾次抽獎，每次會消耗 5 點")
@@ -114,8 +116,8 @@ class LotteryCommands(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(
-        name="lottery_status",
+    @lottery.command(
+        name="status",
         description="客服查看目前抽獎池狀態",
     )
     async def lottery_status(self, interaction: discord.Interaction):
@@ -126,8 +128,8 @@ class LotteryCommands(commands.Cog):
         settings = get_lottery_settings()
         await interaction.response.send_message(embed=build_lottery_status_embed(settings), ephemeral=True)
 
-    @app_commands.command(
-        name="lottery_open",
+    @lottery.command(
+        name="open",
         description="管理層設定或開啟本期點數抽獎",
     )
     @app_commands.describe(
@@ -189,8 +191,8 @@ class LotteryCommands(commands.Cog):
         announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
         await interaction.response.send_message(f"抽獎已設定並開放報名，{announce_text}", embed=build_lottery_info_embed(settings), ephemeral=True)
 
-    @app_commands.command(
-        name="lottery_set_prizes",
+    @lottery.command(
+        name="set_prizes",
         description="管理層設定本期抽獎獎池內容",
     )
     @app_commands.describe(
@@ -249,8 +251,8 @@ class LotteryCommands(commands.Cog):
         else:
             await interaction.response.send_message("獎池已設定。", embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name="lottery_close",
+    @lottery.command(
+        name="close",
         description="管理層關閉本期抽獎報名",
     )
     @app_commands.default_permissions(manage_messages=True)
@@ -264,8 +266,8 @@ class LotteryCommands(commands.Cog):
         save_lottery_settings(settings)
         await interaction.response.send_message(f"已關閉 **{settings['period']}** 抽獎報名。", ephemeral=True)
 
-    @app_commands.command(
-        name="draw_lottery",
+    @lottery.command(
+        name="draw",
         description="客服開獎；可依照已設定獎池輸入本次要抽的獎品",
     )
     @app_commands.describe(
@@ -336,8 +338,8 @@ class LotteryCommands(commands.Cog):
         announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
         await interaction.response.send_message(f"開獎完成，{announce_text}", embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name="cancel_lottery_entry",
+    @lottery.command(
+        name="cancel",
         description="客服取消顧客本期抽獎報名並退還點數",
     )
     @app_commands.describe(customer="要取消報名的顧客", reason="取消原因，可不填")
@@ -378,8 +380,8 @@ class LotteryCommands(commands.Cog):
 
         await interaction.response.send_message(message, ephemeral=True)
 
-    @app_commands.command(
-        name="reset_lottery",
+    @lottery.command(
+        name="reset",
         description="清空本期抽獎池，不自動退點。需輸入確認文字",
     )
     @app_commands.describe(confirm_text="請輸入：確認清空", reason="清空原因，可不填")

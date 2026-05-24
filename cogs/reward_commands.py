@@ -21,6 +21,9 @@ from services.rewards import (
 
 
 class RewardCommands(commands.Cog):
+    member = app_commands.Group(name="member", description="會員資料")
+    reward = app_commands.Group(name="reward", description="會員點數與消費管理")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -30,8 +33,8 @@ class RewardCommands(commands.Cog):
     def can_customer_staff(self, member: discord.Member) -> bool:
         return is_customer_staff(member) or has_role(member, self.manager_role_id()) or member.guild_permissions.administrator
 
-    @app_commands.command(
-        name="my_points",
+    @member.command(
+        name="points",
         description="查詢自己的魔丸會員資料",
     )
     async def my_points(self, interaction: discord.Interaction):
@@ -39,7 +42,7 @@ class RewardCommands(commands.Cog):
         embed = build_member_info_embed(interaction.user, data, show_points=True)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
+    @reward.command(
         name="customer_points",
         description="客服查詢指定顧客的魔丸會員資料",
     )
@@ -59,7 +62,7 @@ class RewardCommands(commands.Cog):
         embed.title = "顧客會員資料"
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
+    @reward.command(
         name="adjust_points",
         description="客服調整顧客魔丸點數，可輸入正數加點或負數扣點",
     )
@@ -106,7 +109,7 @@ class RewardCommands(commands.Cog):
 
         await interaction.response.send_message(message, ephemeral=True)
 
-    @app_commands.command(
+    @reward.command(
         name="add_purchase",
         description="客服補登單筆顧客歷史消費",
     )
@@ -163,7 +166,7 @@ class RewardCommands(commands.Cog):
 
         await interaction.response.send_message(message, ephemeral=True)
 
-    @app_commands.command(
+    @reward.command(
         name="import_purchases",
         description="客服批量補登歷史消費，多行格式：顧客ID,金額,日期,備註",
     )
@@ -235,7 +238,7 @@ class RewardCommands(commands.Cog):
 
         await interaction.followup.send(f"{summary}\n\n{detail}", ephemeral=True)
 
-    @app_commands.command(
+    @reward.command(
         name="set_customer_rewards",
         description="管理員手動修正顧客會員資料",
     )

@@ -436,6 +436,10 @@ bot.complaint_panel_channel_id_value = COMPLAINT_PANEL_CHANNEL_ID
 bot.feedback_panel_channel_id_value = FEEDBACK_PANEL_CHANNEL_ID
 bot._extensions_loaded = False
 
+# ========= Slash 指令群組 =========
+order_group = app_commands.Group(name="order", description="訂單管理")
+vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
+
 
 # ========= 工具函式 =========
 
@@ -5539,6 +5543,17 @@ async def delete_dispatch_panel(
         ),
         color=discord.Color.red()
     )
+
+
+# 註冊 bot.py 裡的 top-level slash 指令群組
+try:
+    bot.tree.add_command(order_group)
+except app_commands.CommandAlreadyRegistered:
+    pass
+try:
+    bot.tree.add_command(vip_group)
+except app_commands.CommandAlreadyRegistered:
+    pass
 
 bot.run(TOKEN)
 

@@ -16,6 +16,8 @@ from services.rewards import (
 
 
 class CustomerCommands(commands.Cog):
+    customer = app_commands.Group(name="customer", description="顧客備註管理")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -30,8 +32,8 @@ class CustomerCommands(commands.Cog):
             )
         )
 
-    @app_commands.command(
-        name="add_customer_note",
+    @customer.command(
+        name="add_note",
         description="客服新增顧客備註或黑名單紀錄",
     )
     @app_commands.describe(
@@ -84,8 +86,8 @@ class CustomerCommands(commands.Cog):
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
 
-    @app_commands.command(
-        name="customer_notes",
+    @customer.command(
+        name="notes",
         description="客服查詢顧客備註 / 黑名單紀錄",
     )
     @app_commands.describe(customer="要查詢備註的顧客")
@@ -104,8 +106,8 @@ class CustomerCommands(commands.Cog):
         embed.add_field(name="顧客", value=customer.mention, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name="remove_customer_note",
+    @customer.command(
+        name="remove_note",
         description="客服刪除顧客備註，index 請看 /customer_notes 的編號",
     )
     @app_commands.describe(

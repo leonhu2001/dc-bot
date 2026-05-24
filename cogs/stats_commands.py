@@ -19,6 +19,8 @@ from services.stats import build_sales_stats_embed
 
 
 class StatsCommands(commands.Cog):
+    stats = app_commands.Group(name="stats", description="營運統計")
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -35,8 +37,8 @@ class StatsCommands(commands.Cog):
             or member.guild_permissions.administrator
         )
 
-    @app_commands.command(
-        name="stats_today",
+    @stats.command(
+        name="today",
         description="客服查詢今日營運統計",
     )
     @app_commands.default_permissions(manage_messages=True)
@@ -51,8 +53,8 @@ class StatsCommands(commands.Cog):
         embed = build_sales_stats_embed("今日營運統計", start_dt, end_dt)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name="stats_month",
+    @stats.command(
+        name="month",
         description="客服查詢本月營運統計",
     )
     @app_commands.default_permissions(manage_messages=True)
@@ -70,7 +72,7 @@ class StatsCommands(commands.Cog):
         embed = build_sales_stats_embed("本月營運統計", start_dt, end_dt)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
+    @stats.command(
         name="top_customers",
         description="客服查詢顧客累積消費排行前 10 名",
     )
@@ -119,7 +121,7 @@ class StatsCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
+    @stats.command(
         name="check_vip_downgrades",
         description="管理員手動檢查 VIP 維持條件並執行降階",
     )
