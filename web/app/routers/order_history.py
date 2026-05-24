@@ -61,6 +61,47 @@ def redirect_to_history(**params) -> RedirectResponse:
             status_code=303,
         )
 
+
+    conn = sqlite3.connect(history_db_path())
+
+    try:
+        for key, value in form.multi_items():
+            if key.startswith("worker_payout_"):
+                payout_id = history_to_int(key.replace("worker_payout_", ""), 0)
+                amount = history_to_int(value, 0)
+
+                if payout_id > 0:
+                    conn.execute(
+                        """
+                        UPDATE worker_payouts
+                        SET
+                            gross_share = ?,
+                            base_payout = ?,
+                            named_bonus_amount = 0,
+                            final_payout = ?
+                        WHERE id = ?
+                        """,
+                        (amount, amount, amount, payout_id),
+                    )
+
+            if key.startswith("cs_payout_"):
+                payout_id = history_to_int(key.replace("cs_payout_", ""), 0)
+                amount = history_to_int(value, 0)
+
+                if payout_id > 0:
+                    conn.execute(
+                        """
+                        UPDATE customer_service_payouts
+                        SET payout_amount = ?
+                        WHERE id = ?
+                        """,
+                        (amount, payout_id),
+                    )
+
+        conn.commit()
+    finally:
+        conn.close()
+
     return RedirectResponse(url="/admin/orders/history", status_code=303)
 
 
@@ -100,55 +141,25 @@ def list_history_orders(
 
 
 
-def build_customer_groups(orders):
-    """依老闆 Discord ID 分組；同 ID 有名稱就補給只有 ID 的舊單。"""
-    name_by_customer_id = {}
-
-    for order in orders:
-        customer_id = str(getattr(order, "customer_discord_id", "") or "").strip()
-        customer_name = str(getattr(order, "customer_display_name", "") or "").strip()
-
-        if customer_id and customer_name and customer_name != customer_id:
-            name_by_customer_id[customer_id] = customer_name
-
-    groups_by_key = {}
-
-    for order in orders:
-        customer_id = str(getattr(order, "customer_discord_id", "") or "").strip()
-        raw_name = str(getattr(order, "customer_display_name", "") or "").strip()
-
-        key = customer_id or raw_name or "unknown"
-        display_name = raw_name or name_by_customer_id.get(customer_id) or customer_id or "未知老闆"
-
-        if customer_id and customer_id in name_by_customer_id:
-            display_name = name_by_customer_id[customer_id]
-
-        if key not in groups_by_key:
-            groups_by_key[key] = {
-                "customer_id": customer_id,
-                "customer_name": display_name,
-                "orders": [],
-                "order_count": 0,
-                "total_amount": 0,
-            }
-
-        group = groups_by_key[key]
-        group["orders"].append(order)
-        group["order_count"] += 1
-        group["total_amount"] += int(getattr(order, "amount", 0) or 0)
-
-        if group["customer_name"] == group["customer_id"] and display_name:
-            group["customer_name"] = display_name
-
-    groups = list(groups_by_key.values())
-    groups.sort(key=lambda group: (str(group["customer_name"] or ""), str(group["customer_id"] or "")))
-    return groups
+def history_to_int(value, default: int = 0) -> int:
+    try:
+        return int(str(value or "").strip())
+    except Exception:
+        return default
 
 
+def history_safe_status(value: str | None) -> str:
+    value = str(value or "").strip()
+
+    if value in {"active", "stored", "closed"}:
+        return value
+
+    return "closed"
 
 
-def get_history_db_path() -> str:
+def history_db_path() -> str:
     return str(Path.cwd() / "web_dashboard.db")
+
 
 
 def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
@@ -159,7 +170,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
     placeholders = ",".join("?" for _ in order_ids)
     result: dict[int, list[dict]] = {}
 
-    conn = sqlite3.connect(get_history_db_path())
+    conn = sqlite3.connect(history_db_path())
     conn.row_factory = sqlite3.Row
 
     try:
@@ -230,20 +241,404 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
     return result
 
 
-def to_int(value, default: int = 0) -> int:
+
+def history_to_int(value, default: int = 0) -> int:
     try:
         return int(str(value or "").strip())
     except Exception:
         return default
 
 
-def safe_status(value: str | None) -> str:
-    value = (value or "").strip()
+def history_safe_status(value: str | None) -> str:
+    value = str(value or "").strip()
+    return value if value in {"active", "stored", "closed"} else "closed"
 
-    if value in {"active", "stored", "closed"}:
-        return value
 
-    return "closed"
+def history_db_path() -> str:
+    return str(Path.cwd() / "web_dashboard.db")
+
+
+def history_staff_options() -> dict:
+    """從現有資料整理客服/打手選項。先用已出現過的人員，避免依賴未知 staff table。"""
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    workers = {}
+    customer_services = {}
+
+    try:
+        for row in conn.execute(
+            """
+            SELECT DISTINCT worker_discord_id, worker_display_name, role_type
+            FROM order_assignments
+            WHERE COALESCE(worker_discord_id, '') <> ''
+            ORDER BY worker_display_name, worker_discord_id
+            """
+        ).fetchall():
+            discord_id = str(row["worker_discord_id"] or "").strip()
+            display_name = str(row["worker_display_name"] or "").strip() or discord_id
+            role_type = str(row["role_type"] or "worker").strip() or "worker"
+
+            if discord_id:
+                workers[discord_id] = {
+                    "id": discord_id,
+                    "name": display_name,
+                    "role_type": role_type,
+                }
+
+        for row in conn.execute(
+            """
+            SELECT DISTINCT customer_service_discord_id, customer_service_display_name
+            FROM web_orders
+            WHERE COALESCE(customer_service_discord_id, '') <> ''
+               OR COALESCE(customer_service_display_name, '') <> ''
+            ORDER BY customer_service_display_name, customer_service_discord_id
+            """
+        ).fetchall():
+            discord_id = str(row["customer_service_discord_id"] or "").strip()
+            display_name = str(row["customer_service_display_name"] or "").strip() or discord_id
+
+            if discord_id:
+                customer_services[discord_id] = {
+                    "id": discord_id,
+                    "name": display_name,
+                }
+    finally:
+        conn.close()
+
+    return {
+        "workers": sorted(workers.values(), key=lambda item: item["name"]),
+        "customer_services": sorted(customer_services.values(), key=lambda item: item["name"]),
+    }
+
+
+def history_assignments_by_order(order_ids: list[int]) -> dict[int, list[dict]]:
+    if not order_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in order_ids)
+    result: dict[int, list[dict]] = {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT
+                id,
+                order_id,
+                worker_discord_id,
+                worker_display_name,
+                role_type,
+                has_named_bonus,
+                is_active
+            FROM order_assignments
+            WHERE order_id IN ({placeholders})
+              AND is_active = 1
+            ORDER BY id ASC
+            """,
+            order_ids,
+        ).fetchall()
+
+        for row in rows:
+            order_id = int(row["order_id"])
+            result.setdefault(order_id, []).append(
+                {
+                    "id": int(row["id"]),
+                    "worker_discord_id": str(row["worker_discord_id"] or ""),
+                    "worker_display_name": str(row["worker_display_name"] or row["worker_discord_id"] or ""),
+                    "role_type": str(row["role_type"] or "worker"),
+                    "has_named_bonus": bool(row["has_named_bonus"]),
+                }
+            )
+    finally:
+        conn.close()
+
+    return result
+
+
+def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
+    """分潤輸入用 person key，不用 payout id，因為保存時可能會重算刪掉重建。"""
+    if not order_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in order_ids)
+    result: dict[int, list[dict]] = {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        worker_rows = conn.execute(
+            f"""
+            SELECT
+                order_id,
+                worker_discord_id AS person_id,
+                worker_display_name AS person_name,
+                final_payout AS amount,
+                payout_status,
+                paid_at
+            FROM worker_payouts
+            WHERE order_id IN ({placeholders})
+            ORDER BY id ASC
+            """,
+            order_ids,
+        ).fetchall()
+
+        for row in worker_rows:
+            order_id = int(row["order_id"])
+            person_id = str(row["person_id"] or "").strip()
+
+            if not person_id:
+                continue
+
+            result.setdefault(order_id, []).append(
+                {
+                    "kind": "worker",
+                    "label": "打手",
+                    "person_id": person_id,
+                    "person_name": row["person_name"] or person_id,
+                    "amount": int(row["amount"] or 0),
+                    "payout_status": row["payout_status"],
+                    "paid_at": row["paid_at"],
+                    "input_name": f"manual_worker_{order_id}_{person_id}",
+                    "original_name": f"original_worker_{order_id}_{person_id}",
+                }
+            )
+
+        cs_rows = conn.execute(
+            f"""
+            SELECT
+                order_id,
+                customer_service_discord_id AS person_id,
+                customer_service_display_name AS person_name,
+                payout_amount AS amount,
+                payout_status,
+                paid_at
+            FROM customer_service_payouts
+            WHERE order_id IN ({placeholders})
+            ORDER BY id ASC
+            """,
+            order_ids,
+        ).fetchall()
+
+        for row in cs_rows:
+            order_id = int(row["order_id"])
+            person_id = str(row["person_id"] or "").strip()
+
+            if not person_id:
+                continue
+
+            result.setdefault(order_id, []).append(
+                {
+                    "kind": "customer_service",
+                    "label": "客服",
+                    "person_id": person_id,
+                    "person_name": row["person_name"] or person_id,
+                    "amount": int(row["amount"] or 0),
+                    "payout_status": row["payout_status"],
+                    "paid_at": row["paid_at"],
+                    "input_name": f"manual_cs_{order_id}_{person_id}",
+                    "original_name": f"original_cs_{order_id}_{person_id}",
+                }
+            )
+    finally:
+        conn.close()
+
+    # 客服排上面
+    for order_id, rows in result.items():
+        rows.sort(key=lambda item: 0 if item["kind"] == "customer_service" else 1)
+
+    return result
+
+
+def snapshot_payout_status(order_ids: list[int]) -> dict[tuple[str, int, str], tuple[str, str | None]]:
+    if not order_ids:
+        return {}
+
+    placeholders = ",".join("?" for _ in order_ids)
+    snapshot = {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        for row in conn.execute(
+            f"""
+            SELECT order_id, worker_discord_id AS person_id, payout_status, paid_at
+            FROM worker_payouts
+            WHERE order_id IN ({placeholders})
+            """,
+            order_ids,
+        ).fetchall():
+            snapshot[("worker", int(row["order_id"]), str(row["person_id"]))] = (
+                row["payout_status"],
+                row["paid_at"],
+            )
+
+        for row in conn.execute(
+            f"""
+            SELECT order_id, customer_service_discord_id AS person_id, payout_status, paid_at
+            FROM customer_service_payouts
+            WHERE order_id IN ({placeholders})
+            """,
+            order_ids,
+        ).fetchall():
+            snapshot[("customer_service", int(row["order_id"]), str(row["person_id"]))] = (
+                row["payout_status"],
+                row["paid_at"],
+            )
+    finally:
+        conn.close()
+
+    return snapshot
+
+
+def restore_payout_status(snapshot: dict[tuple[str, int, str], tuple[str, str | None]]) -> None:
+    if not snapshot:
+        return
+
+    conn = sqlite3.connect(history_db_path())
+
+    try:
+        for (kind, order_id, person_id), (status, paid_at) in snapshot.items():
+            if kind == "worker":
+                conn.execute(
+                    """
+                    UPDATE worker_payouts
+                    SET payout_status = ?, paid_at = ?
+                    WHERE order_id = ? AND worker_discord_id = ?
+                    """,
+                    (status, paid_at, order_id, person_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE customer_service_payouts
+                    SET payout_status = ?, paid_at = ?
+                    WHERE order_id = ? AND customer_service_discord_id = ?
+                    """,
+                    (status, paid_at, order_id, person_id),
+                )
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def apply_manual_payout_edits(form, order_ids: list[int]) -> None:
+    """有改且不是 0 → 手動實拿；沒動或 0 → 保留系統公式。"""
+    conn = sqlite3.connect(history_db_path())
+
+    try:
+        for key, value in form.multi_items():
+            if key.startswith("manual_worker_"):
+                parts = key.split("_", 3)
+
+                if len(parts) < 4:
+                    continue
+
+                raw = parts[3]
+                order_id_text, person_id = raw.split("_", 1) if "_" in raw else ("0", "")
+                order_id = history_to_int(order_id_text)
+                new_amount = history_to_int(value)
+                original_amount = history_to_int(form.get(f"original_worker_{order_id}_{person_id}"))
+
+                if order_id <= 0 or not person_id:
+                    continue
+
+                if new_amount <= 0 or new_amount == original_amount:
+                    continue
+
+                conn.execute(
+                    """
+                    UPDATE worker_payouts
+                    SET
+                        gross_share = ?,
+                        base_payout = ?,
+                        named_bonus_amount = 0,
+                        final_payout = ?
+                    WHERE order_id = ? AND worker_discord_id = ?
+                    """,
+                    (new_amount, new_amount, new_amount, order_id, person_id),
+                )
+
+            if key.startswith("manual_cs_"):
+                parts = key.split("_", 3)
+
+                if len(parts) < 4:
+                    continue
+
+                raw = parts[3]
+                order_id_text, person_id = raw.split("_", 1) if "_" in raw else ("0", "")
+                order_id = history_to_int(order_id_text)
+                new_amount = history_to_int(value)
+                original_amount = history_to_int(form.get(f"original_cs_{order_id}_{person_id}"))
+
+                if order_id <= 0 or not person_id:
+                    continue
+
+                if new_amount <= 0 or new_amount == original_amount:
+                    continue
+
+                conn.execute(
+                    """
+                    UPDATE customer_service_payouts
+                    SET payout_amount = ?
+                    WHERE order_id = ? AND customer_service_discord_id = ?
+                    """,
+                    (new_amount, order_id, person_id),
+                )
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def build_customer_groups(orders):
+    """依老闆 Discord ID 分組；同 ID 有名稱就補給只有 ID 的舊單。"""
+    name_by_customer_id = {}
+
+    for order in orders:
+        customer_id = str(getattr(order, "customer_discord_id", "") or "").strip()
+        customer_name = str(getattr(order, "customer_display_name", "") or "").strip()
+
+        if customer_id and customer_name and customer_name != customer_id:
+            name_by_customer_id[customer_id] = customer_name
+
+    groups_by_key = {}
+
+    for order in orders:
+        customer_id = str(getattr(order, "customer_discord_id", "") or "").strip()
+        raw_name = str(getattr(order, "customer_display_name", "") or "").strip()
+
+        key = customer_id or raw_name or "unknown"
+        display_name = raw_name or name_by_customer_id.get(customer_id) or customer_id or "未知老闆"
+
+        if customer_id and customer_id in name_by_customer_id:
+            display_name = name_by_customer_id[customer_id]
+
+        if key not in groups_by_key:
+            groups_by_key[key] = {
+                "customer_id": customer_id,
+                "customer_name": display_name,
+                "orders": [],
+                "order_count": 0,
+                "total_amount": 0,
+            }
+
+        group = groups_by_key[key]
+        group["orders"].append(order)
+        group["order_count"] += 1
+        group["total_amount"] += int(getattr(order, "amount", 0) or 0)
+
+        if group["customer_name"] == group["customer_id"] and display_name:
+            group["customer_name"] = display_name
+
+    groups = list(groups_by_key.values())
+    groups.sort(key=lambda group: (str(group["customer_name"] or ""), str(group["customer_id"] or "")))
+    return groups
 
 
 @router.get("/admin/orders/history")
@@ -312,6 +707,9 @@ async def admin_order_history(
             "user": user,
             "orders": orders,
             "customer_groups": build_customer_groups(orders),
+            "history_staff_options": history_staff_options(),
+            "assignments_by_order_id": history_assignments_by_order([int(order.id) for order in orders]),
+            "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "current_status": status,
             "keyword": keyword or "",
@@ -556,7 +954,6 @@ async def history_set_customer_service_payout_status(
     return redirect_to_history(message="客服分潤狀態已更新。")
 
 
-
 @router.post("/admin/orders/history/bulk-update")
 async def bulk_update_order_history(request: Request):
     user = request.session.get("user")
@@ -565,28 +962,44 @@ async def bulk_update_order_history(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
     form = await request.form()
-    order_ids = [to_int(order_id) for order_id in form.getlist("order_id") if to_int(order_id) > 0]
+    order_ids = [
+        history_to_int(order_id)
+        for order_id in form.getlist("order_id")
+        if history_to_int(order_id) > 0
+    ]
 
     if not order_ids:
         return RedirectResponse(url="/admin/orders/history", status_code=303)
 
-    conn = sqlite3.connect(get_history_db_path())
+    payout_status_snapshot = snapshot_payout_status(order_ids)
+
+    staff_options = history_staff_options()
+    worker_name_map = {item["id"]: item["name"] for item in staff_options["workers"]}
+    worker_role_map = {item["id"]: item.get("role_type") or "worker" for item in staff_options["workers"]}
+    cs_name_map = {item["id"]: item["name"] for item in staff_options["customer_services"]}
+
+    conn = sqlite3.connect(history_db_path())
 
     try:
         for order_id in order_ids:
+            customer_display_name = str(form.get(f"customer_display_name_{order_id}") or "").strip()
+            customer_discord_id = str(form.get(f"customer_discord_id_{order_id}") or "").strip()
             category = str(form.get(f"category_{order_id}") or "").strip()
             item = str(form.get(f"item_{order_id}") or "").strip()
-            amount = to_int(form.get(f"amount_{order_id}"), 0)
-            status = safe_status(form.get(f"status_{order_id}"))
-            customer_discord_id = str(form.get(f"customer_discord_id_{order_id}") or "").strip()
-            customer_display_name = str(form.get(f"customer_display_name_{order_id}") or "").strip()
+            amount = history_to_int(form.get(f"amount_{order_id}"), 0)
+            status = history_safe_status(form.get(f"status_{order_id}"))
+
+            cs_id = str(form.get(f"customer_service_{order_id}") or "").strip()
+            cs_name = cs_name_map.get(cs_id, "") if cs_id else ""
 
             conn.execute(
                 """
                 UPDATE web_orders
                 SET
-                    customer_discord_id = ?,
                     customer_display_name = ?,
+                    customer_discord_id = ?,
+                    customer_service_discord_id = ?,
+                    customer_service_display_name = ?,
                     category = ?,
                     item = ?,
                     amount = ?,
@@ -595,8 +1008,10 @@ async def bulk_update_order_history(request: Request):
                 WHERE id = ?
                 """,
                 (
-                    customer_discord_id,
                     customer_display_name,
+                    customer_discord_id,
+                    cs_id,
+                    cs_name,
                     category,
                     item,
                     amount,
@@ -605,51 +1020,179 @@ async def bulk_update_order_history(request: Request):
                 ),
             )
 
+            # 現有接單人：可刪除或改人
+            for assignment_id_text in form.getlist(f"assignment_id_{order_id}"):
+                assignment_id = history_to_int(assignment_id_text)
+                selected_worker_id = str(form.get(f"assignment_worker_{assignment_id}") or "").strip()
+                delete_flag = str(form.get(f"delete_assignment_{assignment_id}") or "").strip() == "1"
+
+                if assignment_id <= 0:
+                    continue
+
+                if delete_flag or not selected_worker_id:
+                    conn.execute(
+                        """
+                        UPDATE order_assignments
+                        SET is_active = 0, removed_at = datetime('now')
+                        WHERE id = ?
+                        """,
+                        (assignment_id,),
+                    )
+                    continue
+
+                conn.execute(
+                    """
+                    UPDATE order_assignments
+                    SET
+                        worker_discord_id = ?,
+                        worker_display_name = ?,
+                        role_type = ?,
+                        is_active = 1
+                    WHERE id = ?
+                    """,
+                    (
+                        selected_worker_id,
+                        worker_name_map.get(selected_worker_id, selected_worker_id),
+                        worker_role_map.get(selected_worker_id, "worker"),
+                        assignment_id,
+                    ),
+                )
+
+            # 新增接單人，預留 3 格
+            existing_active = {
+                str(row[0])
+                for row in conn.execute(
+                    """
+                    SELECT worker_discord_id
+                    FROM order_assignments
+                    WHERE order_id = ? AND is_active = 1
+                    """,
+                    (order_id,),
+                ).fetchall()
+            }
+
+            for index in range(1, 4):
+                new_worker_id = str(form.get(f"new_worker_{order_id}_{index}") or "").strip()
+
+                if not new_worker_id or new_worker_id in existing_active:
+                    continue
+
+                conn.execute(
+                    """
+                    INSERT INTO order_assignments (
+                        order_id,
+                        worker_discord_id,
+                        worker_display_name,
+                        role_type,
+                        is_active,
+                        has_named_bonus,
+                        assigned_at
+                    )
+                    VALUES (?, ?, ?, ?, 1, 0, datetime('now'))
+                    """,
+                    (
+                        order_id,
+                        new_worker_id,
+                        worker_name_map.get(new_worker_id, new_worker_id),
+                        worker_role_map.get(new_worker_id, "worker"),
+                    ),
+                )
+
+                existing_active.add(new_worker_id)
+
         conn.commit()
     finally:
         conn.close()
 
-    # 先按訂單狀態與金額重新計算一次分潤。
-    # active / stored 不產生分潤；closed 才會產生。
+    # 只對結單重新公式計算；active/stored 清掉分潤。
+    try:
+        from shared.db import SessionLocal
+        from shared.models import WebOrder
+        from web.app.services.order_service import recalculate_order_payouts
+
+        db = SessionLocal()
+
+        try:
+            for order_id in order_ids:
+                order = db.get(WebOrder, order_id)
+
+                if order is None:
+                    continue
+
+                if str(order.status) == "closed":
+                    recalculate_order_payouts(db, order_id)
+                else:
+                    conn = sqlite3.connect(history_db_path())
+
+                    try:
+                        conn.execute("DELETE FROM worker_payouts WHERE order_id = ?", (order_id,))
+                        conn.execute("DELETE FROM customer_service_payouts WHERE order_id = ?", (order_id,))
+                        conn.commit()
+                    finally:
+                        conn.close()
+
+            db.commit()
+        finally:
+            db.close()
     except Exception as exc:
         print(f"[order-history] recalculate payouts failed: {exc}")
 
-    # 再套用人工修改過的分潤金額。
-    conn = sqlite3.connect(get_history_db_path())
+    # 客服選無：刪掉客服分潤。
+    conn = sqlite3.connect(history_db_path())
 
     try:
-        for key, value in form.multi_items():
-            if key.startswith("worker_payout_"):
-                payout_id = to_int(key.replace("worker_payout_", ""), 0)
-                amount = to_int(value, 0)
+        for order_id in order_ids:
+            cs_id = str(form.get(f"customer_service_{order_id}") or "").strip()
 
-                if payout_id > 0:
-                    conn.execute(
-                        """
-                        UPDATE worker_payouts
-                        SET
-                            gross_share = ?,
-                            base_payout = ?,
-                            named_bonus_amount = 0,
-                            final_payout = ?
-                        WHERE id = ?
-                        """,
-                        (amount, amount, amount, payout_id),
-                    )
+            if not cs_id:
+                conn.execute(
+                    "DELETE FROM customer_service_payouts WHERE order_id = ?",
+                    (order_id,),
+                )
 
-            if key.startswith("cs_payout_"):
-                payout_id = to_int(key.replace("cs_payout_", ""), 0)
-                amount = to_int(value, 0)
+        conn.commit()
+    finally:
+        conn.close()
 
-                if payout_id > 0:
-                    conn.execute(
-                        """
-                        UPDATE customer_service_payouts
-                        SET payout_amount = ?
-                        WHERE id = ?
-                        """,
-                        (amount, payout_id),
-                    )
+    restore_payout_status(payout_status_snapshot)
+    apply_manual_payout_edits(form, order_ids)
+
+    return RedirectResponse(url="/admin/orders/history", status_code=303)
+
+    conn = sqlite3.connect(history_db_path())
+
+    try:
+        for order_id in order_ids:
+            customer_display_name = str(form.get(f"customer_display_name_{order_id}") or "").strip()
+            customer_discord_id = str(form.get(f"customer_discord_id_{order_id}") or "").strip()
+            category = str(form.get(f"category_{order_id}") or "").strip()
+            item = str(form.get(f"item_{order_id}") or "").strip()
+            amount = history_to_int(form.get(f"amount_{order_id}"), 0)
+            status = history_safe_status(form.get(f"status_{order_id}"))
+
+            conn.execute(
+                """
+                UPDATE web_orders
+                SET
+                    customer_display_name = ?,
+                    customer_discord_id = ?,
+                    category = ?,
+                    item = ?,
+                    amount = ?,
+                    status = ?,
+                    updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (
+                    customer_display_name,
+                    customer_discord_id,
+                    category,
+                    item,
+                    amount,
+                    status,
+                    order_id,
+                ),
+            )
 
         conn.commit()
     finally:
