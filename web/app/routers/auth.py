@@ -90,12 +90,13 @@ async def discord_callback(request: Request, code: str | None = None, error: str
         "role_ids": role_ids,
         "is_admin": access["is_admin"],
         "is_worker": access["is_worker"],
+        "is_companion": access.get("is_companion", False),
     }
 
     if access["is_admin"]:
         return RedirectResponse("/admin")
 
-    if access["is_worker"]:
+    if access.get("is_worker") or access.get("is_companion") or access.get("is_customer_service"):
         return RedirectResponse("/dispatch")
 
     return RedirectResponse("/no-access")

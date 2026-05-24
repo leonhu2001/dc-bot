@@ -18,36 +18,23 @@ from web.app.services.order_service import (
 router = APIRouter(tags=["dispatch"])
 
 
-def can_use_dispatch_page(user: dict | None) -> bool:
-    """打手 / 陪玩 / 客服 / 總控 都可以使用派單頁。"""
+def can_use_dispatch(user: dict | None) -> bool:
     if not user:
         return False
-
-    roles = user.get("roles") or []
 
     return bool(
         user.get("is_admin")
         or user.get("is_worker")
         or user.get("is_companion")
         or user.get("is_customer_service")
-        or "admin" in roles
-        or "worker" in roles
-        or "companion" in roles
-        or "customer_service" in roles
-        or "打手" in roles
-        or "陪玩" in roles
-        or "客服" in roles
     )
 
 
-def get_dispatch_claim_role(user: dict | None) -> str:
-    """決定網站接單時的身份。陪玩優先記陪玩；其他可操作人員預設記打手。"""
+def get_dispatch_role_type(user: dict | None) -> str:
     if not user:
         return "worker"
 
-    roles = user.get("roles") or []
-
-    if user.get("is_companion") or "companion" in roles or "陪玩" in roles:
+    if user.get("is_companion"):
         return "companion"
 
     return "worker"
@@ -83,7 +70,7 @@ def require_dispatch_user(request: Request) -> dict | None:
     if not user:
         return None
 
-    if not user.get("is_worker") and not user.get("is_admin"):
+    if not can_use_dispatch(user):
         return None
 
     return user
@@ -109,7 +96,7 @@ async def dispatch_dashboard(
             status_code=401,
         )
 
-    if not user.get("is_worker") and not user.get("is_admin"):
+    if not can_use_dispatch(user):
         return templates.TemplateResponse(
             request=request,
             name="no_access.html",

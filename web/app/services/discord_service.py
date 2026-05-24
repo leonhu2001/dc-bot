@@ -44,8 +44,17 @@ def get_dashboard_access(role_ids: list[str]) -> dict:
     is_admin = bool(roles & config.ADMIN_ROLE_IDS)
     is_worker = bool(roles & config.WORKER_ROLE_IDS)
 
+    companion_role_ids = set()
+    if hasattr(config, "COMPANION_ROLE_IDS"):
+        companion_role_ids = set(config.COMPANION_ROLE_IDS)
+    elif hasattr(config, "COMPANION_ROLE_ID") and config.COMPANION_ROLE_ID:
+        companion_role_ids = {config.COMPANION_ROLE_ID}
+
+    is_companion = bool(roles & companion_role_ids)
+
     return {
         "is_admin": is_admin,
         "is_worker": is_worker,
+        "is_companion": is_companion,
         "role_ids": list(roles),
     }

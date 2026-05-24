@@ -14,25 +14,6 @@
                     <p class="eyebrow">MW Dashboard</p>
                     <h1>{% block page_title %}魔丸打手系統{% endblock %}</h1>
                     {% if user %}
-
-{% set nav_roles = user.roles if user and user.roles is defined else [] %}
-{% set can_use_dispatch =
-    user
-    and (
-        user.is_admin
-        or user.is_worker
-        or user.is_companion
-        or user.is_customer_service
-        or ('admin' in nav_roles)
-        or ('worker' in nav_roles)
-        or ('companion' in nav_roles)
-        or ('customer_service' in nav_roles)
-        or ('打手' in nav_roles)
-        or ('陪玩' in nav_roles)
-        or ('客服' in nav_roles)
-    )
-%}
-
                         <p class="muted compact-user">
                             {{ user.global_name or user.username or user.id }}
                         </p>
@@ -41,7 +22,7 @@
 
                 {% if user %}
                     <nav class="nav role-nav">
-                        {% if can_use_dispatch %}
+                        {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
                             <div class="nav-group">
                                 <span class="nav-label">打手 / 陪玩 / 客服</span>
                                 <a class="nav-link" href="/dispatch">派單頁</a>
@@ -75,7 +56,7 @@
 <script>
 if (window.location.pathname === "/dispatch") {
   const script = document.createElement("script");
-  script.src = "/static/js/dispatch_alerts.js?v=50";
+  script.src = "/static/js/dispatch_alerts.js?v=53";
   script.defer = true;
   document.body.appendChild(script);
 }
