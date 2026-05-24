@@ -4007,6 +4007,7 @@ VIP_LEVEL_CHOICES = [
     reason="調整原因，可不填"
 )
 @app_commands.choices(level=VIP_LEVEL_CHOICES)
+@app_commands.default_permissions(manage_messages=True)
 async def set_customer_level(
     interaction: discord.Interaction,
     customer: discord.Member,
@@ -4086,6 +4087,7 @@ def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool
     status="狀態：active / stored / closed / cancelled，可不填",
     limit="最多顯示幾筆，預設 10，最多 20"
 )
+@app_commands.default_permissions(manage_messages=True)
 async def order_search(
     interaction: discord.Interaction,
     keyword: str | None = None,
@@ -4324,6 +4326,7 @@ def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None,
     adjust_customer="若訂單已結單，是否同步扣回會員累積與完成單數，預設是",
     delete_dispatch_panel="是否嘗試刪除派單頻道接單面板，預設是"
 )
+@app_commands.default_permissions(manage_messages=True)
 async def delete_order(
     interaction: discord.Interaction,
     order: str,
@@ -4432,6 +4435,7 @@ async def delete_order(
     amount="新的金額，只能輸入數字，例如 1275",
     adjust_customer="若訂單已結單，是否同步調整會員累積，預設是"
 )
+@app_commands.default_permissions(manage_messages=True)
 async def fix_order_amount(
     interaction: discord.Interaction,
     order: str,
@@ -4512,6 +4516,7 @@ async def fix_order_amount(
     customer="正確的顧客",
     adjust_customer="若訂單已結單，是否把會員累積從舊顧客搬到新顧客，預設是"
 )
+@app_commands.default_permissions(manage_messages=True)
 async def fix_order_customer(
     interaction: discord.Interaction,
     order: str,
@@ -4590,6 +4595,7 @@ async def fix_order_customer(
 @app_commands.describe(
     order_channel_id="票口頻道 ID，例如 1506962556928131112"
 )
+@app_commands.default_permissions(manage_messages=True)
 async def resend_dispatch(interaction: discord.Interaction, order_channel_id: str):
     """重新建立可操作的派單面板。\n\n    用於派單頻道訊息被刪除、按鈕失效、claims 重複或連結錯亂時。\n    會清除同一票口舊 claims，發一則新的 DispatchClaimView，並把新訊息 ID 寫回資料。\n    """
     if not isinstance(interaction.user, discord.Member):
@@ -5409,6 +5415,7 @@ class StoredOrderRefreshButton(discord.ui.Button):
     guild=discord.Object(id=GUILD_ID)
 )
 @app_commands.describe(limit="最多顯示幾筆存單，預設 25，最多 25")
+@app_commands.default_permissions(manage_messages=True)
 async def stored_orders(interaction: discord.Interaction, limit: int = 25):
     if not _require_customer_staff_or_manager(interaction):
         await interaction.response.send_message("只有客服、店長或管理員可以查看存單。", ephemeral=True)
@@ -5431,6 +5438,7 @@ async def stored_orders(interaction: discord.Interaction, limit: int = 25):
     description="客服手動檢查是否有超過 3/7 天的存單提醒",
     guild=discord.Object(id=GUILD_ID)
 )
+@app_commands.default_permissions(manage_messages=True)
 async def check_stored_orders(interaction: discord.Interaction):
     if not _require_customer_staff_or_manager(interaction):
         await interaction.response.send_message("只有客服、店長或管理員可以檢查存單提醒。", ephemeral=True)
@@ -5453,6 +5461,7 @@ async def check_stored_orders(interaction: discord.Interaction):
     message_id="要刪除的派單訊息 ID",
     channel="派單訊息所在頻道；不填則使用目前頻道"
 )
+@app_commands.default_permissions(manage_messages=True)
 async def delete_dispatch_panel(
     interaction: discord.Interaction,
     message_id: str,

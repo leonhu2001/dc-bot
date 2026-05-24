@@ -22,6 +22,7 @@ class SetupCommands(commands.Cog):
         description="建立魔丸娛樂客服面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
     async def setup_panel(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="魔丸娛樂客服中心",
@@ -41,6 +42,7 @@ class SetupCommands(commands.Cog):
         description="建立客訴表單面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
     async def setup_complaint_panel(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
@@ -72,6 +74,7 @@ class SetupCommands(commands.Cog):
         description="建立顧客意見箱面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
     async def setup_feedback_panel(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
@@ -103,6 +106,7 @@ class SetupCommands(commands.Cog):
         description="建立陪玩語音入口頻道",
     )
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
     async def setup_play_voice(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
@@ -121,6 +125,7 @@ class SetupCommands(commands.Cog):
         description="建立 VIP 語音入口頻道",
     )
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
     async def setup_vip_voice(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
@@ -139,6 +144,7 @@ class SetupCommands(commands.Cog):
         description="建立公共語音入口頻道",
     )
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
     async def setup_public_voice(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:

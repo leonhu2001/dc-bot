@@ -31,6 +31,7 @@ class AuditCommands(commands.Cog):
         description="客服檢查訂單、會員累積、存單與接單面板資料是否異常",
     )
     @app_commands.describe(limit="每一類最多顯示幾筆明細，預設 10，最高 25")
+    @app_commands.default_permissions(manage_messages=True)
     async def audit_data(self, interaction: discord.Interaction, limit: int = 10):
         if not isinstance(interaction.user, discord.Member) or not self.can_customer_staff(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以檢查資料庫健康狀態。", ephemeral=True)

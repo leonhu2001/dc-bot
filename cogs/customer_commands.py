@@ -39,6 +39,7 @@ class CustomerCommands(commands.Cog):
         note="備註內容",
         blacklist="是否標記為黑名單 / 高風險備註",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def add_customer_note(
         self,
         interaction: discord.Interaction,
@@ -88,6 +89,7 @@ class CustomerCommands(commands.Cog):
         description="客服查詢顧客備註 / 黑名單紀錄",
     )
     @app_commands.describe(customer="要查詢備註的顧客")
+    @app_commands.default_permissions(manage_messages=True)
     async def customer_notes(self, interaction: discord.Interaction, customer: discord.Member):
         if not self.require_customer_staff_or_manager(interaction):
             await interaction.response.send_message("只有客服、店長或管理員可以查詢顧客備註。", ephemeral=True)
@@ -110,6 +112,7 @@ class CustomerCommands(commands.Cog):
         customer="要刪除備註的顧客",
         index="要刪除第幾筆備註，從 1 開始",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def remove_customer_note(self, interaction: discord.Interaction, customer: discord.Member, index: int):
         if not self.require_customer_staff_or_manager(interaction):
             await interaction.response.send_message("只有客服、店長或管理員可以刪除顧客備註。", ephemeral=True)

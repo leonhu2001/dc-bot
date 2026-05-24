@@ -44,6 +44,7 @@ class RewardCommands(commands.Cog):
         description="客服查詢指定顧客的魔丸會員資料",
     )
     @app_commands.describe(customer="要查詢的顧客")
+    @app_commands.default_permissions(manage_messages=True)
     async def customer_points(self, interaction: discord.Interaction, customer: discord.Member):
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
@@ -67,6 +68,7 @@ class RewardCommands(commands.Cog):
         points="調整點數，正數為加點，負數為扣點，例如 10 或 -10",
         reason="調整原因，可不填",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def adjust_points(
         self,
         interaction: discord.Interaction,
@@ -114,6 +116,7 @@ class RewardCommands(commands.Cog):
         date="完成日期，例如 20260512、2026/05/12 或 2026-05-12",
         note="備註，可不填",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def add_purchase(
         self,
         interaction: discord.Interaction,
@@ -165,6 +168,7 @@ class RewardCommands(commands.Cog):
         description="客服批量補登歷史消費，多行格式：顧客ID,金額,日期,備註",
     )
     @app_commands.describe(records="每行一筆：顧客ID,金額,日期,備註；備註可省略")
+    @app_commands.default_permissions(manage_messages=True)
     async def import_purchases(self, interaction: discord.Interaction, records: str):
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
@@ -243,6 +247,7 @@ class RewardCommands(commands.Cog):
         point_adjustment="額外點數修正值，可正可負；不填則不修改",
         reason="修正原因，可不填",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def set_customer_rewards(
         self,
         interaction: discord.Interaction,

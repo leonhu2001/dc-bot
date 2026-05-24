@@ -39,6 +39,7 @@ class StatsCommands(commands.Cog):
         name="stats_today",
         description="客服查詢今日營運統計",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def stats_today(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not self.can_customer_staff(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以查詢營運統計。", ephemeral=True)
@@ -54,6 +55,7 @@ class StatsCommands(commands.Cog):
         name="stats_month",
         description="客服查詢本月營運統計",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def stats_month(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not self.can_customer_staff(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以查詢營運統計。", ephemeral=True)
@@ -72,6 +74,7 @@ class StatsCommands(commands.Cog):
         name="top_customers",
         description="客服查詢顧客累積消費排行前 10 名",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def top_customers(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not self.can_customer_staff(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以查詢顧客排行。", ephemeral=True)
@@ -121,6 +124,7 @@ class StatsCommands(commands.Cog):
         description="管理員手動檢查 VIP 維持條件並執行降階",
     )
     @app_commands.describe(force="是否強制重新檢查本月，預設否")
+    @app_commands.default_permissions(manage_messages=True)
     async def check_vip_downgrades(self, interaction: discord.Interaction, force: bool = False):
         if not isinstance(interaction.user, discord.Member) or not self.can_customer_staff(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以檢查 VIP 降階。", ephemeral=True)

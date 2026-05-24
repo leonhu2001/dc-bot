@@ -74,6 +74,7 @@ class StaffSyncCog(commands.Cog):
         name="sync_staff_members",
         description="手動同步網站後台的客服 / 打手 / 陪玩下拉選單名單",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def sync_staff_members_command(self, interaction: discord.Interaction) -> None:
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
