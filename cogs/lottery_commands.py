@@ -137,6 +137,7 @@ class LotteryCommands(commands.Cog):
         max_chances_per_user="每人本期最多可投入幾次，預設 20",
         announce_channel="抽獎開始公告要發到哪個頻道；不填則用預設公告頻道",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def lottery_open(
         self,
         interaction: discord.Interaction,
@@ -197,6 +198,7 @@ class LotteryCommands(commands.Cog):
         announce="是否發公告，預設否",
         announce_channel="獎池公告要發到哪個頻道；不填則用預設公告頻道",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def lottery_set_prizes(
         self,
         interaction: discord.Interaction,
@@ -251,6 +253,7 @@ class LotteryCommands(commands.Cog):
         name="lottery_close",
         description="管理層關閉本期抽獎報名",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def lottery_close(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以關閉抽獎。", ephemeral=True)
@@ -270,6 +273,7 @@ class LotteryCommands(commands.Cog):
         winners="要抽出幾位得主，預設 1",
         announce_channel="開獎公告要發到哪個頻道；不填則用預設公告頻道",
     )
+    @app_commands.default_permissions(manage_messages=True)
     async def draw_lottery(
         self,
         interaction: discord.Interaction,
@@ -379,6 +383,7 @@ class LotteryCommands(commands.Cog):
         description="清空本期抽獎池，不自動退點。需輸入確認文字",
     )
     @app_commands.describe(confirm_text="請輸入：確認清空", reason="清空原因，可不填")
+    @app_commands.default_permissions(manage_messages=True)
     async def reset_lottery(self, interaction: discord.Interaction, confirm_text: str, reason: str | None = None):
         if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以清空抽獎池。", ephemeral=True)
