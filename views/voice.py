@@ -305,7 +305,6 @@ def build_voice_control_panel_overwrites(
 
 
 def is_temp_play_voice_room(channel: discord.abc.GuildChannel | None) -> bool:
-    """判斷頻道是否為 Bot 建立的一般陪玩語音房。"""
     if not isinstance(channel, discord.VoiceChannel):
         return False
 
@@ -330,17 +329,18 @@ def _overwrite_has_any_explicit_value(overwrite: discord.PermissionOverwrite) ->
     if isinstance(values, dict):
         return bool(values)
 
-    # 保底：discord.py 版本差異時，檢查常見欄位是否仍有明確設定。
     for attr in (
         "view_channel",
-        "send_messages",
-        "read_message_history",
-        "attach_files",
-        "add_reactions",
         "connect",
         "speak",
         "stream",
         "use_voice_activation",
+        "send_messages",
+        "read_message_history",
+        "attach_files",
+        "add_reactions",
+        "use_external_emojis",
+        "use_external_stickers",
         "move_members",
         "manage_channels",
     ):
@@ -353,34 +353,42 @@ async def grant_play_voice_room_chat_access(
     voice_channel: discord.VoiceChannel | None,
     member: discord.Member,
 ) -> None:
-    """成員進入陪玩語音房時，給他這間語音房內建聊天室的臨時權限。"""
     if member.bot or not is_temp_play_voice_room(voice_channel):
         return
 
     overwrite = voice_channel.overwrites_for(member)
+
+    # 語音頻道本體。缺 view_channel 或 connect 時，語音內建聊天室仍可能顯示鎖住。
     overwrite.view_channel = True
+    overwrite.connect = True
+    overwrite.speak = True
+    overwrite.stream = True
+    overwrite.use_voice_activation = True
+
+    # 語音頻道內建聊天室。
     overwrite.send_messages = True
     overwrite.read_message_history = True
     overwrite.attach_files = True
     overwrite.add_reactions = True
+    overwrite.use_external_emojis = True
+    overwrite.use_external_stickers = True
 
     try:
         await voice_channel.set_permissions(
             member,
             overwrite=overwrite,
-            reason="Grant temporary play voice room chat access",
+            reason="Grant temporary play voice room and chat access",
         )
     except discord.Forbidden:
-        print("Bot 權限不足，無法給予陪玩房聊天室臨時權限。")
+        print("Bot 權限不足，無法給予陪玩房語音 / 聊天室臨時權限。")
     except discord.HTTPException as e:
-        print(f"給予陪玩房聊天室臨時權限失敗：{e}")
+        print(f"給予陪玩房語音 / 聊天室臨時權限失敗：{e}")
 
 
 async def revoke_play_voice_room_chat_access(
     voice_channel: discord.VoiceChannel | None,
     member: discord.Member,
 ) -> None:
-    """成員離開陪玩語音房時，收回他在該房內建聊天室的臨時個人權限。"""
     if member.bot or not is_temp_play_voice_room(voice_channel):
         return
 
@@ -395,30 +403,39 @@ async def revoke_play_voice_room_chat_access(
         return
 
     overwrite = voice_channel.overwrites_for(member)
+
+    # 收回進房時臨時補上的語音房本體權限。
     overwrite.view_channel = None
+    overwrite.connect = None
+    overwrite.speak = None
+    overwrite.stream = None
+    overwrite.use_voice_activation = None
+
+    # 收回進房時臨時補上的語音內建聊天室權限。
     overwrite.send_messages = None
     overwrite.read_message_history = None
     overwrite.attach_files = None
     overwrite.add_reactions = None
+    overwrite.use_external_emojis = None
+    overwrite.use_external_stickers = None
 
     try:
         if _overwrite_has_any_explicit_value(overwrite):
             await voice_channel.set_permissions(
                 member,
                 overwrite=overwrite,
-                reason="Revoke temporary play voice room chat access",
+                reason="Revoke temporary play voice room and chat access",
             )
         else:
             await voice_channel.set_permissions(
                 member,
                 overwrite=None,
-                reason="Revoke temporary play voice room chat access",
+                reason="Revoke temporary play voice room and chat access",
             )
     except discord.Forbidden:
-        print("Bot 權限不足，無法收回陪玩房聊天室臨時權限。")
+        print("Bot 權限不足，無法收回陪玩房語音 / 聊天室臨時權限。")
     except discord.HTTPException as e:
-        print(f"收回陪玩房聊天室臨時權限失敗：{e}")
-
+        print(f"收回陪玩房語音 / 聊天室臨時權限失敗：{e}")
 
 def safe_voice_control_panel_name(member: discord.Member) -> str:
     display_name = member.display_name.strip() or member.name
