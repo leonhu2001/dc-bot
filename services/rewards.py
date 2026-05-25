@@ -25,6 +25,63 @@ _PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
 _PLATINUM_CHAT_ROLE_IDS: list[int] = []
 _REWARD_DB_FILE: Path | None = None
 
+# ========= VIP display / reward exclusions =========
+
+NO_VIP_REWARD_ITEMS = {
+    "哈夫幣代洗",
+    "代洗哈夫幣",
+    "純綠代肝哈夫幣",
+}
+
+VIP_LEVEL_BENEFITS = {
+    "普通魔丸": "尚未解鎖 VIP 福利。",
+    "銀級魔丸": (
+        "累積消費 2,000T⤴️\n"
+        "・專屬 VIP 身分組，可自行創建 VIP 語音頻道\n"
+        "・基礎單 97 折，體驗單除外"
+    ),
+    "金級魔丸": (
+        "累積消費 6,000T⤴️\n"
+        "・享有銀級所有福利\n"
+        "・基礎單 96 折，體驗單除外"
+    ),
+    "白金魔丸": (
+        "累積消費 12,000T⤴️\n"
+        "・享有金級所有福利\n"
+        "・基礎單 95.5 折，體驗單除外\n"
+        "・可建立 VIP 專屬文字頻道\n"
+        "・升級當月贈送 9 折優惠券 1 張，低消 500，限 30 天內使用"
+    ),
+    "鑽石魔丸": (
+        "累積消費 25,000T⤴️\n"
+        "・享有白金所有福利\n"
+        "・基礎單 95 折，體驗單除外\n"
+        "・優先安排熟悉打手"
+    ),
+    "星耀魔丸": (
+        "累積消費 50,000T⤴️\n"
+        "・享有鑽石所有福利\n"
+        "・每月 1 小時免指定費\n"
+        "・優先排單"
+    ),
+    "頂級魔丸": (
+        "累積消費 88,888T⤴️\n"
+        "・享有星耀所有福利\n"
+        "・基礎單 9 折，體驗單除外\n"
+        "・每月 3 小時免指定費\n"
+        "・每月一次免費「機密航天保底1000w」\n"
+        "・最高優先排單\n"
+        "・專屬客服優先處理"
+    ),
+}
+
+
+def get_member_level_benefits_text(level_name: str) -> str:
+    return VIP_LEVEL_BENEFITS.get(str(level_name or "普通魔丸"), "尚未設定此等級福利。")
+
+
+# ========= end VIP display / reward exclusions =========
+
 
 
 def configure_reward_database(db_file: str | Path | None) -> None:
@@ -263,6 +320,11 @@ def build_member_info_embed(member: discord.abc.User, data: dict, show_points: b
         embed.add_field(name="目前點數", value=f"{points:,} 點", inline=True)
     embed.add_field(name="完成訂單", value=f"{order_count:,} 單", inline=True)
     embed.add_field(name="會員等級", value=level["name"], inline=True)
+    embed.add_field(
+        name="目前福利",
+        value=get_member_level_benefits_text(str(level.get("name") or "普通魔丸")),
+        inline=False,
+    )
 
     if next_level is None:
         embed.add_field(name="距離下一級還差", value="已達最高等級", inline=False)
@@ -347,7 +409,7 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
     else:
         silver_role = None
 
-    if level_threshold >= 2500:
+    if level_threshold >= 2000:
         if silver_role is not None and silver_role not in member.roles:
             try:
                 await member.add_roles(silver_role, reason="累積消費達銀級魔丸門檻")
@@ -366,7 +428,7 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
             except discord.HTTPException:
                 notices.append("銀級魔丸身分組收回失敗：Discord API 錯誤")
 
-    if level_threshold >= 13000:
+    if level_threshold >= 12000:
         existing_channel_id = _to_int(data.get("platinum_channel_id"))
         if existing_channel_id is not None and guild.get_channel(existing_channel_id) is not None:
             return notices
@@ -463,6 +525,19 @@ async def add_customer_reward_from_order(
 
     if order_data.get("reward_counted"):
         return "此訂單已累積過會員消費，未重複累積。"
+
+    item_name = str(order_data.get("item") or "").strip()
+    if item_name in NO_VIP_REWARD_ITEMS:
+        order_data["reward_counted"] = True
+        order_data["reward_excluded"] = True
+        order_data["reward_excluded_reason"] = "此項目不累積 VIP 點數"
+        order_data["reward_counted_at"] = get_taipei_now_iso()
+        _ORDER_SELECTIONS[order_channel_id] = order_data
+
+        if _SAVE_BOT_DATA is not None:
+            _SAVE_BOT_DATA()
+
+        return f"會員消費未累積：{item_name} 不累積 VIP 點數。"
 
     amount = parse_receipt_amount(amount_text)
     if amount is None or amount <= 0:

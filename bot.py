@@ -263,11 +263,12 @@ PLATINUM_CHAT_ROLE_IDS = [
 REWARD_POINT_DIVISOR = 100
 MEMBER_LEVELS = [
     {"name": "普通魔丸", "threshold": 0},
-    {"name": "銀級魔丸", "threshold": 2500},
-    {"name": "金級魔丸", "threshold": 7000},
-    {"name": "白金魔丸", "threshold": 13000},
-    {"name": "鑽石魔丸", "threshold": 30000},
-    {"name": "頂級魔丸", "threshold": 77777},
+    {"name": "銀級魔丸", "threshold": 2000},
+    {"name": "金級魔丸", "threshold": 6000},
+    {"name": "白金魔丸", "threshold": 12000},
+    {"name": "鑽石魔丸", "threshold": 25000},
+    {"name": "星耀魔丸", "threshold": 50000},
+    {"name": "頂級魔丸", "threshold": 88888},
 ]
 
 # 訂單日誌 / 備份設定
