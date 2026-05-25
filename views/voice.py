@@ -101,11 +101,11 @@ def apply_voice_view_only_role_overwrites(
         overwrites[role] = discord.PermissionOverwrite(
             view_channel=True,
             connect=False,
-            speak=False,
+            speak=True,
             stream=False,
             use_voice_activation=False,
             read_message_history=True,
-            send_messages=False,
+            send_messages=True,
         )
 
     return overwrites
