@@ -2707,6 +2707,11 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
                 expected_time=self.expected_time.value.strip() or None,
                 note=self.note.value.strip() or None,
             )
+            store_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id, {})
+            store_item = str(store_data.get("item") or store_data.get("category_label") or "訂單")
+            store_customer_id = get_order_customer_id_from_channel(interaction.channel)
+            store_customer_member = guild.get_member(store_customer_id) if store_customer_id is not None else None
+            await rename_ticket_channel(interaction.channel, f"存單-{store_item}", member=store_customer_member)
             await send_order_log(
                 guild,
                 title="訂單已存單",
@@ -3507,6 +3512,11 @@ class StaffOrderOperationView(discord.ui.View):
                     order_channel=interaction.channel,
                     staff_member=interaction.user,
                 )
+                resume_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id, {})
+                resume_item = str(resume_data.get("item") or resume_data.get("category_label") or "恢復訂單")
+                resume_customer_id = get_order_customer_id_from_channel(interaction.channel)
+                resume_customer_member = guild.get_member(resume_customer_id) if resume_customer_id is not None else None
+                await rename_ticket_channel(interaction.channel, resume_item, member=resume_customer_member)
                 await send_order_log(
                     guild,
                     title="訂單已恢復",
