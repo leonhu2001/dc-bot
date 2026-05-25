@@ -5,23 +5,14 @@
 
 {% block content %}
 <style>
-.summary-top-note {
-    color: #9ca3af;
-    margin-top: 6px;
-}
-
-.summary-list {
-    display: grid;
-    gap: 14px;
-}
-
+.summary-top-note { color: #9ca3af; margin-top: 6px; }
+.summary-list { display: grid; gap: 14px; }
 .summary-person-card {
     border: 1px solid rgba(148, 163, 184, 0.24);
     border-radius: 16px;
     background: rgba(15, 23, 42, 0.44);
     overflow: hidden;
 }
-
 .summary-person-head {
     padding: 16px;
     display: grid;
@@ -29,44 +20,17 @@
     gap: 16px;
     align-items: center;
 }
-
-.summary-person-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-}
-
+.summary-person-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .summary-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
+    width: 42px; height: 42px; border-radius: 999px;
+    display: grid; place-items: center;
     background: rgba(99, 102, 241, 0.22);
     border: 1px solid rgba(129, 140, 248, 0.38);
     font-weight: 800;
 }
-
-.summary-name {
-    margin: 0;
-    font-size: 18px;
-}
-
-.summary-id {
-    margin: 4px 0 0;
-    color: #9ca3af;
-    font-size: 13px;
-    word-break: break-all;
-}
-
-.summary-person-meta {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
+.summary-name { margin: 0; font-size: 18px; }
+.summary-id { margin: 4px 0 0; color: #9ca3af; font-size: 13px; word-break: break-all; }
+.summary-person-meta { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .summary-pill {
     border-radius: 12px;
     background: rgba(2, 6, 23, 0.42);
@@ -74,30 +38,10 @@
     min-width: 86px;
     text-align: right;
 }
-
-.summary-pill span {
-    display: block;
-    color: #9ca3af;
-    font-size: 12px;
-}
-
-.summary-pill strong {
-    display: block;
-    margin-top: 3px;
-    font-size: 18px;
-}
-
-.summary-person-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 0 16px 12px;
-}
-
-.summary-person-actions form {
-    margin: 0;
-}
-
+.summary-pill span { display: block; color: #9ca3af; font-size: 12px; }
+.summary-pill strong { display: block; margin-top: 3px; font-size: 18px; }
+.summary-person-actions { display: flex; gap: 10px; flex-wrap: wrap; padding: 0 16px 12px; }
+.summary-person-actions form { margin: 0; }
 .summary-person-actions .button {
     min-height: 36px;
     padding: 8px 12px;
@@ -105,93 +49,40 @@
     font-size: 13px;
     font-weight: 700;
 }
-
-.summary-items {
-    padding: 0 16px 16px;
-}
-
-.summary-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.summary-table th,
-.summary-table td {
+.summary-items { padding: 0 16px 16px; }
+.summary-table { width: 100%; border-collapse: collapse; }
+.summary-table th, .summary-table td {
     padding: 10px 8px;
     border-top: 1px solid rgba(148, 163, 184, 0.14);
     text-align: left;
 }
-
-.summary-table th {
-    color: #93c5fd;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.summary-table td:last-child,
-.summary-table th:last-child {
-    text-align: right;
-}
-
-.summary-status-paid {
-    color: #86efac;
-    font-weight: 800;
-}
-
-.summary-status-unpaid {
-    color: #67e8f9;
-    font-weight: 800;
-}
-
-.summary-list-title {
-    margin: 18px 0 12px;
-    font-size: 20px;
-    font-weight: 800;
-}
-
+.summary-table th { color: #93c5fd; font-size: 13px; font-weight: 700; }
+.summary-table td:last-child, .summary-table th:last-child { text-align: right; }
+.summary-status-paid { color: #86efac; font-weight: 800; }
+.summary-status-unpaid { color: #67e8f9; font-weight: 800; }
+.summary-list-title { margin: 18px 0 12px; font-size: 20px; font-weight: 800; }
 .summary-empty {
     border: 1px dashed rgba(148, 163, 184, 0.28);
     border-radius: 14px;
     padding: 18px;
     color: #9ca3af;
 }
-
-@media (max-width: 800px) {
-    .summary-person-head {
-        grid-template-columns: 1fr;
-    }
-
-    .summary-person-meta {
-        justify-content: flex-start;
-    }
-
-    .summary-pill {
-        text-align: left;
-    }
-
-    .summary-table {
-        font-size: 13px;
-    }
-}
-
 .payout-summary-filter {
     display: grid;
     grid-template-columns: 180px 180px minmax(260px, 1fr) auto auto;
     gap: 12px;
     align-items: end;
 }
-
-.payout-summary-filter .button {
-    min-height: 40px;
-    white-space: nowrap;
-}
-
+.payout-summary-filter .button { min-height: 40px; white-space: nowrap; }
 @media (max-width: 900px) {
-    .payout-summary-filter {
-        grid-template-columns: 1fr;
-    }
+    .payout-summary-filter { grid-template-columns: 1fr; }
 }
-
+@media (max-width: 800px) {
+    .summary-person-head { grid-template-columns: 1fr; }
+    .summary-person-meta { justify-content: flex-start; }
+    .summary-pill { text-align: left; }
+    .summary-table { font-size: 13px; }
+}
 </style>
 
 <section class="panel">
@@ -233,23 +124,11 @@
         <div class="summary-person-meta">
             <div class="summary-pill">
                 <span>{% if list_status == "paid" %}已支付{% else %}未支付{% endif %}</span>
-                <strong>
-                    {% if list_status == "paid" %}
-                        {{ row.paid_total }}T
-                    {% else %}
-                        {{ row.unpaid_total }}T
-                    {% endif %}
-                </strong>
+                <strong>{% if list_status == "paid" %}{{ row.paid_total|round(0, 'common')|int }}{% else %}{{ row.display_total|default(row.unpaid_total)|round(0, 'common')|int }}{% endif %}T</strong>
             </div>
             <div class="summary-pill">
                 <span>筆數</span>
-                <strong>
-                    {% if list_status == "paid" %}
-                        {{ row.paid_count }}
-                    {% else %}
-                        {{ row.unpaid_count }}
-                    {% endif %}
-                </strong>
+                <strong>{% if list_status == "paid" %}{{ row.paid_count }}{% else %}{{ row.unpaid_count }}{% endif %}</strong>
             </div>
         </div>
     </div>
@@ -297,7 +176,7 @@
                                     <span class="summary-status-unpaid">未支付</span>
                                 {% endif %}
                             </td>
-                            <td>{{ item.amount }}T</td>
+                            <td>{{ item.amount|round(0, 'common')|int }}T</td>
                         </tr>
                     {% endif %}
                 {% endfor %}
@@ -309,7 +188,6 @@
 
 <section class="panel payout-summary-list-section">
     <h2 class="summary-list-title">未支付名單</h2>
-
     {% if unpaid_rows %}
         <div class="summary-list">
             {% for row in unpaid_rows %}
@@ -323,7 +201,6 @@
 
 <section class="panel payout-summary-list-section">
     <h2 class="summary-list-title">已支付名單</h2>
-
     {% if paid_rows %}
         <div class="summary-list">
             {% for row in paid_rows %}

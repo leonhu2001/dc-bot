@@ -9,12 +9,12 @@ WORKER_NAMED_BONUS_RATE = 0.05
 @dataclass(frozen=True)
 class WorkerPayoutResult:
     worker_discord_id: str
-    gross_share: int
+    gross_share: float
     base_rate: float
-    base_payout: int
+    base_payout: float
     named_bonus_rate: float
-    named_bonus_amount: int
-    final_payout: int
+    named_bonus_amount: float
+    final_payout: float
     has_named_bonus: bool
 
 
@@ -25,20 +25,20 @@ class OrderPayoutResult:
     worker_base_rate: float
     customer_service_rate: float
     named_bonus_rate: float
-    customer_service_payout: int
+    customer_service_payout: float
     worker_payouts: list[WorkerPayoutResult]
-    total_worker_payout: int
-    total_payout: int
+    total_worker_payout: float
+    total_payout: float
 
 
 def calculate_customer_service_payout(
     total_amount: int,
     customer_service_rate: float = CUSTOMER_SERVICE_PAYOUT_RATE,
-) -> int:
+) -> float:
     if total_amount <= 0:
         return 0
 
-    return int(total_amount * customer_service_rate)
+    return total_amount * customer_service_rate
 
 
 def calculate_order_payout(
@@ -104,13 +104,13 @@ def calculate_order_payout(
         if str(worker_id)
     }
 
-    gross_share = int(total_amount / worker_count)
+    gross_share = total_amount / worker_count
     worker_payouts = []
 
     for worker_id in unique_worker_ids:
-        base_payout = int(gross_share * worker_base_rate)
+        base_payout = gross_share * worker_base_rate
         has_named_bonus = worker_id in named_bonus_worker_set
-        named_bonus_amount = int(gross_share * named_bonus_rate) if has_named_bonus else 0
+        named_bonus_amount = gross_share * named_bonus_rate if has_named_bonus else 0
         final_payout = base_payout + named_bonus_amount
 
         worker_payouts.append(
