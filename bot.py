@@ -323,6 +323,12 @@ VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [
     1482084782031638548,
 ]
 
+
+# 可看見創建後陪玩 / VIP 語音房，但不可連接的身分組 ID
+VOICE_VIEW_ONLY_ROLE_IDS = [
+    1507204925766242425,
+]
+
 # 暫存由機器人建立的陪玩語音房 ID
 TEMP_PLAY_VOICE_CHANNEL_IDS = set()
 
@@ -374,6 +380,7 @@ NEW_MEMBER_ROLE_ID = _config_int("NEW_MEMBER_ROLE_ID", NEW_MEMBER_ROLE_ID)
 PLATINUM_CHAT_ROLE_IDS = _config_int_list("PLATINUM_CHAT_ROLE_IDS", PLATINUM_CHAT_ROLE_IDS)
 PLAY_VOICE_ALLOWED_ROLE_IDS = _config_int_list("PLAY_VOICE_ALLOWED_ROLE_IDS", PLAY_VOICE_ALLOWED_ROLE_IDS)
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = _config_int_list("VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS", VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS)
+VOICE_VIEW_ONLY_ROLE_IDS = _config_int_list("VOICE_VIEW_ONLY_ROLE_IDS", VOICE_VIEW_ONLY_ROLE_IDS)
 
 # 名稱 / 其他設定
 PLAY_VOICE_CREATE_CHANNEL_NAME = _config_str("PLAY_VOICE_CREATE_CHANNEL_NAME", PLAY_VOICE_CREATE_CHANNEL_NAME)
@@ -448,10 +455,45 @@ vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
 
 # ========= 工具函式 =========
 
+def _clean_ticket_channel_part(value: str, *, fallback: str = "user") -> str:
+    clean = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(value))
+    clean = re.sub(r"-+", "-", clean).strip("-")
+    return clean or fallback
+
+
+def build_ticket_channel_name(prefix: str, member: discord.Member | None = None, *, display_name: str | None = None) -> str:
+    raw_name = display_name or (member.display_name if member is not None else None) or "user"
+    prefix_part = _clean_ticket_channel_part(prefix, fallback="ticket")
+    name_part = _clean_ticket_channel_part(raw_name, fallback="user")
+    date_part = get_taipei_now().strftime("%m%d")
+    return f"{prefix_part}-{name_part}-{date_part}"[:90]
+
+
 def safe_channel_name(prefix: str, member: discord.Member) -> str:
-    name = member.name.lower()
-    clean = "".join(c if c.isalnum() else "-" for c in name)
-    return f"{prefix}-{clean}-{member.id}"[:90]
+    return build_ticket_channel_name(prefix, member)
+
+
+async def rename_ticket_channel(
+    channel: discord.abc.GuildChannel | None,
+    prefix: str,
+    member: discord.Member | None = None,
+    *,
+    display_name: str | None = None,
+) -> None:
+    if not isinstance(channel, discord.TextChannel):
+        return
+
+    new_name = build_ticket_channel_name(prefix, member, display_name=display_name)
+
+    if channel.name == new_name:
+        return
+
+    try:
+        await channel.edit(name=new_name, reason=f"Ticket status changed: {prefix}")
+    except discord.Forbidden:
+        print(f"Bot 權限不足，無法更改票口名稱：{channel.id} -> {new_name}")
+    except discord.HTTPException as e:
+        print(f"更改票口名稱失敗：{channel.id} -> {new_name}：{e}")
 
 
 def is_agree_answer(text: str) -> bool:
@@ -945,6 +987,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         )
 
         await lock_dispatch_claim_panel(guild, order_channel.id)
+        await rename_ticket_channel(order_channel, "已結單", member=customer_member)
 
         reward_result = "會員累積已在顧客送出付款方式時處理。" if order_data.get("reward_counted") else "提醒：這張單尚未標記會員累積，請確認顧客是否已送出付款方式。"
 
@@ -3029,6 +3072,7 @@ async def finalize_payment_and_dispatch(
     remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
 
     customer_member = guild.get_member(customer_id) if customer_id is not None else None
+    await rename_ticket_channel(interaction.channel, str(item), member=customer_member)
     sync_web_order_active_from_dispatch_from_bot(
         ticket_channel_id=interaction.channel.id,
         dispatch_channel_id=dispatch_channel.id,
