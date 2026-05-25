@@ -10,6 +10,7 @@ PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 VIP_VOICE_LOBBY_ROLE_ID = 0
 PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = []
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS: list[int] = []
+VOICE_VIEW_ONLY_ROLE_IDS = [1507204925766242425]
 TEMP_VOICE_CONTROL_PANELS: dict[int, dict] = {}
 
 
@@ -35,6 +36,7 @@ def configure_voice_helpers(
     global VIP_VOICE_LOBBY_ROLE_ID
     global PLAY_VOICE_ALLOWED_ROLE_IDS
     global VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS
+    global VOICE_VIEW_ONLY_ROLE_IDS
     global TEMP_VOICE_CONTROL_PANELS
 
     PLAY_VOICE_CATEGORY_ID = int(play_voice_category_id)
@@ -83,6 +85,30 @@ def get_voice_room_hidden_visible_roles(guild: discord.Guild) -> list[discord.Ro
     ]
 
 
+
+def apply_voice_view_only_role_overwrites(
+    guild: discord.Guild,
+    overwrites: dict,
+) -> dict:
+    """讓指定身分組可以看見創建後的語音房，但不能連接。"""
+    for role_id in VOICE_VIEW_ONLY_ROLE_IDS:
+        role = guild.get_role(int(role_id))
+        if role is None:
+            continue
+
+        overwrites[role] = discord.PermissionOverwrite(
+            view_channel=True,
+            connect=False,
+            speak=False,
+            stream=False,
+            use_voice_activation=False,
+            read_message_history=True,
+            send_messages=False,
+        )
+
+    return overwrites
+
+
 def build_play_voice_overwrites(guild: discord.Guild) -> dict:
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
@@ -107,6 +133,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
             use_voice_activation=True
         )
 
+    apply_voice_view_only_role_overwrites(guild, overwrites)
     return overwrites
 
 
@@ -170,6 +197,7 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
             use_voice_activation=True
         )
 
+    apply_voice_view_only_role_overwrites(guild, overwrites)
     return overwrites
 
 
