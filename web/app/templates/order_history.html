@@ -261,7 +261,7 @@
     align-items: end;
 }
 .history-assignment-row {
-    grid-template-columns: 90px minmax(160px, 1fr) 90px;
+    grid-template-columns: 90px minmax(160px, 1fr) 120px 90px;
 }
 .history-assignment-row label,
 .history-payout-row label {
@@ -489,6 +489,12 @@
                                                 </select>
                                             </label>
 
+
+                                            <label class="history-delete-check">
+                                                <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
+                                                <span>掛名 +5%</span>
+                                            </label>
+
                                             <label class="history-delete-check">
                                                 <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
                                                 <span>刪除</span>
@@ -511,6 +517,11 @@
                                                         <option value="{{ option.id }}">{{ option.name }}</option>
                                                     {% endfor %}
                                                 </select>
+                                            </label>
+
+                                            <label class="history-delete-check">
+                                                <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
+                                                <span>掛名 +5%</span>
                                             </label>
 
                                             <div></div>

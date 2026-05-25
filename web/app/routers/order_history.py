@@ -660,8 +660,19 @@ def restore_payout_status(snapshot: dict[tuple[str, int, str], tuple[str, str | 
 
 
 def recalculate_history_orders(order_ids: list[int]) -> None:
-    """歷史訂單保存後先重算公式，再套用手動覆蓋。"""
-    if not order_ids:
+    """歷史訂單保存後安全重算已結單分潤；不直接刪除分潤表。"""
+    clean_order_ids = []
+
+    for order_id in order_ids:
+        try:
+            order_id = int(order_id)
+        except Exception:
+            continue
+
+        if order_id > 0:
+            clean_order_ids.append(order_id)
+
+    if not clean_order_ids:
         return
 
     try:
@@ -672,7 +683,7 @@ def recalculate_history_orders(order_ids: list[int]) -> None:
         db = SessionLocal()
 
         try:
-            for order_id in order_ids:
+            for order_id in clean_order_ids:
                 order = db.get(WebOrder, order_id)
 
                 if order is None:
@@ -680,13 +691,6 @@ def recalculate_history_orders(order_ids: list[int]) -> None:
 
                 if str(order.status) == "closed":
                     recalculate_order_payouts(db, order_id)
-                else:
-                    conn = sqlite3.connect(history_db_path())
-
-                    try:
-conn.commit()
-                    finally:
-                        conn.close()
 
             db.commit()
         finally:
@@ -784,10 +788,8 @@ def apply_manual_payout_edits(form, order_ids: list[int]) -> None:
 
         conn.commit()
 
-        # 重點：先刪掉舊分潤 rows。
-        # 否則舊的手動 final_payout 可能被保留下來，導致填 0 也不回公式。
-        for order_id in clean_order_ids:
-conn.commit()
+        # 已停用：不要在歷史訂單保存時直接刪除分潤 rows。
+        conn.commit()
     finally:
         conn.close()
 
@@ -1294,6 +1296,7 @@ async def bulk_update_order_history(request: Request):
                 assignment_id = history_to_int(assignment_id_text)
                 selected_worker_id = str(form.get(f"assignment_worker_{assignment_id}") or "").strip()
                 delete_flag = str(form.get(f"delete_assignment_{assignment_id}") or "").strip() == "1"
+                named_bonus = 1 if str(form.get(f"assignment_named_bonus_{assignment_id}") or "").strip() == "1" else 0
 
                 if assignment_id <= 0:
                     continue
@@ -1316,6 +1319,7 @@ async def bulk_update_order_history(request: Request):
                         worker_discord_id = ?,
                         worker_display_name = ?,
                         role_type = ?,
+                        has_named_bonus = ?,
                         is_active = 1
                     WHERE id = ?
                     """,
@@ -1323,6 +1327,7 @@ async def bulk_update_order_history(request: Request):
                         selected_worker_id,
                         worker_name_map.get(selected_worker_id, selected_worker_id),
                         worker_role_map.get(selected_worker_id, "worker"),
+                        named_bonus,
                         assignment_id,
                     ),
                 )
@@ -1342,6 +1347,7 @@ async def bulk_update_order_history(request: Request):
 
             for index in range(1, 4):
                 new_worker_id = str(form.get(f"new_worker_{order_id}_{index}") or "").strip()
+                new_named_bonus = 1 if str(form.get(f"new_worker_named_bonus_{order_id}_{index}") or "").strip() == "1" else 0
 
                 if not new_worker_id or new_worker_id in existing_active:
                     continue
@@ -1357,13 +1363,14 @@ async def bulk_update_order_history(request: Request):
                         has_named_bonus,
                         assigned_at
                     )
-                    VALUES (?, ?, ?, ?, 1, 0, datetime('now'))
+                    VALUES (?, ?, ?, ?, 1, ?, datetime('now'))
                     """,
                     (
                         order_id,
                         new_worker_id,
                         worker_name_map.get(new_worker_id, new_worker_id),
                         worker_role_map.get(new_worker_id, "worker"),
+                        new_named_bonus,
                     ),
                 )
 
@@ -1394,7 +1401,7 @@ async def bulk_update_order_history(request: Request):
                     conn = sqlite3.connect(history_db_path())
 
                     try:
-conn.commit()
+                        conn.commit()
                     finally:
                         conn.close()
 
@@ -1403,23 +1410,6 @@ conn.commit()
             db.close()
     except Exception as exc:
         print(f"[order-history] recalculate payouts failed: {exc}")
-
-    # 客服選無：刪掉客服分潤。
-    conn = sqlite3.connect(history_db_path())
-
-    try:
-        for order_id in order_ids:
-            cs_id = str(form.get(f"customer_service_{order_id}") or "").strip()
-
-            if not cs_id:
-                conn.execute(
-                    "DELETE FROM customer_service_payouts WHERE order_id = ?",
-                    (order_id,),
-                )
-
-        conn.commit()
-    finally:
-        conn.close()
 
     restore_payout_status(payout_status_snapshot)
     apply_manual_payout_edits(form, order_ids)
