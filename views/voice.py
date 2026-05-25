@@ -2,6 +2,8 @@ import discord
 
 
 PLAY_VOICE_CATEGORY_ID = 0
+PLAY_VOICE_LOBBY_CATEGORY_ID = 1508550586696597604
+VIP_VOICE_LOBBY_CATEGORY_ID = 1508550977169526784
 PLAY_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建陪玩頻道"
 OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES: list[str] = []
 VIP_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建VIP頻道"
@@ -221,10 +223,10 @@ def build_public_voice_overwrites(guild: discord.Guild) -> dict:
 
 
 async def get_or_create_play_voice_lobby(guild: discord.Guild) -> discord.VoiceChannel | None:
-    category = guild.get_channel(PLAY_VOICE_CATEGORY_ID)
+    category = guild.get_channel(PLAY_VOICE_LOBBY_CATEGORY_ID)
 
     if category is None or not isinstance(category, discord.CategoryChannel):
-        print("找不到陪玩語音類別，請確認 PLAY_VOICE_CATEGORY_ID 是否正確。")
+        print("找不到陪玩語音類別，請確認 PLAY_VOICE_LOBBY_CATEGORY_ID 是否正確。")
         return None
 
     for channel in category.voice_channels:
@@ -249,10 +251,10 @@ async def get_or_create_play_voice_lobby(guild: discord.Guild) -> discord.VoiceC
 
 
 async def get_or_create_vip_voice_lobby(guild: discord.Guild) -> discord.VoiceChannel | None:
-    category = guild.get_channel(PLAY_VOICE_CATEGORY_ID)
+    category = guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
 
     if category is None or not isinstance(category, discord.CategoryChannel):
-        print("找不到 VIP 語音類別，請確認 PLAY_VOICE_CATEGORY_ID 是否正確。")
+        print("找不到 VIP 語音類別，請確認 VIP_VOICE_LOBBY_CATEGORY_ID 是否正確。")
         return None
 
     for channel in category.voice_channels:

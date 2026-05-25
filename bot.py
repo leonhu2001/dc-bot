@@ -232,13 +232,17 @@ GUILD_ID = 1129474191226306672
 CUSTOMER_CATEGORY_ID = 1483895536938651809
 EXAM_CATEGORY_ID = 1483873316702781471
 PLAY_VOICE_CATEGORY_ID = 1482016208638447699
+PLAY_VOICE_LOBBY_CATEGORY_ID = 1508550586696597604
+VIP_VOICE_LOBBY_CATEGORY_ID = 1508550977169526784
 
 # 陪玩語音入口頻道名稱
 PLAY_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建陪玩頻道"
+PLAY_VOICE_CREATE_CHANNEL_ID = 1508550586696597604
 OLD_PLAY_VOICE_CREATE_CHANNEL_NAMES = ["🎮┃陪玩點我創建頻道"]
 
 # VIP 語音入口頻道名稱
 VIP_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建VIP頻道"
+VIP_VOICE_CREATE_CHANNEL_ID = 1508550977169526784
 OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = ["👑┃𝙑𝙄𝙋專用點我創建頻道"]
 
 # 公共語音入口頻道名稱
@@ -3723,7 +3727,7 @@ async def on_voice_state_update(
         is_temp_play_voice_room = (
             before.channel.id in TEMP_PLAY_VOICE_CHANNEL_IDS
             or (
-                before.channel.category_id == PLAY_VOICE_CATEGORY_ID
+                before.channel.category_id in {PLAY_VOICE_CATEGORY_ID, PLAY_VOICE_LOBBY_CATEGORY_ID}
                 and before.channel.name.startswith("🎮┃")
                 and before.channel.name.endswith("的陪玩頻道")
                 and before.channel.name != PLAY_VOICE_CREATE_CHANNEL_NAME
@@ -3733,7 +3737,7 @@ async def on_voice_state_update(
         is_temp_vip_voice_room = (
             before.channel.id in TEMP_VIP_VOICE_CHANNEL_IDS
             or (
-                before.channel.category_id == PLAY_VOICE_CATEGORY_ID
+                before.channel.category_id in {PLAY_VOICE_CATEGORY_ID, VIP_VOICE_LOBBY_CATEGORY_ID}
                 and before.channel.name.startswith("👑┃")
                 and before.channel.name.endswith("的𝙑𝙄𝙋頻道")
                 and before.channel.name != VIP_VOICE_CREATE_CHANNEL_NAME
@@ -3812,6 +3816,10 @@ async def on_voice_state_update(
     # 進入一般陪玩入口：建立一般陪玩語音房
     if play_lobby_channel is not None and after.channel.id == play_lobby_channel.id:
         try:
+            category = guild.get_channel(PLAY_VOICE_LOBBY_CATEGORY_ID)
+            if category is None or not isinstance(category, discord.CategoryChannel):
+                category = play_lobby_channel.category
+
             overwrites = build_play_voice_overwrites(guild)
             overwrites[member] = build_creator_voice_overwrite()
 
@@ -3845,6 +3853,10 @@ async def on_voice_state_update(
     # 進入 VIP 入口：建立 VIP 專用語音房
     if vip_lobby_channel is not None and after.channel.id == vip_lobby_channel.id:
         try:
+            category = guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
+            if category is None or not isinstance(category, discord.CategoryChannel):
+                category = vip_lobby_channel.category
+
             new_channel = await guild.create_voice_channel(
                 name=safe_vip_voice_channel_name(member),
                 category=category,
@@ -3875,6 +3887,10 @@ async def on_voice_state_update(
     # 進入公共入口：建立所有人可見 / 可加入的公共語音房
     if public_lobby_channel is not None and after.channel.id == public_lobby_channel.id:
         try:
+            category = guild.get_channel(PLAY_VOICE_CATEGORY_ID)
+            if category is None or not isinstance(category, discord.CategoryChannel):
+                category = public_lobby_channel.category
+
             overwrites = build_public_voice_overwrites(guild)
             overwrites[member] = build_creator_voice_overwrite()
 
