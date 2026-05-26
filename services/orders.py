@@ -263,9 +263,23 @@ def build_self_service_order_embed(
         embed.add_field(name="指定選項", value=companion_preference, inline=False)
 
     if receiver_text is not None:
-        embed.add_field(name="接單人員", value=receiver_text, inline=False)
+        normalized_receiver_text = str(receiver_text or "").strip()
+
+        if normalized_receiver_text.startswith("打手："):
+            normalized_receiver_text = "打手接單：" + normalized_receiver_text.removeprefix("打手：").strip()
+        elif normalized_receiver_text.startswith("打手:"):
+            normalized_receiver_text = "打手接單：" + normalized_receiver_text.removeprefix("打手:").strip()
+        elif normalized_receiver_text.startswith("陪玩："):
+            normalized_receiver_text = "陪玩接單：" + normalized_receiver_text.removeprefix("陪玩：").strip()
+        elif normalized_receiver_text.startswith("陪玩:"):
+            normalized_receiver_text = "陪玩接單：" + normalized_receiver_text.removeprefix("陪玩:").strip()
+        elif normalized_receiver_text in {"不指定陪玩/打手", "不指定打手/陪玩"}:
+            normalized_receiver_text = "尚未接單"
+
+        embed.add_field(name="接單人員", value=normalized_receiver_text or "尚未接單", inline=False)
 
     embed.add_field(name="來源票口", value=source_channel.mention, inline=False)
+    embed.add_field(name="接單狀態", value="等待接單", inline=False)
     return embed
 
 
