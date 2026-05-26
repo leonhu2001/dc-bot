@@ -320,6 +320,7 @@ PLAY_VOICE_ALLOWED_ROLE_IDS = [
     1503706721883783218,
     1503701170504339458,
     1482084782031638548,
+    1507204925766242425,
 ]
 
 # 語音房按「隱藏」後，仍可看見房間的身分組 ID
@@ -4959,15 +4960,87 @@ def _web_sync_build_receiver_text(assignments: list[dict]) -> str:
     parts = []
 
     if boosters:
-        parts.append("打手：" + "、".join(boosters))
+        parts.append("打手接單：" + "、".join(boosters))
 
     if companions:
-        parts.append("陪玩：" + "、".join(companions))
+        parts.append("陪玩接單：" + "、".join(companions))
 
     if not parts:
         return "尚未有人接單"
 
     return "\n".join(parts)
+
+
+
+def _normalize_dispatch_embed_field_order(embed):
+    """統一派單面板欄位順序，以 DC bot 接單格式為準。"""
+    fields = []
+
+    for field in embed.fields:
+        name = str(field.name or "").strip()
+        value = str(field.value or "").strip()
+
+        if name in {"目前接單", "目前接單人"}:
+            name = "接單人員"
+
+        if name in {"目前狀態"}:
+            name = "接單狀態"
+
+        fields.append({
+            "name": name,
+            "value": value or "—",
+            "inline": field.inline,
+        })
+
+    preferred_order = [
+        "下單用戶",
+        "訂單類別",
+        "訂單項目",
+        "數量",
+        "付款方式",
+        "指定選項",
+        "接單人員",
+        "來源票口",
+        "接單狀態",
+    ]
+
+    embed.clear_fields()
+
+    used = [False] * len(fields)
+
+    for preferred_name in preferred_order:
+        for index, field in enumerate(fields):
+            if used[index]:
+                continue
+
+            if field["name"] != preferred_name:
+                continue
+
+            inline = field["inline"]
+
+            if preferred_name in {"訂單類別", "訂單項目", "數量"}:
+                inline = True
+            else:
+                inline = False
+
+            embed.add_field(
+                name=preferred_name,
+                value=field["value"],
+                inline=inline,
+            )
+            used[index] = True
+
+    for index, field in enumerate(fields):
+        if used[index]:
+            continue
+
+        embed.add_field(
+            name=field["name"],
+            value=field["value"],
+            inline=field["inline"],
+        )
+
+    return embed
 
 
 def _web_sync_embed_without_receiver_fields(embed):
@@ -5018,6 +5091,33 @@ async def process_one_web_sync_event(event: dict) -> None:
         assignments = _web_sync_get_assignments(int(event["order_id"]))
         receiver_text = _web_sync_build_receiver_text(assignments)
 
+        # 網頁接單同步到 DC bot 記憶體，讓 Discord 的取消接單按鈕也認得。
+        claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+        claim_data["booster"] = set()
+        claim_data["companion"] = set()
+
+        for row in assignments:
+            user_id = str(row.get("worker_discord_id") or "").strip()
+            role_type = str(row.get("role_type") or "booster").strip()
+
+            if not user_id:
+                continue
+
+            try:
+                parsed_user_id = int(user_id)
+            except Exception:
+                continue
+
+            if role_type == "companion":
+                claim_data["companion"].add(parsed_user_id)
+            else:
+                claim_data["booster"].add(parsed_user_id)
+
+        try:
+            remember_claim_data(dispatch_message_id, claim_data)
+        except Exception as exc:
+            print(f"[web-sync] remember claim data failed dispatch_message_id={dispatch_message_id}: {exc}")
+
         if message.embeds:
             embed = message.embeds[0].copy()
         else:
@@ -5030,8 +5130,10 @@ async def process_one_web_sync_event(event: dict) -> None:
             inline=False,
         )
 
+        embed = _normalize_dispatch_embed_field_order(embed)
+
         await message.edit(
-            embed=embed,
+                  embed=embed,
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
 
