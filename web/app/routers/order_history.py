@@ -259,7 +259,7 @@ def history_db_path() -> str:
 
 
 def history_staff_options() -> dict:
-    """從現有資料整理客服/打手選項。先用已出現過的人員，避免依賴未知 staff table。"""
+    """從 Discord 同步成員表建立歷史訂單的人員下拉選項。"""
     conn = sqlite3.connect(history_db_path())
     conn.row_factory = sqlite3.Row
 
@@ -267,42 +267,57 @@ def history_staff_options() -> dict:
     customer_services = {}
 
     try:
-        for row in conn.execute(
+        rows = conn.execute(
             """
-            SELECT DISTINCT worker_discord_id, worker_display_name, role_type
-            FROM order_assignments
-            WHERE COALESCE(worker_discord_id, '') <> ''
-            ORDER BY worker_display_name, worker_discord_id
+            SELECT
+                discord_id,
+                username,
+                display_name,
+                global_name,
+                is_customer_service,
+                is_worker,
+                is_companion,
+                is_active
+            FROM web_staff_members
+            WHERE is_active = 1
+            ORDER BY display_name, global_name, username, discord_id
             """
-        ).fetchall():
-            discord_id = str(row["worker_discord_id"] or "").strip()
-            display_name = str(row["worker_display_name"] or "").strip() or discord_id
-            role_type = str(row["role_type"] or "worker").strip() or "worker"
+        ).fetchall()
 
-            if discord_id:
+        for row in rows:
+            discord_id = str(row["discord_id"] or "").strip()
+
+            if not discord_id:
+                continue
+
+            display_name = (
+                str(row["display_name"] or "").strip()
+                or str(row["global_name"] or "").strip()
+                or str(row["username"] or "").strip()
+                or discord_id
+            )
+
+            if discord_id == "demo_customer_service":
+                continue
+
+            if display_name in {"測試客服", "demo_customer_service", "無"}:
+                continue
+
+            if int(row["is_customer_service"] or 0) == 1:
+                customer_services[discord_id] = {
+                    "id": discord_id,
+                    "name": display_name,
+                }
+
+            if int(row["is_worker"] or 0) == 1 or int(row["is_companion"] or 0) == 1:
+                role_type = "worker" if int(row["is_worker"] or 0) == 1 else "companion"
+
                 workers[discord_id] = {
                     "id": discord_id,
                     "name": display_name,
                     "role_type": role_type,
                 }
 
-        for row in conn.execute(
-            """
-            SELECT DISTINCT customer_service_discord_id, customer_service_display_name
-            FROM web_orders
-            WHERE COALESCE(customer_service_discord_id, '') <> ''
-               OR COALESCE(customer_service_display_name, '') <> ''
-            ORDER BY customer_service_display_name, customer_service_discord_id
-            """
-        ).fetchall():
-            discord_id = str(row["customer_service_discord_id"] or "").strip()
-            display_name = str(row["customer_service_display_name"] or "").strip() or discord_id
-
-            if discord_id:
-                customer_services[discord_id] = {
-                    "id": discord_id,
-                    "name": display_name,
-                }
     finally:
         conn.close()
 
