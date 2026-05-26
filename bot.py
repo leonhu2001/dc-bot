@@ -134,7 +134,6 @@ from services.orders import (
     ORDER_ITEM_TO_CATEGORY,
     SPECIAL_COMPANION_ITEMS,
     QUANTITY_SELECT_ITEMS,
-    get_quantity_options_for_item,
     QUANTITY_OPTIONS,
     find_order_by_identifier,
     is_order_closed_for_rewards,
@@ -1477,31 +1476,26 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
             discord.SelectOption(
                 label="基礎單",
                 value="basic",
-                description="油鍋單、賭約單、保底單、技術陪、娛樂陪、體驗單",
                 default=selected_category == "basic"
             ),
             discord.SelectOption(
                 label="趣味單",
                 value="fun",
-                description="豪到你了嗎、瘋狗嘶咬、這什麼鳥槍、想吃自己打",
                 default=selected_category == "fun"
             ),
             discord.SelectOption(
                 label="代解代肝",
                 value="farm",
-                description="賽季3x3、哈夫幣代洗",
                 default=selected_category == "farm"
             ),
             discord.SelectOption(
                 label="賽季限定活動",
                 value="season",
-                description="勇敢者行動、S9炫彩勇敢者行動",
                 default=selected_category == "season"
             ),
             discord.SelectOption(
                 label="Valorant",
                 value="valorant",
-                description="陪打、代打",
                 default=selected_category == "valorant"
             ),
         ]
@@ -1544,7 +1538,6 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
                 selected_category=selected_category
             )
         )
-
 
 class SelfServiceOrderItemSelect(discord.ui.Select):
     def __init__(
@@ -1732,6 +1725,64 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             )
         )
 
+class SelfServiceOrderQuantityModal(discord.ui.Modal, title="填寫訂單數量"):
+    quantity = discord.ui.TextInput(
+        label="訂單數量",
+        placeholder="請輸入 1～99",
+        required=True,
+        max_length=2,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int):
+        super().__init__()
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單數量。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        selected_item = data.get("item")
+
+        if selected_item not in QUANTITY_SELECT_ITEMS:
+            data["quantity"] = 1
+            remember_order_data(self.channel_id, data)
+            await interaction.response.send_message("此項目數量固定為 1 單。", ephemeral=True)
+            return
+
+        try:
+            quantity = int(str(self.quantity.value).strip())
+        except ValueError:
+            await interaction.response.send_message("數量請輸入 1～99 的數字。", ephemeral=True)
+            return
+
+        if quantity < 1 or quantity > 99:
+            await interaction.response.send_message("數量請輸入 1～99 單。", ephemeral=True)
+            return
+
+        data["customer_id"] = self.customer_id
+        data["quantity"] = quantity
+        data.pop("payment_method", None)
+        remember_order_data(self.channel_id, data)
+
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "填寫訂單數量",
+            f"{quantity} 單",
+        )
+
+        await interaction.response.edit_message(
+            view=SelfServiceOrderView(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+                selected_category=data.get("category")
+            )
+        )
+
+
 class SelfServiceOrderQuantitySelect(discord.ui.Select):
     def __init__(
         self,
@@ -1758,15 +1809,13 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         elif selected_item in QUANTITY_SELECT_ITEMS:
             options = [
                 discord.SelectOption(
-                    label=f"{num} 單",
-                    value=str(num),
-                    description=f"{num} 單 = 約 {num} 小時",
-                    default=quantity == num
+                    label=f"目前：{quantity} 單",
+                    value="custom_quantity",
+                    description="點這裡填寫 1～99 單"
                 )
-                for num in QUANTITY_OPTIONS
             ]
             disabled = False
-            placeholder = "請選擇數量"
+            placeholder = "填寫數量 1～99 單"
         else:
             options = [
                 discord.SelectOption(
@@ -1801,28 +1850,22 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         selected_item = data.get("item")
 
-        try:
-            quantity = int(self.values[0])
-        except ValueError:
-            await interaction.response.send_message("數量選擇異常，請重新選擇。", ephemeral=True)
-            return
-
-        if selected_item not in QUANTITY_SELECT_ITEMS:
-            quantity = 1
-
-        if quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-            await interaction.response.send_message("數量請選擇 1 到 8 單。", ephemeral=True)
+        if selected_item in QUANTITY_SELECT_ITEMS:
+            await interaction.response.send_modal(
+                SelfServiceOrderQuantityModal(self.customer_id, self.channel_id)
+            )
             return
 
         data["customer_id"] = self.customer_id
-        data["quantity"] = quantity
+        data["quantity"] = 1
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
+
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
             "選擇訂單數量",
-            f"{quantity} 單",
+            "1 單",
         )
 
         await interaction.response.edit_message(
@@ -3024,7 +3067,7 @@ async def finalize_payment_and_dispatch(
         data["quantity"] = 1
         remember_order_data(channel_id, data)
     else:
-        valid_quantity_options = get_quantity_options_for_item(item)
+        valid_quantity_options = QUANTITY_OPTIONS
         if quantity not in valid_quantity_options:
             await interaction.response.send_message(
                 f"數量選擇異常，{item} 只能選擇 {min(valid_quantity_options)}～{max(valid_quantity_options)} 單，請回到自助下單面板重新選擇。",
@@ -3420,8 +3463,8 @@ class SelfServiceOrderView(discord.ui.View):
             quantity = 1
             data["quantity"] = 1
             remember_order_data(self.channel_id, data)
-        elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-            await interaction.response.send_message("請重新選擇正確的數量。", ephemeral=True)
+        elif quantity < 1 or quantity > 99:
+            await interaction.response.send_message("數量請輸入 1～99 單。", ephemeral=True)
             return
 
         if companion_preference is None:
