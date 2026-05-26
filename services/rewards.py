@@ -76,6 +76,49 @@ VIP_LEVEL_BENEFITS = {
 }
 
 
+
+def recalculate_web_payout_after_close(order_no=None, web_order_id=None):
+    """Discord 結單後同步重算 web dashboard 分潤。"""
+    try:
+        from shared.db import SessionLocal
+        from shared.models import WebOrder
+        from web.app.services.order_service import recalculate_order_payouts
+
+        db = SessionLocal()
+
+        try:
+            order = None
+
+            if web_order_id:
+                try:
+                    order = db.get(WebOrder, int(web_order_id))
+                except Exception:
+                    order = None
+
+            if order is None and order_no:
+                order = (
+                    db.query(WebOrder)
+                    .filter(WebOrder.bot_order_no == str(order_no))
+                    .first()
+                )
+
+            if order is None:
+                print(f"[rewards] web payout skipped: order not found order_no={order_no} web_order_id={web_order_id}")
+                return
+
+            order.status = "closed"
+            recalculate_order_payouts(db, order.id)
+            db.commit()
+
+            print(f"[rewards] web payout recalculated WEB-{order.id} order_no={order.bot_order_no}")
+
+        finally:
+            db.close()
+
+    except Exception as exc:
+        print(f"[rewards] web payout recalculate failed: {exc}")
+
+
 def get_member_level_benefits_text(level_name: str) -> str:
     return VIP_LEVEL_BENEFITS.get(str(level_name or "普通魔丸"), "尚未設定此等級福利。")
 
@@ -428,10 +471,11 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
             except discord.HTTPException:
                 notices.append("銀級魔丸身分組收回失敗：Discord API 錯誤")
 
-    if level_threshold >= 12000:
-        existing_channel_id = _to_int(data.get("platinum_channel_id"))
-        if existing_channel_id is not None and guild.get_channel(existing_channel_id) is not None:
-            return notices
+    # 白金以上不再自動建立 VIP 專屬文字頻道。
+    # 文字頻道若要建立，改由客服手動處理。
+
+
+    return notices
 
         category = guild.get_channel(_PLATINUM_PRIVATE_CATEGORY_ID) if _PLATINUM_PRIVATE_CATEGORY_ID is not None else None
         if not isinstance(category, discord.CategoryChannel):
