@@ -12,7 +12,7 @@ PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 VIP_VOICE_LOBBY_ROLE_ID = 0
 PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = []
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS: list[int] = []
-VOICE_VIEW_ONLY_ROLE_IDS = [1507204925766242425]
+VOICE_VIEW_ONLY_ROLE_IDS = []
 TEMP_VOICE_CONTROL_PANELS: dict[int, dict] = {}
 
 
@@ -48,7 +48,9 @@ def configure_voice_helpers(
     OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = list(old_vip_voice_create_channel_names or [])
     PUBLIC_VOICE_CREATE_CHANNEL_NAME = str(public_voice_create_channel_name)
     VIP_VOICE_LOBBY_ROLE_ID = int(vip_voice_lobby_role_id)
-    PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or [])]
+    PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or [
+    1507204925766242425,
+])]
     VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [int(role_id) for role_id in (voice_room_hidden_visible_role_ids or [])]
     TEMP_VOICE_CONTROL_PANELS = temp_voice_control_panels
 
@@ -94,6 +96,8 @@ def apply_voice_view_only_role_overwrites(
 ) -> dict:
     """讓指定身分組可以看見創建後的語音房，但不能連接。"""
     for role_id in VOICE_VIEW_ONLY_ROLE_IDS:
+        if int(role_id) in PLAY_VOICE_ALLOWED_ROLE_IDS:
+            continue
         role = guild.get_role(int(role_id))
         if role is None:
             continue

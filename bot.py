@@ -320,6 +320,7 @@ PLAY_VOICE_ALLOWED_ROLE_IDS = [
     1503706721883783218,
     1503701170504339458,
     1482084782031638548,
+    1507204925766242425,
 ]
 
 # 語音房按「隱藏」後，仍可看見房間的身分組 ID
@@ -332,7 +333,6 @@ VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [
 
 # 可看見創建後陪玩 / VIP 語音房，但不可連接的身分組 ID
 VOICE_VIEW_ONLY_ROLE_IDS = [
-    1507204925766242425,
 ]
 
 # 暫存由機器人建立的陪玩語音房 ID
@@ -841,6 +841,42 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
             note="由 DC bot 結單同步。",
         )
         print(f"[web-sync] close order ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} ok={ok}")
+
+        if ok:
+            try:
+                from shared.db import SessionLocal
+                from shared.models import WebOrder
+                from web.app.services.order_service import recalculate_order_payouts
+
+                db = SessionLocal()
+
+                try:
+                    order = (
+                        db.query(WebOrder)
+                        .filter(WebOrder.ticket_channel_id == str(ticket_channel_id))
+                        .first()
+                    )
+
+                    if order is None:
+                        order = (
+                            db.query(WebOrder)
+                            .filter(WebOrder.ticket_channel_id == ticket_channel_id)
+                            .first()
+                        )
+
+                    if order is None:
+                        print(f"[web-sync] payout skipped: web order not found ticket_channel_id={ticket_channel_id}")
+                    else:
+                        order.status = "closed"
+                        recalculate_order_payouts(db, order.id)
+                        db.commit()
+                        print(f"[web-sync] payout recalculated WEB-{order.id} ticket_channel_id={ticket_channel_id}")
+
+                finally:
+                    db.close()
+
+            except Exception as exc:
+                print(f"[web-sync] payout recalculate failed ticket_channel_id={ticket_channel_id}: {exc}")
     except Exception as exc:
         print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
 
