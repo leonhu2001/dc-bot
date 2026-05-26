@@ -134,6 +134,7 @@ from services.orders import (
     ORDER_ITEM_TO_CATEGORY,
     SPECIAL_COMPANION_ITEMS,
     QUANTITY_SELECT_ITEMS,
+    get_quantity_options_for_item,
     QUANTITY_OPTIONS,
     find_order_by_identifier,
     is_order_closed_for_rewards,
@@ -2986,9 +2987,14 @@ async def finalize_payment_and_dispatch(
         quantity = 1
         data["quantity"] = 1
         remember_order_data(channel_id, data)
-    elif quantity < 1 or quantity > max(QUANTITY_OPTIONS):
-        await interaction.response.send_message("數量選擇異常，請回到自助下單面板重新選擇。", ephemeral=True)
-        return
+    else:
+        valid_quantity_options = get_quantity_options_for_item(item)
+        if quantity not in valid_quantity_options:
+            await interaction.response.send_message(
+                f"數量選擇異常，{item} 只能選擇 {min(valid_quantity_options)}～{max(valid_quantity_options)} 單，請回到自助下單面板重新選擇。",
+                ephemeral=True,
+            )
+            return
 
     if companion_preference is None:
         companion_preference = "不指定陪玩/打手"

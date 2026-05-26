@@ -30,6 +30,7 @@ ORDER_ITEMS_BY_CATEGORY = {
         "技術陪",
         "保底單",
         "節日特別單",
+        "教學單",
         "賭約單",
         "油鍋單",
     ],
@@ -67,6 +68,7 @@ SPECIAL_COMPANION_ITEMS = {
 }
 
 QUANTITY_SELECT_ITEMS = {
+    "教學單",
     "娛樂陪",
     "技術陪",
     "陪打",
@@ -74,6 +76,14 @@ QUANTITY_SELECT_ITEMS = {
 }
 
 QUANTITY_OPTIONS = list(range(1, 9))
+
+ITEM_QUANTITY_OPTIONS = {
+    "教學單": list(range(3, 9)),
+}
+
+
+def get_quantity_options_for_item(item: str | None) -> list[int]:
+    return list(ITEM_QUANTITY_OPTIONS.get(str(item or ""), QUANTITY_OPTIONS))
 
 
 _ORDER_SELECTIONS: dict[int, dict] = {}
