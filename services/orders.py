@@ -42,6 +42,7 @@ ORDER_ITEMS_BY_CATEGORY = {
     "farm": [
         "賽季3x3",
         "哈夫幣代洗",
+        "幣號",
     ],
     "season": [
         "勇敢者行動",
@@ -71,10 +72,10 @@ QUANTITY_SELECT_ITEMS = {
     "娛樂陪",
     "技術陪",
     "陪打",
+    "幣號",
 }
 
-QUANTITY_OPTIONS = list(range(1, 100))
-
+QUANTITY_OPTIONS = list(range(1, 25))
 
 
 _ORDER_SELECTIONS: dict[int, dict] = {}
