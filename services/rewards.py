@@ -24,11 +24,12 @@ _SILVER_MEMBER_ROLE_ID: int | None = None
 _PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
 _PLATINUM_CHAT_ROLE_IDS: list[int] = []
 _REWARD_DB_FILE: Path | None = None
+VIP_PROGRESS_EXCLUDED_ITEMS = {"幣號"}
 
 # ========= VIP display / reward exclusions =========
 
 NO_VIP_REWARD_ITEMS = {
-    "哈夫幣代洗",
+    
     "代洗哈夫幣",
     "純綠代肝哈夫幣",
 }
@@ -474,70 +475,6 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
     # 白金以上不再自動建立 VIP 專屬文字頻道。
     # 文字頻道若要建立，改由客服手動處理。
 
-
-    return notices
-
-        category = guild.get_channel(_PLATINUM_PRIVATE_CATEGORY_ID) if _PLATINUM_PRIVATE_CATEGORY_ID is not None else None
-        if not isinstance(category, discord.CategoryChannel):
-            notices.append("白金專屬頻道建立失敗：找不到指定類別")
-            return notices
-
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(
-                view_channel=False,
-                send_messages=False,
-                read_message_history=False,
-            ),
-            member: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-                attach_files=True,
-            ),
-        }
-
-        if guild.me is not None:
-            overwrites[guild.me] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                manage_channels=True,
-                read_message_history=True,
-                attach_files=True,
-            )
-
-        for role_id in _PLATINUM_CHAT_ROLE_IDS:
-            role = guild.get_role(role_id)
-            if role is not None:
-                overwrites[role] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    attach_files=True,
-                )
-
-        clean_name = "".join(c if c.isalnum() else "-" for c in member.display_name.lower())[:40]
-        channel_name = f"白金魔丸-{clean_name}-{member.id}"[:90]
-
-        try:
-            channel = await guild.create_text_channel(
-                name=channel_name,
-                category=category,
-                overwrites=overwrites,
-                topic=f"platinum_customer_id={member.id}",
-                reason="累積消費達白金魔丸門檻，自動建立專屬聊天頻道"
-            )
-            data["platinum_channel_id"] = channel.id
-            notices.append(f"已建立白金專屬聊天頻道：{channel.mention}")
-
-            await channel.send(
-                f"{member.mention} 已達白金魔丸會員，這裡是你的專屬聊天頻道。",
-                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False)
-            )
-        except discord.Forbidden:
-            notices.append("白金專屬頻道建立失敗：Bot 權限不足")
-        except discord.HTTPException:
-            notices.append("白金專屬頻道建立失敗：Discord API 錯誤")
-
     return notices
 
 
@@ -586,6 +523,20 @@ async def add_customer_reward_from_order(
     amount = parse_receipt_amount(amount_text)
     if amount is None or amount <= 0:
         return "會員消費未累積：收據金額欄位沒有可辨識的數字。"
+
+    item = str(order_data.get("item") or "").strip()
+    if item in VIP_PROGRESS_EXCLUDED_ITEMS:
+        order_data["reward_counted"] = True
+        order_data["reward_excluded"] = True
+        order_data["reward_excluded_reason"] = f"{item} 不累積 VIP 進度"
+        order_data["reward_amount"] = 0
+        order_data["reward_counted_at"] = get_taipei_now_iso()
+        _ORDER_SELECTIONS[order_channel_id] = order_data
+
+        if _SAVE_BOT_DATA is not None:
+            _SAVE_BOT_DATA()
+
+        return f"會員消費未累積：{item} 不累積 VIP 進度。"
 
     data = get_customer_reward_data(customer_id)
     old_total_spent = int(data.get("total_spent", 0) or 0)

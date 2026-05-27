@@ -4441,9 +4441,12 @@ async def delete_order(
         old_data = dict(data)
         customer_id = _to_int(data.get("customer_id"))
         amount = get_order_amount_for_maintenance(data)
-        order_count_delta = -1 if is_order_closed_for_rewards(data) else 0
+        item_name = str(data.get("item") or "").strip()
+        reward_excluded = bool(data.get("reward_excluded")) or item_name == "幣號" or int(data.get("reward_amount", amount) or 0) <= 0
+        should_adjust_customer = adjust_customer and is_order_closed_for_rewards(data) and not reward_excluded
+        order_count_delta = -1 if should_adjust_customer else 0
 
-        if adjust_customer and is_order_closed_for_rewards(data):
+        if should_adjust_customer:
             adjust_customer_totals_for_order(customer_id, -amount, order_count_delta)
 
         dispatch_deleted = False
@@ -4472,7 +4475,7 @@ async def delete_order(
         description = (
             f"已刪除訂單資料。\n"
             f"票口 ID：`{channel_id}`\n"
-            f"會員同步：{'已扣回' if adjust_customer and is_order_closed_for_rewards(old_data) else '未扣回 / 不適用'}\n"
+            f"會員同步：{'已扣回' if should_adjust_customer else ('不扣回，因為此訂單未累積 VIP' if reward_excluded else '未扣回 / 不適用')}\n"
             f"派單面板：{'已刪除' if dispatch_deleted else '未刪除或找不到'}\n"
             f"備份：`{backup_path or '建立失敗或無資料庫'}`"
         )
