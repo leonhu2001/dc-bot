@@ -205,6 +205,22 @@ def record_lottery_draw(period: str, prize: str, winner_id: int, drawn_by: int) 
         print(f"保存抽獎結果失敗：{e}")
 
 
+def get_lottery_drawn_user_ids(period: str) -> set[int]:
+    db_file, _init_database_func = _ensure_configured()
+    _init_database_func()
+    try:
+        with sqlite3.connect(db_file) as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT winner_id FROM lottery_draws WHERE period=?",
+                (period,),
+            ).fetchall()
+    except sqlite3.Error as e:
+        print(f"讀取已中獎名單失敗：{e}")
+        return set()
+
+    return {int(row[0]) for row in rows if row[0] is not None}
+
+
 def build_lottery_info_embed(settings: dict) -> discord.Embed:
     period = str(settings.get("period", get_default_lottery_period()))
     entries = get_lottery_entries(period)

@@ -13,6 +13,7 @@ from services.lottery import (
     get_lottery_settings,
     save_lottery_settings,
     get_lottery_entries,
+    get_lottery_drawn_user_ids,
     get_lottery_entry,
     upsert_lottery_entry,
     clear_lottery_entries,
@@ -294,9 +295,11 @@ class LotteryCommands(commands.Cog):
         settings = get_lottery_settings()
         period = str(settings.get("period", get_default_lottery_period()))
         entries = get_lottery_entries(period)
+        drawn_user_ids = get_lottery_drawn_user_ids(period)
+        entries = [row for row in entries if int(row.get("user_id", 0) or 0) not in drawn_user_ids]
 
         if not entries:
-            await interaction.response.send_message("目前抽獎池沒有人參加，無法開獎。", ephemeral=True)
+            await interaction.response.send_message("目前抽獎池沒有可開獎名單，或本期所有參加者都已中過獎。", ephemeral=True)
             return
 
         if winners > len(entries):
