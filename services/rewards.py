@@ -38,44 +38,48 @@ VIP_LEVEL_BENEFITS = {
     "普通魔丸": "尚未解鎖 VIP 福利。",
     "銀級魔丸": (
         "累積消費 2,000T⤴️\n"
-        "・專屬 VIP 身分組，可自行創建 VIP 語音頻道\n"
-        "・基礎單 97 折，體驗單除外"
+        "・專屬 VIP 身分組，可使用 VIP 專屬包廂\n"
+        "・除體驗單外基礎單 98 折\n"
+        "・可參與 VIP 限定活動"
     ),
     "金級魔丸": (
         "累積消費 6,000T⤴️\n"
         "・享有銀級所有福利\n"
-        "・基礎單 96 折，體驗單除外"
+        "・除體驗單外基礎單 97 折\n"
+        "・優先客服回覆\n"
+        "・每月贈送 50 元折價券，低消 500，限當月使用"
     ),
     "白金魔丸": (
         "累積消費 12,000T⤴️\n"
         "・享有金級所有福利\n"
-        "・基礎單 95.5 折，體驗單除外\n"
-        "・可建立 VIP 專屬文字頻道\n"
-        "・升級當月贈送 9 折優惠券 1 張，低消 500，限 30 天內使用"
+        "・除體驗單外基礎單 96 折\n"
+        "・可建立 VIP 專屬私人文字頻道\n"
+        "・特殊單優先體驗\n"
+        "・每月贈送 80 元折價券，低消 800，限當月使用"
     ),
     "鑽石魔丸": (
         "累積消費 25,000T⤴️\n"
         "・享有白金所有福利\n"
-        "・基礎單 95 折，體驗單除外\n"
-        "・優先安排熟悉打手"
+        "・除體驗單、趣味單外全館 95 折\n"
+        "・優先安排熟悉打手\n"
+        "・可指定常用陪玩優先排班\n"
+        "・每月贈送 100 元折價券，低消 1000，限當月使用"
     ),
     "星耀魔丸": (
         "累積消費 50,000T⤴️\n"
         "・享有鑽石所有福利\n"
-        "・每月 1 小時免指定費\n"
-        "・優先排單"
+        "・除體驗單、趣味單外全館 94 折\n"
+        "・每月贈送 200 元折價券，低消 2000，限當月使用"
     ),
     "頂級魔丸": (
         "累積消費 88,888T⤴️\n"
         "・享有星耀所有福利\n"
-        "・基礎單 9 折，體驗單除外\n"
-        "・每月 3 小時免指定費\n"
+        "・除體驗單、趣味單外全館 93 折\n"
         "・每月一次免費「機密航天保底1000w」\n"
-        "・最高優先排單\n"
-        "・專屬客服優先處理"
+        "・每月贈送 300 元折價券，低消 3000，限當月使用\n"
+        "・最高優先排單"
     ),
 }
-
 
 
 def recalculate_web_payout_after_close(order_no=None, web_order_id=None):
@@ -412,21 +416,39 @@ def format_customer_notes_for_staff(user_id: int, limit: int = 8) -> str:
 
 
 def format_customer_notes_for_ticket(user_id: int) -> str:
+    data = get_customer_reward_data(user_id)
+    level = get_effective_member_level(data)
+    level_name = str(level.get("name") or "普通魔丸")
+    level_threshold = int(level.get("threshold", 0) or 0)
+
+    lines = []
+
+    if level_threshold >= 2000:
+        benefit_text = get_member_level_benefits_text(level_name)
+        lines.extend([
+            "\n\n💎 VIP 客戶資訊",
+            f"等級：{level_name}",
+            f"累積消費：{format_t_amount(int(data.get('total_spent', 0) or 0))}",
+            "目前福利：",
+            benefit_text,
+        ])
+
     notes = get_customer_notes(user_id)
-    if not notes:
-        return ""
+    if notes:
+        blacklist_notes = [n for n in notes if n.get("is_blacklist")]
+        normal_notes = [n for n in notes if not n.get("is_blacklist")]
+        picked = blacklist_notes[:3] + normal_notes[:3]
 
-    blacklist_notes = [n for n in notes if n.get("is_blacklist")]
-    normal_notes = [n for n in notes if not n.get("is_blacklist")]
-    picked = blacklist_notes[:3] + normal_notes[:3]
+        if lines:
+            lines.append("")
 
-    lines = ["\n\n⚠️ 客服注意：此顧客有備註紀錄"]
-    if blacklist_notes:
-        lines.append("🚫 含黑名單 / 高風險備註")
+        lines.append("⚠️ 客服注意：此顧客有備註紀錄")
+        if blacklist_notes:
+            lines.append("🚫 含黑名單 / 高風險備註")
 
-    for index, note in enumerate(picked[:5], start=1):
-        tag = "黑名單" if note.get("is_blacklist") else "備註"
-        lines.append(f"{index}. [{tag}] {note.get('content') or '未填寫'}")
+        for index, note in enumerate(picked[:5], start=1):
+            tag = "黑名單" if note.get("is_blacklist") else "備註"
+            lines.append(f"{index}. [{tag}] {note.get('content') or '未填寫'}")
 
     return "\n".join(lines)
 
