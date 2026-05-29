@@ -38,6 +38,10 @@ ORDER_ITEMS_BY_CATEGORY = {
         "豪到你了嗎",
         "瘋狗嘶咬",
         "想吃自己打",
+        "大紅拉霸機",
+        "比翼雙飛",
+        "已讀亂回",
+        "真心話大冒險",
     ],
     "farm": [
         "賽季3x3",
@@ -65,6 +69,8 @@ SPECIAL_COMPANION_ITEMS = {
     "技術陪",
     "保底單",
     "陪打",
+    "已讀亂回",
+    "真心話大冒險",
 }
 
 QUANTITY_SELECT_ITEMS = {
@@ -73,6 +79,7 @@ QUANTITY_SELECT_ITEMS = {
     "技術陪",
     "陪打",
     "幣號",
+    "真心話大冒險",
 }
 
 QUANTITY_OPTIONS = list(range(1, 25))

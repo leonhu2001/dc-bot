@@ -1744,7 +1744,7 @@ def get_self_service_quantity_limit(item: str | None) -> int:
     if str(item or "") == "幣號":
         return 10
 
-    if str(item or "") in {"教學單", "娛樂陪", "技術陪", "陪打"}:
+    if str(item or "") in {"教學單", "娛樂陪", "技術陪", "陪打", "真心話大冒險"}:
         return 24
 
     return 1
