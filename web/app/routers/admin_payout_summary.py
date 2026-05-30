@@ -49,7 +49,7 @@ def month_filter_sql(month: str | None, alias: str) -> tuple[str, list[str]]:
     return f" AND strftime('%Y-%m', {alias}.created_at) = ? ", [month]
 
 
-def add_person(people: dict[str, dict], *, discord_id, display_name, role, amount, order_no, category, item, payout_status):
+def add_person(people: dict[str, dict], *, discord_id, display_name, role, amount, order_no, category, item, payout_status, customer_name=None, closed_at=None):
     discord_id = str(discord_id or "").strip()
     if not discord_id:
         return
@@ -71,6 +71,10 @@ def add_person(people: dict[str, dict], *, discord_id, display_name, role, amoun
 
     person = people[discord_id]
 
+    customer_name = str(customer_name or "").strip() or "未紀錄"
+    closed_text = str(closed_at or "").strip()
+    closed_date = closed_text[:10] if closed_text else "未紀錄"
+
     if display_name and person["display_name"] == discord_id:
         person["display_name"] = display_name
 
@@ -88,6 +92,8 @@ def add_person(people: dict[str, dict], *, discord_id, display_name, role, amoun
         "order_no": order_no,
         "category": category or "",
         "item": item or "",
+        "customer_name": customer_name,
+        "closed_date": closed_date,
         "role": "打手" if role == "worker" else "客服",
         "amount": amount,
         "payout_status": payout_status,
@@ -186,7 +192,11 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     w.bot_order_no,
                     w.id AS web_order_id,
                     w.category,
-                    w.item
+                    w.item,
+                    COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
+                    COALESCE(NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at,
+                    COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
+                    COALESCE(NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
                 FROM worker_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -204,6 +214,8 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     role="worker",
                     amount=row["amount"],
                     payout_status=row["payout_status"],
+                    customer_name=row["customer_name"],
+                    closed_at=row["closed_at"],
                     order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
                     category=row["category"],
                     item=row["item"],
@@ -220,7 +232,9 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     w.bot_order_no,
                     w.id AS web_order_id,
                     w.category,
-                    w.item
+                    w.item,
+                    COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
+                    COALESCE(NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
                 FROM customer_service_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -241,6 +255,8 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     role="customer_service",
                     amount=row["amount"],
                     payout_status=row["payout_status"],
+                    customer_name=row["customer_name"],
+                    closed_at=row["closed_at"],
                     order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
                     category=row["category"],
                     item=row["item"],
@@ -431,6 +447,7 @@ async def admin_payout_summary(request: Request, month: str | None = "", role: s
     if status not in {"unpaid", "paid", "all"}:
         status = "unpaid"
 
+    status = "unpaid"
     rows, totals = fetch_rows(month, role, q, status)
     unpaid_rows, unpaid_totals = fetch_rows(month, role, q, "unpaid")
     paid_rows, paid_totals = fetch_rows(month, role, q, "paid")

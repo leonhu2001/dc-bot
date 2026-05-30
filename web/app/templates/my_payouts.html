@@ -43,7 +43,7 @@
                     總控 / 客服
                 {% endif %}
 
-                {% if user.is_worker %}
+                {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
                     打手
                 {% endif %}
             </p>
@@ -81,23 +81,45 @@
 
                         <div class="order-meta">
                             <div>
+                                <span>結單日期</span>
+                                <strong>
+                                    {% if order %}
+                                        {{ ((order.updated_at or order.created_at or '')|string)[:10] or '未紀錄' }}
+                                    {% else %}
+                                        未紀錄
+                                    {% endif %}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>老闆名稱</span>
+                                <strong>
+                                    {% if order %}
+                                        {{ order.customer_display_name or order.customer_discord_id or '未紀錄' }}
+                                    {% else %}
+                                        未紀錄
+                                    {% endif %}
+                                </strong>
+                            </div>
+
+                            <div>
                                 <span>分攤金額</span>
-                                <strong>{{ payout.gross_share }}T</strong>
+                                <strong>{{ payout.gross_share|round(0, 'common')|int }}T</strong>
                             </div>
 
                             <div>
                                 <span>基本分潤</span>
-                                <strong>{{ payout.base_payout }}T</strong>
+                                <strong>{{ payout.base_payout|round(0, 'common')|int }}T</strong>
                             </div>
 
                             <div>
                                 <span>掛名加成</span>
-                                <strong>{{ payout.named_bonus_amount }}T</strong>
+                                <strong>{{ payout.named_bonus_amount|round(0, 'common')|int }}T</strong>
                             </div>
 
                             <div>
                                 <span>最後實拿</span>
-                                <strong>{{ payout.final_payout }}T</strong>
+                                <strong>{{ payout.final_payout|round(0, 'common')|int }}T</strong>
                             </div>
                         </div>
 
@@ -145,6 +167,28 @@
 
                         <div class="order-meta">
                             <div>
+                                <span>結單日期</span>
+                                <strong>
+                                    {% if order %}
+                                        {{ ((order.updated_at or order.created_at or '')|string)[:10] or '未紀錄' }}
+                                    {% else %}
+                                        未紀錄
+                                    {% endif %}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>老闆名稱</span>
+                                <strong>
+                                    {% if order %}
+                                        {{ order.customer_display_name or order.customer_discord_id or '未紀錄' }}
+                                    {% else %}
+                                        未紀錄
+                                    {% endif %}
+                                </strong>
+                            </div>
+
+                            <div>
                                 <span>客服</span>
                                 <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
                             </div>
@@ -156,7 +200,7 @@
 
                             <div>
                                 <span>分潤</span>
-                                <strong>{{ payout.payout_amount }}T</strong>
+                                <strong>{{ payout.payout_amount|round(0, 'common')|int }}T</strong>
                             </div>
 
                             <div>

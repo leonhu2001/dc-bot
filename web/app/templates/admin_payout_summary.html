@@ -83,6 +83,45 @@
     .summary-pill { text-align: left; }
     .summary-table { font-size: 13px; }
 }
+
+.summary-total-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.summary-total-card {
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 14px;
+    background: rgba(2, 6, 23, 0.32);
+    padding: 14px;
+}
+
+.summary-total-card span {
+    display: block;
+    color: #9ca3af;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.summary-total-card strong {
+    display: block;
+    font-size: 24px;
+    line-height: 1.1;
+}
+
+@media (max-width: 900px) {
+    .summary-total-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .summary-total-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 </style>
 
 <section class="panel">
@@ -108,6 +147,32 @@
         <a class="button secondary" href="/admin/payouts/summary">清除</a>
     </form>
 </section>
+
+
+<section class="panel">
+    <div class="summary-total-grid">
+        <div class="summary-total-card">
+            <span>未支付總額</span>
+            <strong>{{ unpaid_totals.display_total|default(unpaid_totals.unpaid_total)|round(0, 'common')|int }}T</strong>
+        </div>
+
+        <div class="summary-total-card">
+            <span>未支付筆數</span>
+            <strong>{{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }}</strong>
+        </div>
+
+        <div class="summary-total-card">
+            <span>已支付總額</span>
+            <strong>{{ paid_totals.paid_total|round(0, 'common')|int }}T</strong>
+        </div>
+
+        <div class="summary-total-card">
+            <span>已支付筆數</span>
+            <strong>{{ paid_totals.paid_count }}</strong>
+        </div>
+    </div>
+</section>
+
 
 {% macro person_card(row, list_status) %}
 <article class="summary-person-card">
@@ -156,6 +221,8 @@
             <thead>
                 <tr>
                     <th>訂單</th>
+                    <th>結單日期</th>
+                    <th>老闆名稱</th>
                     <th>項目</th>
                     <th>身份</th>
                     <th>狀態</th>
@@ -167,6 +234,8 @@
                     {% if item.payout_status == list_status %}
                         <tr>
                             <td>{{ item.order_no }}</td>
+                            <td>{{ item.closed_date }}</td>
+                            <td>{{ item.customer_name }}</td>
                             <td>{{ item.category }}｜{{ item.item }}</td>
                             <td>{{ item.role }}</td>
                             <td>
