@@ -184,7 +184,7 @@ class LotteryCommands(commands.Cog):
         announcement_embed.title = f"🎁 {settings['title']} 開始報名"
         announced = await send_lottery_announcement(
             interaction.guild,
-            content="@everyone 🎁 魔丸點數抽獎已開放報名！使用 `/lottery_info` 查看活動，使用 `/join_lottery` 參加抽獎。",
+            content="@everyone 🎁 魔丸點數抽獎已開放報名！使用 `/lottery info` 查看活動，使用 `/lottery join` 參加抽獎。",
             embed=announcement_embed,
             channel=announce_channel,
         )
@@ -243,7 +243,7 @@ class LotteryCommands(commands.Cog):
         if announce:
             announced = await send_lottery_announcement(
                 interaction.guild,
-                content="@everyone 🎁 魔丸點數抽獎獎池已更新！使用 `/lottery_info` 查看活動詳情。",
+                content="@everyone 🎁 魔丸點數抽獎獎池已更新！使用 `/lottery info` 查看活動詳情。",
                 embed=embed,
                 channel=announce_channel,
             )
