@@ -194,9 +194,9 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     w.category,
                     w.item,
                     COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    COALESCE(NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at,
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.created_at, '')) AS closed_at,
                     COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    COALESCE(NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.created_at, '')) AS closed_at
                 FROM worker_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -234,7 +234,7 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     w.category,
                     w.item,
                     COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    COALESCE(NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.created_at, '')) AS closed_at
                 FROM customer_service_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
