@@ -3300,13 +3300,27 @@ async def finalize_payment_and_dispatch(
 
     customer_member = guild.get_member(customer_id) if customer_id is not None else None
 
+    receipt_staff_member = interaction.user
+    amount_set_by = _to_int(data.get("amount_set_by"))
+
+    if amount_set_by is not None:
+        possible_staff_member = guild.get_member(amount_set_by)
+        if possible_staff_member is None:
+            try:
+                possible_staff_member = await fetch_member_safely(guild, amount_set_by)
+            except Exception:
+                possible_staff_member = None
+
+        if possible_staff_member is not None:
+            receipt_staff_member = possible_staff_member
+
     try:
         receipt_id, receipt_message = await ensure_payment_submit_receipt(
             guild=guild,
             order_channel=interaction.channel,
             customer_id=customer_id,
             customer_member=customer_member,
-            staff_member=interaction.user,
+            staff_member=receipt_staff_member,
             category_label=category_label,
             item=item,
             quantity=quantity,
