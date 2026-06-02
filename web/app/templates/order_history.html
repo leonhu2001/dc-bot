@@ -438,6 +438,16 @@
                                 </label>
 
                                 <label>
+                                    <span>結單日期</span>
+                                    <input
+                                        class="input"
+                                        type="date"
+                                        name="closed_date_{{ order.id }}"
+                                        value="{{ history_effective_closed_date(order) }}"
+                                    >
+                                </label>
+
+                                <label>
                                     <span>更新時間</span>
                                     <input class="input" type="text" value="{{ order.updated_at or '' }}" disabled>
                                 </label>
