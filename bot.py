@@ -1891,7 +1891,7 @@ def get_self_service_quantity_limit(item: str | None) -> int:
     if str(item or "") == "幣號":
         return 10
 
-    if str(item or "") in {"教學單", "娛樂陪", "技術陪", "陪打", "真心話大冒險"}:
+    if str(item or "") in {"教學單", "娛樂陪", "甜蜜單", "技術陪", "陪打", "真心話大冒險"}:
         return 24
 
     return 1
@@ -3887,8 +3887,8 @@ class OrderControlView(discord.ui.View):
             description=(
                 f"下單用戶：{customer_mention}\n\n"
                 "請下單用戶選擇訂單類別與訂單項目，完成後按「取得訂單金額」。\n"
-                "如果選擇娛樂陪、技術陪、Valorant 陪打、Valorant 代打，數量欄位可選擇 1～8 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
-                "如果選擇娛樂陪、技術陪、保底單，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
+                "如果選擇娛樂陪、甜蜜單、技術陪、教學單、真心話大冒險、Valorant 陪打，數量欄位可選擇 1～24 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
+                "如果選擇娛樂陪、甜蜜單、技術陪、保底單，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
             ),
             color=discord.Color.purple()
         )

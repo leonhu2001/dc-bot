@@ -27,6 +27,7 @@ ORDER_ITEMS_BY_CATEGORY = {
     "basic": [
         "體驗單",
         "娛樂陪",
+        "甜蜜單",
         "技術陪",
         "保底單",
         "節日特別單",
@@ -67,6 +68,7 @@ ORDER_ITEM_TO_CATEGORY = {
 
 SPECIAL_COMPANION_ITEMS = {
     "娛樂陪",
+    "甜蜜單",
     "技術陪",
     "保底單",
     "陪打",
@@ -77,6 +79,7 @@ SPECIAL_COMPANION_ITEMS = {
 QUANTITY_SELECT_ITEMS = {
     "教學單",
     "娛樂陪",
+    "甜蜜單",
     "技術陪",
     "陪打",
     "幣號",
