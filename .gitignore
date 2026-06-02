@@ -9,3 +9,66 @@ venv/
 __pycache__/
 *.pyc
 *.log
+# =========================
+# Local secrets / runtime data
+# =========================
+.env
+config.json
+bot.db
+bot.db.*
+*.db
+*.sqlite
+*.sqlite3
+web_dashboard.db
+
+# =========================
+# Python cache / test cache
+# =========================
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# =========================
+# Logs / exports / backups
+# =========================
+*.log
+*_error_log.txt
+*.csv
+*.bak
+*.backup
+*.backup.*
+
+# =========================
+# Temporary one-off patch scripts
+# =========================
+patch_*.py
+fix_*.py
+restore_*.py
+rollback_*.py
+rescue_*.py
+repair_*.py
+rebuild_*.py
+recalc_*.py
+rewrite_*.py
+redirect_*.py
+remove_*.py
+reset_*.py
+insert_*.py
+install_*.py
+merge_*.py
+optimize_*.py
+diagnose_*.py
+inspect_*.py
+check_*.py
+list_*.py
+show_*.py
+mark_*.py
+apply_*.py
+add_*.py
+finish_*.py
+*_latest.py
+
+# =========================
+# Local archive
+# =========================
+_archive/
