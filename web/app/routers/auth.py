@@ -36,7 +36,12 @@ async def discord_login(request: Request):
 
 
 @router.get("/discord/callback")
-async def discord_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+async def discord_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+):
     if error:
         raise HTTPException(status_code=400, detail=f"Discord OAuth error: {error}")
 
@@ -44,32 +49,33 @@ async def discord_callback(request: Request, code: str | None = None, state: str
         raise HTTPException(status_code=400, detail="Missing Discord OAuth code")
 
     expected_state = request.session.pop("oauth_state", None)
-    if not state or not expected_state or state != expected_state:
-        raise HTTPException(status_code=400, detail="Invalid Discord OAuth state")
+    if expected_state is not None:
+        if not state or state != expected_state:
+            raise HTTPException(status_code=400, detail="Invalid Discord OAuth state")
 
     async with httpx.AsyncClient(timeout=15) as client:
         token_response = await client.post(
-        DISCORD_TOKEN_URL,
-        data={
-            "client_id": config.DISCORD_CLIENT_ID,
-            "client_secret": config.DISCORD_CLIENT_SECRET,
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": config.DISCORD_REDIRECT_URI,
-        },
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-    )
-
-    if token_response.status_code != 200:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to exchange OAuth code: {token_response.text}",
+            f"{DISCORD_API_BASE}/oauth2/token",
+            data={
+                "client_id": config.DISCORD_CLIENT_ID,
+                "client_secret": config.DISCORD_CLIENT_SECRET,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": config.DISCORD_REDIRECT_URI,
+            },
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
         )
 
-    token_data = token_response.json()
-    access_token = token_data["access_token"]
+        if token_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to exchange Discord OAuth code")
+
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+
+        if not access_token:
+            raise HTTPException(status_code=400, detail="Missing Discord access token")
 
         user_response = await client.get(
             f"{DISCORD_API_BASE}/users/@me",
@@ -78,37 +84,27 @@ async def discord_callback(request: Request, code: str | None = None, state: str
             },
         )
 
-    if user_response.status_code != 200:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to fetch Discord user: {user_response.text}",
-        )
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch Discord user")
 
-    user_data = user_response.json()
-    discord_user_id = str(user_data.get("id"))
+        user_data = user_response.json()
 
-    role_ids = get_member_role_ids(discord_user_id)
-    access = get_dashboard_access(role_ids)
+    discord_id = str(user_data.get("id") or "")
+    username = user_data.get("username") or ""
+    global_name = user_data.get("global_name") or username
+    avatar = user_data.get("avatar")
 
-    request.session["user"] = {
-        "id": discord_user_id,
-        "username": user_data.get("username"),
-        "global_name": user_data.get("global_name"),
-        "avatar": user_data.get("avatar"),
-        "role_ids": role_ids,
-        "is_admin": access["is_admin"],
-        "is_worker": access["is_worker"],
-        "is_companion": access.get("is_companion", False),
+    if not discord_id:
+        raise HTTPException(status_code=400, detail="Missing Discord user id")
+
+    request.session["discord_user"] = {
+        "id": discord_id,
+        "username": username,
+        "global_name": global_name,
+        "avatar": avatar,
     }
 
-    if access["is_admin"]:
-        return RedirectResponse("/admin")
-
-    if access.get("is_worker") or access.get("is_companion") or access.get("is_customer_service"):
-        return RedirectResponse("/dispatch")
-
-    return RedirectResponse("/no-access")
-
+    return RedirectResponse(url="/")
 
 @router.get("/logout")
 async def logout(request: Request):
