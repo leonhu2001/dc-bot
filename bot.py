@@ -1887,14 +1887,43 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             )
         )
 
+HOUR_QUANTITY_ITEMS = {
+    "教學單",
+    "娛樂陪",
+    "甜蜜單",
+    "技術陪",
+    "陪打",
+    "真心話大冒險",
+}
+
+
 def get_self_service_quantity_limit(item: str | None) -> int:
     if str(item or "") == "幣號":
         return 10
 
-    if str(item or "") in {"教學單", "娛樂陪", "甜蜜單", "技術陪", "陪打", "真心話大冒險"}:
+    if str(item or "") in HOUR_QUANTITY_ITEMS:
         return 24
 
     return 1
+
+
+def get_self_service_quantity_unit(item: str | None) -> str:
+    """只控制自助下單數量選單顯示單位。
+
+    內部 quantity 仍維持整數：
+    - 小時制品項：1～24 小時，但後續仍以 1～24 單計算。
+    - 幣號：1～10 隻。
+    - 其他：1 單。
+    """
+    item_text = str(item or "")
+
+    if item_text == "幣號":
+        return "隻"
+
+    if item_text in HOUR_QUANTITY_ITEMS:
+        return "小時"
+
+    return "單"
 
 
 def get_self_service_quantity_options(item: str | None) -> list[int]:
@@ -1926,20 +1955,22 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             placeholder = "請先選擇訂單項目"
         elif selected_item in QUANTITY_SELECT_ITEMS:
             quantity_options = get_self_service_quantity_options(selected_item)
+            quantity_unit = get_self_service_quantity_unit(selected_item)
+
             if quantity not in quantity_options:
                 quantity = quantity_options[0]
 
             options = [
                 discord.SelectOption(
-                    label=f"{num} 單",
+                    label=f"{num} {quantity_unit}",
                     value=str(num),
-                    description=f"{num} 單",
+                    description=f"{num} {quantity_unit}",
                     default=quantity == num
                 )
                 for num in quantity_options
             ]
             disabled = False
-            placeholder = f"請選擇數量 1～{max(quantity_options)} 單"
+            placeholder = f"請選擇數量 1～{max(quantity_options)} {quantity_unit}"
         else:
             options = [
                 discord.SelectOption(
@@ -1984,8 +2015,10 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             quantity = 1
         else:
             max_quantity = get_self_service_quantity_limit(selected_item)
+            quantity_unit = get_self_service_quantity_unit(selected_item)
+
             if quantity < 1 or quantity > max_quantity:
-                await interaction.response.send_message(f"數量請選擇 1～{max_quantity} 單。", ephemeral=True)
+                await interaction.response.send_message(f"數量請選擇 1～{max_quantity} {quantity_unit}。", ephemeral=True)
                 return
 
         data["customer_id"] = self.customer_id
@@ -1997,7 +2030,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             interaction,
             self.customer_id,
             "選擇訂單數量",
-            f"{quantity} 單",
+            f"{quantity} {get_self_service_quantity_unit(selected_item)}",
         )
 
         await interaction.response.edit_message(
@@ -3200,9 +3233,11 @@ async def finalize_payment_and_dispatch(
         remember_order_data(channel_id, data)
     else:
         valid_quantity_options = QUANTITY_OPTIONS
+        quantity_unit = get_self_service_quantity_unit(item)
+
         if quantity not in valid_quantity_options:
             await interaction.response.send_message(
-                f"數量選擇異常，{item} 只能選擇 {min(valid_quantity_options)}～{max(valid_quantity_options)} 單，請回到自助下單面板重新選擇。",
+                f"數量選擇異常，{item} 只能選擇 {min(valid_quantity_options)}～{max(valid_quantity_options)} {quantity_unit}，請回到自助下單面板重新選擇。",
                 ephemeral=True,
             )
             return
@@ -3641,8 +3676,10 @@ class SelfServiceOrderView(discord.ui.View):
             remember_order_data(self.channel_id, data)
         else:
             max_quantity = get_self_service_quantity_limit(item)
+            quantity_unit = get_self_service_quantity_unit(item)
+
             if quantity < 1 or quantity > max_quantity:
-                await interaction.response.send_message(f"數量請選擇 1～{max_quantity} 單。", ephemeral=True)
+                await interaction.response.send_message(f"數量請選擇 1～{max_quantity} {quantity_unit}。", ephemeral=True)
                 return
 
         if companion_preference is None:
@@ -3887,7 +3924,7 @@ class OrderControlView(discord.ui.View):
             description=(
                 f"下單用戶：{customer_mention}\n\n"
                 "請下單用戶選擇訂單類別與訂單項目，完成後按「取得訂單金額」。\n"
-                "如果選擇娛樂陪、甜蜜單、技術陪、教學單、真心話大冒險、Valorant 陪打，數量欄位可選擇 1～24 單；1 單 = 1 小時，2 單 = 2 小時，依此類推。\n"
+                "如果選擇娛樂陪、甜蜜單、技術陪、教學單、真心話大冒險、Valorant 陪打，數量欄位會顯示 1～24 小時；系統後續仍依 1～24 單計算。幣號會顯示 1～10 隻。\n"
                 "如果選擇娛樂陪、甜蜜單、技術陪、保底單，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
             ),
             color=discord.Color.purple()
