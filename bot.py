@@ -880,6 +880,145 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
         print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
 
 
+
+async def ensure_payment_submit_receipt(
+    *,
+    guild: discord.Guild,
+    order_channel: discord.TextChannel,
+    customer_id: int,
+    customer_member: discord.Member | None,
+    staff_member: discord.Member | discord.User,
+    category_label: str,
+    item: str,
+    quantity: int,
+    amount: int,
+    payment_method: str,
+    companion_preference: str | None = None,
+) -> tuple[str | None, discord.Message | None]:
+    """在付款方式 panel 按下送出後產生交易收據。
+
+    重要：
+    - 已經有 receipt_id 的訂單不重複產生。
+    - 舊單如果沒有 receipt_id，仍可保留原本已結單 ReceiptModal 補開收據。
+    """
+    receipt_channel = guild.get_channel(RECEIPT_CHANNEL_ID)
+
+    if receipt_channel is None or not isinstance(receipt_channel, discord.TextChannel):
+        raise ValueError("找不到收據頻道，請確認 RECEIPT_CHANNEL_ID 是否正確。")
+
+    order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+
+    existing_receipt_id = str(order_data.get("receipt_id") or order_data.get("order_no") or "").strip()
+    existing_message_id = _to_int(order_data.get("receipt_message_id"))
+
+    if existing_receipt_id:
+        return existing_receipt_id, None
+
+    receipt_id = generate_order_receipt_id()
+    created_at_iso = get_taipei_now_iso()
+    created_at_text = get_taipei_now_text()
+
+    payer_name = (
+        getattr(customer_member, "display_name", None)
+        or getattr(customer_member, "name", None)
+        or str(customer_id)
+    )
+
+    staff_name = (
+        getattr(staff_member, "display_name", None)
+        or getattr(staff_member, "name", None)
+        or str(getattr(staff_member, "id", "未紀錄"))
+    )
+
+    amount_text = format_t_amount(amount)
+    order_content = f"{category_label}｜{item}｜數量：{quantity} 單"
+    if companion_preference:
+        order_content += f"｜{companion_preference}"
+
+    receipt_text = (
+        "```text\n"
+        "【魔丸娛樂｜交易收據】\n"
+        "\n"
+        f"收據編號：{receipt_id}\n"
+        f"訂單編號：{receipt_id}\n"
+        f"開立時間：{created_at_text}\n"
+        "\n"
+        f"顧客：{payer_name}\n"
+        f"顧客 ID：{customer_id}\n"
+        "\n"
+        f"服務類別：{category_label}\n"
+        f"服務項目：{item}\n"
+        f"數量：{quantity} 單\n"
+        f"金額：{amount_text}\n"
+        f"付款方式：{payment_method}\n"
+        "付款狀態：已送出，待客服確認\n"
+        "\n"
+        f"客服人員：{staff_name}\n"
+        "\n"
+        "備註：\n"
+        "此收據為魔丸娛樂服務交易紀錄，非統一發票。\n"
+        "如需正式報帳憑證，請先與客服確認。\n"
+        "```"
+    )
+
+    embed = discord.Embed(
+        title="魔丸娛樂｜交易收據",
+        description=receipt_text,
+        color=discord.Color.green(),
+        timestamp=get_taipei_now(),
+    )
+    embed.add_field(name="收據編號", value=receipt_id, inline=True)
+    embed.add_field(name="顧客", value=f"<@{customer_id}>", inline=True)
+    embed.add_field(name="金額", value=amount_text, inline=True)
+    embed.add_field(name="付款方式", value=payment_method, inline=True)
+    embed.add_field(name="付款狀態", value="已送出，待客服確認", inline=True)
+    embed.add_field(name="票口", value=order_channel.mention, inline=False)
+    embed.set_footer(text="此收據為交易紀錄，非統一發票。")
+
+    receipt_message = await receipt_channel.send(
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+    order_data["receipt_id"] = receipt_id
+    order_data["order_no"] = receipt_id
+    order_data["receipt_created_at"] = created_at_iso
+    order_data["receipt_created_by"] = getattr(staff_member, "id", None)
+    order_data["receipt_message_id"] = receipt_message.id
+    order_data["receipt_channel_id"] = receipt_channel.id
+    order_data["receipt_status"] = "payment_submitted"
+    order_data["receipt_note"] = "付款方式送出後自動產生，非統一發票。"
+    order_data["amount"] = int(amount)
+    order_data["total_amount"] = int(amount)
+    order_data["amount_text"] = amount_text
+    order_data["payment_method"] = payment_method
+    order_data["quantity"] = int(quantity)
+    remember_order_data(order_channel.id, order_data)
+
+    await send_order_log(
+        guild,
+        title="交易收據已產生",
+        fields=[
+            ("收據編號", receipt_id, True),
+            ("顧客", f"<@{customer_id}>", True),
+            ("金額", amount_text, True),
+            ("付款方式", payment_method, True),
+            ("付款狀態", "已送出，待客服確認", True),
+            ("客服人員", getattr(staff_member, "mention", staff_name), True),
+            ("票口", order_channel.mention, False),
+            ("收據訊息", receipt_message.jump_url, False),
+        ],
+        color=discord.Color.green(),
+    )
+
+    return receipt_id, receipt_message
+
+
+
 # ========= 收據 Modal =========
 
 class ReceiptModal(discord.ui.Modal, title="已結單收據"):
@@ -959,12 +1098,14 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         amount_text = str(order_data.get("amount_text") or format_t_amount(parsed_amount))
 
-        receipt_id = generate_order_receipt_id()
+        existing_receipt_id = str(order_data.get("receipt_id") or order_data.get("order_no") or "").strip()
+        receipt_already_created = bool(existing_receipt_id)
+        receipt_id = existing_receipt_id or generate_order_receipt_id()
         closed_at_text = get_taipei_now_iso()
 
         order_data["receipt_id"] = receipt_id
         order_data["order_no"] = receipt_id
-        order_data["receipt_created_at"] = closed_at_text
+        order_data.setdefault("receipt_created_at", closed_at_text)
         order_data["closed_at"] = closed_at_text
         order_data["closed"] = True
         order_data["status"] = "closed"
@@ -1018,14 +1159,18 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             inline=False
         )
 
-        await receipt_channel.send(
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
+        if not receipt_already_created:
+            receipt_message = await receipt_channel.send(
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False
+                )
             )
-        )
+            order_data["receipt_message_id"] = receipt_message.id
+            order_data["receipt_channel_id"] = receipt_channel.id
+            remember_order_data(order_channel.id, order_data)
 
         await lock_dispatch_claim_panel(guild, order_channel.id)
         await rename_ticket_channel(order_channel, "已結單", member=customer_member)
@@ -1047,8 +1192,10 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             color=discord.Color.green(),
         )
 
+        close_receipt_text = "收據已於付款送出時產生，本次不重複送出。" if receipt_already_created else "收據已送出。"
+
         await interaction.response.send_message(
-            f"此單已由 {interaction.user.mention} 結單，收據已送出。\n\n"
+            f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
             f"{reward_result}\n\n"
             f"請闆闆留下評論",
             view=ReviewButtonView(customer_id=customer_id),
@@ -3152,6 +3299,34 @@ async def finalize_payment_and_dispatch(
     remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
 
     customer_member = guild.get_member(customer_id) if customer_id is not None else None
+
+    try:
+        receipt_id, receipt_message = await ensure_payment_submit_receipt(
+            guild=guild,
+            order_channel=interaction.channel,
+            customer_id=customer_id,
+            customer_member=customer_member,
+            staff_member=interaction.user,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            amount=parsed_amount,
+            payment_method=payment_method,
+            companion_preference=companion_preference,
+        )
+        if receipt_id:
+            data["receipt_id"] = receipt_id
+            data["order_no"] = receipt_id
+        if receipt_message is not None:
+            data["receipt_message_id"] = receipt_message.id
+            data["receipt_channel_id"] = receipt_message.channel.id
+        remember_order_data(interaction.channel.id, data)
+    except ValueError as e:
+        data.pop("dispatch_submitting", None)
+        remember_order_data(channel_id, data)
+        await interaction.followup.send(str(e), ephemeral=True)
+        return
+
     await rename_ticket_channel(interaction.channel, str(item), member=customer_member)
     sync_web_order_active_from_dispatch_from_bot(
         ticket_channel_id=interaction.channel.id,
@@ -3232,6 +3407,8 @@ async def finalize_payment_and_dispatch(
         remember_order_data(interaction.channel.id, data)
 
     response_text = f"已確認訂單總價 {format_t_amount(parsed_amount)}，並送出派單：{dispatch_message.jump_url}"
+    if data.get("receipt_id"):
+        response_text += f"\n交易收據已產生：{data.get('receipt_id')}"
     if reward_result:
         response_text += f"\n\n{reward_result}"
     await interaction.followup.send(response_text, ephemeral=True)
