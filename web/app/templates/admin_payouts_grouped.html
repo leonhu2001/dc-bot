@@ -27,7 +27,12 @@
         <form method="get" action="/admin/payouts/grouped" class="payout-filter-form">
             <label>
                 <span>月份</span>
-                <input class="input" type="month" name="month" value="{{ month }}">
+                <select class="input" name="month">
+                    <option value="" {% if not month %}selected{% endif %}>全部月份</option>
+                    {% for option in month_options %}
+                        <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
             </label>
 
             <label>
@@ -144,6 +149,7 @@
                             <div class="payout-order-list">
                                 <div class="payout-order-header">
                                     <span>訂單</span>
+                                    <span>結單日期</span>
                                     <span>項目</span>
                                     <span>基本</span>
                                     <span>加成</span>
@@ -154,6 +160,7 @@
                                 {% for row in group.rows %}
                                     <div class="payout-order-row">
                                         <div class="order-no-cell">{{ row.order_no }}</div>
+                                        <div>{{ row.order_date or '未紀錄' }}</div>
                                         <div>{{ row.category }}｜{{ row.item }}</div>
                                         <div>{{ row.base_amount }}T</div>
                                         <div>{{ row.bonus_amount }}T</div>

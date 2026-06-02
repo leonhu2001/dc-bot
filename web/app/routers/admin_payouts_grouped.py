@@ -57,6 +57,59 @@ def connect_db() -> sqlite3.Connection:
     return conn
 
 
+def payout_order_date_expr(alias: str = "o") -> str:
+    """月結分潤使用的有效結單日期：closed_at -> updated_at -> created_at。"""
+    return (
+        f"COALESCE("
+        f"NULLIF({alias}.closed_at, ''), "
+        f"NULLIF({alias}.updated_at, ''), "
+        f"NULLIF({alias}.created_at, '')"
+        f")"
+    )
+
+
+def build_month_options(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT DISTINCT month_value
+        FROM (
+            SELECT substr(
+                COALESCE(NULLIF(closed_at, ''), NULLIF(updated_at, ''), NULLIF(created_at, '')),
+                1,
+                7
+            ) AS month_value
+            FROM web_orders
+            WHERE status = 'closed'
+        )
+        WHERE month_value GLOB '????-??'
+        ORDER BY month_value DESC
+        """
+    ).fetchall()
+
+    options = []
+
+    for row in rows:
+        value = str(row["month_value"] or "").strip()
+
+        if not value:
+            continue
+
+        try:
+            year, month = value.split("-", 1)
+            label = f"{int(year)}年{int(month)}月"
+        except Exception:
+            label = value
+
+        options.append(
+            {
+                "value": value,
+                "label": label,
+            }
+        )
+
+    return options
+
+
 def normalize_filter(value: str | None, allowed: set[str], default: str) -> str:
     value = (value or default).strip()
     return value if value in allowed else default
@@ -64,6 +117,12 @@ def normalize_filter(value: str | None, allowed: set[str], default: str) -> str:
 
 def month_condition(alias: str, month: str | None) -> tuple[str, list[str]]:
     month = (month or "").strip()
+
+    if not month:
+        return "", []
+
+    return f" AND substr({payout_order_date_expr(alias)}, 1, 7) = ?", [month]
+
 
     if not month:
         return "", []
@@ -82,7 +141,7 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
     rows: list[dict] = []
 
     if role in {"all", "worker"}:
-        month_sql, month_params = month_condition("p", month)
+        month_sql, month_params = month_condition("o", month)
         status_sql, status_params = status_condition("p", status)
 
         worker_sql = f"""
@@ -100,6 +159,7 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
                 p.final_payout AS final_amount,
                 p.payout_status AS payout_status,
                 p.paid_at AS paid_at,
+                substr(COALESCE(NULLIF(o.closed_at, ''), NULLIF(o.updated_at, ''), NULLIF(o.created_at, '')), 1, 10) AS order_date,
                 p.created_at AS created_at
             FROM worker_payouts p
             LEFT JOIN web_orders o ON o.id = p.order_id
@@ -108,13 +168,13 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
               AND 1 = 1
             {month_sql}
             {status_sql}
-            ORDER BY person_name ASC, p.created_at DESC, p.id DESC
+            ORDER BY person_name ASC, order_date DESC, p.id DESC
         """
 
         rows.extend(dict(row) for row in conn.execute(worker_sql, [*month_params, *status_params]).fetchall())
 
     if role in {"all", "customer_service"}:
-        month_sql, month_params = month_condition("p", month)
+        month_sql, month_params = month_condition("o", month)
         status_sql, status_params = status_condition("p", status)
 
         service_sql = f"""
@@ -132,13 +192,14 @@ def fetch_rows(conn: sqlite3.Connection, *, month: str, status: str, role: str) 
                 p.payout_amount AS final_amount,
                 p.payout_status AS payout_status,
                 p.paid_at AS paid_at,
+                substr(COALESCE(NULLIF(o.closed_at, ''), NULLIF(o.updated_at, ''), NULLIF(o.created_at, '')), 1, 10) AS order_date,
                 p.created_at AS created_at
             FROM customer_service_payouts p
             LEFT JOIN web_orders o ON o.id = p.order_id
             WHERE 1 = 1
             {month_sql}
             {status_sql}
-            ORDER BY person_name ASC, p.created_at DESC, p.id DESC
+            ORDER BY person_name ASC, order_date DESC, p.id DESC
         """
 
         rows.extend(dict(row) for row in conn.execute(service_sql, [*month_params, *status_params]).fetchall())
@@ -224,6 +285,7 @@ async def grouped_payouts(
         rows = fetch_rows(conn, month=month, status=status, role=role)
         groups = group_rows(rows)
         summary = build_summary(groups)
+        month_options = build_month_options(conn)
     finally:
         conn.close()
 
@@ -236,6 +298,7 @@ async def grouped_payouts(
             "groups": groups,
             "summary": summary,
             "month": month,
+            "month_options": month_options,
             "status": status,
             "role": role,
             "message": message,
@@ -272,7 +335,19 @@ async def update_group_status(
     params: list[str] = [person_id]
 
     if month:
-        conditions.append("strftime('%Y-%m', created_at) = ?")
+        conditions.append(
+            """
+            order_id IN (
+                SELECT id
+                FROM web_orders
+                WHERE substr(
+                    COALESCE(NULLIF(closed_at, ''), NULLIF(updated_at, ''), NULLIF(created_at, '')),
+                    1,
+                    7
+                ) = ?
+            )
+            """
+        )
         params.append(month)
 
     if status != "all":

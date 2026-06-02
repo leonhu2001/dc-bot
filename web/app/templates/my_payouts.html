@@ -84,7 +84,7 @@
                                 <span>結單日期</span>
                                 <strong>
                                     {% if order %}
-                                        {{ ((order.closed_at or order.created_at or '')|string)[:10] or '未紀錄' }}
+                                        {{ ((order.closed_at or order.updated_at or order.created_at or '')|string)[:10] or '未紀錄' }}
                                     {% else %}
                                         未紀錄
                                     {% endif %}
@@ -170,7 +170,7 @@
                                 <span>結單日期</span>
                                 <strong>
                                     {% if order %}
-                                        {{ ((order.closed_at or order.created_at or '')|string)[:10] or '未紀錄' }}
+                                        {{ ((order.closed_at or order.updated_at or order.created_at or '')|string)[:10] or '未紀錄' }}
                                     {% else %}
                                         未紀錄
                                     {% endif %}
