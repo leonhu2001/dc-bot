@@ -70,12 +70,56 @@ def _audit_closed_orders_by_customer() -> dict[int, dict]:
     return totals
 
 
+
+
+def _audit_pending_orders_by_customer() -> dict[int, dict]:
+    """Group stored / active orders as normal tracking items.
+
+    Stored and active orders are not closed-order anomalies. They are shown in
+    the audit report only as normal pending queues.
+    """
+    totals: dict[int, dict] = {}
+
+    for channel_id, data in _ORDER_SELECTIONS.items():
+        if not isinstance(data, dict):
+            continue
+
+        status = _audit_order_status(data)
+        if status not in {"stored", "active"}:
+            continue
+
+        customer_id = _to_int(data.get("customer_id"))
+        if customer_id is None:
+            continue
+
+        bucket = totals.setdefault(
+            customer_id,
+            {
+                "amount": 0,
+                "quantity": 0,
+                "orders": 0,
+                "channel_ids": [],
+                "stored": 0,
+                "active": 0,
+            }
+        )
+        bucket["amount"] += _audit_order_amount(data)
+        bucket["quantity"] += _to_int(data.get("quantity"), 1) or 1
+        bucket["orders"] += 1
+        bucket[status] += 1
+        bucket["channel_ids"].append(channel_id)
+
+    return totals
+
+
 def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
     safe_limit = max(1, min(int(limit or 10), 25))
     closed_totals = _audit_closed_orders_by_customer()
+    pending_totals = _audit_pending_orders_by_customer()
 
     customer_mismatches = []
-    checked_customer_ids = set(_CUSTOMER_REWARDS.keys()) | set(closed_totals.keys())
+    customer_pending_reconcile = []
+    checked_customer_ids = set(_CUSTOMER_REWARDS.keys()) | set(closed_totals.keys()) | set(pending_totals.keys())
 
     for customer_id in sorted(checked_customer_ids):
         customer_data = _CUSTOMER_REWARDS.get(customer_id, {})
@@ -85,6 +129,11 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
         customer_total = int(customer_data.get("total_spent", 0) or 0)
         customer_order_count = int(customer_data.get("order_count", 0) or 0)
         order_bucket = closed_totals.get(customer_id, {"amount": 0, "quantity": 0, "orders": 0})
+        pending_bucket = pending_totals.get(
+            customer_id,
+            {"amount": 0, "quantity": 0, "orders": 0, "stored": 0, "active": 0},
+        )
+
         closed_amount = int(order_bucket.get("amount", 0) or 0)
         closed_quantity = int(order_bucket.get("quantity", 0) or 0)
 
@@ -92,7 +141,7 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
         count_diff = customer_order_count - closed_quantity
 
         if amount_diff != 0 or count_diff != 0:
-            customer_mismatches.append({
+            record = {
                 "customer_id": customer_id,
                 "customer_total": customer_total,
                 "closed_amount": closed_amount,
@@ -100,7 +149,18 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
                 "customer_order_count": customer_order_count,
                 "closed_quantity": closed_quantity,
                 "count_diff": count_diff,
-            })
+                "pending_amount": int(pending_bucket.get("amount", 0) or 0),
+                "pending_quantity": int(pending_bucket.get("quantity", 0) or 0),
+                "pending_orders": int(pending_bucket.get("orders", 0) or 0),
+                "stored_orders": int(pending_bucket.get("stored", 0) or 0),
+                "active_orders": int(pending_bucket.get("active", 0) or 0),
+            }
+
+            # 有 stored / active 的會員，差額多半是未結單造成，不列入異常。
+            if record["pending_orders"] > 0:
+                customer_pending_reconcile.append(record)
+            else:
+                customer_mismatches.append(record)
 
     closed_zero_orders = []
     missing_customer_orders = []
@@ -157,15 +217,19 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
         f"顧客資料：{len(_CUSTOMER_REWARDS):,} 筆",
         f"接單面板 claims：{len(_ORDER_CLAIMS):,} 筆",
         "",
+        "【需處理異常】",
         f"會員 / 已結訂單對帳異常：{len(customer_mismatches):,} 筆",
         f"已結單金額為 0：{len(closed_zero_orders):,} 筆",
         f"缺少 customer_id 訂單：{len(missing_customer_orders):,} 筆",
-        f"存單：{len(stored_orders):,} 筆",
-        f"進行中訂單：{len(active_orders):,} 筆",
         f"已結但未標記 reward_counted：{len(reward_not_counted_closed):,} 筆",
         f"重複訂單編號：{len(duplicated_order_nos):,} 組",
         f"重複派單訊息 ID：{len(duplicated_dispatch_ids):,} 組",
         f"找不到來源訂單的 claims：{len(orphan_claims):,} 筆",
+        "",
+        "【正常追蹤】",
+        f"存單：{len(stored_orders):,} 筆",
+        f"進行中訂單：{len(active_orders):,} 筆",
+        f"會員累積含未結 / 存單差額：{len(customer_pending_reconcile):,} 筆",
     ]
 
     detail_lines = []
@@ -180,7 +244,7 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
         return f"{order_no}｜票口 {channel_id}｜{customer_text}｜{item}｜{audit_amount_text(amount)}｜{status}"
 
     if customer_mismatches:
-        detail_lines.append("\n【會員 / 已結訂單對帳異常】")
+        detail_lines.append("\n【需處理｜會員 / 已結訂單對帳異常】")
         for item in customer_mismatches[:safe_limit]:
             detail_lines.append(
                 f"<@{item['customer_id']}>｜會員累積 {audit_amount_text(item['customer_total'])} / "
@@ -191,10 +255,9 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
             detail_lines.append(f"…還有 {len(customer_mismatches) - safe_limit} 筆")
 
     for title, rows in [
-        ("已結單金額為 0", closed_zero_orders),
-        ("缺少 customer_id 訂單", missing_customer_orders),
-        ("存單", stored_orders),
-        ("已結但未標記 reward_counted", reward_not_counted_closed),
+        ("需處理｜已結單金額為 0", closed_zero_orders),
+        ("需處理｜缺少 customer_id 訂單", missing_customer_orders),
+        ("需處理｜已結但未標記 reward_counted", reward_not_counted_closed),
     ]:
         if rows:
             detail_lines.append(f"\n【{title}】")
@@ -202,6 +265,29 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
                 detail_lines.append(order_line(channel_id, data))
             if len(rows) > safe_limit:
                 detail_lines.append(f"…還有 {len(rows) - safe_limit} 筆")
+
+    for title, rows in [
+        ("正常追蹤｜存單（未結單，不算異常）", stored_orders),
+        ("正常追蹤｜進行中訂單（未結單，不算異常）", active_orders),
+    ]:
+        if rows:
+            detail_lines.append(f"\n【{title}】")
+            for channel_id, data in rows[:safe_limit]:
+                detail_lines.append(order_line(channel_id, data))
+            if len(rows) > safe_limit:
+                detail_lines.append(f"…還有 {len(rows) - safe_limit} 筆")
+
+    if customer_pending_reconcile:
+        detail_lines.append("\n【正常追蹤｜會員累積含未結 / 存單差額】")
+        for item in customer_pending_reconcile[:safe_limit]:
+            detail_lines.append(
+                f"<@{item['customer_id']}>｜會員累積 {audit_amount_text(item['customer_total'])} / "
+                f"已結訂單 {audit_amount_text(item['closed_amount'])} / 差額 {audit_amount_text(item['amount_diff'])}｜"
+                f"未結/存單 {item['pending_orders']} 筆，{audit_amount_text(item['pending_amount'])}｜"
+                f"stored {item['stored_orders']} / active {item['active_orders']}"
+            )
+        if len(customer_pending_reconcile) > safe_limit:
+            detail_lines.append(f"…還有 {len(customer_pending_reconcile) - safe_limit} 筆")
 
     if duplicated_order_nos:
         detail_lines.append("\n【重複訂單編號】")
@@ -236,7 +322,7 @@ def build_audit_data_report(limit: int = 10) -> tuple[discord.Embed, str]:
         color=discord.Color.orange() if has_problem else discord.Color.green(),
         timestamp=get_taipei_now(),
     )
-    embed.set_footer(text=f"明細上限：每類 {safe_limit} 筆。完整內容會在訊息或附件中提供。")
+    embed.set_footer(text=f"明細上限：每類 {safe_limit} 筆。stored / active 為正常追蹤，不列入異常。")
 
     return embed, full_report
 
