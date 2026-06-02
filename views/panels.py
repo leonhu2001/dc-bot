@@ -4,6 +4,8 @@ from typing import Any, Callable, Awaitable
 
 import discord
 
+from views.support import ComplaintModal, FeedbackModal
+
 # Dependencies configured by bot.py after IDs and helper functions are available.
 CUSTOMER_CATEGORY_ID: int | None = None
 EXAM_CATEGORY_ID: int | None = None
@@ -188,64 +190,42 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
         )
 
 
-class MainPanelSelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(
-                label="我要下單",
-                value="order",
-                description="開啟下單票口",
-            ),
-            discord.SelectOption(
-                label="我要入職",
-                value="recruit",
-                description="開啟入職申請票口",
-            ),
-        ]
-
-        super().__init__(
-            placeholder="請選擇你要辦理的項目",
-            min_values=1,
-            max_values=1,
-            options=options,
-            custom_id="mawan_main_panel_select",
-            row=0,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        PANEL_SELECTIONS[interaction.user.id] = self.values[0]
-        await interaction.response.defer()
-
-
 class MainPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(MainPanelSelect())
 
     @discord.ui.button(
-        label="確認",
+        label="我要下單",
+        style=discord.ButtonStyle.primary,
+        custom_id="mawan_main_panel_order_button",
+        row=0,
+    )
+    async def order_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(OrderModal())
+
+    @discord.ui.button(
+        label="我要入職",
         style=discord.ButtonStyle.success,
-        custom_id="mawan_main_panel_confirm",
+        custom_id="mawan_main_panel_recruit_button",
+        row=0,
+    )
+    async def recruit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(RecruitModal())
+
+    @discord.ui.button(
+        label="我要客訴",
+        style=discord.ButtonStyle.danger,
+        custom_id="mawan_main_panel_complaint_button",
         row=1,
     )
-    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        selected = PANEL_SELECTIONS.get(interaction.user.id)
+    async def complaint_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(ComplaintModal())
 
-        if selected is None:
-            await interaction.response.send_message(
-                "請先從下拉式清單選擇項目，再按確認。",
-                ephemeral=True,
-            )
-            return
-
-        PANEL_SELECTIONS.pop(interaction.user.id, None)
-
-        if selected == "order":
-            await interaction.response.send_modal(OrderModal())
-        elif selected == "recruit":
-            await interaction.response.send_modal(RecruitModal())
-        else:
-            await interaction.response.send_message(
-                "選擇項目異常，請重新選擇一次。",
-                ephemeral=True,
-            )
+    @discord.ui.button(
+        label="顧客意見",
+        style=discord.ButtonStyle.secondary,
+        custom_id="mawan_main_panel_feedback_button",
+        row=1,
+    )
+    async def feedback_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(FeedbackModal())

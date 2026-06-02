@@ -5,7 +5,6 @@ from discord import app_commands
 from discord.ext import commands
 
 from views.panels import MainPanelView
-from views.support import ComplaintPanelView, FeedbackPanelView
 from views.voice import (
     get_or_create_play_voice_lobby,
     get_or_create_vip_voice_lobby,
@@ -46,30 +45,11 @@ class SetupCommands(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.default_permissions(manage_messages=True)
     async def setup_complaint_panel(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        channel_id = int(getattr(self.bot, "complaint_panel_channel_id_value", 0) or 0)
-        panel_channel = guild.get_channel(channel_id)
-
-        if panel_channel is None or not isinstance(panel_channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "找不到客訴面板頻道，請確認 COMPLAINT_PANEL_CHANNEL_ID 是否正確。",
-                ephemeral=True,
-            )
-            return
-
-        embed = discord.Embed(
-            title="我要客訴!!",
-            description="如有任何客訴內容，請點擊下方按鈕填寫客訴單。",
-            color=discord.Color.red(),
+        await interaction.response.send_message(
+            "客訴功能已整合到「/setup panel」建立的客服中心主面板，不需要另外建立客訴面板。",
+            ephemeral=True,
         )
-        embed.set_footer(text="魔丸娛樂｜客訴表單")
 
-        await panel_channel.send(embed=embed, view=ComplaintPanelView())
-        await interaction.response.send_message(f"客訴表單面板已建立在 {panel_channel.mention}。", ephemeral=True)
 
     @setup.command(
         name="feedback_panel",
@@ -78,30 +58,11 @@ class SetupCommands(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.default_permissions(manage_messages=True)
     async def setup_feedback_panel(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        channel_id = int(getattr(self.bot, "feedback_panel_channel_id_value", 0) or 0)
-        panel_channel = guild.get_channel(channel_id)
-
-        if panel_channel is None or not isinstance(panel_channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "找不到顧客意見箱面板頻道，請確認 FEEDBACK_PANEL_CHANNEL_ID 是否正確。",
-                ephemeral=True,
-            )
-            return
-
-        embed = discord.Embed(
-            title="顧客意見箱",
-            description="如有任何意見或建議，請點擊下方按鈕填寫。",
-            color=discord.Color.blue(),
+        await interaction.response.send_message(
+            "顧客意見功能已整合到「/setup panel」建立的客服中心主面板，不需要另外建立顧客意見箱面板。",
+            ephemeral=True,
         )
-        embed.set_footer(text="魔丸娛樂｜顧客意見箱")
 
-        await panel_channel.send(embed=embed, view=FeedbackPanelView())
-        await interaction.response.send_message(f"顧客意見箱面板已建立在 {panel_channel.mention}。", ephemeral=True)
 
     @setup.command(
         name="play_voice",
