@@ -43,11 +43,7 @@ def normalize_role(role: str | None) -> str:
 
 
 def payout_order_date_expr(alias: str = "w") -> str:
-    """人員總表使用的有效結單日期。
-
-    優先使用 closed_at；舊資料如果沒有 closed_at，退回 updated_at，再退回 created_at。
-    這樣既能修正舊資料未紀錄，也避免用 payout created_at 導致月份錯亂。
-    """
+    """人員總表使用的有效結單日期：closed_at -> updated_at -> created_at。"""
     return (
         f"COALESCE("
         f"NULLIF({alias}.closed_at, ''), "
@@ -59,18 +55,11 @@ def payout_order_date_expr(alias: str = "w") -> str:
 
 def month_filter_sql(month: str | None, alias: str) -> tuple[str, list[str]]:
     month = (month or "").strip()
+
     if not month:
         return "", []
+
     return f" AND substr({payout_order_date_expr(alias)}, 1, 7) = ? ", [month]
-
-
-    人員總表是薪資 / 分潤頁，月份必須依 web_orders.closed_at，
-    不可用 payout created_at / order created_at / updated_at，避免 5 月結單跑進 6 月。
-    """
-    month = (month or "").strip()
-    if not month:
-        return "", []
-    return f" AND substr(NULLIF({alias}.closed_at, ''), 1, 7) = ? ", [month]
 
 
 def add_person(people: dict[str, dict], *, discord_id, display_name, role, amount, order_no, category, item, payout_status, customer_name=None, closed_at=None):
