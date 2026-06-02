@@ -54,7 +54,15 @@ class WebConfig:
         f"sqlite:///{BASE_DIR / 'web_dashboard.db'}",
     )
 
-    WEB_SECRET_KEY = os.getenv("WEB_SECRET_KEY", "change-this-secret")
+    WEB_SECRET_KEY = os.getenv("WEB_SECRET_KEY", "")
+
+    if not WEB_SECRET_KEY or WEB_SECRET_KEY == "change-this-secret":
+        raise RuntimeError("WEB_SECRET_KEY 未設定或仍為預設值，請在 web/.env 設定正式密鑰")
+
+    WEB_COOKIE_HTTPS_ONLY = os.getenv(
+        "WEB_COOKIE_HTTPS_ONLY",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
 
 
 config = WebConfig()

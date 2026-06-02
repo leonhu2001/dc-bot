@@ -29,7 +29,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=config.WEB_SECRET_KEY,
     same_site="lax",
-    https_only=False,
+    https_only=config.WEB_COOKIE_HTTPS_ONLY,
 )
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

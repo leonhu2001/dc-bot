@@ -1,6 +1,7 @@
 from urllib.parse import urlencode
+import secrets
 
-import requests
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
@@ -15,9 +16,12 @@ DISCORD_TOKEN_URL = f"{DISCORD_API_BASE}/oauth2/token"
 
 
 @router.get("/discord/login")
-async def discord_login():
+async def discord_login(request: Request):
     if not config.DISCORD_CLIENT_ID:
         raise HTTPException(status_code=500, detail="DISCORD_CLIENT_ID is not configured")
+
+    state = secrets.token_urlsafe(32)
+    request.session["oauth_state"] = state
 
     params = {
         "client_id": config.DISCORD_CLIENT_ID,
@@ -25,20 +29,26 @@ async def discord_login():
         "response_type": "code",
         "scope": "identify",
         "prompt": "none",
+        "state": state,
     }
 
     return RedirectResponse(f"{DISCORD_AUTHORIZE_URL}?{urlencode(params)}")
 
 
 @router.get("/discord/callback")
-async def discord_callback(request: Request, code: str | None = None, error: str | None = None):
+async def discord_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
     if error:
         raise HTTPException(status_code=400, detail=f"Discord OAuth error: {error}")
 
     if not code:
         raise HTTPException(status_code=400, detail="Missing Discord OAuth code")
 
-    token_response = requests.post(
+    expected_state = request.session.pop("oauth_state", None)
+    if not state or not expected_state or state != expected_state:
+        raise HTTPException(status_code=400, detail="Invalid Discord OAuth state")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        token_response = await client.post(
         DISCORD_TOKEN_URL,
         data={
             "client_id": config.DISCORD_CLIENT_ID,
@@ -50,7 +60,6 @@ async def discord_callback(request: Request, code: str | None = None, error: str
         headers={
             "Content-Type": "application/x-www-form-urlencoded",
         },
-        timeout=15,
     )
 
     if token_response.status_code != 200:
@@ -62,13 +71,12 @@ async def discord_callback(request: Request, code: str | None = None, error: str
     token_data = token_response.json()
     access_token = token_data["access_token"]
 
-    user_response = requests.get(
-        f"{DISCORD_API_BASE}/users/@me",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-        },
-        timeout=15,
-    )
+        user_response = await client.get(
+            f"{DISCORD_API_BASE}/users/@me",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+            },
+        )
 
     if user_response.status_code != 200:
         raise HTTPException(
