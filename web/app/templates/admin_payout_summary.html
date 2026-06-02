@@ -136,7 +136,12 @@
 
 <section class="panel">
     <form method="get" action="/admin/payouts/summary" class="filter-form payout-summary-filter">
-        <input class="input" type="month" name="month" value="{{ month }}">
+        <select class="input" name="month">
+            <option value="" {% if not month %}selected{% endif %}>全部月份</option>
+            {% for option in month_options %}
+                <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+        </select>
         <select class="input" name="role">
             <option value="all" {% if role == "all" %}selected{% endif %}>全部身份</option>
             <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>

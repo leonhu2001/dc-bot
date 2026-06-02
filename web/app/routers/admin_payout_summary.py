@@ -42,8 +42,27 @@ def normalize_role(role: str | None) -> str:
     return role if role in {"all", "worker", "customer_service"} else "all"
 
 
+def payout_order_date_expr(alias: str = "w") -> str:
+    """人員總表使用的有效結單日期。
+
+    優先使用 closed_at；舊資料如果沒有 closed_at，退回 updated_at，再退回 created_at。
+    這樣既能修正舊資料未紀錄，也避免用 payout created_at 導致月份錯亂。
+    """
+    return (
+        f"COALESCE("
+        f"NULLIF({alias}.closed_at, ''), "
+        f"NULLIF({alias}.updated_at, ''), "
+        f"NULLIF({alias}.created_at, '')"
+        f")"
+    )
+
+
 def month_filter_sql(month: str | None, alias: str) -> tuple[str, list[str]]:
-    """Filter payout summary by the order close month.
+    month = (month or "").strip()
+    if not month:
+        return "", []
+    return f" AND substr({payout_order_date_expr(alias)}, 1, 7) = ? ", [month]
+
 
     人員總表是薪資 / 分潤頁，月份必須依 web_orders.closed_at，
     不可用 payout created_at / order created_at / updated_at，避免 5 月結單跑進 6 月。
@@ -199,9 +218,9 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     w.category,
                     w.item,
                     COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    NULLIF(w.closed_at, '') AS closed_at,
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at,
                     COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    NULLIF(w.closed_at, '') AS closed_at
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
                 FROM worker_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -239,7 +258,7 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     w.category,
                     w.item,
                     COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
-                    NULLIF(w.closed_at, '') AS closed_at
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
                 FROM customer_service_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -289,6 +308,48 @@ def summary_db_path() -> str:
     return str(Path.cwd() / "web_dashboard.db")
 
 
+def get_summary_month_options() -> list[dict]:
+    conn = sqlite3.connect(db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT month_value
+            FROM (
+                SELECT substr(
+                    COALESCE(NULLIF(closed_at, ''), NULLIF(updated_at, ''), NULLIF(created_at, '')),
+                    1,
+                    7
+                ) AS month_value
+                FROM web_orders
+                WHERE status = 'closed'
+            )
+            WHERE month_value GLOB '????-??'
+            ORDER BY month_value DESC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    options = []
+
+    for row in rows:
+        value = str(row["month_value"] or "").strip()
+        if not value:
+            continue
+
+        try:
+            year, month = value.split("-", 1)
+            label = f"{int(year)}年{int(month)}月"
+        except Exception:
+            label = value
+
+        options.append({"value": value, "label": label})
+
+    return options
+
+
 def normalize_summary_month(month: str | None) -> str:
     return str(month or "").strip()
 
@@ -323,7 +384,7 @@ def update_summary_payout_status(month: str | None, role: str | None, target_sta
         params = []
 
         if month:
-            order_filter += " AND substr(NULLIF(w.closed_at, ''), 1, 7) = ?"
+            order_filter += " AND substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
             params.append(month)
 
         # 打手
@@ -386,7 +447,7 @@ def update_summary_person_payout_status(month: str | None, person_role: str | No
         params = []
 
         if month:
-            order_filter += " AND substr(NULLIF(w.closed_at, ''), 1, 7) = ?"
+            order_filter += " AND substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
             params.append(month)
 
         is_worker = person_role in {"worker", "打手", "worker_payout", "打手分潤"}
@@ -470,6 +531,7 @@ async def admin_payout_summary(request: Request, month: str | None = "", role: s
             "paid_totals": paid_totals,
             "totals": totals,
             "month": month or "",
+            "month_options": get_summary_month_options(),
             "role": role,
             "status": status,
             "q": q or "",
@@ -520,7 +582,11 @@ async def admin_month_options(request: Request):
             """
             SELECT DISTINCT month_value
             FROM (
-                SELECT substr(NULLIF(closed_at, ''), 1, 7) AS month_value
+                SELECT substr(
+                    COALESCE(NULLIF(closed_at, ''), NULLIF(updated_at, ''), NULLIF(created_at, '')),
+                    1,
+                    7
+                ) AS month_value
                 FROM web_orders
                 WHERE status = 'closed'
             )
