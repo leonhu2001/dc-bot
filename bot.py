@@ -5736,18 +5736,6 @@ async def delete_dispatch_panel(
     )
 
 
-# 註冊 bot.py 裡的 top-level slash 指令群組
-try:
-    bot.tree.add_command(order_group)
-except app_commands.CommandAlreadyRegistered:
-    pass
-try:
-    bot.tree.add_command(vip_group)
-except app_commands.CommandAlreadyRegistered:
-    pass
-
-bot.run(TOKEN)
-
 def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild):
     """Discord 派單訊息按接單/取消接單後，同步寫回網站資料庫。"""
     try:
@@ -5775,3 +5763,15 @@ def _sync_dispatch_claims_to_web_from_bot(dispatch_message_id, claim_data, guild
     except Exception as exc:
         print(f"[web-sync] Discord 接單同步網站失敗 dispatch_message_id={dispatch_message_id}: {exc}")
 
+
+# 註冊 bot.py 裡的 top-level slash 指令群組
+try:
+    bot.tree.add_command(order_group)
+except app_commands.CommandAlreadyRegistered:
+    pass
+try:
+    bot.tree.add_command(vip_group)
+except app_commands.CommandAlreadyRegistered:
+    pass
+
+bot.run(TOKEN)
