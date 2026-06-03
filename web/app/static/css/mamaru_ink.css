@@ -1380,3 +1380,167 @@ body::before {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 6
+   側欄排版修正：間距、Logo、登出、圓印
+========================================================= */
+
+@media (min-width: 1180px) {
+    :root {
+        --mw-sidebar-width: 260px;
+        --mw-sidebar-gap: 34px;
+        --mw-page-width: calc(100vw - var(--mw-sidebar-width) - 74px);
+    }
+
+    body {
+        padding-left: var(--mw-sidebar-width) !important;
+    }
+
+    /* 側欄 Logo 區縮小並上移，避免壓到選單 */
+    body::after {
+        width: var(--mw-sidebar-width) !important;
+        padding-top: 44px !important;
+        font-size: 50px !important;
+        letter-spacing: -6px !important;
+    }
+
+    html::before {
+        top: 106px !important;
+        width: var(--mw-sidebar-width) !important;
+        font-size: 13px !important;
+        letter-spacing: 0.2em !important;
+    }
+
+    /* 側欄底部圓印縮小並淡化 */
+    html::after {
+        left: 48px !important;
+        bottom: 46px !important;
+        width: 132px !important;
+        height: 132px !important;
+        opacity: 0.38 !important;
+        filter: blur(0.2px);
+    }
+
+    /* 主內容與側欄距離調整 */
+    .container,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl,
+    .layout-container,
+    .app-container,
+    .shell,
+    .app-shell,
+    .admin-shell,
+    .dashboard-shell,
+    .page-shell,
+    .page-container,
+    .dashboard-container,
+    .admin-container,
+    .content-container,
+    .main-container,
+    main,
+    .content,
+    .main-content,
+    .page-content,
+    #content,
+    #main {
+        width: var(--mw-page-width) !important;
+        max-width: var(--mw-page-width) !important;
+        margin-left: var(--mw-sidebar-gap) !important;
+        margin-right: 34px !important;
+    }
+
+    /* 避免所有 nav 都被塞進同一格造成重疊 */
+    .top-nav,
+    .nav-group,
+    .nav-tabs,
+    .navbar,
+    .header-nav {
+        left: 20px !important;
+        top: 162px !important;
+        width: calc(var(--mw-sidebar-width) - 40px) !important;
+        max-height: calc(100vh - 260px) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        gap: 8px !important;
+        padding-right: 2px !important;
+    }
+
+    /* 側欄按鈕統一高度，不要壓縮 */
+    .top-nav .nav-link,
+    .nav-group .nav-link,
+    .nav-tabs .nav-link,
+    .navbar .nav-link,
+    .header-nav .nav-link,
+    .top-nav a,
+    .nav-group a,
+    .nav-tabs a,
+    .navbar a,
+    .header-nav a {
+        min-height: 42px !important;
+        height: 42px !important;
+        padding: 10px 14px !important;
+        font-size: 14px !important;
+        line-height: 1.2 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* 若有導覽群組，讓群組間有細分隔 */
+    .top-nav > *:nth-child(1),
+    .nav-group > *:nth-child(1),
+    .nav-tabs > *:nth-child(1),
+    .navbar > *:nth-child(1),
+    .header-nav > *:nth-child(1) {
+        margin-top: 0 !important;
+    }
+
+    /* 登出固定底部，不跟導覽混在一起 */
+    a[href="/logout"],
+    .logout {
+        left: 20px !important;
+        bottom: 24px !important;
+        width: calc(var(--mw-sidebar-width) - 40px) !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        z-index: 40 !important;
+    }
+
+    /* 側欄滾動條變細 */
+    .top-nav::-webkit-scrollbar,
+    .nav-group::-webkit-scrollbar,
+    .nav-tabs::-webkit-scrollbar,
+    .navbar::-webkit-scrollbar,
+    .header-nav::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .top-nav::-webkit-scrollbar-thumb,
+    .nav-group::-webkit-scrollbar-thumb,
+    .nav-tabs::-webkit-scrollbar-thumb,
+    .navbar::-webkit-scrollbar-thumb,
+    .header-nav::-webkit-scrollbar-thumb {
+        background: rgba(179,49,45,0.55);
+        border: none;
+    }
+
+    /* 主 panel 右側保留一些呼吸感 */
+    .panel {
+        padding-left: 22px !important;
+        padding-right: 22px !important;
+    }
+
+    /* 派單頁內容少時，不要顯得像浮在半空 */
+    body:has(.page-title),
+    body:has(h1) {
+        min-height: 100vh;
+    }
+}
+
