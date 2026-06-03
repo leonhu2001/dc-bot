@@ -265,6 +265,21 @@ def history_effective_closed_date(order) -> str:
     return str(value)[:10] if str(value or "").strip() else ""
 
 
+
+def history_closed_date_input_value(order) -> str:
+    """給歷史訂單編輯欄位使用：只使用真正 closed_at，不用 updated_at / created_at fallback。"""
+    return history_normalize_date(getattr(order, "closed_at", None))
+
+
+def history_should_update_closed_at(current_closed_at, submitted_closed_at: str) -> bool:
+    """只有使用者真的提交了結單日期，且和目前 closed_at 不同時，才更新 closed_at。"""
+    submitted = history_normalize_date(submitted_closed_at)
+    if not submitted:
+        return False
+
+    current = history_normalize_date(current_closed_at)
+    return submitted != current
+
 def history_normalize_date(value: str | None) -> str:
     """把 input type=date 的 YYYY-MM-DD 轉成可存進 SQLite 的 datetime 字串。"""
     value = str(value or "").strip()
@@ -1029,6 +1044,7 @@ async def admin_order_history(
             "customer": customer or "",
             "history_staff_options": history_staff_options(),
             "history_effective_closed_date": history_effective_closed_date,
+            "history_closed_date_input_value": history_closed_date_input_value,
             "assignments_by_order_id": history_assignments_by_order([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "manual_payout_overrides": history_manual_payout_overrides([int(order.id) for order in orders]),
@@ -1310,7 +1326,17 @@ async def bulk_update_order_history(request: Request):
             item = str(form.get(f"item_{order_id}") or "").strip()
             amount = history_to_int(form.get(f"amount_{order_id}"), 0)
             status = history_safe_status(form.get(f"status_{order_id}"))
-            closed_at = history_normalize_date(form.get(f"closed_date_{order_id}"))
+            submitted_closed_at = history_normalize_date(form.get(f"closed_date_{order_id}"))
+
+            original_row = conn.execute(
+                "SELECT closed_at FROM web_orders WHERE id = ?",
+                (order_id,),
+            ).fetchone()
+
+            original_closed_at = history_normalize_date(original_row[0]) if original_row else ""
+            should_update_closed_at = bool(
+                submitted_closed_at and submitted_closed_at != original_closed_at
+            )
 
             cs_id = str(form.get(f"customer_service_{order_id}") or "").strip()
             cs_name = cs_name_map.get(cs_id, "") if cs_id else ""
@@ -1327,7 +1353,7 @@ async def bulk_update_order_history(request: Request):
                     item = ?,
                     amount = ?,
                     status = ?,
-                    closed_at = COALESCE(NULLIF(?, ''), closed_at),
+                    closed_at = CASE WHEN ? THEN ? ELSE closed_at END,
                     updated_at = datetime('now')
                 WHERE id = ?
                 """,
@@ -1340,7 +1366,8 @@ async def bulk_update_order_history(request: Request):
                     item,
                     amount,
                     status,
-                    closed_at,
+                    1 if should_update_closed_at else 0,
+                    submitted_closed_at,
                     order_id,
                 ),
             )
