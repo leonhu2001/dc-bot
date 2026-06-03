@@ -269,15 +269,31 @@ def build_self_service_order_embed(
         normalized_receiver_text = str(receiver_text or "").strip()
 
         if normalized_receiver_text.startswith("打手："):
-            normalized_receiver_text = "打手接單：" + normalized_receiver_text.removeprefix("打手：").strip()
+            normalized_receiver_text = normalized_receiver_text.removeprefix("打手：").strip()
         elif normalized_receiver_text.startswith("打手:"):
-            normalized_receiver_text = "打手接單：" + normalized_receiver_text.removeprefix("打手:").strip()
+            normalized_receiver_text = normalized_receiver_text.removeprefix("打手:").strip()
         elif normalized_receiver_text.startswith("陪玩："):
-            normalized_receiver_text = "陪玩接單：" + normalized_receiver_text.removeprefix("陪玩：").strip()
+            normalized_receiver_text = normalized_receiver_text.removeprefix("陪玩：").strip()
         elif normalized_receiver_text.startswith("陪玩:"):
-            normalized_receiver_text = "陪玩接單：" + normalized_receiver_text.removeprefix("陪玩:").strip()
+            normalized_receiver_text = normalized_receiver_text.removeprefix("陪玩:").strip()
         elif normalized_receiver_text in {"不指定陪玩/打手", "不指定打手/陪玩"}:
             normalized_receiver_text = "尚未接單"
+
+        for prefix in (
+            "打手接單：",
+            "打手接單:",
+            "陪玩接單：",
+            "陪玩接單:",
+            "打手：",
+            "打手:",
+            "陪玩：",
+            "陪玩:",
+            "接單人員：",
+            "接單人員:",
+        ):
+            if normalized_receiver_text.startswith(prefix):
+                normalized_receiver_text = normalized_receiver_text.removeprefix(prefix).strip()
+                break
 
         embed.add_field(name="接單人員", value=normalized_receiver_text or "尚未接單", inline=False)
 

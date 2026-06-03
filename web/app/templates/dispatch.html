@@ -198,13 +198,13 @@
                                 {% if user_claimed_this_order %}
                                     <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
                                         <button class="button danger" type="submit">
-                                            取消我要接單
+                                            取消接單
                                         </button>
                                     </form>
                                 {% else %}
                                     <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
                                         <button class="button" type="submit">
-                                            我要接單
+                                            接單
                                         </button>
                                     </form>
                                 {% endif %}

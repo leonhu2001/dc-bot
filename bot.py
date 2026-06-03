@@ -2108,7 +2108,7 @@ def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action:
         if interaction.message is None:
             return
 
-        role_type = "companion" if claim_type == "companion" else "booster"
+        role_type = "booster"
 
         apply_discord_claim_event_to_web(
             dispatch_message_id=interaction.message.id,
@@ -2156,14 +2156,12 @@ class DispatchClaimView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
 
+
     def get_receiver_label(self, claim_type: str) -> str:
-        if claim_type == "companion":
-            return "陪玩接單"
-        return "打手接單"
+        return "我要接單"
+
 
     def get_required_role_id(self, claim_type: str) -> int:
-        if claim_type == "companion":
-            return COMPANION_RECEIVER_ROLE_ID
         return BOOSTER_RECEIVER_ROLE_ID
 
     def get_claim_data(self, message_id: int) -> dict:
@@ -2187,6 +2185,7 @@ class DispatchClaimView(discord.ui.View):
         data.setdefault("status", self.status)
 
         return data
+
 
     def build_receiver_text(self, claim_data: dict) -> str | None:
         receiver_ids = sorted(
@@ -2275,20 +2274,21 @@ class DispatchClaimView(discord.ui.View):
             )
         )
 
+
     async def claim_order(self, interaction: discord.Interaction, claim_type: str):
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
-        if self.locked or self.status in {"closed", "stored"}:
-            await interaction.response.send_message("此單已結單或已存單，接單面板已鎖定。", ephemeral=True)
+        if self.locked:
+            await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
             return
 
-        # 統一接單：不再分打手/陪玩，只要有任一接單身分組即可。
         allowed_role_ids = (COMPANION_RECEIVER_ROLE_ID, BOOSTER_RECEIVER_ROLE_ID)
+
         if not any(has_role(interaction.user, role_id) for role_id in allowed_role_ids):
             await interaction.response.send_message(
-                "只有接單人員可以按「我要接單」。",
+                "你沒有「我要接單」權限。",
                 ephemeral=True,
             )
             return
@@ -2299,10 +2299,9 @@ class DispatchClaimView(discord.ui.View):
             await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
             return
 
-        claim_data.setdefault("booster", set())
         claim_data.setdefault("companion", set())
+        claim_data.setdefault("booster", set())
 
-        # 同一人只保留一筆接單，不再分陪玩/打手。
         claim_data["companion"].discard(interaction.user.id)
         claim_data["booster"].add(interaction.user.id)
 
@@ -2322,14 +2321,13 @@ class DispatchClaimView(discord.ui.View):
 
         await send_order_log(
             interaction.guild,
-            "派單接單",
-            [
-                ("訂單", f"{self.category_label}｜{self.item}", False),
+            title="我要接單",
+            fields=[
                 ("接單人員", interaction.user.mention, True),
-                ("付款方式", self.payment_method, True),
-                ("來源票口", f"<#{self.source_channel_id}>", False),
+                ("顧客", f"<@{self.customer_id}>", True),
+                ("訂單", f"{self.category_label}｜{self.item} x{self.quantity}", False),
             ],
-            actor=interaction.user,
+            color=discord.Color.green(),
         )
 
         await self.refresh_panel(interaction)
@@ -2514,7 +2512,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         if booster_ids:
             lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
-        receiver_text = "\n".join(lines) if lines else None
+        receiver_text = "、".join(dict.fromkeys(lines)) if lines else None
 
         embed = build_self_service_order_embed(
             customer_mention=customer_mention,
@@ -2687,7 +2685,7 @@ async def store_dispatch_claim_panel(
     if booster_ids:
         lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
-    receiver_text = "\n".join(lines) if lines else None
+    receiver_text = "、".join(dict.fromkeys(lines)) if lines else None
 
     embed = build_self_service_order_embed(
         customer_mention=customer_mention,
@@ -2825,7 +2823,7 @@ async def resume_stored_order(
     if booster_ids:
         lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
-    receiver_text = "\n".join(lines) if lines else None
+    receiver_text = "、".join(dict.fromkeys(lines)) if lines else None
 
     embed = build_self_service_order_embed(
         customer_mention=customer_mention,
@@ -5196,22 +5194,37 @@ def _web_sync_mark_event_failed(event_id: int, error_message: str, retry_count: 
 
 
 def _web_sync_build_receiver_text(assignments: list[dict]) -> str:
-    receivers = []
+    companions = []
+    boosters = []
 
     for row in assignments:
         user_id = str(row.get("worker_discord_id") or "").strip()
+        display_name = str(row.get("worker_display_name") or user_id).strip()
+        role_type = str(row.get("role_type") or "booster").strip()
 
         if not user_id:
             continue
 
         text = f"<@{user_id}>"
-        if text not in receivers:
-            receivers.append(text)
 
-    if not receivers:
+        if role_type == "companion":
+            companions.append(text)
+        else:
+            boosters.append(text)
+
+    parts = []
+
+    if boosters:
+        parts.extend(boosters)
+
+    if companions:
+        parts.extend(companions)
+
+    if not parts:
         return "尚未有人接單"
 
-    return "、".join(receivers)
+    return "\n".join(parts)
+
 
 
 def _normalize_dispatch_embed_field_order(embed):
@@ -5222,7 +5235,7 @@ def _normalize_dispatch_embed_field_order(embed):
         name = str(field.name or "").strip()
         value = str(field.value or "").strip()
 
-        if name in {"目前接單", "目前接單人"}:
+        if name in {"目前接單", "目前接單人", "接單人員"}:
             name = "接單人員"
 
         if name in {"目前狀態"}:
@@ -5288,7 +5301,7 @@ def _normalize_dispatch_embed_field_order(embed):
 def _web_sync_embed_without_receiver_fields(embed):
     blocked_names = {
         "目前接單",
-        "目前接單人",
+        "接單人員",
         "接單狀態",
         "接單人員",
         "打手接單",
