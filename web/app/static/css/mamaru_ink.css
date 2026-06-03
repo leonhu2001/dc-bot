@@ -6189,3 +6189,106 @@ textarea {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Dispatch Transparent Layout
+   派單頁去除大面積黑底，文字直接貼水墨背景
+========================================================= */
+
+/* 派單頁主外框去背景，只留很淡金邊 */
+body:has(.dispatch-v2-hero) .mw-page-card {
+    background: transparent !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+    box-shadow:
+        0 0 0 1px rgba(201, 164, 95, 0.08),
+        0 22px 60px rgba(0, 0, 0, 0.22) !important;
+}
+
+/* Hero 拿掉大黑底，保留紅金氛圍與邊框 */
+.dispatch-v2-hero {
+    background:
+        radial-gradient(circle at 86% 36%, rgba(179, 49, 45, 0.16), transparent 34%),
+        radial-gradient(circle at 8% 22%, rgba(201, 164, 95, 0.07), transparent 32%) !important;
+    border-color: rgba(201, 164, 95, 0.36) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.035),
+        0 18px 42px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* 左右任務欄去掉黑底 */
+.dispatch-v2-column {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.10), transparent 34%),
+        radial-gradient(circle at 0% 100%, rgba(201, 164, 95, 0.035), transparent 32%) !important;
+    border-color: rgba(201, 164, 95, 0.32) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.025),
+        0 16px 36px rgba(0, 0, 0, 0.16) !important;
+}
+
+/* 統計卡改成透明玻璃感，不用黑底 */
+.dispatch-v2-stat-card {
+    background:
+        radial-gradient(circle at 85% 18%, rgba(179, 49, 45, 0.20), transparent 42%),
+        rgba(5, 6, 8, 0.18) !important;
+    border-color: rgba(201, 164, 95, 0.34) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        0 12px 26px rgba(0,0,0,0.18) !important;
+}
+
+/* 空狀態卡：不要大黑框，改成淡框提示 */
+.dispatch-v2-empty-card {
+    background:
+        linear-gradient(145deg, rgba(5, 6, 8, 0.20), rgba(179, 49, 45, 0.045)) !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+    box-shadow: none !important;
+}
+
+/* 如果有任務卡，也改透明 */
+.dispatch-v2-mission-card,
+.dispatch-v2-my-card {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.09), transparent 36%),
+        rgba(5, 6, 8, 0.24) !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+}
+
+/* 任務資料小格淡化 */
+.dispatch-v2-mission-meta > div,
+.dispatch-v2-assignment-row,
+.dispatch-v2-payout > div,
+.dispatch-v2-money-chip,
+.dispatch-v2-assignment-count {
+    background: rgba(5, 6, 8, 0.20) !important;
+    border-color: rgba(201, 164, 95, 0.22) !important;
+}
+
+/* 文字加強陰影，避免直接貼背景後變糊 */
+body:has(.dispatch-v2-hero) h1,
+body:has(.dispatch-v2-hero) h2,
+body:has(.dispatch-v2-hero) h3,
+.dispatch-v2-stat-card strong,
+.dispatch-v2-empty-card strong {
+    text-shadow:
+        0 2px 4px rgba(0,0,0,0.82),
+        0 0 18px rgba(0,0,0,0.56),
+        0 0 20px rgba(225,75,67,0.12) !important;
+}
+
+body:has(.dispatch-v2-hero) .muted-text,
+.dispatch-v2-empty-card span,
+.dispatch-v2-mission-meta span {
+    text-shadow:
+        0 1px 3px rgba(0,0,0,0.82) !important;
+}
+
+/* 頁面底部那個大淡字也拿掉，避免背景上太亂 */
+body:has(.dispatch-v2-hero) .mw-page-card::before,
+body:has(.dispatch-v2-hero) .mw-page-card::after,
+.dispatch-v2-column::after,
+.dispatch-v2-hero::after {
+    display: none !important;
+    content: none !important;
+}
+
