@@ -425,3 +425,409 @@ td:last-child {
         border-radius: 14px !important;
     }
 }
+
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 2
+   統計卡片 / 表格 / 人員卡片精修
+========================================================= */
+
+/* 頁面區塊標題：加紅色印記感 */
+.section-title-row h2,
+.panel > h2,
+.summary-list-title,
+.history-page-header h2 {
+    position: relative;
+    padding-left: 14px;
+}
+
+.section-title-row h2::before,
+.panel > h2::before,
+.summary-list-title::before,
+.history-page-header h2::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.26em;
+    width: 4px;
+    height: 1.1em;
+    border-radius: 99px;
+    background: linear-gradient(180deg, var(--mw-red-bright), var(--mw-red-dark));
+    box-shadow: 0 0 18px rgba(225, 75, 67, 0.48);
+}
+
+/* 統計卡片：更像水墨圓印 + 三色卡片 */
+.my-payout-total-grid > *,
+.summary-total-grid > *,
+.stats-grid > *,
+.metric-grid > *,
+.dashboard-stats > *,
+.stat-card,
+.my-payout-total-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: 118px;
+}
+
+.my-payout-total-grid > *::after,
+.summary-total-grid > *::after,
+.stats-grid > *::after,
+.metric-grid > *::after,
+.dashboard-stats > *::after,
+.stat-card::after,
+.my-payout-total-card::after {
+    content: "";
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    width: 72px;
+    height: 72px;
+    border-radius: 999px;
+    z-index: 0;
+    opacity: 0.36;
+    background:
+        radial-gradient(circle at 50% 50%, transparent 36%, rgba(201, 164, 95, 0.34) 38%, transparent 42%),
+        conic-gradient(from 18deg, rgba(179,49,45,0.0), rgba(179,49,45,0.8), rgba(124,95,184,0.55), rgba(201,164,95,0.62), rgba(179,49,45,0.0));
+    filter: blur(0.2px);
+}
+
+.my-payout-total-grid > *:nth-child(1),
+.summary-total-grid > *:nth-child(1),
+.stats-grid > *:nth-child(1),
+.metric-grid > *:nth-child(1),
+.dashboard-stats > *:nth-child(1) {
+    border-color: rgba(225, 75, 67, 0.34) !important;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(225, 75, 67, 0.20), transparent 40%),
+        linear-gradient(145deg, rgba(28, 14, 17, 0.94), rgba(9, 10, 14, 0.9)) !important;
+}
+
+.my-payout-total-grid > *:nth-child(2),
+.summary-total-grid > *:nth-child(2),
+.stats-grid > *:nth-child(2),
+.metric-grid > *:nth-child(2),
+.dashboard-stats > *:nth-child(2) {
+    border-color: rgba(124, 95, 184, 0.36) !important;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(124, 95, 184, 0.22), transparent 40%),
+        linear-gradient(145deg, rgba(20, 18, 31, 0.94), rgba(9, 10, 14, 0.9)) !important;
+}
+
+.my-payout-total-grid > *:nth-child(3),
+.summary-total-grid > *:nth-child(3),
+.stats-grid > *:nth-child(3),
+.metric-grid > *:nth-child(3),
+.dashboard-stats > *:nth-child(3) {
+    border-color: rgba(70, 201, 216, 0.26) !important;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(70, 201, 216, 0.15), transparent 40%),
+        linear-gradient(145deg, rgba(14, 23, 28, 0.94), rgba(9, 10, 14, 0.9)) !important;
+}
+
+.my-payout-total-grid > *:nth-child(4),
+.summary-total-grid > *:nth-child(4),
+.stats-grid > *:nth-child(4),
+.metric-grid > *:nth-child(4),
+.dashboard-stats > *:nth-child(4) {
+    border-color: rgba(201, 164, 95, 0.32) !important;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(201, 164, 95, 0.18), transparent 40%),
+        linear-gradient(145deg, rgba(31, 25, 15, 0.92), rgba(9, 10, 14, 0.9)) !important;
+}
+
+.my-payout-total-card span,
+.summary-pill span,
+.stat-card span,
+.metric-card span {
+    color: rgba(226, 200, 134, 0.82) !important;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.my-payout-total-card strong,
+.summary-pill strong,
+.stat-card strong,
+.metric-card strong {
+    font-size: clamp(24px, 2.6vw, 38px) !important;
+    font-weight: 900 !important;
+    color: #fff7e8 !important;
+}
+
+/* 篩選列：改成更像管理面板工具列 */
+.filter-form,
+.history-filter-bar,
+.my-payout-filter,
+.summary-filter,
+.toolbar,
+.filter-bar {
+    background:
+        linear-gradient(145deg, rgba(12, 13, 18, 0.88), rgba(5, 6, 8, 0.72)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.18) !important;
+    border-radius: 16px !important;
+    padding: 14px !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+}
+
+/* 表格外框：暗金卷宗感 */
+.summary-items,
+.table-wrap,
+.table-container,
+.history-list,
+.order-list,
+.payout-summary-list-section {
+    border-color: rgba(201, 164, 95, 0.16) !important;
+}
+
+.summary-table,
+table {
+    background:
+        linear-gradient(180deg, rgba(12, 13, 18, 0.72), rgba(6, 7, 9, 0.72)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.16) !important;
+    border-radius: 14px !important;
+    overflow: hidden;
+}
+
+.summary-table thead tr,
+table thead tr {
+    background:
+        linear-gradient(90deg, rgba(80, 19, 18, 0.72), rgba(17, 18, 24, 0.9), rgba(72, 57, 31, 0.42)) !important;
+}
+
+.summary-table th,
+table th {
+    padding-top: 13px !important;
+    padding-bottom: 13px !important;
+    text-transform: none;
+}
+
+.summary-table td,
+table td {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+
+.summary-table tbody tr:nth-child(even),
+table tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.018) !important;
+}
+
+.summary-table tbody tr:hover,
+table tbody tr:hover {
+    background:
+        linear-gradient(90deg, rgba(179, 49, 45, 0.12), rgba(201, 164, 95, 0.04)) !important;
+    box-shadow: inset 3px 0 0 rgba(225, 75, 67, 0.55);
+}
+
+/* 訂單編號 / WEB / MO 字樣變成小標籤感 */
+td:first-child,
+.order-no-cell,
+.order-number,
+.order-id {
+    color: #9ecfff !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em;
+}
+
+/* 狀態文字章：印章感 */
+.summary-status-paid,
+.summary-status-unpaid,
+.badge,
+.status-badge,
+.status-paid,
+.status-unpaid,
+.status-closed,
+.status-active,
+.status-stored {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 3px 10px !important;
+    border-radius: 999px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.03em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* 人員卡片：更像角色卡 */
+.summary-person-card,
+.person-card,
+.staff-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-person-card::before,
+.person-card::before,
+.staff-card::before {
+    content: "";
+    position: absolute;
+    left: -40px;
+    bottom: -46px;
+    width: 160px;
+    height: 160px;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 50% 50%, transparent 44%, rgba(179,49,45,0.28) 45%, transparent 51%),
+        conic-gradient(from 24deg, transparent, rgba(179,49,45,0.34), rgba(201,164,95,0.18), transparent);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.summary-person-card::after,
+.person-card::after,
+.staff-card::after {
+    content: "魔";
+    position: absolute;
+    right: 18px;
+    bottom: 10px;
+    color: rgba(201, 164, 95, 0.055);
+    font-size: 72px;
+    font-weight: 900;
+    pointer-events: none;
+}
+
+.summary-person-title,
+.person-header,
+.staff-header {
+    position: relative;
+    z-index: 1;
+}
+
+.summary-name,
+.person-name,
+.staff-name {
+    color: #fff7e8 !important;
+    font-weight: 900 !important;
+}
+
+.summary-id,
+.person-id,
+.staff-id {
+    color: rgba(169,159,145,0.82) !important;
+}
+
+/* 我的分潤新版表格：間距更接近第一張示意圖 */
+.my-payout-total-grid {
+    gap: 16px !important;
+}
+
+.my-payout-total-card {
+    padding: 18px !important;
+}
+
+.summary-person-card {
+    margin-top: 16px !important;
+    padding: 18px !important;
+}
+
+.summary-person-meta {
+    gap: 12px !important;
+}
+
+.summary-pill {
+    min-width: 112px !important;
+    border-color: rgba(201, 164, 95, 0.20) !important;
+}
+
+/* 派單頁 / 歷史訂單卡片共用：任務卡感 */
+.dispatch-card,
+.order-card,
+.history-order-card,
+.claim-card {
+    border-color: rgba(201, 164, 95, 0.18) !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(18, 20, 27, 0.92), rgba(8, 9, 13, 0.94)) !important;
+}
+
+.dispatch-card:hover,
+.order-card:hover,
+.history-order-card:hover,
+.claim-card:hover {
+    border-color: rgba(225, 75, 67, 0.42) !important;
+    box-shadow:
+        0 20px 45px rgba(0,0,0,0.4),
+        0 0 28px rgba(179,49,45,0.13);
+}
+
+/* 導覽列 Logo 區域若有文字，增加品牌感 */
+.brand,
+.logo,
+.site-title,
+.app-title {
+    color: #fff7e8 !important;
+    text-shadow: 0 0 22px rgba(225, 75, 67, 0.22);
+    letter-spacing: 0.04em;
+}
+
+/* 讓主要內容有一點舞台感 */
+main,
+.content,
+.main-content,
+.page-content {
+    position: relative;
+}
+
+main::before,
+.content::before,
+.main-content::before,
+.page-content::before {
+    content: "";
+    position: fixed;
+    right: 4%;
+    top: 9%;
+    width: 36vw;
+    height: 36vw;
+    max-width: 560px;
+    max-height: 560px;
+    pointer-events: none;
+    z-index: -1;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(124, 95, 184, 0.11), transparent 32%),
+        radial-gradient(circle at 60% 42%, rgba(179, 49, 45, 0.10), transparent 38%);
+    filter: blur(18px);
+}
+
+/* 分隔線改暗金 */
+hr,
+.divider {
+    border-color: rgba(201, 164, 95, 0.16) !important;
+}
+
+/* 頁籤與小按鈕 */
+.tab,
+.page-button,
+.pagination a,
+.pagination button {
+    border-radius: 10px !important;
+    border: 1px solid rgba(201, 164, 95, 0.18) !important;
+    background: rgba(9, 10, 14, 0.82) !important;
+    color: var(--mw-muted) !important;
+}
+
+.tab.active,
+.page-button.active,
+.pagination .active,
+.pagination a.active,
+.pagination button.active {
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.96), rgba(57, 13, 15, 0.96)) !important;
+    color: #fff !important;
+    border-color: rgba(225, 75, 67, 0.48) !important;
+}
+
+/* 讓 select 箭頭比較不突兀 */
+select {
+    color-scheme: dark;
+}
+
+/* 防止某些頁面白底殘留 */
+.panel *,
+.card *,
+.summary-person-card *,
+table * {
+    border-color: rgba(201, 164, 95, 0.16);
+}
+
