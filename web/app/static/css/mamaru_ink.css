@@ -2770,3 +2770,218 @@ body:has(form[action="/admin/payouts/summary"]) .summary-list-title::before {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Bounty Ledger Stage 4
+   帳冊卷軸感 / 篩選列 / 空狀態強化
+========================================================= */
+
+/* 人員總表頁：讓整個內容更像一冊打開的賞金帳 */
+body:has(form[action="/admin/payouts/summary"]) .mw-page-card {
+    background:
+        radial-gradient(circle at 82% 12%, rgba(201, 164, 95, 0.09), transparent 24%),
+        radial-gradient(circle at 14% 32%, rgba(179, 49, 45, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(13, 10, 8, 0.98), rgba(5, 6, 8, 0.98)) !important;
+}
+
+/* 頁首改成帳冊封面感 */
+body:has(form[action="/admin/payouts/summary"]) .mw-page-topbar {
+    border-bottom-color: rgba(201, 164, 95, 0.20) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .mw-page-topbar h1 {
+    position: relative;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .mw-page-topbar h1::after {
+    content: "";
+    display: block;
+    width: 150px;
+    height: 3px;
+    margin-top: 14px;
+    border-radius: 999px;
+    background:
+        linear-gradient(90deg, rgba(225, 75, 67, 0.95), rgba(226, 200, 134, 0.72), transparent);
+    box-shadow: 0 0 18px rgba(201, 164, 95, 0.20);
+}
+
+/* 說明卡：像帳冊封面標籤 */
+body:has(form[action="/admin/payouts/summary"]) .panel:first-of-type {
+    min-height: 108px;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .panel:first-of-type h2 {
+    color: #ffe3a3 !important;
+}
+
+/* 篩選列：更像帳冊查詢工具列 */
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-filter {
+    grid-template-columns: 190px 190px minmax(320px, 1fr) 180px 140px !important;
+    padding: 18px !important;
+    border-radius: 18px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.10), transparent 28%),
+        linear-gradient(145deg, rgba(32, 22, 14, 0.78), rgba(8, 8, 9, 0.88)) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-filter select,
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-filter input {
+    min-height: 44px !important;
+    border-color: rgba(201, 164, 95, 0.28) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-filter .button {
+    min-height: 44px !important;
+}
+
+/* 統計區：加上帳冊四格章 */
+body:has(form[action="/admin/payouts/summary"]) .summary-total-grid {
+    gap: 16px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card {
+    min-height: 132px !important;
+    padding: 20px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card::after {
+    content: "";
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    width: 54px;
+    height: 54px;
+    border-radius: 999px;
+    border: 1px solid rgba(226, 200, 134, 0.18);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(201, 164, 95, 0.10), transparent 60%);
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card strong {
+    font-size: clamp(30px, 2.6vw, 46px) !important;
+}
+
+/* 未發放 / 已發放名單區像左右卷宗 */
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-list-section {
+    position: relative;
+    padding-top: 24px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-list-section::before {
+    content: "";
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    top: 12px;
+    height: 1px;
+    background:
+        linear-gradient(90deg, transparent, rgba(226, 200, 134, 0.32), transparent);
+}
+
+/* 名單標題再像章節標牌 */
+body:has(form[action="/admin/payouts/summary"]) .summary-list-title {
+    margin-left: 4px !important;
+    margin-bottom: 18px !important;
+    color: #fff0c2 !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-list-title::after {
+    box-shadow: 0 0 18px rgba(179, 49, 45, 0.24);
+}
+
+/* 懸賞牌頭部金額區更像左右兩個印章 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-meta {
+    gap: 12px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-pill {
+    position: relative;
+    overflow: hidden;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-pill::after {
+    content: "";
+    position: absolute;
+    right: -18px;
+    bottom: -18px;
+    width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(179,49,45,0.18), transparent 60%);
+    pointer-events: none;
+}
+
+/* 條目讓委託人與內容更像帳冊欄位 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry-main > div,
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry-meta > div {
+    min-width: 0;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-client strong,
+body:has(form[action="/admin/payouts/summary"]) .ledger-task strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 條目 hover 像翻帳冊被掃到 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry {
+    transition: 0.18s ease;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry:hover {
+    background:
+        linear-gradient(90deg, rgba(201, 164, 95, 0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(201, 164, 95, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 0% 50%, rgba(179,49,45,0.13), transparent 30%),
+        linear-gradient(145deg, rgba(25, 17, 11, 0.95), rgba(6, 6, 7, 0.95)) !important;
+    background-size: 24px 24px, 24px 24px, auto, auto;
+}
+
+/* 空狀態也要像帳冊空頁 */
+body:has(form[action="/admin/payouts/summary"]) .summary-empty {
+    position: relative;
+    min-height: 96px;
+    display: flex;
+    align-items: center;
+    padding: 22px 24px !important;
+    color: rgba(226, 200, 134, 0.76) !important;
+    background:
+        radial-gradient(circle at 88% 50%, rgba(179, 49, 45, 0.10), transparent 30%),
+        linear-gradient(145deg, rgba(13, 10, 8, 0.88), rgba(6, 6, 7, 0.92)) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-empty::after {
+    content: "無紀錄";
+    position: absolute;
+    right: 26px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-6deg);
+    color: rgba(179, 49, 45, 0.12);
+    font-size: 36px;
+    font-weight: 900;
+    border: 2px solid rgba(179, 49, 45, 0.10);
+    border-radius: 8px;
+    padding: 3px 10px;
+}
+
+/* 手機與窄螢幕 */
+@media (max-width: 1100px) {
+    body:has(form[action="/admin/payouts/summary"]) .payout-summary-filter {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 720px) {
+    body:has(form[action="/admin/payouts/summary"]) .summary-person-actions {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+    }
+
+    body:has(form[action="/admin/payouts/summary"]) .ledger-items {
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+    }
+}
+
