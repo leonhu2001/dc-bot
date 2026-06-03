@@ -3482,3 +3482,107 @@ body:has(form[action="/admin/orders/history/bulk-update"]) .empty-state::after {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Brush Font Layer
+   毛筆 / 書法字體層
+========================================================= */
+
+:root {
+    --mw-brush-font: "DFKai-SB", "BiauKai", "Kaiti TC", "KaiTi", "STKaiti", "KaiTi_GB2312", serif;
+}
+
+/* 只把品牌與大標題改毛筆字，內容維持清楚 */
+.mw-sidebar-logo,
+.mw-page-topbar h1,
+.page-title,
+h1 {
+    font-family: var(--mw-brush-font) !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.04em;
+}
+
+/* 頁面主要區塊標題加一點書法感 */
+.section-title-row h2,
+.panel > h2,
+.summary-list-title,
+.dispatch-hero-main h2,
+.history-customer-name {
+    font-family: var(--mw-brush-font) !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.03em;
+}
+
+/* 側欄品牌更像招牌 */
+.mw-sidebar-logo {
+    font-size: 54px !important;
+    line-height: 1 !important;
+    letter-spacing: 0.02em !important;
+    text-shadow:
+        0 0 24px rgba(225, 75, 67, 0.42),
+        0 4px 0 rgba(0, 0, 0, 0.62);
+}
+
+/* 側欄副標保留清楚，不用太毛筆 */
+.mw-sidebar-subtitle {
+    font-family: inherit !important;
+    letter-spacing: 0.24em !important;
+}
+
+/* 大標題毛筆化但不過度變形 */
+.mw-page-topbar h1 {
+    font-size: clamp(46px, 4.2vw, 72px) !important;
+    line-height: 1.02 !important;
+    color: #fff3df !important;
+    text-shadow:
+        0 0 22px rgba(225, 75, 67, 0.28),
+        0 3px 0 rgba(0, 0, 0, 0.58);
+}
+
+/* 小標題毛筆化 */
+.section-title-row h2,
+.panel > h2,
+.summary-list-title {
+    color: #fff0d5 !important;
+}
+
+/* 裝飾章字也用毛筆 */
+body:has(form[action="/admin/payouts/summary"]) .mw-page-topbar::after,
+body:has(form[action="/admin/orders/history/bulk-update"]) .mw-page-topbar::after,
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card::after,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-card::after,
+body:has(.dispatch-hero) .mw-page-card::after {
+    font-family: var(--mw-brush-font) !important;
+    font-weight: 900 !important;
+}
+
+/* 表格、輸入框、數字不要毛筆，避免難讀 */
+input,
+select,
+textarea,
+button,
+table,
+.summary-table,
+.ledger-entry,
+.history-edit-grid,
+.history-assignment-box,
+.history-payout-box,
+.dispatch-mission-card,
+.summary-total-card,
+.summary-pill,
+.history-customer-pill,
+.dispatch-stat-card {
+    font-family: inherit !important;
+}
+
+/* 金額與 ID 維持現代字，清楚優先 */
+.order-no,
+.ledger-order strong,
+.history-order-no,
+.summary-id,
+.history-customer-id,
+td,
+th {
+    font-family: inherit !important;
+}
+
