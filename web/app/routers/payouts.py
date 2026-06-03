@@ -8,7 +8,6 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from web.app.config import config
-from web.app.services.payout_service import build_payout_summary
 
 
 router = APIRouter(tags=["payouts"])
@@ -363,22 +362,15 @@ async def my_payouts(request: Request, month: str | None = "", status: str | Non
 
     discord_id = str(user.get("discord_id") or user.get("id") or "").strip()
 
-    worker_rows, customer_service_rows = fetch_legacy_rows(discord_id)
-    summary = build_payout_summary(
-        worker_rows=worker_rows,
-        customer_service_rows=customer_service_rows,
-    )
-
     summary_unpaid_rows, summary_paid_rows, summary_totals = build_my_payout_rows(
         discord_id,
         month=month or "",
         status=status or "all",
     )
 
-    summary = {
-        **summary,
-        **summary_totals,
-    }
+    summary = summary_totals
+    worker_rows = []
+    customer_service_rows = []
 
     return templates.TemplateResponse(
         request=request,
