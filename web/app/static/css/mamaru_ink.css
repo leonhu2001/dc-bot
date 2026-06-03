@@ -6594,3 +6594,260 @@ html body:has(.dispatch-v2-hero) .muted-text {
 }
 /* === DISPATCH ABSOLUTE TRANSPARENT OVERRIDE END === */
 
+
+/* === GLOBAL NO-FILL WIREFRAME START === */
+/* 全站透明線框化：去掉大面積黑底，只留線條與文字 */
+
+/* 1. 全站最外層主框透明 */
+html body main.page.mw-main,
+html body .page.mw-main,
+html body .mw-main,
+html body main.page,
+html body section.card.wide.mw-page-card,
+html body .card.wide.mw-page-card,
+html body .wide.mw-page-card,
+html body .card.mw-page-card,
+html body .mw-page-card,
+html body .card.wide,
+html body .card {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 2. 只保留主外框線 */
+html body section.card.wide.mw-page-card,
+html body .card.wide.mw-page-card,
+html body .mw-page-card {
+    border: 1px solid rgba(201, 164, 95, 0.34) !important;
+}
+
+/* 3. 頁面 topbar 透明 */
+html body .mw-page-topbar,
+html body .topbar,
+html body .compact-topbar {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 4. 所有大區塊 panel / card 透明，只留線 */
+html body .panel,
+html body .admin-order-card,
+html body .order-card,
+html body .compact-card,
+html body .summary-person-card,
+html body .summary-total-card,
+html body .staff-stat-card,
+html body .history-order-card,
+html body .history-customer-group,
+html body .dispatch-v2-hero,
+html body .dispatch-v2-column,
+html body .dispatch-v2-stat-card,
+html body .dispatch-v2-empty-card,
+html body .dispatch-v2-mission-card,
+html body .dispatch-v2-my-card,
+html body .dispatch-v2-mission-meta > div,
+html body .dispatch-v2-assignment-row,
+html body .dispatch-v2-payout > div,
+html body .dispatch-v2-money-chip,
+html body .dispatch-v2-assignment-count,
+html body .claimed-order-item,
+html body .assignment-box,
+html body .payout-preview,
+html body .empty-state,
+html body .summary-empty,
+html body .ledger-entry,
+html body .table-wrap,
+html body .table-container,
+html body .filter-form,
+html body .history-filter-form,
+html body .my-payout-filter,
+html body .staff-filter-form {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 5. 保留區塊線條 */
+html body .panel,
+html body .admin-order-card,
+html body .order-card,
+html body .compact-card,
+html body .summary-person-card,
+html body .summary-total-card,
+html body .staff-stat-card,
+html body .history-order-card,
+html body .history-customer-group,
+html body .dispatch-v2-hero,
+html body .dispatch-v2-column,
+html body .dispatch-v2-stat-card,
+html body .dispatch-v2-mission-card,
+html body .dispatch-v2-my-card,
+html body .claimed-order-item,
+html body .assignment-box,
+html body .payout-preview,
+html body .ledger-entry,
+html body .table-wrap,
+html body .table-container,
+html body .filter-form,
+html body .history-filter-form,
+html body .my-payout-filter,
+html body .staff-filter-form {
+    border-color: rgba(201, 164, 95, 0.30) !important;
+}
+
+/* 6. 空狀態只留虛線 */
+html body .empty-state,
+html body .summary-empty,
+html body .dispatch-v2-empty-card {
+    border: 1px dashed rgba(201, 164, 95, 0.30) !important;
+}
+
+/* 7. 拔掉所有大容器偽元素黑底 / 浮水印 */
+html body main.page.mw-main::before,
+html body main.page.mw-main::after,
+html body .page.mw-main::before,
+html body .page.mw-main::after,
+html body section.card.wide.mw-page-card::before,
+html body section.card.wide.mw-page-card::after,
+html body .card.wide.mw-page-card::before,
+html body .card.wide.mw-page-card::after,
+html body .mw-page-card::before,
+html body .mw-page-card::after,
+html body .card::before,
+html body .card::after,
+html body .wide::before,
+html body .wide::after,
+html body .panel::before,
+html body .panel::after,
+html body .admin-order-card::before,
+html body .admin-order-card::after,
+html body .order-card::before,
+html body .order-card::after,
+html body .compact-card::before,
+html body .compact-card::after,
+html body .summary-person-card::before,
+html body .summary-person-card::after,
+html body .history-order-card::before,
+html body .history-order-card::after,
+html body .dispatch-v2-hero::before,
+html body .dispatch-v2-hero::after,
+html body .dispatch-v2-column::before,
+html body .dispatch-v2-column::after,
+html body .dispatch-v2-mission-card::before,
+html body .dispatch-v2-mission-card::after {
+    display: none !important;
+    content: none !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 8. 表格保留線，不用整塊底 */
+html body table,
+html body .summary-table,
+html body .ledger-table {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+html body table th,
+html body table td,
+html body .summary-table th,
+html body .summary-table td,
+html body .ledger-table th,
+html body .ledger-table td {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* 9. 但 input/select/textarea 保留深色底，不然會不好讀 */
+html body input,
+html body select,
+html body textarea,
+html body .input {
+    background:
+        linear-gradient(145deg, rgba(7, 8, 10, 0.88), rgba(12, 10, 9, 0.82)) !important;
+    color: #f5eee4 !important;
+}
+
+/* 10. 按鈕保留底色，不然操作區會不明顯 */
+html body .button,
+html body button,
+html body input[type="submit"],
+html body input[type="button"] {
+    box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.22) !important;
+}
+
+/* 11. 數字膠囊 / badge 可以半透明，但不要一大塊底 */
+html body .badge,
+html body .chip,
+html body .dispatch-count-pill,
+html body .status-badge,
+html body .history-order-status,
+html body .order-status,
+html body .summary-status,
+html body .dispatch-status {
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.36), rgba(5, 6, 8, 0.18)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.28) !important;
+    box-shadow: none !important;
+}
+
+/* 12. 文字陰影加強，透明後保持可讀 */
+html body h1,
+html body h2,
+html body h3,
+html body strong,
+html body b {
+    text-shadow:
+        0 2px 5px rgba(0,0,0,0.90),
+        0 0 16px rgba(0,0,0,0.58) !important;
+}
+
+html body p,
+html body span,
+html body .muted-text,
+html body td,
+html body th,
+html body label {
+    text-shadow:
+        0 1px 3px rgba(0,0,0,0.82) !important;
+}
+
+/* 13. 側欄保留一點暗度，不然選單會被背景吃掉 */
+html body .mw-sidebar {
+    background:
+        linear-gradient(180deg, rgba(35, 8, 8, 0.42), rgba(3, 4, 6, 0.72)),
+        var(--mw-bg-image) left center / cover no-repeat !important;
+}
+
+/* 14. hover 不要再產生大面積底 */
+html body .panel:hover,
+html body .admin-order-card:hover,
+html body .order-card:hover,
+html body .compact-card:hover,
+html body .summary-person-card:hover,
+html body .history-order-card:hover,
+html body .dispatch-v2-mission-card:hover,
+html body .summary-total-card:hover,
+html body .staff-stat-card:hover {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow:
+        0 0 0 1px rgba(226, 200, 134, 0.14) !important;
+}
+/* === GLOBAL NO-FILL WIREFRAME END === */
+
