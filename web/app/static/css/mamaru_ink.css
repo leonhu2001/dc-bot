@@ -5623,3 +5623,134 @@ table,
     opacity: 0.36 !important;
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Performance Background Fix
+   背景明顯化 / 移除卡頓來源
+========================================================= */
+
+/* 取消 fixed 背景，避免滾動卡頓 */
+body {
+    background:
+        radial-gradient(circle at 18% 18%, rgba(179, 49, 45, 0.10), transparent 34%),
+        radial-gradient(circle at 86% 12%, rgba(201, 164, 95, 0.06), transparent 30%),
+        linear-gradient(
+            180deg,
+            rgba(5, 5, 8, 0.36) 0%,
+            rgba(5, 5, 8, 0.50) 46%,
+            rgba(5, 5, 8, 0.62) 100%
+        ),
+        var(--mw-bg-image) center center / cover no-repeat !important;
+    background-color: #050608 !important;
+}
+
+/* 側欄取消 fixed，保留水墨感 */
+.mw-sidebar {
+    background:
+        linear-gradient(180deg, rgba(35, 8, 8, 0.42), rgba(3, 4, 6, 0.76)),
+        var(--mw-bg-image) left center / cover no-repeat !important;
+}
+
+/* 移除大量 backdrop-filter，這是主要卡頓來源 */
+.mw-page-card,
+.panel,
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-customer-group,
+.history-order-card,
+.dispatch-hero,
+.dispatch-mission-card,
+.summary-total-card,
+.staff-stat-card,
+.staff-filter-form,
+.history-filter-form,
+.my-payout-filter,
+.mw-sidebar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 主容器本身也吃背景圖，讓主內容區看得到水墨 */
+.mw-page-card {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.045), transparent 34%),
+        radial-gradient(circle at 0% 25%, rgba(179, 49, 45, 0.060), transparent 38%),
+        linear-gradient(145deg, rgba(9, 8, 9, 0.58), rgba(4, 5, 7, 0.68)),
+        var(--mw-bg-image) center center / cover no-repeat !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+}
+
+/* 一般 panel 變透明一點 */
+.panel {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.070), transparent 34%),
+        linear-gradient(145deg, rgba(18, 13, 12, 0.52), rgba(5, 6, 8, 0.64)) !important;
+    border-color: rgba(201, 164, 95, 0.24) !important;
+}
+
+/* 卡片變透明，但不透明到影響閱讀 */
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-order-card,
+.dispatch-mission-card,
+.dispatch-hero,
+.summary-total-card,
+.staff-stat-card,
+.history-customer-group {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.060), transparent 34%),
+        linear-gradient(145deg, rgba(12, 9, 8, 0.60), rgba(4, 5, 7, 0.70)) !important;
+}
+
+/* 表格、輸入框維持深底，避免字看不清 */
+table,
+.summary-table,
+.ledger-entry,
+.input,
+input,
+select,
+textarea {
+    background-color: rgba(5, 6, 8, 0.82) !important;
+}
+
+/* 空狀態也透一點 */
+.empty-state {
+    background:
+        linear-gradient(145deg, rgba(8, 8, 10, 0.56), rgba(5, 6, 8, 0.68)) !important;
+}
+
+/* 減少 box-shadow 強度，提升滾動順暢 */
+.panel,
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-order-card,
+.dispatch-mission-card,
+.summary-total-card,
+.staff-stat-card {
+    box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.26),
+        inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+
+/* hover 也不要太重，避免滑過一堆卡片時卡頓 */
+.panel:hover,
+.admin-order-card:hover,
+.compact-card:hover,
+.summary-person-card:hover,
+.history-order-card:hover,
+.dispatch-mission-card:hover,
+.summary-total-card:hover,
+.staff-stat-card:hover {
+    box-shadow:
+        0 16px 34px rgba(0, 0, 0, 0.32),
+        0 0 18px rgba(201, 164, 95, 0.04) !important;
+}
+
+/* 背景圖如果載入失敗，仍保留暗底 */
+:root {
+    background-color: #050608;
+}
+
