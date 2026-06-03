@@ -2574,3 +2574,199 @@ body:has(form[action="/admin/payouts/summary"]) .summary-items {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Bounty Ledger Stage 3
+   懸賞牌細節強化
+========================================================= */
+
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card {
+    position: relative;
+    border-radius: 22px !important;
+    box-shadow:
+        0 24px 56px rgba(0, 0, 0, 0.44),
+        inset 0 1px 0 rgba(255,255,255,0.035);
+}
+
+/* 人員卡外層像懸賞卷宗 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card::before {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(201, 164, 95, 0.12);
+    pointer-events: none;
+    z-index: 0;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* 右下角賞章更明顯 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card::after {
+    color: rgba(179, 49, 45, 0.13) !important;
+    font-size: 66px !important;
+    right: 28px !important;
+    bottom: 22px !important;
+    border: 2px solid rgba(179, 49, 45, 0.12);
+    border-radius: 10px;
+    padding: 2px 10px;
+}
+
+/* 人員頭部改成懸賞牌 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-head {
+    margin: 16px 16px 0;
+    border-radius: 18px;
+    padding: 20px;
+    background:
+        radial-gradient(circle at 10% 20%, rgba(179, 49, 45, 0.22), transparent 30%),
+        radial-gradient(circle at 86% 28%, rgba(201, 164, 95, 0.12), transparent 28%),
+        linear-gradient(145deg, rgba(44, 24, 16, 0.88), rgba(12, 9, 8, 0.94)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.24) !important;
+}
+
+/* 頭像變成紅印 */
+body:has(form[action="/admin/payouts/summary"]) .summary-avatar {
+    width: 52px !important;
+    height: 52px !important;
+    font-size: 18px;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(143, 30, 25, 0.92), rgba(42, 12, 10, 0.96)) !important;
+    border: 1px solid rgba(226, 200, 134, 0.62) !important;
+    box-shadow:
+        0 0 0 4px rgba(179, 49, 45, 0.10),
+        0 0 28px rgba(179, 49, 45, 0.26);
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-name {
+    font-size: 22px !important;
+    letter-spacing: 0.04em;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-id {
+    color: rgba(226, 200, 134, 0.62) !important;
+}
+
+/* 角色標籤像帳冊分類 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-title .order-no {
+    color: #8dc9ff !important;
+    font-weight: 900;
+    margin-bottom: 2px;
+}
+
+/* 金額牌更像賞金牌 */
+body:has(form[action="/admin/payouts/summary"]) .summary-pill {
+    min-width: 118px !important;
+    padding: 13px 15px !important;
+    border-radius: 16px !important;
+    background:
+        radial-gradient(circle at 82% 20%, rgba(201, 164, 95, 0.12), transparent 34%),
+        linear-gradient(145deg, rgba(11, 12, 16, 0.96), rgba(24, 18, 13, 0.92)) !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-pill span {
+    color: rgba(226, 200, 134, 0.86) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-pill strong {
+    font-size: 28px !important;
+    color: #fff7e8 !important;
+}
+
+/* 操作按鈕區像印章列 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-actions {
+    padding: 14px 32px 0 !important;
+    gap: 12px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-person-actions .button {
+    min-height: 38px !important;
+    padding: 8px 15px !important;
+    box-shadow:
+        0 10px 24px rgba(0,0,0,0.28),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* 契約條目加厚，像帳冊單據 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-items {
+    padding: 18px 32px 28px !important;
+    gap: 12px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry {
+    min-height: 76px;
+    border-radius: 16px !important;
+    border-color: rgba(201, 164, 95, 0.26) !important;
+    box-shadow:
+        0 10px 26px rgba(0,0,0,0.24),
+        inset 0 1px 0 rgba(255,255,255,0.025);
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry:hover {
+    border-color: rgba(226, 200, 134, 0.40) !important;
+    transform: translateY(-1px);
+    box-shadow:
+        0 14px 34px rgba(0,0,0,0.32),
+        0 0 22px rgba(201,164,95,0.08);
+}
+
+/* 每筆右側賞章更清楚 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry::after {
+    color: rgba(179, 49, 45, 0.12) !important;
+    font-size: 62px !important;
+    right: 20px !important;
+}
+
+/* 契約編號像藍色編號章 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-order strong {
+    display: inline-flex;
+    align-items: center;
+    color: #9bd2ff !important;
+    font-weight: 900;
+}
+
+/* 賞金欄更醒目 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-amount strong {
+    font-size: 22px !important;
+    color: #ffe3a3 !important;
+    text-shadow: 0 0 16px rgba(201, 164, 95, 0.18);
+}
+
+/* 未發放狀態更像紅章，已發放像綠章 */
+body:has(form[action="/admin/payouts/summary"]) .ledger-stamp.unpaid {
+    color: #ffe3a3 !important;
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.72), rgba(50, 12, 10, 0.72)) !important;
+    border-color: rgba(225, 75, 67, 0.42) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-stamp.paid {
+    color: #9ff0bf !important;
+    background:
+        linear-gradient(145deg, rgba(31, 112, 76, 0.44), rgba(8, 34, 25, 0.58)) !important;
+    border-color: rgba(47, 191, 123, 0.36) !important;
+}
+
+/* 名單標題像章節牌 */
+body:has(form[action="/admin/payouts/summary"]) .summary-list-title {
+    padding: 6px 12px 6px 0;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-list-title::before {
+    height: 1.3em !important;
+}
+
+/* 大螢幕下條目比例更像帳冊 */
+@media (min-width: 1500px) {
+    body:has(form[action="/admin/payouts/summary"]) .ledger-entry {
+        grid-template-columns: minmax(0, 1fr) 560px !important;
+    }
+
+    body:has(form[action="/admin/payouts/summary"]) .ledger-entry-main {
+        grid-template-columns: 160px 190px minmax(0, 1fr) !important;
+    }
+}
+
