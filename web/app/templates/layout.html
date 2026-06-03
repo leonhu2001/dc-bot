@@ -8,49 +8,58 @@
     <link rel="stylesheet" href="/static/css/mamaru_ink.css">
 </head>
 <body>
-    <main class="page">
-        <section class="card wide">
-            <div class="topbar compact-topbar">
-                <div>
-                    <p class="eyebrow">MW Dashboard</p>
-                    <h1>{% block page_title %}魔丸打手系統{% endblock %}</h1>
-                    {% if user %}
-                        <p class="muted compact-user">
-                            {{ user.global_name or user.username or user.id }}
-                        </p>
-                    {% endif %}
+    <div class="mw-layout">
+        {% if user %}
+            <aside class="mw-sidebar">
+                <div class="mw-sidebar-brand">
+                    <div class="mw-sidebar-logo">魔丸</div>
+                    <div class="mw-sidebar-subtitle">魔丸娛樂後台</div>
                 </div>
 
-                {% if user %}
-                    <nav class="nav role-nav">
-                        {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
-                            <div class="nav-group">
-                                <span class="nav-label">打手 / 陪玩 / 客服</span>
-                                <a class="nav-link" href="/dispatch">派單頁</a>
-                                <a class="nav-link" href="/my/payouts">我的分潤</a>
-                            </div>
-                        {% endif %}
-
-                        {% if user.is_admin %}
-                            <div class="nav-group admin-only-nav">
-                                <span class="nav-label">客服</span>
-                                <a class="nav-link" href="/admin">總控</a>
-                                <a class="nav-link" href="/admin/orders/history">歷史訂單</a>
-                                <a class="nav-link" href="/admin/payouts/summary">人員總表</a>
-                                <a class="nav-link" href="/admin/staff">人員名單</a>
-                            </div>
-                        {% endif %}
-
-                        <div class="nav-group">
-                            <a class="nav-link danger" href="/auth/logout">登出</a>
+                <nav class="mw-sidebar-nav">
+                    {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
+                        <div class="mw-sidebar-group">
+                            <span class="mw-sidebar-label">打手 / 陪玩 / 客服</span>
+                            <a class="mw-sidebar-link" href="/dispatch">派單頁</a>
+                            <a class="mw-sidebar-link" href="/my/payouts">我的分潤</a>
                         </div>
-                    </nav>
-                {% endif %}
-            </div>
+                    {% endif %}
 
-            {% block content %}{% endblock %}
-        </section>
-    </main>
+                    {% if user.is_admin %}
+                        <div class="mw-sidebar-group">
+                            <span class="mw-sidebar-label">客服</span>
+                            <a class="mw-sidebar-link" href="/admin">總控</a>
+                            <a class="mw-sidebar-link" href="/admin/orders/history">歷史訂單</a>
+                            <a class="mw-sidebar-link" href="/admin/payouts/summary">人員總表</a>
+                            <a class="mw-sidebar-link" href="/admin/staff">人員名單</a>
+                        </div>
+                    {% endif %}
+                </nav>
+
+                <div class="mw-sidebar-footer">
+                    <a class="mw-sidebar-link mw-sidebar-logout" href="/auth/logout">登出</a>
+                </div>
+            </aside>
+        {% endif %}
+
+        <main class="page mw-main">
+            <section class="card wide mw-page-card">
+                <div class="topbar compact-topbar mw-page-topbar">
+                    <div>
+                        <p class="eyebrow">MW Dashboard</p>
+                        <h1>{% block page_title %}魔丸打手系統{% endblock %}</h1>
+                        {% if user %}
+                            <p class="muted compact-user">
+                                {{ user.global_name or user.username or user.id }}
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% block content %}{% endblock %}
+            </section>
+        </main>
+    </div>
 <script src="/static/js/ui_tweaks.js?v=1"></script>
 <script src="/static/js/payout_status_i18n.js?v=1"></script>
 
