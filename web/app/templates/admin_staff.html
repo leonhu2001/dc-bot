@@ -136,9 +136,23 @@
                 {% for member in members %}
                     <article class="admin-worker-card compact-card">
                         <div class="order-card-header compact-header">
-                            <div>
-                                <strong>{{ member.display_name or member.global_name or member.username or member.discord_id }}</strong>
-                                <p class="muted-text">ID：{{ member.discord_id }}</p>
+                            {% set member_name = member.display_name or member.global_name or member.username or member.discord_id %}
+                            {% set avatar_ext = "gif" if member.avatar and member.avatar[:2] == "a_" else "png" %}
+                            {% set avatar_url = "https://cdn.discordapp.com/avatars/" ~ member.discord_id ~ "/" ~ member.avatar ~ "." ~ avatar_ext ~ "?size=128" if member.avatar else "" %}
+
+                            <div class="staff-person-block">
+                                <div class="staff-avatar">
+                                    {% if avatar_url %}
+                                        <img src="{{ avatar_url }}" alt="{{ member_name }}">
+                                    {% else %}
+                                        <span>{{ member_name[:1] }}</span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="staff-person-meta">
+                                    <strong>{{ member_name }}</strong>
+                                    <p class="muted-text">ID：{{ member.discord_id }}</p>
+                                </div>
                             </div>
 
                             <div class="staff-role-chips">
