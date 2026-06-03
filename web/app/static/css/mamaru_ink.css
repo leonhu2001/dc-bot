@@ -5294,3 +5294,259 @@ table,
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Seal and Icon Polish
+   印章 / 徽章 / 水墨裝飾強化
+========================================================= */
+
+/* ---------- 全站頁面印章 ---------- */
+
+.mw-page-topbar {
+    position: relative;
+}
+
+.mw-page-topbar::before {
+    content: "魔丸";
+    position: absolute;
+    right: 28px;
+    top: 24px;
+    width: 86px;
+    height: 86px;
+    display: grid;
+    place-items: center;
+    border: 2px solid rgba(179, 49, 45, 0.24);
+    color: rgba(225, 75, 67, 0.13);
+    font-family: var(--mw-brush-font, serif);
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    transform: rotate(-8deg);
+    pointer-events: none;
+    box-shadow:
+        inset 0 0 0 4px rgba(179, 49, 45, 0.035),
+        0 0 22px rgba(179, 49, 45, 0.045);
+}
+
+/* 避免和每頁原本 after 章衝突，after 保留更淡 */
+.mw-page-topbar::after {
+    opacity: 0.78;
+}
+
+/* ---------- 標題筆刷線 ---------- */
+
+.mw-page-topbar h1::after,
+.section-title-row h2::after,
+.panel > h2::after,
+.summary-list-title::after {
+    content: "";
+    display: block;
+    width: min(150px, 60%);
+    height: 3px;
+    margin-top: 12px;
+    border-radius: 999px;
+    background:
+        linear-gradient(
+            90deg,
+            rgba(225, 75, 67, 0.95),
+            rgba(226, 200, 134, 0.52),
+            rgba(226, 200, 134, 0)
+        );
+    box-shadow:
+        0 0 14px rgba(225, 75, 67, 0.18),
+        0 0 20px rgba(226, 200, 134, 0.08);
+}
+
+/* 某些頁面之前已經有線，統一一下間距 */
+.panel > h2::after {
+    margin-top: 10px;
+}
+
+/* ---------- Panel / Card 金色角線 ---------- */
+
+.panel,
+.mw-page-card,
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-order-card,
+.history-customer-group,
+.dispatch-mission-card {
+    position: relative;
+}
+
+.panel::before,
+.admin-order-card::before,
+.compact-card::before,
+.summary-person-card::before,
+.history-order-card::before,
+.dispatch-mission-card::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    top: 14px;
+    width: 34px;
+    height: 34px;
+    border-left: 1px solid rgba(226, 200, 134, 0.26);
+    border-top: 1px solid rgba(226, 200, 134, 0.26);
+    border-radius: 10px 0 0 0;
+    pointer-events: none;
+    opacity: 0.65;
+}
+
+.panel:hover::before,
+.admin-order-card:hover::before,
+.compact-card:hover::before,
+.summary-person-card:hover::before,
+.history-order-card:hover::before,
+.dispatch-mission-card:hover::before {
+    border-color: rgba(226, 200, 134, 0.48);
+    opacity: 0.95;
+}
+
+/* ---------- 側欄 icon 徽章感 ---------- */
+
+.mw-sidebar-link {
+    position: relative;
+    overflow: hidden;
+}
+
+.mw-sidebar-link::before {
+    border-radius: 999px !important;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(226, 200, 134, 0.22), rgba(10, 10, 12, 0.70)) !important;
+    border: 1px solid rgba(226, 200, 134, 0.20);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        0 0 12px rgba(201, 164, 95, 0.08);
+}
+
+.mw-sidebar-link.is-active::before {
+    background:
+        radial-gradient(circle at 50% 50%, rgba(255, 226, 160, 0.30), rgba(126, 29, 27, 0.78)) !important;
+    border-color: rgba(255, 226, 160, 0.38);
+    box-shadow:
+        0 0 16px rgba(225, 75, 67, 0.26),
+        inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+.mw-sidebar-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(90deg, rgba(225, 75, 67, 0.10), transparent 42%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+}
+
+.mw-sidebar-link:hover::after,
+.mw-sidebar-link.is-active::after {
+    opacity: 1;
+}
+
+/* ---------- 表格 hover / row polish ---------- */
+
+table tbody tr,
+.summary-table tbody tr,
+.ledger-table tbody tr {
+    transition:
+        background 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.16s ease;
+}
+
+table tbody tr:hover,
+.summary-table tbody tr:hover,
+.ledger-table tbody tr:hover {
+    background:
+        linear-gradient(90deg, rgba(179, 49, 45, 0.10), rgba(201, 164, 95, 0.045), transparent) !important;
+    box-shadow:
+        inset 3px 0 0 rgba(225, 75, 67, 0.60),
+        0 0 18px rgba(201, 164, 95, 0.035);
+}
+
+/* ---------- Badge / Chip 統一 ---------- */
+
+.badge,
+.chip,
+.status-badge,
+.history-order-status,
+.order-status,
+.summary-status,
+.dispatch-status {
+    border-radius: 999px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.03em;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        0 0 14px rgba(179,49,45,0.08);
+}
+
+/* ---------- 水墨淡紋：頁面底部 ---------- */
+
+.mw-page-card::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: min(520px, 42vw);
+    height: min(360px, 38vh);
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 70% 70%, rgba(179,49,45,0.08), transparent 36%),
+        radial-gradient(circle at 48% 58%, rgba(201,164,95,0.045), transparent 38%);
+    filter: blur(1px);
+    opacity: 0.75;
+}
+
+/* 確保內容浮在裝飾上面 */
+.mw-page-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ---------- Hover 互動統一 ---------- */
+
+.panel,
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-order-card,
+.dispatch-mission-card,
+.summary-total-card,
+.staff-stat-card {
+    transition:
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        background 0.18s ease;
+}
+
+.panel:hover,
+.summary-total-card:hover,
+.staff-stat-card:hover {
+    border-color: rgba(226, 200, 134, 0.34) !important;
+    box-shadow:
+        0 18px 42px rgba(0,0,0,0.34),
+        0 0 24px rgba(201,164,95,0.055);
+}
+
+/* ---------- 小螢幕避免印章擋內容 ---------- */
+
+@media (max-width: 900px) {
+    .mw-page-topbar::before {
+        width: 60px;
+        height: 60px;
+        right: 16px;
+        top: 18px;
+        font-size: 22px;
+        opacity: 0.55;
+    }
+
+    .mw-page-topbar h1::after {
+        width: 110px;
+    }
+}
+
