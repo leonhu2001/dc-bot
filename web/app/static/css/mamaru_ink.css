@@ -6292,3 +6292,112 @@ body:has(.dispatch-v2-hero) .mw-page-card::after,
     content: none !important;
 }
 
+
+/* === DISPATCH NO-FILL WIREFRAME START === */
+/* 派單頁：完全去底，只留線條與文字 */
+
+body:has(.dispatch-v2-hero) .mw-page-card,
+body:has(.dispatch-v2-hero) .dispatch-v2-hero,
+body:has(.dispatch-v2-hero) .dispatch-v2-column,
+body:has(.dispatch-v2-hero) .dispatch-v2-stat-card,
+body:has(.dispatch-v2-hero) .dispatch-v2-empty-card,
+body:has(.dispatch-v2-hero) .dispatch-v2-mission-card,
+body:has(.dispatch-v2-hero) .dispatch-v2-my-card,
+body:has(.dispatch-v2-hero) .dispatch-v2-mission-meta > div,
+body:has(.dispatch-v2-hero) .dispatch-v2-assignment-row,
+body:has(.dispatch-v2-hero) .dispatch-v2-payout > div,
+body:has(.dispatch-v2-hero) .dispatch-v2-money-chip,
+body:has(.dispatch-v2-hero) .dispatch-v2-assignment-count {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 主容器只留淡金線 */
+body:has(.dispatch-v2-hero) .mw-page-card {
+    border: 1px solid rgba(201, 164, 95, 0.32) !important;
+}
+
+/* Hero 區只留線 */
+body:has(.dispatch-v2-hero) .dispatch-v2-hero {
+    border: 1px solid rgba(201, 164, 95, 0.36) !important;
+}
+
+/* 左右兩塊任務欄只留線 */
+body:has(.dispatch-v2-hero) .dispatch-v2-column {
+    border: 1px solid rgba(201, 164, 95, 0.30) !important;
+}
+
+/* 右上兩個統計卡只留線 */
+body:has(.dispatch-v2-hero) .dispatch-v2-stat-card {
+    border: 1px solid rgba(201, 164, 95, 0.34) !important;
+}
+
+/* 空狀態提示框只留虛線 */
+body:has(.dispatch-v2-hero) .dispatch-v2-empty-card {
+    border: 1px dashed rgba(201, 164, 95, 0.28) !important;
+}
+
+/* 按鈕保留 */
+body:has(.dispatch-v2-hero) .dispatch-v2-hero .button,
+body:has(.dispatch-v2-hero) .dispatch-v2-hero button,
+body:has(.dispatch-v2-hero) .dispatch-v2-column .button,
+body:has(.dispatch-v2-hero) .dispatch-v2-column button {
+    box-shadow: none !important;
+}
+
+/* 小膠囊數字保留邊線，不要底 */
+body:has(.dispatch-v2-hero) .dispatch-v2-column .status-pill,
+body:has(.dispatch-v2-hero) .dispatch-v2-column .count-pill,
+body:has(.dispatch-v2-hero) .dispatch-v2-column .badge,
+body:has(.dispatch-v2-hero) .dispatch-v2-column .chip {
+    background: transparent !important;
+    background-image: none !important;
+    border: 1px solid rgba(201, 164, 95, 0.30) !important;
+    box-shadow: none !important;
+}
+
+/* 內部分隔線 */
+body:has(.dispatch-v2-hero) .dispatch-v2-hero hr,
+body:has(.dispatch-v2-hero) .dispatch-v2-column hr,
+body:has(.dispatch-v2-hero) .dispatch-v2-column .divider,
+body:has(.dispatch-v2-hero) .dispatch-v2-hero .divider {
+    border-color: rgba(201, 164, 95, 0.20) !important;
+    background: transparent !important;
+}
+
+/* 去掉所有淡字水印 */
+body:has(.dispatch-v2-hero) .mw-page-card::before,
+body:has(.dispatch-v2-hero) .mw-page-card::after,
+body:has(.dispatch-v2-hero) .dispatch-v2-hero::before,
+body:has(.dispatch-v2-hero) .dispatch-v2-hero::after,
+body:has(.dispatch-v2-hero) .dispatch-v2-column::before,
+body:has(.dispatch-v2-hero) .dispatch-v2-column::after,
+body:has(.dispatch-v2-hero) .dispatch-v2-stat-card::before,
+body:has(.dispatch-v2-hero) .dispatch-v2-stat-card::after,
+body:has(.dispatch-v2-hero) .dispatch-v2-empty-card::before,
+body:has(.dispatch-v2-hero) .dispatch-v2-empty-card::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* 文字維持清楚 */
+body:has(.dispatch-v2-hero) h1,
+body:has(.dispatch-v2-hero) h2,
+body:has(.dispatch-v2-hero) h3,
+body:has(.dispatch-v2-hero) strong,
+body:has(.dispatch-v2-hero) .dispatch-v2-title,
+body:has(.dispatch-v2-hero) .dispatch-v2-subtitle {
+    text-shadow:
+        0 2px 4px rgba(0,0,0,0.78),
+        0 0 12px rgba(0,0,0,0.42) !important;
+}
+
+body:has(.dispatch-v2-hero) p,
+body:has(.dispatch-v2-hero) span,
+body:has(.dispatch-v2-hero) .muted-text {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.72) !important;
+}
+/* === DISPATCH NO-FILL WIREFRAME END === */
+
