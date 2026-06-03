@@ -6471,3 +6471,126 @@ body .mw-content-panel::after {
 }
 /* === DASHBOARD OUTER TRANSPARENT END === */
 
+
+/* === DISPATCH ABSOLUTE TRANSPARENT OVERRIDE START === */
+/* 最終覆蓋：派單頁真正擋住背景的是 layout 的 main.page.mw-main > section.card.wide.mw-page-card */
+
+/* 1. 最外層 main 不准有底 */
+html body:has(.dispatch-v2-hero) main.page.mw-main,
+html body:has(.dispatch-v2-hero) .page.mw-main,
+html body:has(.dispatch-v2-hero) .mw-main,
+html body:has(.dispatch-v2-hero) main.page {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 2. 真正那塊大黑底：section.card.wide.mw-page-card */
+html body:has(.dispatch-v2-hero) section.card.wide.mw-page-card,
+html body:has(.dispatch-v2-hero) .card.wide.mw-page-card,
+html body:has(.dispatch-v2-hero) .wide.mw-page-card,
+html body:has(.dispatch-v2-hero) .card.mw-page-card,
+html body:has(.dispatch-v2-hero) .mw-page-card,
+html body:has(.dispatch-v2-hero) .card.wide,
+html body:has(.dispatch-v2-hero) .card {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 3. 只留最外層線條，不要黑底 */
+html body:has(.dispatch-v2-hero) section.card.wide.mw-page-card {
+    border: 1px solid rgba(201, 164, 95, 0.34) !important;
+}
+
+/* 4. 所有可能蓋底的偽元素全部拔掉 */
+html body:has(.dispatch-v2-hero) main.page.mw-main::before,
+html body:has(.dispatch-v2-hero) main.page.mw-main::after,
+html body:has(.dispatch-v2-hero) .page.mw-main::before,
+html body:has(.dispatch-v2-hero) .page.mw-main::after,
+html body:has(.dispatch-v2-hero) section.card.wide.mw-page-card::before,
+html body:has(.dispatch-v2-hero) section.card.wide.mw-page-card::after,
+html body:has(.dispatch-v2-hero) .card.wide.mw-page-card::before,
+html body:has(.dispatch-v2-hero) .card.wide.mw-page-card::after,
+html body:has(.dispatch-v2-hero) .card::before,
+html body:has(.dispatch-v2-hero) .card::after,
+html body:has(.dispatch-v2-hero) .wide::before,
+html body:has(.dispatch-v2-hero) .wide::after {
+    display: none !important;
+    content: none !important;
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 5. 派單頁所有大區塊也只留線條 */
+html body:has(.dispatch-v2-hero) .dispatch-v2-hero,
+html body:has(.dispatch-v2-hero) .dispatch-v2-column,
+html body:has(.dispatch-v2-hero) .dispatch-v2-stat-card,
+html body:has(.dispatch-v2-hero) .dispatch-v2-empty-card,
+html body:has(.dispatch-v2-hero) .dispatch-v2-mission-card,
+html body:has(.dispatch-v2-hero) .dispatch-v2-my-card,
+html body:has(.dispatch-v2-hero) .dispatch-v2-mission-meta > div,
+html body:has(.dispatch-v2-hero) .dispatch-v2-assignment-row,
+html body:has(.dispatch-v2-hero) .dispatch-v2-payout > div,
+html body:has(.dispatch-v2-hero) .dispatch-v2-money-chip,
+html body:has(.dispatch-v2-hero) .dispatch-v2-assignment-count {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* 6. 保留線條層級 */
+html body:has(.dispatch-v2-hero) .dispatch-v2-hero {
+    border: 1px solid rgba(201, 164, 95, 0.38) !important;
+}
+
+html body:has(.dispatch-v2-hero) .dispatch-v2-column {
+    border: 1px solid rgba(201, 164, 95, 0.32) !important;
+}
+
+html body:has(.dispatch-v2-hero) .dispatch-v2-stat-card {
+    border: 1px solid rgba(201, 164, 95, 0.34) !important;
+}
+
+html body:has(.dispatch-v2-hero) .dispatch-v2-empty-card {
+    border: 1px dashed rgba(201, 164, 95, 0.30) !important;
+}
+
+/* 7. header 區不要再有深色橫條 */
+html body:has(.dispatch-v2-hero) .mw-page-topbar,
+html body:has(.dispatch-v2-hero) .topbar,
+html body:has(.dispatch-v2-hero) .compact-topbar {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 8. 文字加陰影，避免透明後吃背景 */
+html body:has(.dispatch-v2-hero) h1,
+html body:has(.dispatch-v2-hero) h2,
+html body:has(.dispatch-v2-hero) h3,
+html body:has(.dispatch-v2-hero) strong {
+    text-shadow:
+        0 2px 5px rgba(0,0,0,0.90),
+        0 0 16px rgba(0,0,0,0.58) !important;
+}
+
+html body:has(.dispatch-v2-hero) p,
+html body:has(.dispatch-v2-hero) span,
+html body:has(.dispatch-v2-hero) .muted-text {
+    text-shadow:
+        0 1px 3px rgba(0,0,0,0.82) !important;
+}
+/* === DISPATCH ABSOLUTE TRANSPARENT OVERRIDE END === */
+
