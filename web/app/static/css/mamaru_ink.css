@@ -1698,3 +1698,150 @@ body::before {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 9
+   Dispatch Page Mission Board
+   派單頁任務中心化
+========================================================= */
+
+/* 只針對派單頁網址 */
+body:has(.mw-page-topbar h1) .mw-page-card {
+    transition: 0.18s ease;
+}
+
+/* 派單頁主標題更有任務中心感 */
+body:has(.mw-page-topbar h1) .mw-page-topbar h1 {
+    position: relative;
+}
+
+body:has(.mw-page-topbar h1) .mw-page-topbar h1::after {
+    content: "";
+    display: block;
+    width: 128px;
+    height: 3px;
+    margin-top: 14px;
+    border-radius: 999px;
+    background:
+        linear-gradient(90deg, var(--mw-red-bright), rgba(201, 164, 95, 0.65), transparent);
+    box-shadow: 0 0 18px rgba(225, 75, 67, 0.32);
+}
+
+/* 派單頁內容區塊加任務卡質感 */
+body:has(.mw-page-topbar h1) .panel {
+    border-radius: 20px !important;
+}
+
+/* 我的接單狀態 / 目前可接訂單 區塊 */
+body:has(.mw-page-topbar h1) .panel h2,
+body:has(.mw-page-topbar h1) .panel h3 {
+    letter-spacing: 0.04em;
+}
+
+/* 派單頁的 panel 內層卡片加暗紅掃光 */
+body:has(.mw-page-topbar h1) .panel::after {
+    content: "";
+    position: absolute;
+    right: -80px;
+    top: -80px;
+    width: 260px;
+    height: 260px;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(179,49,45,0.12), transparent 60%);
+    opacity: 0.72;
+}
+
+/* 派單數字 0 右側顯示更像狀態值 */
+body:has(.mw-page-topbar h1) .panel strong,
+body:has(.mw-page-topbar h1) .panel b {
+    color: #fff7e8 !important;
+    text-shadow: 0 0 18px rgba(201, 164, 95, 0.12);
+}
+
+/* 可接訂單空狀態：任務榜空白提示 */
+body:has(.mw-page-topbar h1) .empty-state,
+body:has(.mw-page-topbar h1) .summary-empty,
+body:has(.mw-page-topbar h1) .panel div:has(> p) {
+    border-radius: 14px;
+}
+
+/* 空框加淡淡任務榜底紋 */
+body:has(.mw-page-topbar h1) .summary-empty,
+body:has(.mw-page-topbar h1) .empty-state {
+    position: relative;
+    overflow: hidden;
+    min-height: 58px;
+}
+
+body:has(.mw-page-topbar h1) .summary-empty::after,
+body:has(.mw-page-topbar h1) .empty-state::after {
+    content: "MISSION BOARD";
+    position: absolute;
+    right: 18px;
+    bottom: 10px;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    color: rgba(201, 164, 95, 0.12);
+}
+
+/* 若派單頁有訂單卡片，改成任務卡 */
+body:has(.mw-page-topbar h1) .order-card,
+body:has(.mw-page-topbar h1) .dispatch-card,
+body:has(.mw-page-topbar h1) .claim-card {
+    position: relative;
+    border-radius: 18px !important;
+    padding: 18px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179,49,45,0.16), transparent 32%),
+        linear-gradient(145deg, rgba(18,20,27,0.96), rgba(8,9,13,0.96)) !important;
+}
+
+body:has(.mw-page-topbar h1) .order-card::before,
+body:has(.mw-page-topbar h1) .dispatch-card::before,
+body:has(.mw-page-topbar h1) .claim-card::before {
+    content: "任務";
+    position: absolute;
+    right: 16px;
+    top: 14px;
+    color: rgba(201, 164, 95, 0.16);
+    font-size: 34px;
+    font-weight: 900;
+}
+
+/* 派單頁按鈕更像接任務 */
+body:has(.mw-page-topbar h1) .button,
+body:has(.mw-page-topbar h1) button {
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+
+/* 派單頁兩個主要區塊間距 */
+body:has(.mw-page-topbar h1) .panel + .panel {
+    margin-top: 22px !important;
+}
+
+/* 大螢幕派單頁空白區加背景水墨，不讓下半部太空 */
+@media (min-width: 1100px) {
+    body:has(.mw-page-topbar h1) .mw-page-card {
+        background:
+            radial-gradient(circle at 74% 36%, rgba(179, 49, 45, 0.08), transparent 30%),
+            radial-gradient(circle at 86% 82%, rgba(201, 164, 95, 0.055), transparent 26%),
+            linear-gradient(145deg, rgba(15, 16, 22, 0.94), rgba(5, 6, 8, 0.96)) !important;
+    }
+
+    body:has(.mw-page-topbar h1) .mw-page-card::after {
+        content: "魔丸任務榜";
+        position: absolute;
+        right: 42px;
+        bottom: 36px;
+        color: rgba(201, 164, 95, 0.045);
+        font-size: 82px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        pointer-events: none;
+        writing-mode: horizontal-tb;
+    }
+}
+
