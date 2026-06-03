@@ -1,0 +1,427 @@
+﻿/* =========================================================
+   Mamaru Ink Dashboard
+   魔丸水墨 × 暗黑後台
+   只改視覺，不改現有文字與功能
+========================================================= */
+
+:root {
+    --mw-bg: #060708;
+    --mw-bg-soft: #0b0d10;
+    --mw-panel: rgba(16, 18, 24, 0.86);
+    --mw-panel-strong: rgba(22, 24, 32, 0.94);
+    --mw-line: rgba(190, 155, 92, 0.22);
+    --mw-line-red: rgba(170, 38, 32, 0.45);
+    --mw-red: #b3312d;
+    --mw-red-bright: #e14b43;
+    --mw-red-dark: #4a1111;
+    --mw-gold: #c9a45f;
+    --mw-gold-soft: #e2c886;
+    --mw-purple: #7c5fb8;
+    --mw-green: #2fbf7b;
+    --mw-cyan: #46c9d8;
+    --mw-text: #f5eee4;
+    --mw-muted: #a99f91;
+    --mw-muted-2: #756f67;
+    --mw-shadow: 0 18px 55px rgba(0, 0, 0, 0.48);
+    --mw-radius: 18px;
+}
+
+html {
+    background: var(--mw-bg);
+}
+
+body {
+    color: var(--mw-text);
+    background:
+        radial-gradient(circle at 8% 8%, rgba(168, 37, 34, 0.18), transparent 28%),
+        radial-gradient(circle at 78% 0%, rgba(118, 82, 170, 0.13), transparent 32%),
+        radial-gradient(circle at 100% 86%, rgba(201, 164, 95, 0.08), transparent 32%),
+        linear-gradient(135deg, #050607 0%, #0b0d12 42%, #070707 100%) !important;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    background:
+        linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.025) 38%, transparent 39%),
+        radial-gradient(circle at 20% 90%, rgba(179,49,45,0.12), transparent 23%);
+}
+
+body::after {
+    content: "魔丸";
+    position: fixed;
+    left: -34px;
+    bottom: 24px;
+    z-index: -1;
+    pointer-events: none;
+    font-size: 170px;
+    font-weight: 900;
+    letter-spacing: -18px;
+    color: rgba(179, 49, 45, 0.055);
+    transform: rotate(-10deg);
+    filter: blur(0.2px);
+}
+
+/* 主容器 */
+.app-shell,
+.admin-shell,
+.dashboard-shell,
+.page-shell,
+main {
+    color: var(--mw-text);
+}
+
+/* 頁面主卡片 */
+.panel,
+.card,
+.stat-card,
+.summary-card,
+.order-card,
+.payout-card,
+.history-card,
+.section-card {
+    background:
+        linear-gradient(145deg, rgba(24, 26, 34, 0.92), rgba(9, 10, 14, 0.9)),
+        radial-gradient(circle at 10% 0%, rgba(179, 49, 45, 0.12), transparent 35%) !important;
+    border: 1px solid var(--mw-line) !important;
+    box-shadow: var(--mw-shadow);
+    border-radius: var(--mw-radius) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.panel::before,
+.card::before,
+.stat-card::before,
+.summary-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(90deg, rgba(179, 49, 45, 0.16), transparent 18%, transparent 82%, rgba(201, 164, 95, 0.08)),
+        radial-gradient(circle at 0% 0%, rgba(255,255,255,0.035), transparent 26%);
+    opacity: 0.65;
+}
+
+.panel > *,
+.card > *,
+.stat-card > *,
+.summary-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* 標題 */
+h1, h2, h3,
+.page-title,
+.section-title,
+.summary-list-title {
+    color: var(--mw-text) !important;
+    letter-spacing: 0.02em;
+}
+
+h1::first-letter,
+h2::first-letter {
+    text-shadow: 0 0 18px rgba(225, 75, 67, 0.38);
+}
+
+.muted-text,
+.text-muted,
+small,
+.order-no {
+    color: var(--mw-muted) !important;
+}
+
+.order-no {
+    color: var(--mw-gold-soft) !important;
+    letter-spacing: 0.04em;
+}
+
+/* 導覽列 */
+.nav-link,
+a.nav-link,
+.sidebar a,
+.sidebar-link {
+    color: rgba(245, 238, 228, 0.78) !important;
+    border-radius: 13px !important;
+    transition: 0.18s ease;
+}
+
+.nav-link:hover,
+.sidebar a:hover,
+.sidebar-link:hover {
+    color: #fff !important;
+    background: rgba(179, 49, 45, 0.16) !important;
+    box-shadow: inset 3px 0 0 rgba(225, 75, 67, 0.75);
+}
+
+.nav-link.active,
+.nav-link.is-active,
+.sidebar a.active,
+.sidebar-link.active,
+.nav-link[aria-current="page"] {
+    color: #fff !important;
+    background:
+        linear-gradient(90deg, rgba(129, 26, 23, 0.88), rgba(60, 14, 16, 0.5)) !important;
+    border: 1px solid rgba(225, 75, 67, 0.34) !important;
+    box-shadow:
+        inset 4px 0 0 var(--mw-red-bright),
+        0 0 24px rgba(179, 49, 45, 0.18);
+}
+
+/* 頂部導覽按鈕群 */
+.top-nav,
+.nav-group,
+.nav-tabs {
+    background: rgba(5, 6, 8, 0.52) !important;
+    border: 1px solid rgba(201, 164, 95, 0.16) !important;
+    border-radius: 16px !important;
+}
+
+/* 按鈕 */
+.button,
+button,
+input[type="submit"],
+.btn {
+    border-radius: 12px !important;
+    border: 1px solid rgba(201, 164, 95, 0.24) !important;
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.96), rgba(57, 13, 15, 0.96)) !important;
+    color: #fff !important;
+    box-shadow:
+        0 10px 25px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: 0.18s ease;
+}
+
+.button:hover,
+button:hover,
+input[type="submit"]:hover,
+.btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(226, 200, 134, 0.55) !important;
+    box-shadow:
+        0 14px 30px rgba(0, 0, 0, 0.35),
+        0 0 18px rgba(179, 49, 45, 0.25);
+}
+
+.button.secondary,
+.btn.secondary,
+a.button.secondary {
+    background:
+        linear-gradient(145deg, rgba(31, 34, 42, 0.96), rgba(10, 11, 14, 0.96)) !important;
+    color: var(--mw-gold-soft) !important;
+}
+
+.button.danger,
+.btn.danger {
+    background:
+        linear-gradient(145deg, #a61919, #3d0909) !important;
+}
+
+/* 表單 */
+.input,
+select,
+textarea,
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+input[type="month"],
+input[type="password"] {
+    color: var(--mw-text) !important;
+    background:
+        linear-gradient(145deg, rgba(9, 11, 16, 0.96), rgba(16, 18, 25, 0.92)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.22) !important;
+    border-radius: 12px !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+}
+
+.input:focus,
+select:focus,
+textarea:focus,
+input:focus {
+    outline: none !important;
+    border-color: rgba(225, 75, 67, 0.72) !important;
+    box-shadow:
+        0 0 0 3px rgba(179, 49, 45, 0.18),
+        inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+::placeholder {
+    color: rgba(169, 159, 145, 0.72) !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) sepia(0.4) saturate(1.2);
+    opacity: 0.86;
+    cursor: pointer;
+}
+
+/* 統計卡片 */
+.my-payout-total-card,
+.summary-pill,
+.metric-card,
+.stat-box {
+    background:
+        linear-gradient(145deg, rgba(10, 11, 15, 0.94), rgba(25, 27, 35, 0.86)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.18) !important;
+    border-radius: 16px !important;
+}
+
+.my-payout-total-card strong,
+.summary-pill strong,
+.metric-card strong,
+.stat-box strong {
+    color: #fff7e8 !important;
+    text-shadow: 0 0 18px rgba(201, 164, 95, 0.12);
+}
+
+/* 表格 */
+table,
+.summary-table {
+    color: var(--mw-text) !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+thead,
+.table-header {
+    background:
+        linear-gradient(90deg, rgba(98, 24, 22, 0.42), rgba(22, 23, 29, 0.72)) !important;
+}
+
+th {
+    color: var(--mw-gold-soft) !important;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.24) !important;
+    font-weight: 800 !important;
+}
+
+td {
+    border-bottom: 1px solid rgba(201, 164, 95, 0.10) !important;
+}
+
+tbody tr {
+    transition: 0.16s ease;
+}
+
+tbody tr:hover {
+    background: rgba(179, 49, 45, 0.075) !important;
+}
+
+/* 人員卡片 / 分潤卡片 */
+.summary-person-card,
+.person-card,
+.staff-card {
+    background:
+        linear-gradient(145deg, rgba(18, 20, 27, 0.92), rgba(8, 9, 13, 0.92)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.22) !important;
+    box-shadow: 0 20px 45px rgba(0,0,0,0.35);
+}
+
+.summary-avatar,
+.avatar,
+.user-avatar {
+    border: 1px solid rgba(201, 164, 95, 0.48) !important;
+    background:
+        radial-gradient(circle at 35% 25%, rgba(225, 75, 67, 0.42), transparent 34%),
+        linear-gradient(145deg, rgba(48, 14, 16, 0.96), rgba(17, 18, 24, 0.96)) !important;
+    color: #fff !important;
+    box-shadow: 0 0 24px rgba(179, 49, 45, 0.24);
+}
+
+/* 狀態徽章 */
+.badge,
+.status-badge,
+.summary-status-paid,
+.summary-status-unpaid,
+[class*="status"] {
+    border-radius: 999px !important;
+}
+
+.summary-status-paid,
+.badge-paid,
+.status-paid,
+.status-closed,
+.paid {
+    color: #8ff0be !important;
+    background: rgba(47, 191, 123, 0.14) !important;
+    border: 1px solid rgba(47, 191, 123, 0.32) !important;
+}
+
+.summary-status-unpaid,
+.badge-unpaid,
+.status-unpaid,
+.status-active,
+.unpaid {
+    color: #70e5ef !important;
+    background: rgba(70, 201, 216, 0.12) !important;
+    border: 1px solid rgba(70, 201, 216, 0.28) !important;
+}
+
+.status-stored,
+.badge-stored,
+.stored {
+    color: #e8ca7d !important;
+    background: rgba(201, 164, 95, 0.14) !important;
+    border: 1px solid rgba(201, 164, 95, 0.32) !important;
+}
+
+/* 金額強調 */
+.amount,
+.money,
+.price,
+td:last-child {
+    color: var(--mw-gold-soft);
+}
+
+/* 空狀態 */
+.summary-empty,
+.empty-state {
+    border: 1px dashed rgba(201, 164, 95, 0.28) !important;
+    background:
+        linear-gradient(145deg, rgba(10, 11, 15, 0.68), rgba(20, 22, 28, 0.5)) !important;
+    color: var(--mw-muted) !important;
+}
+
+/* 捲軸 */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(5, 6, 8, 0.9);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(179,49,45,0.82), rgba(93,25,24,0.86));
+    border-radius: 999px;
+    border: 2px solid rgba(5, 6, 8, 0.9);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(225,75,67,0.9), rgba(124,33,31,0.9));
+}
+
+/* 手機版微調 */
+@media (max-width: 900px) {
+    body::after {
+        font-size: 110px;
+        opacity: 0.5;
+    }
+
+    .panel,
+    .card,
+    .summary-person-card {
+        border-radius: 14px !important;
+    }
+}
