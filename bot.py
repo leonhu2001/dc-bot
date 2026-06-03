@@ -2189,21 +2189,15 @@ class DispatchClaimView(discord.ui.View):
         return data
 
     def build_receiver_text(self, claim_data: dict) -> str | None:
-        companion_ids = sorted(claim_data.get("companion", set()))
-        booster_ids = sorted(claim_data.get("booster", set()))
+        receiver_ids = sorted(
+            set(claim_data.get("companion", set()))
+            | set(claim_data.get("booster", set()))
+        )
 
-        lines = []
-
-        if companion_ids:
-            lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
-
-        if booster_ids:
-            lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
-
-        if not lines:
+        if not receiver_ids:
             return None
 
-        return "\n".join(lines)
+        return "、".join(f"<@{user_id}>" for user_id in receiver_ids)
 
     async def refresh_panel(self, interaction: discord.Interaction, locked: bool | None = None):
         guild = interaction.guild
@@ -2286,17 +2280,16 @@ class DispatchClaimView(discord.ui.View):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
-        if self.locked:
-            await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
+        if self.locked or self.status in {"closed", "stored"}:
+            await interaction.response.send_message("此單已結單或已存單，接單面板已鎖定。", ephemeral=True)
             return
 
-        required_role_id = self.get_required_role_id(claim_type)
-        receiver_label = self.get_receiver_label(claim_type)
-
-        if not has_role(interaction.user, required_role_id):
+        # 統一接單：不再分打手/陪玩，只要有任一接單身分組即可。
+        allowed_role_ids = (COMPANION_RECEIVER_ROLE_ID, BOOSTER_RECEIVER_ROLE_ID)
+        if not any(has_role(interaction.user, role_id) for role_id in allowed_role_ids):
             await interaction.response.send_message(
-                f"你沒有「{receiver_label}」權限。",
-                ephemeral=True
+                "只有接單人員可以按「我要接單」。",
+                ephemeral=True,
             )
             return
 
@@ -2306,16 +2299,22 @@ class DispatchClaimView(discord.ui.View):
             await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
             return
 
-        claim_data[claim_type].add(interaction.user.id)
+        claim_data.setdefault("booster", set())
+        claim_data.setdefault("companion", set())
+
+        # 同一人只保留一筆接單，不再分陪玩/打手。
+        claim_data["companion"].discard(interaction.user.id)
+        claim_data["booster"].add(interaction.user.id)
+
         remember_claim_data(interaction.message.id, claim_data)
-        sync_single_discord_claim_event_to_web(interaction, claim_type, "claim")
+        sync_single_discord_claim_event_to_web(interaction, "booster", "claim")
 
         try:
             sync_web_worker_claim_from_dispatch(
                 dispatch_message_id=interaction.message.id,
                 worker_discord_id=interaction.user.id,
                 worker_display_name=getattr(interaction.user, "display_name", None) or getattr(interaction.user, "name", None),
-                role_type=claim_type,
+                role_type="booster",
                 claimed=True,
             )
         except Exception as e:
@@ -2323,13 +2322,14 @@ class DispatchClaimView(discord.ui.View):
 
         await send_order_log(
             interaction.guild,
-            title=f"{receiver_label}",
-            fields=[
-                ("接單人", interaction.user.mention, True),
-                ("顧客", f"<@{self.customer_id}>", True),
-                ("訂單", f"{self.category_label}｜{self.item} x{self.quantity}", False),
+            "派單接單",
+            [
+                ("訂單", f"{self.category_label}｜{self.item}", False),
+                ("接單人員", interaction.user.mention, True),
+                ("付款方式", self.payment_method, True),
+                ("來源票口", f"<#{self.source_channel_id}>", False),
             ],
-            color=discord.Color.green(),
+            actor=interaction.user,
         )
 
         await self.refresh_panel(interaction)
@@ -2378,16 +2378,12 @@ class DispatchClaimView(discord.ui.View):
 
         await self.refresh_panel(interaction)
 
-    @discord.ui.button(
-        label="陪玩接單",
-        style=discord.ButtonStyle.success,
-        custom_id="dispatch_claim_companion"
-    )
+
     async def companion_claim(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.claim_order(interaction, "companion")
 
     @discord.ui.button(
-        label="打手接單",
+        label="我要接單",
         style=discord.ButtonStyle.primary,
         custom_id="dispatch_claim_booster"
     )
@@ -2513,10 +2509,10 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         lines = []
 
         if companion_ids:
-            lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+            lines.extend(f"<@{user_id}>" for user_id in companion_ids)
 
         if booster_ids:
-            lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+            lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
         receiver_text = "\n".join(lines) if lines else None
 
@@ -2686,10 +2682,10 @@ async def store_dispatch_claim_panel(
     lines = []
 
     if companion_ids:
-        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+        lines.extend(f"<@{user_id}>" for user_id in companion_ids)
 
     if booster_ids:
-        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+        lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
     receiver_text = "\n".join(lines) if lines else None
 
@@ -2824,10 +2820,10 @@ async def resume_stored_order(
     lines = []
 
     if companion_ids:
-        lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+        lines.extend(f"<@{user_id}>" for user_id in companion_ids)
 
     if booster_ids:
-        lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+        lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
     receiver_text = "\n".join(lines) if lines else None
 
@@ -5200,37 +5196,22 @@ def _web_sync_mark_event_failed(event_id: int, error_message: str, retry_count: 
 
 
 def _web_sync_build_receiver_text(assignments: list[dict]) -> str:
-    companions = []
-    boosters = []
+    receivers = []
 
     for row in assignments:
         user_id = str(row.get("worker_discord_id") or "").strip()
-        display_name = str(row.get("worker_display_name") or user_id).strip()
-        role_type = str(row.get("role_type") or "booster").strip()
 
         if not user_id:
             continue
 
         text = f"<@{user_id}>"
+        if text not in receivers:
+            receivers.append(text)
 
-        if role_type == "companion":
-            companions.append(text)
-        else:
-            boosters.append(text)
-
-    parts = []
-
-    if boosters:
-        parts.append("打手接單：" + "、".join(boosters))
-
-    if companions:
-        parts.append("陪玩接單：" + "、".join(companions))
-
-    if not parts:
+    if not receivers:
         return "尚未有人接單"
 
-    return "\n".join(parts)
-
+    return "、".join(receivers)
 
 
 def _normalize_dispatch_embed_field_order(embed):
@@ -5499,9 +5480,9 @@ async def update_stored_order_note_and_panel(
     booster_ids = sorted(claim_data.get("booster", set())) if isinstance(claim_data, dict) else []
     receiver_lines = []
     if companion_ids:
-        receiver_lines.append("陪玩接單：" + " ".join(f"<@{user_id}>" for user_id in companion_ids))
+        receiver_lines.extend(f"<@{user_id}>" for user_id in companion_ids)
     if booster_ids:
-        receiver_lines.append("打手接單：" + " ".join(f"<@{user_id}>" for user_id in booster_ids))
+        receiver_lines.extend(f"<@{user_id}>" for user_id in booster_ids)
 
     embed = build_self_service_order_embed(
         customer_mention=customer_mention,
