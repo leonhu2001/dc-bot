@@ -4731,3 +4731,47 @@ body:has(form[action="/admin/staff"]) .panel:has(.compact-list) {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Sidebar GIF Logo Size Fix
+   側欄 GIF LOGO 縮放修正
+========================================================= */
+
+.mw-sidebar-logo-image {
+    width: 112px !important;
+    height: 112px !important;
+    padding: 10px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+.mw-sidebar-logo-image img {
+    width: 74% !important;
+    height: 74% !important;
+    max-width: 74% !important;
+    max-height: 74% !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: auto !important;
+    border-radius: 14px !important;
+}
+
+.mw-sidebar-logo-image span {
+    display: none;
+}
+
+@media (max-width: 680px) {
+    .mw-sidebar-logo-image {
+        width: 76px !important;
+        height: 76px !important;
+        padding: 8px !important;
+    }
+
+    .mw-sidebar-logo-image img {
+        width: 72% !important;
+        height: 72% !important;
+        max-width: 72% !important;
+        max-height: 72% !important;
+    }
+}
+
