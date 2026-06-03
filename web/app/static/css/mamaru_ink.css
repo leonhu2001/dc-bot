@@ -4269,3 +4269,71 @@ body:has(form[action="/admin/staff/sync"]) .empty-state {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Admin Stage 2
+   修正總控頁裝飾字與空狀態
+========================================================= */
+
+/* 總控頁覆蓋派單頁殘留的「魔丸任務榜」 */
+body:has(form[action="/admin/staff/sync"]) .mw-page-card::after {
+    content: "魔丸總控台" !important;
+    position: absolute;
+    right: 42px;
+    bottom: 36px;
+    color: rgba(201, 164, 95, 0.035) !important;
+    font-family: var(--mw-brush-font, serif);
+    font-size: 82px !important;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    pointer-events: none;
+}
+
+/* 訂單列表空狀態改成總控風，不要像派單任務榜 */
+body:has(form[action="/admin/staff/sync"]) .panel:has(.admin-order-list),
+body:has(form[action="/admin/staff/sync"]) .panel:has(.empty-state) {
+    position: relative;
+}
+
+body:has(form[action="/admin/staff/sync"]) .panel:has(.empty-state) .empty-state {
+    min-height: 78px;
+    display: flex;
+    align-items: center;
+    border-color: rgba(201, 164, 95, 0.24) !important;
+}
+
+body:has(form[action="/admin/staff/sync"]) .panel:has(.empty-state) .empty-state::after {
+    content: "目前無單";
+    position: absolute;
+    right: 28px;
+    color: rgba(179, 49, 45, 0.13);
+    font-family: var(--mw-brush-font, serif);
+    font-size: 34px;
+    font-weight: 900;
+    transform: rotate(-6deg);
+}
+
+/* 總控首頁的訂單列表標題更像作戰區 */
+body:has(form[action="/admin/staff/sync"]) .panel > h2 {
+    color: #fff0d5 !important;
+}
+
+body:has(form[action="/admin/staff/sync"]) .panel > h2::after {
+    content: "";
+    display: block;
+    width: 96px;
+    height: 2px;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(225,75,67,0.9), rgba(226,200,134,0.5), transparent);
+}
+
+/* 同步區與統計卡間距微調 */
+body:has(form[action="/admin/staff/sync"]) .panel:first-of-type {
+    margin-bottom: 18px !important;
+}
+
+body:has(form[action="/admin/staff/sync"]) .grid {
+    margin-bottom: 18px !important;
+}
+
