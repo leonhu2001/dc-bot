@@ -6401,3 +6401,73 @@ body:has(.dispatch-v2-hero) .muted-text {
 }
 /* === DISPATCH NO-FILL WIREFRAME END === */
 
+
+/* === DASHBOARD OUTER TRANSPARENT START === */
+/* 重點：把整個 dashboard 外層主框變透明，讓背景透出來 */
+
+body .mw-main-content,
+body .mw-page-shell,
+body .mw-page-card,
+body .mw-page-panel,
+body .mw-content-card,
+body .mw-dashboard-shell,
+body .mw-dashboard-main,
+body .mw-main-panel,
+body .mw-content-panel,
+body .mw-page-wrap,
+body .mw-page-container {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 只保留外框 */
+body .mw-page-card,
+body .mw-page-panel,
+body .mw-content-card,
+body .mw-dashboard-shell,
+body .mw-dashboard-main,
+body .mw-main-panel,
+body .mw-content-panel {
+    border: 1px solid rgba(201, 164, 95, 0.26) !important;
+}
+
+/* 派單頁主區塊也不要有整塊深色底 */
+body:has(.dispatch-v2-hero) .mw-main-content,
+body:has(.dispatch-v2-hero) .mw-page-shell,
+body:has(.dispatch-v2-hero) .mw-page-card,
+body:has(.dispatch-v2-hero) .mw-page-panel,
+body:has(.dispatch-v2-hero) .mw-content-card,
+body:has(.dispatch-v2-hero) .mw-dashboard-shell,
+body:has(.dispatch-v2-hero) .mw-dashboard-main,
+body:has(.dispatch-v2-hero) .mw-main-panel,
+body:has(.dispatch-v2-hero) .mw-content-panel,
+body:has(.dispatch-v2-hero) .mw-page-wrap,
+body:has(.dispatch-v2-hero) .mw-page-container {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 避免有偽元素再蓋一層 */
+body .mw-page-card::before,
+body .mw-page-card::after,
+body .mw-page-panel::before,
+body .mw-page-panel::after,
+body .mw-content-card::before,
+body .mw-content-card::after,
+body .mw-dashboard-shell::before,
+body .mw-dashboard-shell::after,
+body .mw-dashboard-main::before,
+body .mw-dashboard-main::after,
+body .mw-main-panel::before,
+body .mw-main-panel::after,
+body .mw-content-panel::before,
+body .mw-content-panel::after {
+    display: none !important;
+    content: none !important;
+}
+/* === DASHBOARD OUTER TRANSPARENT END === */
+
