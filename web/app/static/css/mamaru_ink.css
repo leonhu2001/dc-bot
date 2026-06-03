@@ -1398,3 +1398,192 @@ body::before {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 7
+   側欄高級化 / 目前頁面高亮 / 頁首橫幅
+========================================================= */
+
+@media (min-width: 1100px) {
+    .mw-sidebar {
+        padding-top: 38px;
+    }
+
+    .mw-sidebar-brand {
+        margin-bottom: 30px;
+    }
+
+    .mw-sidebar-logo {
+        position: relative;
+        display: inline-block;
+        padding: 10px 16px 8px;
+    }
+
+    .mw-sidebar-logo::before {
+        content: "";
+        position: absolute;
+        inset: -10px -16px;
+        border-radius: 999px;
+        z-index: -1;
+        background:
+            radial-gradient(circle at 50% 50%, rgba(179,49,45,0.34), transparent 46%),
+            conic-gradient(from 18deg, transparent, rgba(179,49,45,0.42), rgba(201,164,95,0.22), transparent);
+        opacity: 0.72;
+    }
+
+    .mw-sidebar-subtitle {
+        text-shadow: 0 0 14px rgba(201, 164, 95, 0.18);
+    }
+
+    .mw-sidebar-group {
+        position: relative;
+    }
+
+    .mw-sidebar-group + .mw-sidebar-group {
+        padding-top: 16px;
+        border-top: 1px solid rgba(201, 164, 95, 0.12);
+    }
+
+    .mw-sidebar-label {
+        margin-bottom: 2px;
+        color: rgba(226, 200, 134, 0.62);
+    }
+
+    .mw-sidebar-link {
+        position: relative;
+        gap: 10px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+    }
+
+    .mw-sidebar-link::before {
+        content: attr(data-icon);
+        width: 24px;
+        height: 24px;
+        flex: 0 0 24px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 999px;
+        color: rgba(226, 200, 134, 0.82);
+        background:
+            radial-gradient(circle at 50% 50%, rgba(201,164,95,0.14), transparent 60%);
+        border: 1px solid rgba(201, 164, 95, 0.12);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        font-size: 13px;
+    }
+
+    .mw-sidebar-link.is-active {
+        color: #fff !important;
+        background:
+            linear-gradient(90deg, rgba(126, 29, 27, 0.96), rgba(35, 12, 14, 0.78)) !important;
+        border-color: rgba(225, 75, 67, 0.54) !important;
+        box-shadow:
+            inset 4px 0 0 rgba(225, 75, 67, 0.92),
+            0 0 28px rgba(179, 49, 45, 0.22);
+        transform: translateX(2px);
+    }
+
+    .mw-sidebar-link.is-active::before {
+        color: #fff7e8;
+        border-color: rgba(226, 200, 134, 0.38);
+        background:
+            radial-gradient(circle at 50% 50%, rgba(225,75,67,0.32), rgba(201,164,95,0.16));
+        box-shadow:
+            0 0 18px rgba(225,75,67,0.20),
+            inset 0 1px 0 rgba(255,255,255,0.10);
+    }
+
+    .mw-sidebar-logout::before {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    /* 右側主卡片再靠近第一張範例：頁首橫幅感 */
+    .mw-page-card {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .mw-page-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 180px;
+        pointer-events: none;
+        background:
+            radial-gradient(circle at 10% 20%, rgba(179,49,45,0.18), transparent 32%),
+            radial-gradient(circle at 78% 0%, rgba(124,95,184,0.12), transparent 34%),
+            linear-gradient(90deg, rgba(28, 9, 10, 0.52), transparent 68%);
+        border-bottom: 1px solid rgba(201, 164, 95, 0.08);
+        z-index: 0;
+    }
+
+    .mw-page-card > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .mw-page-topbar {
+        min-height: 142px;
+        align-items: center;
+        border-bottom: 1px solid rgba(201, 164, 95, 0.12);
+        margin-bottom: 18px;
+    }
+
+    .mw-page-topbar .eyebrow {
+        color: #8dc9ff !important;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .mw-page-topbar h1 {
+        margin-top: 8px;
+        color: #fff7e8 !important;
+        text-shadow:
+            0 0 24px rgba(225, 75, 67, 0.22),
+            0 3px 0 rgba(0, 0, 0, 0.54);
+    }
+
+    .mw-page-topbar .compact-user {
+        margin-top: 10px;
+        color: rgba(226, 200, 134, 0.74) !important;
+    }
+
+    /* 內容少的頁面也能保持高級留白 */
+    .mw-page-card {
+        min-height: calc(100vh - 56px);
+    }
+
+    /* 左側側欄視覺深度 */
+    .mw-sidebar::after {
+        content: "娛樂";
+        position: absolute;
+        right: 22px;
+        top: 132px;
+        writing-mode: vertical-rl;
+        color: rgba(179, 49, 45, 0.20);
+        font-size: 34px;
+        font-weight: 900;
+        letter-spacing: 0.16em;
+        pointer-events: none;
+    }
+}
+
+/* 手機版目前頁面高亮 */
+@media (max-width: 1099px) {
+    .mw-sidebar-link.is-active {
+        color: #fff !important;
+        background:
+            linear-gradient(145deg, rgba(126, 29, 27, 0.96), rgba(54, 12, 14, 0.96)) !important;
+        border-color: rgba(225, 75, 67, 0.46) !important;
+    }
+
+    .mw-sidebar-link::before {
+        content: attr(data-icon);
+        margin-right: 6px;
+    }
+}
+

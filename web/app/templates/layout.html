@@ -9,6 +9,7 @@
 </head>
 <body>
     <div class="mw-layout">
+        {% set current_path = request.url.path %}
         {% if user %}
             <aside class="mw-sidebar">
                 <div class="mw-sidebar-brand">
@@ -20,24 +21,24 @@
                     {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
                         <div class="mw-sidebar-group">
                             <span class="mw-sidebar-label">打手 / 陪玩 / 客服</span>
-                            <a class="mw-sidebar-link" href="/dispatch">派單頁</a>
-                            <a class="mw-sidebar-link" href="/my/payouts">我的分潤</a>
+                            <a class="mw-sidebar-link {% if current_path == '/dispatch' %}is-active{% endif %}" data-icon="◈" href="/dispatch">派單頁</a>
+                            <a class="mw-sidebar-link {% if current_path == '/my/payouts' %}is-active{% endif %}" data-icon="◉" href="/my/payouts">我的分潤</a>
                         </div>
                     {% endif %}
 
                     {% if user.is_admin %}
                         <div class="mw-sidebar-group">
                             <span class="mw-sidebar-label">客服</span>
-                            <a class="mw-sidebar-link" href="/admin">總控</a>
-                            <a class="mw-sidebar-link" href="/admin/orders/history">歷史訂單</a>
-                            <a class="mw-sidebar-link" href="/admin/payouts/summary">人員總表</a>
-                            <a class="mw-sidebar-link" href="/admin/staff">人員名單</a>
+                            <a class="mw-sidebar-link {% if current_path == '/admin' %}is-active{% endif %}" data-icon="✦" href="/admin">總控</a>
+                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/orders/history') %}is-active{% endif %}" data-icon="☷" href="/admin/orders/history">歷史訂單</a>
+                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/payouts/summary') %}is-active{% endif %}" data-icon="◎" href="/admin/payouts/summary">人員總表</a>
+                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/staff') %}is-active{% endif %}" data-icon="◇" href="/admin/staff">人員名單</a>
                         </div>
                     {% endif %}
                 </nav>
 
                 <div class="mw-sidebar-footer">
-                    <a class="mw-sidebar-link mw-sidebar-logout" href="/auth/logout">登出</a>
+                    <a class="mw-sidebar-link mw-sidebar-logout" data-icon="↯" href="/auth/logout">登出</a>
                 </div>
             </aside>
         {% endif %}
