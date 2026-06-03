@@ -4612,3 +4612,122 @@ body:has(form[action="/admin/staff"]) .compact-header {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Staff Card Grid Safe Patch
+   人員名單卡片化 / 移除娛樂浮水印
+========================================================= */
+
+/* 移除側欄淡淡的「娛樂」浮水印 */
+@media (min-width: 1100px) {
+    .mw-sidebar::after {
+        content: none !important;
+        display: none !important;
+    }
+}
+
+/* 人員名單改成卡片格狀，不再一條一條 */
+body:has(form[action="/admin/staff"]) .compact-list {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+    gap: 18px !important;
+}
+
+body:has(form[action="/admin/staff"]) .compact-card {
+    min-height: 230px !important;
+    padding: 18px !important;
+    border-radius: 22px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(201,164,95,0.07), transparent 32%),
+        radial-gradient(circle at 100% 10%, rgba(179,49,45,0.15), transparent 34%),
+        linear-gradient(145deg, rgba(15, 10, 8, 0.96), rgba(5, 6, 8, 0.96)) !important;
+}
+
+body:has(form[action="/admin/staff"]) .compact-card::after {
+    right: 16px !important;
+    bottom: 10px !important;
+    top: auto !important;
+    font-size: 54px !important;
+    opacity: 0.9;
+}
+
+/* 卡片上半部改直式角色卡 */
+body:has(form[action="/admin/staff"]) .compact-header {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
+    text-align: center !important;
+    gap: 12px !important;
+    padding-bottom: 14px !important;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.14);
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-block {
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    width: 100%;
+}
+
+body:has(form[action="/admin/staff"]) .staff-avatar {
+    width: 82px !important;
+    height: 82px !important;
+    flex-basis: 82px !important;
+    border-width: 2px !important;
+    box-shadow:
+        0 0 0 5px rgba(179, 49, 45, 0.10),
+        0 0 34px rgba(179, 49, 45, 0.28);
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-meta {
+    width: 100%;
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-meta strong {
+    font-size: 20px !important;
+    color: #fff7e8 !important;
+    text-align: center;
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-meta .muted-text {
+    text-align: center;
+    font-size: 12px;
+}
+
+/* 身份章移到卡片中段，像角色標籤 */
+body:has(form[action="/admin/staff"]) .staff-role-chips {
+    justify-content: center !important;
+    width: 100%;
+    min-height: 30px;
+}
+
+body:has(form[action="/admin/staff"]) .staff-role-chips .chip {
+    min-width: 46px;
+    justify-content: center;
+    border-radius: 999px !important;
+}
+
+/* 底部 Discord / 同步時間變成卡片資訊欄 */
+body:has(form[action="/admin/staff"]) .compact-card > p.muted-text {
+    margin: 0 !important;
+    padding-top: 12px;
+    border-top: 1px solid rgba(201, 164, 95, 0.12);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* 人員名單的 panel 留白更適合卡片 */
+body:has(form[action="/admin/staff"]) .panel:has(.compact-list) {
+    padding: 22px !important;
+}
+
+@media (max-width: 680px) {
+    body:has(form[action="/admin/staff"]) .compact-list {
+        grid-template-columns: 1fr !important;
+    }
+}
+
