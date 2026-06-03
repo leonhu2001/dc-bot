@@ -3911,3 +3911,93 @@ body:has(form#historyBulkForm) .history-bulk-toolbar .muted-text {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Floating History Save Bar
+   歷史訂單固定懸浮儲存列
+========================================================= */
+
+body:has(form#historyBulkForm) {
+    padding-bottom: 110px;
+}
+
+/* 把卷宗修改列改成真正固定在視窗底部 */
+body:has(form#historyBulkForm) .history-bulk-toolbar {
+    position: fixed !important;
+    left: calc(270px + 28px) !important;
+    right: 34px !important;
+    bottom: 18px !important;
+    z-index: 999 !important;
+
+    margin-top: 0 !important;
+    padding: 14px 18px !important;
+
+    border-radius: 18px !important;
+    border: 1px solid rgba(201, 164, 95, 0.36) !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.18), transparent 32%),
+        linear-gradient(145deg, rgba(32, 22, 14, 0.96), rgba(8, 8, 9, 0.96)) !important;
+
+    backdrop-filter: blur(16px);
+    box-shadow:
+        0 20px 56px rgba(0, 0, 0, 0.56),
+        0 0 32px rgba(179, 49, 45, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* 左側標籤 */
+body:has(form#historyBulkForm) .history-bulk-toolbar::before {
+    content: "卷宗修改";
+    flex: 0 0 auto;
+    color: rgba(226, 200, 134, 0.92);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    padding: 6px 11px;
+    border-radius: 999px;
+    background: rgba(126, 29, 27, 0.38);
+    border: 1px solid rgba(225, 75, 67, 0.28);
+}
+
+body:has(form#historyBulkForm) .history-bulk-toolbar .muted-text {
+    flex: 1;
+    color: rgba(245, 238, 228, 0.78) !important;
+}
+
+body:has(form#historyBulkForm) .history-bulk-actions {
+    flex: 0 0 auto;
+}
+
+body:has(form#historyBulkForm) .history-bulk-actions .button {
+    min-height: 42px !important;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+}
+
+/* 手機 / 窄螢幕 */
+@media (max-width: 1099px) {
+    body:has(form#historyBulkForm) {
+        padding-bottom: 150px;
+    }
+
+    body:has(form#historyBulkForm) .history-bulk-toolbar {
+        left: 14px !important;
+        right: 14px !important;
+        bottom: 14px !important;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    body:has(form#historyBulkForm) .history-bulk-toolbar::before {
+        width: fit-content;
+    }
+
+    body:has(form#historyBulkForm) .history-bulk-actions {
+        width: 100%;
+    }
+
+    body:has(form#historyBulkForm) .history-bulk-actions .button {
+        flex: 1;
+    }
+}
+
