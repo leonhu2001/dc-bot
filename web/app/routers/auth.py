@@ -69,13 +69,10 @@ async def discord_callback(
         )
 
         if token_response.status_code != 200:
-            print(
-                "Discord OAuth token exchange failed:",
-                token_response.status_code,
-                token_response.text,
-                flush=True,
+            raise HTTPException(
+                status_code=400,
+                detail=f"Discord token exchange failed: {token_response.status_code} {token_response.text}",
             )
-            raise HTTPException(status_code=400, detail="Failed to exchange Discord OAuth code")
 
         token_data = token_response.json()
         access_token = token_data.get("access_token")
