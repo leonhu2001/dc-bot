@@ -1,224 +1,312 @@
-{% extends "layout.html" %}
+﻿{% extends "layout.html" %}
 
 {% block page_title %}我的分潤{% endblock %}
 
 {% block content %}
-    <div class="grid">
-        <div class="panel">
-            <h2>未發放分潤</h2>
-            <p class="big-number">{{ summary.unpaid_total }}T</p>
-            <p>包含打手分潤與客服分潤。</p>
-        </div>
+<style>
+.my-payout-filter {
+    display: grid;
+    grid-template-columns: 180px 180px auto auto;
+    gap: 12px;
+    align-items: end;
+}
 
-        <div class="panel">
-            <h2>已發放分潤</h2>
-            <p class="big-number">{{ summary.paid_total }}T</p>
-            <p>已由總控標記為已發放。</p>
-        </div>
+.my-payout-total-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
 
-        <div class="panel">
-            <h2>累計分潤</h2>
-            <p class="big-number">{{ summary.all_total }}T</p>
-            <p>目前網站資料庫內的全部紀錄。</p>
+.my-payout-total-card {
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 14px;
+    background: rgba(2, 6, 23, 0.32);
+    padding: 14px;
+}
+
+.my-payout-total-card span {
+    display: block;
+    color: #9ca3af;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.my-payout-total-card strong {
+    display: block;
+    font-size: 24px;
+    line-height: 1.1;
+}
+
+.summary-person-card {
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.66);
+    padding: 16px;
+    margin-top: 14px;
+}
+
+.summary-person-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+}
+
+.summary-person-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.summary-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(99, 102, 241, 0.75);
+    background: rgba(99, 102, 241, 0.28);
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.summary-name {
+    margin: 0;
+}
+
+.summary-id {
+    color: #9ca3af;
+    margin: 4px 0 0;
+    font-size: 13px;
+}
+
+.summary-person-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.summary-pill {
+    min-width: 90px;
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.42);
+    padding: 10px 12px;
+    text-align: right;
+}
+
+.summary-pill span {
+    display: block;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+.summary-pill strong {
+    display: block;
+    font-size: 20px;
+}
+
+.summary-items {
+    margin-top: 16px;
+    overflow-x: auto;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.summary-table th,
+.summary-table td {
+    padding: 10px 8px;
+    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.summary-table th {
+    color: #93c5fd;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.summary-status-paid {
+    color: #34d399;
+    font-weight: 800;
+}
+
+.summary-status-unpaid {
+    color: #22d3ee;
+    font-weight: 800;
+}
+
+.summary-empty {
+    border: 1px dashed rgba(148, 163, 184, 0.28);
+    border-radius: 14px;
+    padding: 18px;
+    color: #9ca3af;
+}
+
+@media (max-width: 900px) {
+    .my-payout-filter {
+        grid-template-columns: 1fr;
+    }
+
+    .my-payout-total-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .summary-person-head {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-person-meta {
+        justify-content: flex-start;
+    }
+
+    .summary-pill {
+        text-align: left;
+    }
+}
+</style>
+
+<section class="panel">
+    <div class="section-title-row">
+        <div>
+            <p class="order-no">MY PAYOUTS</p>
+            <h2>我的分潤</h2>
+            <p class="muted-text">依未發放 / 已發放分類顯示，排列方式與人員總表一致。</p>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <form method="get" action="/my/payouts" class="filter-form my-payout-filter">
+        <select class="input" name="month">
+            <option value="" {% if not month %}selected{% endif %}>全部月份</option>
+            {% for option in month_options %}
+                <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="input" name="status">
+            <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
+            <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>未發放</option>
+            <option value="paid" {% if status == "paid" %}selected{% endif %}>已發放</option>
+        </select>
+
+        <button class="button" type="submit">套用篩選</button>
+        <a class="button secondary" href="/my/payouts">清除</a>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="my-payout-total-grid">
+        <div class="my-payout-total-card">
+            <span>未發放總額</span>
+            <strong>{{ summary.unpaid_total|round(0, 'common')|int }}T</strong>
+        </div>
+        <div class="my-payout-total-card">
+            <span>未發放筆數</span>
+            <strong>{{ summary.unpaid_count }}</strong>
+        </div>
+        <div class="my-payout-total-card">
+            <span>已發放總額</span>
+            <strong>{{ summary.paid_total|round(0, 'common')|int }}T</strong>
+        </div>
+        <div class="my-payout-total-card">
+            <span>已發放筆數</span>
+            <strong>{{ summary.paid_count }}</strong>
+        </div>
+    </div>
+</section>
+
+{% macro person_card(row, list_status) %}
+<article class="summary-person-card">
+    <div class="summary-person-head">
+        <div class="summary-person-title">
+            <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
+            <div>
+                <p class="order-no">{{ row.role_label }}</p>
+                <h3 class="summary-name">{{ row.display_name }}</h3>
+                <p class="summary-id">ID：{{ row.discord_id }}</p>
+            </div>
+        </div>
+        <div class="summary-person-meta">
+            <div class="summary-pill">
+                <span>{% if list_status == "paid" %}已發放{% else %}未發放{% endif %}</span>
+                <strong>{% if list_status == "paid" %}{{ row.paid_total|round(0, 'common')|int }}{% else %}{{ row.unpaid_total|round(0, 'common')|int }}{% endif %}T</strong>
+            </div>
+            <div class="summary-pill">
+                <span>筆數</span>
+                <strong>{% if list_status == "paid" %}{{ row.paid_count }}{% else %}{{ row.unpaid_count }}{% endif %}</strong>
+            </div>
         </div>
     </div>
 
-    <div class="grid">
-        <div class="panel">
-            <h2>打手未發放</h2>
-            <p class="big-number">{{ summary.worker_unpaid_total }}T</p>
-            <p>共 {{ summary.worker_count }} 筆打手分潤紀錄。</p>
-        </div>
-
-        <div class="panel">
-            <h2>客服未發放</h2>
-            <p class="big-number">{{ summary.customer_service_unpaid_total }}T</p>
-            <p>共 {{ summary.customer_service_count }} 筆客服分潤紀錄。</p>
-        </div>
-
-        <div class="panel">
-            <h2>身份</h2>
-            <p>
-                {% if user.is_admin %}
-                    總控 / 客服
-                {% endif %}
-
-                {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
-                    打手
-                {% endif %}
-            </p>
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>打手分潤明細</h2>
-
-        {% if worker_rows %}
-            <div class="admin-order-list">
-                {% for payout, order in worker_rows %}
-                    <article class="admin-order-card">
-                        <div class="order-card-header">
-                            <div>
-                                <p class="order-no">
-                                    {% if order %}
-                                        {{ order.bot_order_no or ("WEB-" ~ order.id) }}
-                                    {% else %}
-                                        訂單 #{{ payout.order_id }}
-                                    {% endif %}
-                                </p>
-
-                                <h3>
-                                    {% if order %}
-                                        {{ order.category }}｜{{ order.item }}
-                                    {% else %}
-                                        找不到訂單資料
-                                    {% endif %}
-                                </h3>
-                            </div>
-
-                            <span class="badge">{{ payout.payout_status }}</span>
-                        </div>
-
-                        <div class="order-meta">
-                            <div>
-                                <span>結單日期</span>
-                                <strong>
-                                    {% if order %}
-                                        {{ ((order.closed_at or order.updated_at or order.created_at or '')|string)[:10] or '未紀錄' }}
-                                    {% else %}
-                                        未紀錄
-                                    {% endif %}
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>老闆名稱</span>
-                                <strong>
-                                    {% if order %}
-                                        {{ order.customer_display_name or order.customer_discord_id or '未紀錄' }}
-                                    {% else %}
-                                        未紀錄
-                                    {% endif %}
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>分攤金額</span>
-                                <strong>{{ payout.gross_share|round(0, 'common')|int }}T</strong>
-                            </div>
-
-                            <div>
-                                <span>基本分潤</span>
-                                <strong>{{ payout.base_payout|round(0, 'common')|int }}T</strong>
-                            </div>
-
-                            <div>
-                                <span>掛名加成</span>
-                                <strong>{{ payout.named_bonus_amount|round(0, 'common')|int }}T</strong>
-                            </div>
-
-                            <div>
-                                <span>最後實拿</span>
-                                <strong>{{ payout.final_payout|round(0, 'common')|int }}T</strong>
-                            </div>
-                        </div>
-
-                        {% if payout.note %}
-                            <p class="order-note">{{ payout.note }}</p>
-                        {% endif %}
-                    </article>
+    <div class="summary-items">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>訂單</th>
+                    <th>結單日期</th>
+                    <th>老闆名稱</th>
+                    <th>項目</th>
+                    <th>身份</th>
+                    <th>狀態</th>
+                    <th>金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in row["items"] %}
+                    {% if item.payout_status == list_status %}
+                        <tr>
+                            <td>{{ item.order_no }}</td>
+                            <td>{{ item.closed_date }}</td>
+                            <td>{{ item.customer_name }}</td>
+                            <td>{{ item.category }}｜{{ item.item }}</td>
+                            <td>{{ item.role }}</td>
+                            <td>
+                                {% if item.payout_status == "paid" %}
+                                    <span class="summary-status-paid">已發放</span>
+                                {% else %}
+                                    <span class="summary-status-unpaid">未發放</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.amount|round(0, 'common')|int }}T</td>
+                        </tr>
+                    {% endif %}
                 {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state">
-                目前沒有打手分潤紀錄。
-            </div>
-        {% endif %}
+            </tbody>
+        </table>
     </div>
+</article>
+{% endmacro %}
 
-    <div class="panel">
-        <h2>客服分潤明細</h2>
+{% if status in ["all", "unpaid"] %}
+<section class="panel payout-summary-list-section">
+    <h2 class="summary-list-title">未發放明細</h2>
+    {% if summary_unpaid_rows %}
+        {% for row in summary_unpaid_rows %}
+            {{ person_card(row, "unpaid") }}
+        {% endfor %}
+    {% else %}
+        <div class="summary-empty">目前沒有未發放分潤。</div>
+    {% endif %}
+</section>
+{% endif %}
 
-        {% if customer_service_rows %}
-            <div class="admin-order-list">
-                {% for payout, order in customer_service_rows %}
-                    <article class="admin-order-card">
-                        <div class="order-card-header">
-                            <div>
-                                <p class="order-no">
-                                    {% if order %}
-                                        {{ order.bot_order_no or ("WEB-" ~ order.id) }}
-                                    {% else %}
-                                        訂單 #{{ payout.order_id }}
-                                    {% endif %}
-                                </p>
-
-                                <h3>
-                                    {% if order %}
-                                        {{ order.category }}｜{{ order.item }}
-                                    {% else %}
-                                        找不到訂單資料
-                                    {% endif %}
-                                </h3>
-                            </div>
-
-                            <span class="badge">{{ payout.payout_status }}</span>
-                        </div>
-
-                        <div class="order-meta">
-                            <div>
-                                <span>結單日期</span>
-                                <strong>
-                                    {% if order %}
-                                        {{ ((order.closed_at or order.updated_at or order.created_at or '')|string)[:10] or '未紀錄' }}
-                                    {% else %}
-                                        未紀錄
-                                    {% endif %}
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>老闆名稱</span>
-                                <strong>
-                                    {% if order %}
-                                        {{ order.customer_display_name or order.customer_discord_id or '未紀錄' }}
-                                    {% else %}
-                                        未紀錄
-                                    {% endif %}
-                                </strong>
-                            </div>
-
-                            <div>
-                                <span>客服</span>
-                                <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
-                            </div>
-
-                            <div>
-                                <span>比例</span>
-                                <strong>{{ (payout.rate * 100) | int }}%</strong>
-                            </div>
-
-                            <div>
-                                <span>分潤</span>
-                                <strong>{{ payout.payout_amount|round(0, 'common')|int }}T</strong>
-                            </div>
-
-                            <div>
-                                <span>狀態</span>
-                                <strong>{{ payout.payout_status }}</strong>
-                            </div>
-                        </div>
-
-                        {% if payout.note %}
-                            <p class="order-note">{{ payout.note }}</p>
-                        {% endif %}
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state">
-                目前沒有客服分潤紀錄。
-            </div>
-        {% endif %}
-    </div>
+{% if status in ["all", "paid"] %}
+<section class="panel payout-summary-list-section">
+    <h2 class="summary-list-title">已發放明細</h2>
+    {% if summary_paid_rows %}
+        {% for row in summary_paid_rows %}
+            {{ person_card(row, "paid") }}
+        {% endfor %}
+    {% else %}
+        <div class="summary-empty">目前沒有已發放分潤。</div>
+    {% endif %}
+</section>
+{% endif %}
 {% endblock %}
