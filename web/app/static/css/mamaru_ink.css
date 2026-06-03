@@ -4841,3 +4841,365 @@ body:has(form[action="/admin/staff"]) .panel:has(.compact-list) {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Final UI Polish Layer
+   人員卡片細修 / 全站按鈕輸入統一層
+========================================================= */
+
+/* ---------- 全站 Button 統一 ---------- */
+
+.button,
+button,
+input[type="submit"],
+input[type="button"] {
+    min-height: 42px !important;
+    border-radius: 13px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.02em;
+    transition:
+        transform 0.16s ease,
+        box-shadow 0.16s ease,
+        border-color 0.16s ease,
+        background 0.16s ease,
+        color 0.16s ease !important;
+}
+
+.button:hover,
+button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.30),
+        0 0 22px rgba(179, 49, 45, 0.14) !important;
+}
+
+.button:active,
+button:active,
+input[type="submit"]:active,
+input[type="button"]:active {
+    transform: translateY(0);
+}
+
+/* 主要按鈕紅色不要過亮，改深紅金邊 */
+.button:not(.secondary),
+button:not(.secondary),
+input[type="submit"],
+input[type="button"] {
+    background:
+        linear-gradient(145deg, rgba(142, 28, 24, 0.94), rgba(66, 11, 11, 0.96)) !important;
+    border: 1px solid rgba(225, 75, 67, 0.42) !important;
+    color: #fff7e8 !important;
+}
+
+/* 次要按鈕 */
+.button.secondary,
+button.secondary,
+a.button.secondary {
+    background:
+        linear-gradient(145deg, rgba(14, 15, 18, 0.96), rgba(7, 8, 10, 0.96)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.24) !important;
+    color: rgba(245, 238, 228, 0.88) !important;
+}
+
+.button.secondary:hover,
+button.secondary:hover,
+a.button.secondary:hover {
+    border-color: rgba(226, 200, 134, 0.42) !important;
+    color: #fff7e8 !important;
+}
+
+/* 危險按鈕 */
+.button.danger,
+button.danger,
+a.button.danger {
+    background:
+        linear-gradient(145deg, rgba(128, 20, 20, 0.96), rgba(54, 8, 9, 0.96)) !important;
+    border-color: rgba(255, 92, 82, 0.44) !important;
+}
+
+/* ---------- 全站 input / select / textarea 統一 ---------- */
+
+.input,
+input,
+select,
+textarea {
+    border-radius: 13px !important;
+    border: 1px solid rgba(201, 164, 95, 0.22) !important;
+    background:
+        linear-gradient(145deg, rgba(7, 8, 10, 0.96), rgba(12, 10, 9, 0.92)) !important;
+    color: #f5eee4 !important;
+    min-height: 40px;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.035),
+        0 0 0 rgba(179,49,45,0);
+    transition:
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        background 0.16s ease !important;
+}
+
+.input:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none !important;
+    border-color: rgba(226, 200, 134, 0.54) !important;
+    box-shadow:
+        0 0 0 3px rgba(179, 49, 45, 0.16),
+        inset 0 1px 0 rgba(255,255,255,0.04) !important;
+}
+
+.input::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: rgba(169, 159, 145, 0.60) !important;
+}
+
+/* disabled 欄位 */
+input:disabled,
+select:disabled,
+textarea:disabled {
+    color: rgba(245, 238, 228, 0.48) !important;
+    border-color: rgba(201, 164, 95, 0.12) !important;
+    background:
+        linear-gradient(145deg, rgba(5, 6, 8, 0.64), rgba(14, 12, 10, 0.52)) !important;
+    cursor: not-allowed;
+}
+
+/* select 下拉選項，避免白底白字 */
+select,
+select.input {
+    color-scheme: dark;
+}
+
+select option,
+select.input option {
+    background-color: #0b0d10 !important;
+    color: #f5eee4 !important;
+}
+
+select option:checked,
+select.input option:checked {
+    background-color: #8f1e19 !important;
+    color: #ffffff !important;
+}
+
+select option:disabled,
+select.input option:disabled {
+    background-color: #111111 !important;
+    color: rgba(245, 238, 228, 0.40) !important;
+}
+
+/* checkbox */
+input[type="checkbox"] {
+    accent-color: #b3312d;
+    min-height: auto !important;
+}
+
+/* date icon */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) sepia(0.35) saturate(1.2);
+    opacity: 0.86;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.12);
+}
+
+/* ---------- 人員名單卡片細修 ---------- */
+
+body:has(form[action="/admin/staff"]) .panel:has(.compact-list) {
+    padding: 24px !important;
+}
+
+body:has(form[action="/admin/staff"]) .compact-list {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 18px !important;
+    align-items: stretch;
+}
+
+/* 大螢幕固定更像卡片牆 */
+@media (min-width: 1500px) {
+    body:has(form[action="/admin/staff"]) .compact-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+}
+
+@media (min-width: 1150px) and (max-width: 1499px) {
+    body:has(form[action="/admin/staff"]) .compact-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+body:has(form[action="/admin/staff"]) .compact-card {
+    min-height: 255px !important;
+    padding: 18px !important;
+    border-radius: 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(201,164,95,0.08), transparent 34%),
+        radial-gradient(circle at 100% 8%, rgba(179,49,45,0.15), transparent 36%),
+        linear-gradient(145deg, rgba(15, 10, 8, 0.97), rgba(5, 6, 8, 0.97)) !important;
+    box-shadow:
+        0 16px 34px rgba(0, 0, 0, 0.30),
+        inset 0 1px 0 rgba(255,255,255,0.035);
+}
+
+body:has(form[action="/admin/staff"]) .compact-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 22px 44px rgba(0, 0, 0, 0.42),
+        0 0 28px rgba(201, 164, 95, 0.08);
+}
+
+/* 卡片章字淡一點，不要干擾內容 */
+body:has(form[action="/admin/staff"]) .compact-card::after {
+    right: 16px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    color: rgba(179, 49, 45, 0.075) !important;
+    font-size: 58px !important;
+}
+
+/* 上方角色資訊 */
+body:has(form[action="/admin/staff"]) .compact-header {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
+    text-align: center !important;
+    gap: 12px !important;
+    padding-bottom: 14px !important;
+    margin-bottom: 12px !important;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.14);
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-block {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 11px !important;
+    width: 100%;
+    min-width: 0;
+}
+
+/* 頭像大小 */
+body:has(form[action="/admin/staff"]) .staff-avatar {
+    width: 88px !important;
+    height: 88px !important;
+    flex: 0 0 88px !important;
+    border-width: 2px !important;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(143, 30, 25, 0.90), rgba(42, 12, 10, 0.96)) !important;
+    box-shadow:
+        0 0 0 5px rgba(179, 49, 45, 0.10),
+        0 0 36px rgba(179, 49, 45, 0.28);
+}
+
+body:has(form[action="/admin/staff"]) .staff-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+/* 名稱與 ID */
+body:has(form[action="/admin/staff"]) .staff-person-meta {
+    width: 100%;
+    min-width: 0;
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-meta strong {
+    display: block;
+    max-width: 100%;
+    color: #fff7e8 !important;
+    font-size: 20px !important;
+    font-weight: 900 !important;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body:has(form[action="/admin/staff"]) .staff-person-meta .muted-text {
+    margin-top: 5px !important;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.45;
+    word-break: break-all;
+}
+
+/* 身份章固定在名字下面 */
+body:has(form[action="/admin/staff"]) .staff-role-chips {
+    width: 100%;
+    min-height: 30px;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px !important;
+}
+
+body:has(form[action="/admin/staff"]) .staff-role-chips .chip {
+    min-width: 48px;
+    justify-content: center;
+    border-radius: 999px !important;
+    font-size: 12px !important;
+    padding: 5px 10px !important;
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.46), rgba(32, 14, 12, 0.78)) !important;
+    border: 1px solid rgba(225, 75, 67, 0.32) !important;
+    color: #ffe3a3 !important;
+}
+
+/* 底部資訊欄：Discord / 最後同步 */
+body:has(form[action="/admin/staff"]) .compact-card > p.muted-text {
+    margin: 0 !important;
+    padding: 12px 10px 0 !important;
+    border-top: 1px solid rgba(201, 164, 95, 0.12);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.65;
+    color: rgba(169, 159, 145, 0.86) !important;
+}
+
+/* 把直線分隔符視覺變淡 */
+body:has(form[action="/admin/staff"]) .compact-card > p.muted-text {
+    opacity: 0.92;
+}
+
+/* 篩選列更整齊 */
+body:has(form[action="/admin/staff"]) .staff-filter-form {
+    gap: 12px !important;
+}
+
+body:has(form[action="/admin/staff"]) .staff-filter-form select,
+body:has(form[action="/admin/staff"]) .staff-filter-form input {
+    min-height: 44px !important;
+}
+
+/* 手機 */
+@media (max-width: 680px) {
+    body:has(form[action="/admin/staff"]) .compact-list {
+        grid-template-columns: 1fr !important;
+    }
+
+    body:has(form[action="/admin/staff"]) .compact-card {
+        min-height: 240px !important;
+    }
+
+    body:has(form[action="/admin/staff"]) .staff-avatar {
+        width: 78px !important;
+        height: 78px !important;
+        flex-basis: 78px !important;
+    }
+}
+
