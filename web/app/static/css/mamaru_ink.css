@@ -3252,3 +3252,233 @@ body:has(form[action="/admin/orders/history/bulk-update"]) input[type="date"]::-
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Archive Page Stage 2
+   卷宗庫細節強化
+========================================================= */
+
+/* 卷宗群組：像資料夾 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group {
+    position: relative;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group::before {
+    content: "卷宗";
+    position: absolute;
+    right: 28px;
+    top: 18px;
+    color: rgba(201, 164, 95, 0.08);
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 0.10em;
+    pointer-events: none;
+    transform: rotate(-5deg);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group[open] {
+    border-color: rgba(226, 200, 134, 0.42) !important;
+    box-shadow:
+        0 24px 58px rgba(0, 0, 0, 0.42),
+        0 0 34px rgba(201, 164, 95, 0.08);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group[open] > summary {
+    background:
+        radial-gradient(circle at 8% 30%, rgba(179, 49, 45, 0.20), transparent 32%),
+        linear-gradient(90deg, rgba(86, 27, 21, 0.34), rgba(201, 164, 95, 0.08), transparent) !important;
+}
+
+/* summary 加展開箭頭 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group > summary::after {
+    content: "展開";
+    justify-self: end;
+    align-self: center;
+    min-width: 58px;
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    color: rgba(226, 200, 134, 0.86);
+    background: rgba(201, 164, 95, 0.10);
+    border: 1px solid rgba(201, 164, 95, 0.20);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group[open] > summary::after {
+    content: "收合";
+    color: #fff7e8;
+    background: rgba(126, 29, 27, 0.72);
+    border-color: rgba(225, 75, 67, 0.38);
+}
+
+/* 避免 summary 原本 grid 的 auto 欄位跟新增 after 打架 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group > summary {
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+}
+
+/* 老闆卷宗頭像與資訊更像資料夾標籤 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-title {
+    position: relative;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-title::before {
+    content: "";
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    width: 4px;
+    height: 42px;
+    transform: translateY(-50%);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(225,75,67,0.95), rgba(126,29,27,0.45));
+    box-shadow: 0 0 18px rgba(225,75,67,0.32);
+}
+
+/* 訂單卡 hover：像翻到某份卷宗 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-card {
+    transition: 0.18s ease;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-card:hover {
+    border-color: rgba(226, 200, 134, 0.42) !important;
+    transform: translateY(-1px);
+    box-shadow:
+        0 18px 38px rgba(0, 0, 0, 0.36),
+        0 0 24px rgba(201, 164, 95, 0.08);
+}
+
+/* 訂單狀態章 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-status {
+    box-shadow:
+        0 0 18px rgba(179,49,45,0.16),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* 欄位輸入區：變成卷宗資料格 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-edit-grid label {
+    padding: 10px;
+    border-radius: 13px;
+    background: rgba(5, 6, 8, 0.34);
+    border: 1px solid rgba(201, 164, 95, 0.10);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-edit-grid input,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-edit-grid select {
+    min-height: 38px !important;
+}
+
+/* disabled 欄位要看起來像封存時間 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-edit-grid input:disabled {
+    color: rgba(245, 238, 228, 0.62) !important;
+    background:
+        linear-gradient(145deg, rgba(5, 6, 8, 0.62), rgba(15, 13, 10, 0.54)) !important;
+    border-color: rgba(201, 164, 95, 0.10) !important;
+}
+
+/* 客服/打手/分潤區塊像卷宗內頁 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-box,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-box {
+    max-width: none !important;
+    padding: 16px !important;
+    border-radius: 16px;
+    border: 1px solid rgba(201, 164, 95, 0.14);
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.06), transparent 28%),
+        linear-gradient(145deg, rgba(10, 8, 7, 0.64), rgba(5, 6, 8, 0.62));
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-title,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-title::before,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-title::before {
+    content: "◆";
+    color: rgba(225, 75, 67, 0.86);
+    font-size: 12px;
+}
+
+/* 每列人員分配更清楚 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-row,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-row {
+    padding: 10px;
+    border-radius: 13px;
+    background: rgba(5, 6, 8, 0.32);
+    border: 1px solid rgba(201, 164, 95, 0.10);
+}
+
+/* checkbox 樣式靠近暗色 UI */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-delete-check {
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(5, 6, 8, 0.24);
+    border: 1px solid rgba(201, 164, 95, 0.08);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) input[type="checkbox"] {
+    accent-color: #b3312d;
+}
+
+/* 分潤輸入框醒目一點 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-row input[type="number"] {
+    font-weight: 900;
+    color: #ffe3a3 !important;
+}
+
+/* 底部工具列更像固定操作台 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-bulk-toolbar {
+    bottom: 18px !important;
+    padding: 16px 18px !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-bulk-toolbar::before {
+    content: "卷宗修改";
+    color: rgba(226, 200, 134, 0.88);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-bulk-toolbar .muted-text {
+    flex: 1;
+}
+
+/* 空狀態 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .empty-state {
+    position: relative;
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    border-color: rgba(201, 164, 95, 0.28) !important;
+    background:
+        radial-gradient(circle at 88% 50%, rgba(179,49,45,0.10), transparent 30%),
+        linear-gradient(145deg, rgba(13, 10, 8, 0.88), rgba(6, 6, 7, 0.92)) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .empty-state::after {
+    content: "卷宗暫空";
+    position: absolute;
+    right: 24px;
+    color: rgba(179, 49, 45, 0.12);
+    font-size: 34px;
+    font-weight: 900;
+    transform: rotate(-6deg);
+}
+
+/* 小螢幕修正 */
+@media (max-width: 1000px) {
+    body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group > summary {
+        grid-template-columns: 1fr !important;
+    }
+
+    body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group > summary::after {
+        justify-self: start;
+    }
+}
+
