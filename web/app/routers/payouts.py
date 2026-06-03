@@ -5,17 +5,29 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 
-from web.app.deps import templates
-from web.app.auth import get_current_user
+from web.app.config import config
 from web.app.services.payout_service import build_payout_summary
 
 
 router = APIRouter(tags=["payouts"])
 
+TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def get_current_user(request: Request) -> dict | None:
+    return request.session.get("user")
+
 
 def my_payout_db_path() -> str:
-    return str(Path.cwd() / "web_dashboard.db")
+    database_url = config.DATABASE_URL
+
+    if database_url.startswith("sqlite:///"):
+        return database_url.replace("sqlite:///", "", 1)
+
+    raise RuntimeError("My payouts page only supports sqlite DATABASE_URL for now.")
 
 
 def my_payout_order_date_expr(alias: str = "w") -> str:
