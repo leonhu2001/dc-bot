@@ -3586,3 +3586,328 @@ th {
     font-family: inherit !important;
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Order Archive Stage 4
+   歷史訂單卷宗庫收尾
+========================================================= */
+
+body:has(form#historyBulkForm) .mw-page-card {
+    background:
+        radial-gradient(circle at 88% 10%, rgba(201, 164, 95, 0.08), transparent 24%),
+        radial-gradient(circle at 12% 36%, rgba(179, 49, 45, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(13, 10, 8, 0.98), rgba(5, 6, 8, 0.98)) !important;
+}
+
+/* 頁首卷宗章 */
+body:has(form#historyBulkForm) .mw-page-topbar::after {
+    content: "卷宗庫";
+    position: absolute;
+    right: 34px;
+    top: 34px;
+    color: rgba(201, 164, 95, 0.10);
+    font-family: var(--mw-brush-font, serif);
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    border: 2px solid rgba(179, 49, 45, 0.14);
+    padding: 8px 14px;
+    transform: rotate(-7deg);
+    pointer-events: none;
+}
+
+/* 篩選列 */
+body:has(form#historyBulkForm) .history-filter-form {
+    grid-template-columns: minmax(300px, 1fr) 180px 140px !important;
+    padding: 18px !important;
+    border-radius: 18px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.10), transparent 28%),
+        linear-gradient(145deg, rgba(32, 22, 14, 0.78), rgba(8, 8, 9, 0.88)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.26) !important;
+}
+
+/* 老闆卷宗群組 */
+body:has(form#historyBulkForm) .history-customer-group {
+    position: relative;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+    border-radius: 24px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.10), transparent 34%),
+        linear-gradient(145deg, rgba(18, 13, 9, 0.94), rgba(6, 6, 8, 0.95)) !important;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
+}
+
+body:has(form#historyBulkForm) .history-customer-group::before {
+    content: "卷宗";
+    position: absolute;
+    right: 30px;
+    top: 20px;
+    color: rgba(201, 164, 95, 0.07);
+    font-family: var(--mw-brush-font, serif);
+    font-size: 44px;
+    font-weight: 900;
+    letter-spacing: 0.10em;
+    pointer-events: none;
+    transform: rotate(-5deg);
+}
+
+body:has(form#historyBulkForm) .history-customer-group[open] {
+    border-color: rgba(226, 200, 134, 0.46) !important;
+    box-shadow:
+        0 24px 58px rgba(0, 0, 0, 0.42),
+        0 0 34px rgba(201, 164, 95, 0.08);
+}
+
+body:has(form#historyBulkForm) .history-customer-group > summary {
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.14);
+    background:
+        linear-gradient(90deg, rgba(86, 27, 21, 0.24), rgba(201, 164, 95, 0.05), transparent) !important;
+}
+
+body:has(form#historyBulkForm) .history-customer-group[open] > summary {
+    background:
+        radial-gradient(circle at 8% 30%, rgba(179, 49, 45, 0.20), transparent 32%),
+        linear-gradient(90deg, rgba(86, 27, 21, 0.34), rgba(201, 164, 95, 0.08), transparent) !important;
+}
+
+body:has(form#historyBulkForm) .history-customer-group > summary::after {
+    content: "展開";
+    justify-self: end;
+    align-self: center;
+    min-width: 58px;
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    color: rgba(226, 200, 134, 0.86);
+    background: rgba(201, 164, 95, 0.10);
+    border: 1px solid rgba(201, 164, 95, 0.20);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+body:has(form#historyBulkForm) .history-customer-group[open] > summary::after {
+    content: "收合";
+    color: #fff7e8;
+    background: rgba(126, 29, 27, 0.72);
+    border-color: rgba(225, 75, 67, 0.38);
+}
+
+/* 老闆資訊 */
+body:has(form#historyBulkForm) .history-customer-avatar {
+    width: 50px !important;
+    height: 50px !important;
+    color: #fff7e8 !important;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(143, 30, 25, 0.92), rgba(42, 12, 10, 0.96)) !important;
+    border: 1px solid rgba(226, 200, 134, 0.56) !important;
+    box-shadow:
+        0 0 0 4px rgba(179, 49, 45, 0.08),
+        0 0 28px rgba(179, 49, 45, 0.22);
+}
+
+body:has(form#historyBulkForm) .history-customer-name {
+    color: #fff7e8 !important;
+    font-size: 21px !important;
+    font-family: var(--mw-brush-font, serif);
+}
+
+body:has(form#historyBulkForm) .history-customer-pill {
+    border-radius: 15px !important;
+    background:
+        radial-gradient(circle at 82% 20%, rgba(201, 164, 95, 0.12), transparent 34%),
+        linear-gradient(145deg, rgba(10, 11, 15, 0.96), rgba(24, 18, 13, 0.92)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.26) !important;
+}
+
+body:has(form#historyBulkForm) .history-customer-pill span {
+    color: rgba(226, 200, 134, 0.82) !important;
+    font-weight: 800;
+}
+
+body:has(form#historyBulkForm) .history-customer-pill strong {
+    color: #fff7e8 !important;
+    font-size: 22px;
+}
+
+/* 訂單卷宗卡 */
+body:has(form#historyBulkForm) .history-order-card {
+    position: relative;
+    border-color: rgba(201, 164, 95, 0.26) !important;
+    border-radius: 18px !important;
+    padding: 18px !important;
+    background:
+        linear-gradient(90deg, rgba(201, 164, 95, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(201, 164, 95, 0.025) 1px, transparent 1px),
+        linear-gradient(145deg, rgba(14, 10, 8, 0.94), rgba(5, 6, 8, 0.96)) !important;
+    background-size: 24px 24px, 24px 24px, auto;
+    overflow: hidden;
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255,255,255,0.025);
+    transition: 0.18s ease;
+}
+
+body:has(form#historyBulkForm) .history-order-card::after {
+    content: "卷";
+    position: absolute;
+    right: 20px;
+    top: 16px;
+    color: rgba(179, 49, 45, 0.11);
+    font-family: var(--mw-brush-font, serif);
+    font-size: 62px;
+    font-weight: 900;
+    pointer-events: none;
+    transform: rotate(-7deg);
+}
+
+body:has(form#historyBulkForm) .history-order-card:hover {
+    border-color: rgba(226, 200, 134, 0.42) !important;
+    transform: translateY(-1px);
+    box-shadow:
+        0 18px 38px rgba(0, 0, 0, 0.36),
+        0 0 24px rgba(201, 164, 95, 0.08);
+}
+
+body:has(form#historyBulkForm) .history-order-head {
+    padding-bottom: 12px;
+    margin-bottom: 14px !important;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.14);
+}
+
+body:has(form#historyBulkForm) .history-order-no {
+    color: #9bd2ff !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.03em;
+}
+
+body:has(form#historyBulkForm) .history-order-status {
+    color: #ffe3a3 !important;
+    background: rgba(126, 29, 27, 0.34) !important;
+    border: 1px solid rgba(225, 75, 67, 0.34);
+    font-weight: 900;
+    box-shadow:
+        0 0 18px rgba(179,49,45,0.16),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* 資料格 */
+body:has(form#historyBulkForm) .history-edit-grid label {
+    padding: 10px;
+    border-radius: 13px;
+    background: rgba(5, 6, 8, 0.34);
+    border: 1px solid rgba(201, 164, 95, 0.10);
+}
+
+body:has(form#historyBulkForm) .history-edit-grid span,
+body:has(form#historyBulkForm) .history-assignment-row span,
+body:has(form#historyBulkForm) .history-payout-row span {
+    color: rgba(226, 200, 134, 0.72) !important;
+    font-weight: 800;
+}
+
+body:has(form#historyBulkForm) .history-edit-grid input,
+body:has(form#historyBulkForm) .history-edit-grid select {
+    min-height: 38px !important;
+}
+
+body:has(form#historyBulkForm) .history-edit-grid input:disabled {
+    color: rgba(245, 238, 228, 0.62) !important;
+    background:
+        linear-gradient(145deg, rgba(5, 6, 8, 0.62), rgba(15, 13, 10, 0.54)) !important;
+    border-color: rgba(201, 164, 95, 0.10) !important;
+}
+
+/* 客服 / 打手 / 分潤內頁 */
+body:has(form#historyBulkForm) .history-assignment-box,
+body:has(form#historyBulkForm) .history-payout-box {
+    max-width: none !important;
+    padding: 16px !important;
+    border-radius: 16px;
+    border: 1px solid rgba(201, 164, 95, 0.14) !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.06), transparent 28%),
+        linear-gradient(145deg, rgba(10, 8, 7, 0.64), rgba(5, 6, 8, 0.62));
+}
+
+body:has(form#historyBulkForm) .history-assignment-title,
+body:has(form#historyBulkForm) .history-payout-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffe3a3 !important;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+
+body:has(form#historyBulkForm) .history-assignment-title::before,
+body:has(form#historyBulkForm) .history-payout-title::before {
+    content: "◆";
+    color: rgba(225, 75, 67, 0.86);
+    font-size: 12px;
+}
+
+body:has(form#historyBulkForm) .history-assignment-row,
+body:has(form#historyBulkForm) .history-payout-row {
+    padding: 10px;
+    border-radius: 13px;
+    background: rgba(5, 6, 8, 0.32);
+    border: 1px solid rgba(201, 164, 95, 0.10);
+}
+
+body:has(form#historyBulkForm) input[type="checkbox"] {
+    accent-color: #b3312d;
+}
+
+body:has(form#historyBulkForm) .history-delete-check {
+    min-height: 38px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(5, 6, 8, 0.24);
+    border: 1px solid rgba(201, 164, 95, 0.08);
+}
+
+/* 分潤輸入 */
+body:has(form#historyBulkForm) .history-payout-row input[type="number"] {
+    font-weight: 900;
+    color: #ffe3a3 !important;
+}
+
+/* 底部工具列 */
+body:has(form#historyBulkForm) .history-bulk-toolbar {
+    bottom: 18px !important;
+    padding: 16px 18px !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+    background:
+        linear-gradient(145deg, rgba(32, 22, 14, 0.94), rgba(8, 8, 9, 0.96)) !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+}
+
+body:has(form#historyBulkForm) .history-bulk-toolbar::before {
+    content: "卷宗修改";
+    color: rgba(226, 200, 134, 0.88);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
+
+body:has(form#historyBulkForm) .history-bulk-toolbar .muted-text {
+    flex: 1;
+}
+
+/* 小螢幕 */
+@media (max-width: 1000px) {
+    body:has(form#historyBulkForm) .history-customer-group > summary {
+        grid-template-columns: 1fr !important;
+    }
+
+    body:has(form#historyBulkForm) .history-customer-group > summary::after {
+        justify-self: start;
+    }
+
+    body:has(form#historyBulkForm) .history-filter-form {
+        grid-template-columns: 1fr !important;
+    }
+}
+
