@@ -1587,3 +1587,114 @@ body::before {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 8
+   側欄與頁首微調
+========================================================= */
+
+@media (min-width: 1100px) {
+    /* Logo 從大圓章改成水墨牌匾感 */
+    .mw-sidebar-logo {
+        padding: 8px 18px 10px !important;
+        border-radius: 18px !important;
+        background:
+            radial-gradient(circle at 22% 20%, rgba(255,255,255,0.08), transparent 28%),
+            linear-gradient(145deg, rgba(91, 24, 22, 0.72), rgba(22, 12, 13, 0.68)) !important;
+        border: 1px solid rgba(201, 164, 95, 0.18);
+        letter-spacing: -4px !important;
+    }
+
+    .mw-sidebar-logo::before {
+        inset: -6px -10px !important;
+        border-radius: 22px !important;
+        opacity: 0.42 !important;
+        background:
+            radial-gradient(circle at 50% 50%, rgba(179,49,45,0.26), transparent 54%),
+            linear-gradient(90deg, rgba(201,164,95,0.12), transparent) !important;
+    }
+
+    .mw-sidebar-subtitle {
+        margin-top: 10px !important;
+        font-size: 12px !important;
+    }
+
+    .mw-sidebar::after {
+        top: 130px !important;
+        right: 22px !important;
+        font-size: 30px !important;
+        opacity: 0.48;
+        color: rgba(179, 49, 45, 0.13) !important;
+    }
+
+    .mw-sidebar::before {
+        width: 118px !important;
+        height: 118px !important;
+        left: 54px !important;
+        bottom: 76px !important;
+        opacity: 0.24 !important;
+    }
+
+    /* 側欄導覽更緊湊一點 */
+    .mw-sidebar {
+        padding-top: 30px !important;
+    }
+
+    .mw-sidebar-brand {
+        margin-bottom: 24px !important;
+        padding-bottom: 20px !important;
+    }
+
+    .mw-sidebar-nav {
+        gap: 18px !important;
+    }
+
+    .mw-sidebar-link {
+        min-height: 42px !important;
+        padding: 9px 14px !important;
+    }
+
+    .mw-sidebar-link::before {
+        width: 22px !important;
+        height: 22px !important;
+        flex-basis: 22px !important;
+    }
+
+    /* 頁首高度收斂，不要吃太多垂直空間 */
+    .mw-page-topbar {
+        min-height: 116px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .mw-page-topbar h1 {
+        font-size: clamp(38px, 3.2vw, 54px) !important;
+    }
+
+    .mw-page-card::before {
+        height: 150px !important;
+    }
+
+    /* 篩選列比例：查詢按鈕不要過長到像紅地毯 */
+    .my-payout-filter {
+        grid-template-columns: 220px 220px 220px 160px !important;
+        justify-content: start !important;
+    }
+
+    .filter-form .button,
+    .my-payout-filter .button {
+        min-width: 160px !important;
+    }
+
+    /* 寬表格仍吃滿 */
+    .summary-person-card,
+    .panel {
+        max-width: 100% !important;
+    }
+}
+
+@media (max-width: 1099px) {
+    .mw-sidebar-logo {
+        letter-spacing: -2px;
+    }
+}
+
