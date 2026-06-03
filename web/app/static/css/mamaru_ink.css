@@ -831,3 +831,173 @@ table * {
     border-color: rgba(201, 164, 95, 0.16);
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 3
+   版面寬度 / 導覽品牌化
+========================================================= */
+
+/* 主內容不要太窄，避免右側空太多 */
+.container,
+.page-container,
+.dashboard-container,
+.admin-container,
+.content-container {
+    max-width: 1380px !important;
+}
+
+/* 若 layout 使用 body > main 或 .app 置中，放寬寬度 */
+main,
+.content,
+.main-content,
+.page-content {
+    max-width: 1380px !important;
+}
+
+/* 頁面外框更像後台舞台 */
+body {
+    background:
+        radial-gradient(circle at 15% 20%, rgba(179, 49, 45, 0.20), transparent 24%),
+        radial-gradient(circle at 82% 16%, rgba(124, 95, 184, 0.13), transparent 28%),
+        linear-gradient(90deg, #060708 0%, #120607 18%, #07080a 42%, #050607 100%) !important;
+}
+
+/* 頂部品牌區：文字更有魔丸感 */
+body .panel:first-of-type,
+body .card:first-of-type {
+    border-color: rgba(201, 164, 95, 0.28) !important;
+}
+
+/* 頁面頂部 MW DASHBOARD 小字 */
+.order-no:first-child,
+.panel .order-no:first-child {
+    color: #8dc9ff !important;
+    font-weight: 900 !important;
+}
+
+/* 上方導覽按鈕群變成暗色膠囊 */
+.nav-link,
+a.nav-link {
+    background:
+        linear-gradient(145deg, rgba(28, 31, 40, 0.96), rgba(12, 13, 17, 0.96)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.14) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.nav-link:hover,
+a.nav-link:hover {
+    background:
+        linear-gradient(145deg, rgba(86, 23, 23, 0.95), rgba(20, 14, 16, 0.95)) !important;
+    border-color: rgba(225, 75, 67, 0.36) !important;
+}
+
+.nav-link.active,
+.nav-link.is-active,
+.nav-link[aria-current="page"] {
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.96), rgba(54, 12, 14, 0.96)) !important;
+    color: #fff !important;
+    border-color: rgba(225, 75, 67, 0.48) !important;
+}
+
+/* 登出按鈕更像紅色印章 */
+a[href="/logout"],
+button.logout,
+.logout {
+    background:
+        linear-gradient(145deg, rgba(148, 24, 22, 0.96), rgba(58, 8, 9, 0.96)) !important;
+    border-color: rgba(225, 75, 67, 0.5) !important;
+    color: #fff !important;
+}
+
+/* 大標題更靠近第一張水墨感 */
+h1,
+.page-title,
+.panel > h1 {
+    font-size: clamp(30px, 3.2vw, 48px) !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.05em;
+}
+
+/* 二級標題加一點金色層次 */
+h2,
+.section-title,
+.summary-list-title {
+    text-shadow: 0 0 20px rgba(201, 164, 95, 0.08);
+}
+
+/* 篩選列按鈕比例：查詢按鈕更像主操作 */
+.filter-form .button,
+.my-payout-filter .button,
+.filter-bar .button {
+    min-height: 42px;
+    font-weight: 900;
+}
+
+/* 統計卡片更有大片留白與數字感 */
+.my-payout-total-grid,
+.summary-total-grid,
+.stats-grid,
+.metric-grid {
+    align-items: stretch;
+}
+
+.my-payout-total-card,
+.stat-card,
+.metric-card {
+    min-height: 132px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* 已發放明細人員卡片更接近第一張下方角色卡 */
+.summary-person-card {
+    border-radius: 20px !important;
+}
+
+.summary-person-head {
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.12);
+}
+
+.summary-avatar {
+    width: 48px !important;
+    height: 48px !important;
+}
+
+/* 表格區的第一欄與金額欄更突出 */
+.summary-table td:first-child,
+table td:first-child {
+    color: #8dc9ff !important;
+}
+
+.summary-table td:last-child,
+table td:last-child {
+    color: var(--mw-gold-soft) !important;
+    font-weight: 900;
+}
+
+/* 頁面面板上下間距更像完整後台 */
+.panel {
+    margin-bottom: 18px !important;
+}
+
+/* 防止卡片內容被過度壓縮 */
+.summary-table,
+table {
+    min-width: 760px;
+}
+
+.summary-items {
+    padding-bottom: 4px;
+}
+
+/* 右側空背景加淡淡水墨圈 */
+body::before {
+    background:
+        radial-gradient(circle at 78% 26%, rgba(201, 164, 95, 0.055), transparent 21%),
+        radial-gradient(circle at 82% 62%, rgba(179, 49, 45, 0.075), transparent 23%),
+        linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.025) 38%, transparent 39%) !important;
+}
+
