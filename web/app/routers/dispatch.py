@@ -31,13 +31,8 @@ def can_use_dispatch(user: dict | None) -> bool:
 
 
 def get_dispatch_role_type(user: dict | None) -> str:
-    if not user:
-        return "worker"
-
-    if user.get("is_companion"):
-        return "companion"
-
-    return "worker"
+    # 前台不再分打手/陪玩，網站接單統一視為接單人員。
+    return "booster"
 
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"

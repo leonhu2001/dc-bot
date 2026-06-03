@@ -143,13 +143,13 @@
 
                             <div class="dispatch-v2-assignment-row">
                                 <div>
-                                    <span class="muted-text">目前接單人</span>
+                                    <span class="muted-text">接單人員</span>
 
                                     {% if active_assignments %}
                                         <div class="chip-list">
                                             {% for assignment in active_assignments %}
                                                 <span class="chip">
-                                                    {{ assignment.worker_display_name or assignment.worker_discord_id }}
+                                                    @{{ assignment.worker_display_name or assignment.worker_discord_id }}
                                                     {% if assignment.has_named_bonus %}
                                                         +掛名
                                                     {% endif %}
@@ -198,13 +198,13 @@
                                 {% if user_claimed_this_order %}
                                     <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
                                         <button class="button danger" type="submit">
-                                            取消接單
+                                            取消我要接單
                                         </button>
                                     </form>
                                 {% else %}
                                     <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
                                         <button class="button" type="submit">
-                                            接單
+                                            我要接單
                                         </button>
                                     </form>
                                 {% endif %}
