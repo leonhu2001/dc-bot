@@ -4775,3 +4775,69 @@ body:has(form[action="/admin/staff"]) .panel:has(.compact-list) {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Sidebar Logo Only
+   側欄只留 LOGO / 移除框線與文字 / 放大圖標
+========================================================= */
+
+.mw-sidebar-brand {
+    gap: 8px !important;
+    padding-bottom: 18px !important;
+}
+
+/* 只留 LOGO，本體去框線與底色 */
+.mw-sidebar-logo-image {
+    width: 138px !important;
+    height: 138px !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 28px !important;
+    overflow: visible !important;
+}
+
+.mw-sidebar-logo-image::before,
+.mw-sidebar-logo-image::after {
+    display: none !important;
+    content: none !important;
+}
+
+.mw-sidebar-logo-image img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+    border-radius: 24px !important;
+    box-shadow: none !important;
+}
+
+.mw-sidebar-logo-image span {
+    display: none !important;
+}
+
+/* 把 LOGO 下方那行字隱藏 */
+.mw-sidebar-brand p,
+.mw-sidebar-brand .mw-sidebar-brand-subtitle,
+.mw-sidebar-brand .brand-subtitle,
+.mw-sidebar-brand .sidebar-brand-subtitle {
+    display: none !important;
+}
+
+/* 手機版略縮 */
+@media (max-width: 680px) {
+    .mw-sidebar-logo-image {
+        width: 96px !important;
+        height: 96px !important;
+    }
+
+    .mw-sidebar-logo-image img {
+        border-radius: 18px !important;
+    }
+}
+
