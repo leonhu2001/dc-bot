@@ -2228,3 +2228,212 @@ body:has(.dispatch-hero) .mw-page-card::after {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Bounty Ledger Theme
+   人員總表賞金帳視覺強化
+========================================================= */
+
+/* 只針對人員總表頁 */
+body:has(form[action="/admin/payouts/summary"]) .mw-page-card {
+    background:
+        radial-gradient(circle at 86% 12%, rgba(201, 164, 95, 0.09), transparent 26%),
+        radial-gradient(circle at 12% 36%, rgba(179, 49, 45, 0.12), transparent 28%),
+        linear-gradient(145deg, rgba(12, 10, 8, 0.96), rgba(5, 6, 8, 0.98)) !important;
+}
+
+/* 頁首加賞金帳印記 */
+body:has(form[action="/admin/payouts/summary"]) .mw-page-topbar::after {
+    content: "賞金帳";
+    position: absolute;
+    right: 34px;
+    top: 34px;
+    color: rgba(201, 164, 95, 0.10);
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    border: 2px solid rgba(179, 49, 45, 0.16);
+    padding: 8px 14px;
+    transform: rotate(-7deg);
+    pointer-events: none;
+}
+
+/* 上方說明卡改成帳冊封面 */
+body:has(form[action="/admin/payouts/summary"]) .panel:first-of-type {
+    background:
+        radial-gradient(circle at 96% 20%, rgba(179, 49, 45, 0.16), transparent 32%),
+        linear-gradient(145deg, rgba(42, 31, 20, 0.66), rgba(12, 10, 8, 0.92)) !important;
+    border-color: rgba(201, 164, 95, 0.32) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .panel:first-of-type::after {
+    content: "MAMARU LEDGER";
+    position: absolute;
+    right: 24px;
+    bottom: 18px;
+    color: rgba(226, 200, 134, 0.10);
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.22em;
+}
+
+/* 篩選列像帳冊工具列 */
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-filter {
+    background:
+        linear-gradient(145deg, rgba(31, 23, 15, 0.72), rgba(8, 8, 8, 0.82)) !important;
+    border-color: rgba(201, 164, 95, 0.28) !important;
+}
+
+/* 統計卡變成暗金帳冊卡，而不是一般數字卡 */
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 88% 20%, rgba(226, 200, 134, 0.14), transparent 28%),
+        linear-gradient(145deg, rgba(44, 33, 20, 0.82), rgba(9, 8, 7, 0.92)) !important;
+    border-color: rgba(201, 164, 95, 0.36) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card::before {
+    content: "賞";
+    position: absolute;
+    right: 18px;
+    bottom: 6px;
+    color: rgba(201, 164, 95, 0.08);
+    font-size: 58px;
+    font-weight: 900;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card span {
+    color: rgba(226, 200, 134, 0.92) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-total-card strong {
+    color: #ffe3a3 !important;
+    text-shadow: 0 0 18px rgba(201, 164, 95, 0.18);
+}
+
+/* 名單區塊像帳冊章節 */
+body:has(form[action="/admin/payouts/summary"]) .payout-summary-list-section {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.08), transparent 28%),
+        linear-gradient(145deg, rgba(20, 15, 11, 0.92), rgba(5, 6, 8, 0.95)) !important;
+    border-color: rgba(201, 164, 95, 0.30) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-list-title {
+    color: #ffe8b8 !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-list-title::after {
+    content: "帳";
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    color: rgba(255, 247, 232, 0.88);
+    background: rgba(126, 29, 27, 0.82);
+    border: 1px solid rgba(225, 75, 67, 0.42);
+    font-size: 14px;
+}
+
+/* 人員卡改成賞金帳頁 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card {
+    background:
+        linear-gradient(90deg, rgba(201, 164, 95, 0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(201, 164, 95, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 95% 18%, rgba(179, 49, 45, 0.12), transparent 28%),
+        linear-gradient(145deg, rgba(22, 17, 12, 0.94), rgba(7, 7, 8, 0.94)) !important;
+    background-size:
+        28px 28px,
+        28px 28px,
+        auto,
+        auto;
+    border-color: rgba(201, 164, 95, 0.34) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-person-card::after {
+    content: "賞金";
+    right: 24px;
+    bottom: 18px;
+    color: rgba(201, 164, 95, 0.075);
+    font-size: 54px;
+    letter-spacing: 0.14em;
+    transform: rotate(-6deg);
+}
+
+/* 人員頭部像帳冊名條 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-head {
+    background:
+        linear-gradient(90deg, rgba(86, 27, 21, 0.28), rgba(201, 164, 95, 0.06), transparent) !important;
+    border-bottom-color: rgba(201, 164, 95, 0.22) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-avatar {
+    background:
+        radial-gradient(circle at 50% 50%, rgba(126, 29, 27, 0.82), rgba(35, 12, 14, 0.96)) !important;
+    border-color: rgba(226, 200, 134, 0.56) !important;
+}
+
+/* 按鈕做成帳冊印章 */
+body:has(form[action="/admin/payouts/summary"]) .summary-person-actions .button {
+    border-radius: 999px !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-person-actions .button:not(.secondary) {
+    background:
+        linear-gradient(145deg, rgba(142, 28, 24, 0.96), rgba(67, 12, 12, 0.96)) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-person-actions .button.secondary {
+    color: #ffe3a3 !important;
+    background:
+        linear-gradient(145deg, rgba(54, 42, 22, 0.96), rgba(14, 12, 9, 0.96)) !important;
+}
+
+/* 表格像賞金帳明細 */
+body:has(form[action="/admin/payouts/summary"]) .summary-table {
+    border-color: rgba(201, 164, 95, 0.30) !important;
+    background:
+        linear-gradient(145deg, rgba(12, 10, 8, 0.92), rgba(5, 6, 8, 0.92)) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-table thead tr {
+    background:
+        linear-gradient(90deg, rgba(86, 27, 21, 0.88), rgba(48, 36, 20, 0.76)) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-table th {
+    color: #ffe3a3 !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-table td {
+    border-top-color: rgba(201, 164, 95, 0.14) !important;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-table td:last-child {
+    color: #ffe3a3 !important;
+    font-weight: 900;
+}
+
+/* 狀態改成印章色 */
+body:has(form[action="/admin/payouts/summary"]) .summary-status-paid {
+    color: #9ff0bf !important;
+    background: rgba(47, 191, 123, 0.12);
+    border: 1px solid rgba(47, 191, 123, 0.24);
+    padding: 3px 9px;
+    border-radius: 999px;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-status-unpaid {
+    color: #ffd38b !important;
+    background: rgba(201, 164, 95, 0.13);
+    border: 1px solid rgba(201, 164, 95, 0.26);
+    padding: 3px 9px;
+    border-radius: 999px;
+}
+
