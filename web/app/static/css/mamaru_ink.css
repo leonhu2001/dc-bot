@@ -1845,3 +1845,272 @@ body:has(.mw-page-topbar h1) .panel + .panel {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 10
+   Dispatch HTML Mission Layout
+========================================================= */
+
+.dispatch-notice {
+    margin-bottom: 16px;
+}
+
+.dispatch-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 18px;
+    align-items: stretch;
+}
+
+.dispatch-hero-main h2 {
+    font-size: clamp(26px, 2.4vw, 42px);
+    margin: 8px 0 8px;
+}
+
+.dispatch-hero-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.dispatch-stat-card {
+    border: 1px solid rgba(201, 164, 95, 0.18);
+    border-radius: 16px;
+    padding: 16px;
+    background:
+        radial-gradient(circle at 82% 24%, rgba(225, 75, 67, 0.18), transparent 34%),
+        linear-gradient(145deg, rgba(10, 11, 15, 0.96), rgba(22, 24, 32, 0.88));
+}
+
+.dispatch-stat-card span {
+    display: block;
+    color: rgba(226, 200, 134, 0.82);
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.dispatch-stat-card strong {
+    display: block;
+    color: #fff7e8;
+    font-size: 38px;
+    line-height: 1;
+}
+
+.dispatch-section {
+    margin-top: 18px;
+}
+
+.dispatch-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.dispatch-section-head h2 {
+    margin: 2px 0 0;
+}
+
+.dispatch-count-pill {
+    min-width: 68px;
+    text-align: center;
+    border-radius: 999px;
+    padding: 7px 12px;
+    color: #fff7e8;
+    font-weight: 900;
+    background:
+        linear-gradient(145deg, rgba(126, 29, 27, 0.88), rgba(35, 12, 14, 0.88));
+    border: 1px solid rgba(225, 75, 67, 0.36);
+}
+
+.dispatch-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 76px;
+    justify-content: center;
+}
+
+.dispatch-empty strong {
+    color: #fff7e8;
+}
+
+.dispatch-empty span {
+    color: rgba(169, 159, 145, 0.82);
+}
+
+.dispatch-claimed-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+}
+
+.dispatch-claimed-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(201, 164, 95, 0.18);
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.13), transparent 32%),
+        linear-gradient(145deg, rgba(18, 20, 27, 0.94), rgba(8, 9, 13, 0.94));
+}
+
+.dispatch-claimed-card h3 {
+    margin: 4px 0 0;
+}
+
+.dispatch-claimed-amount span {
+    display: block;
+    color: rgba(226, 200, 134, 0.76);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.dispatch-claimed-amount strong {
+    display: block;
+    margin-top: 4px;
+    color: #fff7e8;
+    font-size: 22px;
+}
+
+.dispatch-mission-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+}
+
+.dispatch-mission-card {
+    position: relative;
+    min-height: 280px;
+    padding: 18px !important;
+    border-radius: 20px !important;
+}
+
+.dispatch-mission-card::after {
+    content: "任務";
+    position: absolute;
+    right: 18px;
+    bottom: 12px;
+    color: rgba(201, 164, 95, 0.055);
+    font-size: 58px;
+    font-weight: 900;
+    pointer-events: none;
+}
+
+.dispatch-mission-header {
+    align-items: flex-start;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.12);
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+}
+
+.dispatch-mission-header h3 {
+    margin: 4px 0 0;
+}
+
+.dispatch-status-badge {
+    flex-shrink: 0;
+}
+
+.dispatch-mission-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.dispatch-mission-meta > div {
+    border-radius: 13px;
+    padding: 12px;
+    background: rgba(5, 6, 8, 0.52);
+    border: 1px solid rgba(201, 164, 95, 0.12);
+}
+
+.dispatch-mission-meta span,
+.dispatch-assignment-box > .muted-text,
+.dispatch-mission-footer .muted-text {
+    display: block;
+    color: rgba(226, 200, 134, 0.74) !important;
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 5px;
+}
+
+.dispatch-mission-meta strong {
+    color: #fff7e8;
+}
+
+.dispatch-assignment-box {
+    margin-top: 14px;
+    border-radius: 14px;
+    padding: 14px;
+    border: 1px dashed rgba(201, 164, 95, 0.20);
+    background: rgba(5, 6, 8, 0.42);
+}
+
+.dispatch-payout-preview {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.dispatch-payout-preview > div {
+    border-radius: 13px;
+    padding: 12px;
+    background:
+        linear-gradient(145deg, rgba(31, 25, 15, 0.72), rgba(8, 9, 13, 0.86));
+    border: 1px solid rgba(201, 164, 95, 0.16);
+}
+
+.dispatch-mission-footer {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(201, 164, 95, 0.12);
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: center;
+}
+
+.dispatch-mission-footer form {
+    margin: 0;
+}
+
+.dispatch-mission-footer .button {
+    min-width: 112px;
+}
+
+@media (max-width: 1250px) {
+    .dispatch-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .dispatch-mission-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .dispatch-hero-grid,
+    .dispatch-mission-meta,
+    .dispatch-payout-preview {
+        grid-template-columns: 1fr;
+    }
+
+    .dispatch-section-head,
+    .dispatch-mission-footer,
+    .dispatch-claimed-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dispatch-mission-list {
+        grid-template-columns: 1fr;
+    }
+}
+
