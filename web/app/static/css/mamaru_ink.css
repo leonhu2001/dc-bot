@@ -1001,3 +1001,142 @@ body::before {
         linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.025) 38%, transparent 39%) !important;
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Stage 4
+   強制放寬主版面，修正右側空白過大
+========================================================= */
+
+/* Bootstrap / 自訂 layout 常見容器全部放寬 */
+.container,
+.container-sm,
+.container-md,
+.container-lg,
+.container-xl,
+.container-xxl,
+.layout-container,
+.app-container,
+.shell,
+.app-shell,
+.admin-shell,
+.dashboard-shell,
+.page-shell,
+.page-container,
+.dashboard-container,
+.admin-container,
+.content-container,
+.main-container {
+    width: min(1560px, calc(100vw - 72px)) !important;
+    max-width: min(1560px, calc(100vw - 72px)) !important;
+}
+
+/* 若頁面是 margin auto 置中，保留置中但放大 */
+.container,
+.container-sm,
+.container-md,
+.container-lg,
+.container-xl,
+.container-xxl,
+.layout-container,
+.app-container,
+.shell,
+.app-shell,
+.admin-shell,
+.dashboard-shell,
+.page-shell {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* 主內容區放寬 */
+main,
+.content,
+.main-content,
+.page-content,
+#content,
+#main,
+main > section,
+body > main {
+    width: min(1560px, calc(100vw - 72px)) !important;
+    max-width: min(1560px, calc(100vw - 72px)) !important;
+}
+
+/* 如果最外層 panel 是第一個主卡，也放寬 */
+body > .panel,
+main > .panel,
+.content > .panel,
+.main-content > .panel,
+.page-content > .panel {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* 我的分潤的主要統計卡片在寬螢幕上維持四欄 */
+.my-payout-total-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+/* 篩選列在寬螢幕上拉滿，按鈕比例更正常 */
+.my-payout-filter {
+    grid-template-columns: 220px 220px minmax(180px, 1fr) 180px !important;
+}
+
+/* 表格區可以吃滿寬度 */
+.summary-items,
+.summary-table,
+.summary-table table,
+table {
+    width: 100% !important;
+}
+
+/* 已發放人員卡頭部更寬鬆 */
+.summary-person-head {
+    grid-template-columns: minmax(320px, 1fr) auto !important;
+}
+
+/* 右側背景不要壓過內容視覺 */
+body::before {
+    opacity: 0.88;
+}
+
+/* 大螢幕才套寬版，手機不影響 */
+@media (max-width: 1100px) {
+    .container,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl,
+    .layout-container,
+    .app-container,
+    .shell,
+    .app-shell,
+    .admin-shell,
+    .dashboard-shell,
+    .page-shell,
+    .page-container,
+    .dashboard-container,
+    .admin-container,
+    .content-container,
+    .main-container,
+    main,
+    .content,
+    .main-content,
+    .page-content,
+    #content,
+    #main,
+    main > section,
+    body > main {
+        width: calc(100vw - 28px) !important;
+        max-width: calc(100vw - 28px) !important;
+    }
+
+    .my-payout-filter {
+        grid-template-columns: 1fr !important;
+    }
+
+    .my-payout-total-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
