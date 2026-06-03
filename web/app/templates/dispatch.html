@@ -1,4 +1,4 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 
 {% block page_title %}派單頁面{% endblock %}
 
@@ -15,205 +15,210 @@
         </div>
     {% endif %}
 
-    <section class="dispatch-hero panel">
-        <div class="dispatch-hero-main">
+    <section class="dispatch-v2-hero">
+        <div class="dispatch-v2-hero-main">
             <p class="order-no">MISSION DISPATCH</p>
             <h2>任務派單中心</h2>
             <p class="muted-text">
                 查看目前可接任務、已接任務與預估分潤。接單後系統會同步紀錄。
             </p>
+
+            <div class="dispatch-v2-hero-tags">
+                <span>魔丸任務榜</span>
+                <span>即時同步</span>
+                <span>分潤預估</span>
+            </div>
         </div>
 
-        <div class="dispatch-hero-grid">
-            <div class="dispatch-stat-card">
-                <span>目前已接訂單</span>
+        <div class="dispatch-v2-stat-grid">
+            <article class="dispatch-v2-stat-card">
+                <span>目前已接</span>
                 <strong>{{ claimed_orders | length }}</strong>
-            </div>
+                <small>MY MISSIONS</small>
+            </article>
 
-            <div class="dispatch-stat-card">
-                <span>目前可接訂單</span>
+            <article class="dispatch-v2-stat-card">
+                <span>目前可接</span>
                 <strong>{{ orders | length }}</strong>
-            </div>
+                <small>AVAILABLE</small>
+            </article>
         </div>
     </section>
 
-    <section class="panel dispatch-section">
-        <div class="dispatch-section-head">
-            <div>
-                <p class="order-no">MY MISSIONS</p>
-                <h2>我的接單狀態</h2>
+    <section class="dispatch-v2-board">
+        <div class="dispatch-v2-column dispatch-v2-column-my">
+            <div class="dispatch-v2-column-head">
+                <div>
+                    <p class="order-no">MY MISSIONS</p>
+                    <h2>我的接單狀態</h2>
+                </div>
+                <span class="dispatch-count-pill">{{ claimed_orders | length }} 筆</span>
             </div>
-            <span class="dispatch-count-pill">{{ claimed_orders | length }} 筆</span>
-        </div>
 
-        {% if claimed_orders %}
-            <div class="claimed-order-list dispatch-claimed-list">
-                {% for claimed_order in claimed_orders %}
-                    <article class="claimed-order-item dispatch-claimed-card">
-                        <div>
-                            <p class="order-no">
-                                {{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}
-                            </p>
-                            <h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3>
-                        </div>
-
-                        <div class="dispatch-claimed-amount">
-                            <span>金額</span>
-                            <strong>{{ claimed_order.amount }}T</strong>
-                        </div>
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state dispatch-empty">
-                <strong>目前尚未接任何訂單。</strong>
-                <span>有任務可以接時，會顯示在下方任務榜。</span>
-            </div>
-        {% endif %}
-    </section>
-
-    <section class="panel dispatch-section">
-        <div class="dispatch-section-head">
-            <div>
-                <p class="order-no">AVAILABLE MISSIONS</p>
-                <h2>目前可接訂單</h2>
-                <p class="muted-text">
-                    這裡目前先顯示網站資料庫測試訂單。之後 DC bot 派單後會自動寫入這裡。
-                </p>
-            </div>
-            <span class="dispatch-count-pill">{{ orders | length }} 筆</span>
-        </div>
-
-        {% if orders %}
-            <div class="order-list dispatch-mission-list">
-                {% for order in orders %}
-                    {% set active_assignments = [] %}
-                    {% for assignment in order.assignments %}
-                        {% if assignment.is_active %}
-                            {% set _ = active_assignments.append(assignment) %}
-                        {% endif %}
-                    {% endfor %}
-
-                    {% set user_claimed_this_order = order.id in claimed_order_ids %}
-
-                    {% set my_payout = none %}
-                    {% for payout in order.payouts %}
-                        {% if payout.worker_discord_id == user.id %}
-                            {% set my_payout = payout %}
-                        {% endif %}
-                    {% endfor %}
-
-                    <article class="order-card dispatch-mission-card">
-                        <div class="order-card-header dispatch-mission-header">
+            {% if claimed_orders %}
+                <div class="dispatch-v2-my-list">
+                    {% for claimed_order in claimed_orders %}
+                        <article class="dispatch-v2-my-card">
                             <div>
                                 <p class="order-no">
-                                    {{ order.bot_order_no or ("WEB-" ~ order.id) }}
+                                    {{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}
                                 </p>
-                                <h3>{{ order.category }}｜{{ order.item }}</h3>
+                                <h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3>
                             </div>
 
-                            <span class="badge dispatch-status-badge">
-                                {{ order.status }}
-                            </span>
-                        </div>
-
-                        <div class="order-meta dispatch-mission-meta">
-                            <div>
-                                <span>老闆</span>
-                                <strong>{{ order.customer_display_name or "未記錄" }}</strong>
-                            </div>
-
-                            <div>
-                                <span>數量</span>
-                                <strong>{{ order.quantity }} 單</strong>
-                            </div>
-
-                            <div>
+                            <div class="dispatch-v2-money-chip">
                                 <span>金額</span>
-                                <strong>{{ order.amount }}T</strong>
+                                <strong>{{ claimed_order.amount }}T</strong>
                             </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="dispatch-v2-empty-card">
+                    <strong>目前尚未接任何訂單。</strong>
+                    <span>有任務可以接時，會顯示在右側任務榜。</span>
+                </div>
+            {% endif %}
+        </div>
 
-                            <div>
-                                <span>付款</span>
-                                <strong>{{ order.payment_method or "未記錄" }}</strong>
-                            </div>
-                        </div>
+        <div class="dispatch-v2-column dispatch-v2-column-available">
+            <div class="dispatch-v2-column-head">
+                <div>
+                    <p class="order-no">AVAILABLE MISSIONS</p>
+                    <h2>目前可接訂單</h2>
+                    <p class="muted-text">
+                        這裡目前先顯示網站資料庫測試訂單。之後 DC bot 派單後會自動寫入這裡。
+                    </p>
+                </div>
+                <span class="dispatch-count-pill">{{ orders | length }} 筆</span>
+            </div>
 
-                        <div class="assignment-box dispatch-assignment-box">
-                            <span class="muted-text">目前接單人</span>
-
-                            {% if active_assignments %}
-                                <div class="chip-list">
-                                    {% for assignment in active_assignments %}
-                                        <span class="chip">
-                                            {{ assignment.worker_display_name or assignment.worker_discord_id }}
-                                            {% if assignment.has_named_bonus %}
-                                                +掛名
-                                            {% endif %}
-                                        </span>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="muted-text">尚未有人接單</p>
+            {% if orders %}
+                <div class="dispatch-v2-mission-list">
+                    {% for order in orders %}
+                        {% set active_assignments = [] %}
+                        {% for assignment in order.assignments %}
+                            {% if assignment.is_active %}
+                                {% set _ = active_assignments.append(assignment) %}
                             {% endif %}
-                        </div>
+                        {% endfor %}
 
-                        {% if user_claimed_this_order %}
-                            {% for payout in order.payouts %}
-                                {% if payout.worker_discord_id == user.id %}
-                                    <div class="payout-preview dispatch-payout-preview">
-                                        <div>
-                                            <span>你的基本分潤</span>
-                                            <strong>{{ payout.base_payout }}T</strong>
+                        {% set user_claimed_this_order = order.id in claimed_order_ids %}
+
+                        <article class="dispatch-v2-mission-card">
+                            <div class="dispatch-v2-mission-top">
+                                <div>
+                                    <p class="order-no">
+                                        {{ order.bot_order_no or ("WEB-" ~ order.id) }}
+                                    </p>
+                                    <h3>{{ order.category }}｜{{ order.item }}</h3>
+                                </div>
+
+                                <span class="badge dispatch-status-badge">
+                                    {{ order.status }}
+                                </span>
+                            </div>
+
+                            <div class="dispatch-v2-mission-meta">
+                                <div>
+                                    <span>老闆</span>
+                                    <strong>{{ order.customer_display_name or "未記錄" }}</strong>
+                                </div>
+
+                                <div>
+                                    <span>數量</span>
+                                    <strong>{{ order.quantity }} 單</strong>
+                                </div>
+
+                                <div>
+                                    <span>金額</span>
+                                    <strong>{{ order.amount }}T</strong>
+                                </div>
+
+                                <div>
+                                    <span>付款</span>
+                                    <strong>{{ order.payment_method or "未記錄" }}</strong>
+                                </div>
+                            </div>
+
+                            <div class="dispatch-v2-assignment-row">
+                                <div>
+                                    <span class="muted-text">目前接單人</span>
+
+                                    {% if active_assignments %}
+                                        <div class="chip-list">
+                                            {% for assignment in active_assignments %}
+                                                <span class="chip">
+                                                    {{ assignment.worker_display_name or assignment.worker_discord_id }}
+                                                    {% if assignment.has_named_bonus %}
+                                                        +掛名
+                                                    {% endif %}
+                                                </span>
+                                            {% endfor %}
                                         </div>
+                                    {% else %}
+                                        <p class="muted-text">尚未有人接單</p>
+                                    {% endif %}
+                                </div>
 
-                                        <div>
-                                            <span>掛名加成</span>
-                                            <strong>{{ payout.named_bonus_amount }}T</strong>
-                                        </div>
-
-                                        <div>
-                                            <span>你的預估可得</span>
-                                            <strong>{{ payout.final_payout }}T</strong>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-
-                        <div class="order-footer dispatch-mission-footer">
-                            <div>
-                                <span class="muted-text">目前接單人數</span>
-                                <strong>{{ active_assignments | length }}</strong>
+                                <div class="dispatch-v2-assignment-count">
+                                    <span>人數</span>
+                                    <strong>{{ active_assignments | length }}</strong>
+                                </div>
                             </div>
 
                             {% if user_claimed_this_order %}
-                                <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
-                                    <button class="button danger" type="submit">
-                                        取消接單
-                                    </button>
-                                </form>
-                            {% else %}
-                                <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
-                                    <button class="button" type="submit">
-                                        接單
-                                    </button>
-                                </form>
-                            {% endif %}
-                        </div>
+                                {% for payout in order.payouts %}
+                                    {% if payout.worker_discord_id == user.id %}
+                                        <div class="dispatch-v2-payout">
+                                            <div>
+                                                <span>你的基本分潤</span>
+                                                <strong>{{ payout.base_amount }}T</strong>
+                                            </div>
 
-                        {% if order.note %}
-                            <p class="order-note">{{ order.note }}</p>
-                        {% endif %}
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state dispatch-empty">
-                <strong>目前沒有 active 訂單。</strong>
-                <span>等 DC bot 或網站資料庫寫入可接訂單後，會自動顯示在這裡。</span>
-            </div>
-        {% endif %}
+                                            <div>
+                                                <span>掛名加成</span>
+                                                <strong>{{ payout.named_bonus_amount }}T</strong>
+                                            </div>
+
+                                            <div>
+                                                <span>預估總分潤</span>
+                                                <strong>{{ payout.total_amount }}T</strong>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+
+                            {% if order.note %}
+                                <p class="dispatch-v2-note">{{ order.note }}</p>
+                            {% endif %}
+
+                            <div class="dispatch-v2-mission-footer">
+                                {% if user_claimed_this_order %}
+                                    <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
+                                        <button class="button danger" type="submit">
+                                            取消接單
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
+                                        <button class="button" type="submit">
+                                            接單
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="dispatch-v2-empty-card dispatch-v2-empty-wide">
+                    <strong>目前沒有 active 訂單。</strong>
+                    <span>等 DC bot 或網站資料庫寫入可接訂單後，會自動顯示在這裡。</span>
+                </div>
+            {% endif %}
+        </div>
     </section>
 
 <script src="/static/js/dispatch_alerts.js"></script>
