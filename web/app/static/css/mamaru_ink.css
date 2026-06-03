@@ -3014,3 +3014,241 @@ select.input option:disabled {
     color: rgba(245, 238, 228, 0.42) !important;
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Archive Page Safe Theme
+   歷史訂單卷宗庫安全版：只改 CSS，不動功能
+========================================================= */
+
+/* 全站 select 下拉選項修正 */
+select,
+select.input {
+    color-scheme: dark;
+}
+
+select option,
+select.input option {
+    background-color: #0b0d10 !important;
+    color: #f5eee4 !important;
+}
+
+select option:checked,
+select.input option:checked {
+    background-color: #8f1e19 !important;
+    color: #ffffff !important;
+}
+
+select option:disabled,
+select.input option:disabled {
+    background-color: #111111 !important;
+    color: rgba(245, 238, 228, 0.42) !important;
+}
+
+/* 歷史訂單頁：卷宗庫背景 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .mw-page-card {
+    background:
+        radial-gradient(circle at 86% 12%, rgba(201, 164, 95, 0.08), transparent 26%),
+        radial-gradient(circle at 14% 34%, rgba(179, 49, 45, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(13, 10, 8, 0.98), rgba(5, 6, 8, 0.98)) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .mw-page-topbar::after {
+    content: "卷宗庫";
+    position: absolute;
+    right: 34px;
+    top: 34px;
+    color: rgba(201, 164, 95, 0.10);
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    border: 2px solid rgba(179, 49, 45, 0.14);
+    padding: 8px 14px;
+    transform: rotate(-7deg);
+    pointer-events: none;
+}
+
+/* 篩選列 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-filter-form {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) 180px 140px !important;
+    gap: 12px !important;
+    align-items: end;
+    padding: 18px !important;
+    border-radius: 18px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.10), transparent 28%),
+        linear-gradient(145deg, rgba(32, 22, 14, 0.78), rgba(8, 8, 9, 0.88)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.26) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-filter-form label {
+    display: grid;
+    gap: 6px;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-filter-form label > span {
+    color: rgba(226, 200, 134, 0.80) !important;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+/* 老闆群組：卷宗分類 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-list {
+    display: grid;
+    gap: 16px;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group {
+    border: 1px solid rgba(201, 164, 95, 0.28) !important;
+    border-radius: 22px !important;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.11), transparent 34%),
+        linear-gradient(145deg, rgba(18, 13, 9, 0.94), rgba(6, 6, 8, 0.95)) !important;
+    overflow: hidden;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.36);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-group > summary {
+    padding: 18px 20px !important;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.14);
+    background:
+        linear-gradient(90deg, rgba(86, 27, 21, 0.24), rgba(201, 164, 95, 0.05), transparent) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-avatar {
+    width: 48px !important;
+    height: 48px !important;
+    color: #fff7e8 !important;
+    background:
+        radial-gradient(circle at 50% 50%, rgba(143, 30, 25, 0.92), rgba(42, 12, 10, 0.96)) !important;
+    border: 1px solid rgba(226, 200, 134, 0.56) !important;
+    box-shadow: 0 0 28px rgba(179, 49, 45, 0.22);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-name {
+    color: #fff7e8 !important;
+    font-size: 20px !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-id {
+    color: rgba(169, 159, 145, 0.86) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-pill {
+    border-radius: 15px !important;
+    background:
+        radial-gradient(circle at 82% 20%, rgba(201, 164, 95, 0.12), transparent 34%),
+        linear-gradient(145deg, rgba(10, 11, 15, 0.96), rgba(24, 18, 13, 0.92)) !important;
+    border: 1px solid rgba(201, 164, 95, 0.26) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-pill span {
+    color: rgba(226, 200, 134, 0.82) !important;
+    font-weight: 800;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-customer-pill strong {
+    color: #fff7e8 !important;
+}
+
+/* 訂單卡：卷宗單據 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-card {
+    position: relative;
+    border: 1px solid rgba(201, 164, 95, 0.24) !important;
+    border-radius: 18px !important;
+    padding: 16px !important;
+    background:
+        linear-gradient(90deg, rgba(201, 164, 95, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(201, 164, 95, 0.025) 1px, transparent 1px),
+        linear-gradient(145deg, rgba(14, 10, 8, 0.94), rgba(5, 6, 8, 0.96)) !important;
+    background-size: 24px 24px, 24px 24px, auto;
+    overflow: hidden;
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255,255,255,0.025);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-card::after {
+    content: "卷";
+    position: absolute;
+    right: 18px;
+    top: 16px;
+    color: rgba(179, 49, 45, 0.10);
+    font-size: 58px;
+    font-weight: 900;
+    pointer-events: none;
+    transform: rotate(-7deg);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-head {
+    margin-bottom: 14px !important;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(201, 164, 95, 0.14);
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-no {
+    color: #9bd2ff !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.03em;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-order-status {
+    color: #ffe3a3 !important;
+    background: rgba(126, 29, 27, 0.34) !important;
+    border: 1px solid rgba(225, 75, 67, 0.34);
+    font-weight: 900;
+}
+
+/* 編輯欄位 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-edit-grid {
+    gap: 11px !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-edit-grid span,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-row span,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-row span {
+    color: rgba(226, 200, 134, 0.72) !important;
+    font-weight: 800;
+}
+
+/* 客服 / 打手 / 分潤區 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-box,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-box {
+    border-top: 1px solid rgba(201, 164, 95, 0.16) !important;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-assignment-title,
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-payout-title {
+    color: #ffe3a3 !important;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+
+/* 底部儲存工具列 */
+body:has(form[action="/admin/orders/history/bulk-update"]) .history-bulk-toolbar {
+    border: 1px solid rgba(201, 164, 95, 0.30) !important;
+    background:
+        linear-gradient(145deg, rgba(32, 22, 14, 0.94), rgba(8, 8, 9, 0.96)) !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38);
+}
+
+/* date picker icon */
+body:has(form[action="/admin/orders/history/bulk-update"]) input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) sepia(0.35) saturate(1.2);
+    opacity: 0.9;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+body:has(form[action="/admin/orders/history/bulk-update"]) input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 1000px) {
+    body:has(form[action="/admin/orders/history/bulk-update"]) .history-filter-form {
+        grid-template-columns: 1fr !important;
+    }
+}
+
