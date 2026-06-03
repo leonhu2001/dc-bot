@@ -5203,3 +5203,94 @@ body:has(form[action="/admin/staff"]) .staff-filter-form input {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - External Ink Background
+   外部水墨背景素材
+========================================================= */
+
+:root {
+    --mw-bg-image: url("/static/img/墨雲山水與金色點綴.png");
+}
+
+/* 全站背景：水墨圖 + 暗色遮罩 */
+html,
+body {
+    min-height: 100%;
+}
+
+body {
+    background:
+        radial-gradient(circle at 18% 18%, rgba(179, 49, 45, 0.18), transparent 30%),
+        radial-gradient(circle at 86% 12%, rgba(201, 164, 95, 0.10), transparent 26%),
+        linear-gradient(
+            180deg,
+            rgba(5, 5, 8, 0.76) 0%,
+            rgba(5, 5, 8, 0.88) 48%,
+            rgba(5, 5, 8, 0.92) 100%
+        ),
+        var(--mw-bg-image) center center / cover no-repeat fixed !important;
+    background-color: #050608 !important;
+}
+
+/* 側欄也吃一點背景，但保持可讀 */
+.mw-sidebar {
+    background:
+        linear-gradient(180deg, rgba(35, 8, 8, 0.62), rgba(3, 4, 6, 0.94)),
+        var(--mw-bg-image) left center / cover no-repeat fixed !important;
+    backdrop-filter: blur(10px);
+}
+
+/* 主頁卡片：稍微透明，讓背景質感透出 */
+.mw-page-card,
+.panel,
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-customer-group,
+.history-order-card,
+.dispatch-hero,
+.dispatch-mission-card,
+.summary-total-card,
+.staff-stat-card,
+.staff-filter-form,
+.history-filter-form,
+.my-payout-filter {
+    backdrop-filter: blur(12px);
+}
+
+/* 頁面大容器：更像玻璃墨盒 */
+.mw-page-card {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.055), transparent 30%),
+        radial-gradient(circle at 0% 25%, rgba(179, 49, 45, 0.090), transparent 36%),
+        linear-gradient(145deg, rgba(9, 8, 9, 0.88), rgba(4, 5, 7, 0.90)) !important;
+    border-color: rgba(201, 164, 95, 0.26) !important;
+}
+
+/* 一般 panel：壓暗但保留背景層次 */
+.panel {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.090), transparent 34%),
+        linear-gradient(145deg, rgba(18, 13, 12, 0.82), rgba(5, 6, 8, 0.88)) !important;
+    border-color: rgba(201, 164, 95, 0.22) !important;
+}
+
+/* 表格與列表不要太透明，避免難讀 */
+table,
+.summary-table,
+.ledger-entry,
+.history-order-card,
+.admin-order-card,
+.compact-card {
+    background-color: rgba(5, 6, 8, 0.78) !important;
+}
+
+/* 背景固定在手機可能卡，手機改成 scroll */
+@media (max-width: 900px) {
+    body,
+    .mw-sidebar {
+        background-attachment: scroll !important;
+    }
+}
+
