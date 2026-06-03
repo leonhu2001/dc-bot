@@ -1,11 +1,25 @@
-
 {% extends "layout.html" %}
 
-{% block page_title %}歷史訂單
-{% endblock %}
+{% block page_title %}歷史訂單{% endblock %}
 
 {% block content %}
 <style>
+.history-filter-form {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto auto;
+    gap: 10px;
+    align-items: end;
+}
+.history-filter-form label {
+    display: grid;
+    gap: 6px;
+}
+.history-filter-form label > span {
+    color: rgba(226, 200, 134, 0.78);
+    font-size: 13px;
+    font-weight: 800;
+}
+
 .history-customer-list {
     display: grid;
     gap: 14px;
@@ -104,33 +118,6 @@
     background: rgba(148, 163, 184, 0.16);
     font-size: 13px;
 }
-.history-order-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-}
-.history-order-field span {
-    display: block;
-    color: #9ca3af;
-    font-size: 12px;
-}
-.history-order-field strong {
-    display: block;
-    margin-top: 3px;
-}
-@media (max-width: 800px) {
-    .history-customer-group > summary,
-    .history-order-grid {
-        grid-template-columns: 1fr;
-    }
-    .history-customer-meta {
-        justify-content: flex-start;
-    }
-    .history-customer-pill {
-        text-align: left;
-    }
-}
-
 .history-edit-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -148,6 +135,58 @@
 .history-edit-grid select {
     width: 100%;
     box-sizing: border-box;
+}
+.history-assignment-box,
+.history-payout-box {
+    margin-top: 14px;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    padding-top: 14px;
+    display: grid;
+    gap: 10px;
+    max-width: 760px;
+}
+.history-assignment-title,
+.history-payout-title {
+    color: #cbd5e1;
+    font-weight: 800;
+    font-size: 14px;
+}
+.history-assignment-row,
+.history-payout-row {
+    display: grid;
+    grid-template-columns: 90px minmax(160px, 1fr) 120px 90px;
+    gap: 12px;
+    align-items: end;
+}
+.history-payout-row {
+    grid-template-columns: 90px minmax(160px, 1fr) 150px;
+}
+.history-assignment-row label,
+.history-payout-row label {
+    display: grid;
+    gap: 5px;
+}
+.history-assignment-row span,
+.history-payout-row span {
+    color: #9ca3af;
+    font-size: 12px;
+}
+.history-assignment-row select,
+.history-payout-row input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.history-assignment-row strong,
+.history-payout-row strong {
+    overflow-wrap: anywhere;
+}
+.history-delete-check {
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+}
+.history-delete-check input {
+    width: auto !important;
 }
 .history-bulk-toolbar {
     position: sticky;
@@ -173,9 +212,34 @@
     gap: 10px;
     flex-wrap: wrap;
 }
+.history-payout-row input::placeholder {
+    color: #64748b;
+}
+.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.9;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+}
+.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.12);
+}
+
 @media (max-width: 900px) {
-    .history-edit-grid {
+    .history-filter-form,
+    .history-edit-grid,
+    .history-customer-group > summary,
+    .history-assignment-row,
+    .history-payout-row {
         grid-template-columns: 1fr;
+    }
+    .history-customer-meta {
+        justify-content: flex-start;
+    }
+    .history-customer-pill {
+        text-align: left;
     }
     .history-bulk-toolbar {
         align-items: stretch;
@@ -188,166 +252,18 @@
         flex: 1;
     }
 }
-
-
-.history-payout-box {
-    margin-top: 14px;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding-top: 14px;
-    display: grid;
-    gap: 10px;
-    max-width: 620px;
-}
-.history-payout-title {
-    color: #cbd5e1;
-    font-weight: 800;
-    font-size: 14px;
-}
-.history-payout-row {
-    display: grid;
-    grid-template-columns: 70px minmax(120px, 1fr) 150px;
-    gap: 12px;
-    align-items: end;
-}
-.history-payout-row > div,
-.history-payout-row > label {
-    min-width: 0;
-}
-.history-payout-row strong {
-    overflow-wrap: anywhere;
-}
-.history-payout-row label {
-    display: grid;
-    gap: 5px;
-}
-.history-payout-row span {
-    color: #9ca3af;
-    font-size: 12px;
-}
-.history-payout-row input {
-    width: 100%;
-    box-sizing: border-box;
-}
-@media (max-width: 800px) {
-    .history-payout-box {
-        max-width: none;
-    }
-    .history-payout-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-
-.history-assignment-box,
-.history-payout-box {
-    margin-top: 14px;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding-top: 14px;
-    display: grid;
-    gap: 10px;
-    max-width: 760px;
-}
-.history-assignment-title,
-.history-payout-title {
-    color: #cbd5e1;
-    font-weight: 800;
-    font-size: 14px;
-}
-.history-assignment-row,
-.history-payout-row {
-    display: grid;
-    grid-template-columns: 90px minmax(140px, 1fr) 150px;
-    gap: 12px;
-    align-items: end;
-}
-.history-assignment-row {
-    grid-template-columns: 90px minmax(160px, 1fr) 120px 90px;
-}
-.history-assignment-row label,
-.history-payout-row label {
-    display: grid;
-    gap: 5px;
-}
-.history-assignment-row span,
-.history-payout-row span {
-    color: #9ca3af;
-    font-size: 12px;
-}
-.history-assignment-row select,
-.history-payout-row input {
-    width: 100%;
-    box-sizing: border-box;
-}
-.history-delete-check {
-    display: flex !important;
-    gap: 8px !important;
-    align-items: center !important;
-}
-.history-delete-check input {
-    width: auto !important;
-}
-@media (max-width: 800px) {
-    .history-assignment-box,
-    .history-payout-box {
-        max-width: none;
-    }
-    .history-assignment-row,
-    .history-payout-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-
-.history-filter-form {
-    display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto auto;
-    gap: 10px;
-    align-items: end;
-}
-
-.history-filter-form label {
-    display: grid;
-    gap: 6px;
-}
-
-@media (max-width: 800px) {
-    .history-filter-form {
-        grid-template-columns: 1fr;
-    }
-}
-
-
-.history-payout-row input::placeholder {
-    color: #64748b;
-}
-
-
-.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.9;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-}
-
-.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.12);
-}
-
 </style>
 
 <section class="panel">
     <div class="section-title-row">
         <div>
-            <p class="order-no">ORDER HISTORY</p>
-            <h2>歷史訂單</h2>
-            <p class="muted-text">依老闆分組，點開後查看該老闆的所有訂單。</p>
+            <p class="order-no">ORDER ARCHIVE</p>
+            <h2>歷史訂單｜卷宗庫</h2>
+            <p class="muted-text">已存單、已結單與歷史訂單會保留在這裡，可修正訂單資料、結單日期、人員與分潤。</p>
         </div>
-        <a class="button secondary" href="/admin">回總控</a>
+        <a class="button secondary" href="/admin">回總控後台</a>
     </div>
 </section>
-
 
 <section class="panel">
     <form method="get" action="/admin/orders/history" class="history-filter-form">
@@ -365,7 +281,6 @@
         <a class="button secondary" href="/admin/orders/history">清除</a>
     </form>
 </section>
-
 
 <form id="historyBulkForm" method="post" action="/admin/orders/history/bulk-update">
 {% if customer_groups %}
@@ -405,7 +320,7 @@
                             <div class="history-order-head">
                                 <div class="history-order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</div>
                                 <div class="history-order-status">
-                                    {{ {'active': '可接單', 'stored': '存單', 'closed': '結單'}.get(order.status, order.status) }}
+                                    {{ {'active': '進行中', 'stored': '存單', 'closed': '已結單'}.get(order.status, order.status) }}
                                 </div>
                             </div>
 
@@ -440,9 +355,9 @@
                                 <label>
                                     <span>狀態</span>
                                     <select class="input" name="status_{{ order.id }}">
-                                        <option value="active" {% if order.status == "active" %}selected{% endif %}>可接單</option>
+                                        <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
                                         <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
-                                        <option value="closed" {% if order.status == "closed" %}selected{% endif %}>結單</option>
+                                        <option value="closed" {% if order.status == "closed" %}selected{% endif %}>已結單</option>
                                     </select>
                                 </label>
 
@@ -467,124 +382,123 @@
                                 </label>
                             </div>
 
+                            <div class="history-assignment-box">
+                                <div class="history-assignment-title">客服</div>
 
-                                <div class="history-assignment-box">
-                                    <div class="history-assignment-title">客服</div>
+                                <div class="history-assignment-row">
+                                    <div>
+                                        <span>身份</span>
+                                        <strong>客服</strong>
+                                    </div>
 
+                                    <label>
+                                        <span>人員</span>
+                                        <select class="input" name="customer_service_{{ order.id }}">
+                                            <option value="">無</option>
+                                            {% for option in history_staff_options.customer_services %}
+                                                <option value="{{ option.id }}" {% if order.customer_service_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+
+                                    <div></div>
+                                    <div></div>
+                                </div>
+                            </div>
+
+                            <div class="history-assignment-box">
+                                <div class="history-assignment-title">打手</div>
+
+                                {% set assignment_rows = assignments_by_order_id.get(order.id, []) %}
+                                {% for assignment in assignment_rows %}
                                     <div class="history-assignment-row">
+                                        <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
+
                                         <div>
                                             <span>身份</span>
-                                            <strong>客服</strong>
+                                            <strong>打手</strong>
                                         </div>
 
                                         <label>
                                             <span>人員</span>
-                                            <select class="input" name="customer_service_{{ order.id }}">
-                                                <option value="">無</option>
-                                                {% for option in history_staff_options.customer_services %}
-                                                    <option value="{{ option.id }}" {% if order.customer_service_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
+                                            <select class="input" name="assignment_worker_{{ assignment.id }}">
+                                                {% for option in history_staff_options.workers %}
+                                                    <option value="{{ option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
                                                 {% endfor %}
                                             </select>
                                         </label>
 
+                                        <label class="history-delete-check">
+                                            <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
+                                            <span>掛名 +5%</span>
+                                        </label>
+
+                                        <label class="history-delete-check">
+                                            <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
+                                            <span>刪除</span>
+                                        </label>
+                                    </div>
+                                {% endfor %}
+
+                                {% for i in [1, 2, 3] %}
+                                    <div class="history-assignment-row">
+                                        <div>
+                                            <span>身份</span>
+                                            <strong>新增</strong>
+                                        </div>
+
+                                        <label>
+                                            <span>新增打手</span>
+                                            <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
+                                                <option value="">不新增</option>
+                                                {% for option in history_staff_options.workers %}
+                                                    <option value="{{ option.id }}">{{ option.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+
+                                        <label class="history-delete-check">
+                                            <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
+                                            <span>掛名 +5%</span>
+                                        </label>
+
                                         <div></div>
                                     </div>
-                                </div>
+                                {% endfor %}
+                            </div>
 
-                                <div class="history-assignment-box">
-                                    <div class="history-assignment-title">打手</div>
+                            {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
+                            {% if payout_rows %}
+                                <div class="history-payout-box">
+                                    <div class="history-payout-title">分潤調整</div>
 
-                                    {% set assignment_rows = assignments_by_order_id.get(order.id, []) %}
-                                    {% for assignment in assignment_rows %}
-                                        <div class="history-assignment-row">
-                                            <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
-
+                                    {% for payout in payout_rows %}
+                                        <div class="history-payout-row">
                                             <div>
                                                 <span>身份</span>
-                                                <strong>打手</strong>
+                                                <strong>{{ payout.label }}</strong>
                                             </div>
 
-                                            <label>
+                                            <div>
                                                 <span>人員</span>
-                                                <select class="input" name="assignment_worker_{{ assignment.id }}">
-                                                    {% for option in history_staff_options.workers %}
-                                                        <option value="{{ option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </label>
-
-
-                                            <label class="history-delete-check">
-                                                <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
-                                                <span>掛名 +5%</span>
-                                            </label>
-
-                                            <label class="history-delete-check">
-                                                <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
-                                                <span>刪除</span>
-                                            </label>
-                                        </div>
-                                    {% endfor %}
-
-                                    {% for i in [1, 2, 3] %}
-                                        <div class="history-assignment-row">
-                                            <div>
-                                                <span>身份</span>
-                                                <strong>新增</strong>
+                                                <strong>{{ payout.person_name }}</strong>
                                             </div>
 
                                             <label>
-                                                <span>新增打手</span>
-                                                <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
-                                                    <option value="">不新增</option>
-                                                    {% for option in history_staff_options.workers %}
-                                                        <option value="{{ option.id }}">{{ option.name }}</option>
-                                                    {% endfor %}
-                                                </select>
+                                                <span>分潤金額</span>
+                                                {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
+                                                <input
+                                                    class="input"
+                                                    type="number"
+                                                    name="{{ payout.input_name }}"
+                                                    value="{{ manual_payout_overrides.get(manual_key, '') }}"
+                                                    placeholder="自動"
+                                                >
                                             </label>
-
-                                            <label class="history-delete-check">
-                                                <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
-                                                <span>掛名 +5%</span>
-                                            </label>
-
-                                            <div></div>
                                         </div>
                                     {% endfor %}
                                 </div>
-
-                                {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
-                                {% if payout_rows %}
-                                    <div class="history-payout-box">
-                                        <div class="history-payout-title">分潤調整</div>
-
-                                        {% for payout in payout_rows %}
-                                            <div class="history-payout-row">
-                                                <div>
-                                                    <span>身份</span>
-                                                    <strong>{{ payout.label }}</strong>
-                                                </div>
-
-                                                <div>
-                                                    <span>人員</span>
-                                                    <strong>{{ payout.person_name }}</strong>
-                                                </div>
-
-                                                <label>
-                                                    <span>分潤金額</span>
-                                                    {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
-                                                    <input
-                                                        class="input"
-                                                        type="number"
-                                                        name="{{ payout.input_name }}"
-                                                        value="{{ manual_payout_overrides.get(manual_key, '') }}"
-                                                        placeholder="公式"
-                                                    >
-                                                </label>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
+                            {% endif %}
                         </article>
                     {% endfor %}
                 </div>
@@ -592,14 +506,14 @@
         {% endfor %}
     </section>
 
-        <div class="history-bulk-toolbar">
-            <p class="muted-text">修改多筆訂單後，按一次保存即可。重置會還原成上次載入的內容。</p>
+    <div class="history-bulk-toolbar">
+        <p class="muted-text">修改完成後請按「儲存全部修改」，系統會一次更新本頁所有訂單資料。</p>
 
-            <div class="history-bulk-actions">
-                <button class="button secondary" type="reset">重置</button>
-                <button class="button" type="submit">保存全部修改</button>
-            </div>
+        <div class="history-bulk-actions">
+            <button class="button secondary" type="reset">還原</button>
+            <button class="button" type="submit">儲存全部修改</button>
         </div>
+    </div>
 {% else %}
     <section class="panel">
         <div class="empty-state">目前沒有歷史訂單。</div>
