@@ -2985,3 +2985,32 @@ body:has(form[action="/admin/payouts/summary"]) .summary-empty::after {
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Select Dropdown Fix
+   修正下拉式選單白底白字
+========================================================= */
+
+select,
+select.input {
+    color-scheme: dark;
+}
+
+select option,
+select.input option {
+    background-color: #0b0d10 !important;
+    color: #f5eee4 !important;
+}
+
+select option:checked,
+select.input option:checked {
+    background-color: #8f1e19 !important;
+    color: #ffffff !important;
+}
+
+select option:disabled,
+select.input option:disabled {
+    background-color: #111111 !important;
+    color: rgba(245, 238, 228, 0.42) !important;
+}
+
