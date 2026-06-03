@@ -5550,3 +5550,76 @@ table tbody tr:hover,
     }
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Background Visibility + Seal Fix
+   背景強化 / 移除右上角印章
+========================================================= */
+
+/* 移除 Stage 5-2 加上的右上角方形「魔丸」印章 */
+.mw-page-topbar::before {
+    content: none !important;
+    display: none !important;
+}
+
+/* 讓外部水墨背景更明顯：降低黑色遮罩 */
+body {
+    background:
+        radial-gradient(circle at 18% 18%, rgba(179, 49, 45, 0.14), transparent 34%),
+        radial-gradient(circle at 86% 12%, rgba(201, 164, 95, 0.08), transparent 30%),
+        linear-gradient(
+            180deg,
+            rgba(5, 5, 8, 0.54) 0%,
+            rgba(5, 5, 8, 0.68) 48%,
+            rgba(5, 5, 8, 0.76) 100%
+        ),
+        var(--mw-bg-image) center center / cover no-repeat fixed !important;
+    background-color: #050608 !important;
+}
+
+/* 主容器再透明一點，讓背景進來 */
+.mw-page-card {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(201, 164, 95, 0.050), transparent 30%),
+        radial-gradient(circle at 0% 25%, rgba(179, 49, 45, 0.075), transparent 36%),
+        linear-gradient(145deg, rgba(9, 8, 9, 0.76), rgba(4, 5, 7, 0.82)) !important;
+}
+
+/* panel 透明一點，但保留文字可讀 */
+.panel {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.075), transparent 34%),
+        linear-gradient(145deg, rgba(18, 13, 12, 0.70), rgba(5, 6, 8, 0.78)) !important;
+}
+
+/* 卡片類也稍微透，但表格卡保持比較深 */
+.admin-order-card,
+.compact-card,
+.summary-person-card,
+.history-order-card,
+.dispatch-mission-card,
+.dispatch-hero,
+.summary-total-card,
+.staff-stat-card {
+    background-color: rgba(5, 6, 8, 0.66) !important;
+}
+
+/* 表格仍維持深底，避免難讀 */
+table,
+.summary-table,
+.ledger-entry {
+    background-color: rgba(5, 6, 8, 0.82) !important;
+}
+
+/* 側欄背景也清楚一點 */
+.mw-sidebar {
+    background:
+        linear-gradient(180deg, rgba(35, 8, 8, 0.50), rgba(3, 4, 6, 0.84)),
+        var(--mw-bg-image) left center / cover no-repeat fixed !important;
+}
+
+/* 保留頁面原本淡淡大字章，但再壓低存在感 */
+.mw-page-topbar::after {
+    opacity: 0.36 !important;
+}
+
