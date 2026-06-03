@@ -2437,3 +2437,140 @@ body:has(form[action="/admin/payouts/summary"]) .summary-status-unpaid {
     border-radius: 999px;
 }
 
+
+/* =========================================================
+   Mamaru Ink Dashboard - Ledger Structure
+   人員總表賞金帳結構版
+========================================================= */
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-items {
+    display: grid;
+    gap: 10px;
+    padding: 16px 18px 18px;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 520px;
+    gap: 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(201, 164, 95, 0.22);
+    background:
+        linear-gradient(90deg, rgba(201, 164, 95, 0.035) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(201, 164, 95, 0.025) 1px, transparent 1px),
+        linear-gradient(145deg, rgba(18, 13, 9, 0.92), rgba(6, 6, 7, 0.94));
+    background-size: 24px 24px, 24px 24px, auto;
+    overflow: hidden;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry::after {
+    content: "賞";
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-8deg);
+    color: rgba(179, 49, 45, 0.08);
+    font-size: 54px;
+    font-weight: 900;
+    pointer-events: none;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry-main {
+    display: grid;
+    grid-template-columns: 150px 170px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry-meta {
+    display: grid;
+    grid-template-columns: 120px 80px 100px 120px;
+    gap: 10px;
+    align-items: center;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-label {
+    display: block;
+    margin-bottom: 4px;
+    color: rgba(226, 200, 134, 0.68);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-entry strong {
+    color: #fff7e8;
+    font-size: 15px;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-order strong {
+    color: #8dc9ff;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-task strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-stamp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 68px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 13px !important;
+    letter-spacing: 0.04em;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-stamp.paid {
+    color: #9ff0bf !important;
+    background: rgba(47, 191, 123, 0.12);
+    border: 1px solid rgba(47, 191, 123, 0.28);
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-stamp.unpaid {
+    color: #ffe3a3 !important;
+    background: rgba(126, 29, 27, 0.34);
+    border: 1px solid rgba(225, 75, 67, 0.34);
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-amount {
+    text-align: right;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .ledger-amount strong {
+    color: #ffe3a3;
+    font-size: 19px;
+    font-weight: 900;
+}
+
+body:has(form[action="/admin/payouts/summary"]) .summary-items {
+    display: none !important;
+}
+
+@media (max-width: 1400px) {
+    body:has(form[action="/admin/payouts/summary"]) .ledger-entry {
+        grid-template-columns: 1fr;
+    }
+
+    body:has(form[action="/admin/payouts/summary"]) .ledger-entry-meta {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    body:has(form[action="/admin/payouts/summary"]) .ledger-entry-main,
+    body:has(form[action="/admin/payouts/summary"]) .ledger-entry-meta {
+        grid-template-columns: 1fr;
+    }
+
+    body:has(form[action="/admin/payouts/summary"]) .ledger-amount {
+        text-align: left;
+    }
+}
+

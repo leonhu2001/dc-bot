@@ -360,41 +360,55 @@
         </form>
     </div>
 
-    <div class="summary-items">
-        <table class="summary-table">
-            <thead>
-                <tr>
-                    <th>訂單</th>
-                    <th>結單日期</th>
-                    <th>老闆名稱</th>
-                    <th>項目</th>
-                    <th>身份</th>
-                    <th>狀態</th>
-                    <th>金額</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in row["items"] %}
-                    {% if item.payout_status == list_status %}
-                        <tr>
-                            <td>{{ item.order_no }}</td>
-                            <td>{{ item.closed_date }}</td>
-                            <td>{{ item.customer_name }}</td>
-                            <td>{{ item.category }}｜{{ item.item }}</td>
-                            <td>{{ item.role }}</td>
-                            <td>
-                                {% if item.payout_status == "paid" %}
-                                    <span class="summary-status-paid">已發放</span>
-                                {% else %}
-                                    <span class="summary-status-unpaid">未發放</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ item.amount|round(0, 'common')|int }}T</td>
-                        </tr>
-                    {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="ledger-items">
+        {% for item in row["items"] %}
+            {% if item.payout_status == list_status %}
+                <article class="ledger-entry">
+                    <div class="ledger-entry-main">
+                        <div class="ledger-order">
+                            <span class="ledger-label">契約編號</span>
+                            <strong>{{ item.order_no }}</strong>
+                        </div>
+
+                        <div class="ledger-client">
+                            <span class="ledger-label">委託人</span>
+                            <strong>{{ item.customer_name }}</strong>
+                        </div>
+
+                        <div class="ledger-task">
+                            <span class="ledger-label">內容</span>
+                            <strong>{{ item.category }}｜{{ item.item }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="ledger-entry-meta">
+                        <div>
+                            <span class="ledger-label">結單日期</span>
+                            <strong>{{ item.closed_date }}</strong>
+                        </div>
+
+                        <div>
+                            <span class="ledger-label">身份</span>
+                            <strong>{{ item.role }}</strong>
+                        </div>
+
+                        <div>
+                            <span class="ledger-label">狀態</span>
+                            {% if item.payout_status == "paid" %}
+                                <strong class="ledger-stamp paid">已發放</strong>
+                            {% else %}
+                                <strong class="ledger-stamp unpaid">未發放</strong>
+                            {% endif %}
+                        </div>
+
+                        <div class="ledger-amount">
+                            <span class="ledger-label">賞金</span>
+                            <strong>{{ item.amount|round(0, 'common')|int }}T</strong>
+                        </div>
+                    </div>
+                </article>
+            {% endif %}
+        {% endfor %}
     </div>
 </article>
 {% endmacro %}
