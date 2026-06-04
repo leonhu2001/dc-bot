@@ -738,12 +738,153 @@ class VoiceRoomLimitModal(discord.ui.Modal, title="設定語音房人數"):
         await interaction.response.defer()
 
 
+
+
+def get_default_voice_room_locked(room_type: str) -> bool:
+    """陪玩房 / VIP 房預設鎖定，公共房預設未鎖定。"""
+    return str(room_type or "") in {"play", "vip"}
+
+
+def inject_voice_control_status_line(description: str | None, voice_channel_id: int) -> str:
+    lines = build_voice_control_base_lines(description)
+
+    if not lines:
+        lines = ["歡迎來到您的專屬包廂！", "可以使用遙控器管理頻道。"]
+
+    return chr(10).join([
+        *lines,
+        "",
+        get_voice_control_status_line(voice_channel_id),
+        "",
+        "⚠️ 當包廂內無人時，將自動銷毀。",
+    ])
+
+def update_voice_control_embed_status(message: discord.Message | None, voice_channel_id: int) -> discord.Embed:
+    if message and message.embeds:
+        embed = message.embeds[0]
+    else:
+        embed = discord.Embed(title="專屬語音房")
+
+    embed.description = inject_voice_control_status_line(embed.description or "", voice_channel_id)
+    return embed
+
+
+
+def get_default_voice_room_locked(room_type: str) -> bool:
+    """陪玩房 / VIP 房預設鎖定，公共房預設未鎖定。"""
+    return str(room_type or "") in {"play", "vip"}
+
+
+def get_default_voice_room_hidden(room_type: str) -> bool:
+    """三種房間都預設顯示。"""
+    return False
+
+
+def get_voice_control_status_line(voice_channel_id: int) -> str:
+    data = TEMP_VOICE_CONTROL_PANELS.get(int(voice_channel_id), {})
+    room_type = str(data.get("room_type") or "")
+
+    locked = bool(data.get("locked", get_default_voice_room_locked(room_type)))
+    hidden = bool(data.get("hidden", get_default_voice_room_hidden(room_type)))
+
+    lock_text = "🔒 已鎖定" if locked else "🔓 未鎖定"
+    hidden_text = "🙈 已隱藏" if hidden else "👁️ 顯示中"
+
+    return f"目前狀態：{lock_text}｜{hidden_text}"
+
+
+def build_voice_control_base_lines(description: str | None) -> list[str]:
+    lines: list[str] = []
+
+    for raw_line in str(description or "").splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            continue
+        if line.startswith("目前狀態："):
+            continue
+        if line.startswith("⚠"):
+            continue
+        if "當包廂內無人時" in line:
+            continue
+
+        lines.append(raw_line.rstrip())
+
+    if len(lines) > 2:
+        lines = lines[:2]
+
+    return lines
+
+
+def inject_voice_control_status_line(description: str | None, voice_channel_id: int) -> str:
+    lines = build_voice_control_base_lines(description)
+
+    if not lines:
+        lines = ["歡迎來到您的專屬包廂！", "可以使用遙控器管理頻道。"]
+
+    return chr(10).join([
+        *lines,
+        "",
+        get_voice_control_status_line(voice_channel_id),
+        "",
+        "⚠️ 當包廂內無人時，將自動銷毀。",
+    ])
+
+
+def update_voice_control_embed_status(message: discord.Message | None, voice_channel_id: int) -> discord.Embed:
+    if message and message.embeds:
+        embed = message.embeds[0]
+    else:
+        embed = discord.Embed(title="專屬語音房")
+
+    embed.description = inject_voice_control_status_line(embed.description or "", voice_channel_id)
+    return embed
+
+
 class VoiceRoomControlView(discord.ui.View):
     def __init__(self, voice_channel_id: int, owner_id: int, room_type: str):
         super().__init__(timeout=None)
-        self.voice_channel_id = voice_channel_id
-        self.owner_id = owner_id
+        self.voice_channel_id = int(voice_channel_id)
+        self.owner_id = int(owner_id)
         self.room_type = room_type
+        self.refresh_state_buttons()
+
+    def refresh_state_buttons(self) -> None:
+        data = TEMP_VOICE_CONTROL_PANELS.setdefault(
+            int(self.voice_channel_id),
+            {
+                "owner_id": int(self.owner_id),
+                "panel_channel_id": None,
+                "room_type": self.room_type,
+                "locked": get_default_voice_room_locked(self.room_type),
+                "hidden": get_default_voice_room_hidden(self.room_type),
+            },
+        )
+
+        locked = bool(data.get("locked", get_default_voice_room_locked(self.room_type)))
+        hidden = bool(data.get("hidden", get_default_voice_room_hidden(self.room_type)))
+
+        for child in self.children:
+            if not isinstance(child, discord.ui.Button):
+                continue
+
+            custom_id = str(child.custom_id or "")
+
+            if custom_id == "voice_room_lock_toggle":
+                if locked:
+                    child.label = "🔓 解鎖"
+                    child.style = discord.ButtonStyle.danger
+                else:
+                    child.label = "🔒 鎖定"
+                    child.style = discord.ButtonStyle.primary
+
+            elif custom_id == "voice_room_visibility_toggle":
+                if hidden:
+                    child.label = "👁️ 顯示"
+                    child.style = discord.ButtonStyle.success
+                else:
+                    child.label = "🙈 隱藏"
+                    child.style = discord.ButtonStyle.secondary
 
     async def get_voice_channel_and_owner(
         self,
@@ -768,7 +909,7 @@ class VoiceRoomControlView(discord.ui.View):
         return False
 
     @discord.ui.button(
-        label="🔒 鎖定/解鎖",
+        label="🔒 鎖定",
         style=discord.ButtonStyle.primary,
         custom_id="voice_room_lock_toggle",
         row=0,
@@ -788,8 +929,8 @@ class VoiceRoomControlView(discord.ui.View):
                 "owner_id": self.owner_id,
                 "panel_channel_id": interaction.channel.id if interaction.channel else None,
                 "room_type": self.room_type,
-                "locked": False,
-                "hidden": False,
+                "locked": get_default_voice_room_locked(self.room_type),
+                "hidden": get_default_voice_room_hidden(self.room_type),
             }
         )
         data["locked"] = not data.get("locked", False)
@@ -803,10 +944,14 @@ class VoiceRoomControlView(discord.ui.View):
             await interaction.response.send_message(f"鎖定/解鎖失敗：{e}", ephemeral=True)
             return
 
-        await interaction.response.defer()
+        self.refresh_state_buttons()
+        await interaction.response.edit_message(
+            embed=update_voice_control_embed_status(interaction.message, self.voice_channel_id),
+            view=self,
+        )
 
     @discord.ui.button(
-        label="👁️ 隱藏/顯示",
+        label="🙈 隱藏",
         style=discord.ButtonStyle.secondary,
         custom_id="voice_room_visibility_toggle",
         row=0,
@@ -826,8 +971,8 @@ class VoiceRoomControlView(discord.ui.View):
                 "owner_id": self.owner_id,
                 "panel_channel_id": interaction.channel.id if interaction.channel else None,
                 "room_type": self.room_type,
-                "locked": False,
-                "hidden": False,
+                "locked": get_default_voice_room_locked(self.room_type),
+                "hidden": get_default_voice_room_hidden(self.room_type),
             }
         )
         data["hidden"] = not data.get("hidden", False)
@@ -841,7 +986,11 @@ class VoiceRoomControlView(discord.ui.View):
             await interaction.response.send_message(f"隱藏/顯示失敗：{e}", ephemeral=True)
             return
 
-        await interaction.response.defer()
+        self.refresh_state_buttons()
+        await interaction.response.edit_message(
+            embed=update_voice_control_embed_status(interaction.message, self.voice_channel_id),
+            view=self,
+        )
 
     @discord.ui.button(
         label="✏️ 更改名稱",
@@ -891,8 +1040,8 @@ async def create_voice_control_panel(
         "panel_channel_id": voice_channel.id,
         "panel_message_id": None,
         "room_type": room_type,
-        "locked": False,
-        "hidden": False,
+        "locked": get_default_voice_room_locked(room_type),
+        "hidden": get_default_voice_room_hidden(room_type),
     }
 
     embed = discord.Embed(
@@ -905,6 +1054,7 @@ async def create_voice_control_panel(
         color=discord.Color.purple()
     )
 
+    embed.description = inject_voice_control_status_line(embed.description or "", voice_channel.id)
     message = await voice_channel.send(
         embed=embed,
         view=VoiceRoomControlView(
