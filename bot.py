@@ -4048,7 +4048,15 @@ async def on_voice_state_update(
             )
         )
 
-        if is_temp_play_voice_room and before.channel != after.channel and len(before.channel.members) > 0:
+        if (
+            before.channel != after.channel
+            and len(before.channel.members) > 0
+            and (
+                is_temp_play_voice_room
+                or is_temp_vip_voice_room
+                or is_temp_public_voice_room
+            )
+        ):
             await revoke_play_voice_room_chat_access(before.channel, member)
 
         if is_temp_play_voice_room and len(before.channel.members) == 0:

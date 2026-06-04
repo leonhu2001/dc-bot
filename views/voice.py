@@ -377,6 +377,28 @@ def is_temp_play_voice_room(channel: discord.abc.GuildChannel | None) -> bool:
     )
 
 
+
+def is_temp_managed_voice_room(channel: discord.abc.GuildChannel | None) -> bool:
+    if not isinstance(channel, discord.VoiceChannel):
+        return False
+
+    panel_data = TEMP_VOICE_CONTROL_PANELS.get(channel.id)
+    if isinstance(panel_data, dict) and panel_data.get("room_type") in {"play", "vip", "public"}:
+        return True
+
+    return (
+        is_temp_play_voice_room(channel)
+        or (
+            channel.name.startswith("👑┃")
+            and channel.name.endswith("的𝙑𝙄𝙋頻道")
+        )
+        or (
+            channel.name.startswith("➕┃")
+            and channel.name.endswith("的公共房間")
+        )
+    )
+
+
 def member_has_play_voice_role(member: discord.Member) -> bool:
     return any(role.id in PLAY_VOICE_ALLOWED_ROLE_IDS for role in member.roles)
 
@@ -410,7 +432,7 @@ async def grant_play_voice_room_chat_access(
     voice_channel: discord.VoiceChannel | None,
     member: discord.Member,
 ) -> None:
-    if member.bot or not is_temp_play_voice_room(voice_channel):
+    if member.bot or not is_temp_managed_voice_room(voice_channel):
         return
 
     overwrite = voice_channel.overwrites_for(member)
@@ -446,14 +468,16 @@ async def revoke_play_voice_room_chat_access(
     voice_channel: discord.VoiceChannel | None,
     member: discord.Member,
 ) -> None:
-    if member.bot or not is_temp_play_voice_room(voice_channel):
+    if member.bot or not is_temp_managed_voice_room(voice_channel):
         return
 
     panel_data = TEMP_VOICE_CONTROL_PANELS.get(voice_channel.id, {})
     if isinstance(panel_data, dict) and int(panel_data.get("owner_id") or 0) == member.id:
         return
 
-    if member_has_play_voice_role(member):
+    # 陪玩房原本有全體陪玩/打手身分組權限，可以保留不移除。
+    # VIP / 公共房則要照「進入給權限、離開收權限」處理。
+    if is_temp_play_voice_room(voice_channel) and member_has_play_voice_role(member):
         return
 
     if member in voice_channel.members:
