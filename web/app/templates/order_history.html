@@ -1,523 +1,1684 @@
 {% extends "layout.html" %}
 
-{% block page_title %}歷史訂單{% endblock %}
+{% block page_title %}歷史訂單
+<script>
+document.addEventListener("click", function (event) {
+    const button = event.target.closest(".history-dossier-toggle");
+    if (!button) return;
+
+    const targetId = button.getAttribute("data-dossier-target");
+    if (!targetId) return;
+
+    const row = document.getElementById(targetId);
+    if (!row) return;
+
+    const isHidden = row.hasAttribute("hidden");
+
+    document.querySelectorAll(".history-dossier-detail-row").forEach(function (item) {
+        if (item !== row) {
+            item.setAttribute("hidden", "");
+        }
+    });
+
+    document.querySelectorAll(".history-dossier-toggle").forEach(function (item) {
+        if (item !== button) {
+            item.textContent = "檢視卷宗";
+        }
+    });
+
+    if (isHidden) {
+        row.removeAttribute("hidden");
+        button.textContent = "收起卷宗";
+    } else {
+        row.setAttribute("hidden", "");
+        button.textContent = "檢視卷宗";
+    }
+});
+</script>
+
+
+<script>
+(function () {
+    function clearHistoryBackplates() {
+        const page = document.querySelector(".history-ledger-page");
+        if (!page) return;
+
+        let node = page.parentElement;
+        while (node && node !== document.body) {
+            node.style.setProperty("background", "transparent", "important");
+            node.style.setProperty("background-color", "transparent", "important");
+            node.style.setProperty("background-image", "none", "important");
+            node.style.setProperty("box-shadow", "none", "important");
+            node.style.setProperty("backdrop-filter", "none", "important");
+
+            const border = window.getComputedStyle(node).borderStyle;
+            if (border && border !== "none") {
+                node.style.setProperty("border-color", "rgba(190, 151, 86, 0.42)", "important");
+            }
+
+            node = node.parentElement;
+        }
+
+        page.querySelectorAll(".panel, .history-ledger-panel, .history-ledger-head, .history-ledger-table-wrap, table, thead, tbody, tr, th, td").forEach(function (el) {
+            el.style.setProperty("background", "transparent", "important");
+            el.style.setProperty("background-color", "transparent", "important");
+            el.style.setProperty("background-image", "none", "important");
+            el.style.setProperty("box-shadow", "none", "important");
+            el.style.setProperty("backdrop-filter", "none", "important");
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", clearHistoryBackplates);
+    window.addEventListener("load", clearHistoryBackplates);
+    setTimeout(clearHistoryBackplates, 300);
+})();
+</script>
+
+
+<script>
+(function () {
+    function restoreHistoryBottomToolbar() {
+        const toolbar = document.querySelector(".history-bulk-toolbar");
+        if (!toolbar) return;
+
+        toolbar.style.setProperty(
+            "background",
+            "radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%), linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91))",
+            "important"
+        );
+        toolbar.style.setProperty("background-color", "rgba(12, 9, 8, 0.94)", "important");
+        toolbar.style.setProperty("border", "1px solid rgba(190, 151, 86, 0.48)", "important");
+        toolbar.style.setProperty("box-shadow", "0 -12px 32px rgba(0, 0, 0, 0.42)", "important");
+        toolbar.style.setProperty("backdrop-filter", "blur(10px)", "important");
+    }
+
+    document.addEventListener("DOMContentLoaded", restoreHistoryBottomToolbar);
+    window.addEventListener("load", restoreHistoryBottomToolbar);
+    setTimeout(restoreHistoryBottomToolbar, 400);
+})();
+</script>
+
+
+
+
+{% endblock %}
 
 {% block content %}
 <style>
-.history-filter-form {
+.history-ledger-page {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto auto;
-    gap: 10px;
+    gap: 18px;
+}
+
+.history-ledger-hero {
+    padding: 18px 22px;
+    border: 1px solid rgba(183, 143, 82, 0.34);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 85% 20%, rgba(132, 28, 24, 0.22), transparent 34%),
+        linear-gradient(135deg, rgba(10, 10, 11, 0.62), rgba(22, 16, 14, 0.24));
+}
+
+.history-ledger-title {
+    margin: 0;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 1;
+    letter-spacing: 0.08em;
+}
+
+.history-ledger-filter {
+    display: grid;
+    grid-template-columns: minmax(180px, 220px) minmax(260px, 1fr) auto auto;
+    gap: 12px;
     align-items: end;
 }
-.history-filter-form label {
+
+.history-ledger-filter label {
     display: grid;
     gap: 6px;
 }
-.history-filter-form label > span {
-    color: rgba(226, 200, 134, 0.78);
-    font-size: 13px;
+
+.history-ledger-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.history-ledger-stat {
+    min-height: 112px;
+    padding: 18px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(116, 78, 42, 0.46);
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.92), rgba(203, 180, 137, 0.82)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%);
+    color: #130f0c;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.28);
+    position: relative;
+    overflow: hidden;
+}
+
+.history-ledger-stat::after {
+    content: "魔丸";
+    position: absolute;
+    right: 16px;
+    bottom: 12px;
+    color: rgba(128, 24, 18, 0.72);
+    border: 2px solid rgba(128, 24, 18, 0.48);
+    padding: 4px;
+    font-weight: 900;
+    font-size: 15px;
+    transform: rotate(-3deg);
+}
+
+.history-ledger-stat span {
+    display: block;
+    color: #5b1714;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
+
+.history-ledger-stat strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+}
+
+.history-ledger-stat small {
+    display: block;
+    margin-top: 10px;
+    color: rgba(23, 18, 14, 0.72);
     font-weight: 800;
 }
 
-.history-customer-list {
-    display: grid;
-    gap: 14px;
-}
-.history-customer-group {
-    border: 1px solid rgba(148, 163, 184, 0.24);
+.history-ledger-panel {
+    border: 1px solid rgba(183, 143, 82, 0.36);
     border-radius: 16px;
-    background: rgba(15, 23, 42, 0.44);
+    background:
+        linear-gradient(180deg, rgba(8, 9, 11, 0.45), rgba(8, 7, 6, 0.30)),
+        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
     overflow: hidden;
 }
-.history-customer-group > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 16px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 16px;
-    align-items: center;
-}
-.history-customer-group > summary::-webkit-details-marker {
-    display: none;
-}
-.history-customer-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-}
-.history-customer-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    background: rgba(99, 102, 241, 0.22);
-    border: 1px solid rgba(129, 140, 248, 0.38);
-    font-weight: 800;
-}
-.history-customer-name {
-    margin: 0;
-    font-size: 18px;
-}
-.history-customer-id {
-    margin: 4px 0 0;
-    color: #9ca3af;
-    font-size: 13px;
-    word-break: break-all;
-}
-.history-customer-meta {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-.history-customer-pill {
-    border-radius: 12px;
-    background: rgba(2, 6, 23, 0.42);
-    padding: 8px 12px;
-    min-width: 86px;
-    text-align: right;
-}
-.history-customer-pill span {
-    display: block;
-    color: #9ca3af;
-    font-size: 12px;
-}
-.history-customer-pill strong {
-    display: block;
-    margin-top: 3px;
-}
-.history-customer-orders {
-    border-top: 1px solid rgba(148, 163, 184, 0.16);
-    padding: 14px;
-    display: grid;
-    gap: 12px;
-}
-.history-order-card {
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 14px;
-    padding: 14px;
-    background: rgba(2, 6, 23, 0.28);
-}
-.history-order-head {
+
+.history-ledger-head {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
     align-items: center;
-    margin-bottom: 10px;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(183, 143, 82, 0.26);
 }
-.history-order-no {
-    font-weight: 800;
+
+.history-ledger-head h3 {
+    margin: 0;
+    font-size: 25px;
+    letter-spacing: 0.08em;
 }
-.history-order-status {
+
+.history-ledger-table-wrap {
+    overflow-x: auto;
+}
+
+.history-ledger-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1120px;
+}
+
+.history-ledger-table th,
+.history-ledger-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid rgba(183, 143, 82, 0.18);
+    border-right: 1px solid rgba(183, 143, 82, 0.14);
+    vertical-align: middle;
+}
+
+.history-ledger-table th {
+    color: #d9bd80;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    background: rgba(12, 10, 9, 0.36);
+    white-space: nowrap;
+}
+
+.history-ledger-table td {
+    color: rgba(255, 247, 226, 0.9);
+}
+
+.history-ledger-table .input {
+    width: 100%;
+    min-width: 0;
+    background: rgba(3, 5, 8, 0.22) !important;
+    border-color: rgba(183, 143, 82, 0.28) !important;
+    color: rgba(255, 247, 226, 0.94) !important;
+}
+
+.history-ledger-table input[type="number"] {
+    text-align: right;
+}
+
+.history-ledger-no {
+    font-weight: 900;
+    color: #f3db9a;
+    white-space: nowrap;
+}
+
+.history-ledger-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    min-width: 230px;
+}
+
+.history-ledger-content input {
+    min-width: 190px;
+}
+
+.history-ledger-person {
+    min-width: 190px;
+}
+
+.history-ledger-person strong {
+    display: block;
+}
+
+.history-ledger-person small {
+    display: block;
+    margin-top: 3px;
+    color: rgba(255,255,255,0.45);
+    font-size: 12px;
+}
+
+.history-ledger-workers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 170px;
+}
+
+.history-ledger-chip {
+    display: inline-flex;
+    align-items: center;
     border-radius: 999px;
-    padding: 4px 10px;
-    background: rgba(148, 163, 184, 0.16);
-    font-size: 13px;
-}
-.history-edit-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-}
-.history-edit-grid label {
-    display: grid;
-    gap: 5px;
-}
-.history-edit-grid span {
-    color: #9ca3af;
+    padding: 4px 8px;
+    border: 1px solid rgba(183, 143, 82, 0.26);
+    background: rgba(183, 143, 82, 0.09);
+    color: #f2dfb0;
     font-size: 12px;
-}
-.history-edit-grid input,
-.history-edit-grid select {
-    width: 100%;
-    box-sizing: border-box;
-}
-.history-assignment-box,
-.history-payout-box {
-    margin-top: 14px;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding-top: 14px;
-    display: grid;
-    gap: 10px;
-    max-width: 760px;
-}
-.history-assignment-title,
-.history-payout-title {
-    color: #cbd5e1;
     font-weight: 800;
-    font-size: 14px;
 }
-.history-assignment-row,
-.history-payout-row {
+
+.history-ledger-status select {
+    min-width: 96px;
+}
+
+.history-ledger-amount {
+    min-width: 118px;
+}
+
+.history-ledger-action {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.history-ledger-action .seal-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(214, 67, 50, 0.58);
+    color: #ff8a72;
+    background: rgba(96, 18, 15, 0.28);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
+
+.history-ledger-hidden-fields {
+    display: none;
+}
+
+.history-ledger-pagination,
+.history-bulk-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    border-top: 1px solid rgba(183, 143, 82, 0.18);
+}
+
+.history-page-links {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.history-page-links a,
+.history-page-links span {
+    min-width: 34px;
+    height: 34px;
     display: grid;
-    grid-template-columns: 90px minmax(160px, 1fr) 120px 90px;
-    gap: 12px;
-    align-items: end;
+    place-items: center;
+    border-radius: 8px;
+    border: 1px solid rgba(183, 143, 82, 0.22);
+    color: #e9d6a7;
+    text-decoration: none;
 }
-.history-payout-row {
-    grid-template-columns: 90px minmax(160px, 1fr) 150px;
+
+.history-page-links .active {
+    background: rgba(145, 35, 28, 0.74);
+    border-color: rgba(238, 86, 70, 0.58);
+    color: #fff4d7;
 }
-.history-assignment-row label,
-.history-payout-row label {
-    display: grid;
-    gap: 5px;
-}
-.history-assignment-row span,
-.history-payout-row span {
-    color: #9ca3af;
-    font-size: 12px;
-}
-.history-assignment-row select,
-.history-payout-row input {
-    width: 100%;
-    box-sizing: border-box;
-}
-.history-assignment-row strong,
-.history-payout-row strong {
-    overflow-wrap: anywhere;
-}
-.history-delete-check {
-    display: flex !important;
-    gap: 8px !important;
-    align-items: center !important;
-}
-.history-delete-check input {
-    width: auto !important;
-}
+
 .history-bulk-toolbar {
     position: sticky;
     bottom: 14px;
-    z-index: 30;
-    margin-top: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(15, 23, 42, 0.94);
+    z-index: 5;
+    margin-top: 12px;
+    border: 1px solid rgba(183, 143, 82, 0.32);
+    border-radius: 14px;
+    background: rgba(9, 8, 8, 0.88);
     backdrop-filter: blur(12px);
-    border-radius: 18px;
-    padding: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
 }
-.history-bulk-toolbar .muted-text {
-    margin: 0;
-}
+
 .history-bulk-actions {
     display: flex;
     gap: 10px;
-    flex-wrap: wrap;
 }
-.history-payout-row input::placeholder {
-    color: #64748b;
-}
-.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator {
+
+.history-date-input::-webkit-calendar-picker-indicator {
     filter: invert(1);
     opacity: 0.9;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-}
-.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.12);
 }
 
-@media (max-width: 900px) {
-    .history-filter-form,
-    .history-edit-grid,
-    .history-customer-group > summary,
-    .history-assignment-row,
-    .history-payout-row {
+@media (max-width: 1100px) {
+    .history-ledger-filter,
+    .history-ledger-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .history-ledger-filter,
+    .history-ledger-stats {
         grid-template-columns: 1fr;
     }
-    .history-customer-meta {
-        justify-content: flex-start;
+}
+
+.history-dossier-toggle {
+    cursor: pointer;
+    font-family: var(--mw-kai-font) !important;
+}
+
+.history-dossier-detail-row[hidden] {
+    display: none !important;
+}
+
+.history-dossier-detail-row td {
+    padding: 0 !important;
+    background:
+        radial-gradient(circle at 92% 18%, rgba(126, 23, 20, 0.16), transparent 36%),
+        rgba(5, 5, 6, 0.72);
+}
+
+.history-dossier-detail {
+    margin: 0;
+    padding: 18px;
+    border-top: 1px solid rgba(183, 143, 82, 0.26);
+    display: grid;
+    gap: 16px;
+}
+
+.history-dossier-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid rgba(183, 143, 82, 0.18);
+    padding-bottom: 12px;
+}
+
+.history-dossier-detail-head h4 {
+    margin: 0;
+    font-size: 22px;
+    color: #f2dfb0;
+    letter-spacing: 0.08em;
+}
+
+.history-dossier-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 16px;
+}
+
+.history-dossier-box {
+    border: 1px solid rgba(183, 143, 82, 0.24);
+    border-radius: 14px;
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.history-dossier-box-title {
+    margin: 0 0 12px;
+    color: #d9bd80;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+}
+
+.history-dossier-line {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 0;
+    border-top: 1px dashed rgba(183, 143, 82, 0.14);
+}
+
+.history-dossier-line:first-of-type {
+    border-top: 0;
+}
+
+.history-dossier-new-line {
+    opacity: 0.94;
+}
+
+.history-dossier-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    color: rgba(255, 247, 226, 0.82);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.history-dossier-payout-row {
+    display: grid;
+    grid-template-columns: 92px minmax(150px, 1fr) 150px;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 0;
+    border-top: 1px dashed rgba(183, 143, 82, 0.14);
+}
+
+.history-dossier-payout-row:first-of-type {
+    border-top: 0;
+}
+
+.history-dossier-payout-row strong {
+    color: #f2dfb0;
+}
+
+.history-dossier-payout-row small {
+    color: rgba(255,255,255,0.48);
+}
+
+@media (max-width: 1100px) {
+    .history-dossier-grid {
+        grid-template-columns: 1fr;
     }
-    .history-customer-pill {
-        text-align: left;
-    }
-    .history-bulk-toolbar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-    .history-bulk-actions {
-        width: 100%;
-    }
-    .history-bulk-actions .button {
-        flex: 1;
+
+    .history-dossier-line,
+    .history-dossier-payout-row {
+        grid-template-columns: 1fr;
     }
 }
+
+
+/* === HISTORY LEDGER VISUAL POLISH START === */
+
+/* 歷史訂單頁：讓背景透出來，不再一整塊黑底壓死 */
+.history-ledger-page {
+    gap: 20px;
+}
+
+/* 如果舊 hero 還存在，直接隱藏，避免兩個歷史訂單標題 */
+.history-ledger-hero {
+    display: none !important;
+}
+
+/* 篩選區透明化 */
+.history-ledger-page > .panel {
+    border: 1px solid rgba(183, 143, 82, 0.32) !important;
+    background:
+        radial-gradient(circle at 88% 20%, rgba(120, 24, 22, 0.14), transparent 36%),
+        rgba(5, 5, 7, 0.20) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(2px);
+}
+
+/* 統計卡改成暗色卷宗，不要大片米黃色 */
+.history-ledger-stat {
+    min-height: 104px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(183, 143, 82, 0.34) !important;
+    background:
+        radial-gradient(circle at 88% 16%, rgba(140, 35, 28, 0.18), transparent 40%),
+        linear-gradient(135deg, rgba(12, 10, 9, 0.42), rgba(8, 8, 10, 0.18)) !important;
+    color: rgba(255, 244, 214, 0.94) !important;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18) !important;
+    backdrop-filter: blur(2px);
+}
+
+.history-ledger-stat::after {
+    color: rgba(160, 42, 34, 0.42) !important;
+    border-color: rgba(160, 42, 34, 0.38) !important;
+    opacity: 0.75;
+}
+
+.history-ledger-stat span {
+    color: #d9bd80 !important;
+}
+
+.history-ledger-stat strong {
+    color: #fff1cc !important;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.history-ledger-stat small {
+    color: rgba(255, 244, 214, 0.52) !important;
+}
+
+/* 表格主框透明線框化 */
+.history-ledger-panel {
+    border: 1px solid rgba(183, 143, 82, 0.34) !important;
+    background:
+        radial-gradient(circle at 92% 12%, rgba(126, 23, 20, 0.13), transparent 38%),
+        linear-gradient(180deg, rgba(5, 5, 7, 0.22), rgba(5, 5, 7, 0.14)) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(2px);
+}
+
+.history-ledger-head {
+    background: rgba(5, 5, 7, 0.08) !important;
+    border-bottom: 1px solid rgba(183, 143, 82, 0.24) !important;
+}
+
+.history-ledger-head h3 {
+    color: #fff1cc !important;
+    text-shadow: 0 0 14px rgba(255, 233, 183, 0.12);
+}
+
+/* 表格透明化，但保留可讀性 */
+.history-ledger-table th {
+    background:
+        linear-gradient(90deg, rgba(94, 22, 19, 0.38), rgba(14, 14, 16, 0.20)) !important;
+    color: #e6c981 !important;
+}
+
+.history-ledger-table td {
+    background: rgba(3, 4, 6, 0.10) !important;
+}
+
+.history-ledger-table tr:hover td {
+    background: rgba(146, 48, 39, 0.12) !important;
+}
+
+/* input/select 不要黑成一塊，改成玻璃感 */
+.history-ledger-table .input,
+.history-ledger-filter .input {
+    background: rgba(0, 0, 0, 0.24) !important;
+    border: 1px solid rgba(183, 143, 82, 0.34) !important;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.16);
+}
+
+.history-ledger-table .input:focus,
+.history-ledger-filter .input:focus {
+    border-color: rgba(240, 94, 76, 0.72) !important;
+    box-shadow:
+        inset 0 0 18px rgba(0, 0, 0, 0.18),
+        0 0 0 2px rgba(240, 94, 76, 0.14) !important;
+}
+
+/* 卷宗展開區也透明化 */
+.history-dossier-detail-row td {
+    background:
+        radial-gradient(circle at 92% 18%, rgba(126, 23, 20, 0.12), transparent 36%),
+        rgba(5, 5, 6, 0.28) !important;
+}
+
+.history-dossier-box {
+    background: rgba(0, 0, 0, 0.16) !important;
+    border-color: rgba(183, 143, 82, 0.26) !important;
+}
+
+/* 底部保存列更像派單頁提示條 */
+.history-bulk-toolbar {
+    background:
+        radial-gradient(circle at 90% 30%, rgba(146, 35, 28, 0.18), transparent 42%),
+        rgba(5, 5, 7, 0.42) !important;
+    border: 1px solid rgba(183, 143, 82, 0.34) !important;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22) !important;
+    backdrop-filter: blur(6px);
+}
+
+/* === HISTORY LEDGER VISUAL POLISH END === */
+
+
+/* === HISTORY TRANSPARENT TABLE FINAL START === */
+
+/* 統計卡保留米黃色羊皮紙 */
+.history-ledger-stat {
+    min-height: 112px !important;
+    padding: 18px 20px !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(116, 78, 42, 0.46) !important;
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
+    color: #130f0c !important;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
+    backdrop-filter: none !important;
+}
+
+.history-ledger-stat span {
+    color: #5b1714 !important;
+}
+
+.history-ledger-stat strong {
+    color: #130f0c !important;
+    text-shadow: none !important;
+}
+
+.history-ledger-stat small {
+    color: rgba(23, 18, 14, 0.72) !important;
+}
+
+.history-ledger-stat::after {
+    color: rgba(128, 24, 18, 0.72) !important;
+    border-color: rgba(128, 24, 18, 0.48) !important;
+    opacity: 1 !important;
+}
+
+/* 其他區塊全部透明：只留線條 */
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-ledger-head,
+.history-ledger-table th,
+.history-ledger-table td,
+.history-ledger-table tr:hover td,
+.history-dossier-detail-row td,
+.history-dossier-box,
+.history-bulk-toolbar {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 外框與分隔線保留 */
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-bulk-toolbar {
+    border: 1px solid rgba(183, 143, 82, 0.36) !important;
+}
+
+.history-ledger-head,
+.history-ledger-pagination,
+.history-bulk-toolbar {
+    border-top-color: rgba(183, 143, 82, 0.22) !important;
+    border-bottom-color: rgba(183, 143, 82, 0.22) !important;
+}
+
+.history-ledger-table th,
+.history-ledger-table td {
+    border-color: rgba(183, 143, 82, 0.20) !important;
+}
+
+/* 表頭不要有色塊，只留金字 */
+.history-ledger-table th {
+    color: #e6c981 !important;
+}
+
+/* input / select 保留一點點深色可讀性，不然字會飄 */
+.history-ledger-table .input,
+.history-ledger-filter .input {
+    background: rgba(0, 0, 0, 0.16) !important;
+    border: 1px solid rgba(183, 143, 82, 0.36) !important;
+    box-shadow: none !important;
+}
+
+/* 展開卷宗區塊也只留框線 */
+.history-dossier-detail {
+    background: transparent !important;
+    border-top: 1px solid rgba(183, 143, 82, 0.24) !important;
+}
+
+.history-dossier-box {
+    border: 1px solid rgba(183, 143, 82, 0.26) !important;
+}
+
+/* 底部保存列不再是一整塊黑底 */
+.history-bulk-toolbar {
+    background: rgba(0, 0, 0, 0.06) !important;
+    backdrop-filter: none !important;
+}
+
+/* === HISTORY TRANSPARENT TABLE FINAL END === */
+
+
+/* === HISTORY REMOVE ALL BACKPLATES START === */
+
+/* 歷史訂單頁外層大底板全部拿掉 */
+body:has(.history-ledger-page) .content-card,
+body:has(.history-ledger-page) .content-shell,
+body:has(.history-ledger-page) .main-card,
+body:has(.history-ledger-page) .dashboard-card,
+body:has(.history-ledger-page) .page-card,
+body:has(.history-ledger-page) .admin-card,
+body:has(.history-ledger-page) .mw-content-card,
+body:has(.history-ledger-page) main,
+body:has(.history-ledger-page) .panel {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 歷史頁自己的區塊也透明，只留線 */
+.history-ledger-page,
+.history-ledger-page > section,
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-ledger-head,
+.history-ledger-table-wrap,
+.history-ledger-table,
+.history-ledger-table thead,
+.history-ledger-table tbody,
+.history-ledger-table tr,
+.history-ledger-table th,
+.history-ledger-table td,
+.history-ledger-pagination,
+.history-dossier-detail-row,
+.history-dossier-detail-row td,
+.history-dossier-detail,
+.history-dossier-box,
+.history-bulk-toolbar {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 保留外框線 */
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-bulk-toolbar,
+.history-dossier-box {
+    border: 1px solid rgba(183, 143, 82, 0.34) !important;
+}
+
+/* 表格只剩線條 */
+.history-ledger-table th,
+.history-ledger-table td {
+    border-color: rgba(183, 143, 82, 0.22) !important;
+}
+
+/* 表頭只留金字，不留紅黑底 */
+.history-ledger-table th {
+    color: #e6c981 !important;
+}
+
+/* 統計卡例外：保留米黃色 */
+.history-ledger-stats .history-ledger-stat {
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
+    color: #130f0c !important;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
+    border: 1px solid rgba(116, 78, 42, 0.46) !important;
+}
+
+.history-ledger-stats .history-ledger-stat span {
+    color: #5b1714 !important;
+}
+
+.history-ledger-stats .history-ledger-stat strong {
+    color: #130f0c !important;
+    text-shadow: none !important;
+}
+
+.history-ledger-stats .history-ledger-stat small {
+    color: rgba(23, 18, 14, 0.72) !important;
+}
+
+/* input/select 只留極淡底，避免看不到字 */
+.history-ledger-page .input,
+.history-ledger-page input,
+.history-ledger-page select {
+    background: rgba(0, 0, 0, 0.14) !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* === HISTORY REMOVE ALL BACKPLATES END === */
+
+
+/* === HISTORY OUTER SHELL TRANSPARENT START === */
+
+/* 只針對歷史訂單頁，把最外層大底板拿掉，只留邊框 */
+body:has(.history-ledger-page) .content,
+body:has(.history-ledger-page) .content-area,
+body:has(.history-ledger-page) .page-content,
+body:has(.history-ledger-page) .main-content,
+body:has(.history-ledger-page) .dashboard-content,
+body:has(.history-ledger-page) .mw-main,
+body:has(.history-ledger-page) .mw-page,
+body:has(.history-ledger-page) .mw-page-shell,
+body:has(.history-ledger-page) .mw-dashboard-card,
+body:has(.history-ledger-page) .mw-dashboard-panel,
+body:has(.history-ledger-page) .dashboard-panel,
+body:has(.history-ledger-page) .dashboard-card,
+body:has(.history-ledger-page) .content-card,
+body:has(.history-ledger-page) .page-card,
+body:has(.history-ledger-page) .panel-shell,
+body:has(.history-ledger-page) .admin-shell,
+body:has(.history-ledger-page) .admin-panel,
+body:has(.history-ledger-page) .app-panel,
+body:has(.history-ledger-page) .app-card,
+body:has(.history-ledger-page) main > section,
+body:has(.history-ledger-page) main > div {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 如果這個大框本身就是外層卡片，保留它的金色邊框 */
+body:has(.history-ledger-page) .content-card,
+body:has(.history-ledger-page) .dashboard-card,
+body:has(.history-ledger-page) .page-card,
+body:has(.history-ledger-page) .app-card,
+body:has(.history-ledger-page) .admin-panel,
+body:has(.history-ledger-page) .mw-dashboard-card {
+    border: 1px solid rgba(183, 143, 82, 0.38) !important;
+}
+
+/* 有些底色是用 ::before / ::after 疊出來的，直接關掉 */
+body:has(.history-ledger-page) .content-card::before,
+body:has(.history-ledger-page) .content-card::after,
+body:has(.history-ledger-page) .dashboard-card::before,
+body:has(.history-ledger-page) .dashboard-card::after,
+body:has(.history-ledger-page) .page-card::before,
+body:has(.history-ledger-page) .page-card::after,
+body:has(.history-ledger-page) .app-card::before,
+body:has(.history-ledger-page) .app-card::after,
+body:has(.history-ledger-page) .admin-panel::before,
+body:has(.history-ledger-page) .admin-panel::after,
+body:has(.history-ledger-page) .mw-dashboard-card::before,
+body:has(.history-ledger-page) .mw-dashboard-card::after {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    opacity: 0 !important;
+}
+
+/* 歷史訂單頁自己也不要再放任何大面積底色 */
+.history-ledger-page,
+.history-ledger-page::before,
+.history-ledger-page::after {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 統計卡仍保留米黃色 */
+.history-ledger-stats .history-ledger-stat {
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
+    color: #130f0c !important;
+}
+
+/* === HISTORY OUTER SHELL TRANSPARENT END === */
+
+
+/* === HISTORY MATCH DISPATCH TRANSPARENCY START === */
+
+/*
+    目標：歷史訂單頁跟派單頁一樣，
+    背景要透上來，只保留金色線框與必要的可讀性。
+*/
+
+/* 最外層整頁不要黑膜 */
+.history-ledger-page {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 歷史頁內所有大區塊預設透明 */
+.history-ledger-page .panel,
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-ledger-head,
+.history-ledger-table-wrap,
+.history-ledger-pagination,
+.history-bulk-toolbar,
+.history-dossier-detail,
+.history-dossier-box {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* section 只留線框，像派單頁 */
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-bulk-toolbar {
+    border: 1px solid rgba(190, 151, 86, 0.42) !important;
+    border-radius: 18px !important;
+}
+
+/* 表格整體透明 */
+.history-ledger-table,
+.history-ledger-table thead,
+.history-ledger-table tbody,
+.history-ledger-table tr,
+.history-ledger-table th,
+.history-ledger-table td {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+}
+
+/* 表格線條保留，不要色塊 */
+.history-ledger-table th,
+.history-ledger-table td {
+    border-color: rgba(190, 151, 86, 0.23) !important;
+}
+
+/* 表頭不要紅底，只留金字 */
+.history-ledger-table th {
+    color: #e9cf8f !important;
+    text-shadow: 0 0 10px rgba(233, 207, 143, 0.14);
+}
+
+/* row hover 不要色塊 */
+.history-ledger-table tr:hover td {
+    background: transparent !important;
+}
+
+/* 篩選列改派單頁透明框 */
+.history-ledger-filter {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* input/select 只留薄薄底，避免完全看不清 */
+.history-ledger-page .input,
+.history-ledger-page input,
+.history-ledger-page select {
+    background: rgba(0, 0, 0, 0.18) !important;
+    background-image: none !important;
+    border: 1px solid rgba(190, 151, 86, 0.36) !important;
+    box-shadow: none !important;
+}
+
+/* 卷宗展開區透明 */
+.history-dossier-detail-row,
+.history-dossier-detail-row td,
+.history-dossier-detail,
+.history-dossier-box {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* 底部保存列也不要一整條黑底，只留外框 */
+.history-bulk-toolbar {
+    background: rgba(0, 0, 0, 0.08) !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 統計卡保留米黃色羊皮紙 */
+.history-ledger-stats .history-ledger-stat {
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
+    color: #130f0c !important;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
+    border: 1px solid rgba(116, 78, 42, 0.46) !important;
+}
+
+.history-ledger-stats .history-ledger-stat span {
+    color: #5b1714 !important;
+}
+
+.history-ledger-stats .history-ledger-stat strong {
+    color: #130f0c !important;
+    text-shadow: none !important;
+}
+
+.history-ledger-stats .history-ledger-stat small {
+    color: rgba(23, 18, 14, 0.72) !important;
+}
+
+/* 關鍵：把可能疊在歷史頁上的偽元素黑膜關掉 */
+.history-ledger-page::before,
+.history-ledger-page::after,
+.history-ledger-page .panel::before,
+.history-ledger-page .panel::after,
+.history-ledger-panel::before,
+.history-ledger-panel::after {
+    content: none !important;
+    display: none !important;
+    background: transparent !important;
+    opacity: 0 !important;
+}
+
+/* === HISTORY MATCH DISPATCH TRANSPARENCY END === */
+
+
+/* === HISTORY FORCE TRUE TRANSPARENT START === */
+
+/* 歷史頁自己全部不要底色 */
+.history-ledger-page,
+.history-ledger-page *:not(.history-ledger-stat):not(.history-ledger-stat *) {
+    box-shadow: none;
+}
+
+.history-ledger-page,
+.history-ledger-page > section,
+.history-ledger-page .panel,
+.history-ledger-panel,
+.history-ledger-head,
+.history-ledger-table-wrap,
+.history-ledger-table,
+.history-ledger-table thead,
+.history-ledger-table tbody,
+.history-ledger-table tr,
+.history-ledger-table th,
+.history-ledger-table td,
+.history-ledger-pagination,
+.history-dossier-detail,
+.history-dossier-box,
+.history-bulk-toolbar {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+}
+
+/* 只保留線 */
+.history-ledger-page > .panel,
+.history-ledger-panel,
+.history-bulk-toolbar {
+    border: 1px solid rgba(190, 151, 86, 0.42) !important;
+}
+
+/* 統計卡例外：米黃色保留 */
+.history-ledger-stats .history-ledger-stat {
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
+    color: #130f0c !important;
+    border: 1px solid rgba(116, 78, 42, 0.46) !important;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
+}
+
+/* === HISTORY FORCE TRUE TRANSPARENT END === */
+
+
+
+
+
+
+
+
+/* === HISTORY STICKY TOOLBAR READABILITY START === */
+
+/* 底部保存列需要底色，不然蓋在表格上看不清楚 */
+.history-bulk-toolbar {
+    background:
+        radial-gradient(circle at 92% 30%, rgba(126, 23, 20, 0.24), transparent 42%),
+        linear-gradient(90deg, rgba(13, 10, 8, 0.92), rgba(22, 12, 10, 0.88)) !important;
+    background-color: rgba(10, 8, 7, 0.92) !important;
+    border: 1px solid rgba(190, 151, 86, 0.42) !important;
+    box-shadow:
+        0 -12px 28px rgba(0, 0, 0, 0.34),
+        0 0 0 1px rgba(0, 0, 0, 0.16) inset !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+.history-bulk-toolbar .muted-text {
+    color: rgba(255, 244, 214, 0.82) !important;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.72);
+}
+
+.history-bulk-toolbar .button {
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* === HISTORY STICKY TOOLBAR READABILITY END === */
+
+
+
+
+
+/* === HISTORY BOTTOM TOOLBAR FINAL FIX START === */
+
+/* 底部保存列必須保留霧面底，不然壓在表格上看不清楚 */
+.history-ledger-page .history-bulk-toolbar,
+form#historyBulkForm .history-bulk-toolbar,
+.history-bulk-toolbar {
+    background:
+        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%),
+        linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91)) !important;
+    background-color: rgba(12, 9, 8, 0.94) !important;
+    background-image:
+        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%),
+        linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91)) !important;
+
+    border: 1px solid rgba(190, 151, 86, 0.48) !important;
+    border-radius: 16px !important;
+
+    box-shadow:
+        0 -12px 32px rgba(0, 0, 0, 0.42),
+        0 0 0 1px rgba(255, 214, 128, 0.05) inset !important;
+
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.history-bulk-toolbar .muted-text {
+    color: rgba(255, 244, 214, 0.86) !important;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85) !important;
+}
+
+.history-bulk-toolbar .button {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34) !important;
+}
+
+/* 防止強制透明 JS 或全站 CSS 把它清掉 */
+.history-bulk-toolbar::before,
+.history-bulk-toolbar::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* === HISTORY BOTTOM TOOLBAR FINAL FIX END === */
+
+
+
+
+
+
+
+
+
+
+
+/* === HISTORY STATUS CLEAN FINAL START === */
+
+/* 狀態欄回歸正常表格，不再用 wrapper / 假 select */
+.history-ledger-table td.history-status-cell {
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
+    padding: 10px 8px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* select 本體固定尺寸，不撐壞格線 */
+.history-ledger-table td.history-status-cell select.history-status-select {
+    box-sizing: border-box !important;
+    display: block !important;
+
+    width: 82px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+
+    margin: 0 auto !important;
+    padding: 0 6px !important;
+
+    border-radius: 8px !important;
+    border: 1px solid rgba(190, 151, 86, 0.52) !important;
+    background: rgba(0, 0, 0, 0.22) !important;
+    box-shadow: none !important;
+
+    color: rgba(255, 247, 226, 0.96) !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    font-family: var(--mw-kai-font), "DFKai-SB", "標楷體", serif !important;
+
+    text-align: center !important;
+    text-align-last: center !important;
+}
+
+.history-ledger-table td.history-status-cell select.history-status-select:focus {
+    outline: none !important;
+    border-color: rgba(240, 94, 76, 0.78) !important;
+}
+
+/* 移除殘留大膠囊 */
+.history-status-wrap,
+.history-status-label {
+    display: contents !important;
+}
+
+.history-ledger-table td.history-status-cell::before,
+.history-ledger-table td.history-status-cell::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* === HISTORY STATUS CLEAN FINAL END === */
+
+
+/* === HISTORY FONT SIZE TUNE START === */
+
+/* 只調小字，不動大標題與統計卡大數字 */
+
+/* 篩選列標籤與輸入 */
+.history-ledger-filter label span {
+    font-size: 15px !important;
+    font-weight: 900 !important;
+}
+
+.history-ledger-filter .input,
+.history-ledger-filter input,
+.history-ledger-filter select {
+    font-size: 15px !important;
+}
+
+/* 統計卡小標與說明加大一點，但不動 strong 大數字 */
+.history-ledger-stat span {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+}
+
+.history-ledger-stat small {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+}
+
+/* 表格表頭 */
+.history-ledger-table th {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* 表格內容 */
+.history-ledger-table td {
+    font-size: 15px !important;
+}
+
+/* 契約編號目前略小，加大但不誇張 */
+.history-ledger-no {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+}
+
+/* input / select 文字 */
+.history-ledger-table .input,
+.history-ledger-table input,
+.history-ledger-table select,
+.history-ledger-table .history-status-select {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+}
+
+/* 委託人下方 ID 太小，稍微加大 */
+.history-ledger-person small {
+    font-size: 13px !important;
+    color: rgba(255, 247, 226, 0.62) !important;
+}
+
+/* 接單人員小徽章 */
+.history-ledger-chip {
+    font-size: 13px !important;
+    font-weight: 900 !important;
+    padding: 5px 9px !important;
+}
+
+/* 頁碼 / 右上說明 */
+.history-ledger-head .muted-text,
+.history-ledger-pagination,
+.history-ledger-pagination .muted-text,
+.history-page-links a,
+.history-page-links span {
+    font-size: 14px !important;
+}
+
+/* 底部保存列說明 */
+.history-bulk-toolbar .muted-text {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+}
+
+/* 底部按鈕 */
+.history-bulk-toolbar .button {
+    font-size: 15px !important;
+    font-weight: 900 !important;
+}
+
+/* 檢視卷宗按鈕 */
+.history-ledger-action .seal-button {
+    font-size: 14px !important;
+    font-weight: 900 !important;
+}
+
+/* 卷宗展開區小字 */
+.history-dossier-detail,
+.history-dossier-detail .input,
+.history-dossier-detail select,
+.history-dossier-detail input,
+.history-dossier-check,
+.history-dossier-payout-row {
+    font-size: 15px !important;
+}
+
+.history-dossier-box-title {
+    font-size: 16px !important;
+}
+
+/* === HISTORY FONT SIZE TUNE END === */
+
 </style>
 
-<section class="panel">
-    <div class="section-title-row">
-        <div>
-            <p class="order-no">ORDER ARCHIVE</p>
-            <h2>歷史訂單｜卷宗庫</h2>
-            <p class="muted-text">已存單、已結單與歷史訂單會保留在這裡，可修正訂單資料、結單日期、人員與分潤。</p>
+<div class="history-ledger-page">
+    <section class="panel">
+        <form method="get" action="/admin/orders/history" class="history-ledger-filter">
+            <label>
+                <span>訂單狀態</span>
+                <select class="input" name="status">
+                    {% for value, label in status_options %}
+                        <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label>
+                <span>搜尋契約編號 / 內容 / 委託人</span>
+                <input class="input" type="search" name="keyword" value="{{ keyword }}" placeholder="輸入關鍵字">
+            </label>
+
+            <button class="button" type="submit">套用篩選</button>
+            <a class="button secondary" href="/admin/orders/history">重設條件</a>
+        </form>
+    </section>
+
+    <section class="history-ledger-stats">
+        <div class="history-ledger-stat">
+            <span>歷史總筆數 ◆</span>
+            <strong>{{ total_orders }}</strong>
+            <small>每頁顯示 {{ per_page }} 筆</small>
         </div>
-        <a class="button secondary" href="/admin">回總控後台</a>
-    </div>
-</section>
+        <div class="history-ledger-stat">
+            <span>已結單 ◆</span>
+            <strong>{{ history_closed_count }}</strong>
+            <small>已完成卷宗</small>
+        </div>
+        <div class="history-ledger-stat">
+            <span>存單 ◆</span>
+            <strong>{{ history_stored_count }}</strong>
+            <small>存單紀錄</small>
+        </div>
+        <div class="history-ledger-stat">
+            <span>總金額 ◆</span>
+            <strong>{{ history_total_amount }}</strong>
+            <small>TWD / T</small>
+        </div>
+    </section>
 
-<section class="panel">
-    <form method="get" action="/admin/orders/history" class="history-filter-form">
-        <label>
-            <span>老闆名稱</span>
-            <select class="input" name="customer">
-                <option value="">全部老闆</option>
-                {% for option in customer_options %}
-                    <option value="{{ option.value }}" {% if customer == option.value %}selected{% endif %}>{{ option.label }}</option>
-                {% endfor %}
-            </select>
-        </label>
+    <form id="historyBulkForm" method="post" action="/admin/orders/history/bulk-update">
+        <input type="hidden" name="page" value="{{ page }}">
 
-        <button class="button" type="submit">套用篩選</button>
-        <a class="button secondary" href="/admin/orders/history">清除</a>
-    </form>
-</section>
-
-<form id="historyBulkForm" method="post" action="/admin/orders/history/bulk-update">
-{% if customer_groups %}
-    <section class="history-customer-list">
-        {% for group in customer_groups %}
-            <details class="history-customer-group">
-                <summary>
-                    <div class="history-customer-title">
-                        <div class="history-customer-avatar">{{ (group.customer_name or '?')[:1] }}</div>
-                        <div>
-                            <h3 class="history-customer-name">{{ group.customer_name }}</h3>
-                            <p class="history-customer-id">
-                                {% if group.customer_id %}
-                                    ID：{{ group.customer_id }}
-                                {% else %}
-                                    未記錄 Discord ID
-                                {% endif %}
-                            </p>
-                        </div>
+        {% if orders %}
+            <section class="history-ledger-panel">
+                <div class="history-ledger-head">
+                    <div>
+                        <p class="order-no">DOSSIER LEDGER</p>
+                        <h3>卷宗庫 / 歷史訂單卷宗</h3>
                     </div>
+                    <div class="muted-text">第 {{ page }} / {{ total_pages }} 頁，共 {{ total_orders }} 筆</div>
+                </div>
 
-                    <div class="history-customer-meta">
-                        <div class="history-customer-pill">
-                            <span>訂單數</span>
-                            <strong>{{ group.order_count }}</strong>
-                        </div>
-                        <div class="history-customer-pill">
-                            <span>總金額</span>
-                            <strong>{{ group.total_amount }}T</strong>
-                        </div>
-                    </div>
-                </summary>
+                <div class="history-ledger-table-wrap">
+                    <table class="history-ledger-table">
+                        <thead>
+                            <tr>
+                                <th>契約編號</th>
+                                <th>結單日期</th>
+                                <th>委託人</th>
+                                <th>內容</th>
+                                <th>接單人員</th>
+                                <th>客服</th>
+                                <th>狀態</th>
+                                <th>金額</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                                {% set assignment_rows = assignments_by_order_id.get(order.id, []) %}
+                                <tr>
+                                    <td>
+                                        <input type="hidden" name="order_id" value="{{ order.id }}">
+                                        <div class="history-ledger-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</div>
+                                    </td>
 
-                <div class="history-customer-orders">
-                    {% for order in group.orders %}
-                        <article class="history-order-card">
-                            <div class="history-order-head">
-                                <div class="history-order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</div>
-                                <div class="history-order-status">
-                                    {{ {'active': '進行中', 'stored': '存單', 'closed': '已結單'}.get(order.status, order.status) }}
-                                </div>
-                            </div>
+                                    <td>
+                                        <input
+                                            class="input history-date-input"
+                                            type="date"
+                                            name="closed_date_{{ order.id }}"
+                                            value="{{ closed_dates_by_order_id.get(order.id, "") }}"
+                                        >
+                                    </td>
 
-                            <input type="hidden" name="order_id" value="{{ order.id }}">
+                                    <td>
+                                        <div class="history-ledger-person">
+                                            <input class="input" type="text" name="customer_display_name_{{ order.id }}" value="{{ order.customer_display_name or '' }}" placeholder="委託人">
+                                            <input type="hidden" name="customer_discord_id_{{ order.id }}" value="{{ order.customer_discord_id or '' }}">
+                                            {% if order.customer_discord_id %}
+                                                <small>ID：{{ order.customer_discord_id }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
 
-                            <div class="history-edit-grid">
-                                <label>
-                                    <span>老闆名稱</span>
-                                    <input class="input" type="text" name="customer_display_name_{{ order.id }}" value="{{ order.customer_display_name or '' }}">
-                                </label>
+                                    <td>
+                                        <div class="history-ledger-content">
+                                            <input type="hidden" name="category_{{ order.id }}" value="{{ order.category or '' }}">
+                                            <input class="input" type="text" name="item_{{ order.id }}" value="{{ order.item or '' }}" placeholder="訂單內容">
+                                        </div>
+                                    </td>
 
-                                <label>
-                                    <span>老闆 Discord ID</span>
-                                    <input class="input" type="text" name="customer_discord_id_{{ order.id }}" value="{{ order.customer_discord_id or '' }}">
-                                </label>
+                                    <td>
+                                        <div class="history-ledger-workers">
+                                            {% if assignment_rows %}
+                                                {% for assignment in assignment_rows %}
+                                                    <span class="history-ledger-chip">{{ assignment.worker_display_name or assignment.worker_discord_id }}</span>
+{% endfor %}
+                                            {% else %}
+                                                <span class="muted-text">未記錄</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
 
-                                <label>
-                                    <span>類別</span>
-                                    <input class="input" type="text" name="category_{{ order.id }}" value="{{ order.category or '' }}">
-                                </label>
-
-                                <label>
-                                    <span>項目</span>
-                                    <input class="input" type="text" name="item_{{ order.id }}" value="{{ order.item or '' }}">
-                                </label>
-
-                                <label>
-                                    <span>金額</span>
-                                    <input class="input" type="number" name="amount_{{ order.id }}" value="{{ order.amount or 0 }}">
-                                </label>
-
-                                <label>
-                                    <span>狀態</span>
-                                    <select class="input" name="status_{{ order.id }}">
-                                        <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
-                                        <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
-                                        <option value="closed" {% if order.status == "closed" %}selected{% endif %}>已結單</option>
-                                    </select>
-                                </label>
-
-                                <label>
-                                    <span>建立時間</span>
-                                    <input class="input" type="text" value="{{ order.created_at }}" disabled>
-                                </label>
-
-                                <label>
-                                    <span>結單日期</span>
-                                    <input
-                                        class="input"
-                                        type="date"
-                                        name="closed_date_{{ order.id }}"
-                                        value="{{ history_closed_date_input_value(order) }}"
-                                    >
-                                </label>
-
-                                <label>
-                                    <span>更新時間</span>
-                                    <input class="input" type="text" value="{{ order.updated_at or '' }}" disabled>
-                                </label>
-                            </div>
-
-                            <div class="history-assignment-box">
-                                <div class="history-assignment-title">客服</div>
-
-                                <div class="history-assignment-row">
-                                    <div>
-                                        <span>身份</span>
-                                        <strong>客服</strong>
-                                    </div>
-
-                                    <label>
-                                        <span>人員</span>
+                                    <td>
                                         <select class="input" name="customer_service_{{ order.id }}">
                                             <option value="">無</option>
                                             {% for option in history_staff_options.customer_services %}
                                                 <option value="{{ option.id }}" {% if order.customer_service_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
                                             {% endfor %}
                                         </select>
-                                    </label>
+                                    </td>
 
-                                    <div></div>
-                                    <div></div>
-                                </div>
-                            </div>
+                                    <td class="history-status-cell">
+                                        <select class="history-status-select" name="status_{{ order.id }}">
+                                            <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
+                                            <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
+                                            <option value="closed" {% if order.status == "closed" %}selected{% endif %}>已結單</option>
+                                            <option value="cancelled" {% if order.status == "cancelled" %}selected{% endif %}>取消</option>
+                                        </select>
+                                    </td>
 
-                            <div class="history-assignment-box">
-                                <div class="history-assignment-title">打手</div>
+                                    <td>
+                                        <input class="input history-ledger-amount" type="number" name="amount_{{ order.id }}" value="{{ order.amount or 0 }}">
+                                    </td>
 
-                                {% set assignment_rows = assignments_by_order_id.get(order.id, []) %}
-                                {% for assignment in assignment_rows %}
-                                    <div class="history-assignment-row">
-                                        <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
+                                    <td class="history-ledger-action">
+                                        <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">檢視卷宗</button>
+                                    </td>
+                                </tr>
 
-                                        <div>
-                                            <span>身份</span>
-                                            <strong>打手</strong>
-                                        </div>
-
-                                        <label>
-                                            <span>人員</span>
-                                            <select class="input" name="assignment_worker_{{ assignment.id }}">
-                                                {% for option in history_staff_options.workers %}
-                                                    <option value="{{ option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </label>
-
-                                        <label class="history-delete-check">
-                                            <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
-                                            <span>掛名 +5%</span>
-                                        </label>
-
-                                        <label class="history-delete-check">
-                                            <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
-                                            <span>刪除</span>
-                                        </label>
-                                    </div>
-                                {% endfor %}
-
-                                {% for i in [1, 2, 3] %}
-                                    <div class="history-assignment-row">
-                                        <div>
-                                            <span>身份</span>
-                                            <strong>新增</strong>
-                                        </div>
-
-                                        <label>
-                                            <span>新增打手</span>
-                                            <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
-                                                <option value="">不新增</option>
-                                                {% for option in history_staff_options.workers %}
-                                                    <option value="{{ option.id }}">{{ option.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </label>
-
-                                        <label class="history-delete-check">
-                                            <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
-                                            <span>掛名 +5%</span>
-                                        </label>
-
-                                        <div></div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-
-                            {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
-                            {% if payout_rows %}
-                                <div class="history-payout-box">
-                                    <div class="history-payout-title">分潤調整</div>
-
-                                    {% for payout in payout_rows %}
-                                        <div class="history-payout-row">
-                                            <div>
-                                                <span>身份</span>
-                                                <strong>{{ payout.label }}</strong>
+                                <tr class="history-dossier-detail-row" id="dossier-{{ order.id }}" hidden>
+                                    <td colspan="9">
+                                        <div class="history-dossier-detail">
+                                            <div class="history-dossier-detail-head">
+                                                <div>
+                                                    <p class="order-no">DOSSIER EDITOR</p>
+                                                    <h4>{{ order.bot_order_no or ("WEB-" ~ order.id) }}｜卷宗修改</h4>
+                                                </div>
+                                                <p class="muted-text">可修改接單人員、掛名狀態與分潤金額。</p>
                                             </div>
 
-                                            <div>
-                                                <span>人員</span>
-                                                <strong>{{ payout.person_name }}</strong>
-                                            </div>
+                                            <div class="history-dossier-grid">
+                                                <div class="history-dossier-box">
+                                                    <p class="history-dossier-box-title">接單人員</p>
 
-                                            <label>
-                                                <span>分潤金額</span>
-                                                {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
-                                                <input
-                                                    class="input"
-                                                    type="number"
-                                                    name="{{ payout.input_name }}"
-                                                    value="{{ manual_payout_overrides.get(manual_key, '') }}"
-                                                    placeholder="自動"
-                                                >
-                                            </label>
+                                                    {% if assignment_rows %}
+                                                        {% for assignment in assignment_rows %}
+                                                            <div class="history-dossier-line">
+                                                                <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
+
+                                                                <select class="input" name="assignment_worker_{{ assignment.id }}">
+                                                                    {% for option in history_staff_options.workers %}
+                                                                        <option value="{{ option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
+                                                                    {% endfor %}
+                                                                </select>
+
+                                                                <label class="history-dossier-check">
+                                                                    <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
+                                                                    <span>掛名 +5%</span>
+                                                                </label>
+
+                                                                <label class="history-dossier-check">
+                                                                    <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
+                                                                    <span>移除</span>
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <p class="muted-text">目前沒有接單人員，可使用下方欄位新增。</p>
+                                                    {% endif %}
+
+                                                    {% for i in range(3) %}
+                                                        <div class="history-dossier-line history-dossier-new-line">
+                                                            <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
+                                                                <option value="">新增接單人員</option>
+                                                                {% for option in history_staff_options.workers %}
+                                                                    <option value="{{ option.id }}">{{ option.name }}</option>
+                                                                {% endfor %}
+                                                            </select>
+
+                                                            <label class="history-dossier-check">
+                                                                <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
+                                                                <span>掛名 +5%</span>
+                                                            </label>
+
+                                                            <span class="muted-text">新增</span>
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+
+                                                <div class="history-dossier-box">
+                                                    <p class="history-dossier-box-title">分潤調整</p>
+
+                                                    {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
+                                                    {% if payout_rows %}
+                                                        {% for payout in payout_rows %}
+                                                            {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
+                                                            <div class="history-dossier-payout-row">
+                                                                <strong>{{ payout.label }}</strong>
+                                                                <div>
+                                                                    <span>{{ payout.person_name or payout.person_id }}</span>
+                                                                    <small>{{ payout.person_id }}</small>
+                                                                </div>
+                                                                <input
+                                                                    class="input"
+                                                                    type="number"
+                                                                    name="{{ payout.input_name }}"
+                                                                    value="{{ manual_payout_overrides.get(manual_key, '') }}"
+                                                                    placeholder="自動"
+                                                                >
+                                                            </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <p class="muted-text">目前沒有分潤資料；儲存後系統會依接單人員重新計算。</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
                                         </div>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </article>
-                    {% endfor %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </details>
-        {% endfor %}
-    </section>
 
-    <div class="history-bulk-toolbar">
-        <p class="muted-text">修改完成後請按「儲存全部修改」，系統會一次更新本頁所有訂單資料。</p>
+                <div class="history-ledger-pagination">
+                    <div class="muted-text">共 {{ total_orders }} 筆記錄</div>
+                    <div class="history-page-links">
+                        {% if has_prev_page %}
+                            <a href="/admin/orders/history?page={{ prev_page }}&status={{ current_status }}&keyword={{ keyword }}">‹</a>
+                        {% else %}
+                            <span>‹</span>
+                        {% endif %}
 
-        <div class="history-bulk-actions">
-            <button class="button secondary" type="reset">還原</button>
-            <button class="button" type="submit">儲存全部修改</button>
-        </div>
-    </div>
-{% else %}
-    <section class="panel">
-        <div class="empty-state">目前沒有歷史訂單。</div>
-    </section>
-{% endif %}
-</form>
+                        {% for p in range(1, total_pages + 1) %}
+                            {% if p == page %}
+                                <span class="active">{{ p }}</span>
+                            {% elif p <= 5 or p == total_pages or (p >= page - 1 and p <= page + 1) %}
+                                <a href="/admin/orders/history?page={{ p }}&status={{ current_status }}&keyword={{ keyword }}">{{ p }}</a>
+                            {% elif p == 6 and page > 7 %}
+                                <span>…</span>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if has_next_page %}
+                            <a href="/admin/orders/history?page={{ next_page }}&status={{ current_status }}&keyword={{ keyword }}">›</a>
+                        {% else %}
+                            <span>›</span>
+                        {% endif %}
+                    </div>
+                    <div class="muted-text">每頁顯示 {{ per_page }}</div>
+                </div>
+            </section>
+
+            <div class="history-bulk-toolbar">
+                <p class="muted-text">已進行的變更將暫存在本頁，請按「儲存全部修改」套用至這 10 筆卷宗。</p>
+                <div class="history-bulk-actions">
+                    <button class="button secondary" type="reset">重設</button>
+                    <button class="button" type="submit">儲存全部修改</button>
+                </div>
+            </div>
+        {% else %}
+            <section class="panel">
+                <div class="empty-state">目前沒有歷史訂單。</div>
+            </section>
+        {% endif %}
+    </form>
+</div>
 {% endblock %}

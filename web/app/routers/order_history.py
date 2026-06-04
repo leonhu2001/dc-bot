@@ -102,7 +102,10 @@ def redirect_to_history(**params) -> RedirectResponse:
     finally:
         conn.close()
 
-    return RedirectResponse(url="/admin/orders/history", status_code=303)
+    return RedirectResponse(
+        url=f"/admin/orders/history?page={form.get('page') or 1}",
+        status_code=303,
+    )
 
 
 def list_history_orders(
@@ -118,7 +121,7 @@ def list_history_orders(
             .where(WebOrder.status != OrderStatus.ACTIVE.value)
             .options(selectinload(WebOrder.assignments))
             .options(selectinload(WebOrder.payouts))
-            .order_by(WebOrder.updated_at.desc(), WebOrder.created_at.desc())
+            .order_by(WebOrder.updated_at.desc(), WebOrder.created_at.desc(), WebOrder.id.desc())
         )
 
         if status_filter and status_filter != "all":
@@ -522,6 +525,54 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
 
 
 
+
+
+
+def fetch_history_closed_dates(order_ids: list[int]) -> dict[int, str]:
+    """從 SQLite 直接抓 web_orders.closed_at；有值就回傳 YYYY-MM-DD。"""
+    clean_ids = []
+    for order_id in order_ids:
+        try:
+            order_id = int(order_id)
+        except Exception:
+            continue
+        if order_id > 0:
+            clean_ids.append(order_id)
+
+    if not clean_ids:
+        return {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(web_orders)").fetchall()
+        }
+
+        if "closed_at" not in columns:
+            return {}
+
+        placeholders = ",".join("?" for _ in clean_ids)
+        rows = conn.execute(
+            f"""
+            SELECT id, closed_at
+            FROM web_orders
+            WHERE id IN ({placeholders})
+            """,
+            clean_ids,
+        ).fetchall()
+
+        result = {}
+        for row in rows:
+            value = str(row["closed_at"] or "").strip()
+            if value:
+                result[int(row["id"])] = value[:10]
+
+        return result
+    finally:
+        conn.close()
 
 
 def build_customer_options_from_db():
@@ -978,6 +1029,7 @@ async def admin_order_history(
     message: str | None = None,
     error: str | None = None,
     customer: str | None = "",
+    page: int = 1,
 ):
     user = get_current_user(request)
 
@@ -1008,12 +1060,38 @@ async def admin_order_history(
     db = SessionLocal()
 
     try:
-        orders = list_history_orders(status_filter=status, keyword=keyword)
-        customer = request.query_params.get("customer", customer or "")
-        customer_options = build_customer_options_from_db()
-        orders = filter_orders_by_customer(orders, customer)
+        all_orders = list_history_orders(status_filter=status, keyword=keyword)
+        closed_dates_by_order_id = fetch_history_closed_dates([int(order.id) for order in all_orders])
+
+        # 有結單日期就優先照結單日期新到舊；沒有才用 updated_at / created_at / id。
+        all_orders.sort(
+            key=lambda order: (
+                closed_dates_by_order_id.get(int(order.id), ""),
+                str(getattr(order, "updated_at", "") or ""),
+                str(getattr(order, "created_at", "") or ""),
+                int(getattr(order, "id", 0) or 0),
+            ),
+            reverse=True,
+        )
+
+        # 歷史訂單改成卷宗列表，不再依老闆分組。
+        per_page = 10
+        page = max(1, int(page or 1))
+        total_orders = len(all_orders)
+        total_pages = max(1, (total_orders + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        orders = all_orders[offset:offset + per_page]
+
+        customer = ""
+        customer_options = []
         customer_service_members = list_customer_service_members(db)
         worker_members = list_worker_members(db)
+
+        history_closed_count = sum(1 for order in all_orders if str(order.status) == OrderStatus.CLOSED.value)
+        history_stored_count = sum(1 for order in all_orders if str(order.status) == OrderStatus.STORED.value)
+        history_active_count = sum(1 for order in all_orders if str(order.status) == OrderStatus.ACTIVE.value)
+        history_total_amount = sum(int(getattr(order, "amount", 0) or 0) for order in all_orders)
 
         order_ids = [order.id for order in orders]
         customer_service_payouts_by_order: dict[int, list[CustomerServicePayout]] = {}
@@ -1039,9 +1117,22 @@ async def admin_order_history(
             "title": "歷史訂單",
             "user": user,
             "orders": orders,
-            "customer_groups": build_customer_groups(orders),
+            "customer_groups": [],
             "customer_options": customer_options,
             "customer": customer or "",
+            "page": page,
+            "per_page": per_page,
+            "total_orders": total_orders,
+            "total_pages": total_pages,
+            "history_closed_count": history_closed_count,
+            "history_stored_count": history_stored_count,
+            "history_active_count": history_active_count,
+            "history_total_amount": history_total_amount,
+            "closed_dates_by_order_id": closed_dates_by_order_id,
+            "has_prev_page": page > 1,
+            "has_next_page": page < total_pages,
+            "prev_page": max(1, page - 1),
+            "next_page": min(total_pages, page + 1),
             "history_staff_options": history_staff_options(),
             "history_effective_closed_date": history_effective_closed_date,
             "history_closed_date_input_value": history_closed_date_input_value,
