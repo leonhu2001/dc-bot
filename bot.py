@@ -856,20 +856,43 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
                         .first()
                     )
 
-                    if order is None:
+                    if order is None and ticket_channel_id is not None:
                         order = (
                             db.query(WebOrder)
                             .filter(WebOrder.ticket_channel_id == ticket_channel_id)
                             .first()
                         )
 
+                    if order is None and dispatch_message_id is not None:
+                        order = (
+                            db.query(WebOrder)
+                            .filter(WebOrder.dispatch_message_id == str(dispatch_message_id))
+                            .first()
+                        )
+
+                    if order is None and dispatch_message_id is not None:
+                        order = (
+                            db.query(WebOrder)
+                            .filter(WebOrder.dispatch_message_id == dispatch_message_id)
+                            .first()
+                        )
+
                     if order is None:
-                        print(f"[web-sync] payout skipped: web order not found ticket_channel_id={ticket_channel_id}")
+                        print(
+                            f"[web-sync] payout skipped: web order not found "
+                            f"ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id}"
+                        )
                     else:
                         order.status = "closed"
+                        if not getattr(order, "closed_at", None):
+                            order.closed_at = __import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(hours=8)
                         recalculate_order_payouts(db, order.id)
                         db.commit()
-                        print(f"[web-sync] payout recalculated WEB-{order.id} ticket_channel_id={ticket_channel_id}")
+                        print(
+                            f"[web-sync] payout recalculated WEB-{order.id} "
+                            f"ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} "
+                            f"closed_at={order.closed_at}"
+                        )
 
                 finally:
                     db.close()

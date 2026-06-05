@@ -6,6 +6,12 @@ from shared.db import SessionLocal
 from shared.models import WebOrder
 
 
+
+def _web_order_closed_at_now():
+    """網站訂單結單時間：使用台北時間。"""
+    from datetime import datetime, timedelta
+    return datetime.utcnow() + timedelta(hours=8)
+
 def _to_text_id(value) -> str | None:
     if value is None:
         return None
@@ -92,8 +98,10 @@ def upsert_web_order_from_dispatch(
         order.quantity = _to_int(quantity, 1) or 1
         order.amount = _to_int(amount, 0)
         order.payment_method = payment_method or "未紀錄"
-        order.status = str(status or "active")
-
+        next_status = str(status or "active")
+        order.status = next_status
+        if next_status == "closed" and not getattr(order, "closed_at", None):
+            order.closed_at = _web_order_closed_at_now()
         order.customer_service_discord_id = _to_text_id(customer_service_discord_id)
         order.customer_service_display_name = customer_service_display_name
 
@@ -136,8 +144,13 @@ def update_web_order_status_by_ticket_channel(
         if order is None:
             return False
 
-        order.status = str(status or "active")
+        next_status = str(status or "active")
 
+        order.status = next_status
+
+        if next_status == "closed" and not getattr(order, "closed_at", None):
+
+            order.closed_at = _web_order_closed_at_now()
         dispatch_message_id_text = _to_text_id(dispatch_message_id)
         if dispatch_message_id_text:
             order.dispatch_message_id = dispatch_message_id_text
