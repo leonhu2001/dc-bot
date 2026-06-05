@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
@@ -64,6 +65,93 @@ def require_admin_user(request: Request) -> dict | None:
     return user
 
 
+
+def dedupe_admin_worker_members(members):
+    """Admin 首頁新增 / 更換打手下拉：打手或陪玩都顯示，同一人只出現一次。"""
+    result = {}
+    for member in members or []:
+        discord_id = str(getattr(member, "discord_id", "") or member.get("discord_id", "") if isinstance(member, dict) else getattr(member, "discord_id", "")).strip()
+        if not discord_id:
+            continue
+
+        is_worker = bool(getattr(member, "is_worker", False) if not isinstance(member, dict) else member.get("is_worker"))
+        is_companion = bool(getattr(member, "is_companion", False) if not isinstance(member, dict) else member.get("is_companion"))
+
+        if not (is_worker or is_companion):
+            continue
+
+        result[discord_id] = member
+
+    def member_name(member):
+        if isinstance(member, dict):
+            return str(member.get("display_name") or member.get("username") or member.get("discord_id") or "")
+        return str(getattr(member, "display_name", "") or getattr(member, "username", "") or getattr(member, "discord_id", ""))
+
+    return sorted(result.values(), key=member_name)
+
+
+def list_admin_worker_dropdown_members() -> list[dict]:
+    """Admin 首頁新增 / 更換打手下拉。
+
+    只要有打手或陪玩身分就顯示；同一人只出現一次。
+    """
+    db_path = Path(__file__).resolve().parents[3] / "web_dashboard.db"
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                discord_id,
+                username,
+                display_name,
+                global_name,
+                is_worker,
+                is_companion,
+                is_customer_service,
+                is_active
+            FROM web_staff_members
+            WHERE COALESCE(is_active, 1) = 1
+              AND (
+                    COALESCE(is_worker, 0) = 1
+                 OR COALESCE(is_companion, 0) = 1
+              )
+            ORDER BY
+                COALESCE(display_name, ''),
+                COALESCE(global_name, ''),
+                COALESCE(username, ''),
+                discord_id
+            """
+        ).fetchall()
+
+        members = []
+        seen = set()
+
+        for row in rows:
+            discord_id = str(row["discord_id"] or "").strip()
+            if not discord_id or discord_id in seen:
+                continue
+
+            seen.add(discord_id)
+
+            members.append({
+                "discord_id": discord_id,
+                "username": row["username"],
+                "display_name": row["display_name"],
+                "global_name": row["global_name"],
+                "is_worker": bool(row["is_worker"]),
+                "is_companion": bool(row["is_companion"]),
+                "is_customer_service": bool(row["is_customer_service"]),
+                "is_active": bool(row["is_active"]),
+            })
+
+        return members
+
+    finally:
+        conn.close()
+
 @router.get("/admin")
 async def admin_dashboard(
     request: Request,
@@ -102,7 +190,7 @@ async def admin_dashboard(
         create_demo_orders_if_empty(db)
         orders = list_admin_orders(db)
         customer_service_members = list_customer_service_members(db)
-        worker_members = list_worker_members(db)
+        worker_members = list_admin_worker_dropdown_members()
 
         customer_service_payout_rows = list(
             db.scalars(

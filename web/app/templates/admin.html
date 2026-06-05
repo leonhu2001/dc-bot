@@ -1,6 +1,33 @@
 {% extends "layout.html" %}
 
-{% block page_title %}總控後台{% endblock %}
+{% block page_title %}總控後台
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".admin-add-worker-form").forEach(function (form) {
+        const orderCard = form.closest(".order-card, .admin-order-card, .panel, article, section") || form.parentElement;
+        if (!orderCard) return;
+
+        const assignedIds = new Set();
+
+        orderCard.querySelectorAll(".admin-assigned-worker-id").forEach(function (node) {
+            const text = (node.textContent || "").trim();
+            const match = text.match(/(\d{15,25})/);
+            if (match) assignedIds.add(match[1]);
+        });
+
+        const select = form.querySelector('select[name="worker_discord_id"]');
+        if (!select || assignedIds.size === 0) return;
+
+        select.querySelectorAll("option[data-staff-id]").forEach(function (option) {
+            if (assignedIds.has(option.dataset.staffId)) {
+                option.remove();
+            }
+        });
+    });
+});
+</script>
+
+{% endblock %}
 
 {% block content %}
     {% if message %}
@@ -183,7 +210,7 @@
                                         <div class="admin-worker-card">
                                             <div>
                                                 <strong>{{ assignment.worker_display_name or assignment.worker_discord_id }}</strong>
-                                                <p class="muted-text">ID：{{ assignment.worker_discord_id }}</p>
+                                                <p class="muted-text"><span class="admin-assigned-worker-id">ID：{{ assignment.worker_discord_id }}</span></p>
                                             </div>
 
                                             <div class="worker-payout-line">
@@ -279,10 +306,10 @@
                                     <select class="input" name="worker_discord_id" required>
                                         <option value="">選擇打手 / 陪玩</option>
                                         {% for staff in worker_members %}
-                                            <option value="{{ staff.discord_id }}">
+                                            <option value="{{ staff.discord_id }}" data-staff-id="{{ staff.discord_id }}">
                                                 {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
-                                                {% if staff.is_companion %}｜陪玩{% endif %}
-                                                {% if staff.is_worker and not staff.is_companion %}｜打手{% endif %}
+                                                
+                                                
                                             </option>
                                         {% endfor %}
                                     </select>
