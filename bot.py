@@ -4282,9 +4282,11 @@ async def on_ready():
         if not STORED_REMINDER_TASK_STARTED:
             STORED_REMINDER_TASK_STARTED = True
             asyncio.create_task(stored_order_reminder_loop())
-        if not VIP_DOWNGRADE_TASK_STARTED:
-            VIP_DOWNGRADE_TASK_STARTED = True
-            asyncio.create_task(vip_downgrade_loop())
+        # VIP 自動降階已停用。
+        # 保留手動 /vip check_vip_downgrades 指令，但不再由 bot 自動排程執行。
+        # if not VIP_DOWNGRADE_TASK_STARTED:
+        #     VIP_DOWNGRADE_TASK_STARTED = True
+        #     asyncio.create_task(vip_downgrade_loop())
         try:
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
