@@ -106,7 +106,9 @@ def upsert_web_order_from_dispatch(
         order.customer_service_display_name = customer_service_display_name
 
         if note:
-            order.note = note
+            note_text = str(note).strip()
+            if note_text and not note_text.startswith("由 DC bot"):
+                order.note = note_text
 
         db.commit()
         db.refresh(order)
@@ -156,7 +158,9 @@ def update_web_order_status_by_ticket_channel(
             order.dispatch_message_id = dispatch_message_id_text
 
         if note:
-            order.note = note
+            note_text = str(note).strip()
+            if note_text and not note_text.startswith("由 DC bot"):
+                order.note = note_text
 
         db.commit()
         return True

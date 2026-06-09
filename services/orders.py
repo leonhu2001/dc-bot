@@ -250,6 +250,7 @@ def build_self_service_order_embed(
     source_channel: discord.TextChannel,
     companion_preference: str | None = None,
     receiver_text: str | None = None,
+    staff_note: str | None = None,
 ) -> discord.Embed:
     embed = discord.Embed(
         title="新自助下單",
@@ -264,6 +265,20 @@ def build_self_service_order_embed(
 
     if companion_preference is not None:
         embed.add_field(name="指定選項", value=companion_preference, inline=False)
+
+    if staff_note is None:
+        source_channel_id = getattr(source_channel, "id", None)
+        try:
+            source_data = _ORDER_SELECTIONS.get(int(source_channel_id), {}) if source_channel_id is not None else {}
+        except (TypeError, ValueError):
+            source_data = {}
+
+        if isinstance(source_data, dict):
+            staff_note = source_data.get("staff_note") or source_data.get("customer_service_note")
+
+    staff_note_text = str(staff_note or "").strip()
+    if staff_note_text:
+        embed.add_field(name="客服備註", value=staff_note_text[:1024], inline=False)
 
     if receiver_text is not None:
         normalized_receiver_text = str(receiver_text or "").strip()

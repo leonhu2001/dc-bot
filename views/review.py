@@ -64,10 +64,11 @@ REVIEW_DRAFTS = {}
 # ========= 評價 Modal / 按鈕 =========
 
 class ReviewSubmitView(discord.ui.View):
-    def __init__(self, customer_id: int, channel_id: int):
+    def __init__(self, customer_id: int, channel_id: int, order_content: str | None = None):
         super().__init__(timeout=86400)
         self.customer_id = customer_id
         self.channel_id = channel_id
+        self.order_content = order_content
 
     @discord.ui.button(
         label="送出好評",
@@ -169,6 +170,14 @@ class ReviewSubmitView(discord.ui.View):
                 value=draft["stars"],
                 inline=True
             )
+
+            order_content = str(draft.get("order_content") or "").strip()
+            if order_content:
+                embed.add_field(
+                    name="訂單內容",
+                    value=order_content[:1024],
+                    inline=False
+                )
 
             embed.add_field(
                 name="評價內容",
@@ -319,9 +328,10 @@ class ReviewModal(discord.ui.Modal, title="留下好評"):
         max_length=10
     )
 
-    def __init__(self, customer_id: int):
+    def __init__(self, customer_id: int, order_content: str | None = None):
         super().__init__()
         self.customer_id = customer_id
+        self.order_content = order_content
 
     async def on_submit(self, interaction: discord.Interaction):
         guild = interaction.guild
@@ -350,6 +360,7 @@ class ReviewModal(discord.ui.Modal, title="留下好評"):
             "stars": stars,
             "content": self.content.value,
             "is_anonymous": is_anonymous_answer(self.anonymous.value),
+            "order_content": self.order_content,
             "started_at": interaction.created_at,
         }
 
@@ -360,16 +371,18 @@ class ReviewModal(discord.ui.Modal, title="留下好評"):
             "全部傳完後，請按下方的「送出好評」。",
             view=ReviewSubmitView(
                 customer_id=self.customer_id,
-                channel_id=interaction.channel.id
+                channel_id=interaction.channel.id,
+                order_content=self.order_content
             ),
             ephemeral=False
         )
 
 
 class ReviewButtonView(discord.ui.View):
-    def __init__(self, customer_id: int):
+    def __init__(self, customer_id: int, order_content: str | None = None):
         super().__init__(timeout=86400)
         self.customer_id = customer_id
+        self.order_content = order_content
 
     @discord.ui.button(
         label="留下好評",
@@ -383,7 +396,10 @@ class ReviewButtonView(discord.ui.View):
             return
 
         await interaction.response.send_modal(
-            ReviewModal(customer_id=self.customer_id)
+            ReviewModal(
+                customer_id=self.customer_id,
+                order_content=self.order_content
+            )
         )
 
     @discord.ui.button(

@@ -1221,7 +1221,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
             f"{reward_result}\n\n"
             f"請闆闆留下評論",
-            view=ReviewButtonView(customer_id=customer_id),
+            view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
                 roles=False,
@@ -3019,6 +3019,14 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
         max_length=100,
     )
 
+    staff_note = discord.ui.TextInput(
+        label="客服備註",
+        placeholder="選填，例如：指定女陪、晚點打、老闆要求安靜、注意事項",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=800,
+    )
+
     def __init__(self, customer_id: int, channel_id: int):
         super().__init__()
         self.customer_id = customer_id
@@ -3052,6 +3060,13 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
         data["amount_text"] = format_t_amount(parsed_amount)
         data["amount_set_at"] = get_taipei_now_iso()
         data["amount_set_by"] = interaction.user.id
+
+        staff_note_text = str(self.staff_note.value or "").strip()
+        if staff_note_text:
+            data["staff_note"] = staff_note_text
+        else:
+            data.pop("staff_note", None)
+
         remember_order_data(self.channel_id, data)
 
         await send_order_log(
@@ -3189,6 +3204,7 @@ async def finalize_payment_and_dispatch(
     companion_preference = data.get("companion_preference")
     payment_method = data.get("payment_method")
     parsed_amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
+    staff_note = str(data.get("staff_note") or data.get("customer_service_note") or "").strip() or None
 
     if category is None or item is None:
         await interaction.response.send_message("找不到訂單資料，請回到自助下單面板重新選擇。", ephemeral=True)
@@ -3296,6 +3312,7 @@ async def finalize_payment_and_dispatch(
         payment_method=payment_method,
         source_channel=interaction.channel,
         companion_preference=companion_preference,
+        staff_note=staff_note,
     )
     embed.add_field(name="訂單總價", value=format_t_amount(parsed_amount), inline=True)
 
@@ -3339,6 +3356,7 @@ async def finalize_payment_and_dispatch(
         "source_channel_id": interaction.channel.id,
         "companion_preference": companion_preference,
         "dispatch_channel_id": dispatch_channel.id,
+        "staff_note": staff_note,
     }
     data["quantity"] = quantity
     data["dispatch_message_id"] = dispatch_message.id
@@ -3504,6 +3522,7 @@ def sync_web_order_active_from_dispatch_from_bot(
     payment_method,
     customer_service_member=None,
     bot_order_no=None,
+    staff_note: str | None = None,
 ) -> None:
     """DC bot 新派單後，把 active 訂單寫進網站資料庫。"""
     try:
@@ -3524,7 +3543,7 @@ def sync_web_order_active_from_dispatch_from_bot(
             customer_service_discord_id=getattr(customer_service_member, "id", None),
             customer_service_display_name=getattr(customer_service_member, "display_name", None),
             bot_order_no=bot_order_no,
-            note="由 DC bot 派單同步。",
+            note=staff_note,
         )
 
         print(
