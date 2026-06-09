@@ -3,7 +3,7 @@ from typing import Awaitable, Callable
 
 import discord
 
-from core.permissions import is_exam_staff, is_complaint_staff
+from core.permissions import is_exam_staff, is_complaint_staff, is_customer_staff
 
 COMPLAINT_RECEIVE_CHANNEL_ID = 0
 _remove_recruit_applicant_role: Callable[[discord.Guild | None, discord.TextChannel], Awaitable[None]] | None = None
@@ -41,8 +41,8 @@ class RecruitControlView(discord.ui.View):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
-        if not is_exam_staff(interaction.user):
-            await interaction.response.send_message("只有考官或店長可以操作。", ephemeral=True)
+        if not (is_exam_staff(interaction.user) or is_customer_staff(interaction.user)):
+            await interaction.response.send_message("只有考官、客服或店長可以操作。", ephemeral=True)
             return
 
         channel = interaction.channel
