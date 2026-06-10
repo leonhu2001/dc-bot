@@ -280,6 +280,8 @@ async def admin_wallets(
         request,
         "admin_wallets.html",
         {
+            "title": "顧客錢包",
+            "user": request.session.get("user"),
             "wallets": wallets,
             "q": q or "",
             "total_balance": total_balance,
@@ -302,6 +304,8 @@ async def admin_wallet_detail(
         request,
         "admin_wallet_detail.html",
         {
+            "title": "錢包流水",
+            "user": request.session.get("user"),
             "wallet": wallet,
             "transactions": transactions,
             "limit": limit,

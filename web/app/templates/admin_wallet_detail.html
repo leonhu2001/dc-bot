@@ -5,71 +5,13 @@
 
 {% block content %}
 <style>
-
-/* Wallet page shared-layout width fix */
-.wallet-ledger-page {
-    width: min(1480px, calc(100vw - 330px)) !important;
-    max-width: none !important;
-    min-width: 980px;
-    margin-left: 0 !important;
-    margin-right: auto !important;
-}
-
-.wallet-ledger-hero,
-.wallet-ledger-filter,
-.wallet-ledger-stats,
-.wallet-ledger-panel {
-    width: 100% !important;
-    max-width: none !important;
-}
-
-.wallet-ledger-table-wrap {
-    width: 100% !important;
-    max-width: none !important;
-}
-
-.wallet-ledger-table {
-    width: 100% !important;
-}
-
-@media (max-width: 1100px) {
-    .wallet-ledger-page {
-        width: calc(100vw - 280px) !important;
-        min-width: 720px;
-    }
-}
-
-@media (max-width: 900px) {
-    .wallet-ledger-page {
-        width: calc(100vw - 32px) !important;
-        min-width: 0;
-    }
-}
-
-
 .wallet-ledger-page {
     display: grid;
     gap: 18px;
-}
-
-.wallet-ledger-hero {
-    padding: 18px 22px;
-    border: 1px solid rgba(183, 143, 82, 0.34);
-    border-radius: 18px;
-    background:
-        radial-gradient(circle at 85% 20%, rgba(132, 28, 24, 0.22), transparent 34%),
-        linear-gradient(135deg, rgba(10, 10, 11, 0.62), rgba(22, 16, 14, 0.24));
-}
-
-.wallet-ledger-title {
-    margin: 0;
-    font-size: clamp(42px, 5vw, 72px);
-    line-height: 1;
-    letter-spacing: 0.08em;
+    width: 100%;
 }
 
 .wallet-ledger-desc {
-    margin: 12px 0 0;
     color: rgba(246, 232, 204, 0.72);
     font-weight: 700;
 }
@@ -246,14 +188,10 @@
 </style>
 
 <section class="wallet-ledger-page">
-    <header class="wallet-ledger-hero">
-        <p class="eyebrow">WALLET LEDGER</p>
-        <h1 class="wallet-ledger-title">錢包流水</h1>
-        <p class="wallet-ledger-desc">
-            老闆名稱：{{ wallet.customer_display_name }}<br>
-            Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span>
-        </p>
-    </header>
+    <p class="wallet-ledger-desc">
+        老闆名稱：{{ wallet.customer_display_name }}<br>
+        Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span>
+    </p>
 
     <div class="wallet-ledger-actions">
         <a class="wallet-ledger-button" href="/admin/wallets">返回錢包總覽</a>
