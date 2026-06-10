@@ -166,11 +166,11 @@ def build_play_lobby_overwrites(guild: discord.Guild) -> dict:
 
 
 def build_play_voice_overwrites(guild: discord.Guild) -> dict:
-    """臨時陪玩房：所有人可見，但預設鎖定；陪玩/打手可見但不能加入。"""
+    """臨時陪玩房：所有人可見，但預設未鎖定；陪玩/打手可見但可加入。"""
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
-            connect=False,
+            connect=True,
             send_messages=False,
             read_message_history=False,
         ),
@@ -188,7 +188,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
     for role in get_play_voice_allowed_roles(guild):
         overwrites[role] = discord.PermissionOverwrite(
             view_channel=True,
-            connect=False,
+            connect=True,
             speak=True,
             stream=True,
             use_voice_activation=True,
@@ -200,7 +200,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
 
     employee_family_role = get_employee_family_role(guild)
     if employee_family_role is not None:
-        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=False)
+        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=True)
 
     return overwrites
 
@@ -240,11 +240,11 @@ def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
 
 
 def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> dict:
-    """臨時 VIP 房：所有人可見，但預設鎖定；房主可加入。"""
+    """臨時 VIP 房：所有人可見，但預設未鎖定；房主可加入。"""
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
-            connect=False,
+            connect=True,
             send_messages=False,
             read_message_history=False,
         ),
@@ -268,11 +268,11 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
         ),
     }
 
-    # 讓管理/陪玩/打手可看見 VIP 臨時房，但預設不能加入。
+    # 讓管理/陪玩/打手可看見 VIP 臨時房，但預設可加入。
     for role in get_play_voice_allowed_roles(guild):
         overwrites[role] = discord.PermissionOverwrite(
             view_channel=True,
-            connect=False,
+            connect=True,
             speak=True,
             stream=True,
             use_voice_activation=True,
@@ -670,10 +670,9 @@ async def apply_voice_hidden_state(
     everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
     everyone_overwrite.view_channel = not hidden
 
-    if room_type == "public":
-        everyone_overwrite.connect = True
-    else:
-        everyone_overwrite.connect = False
+    # 隱藏時不能加入；顯示時三種臨時房都預設可加入。
+    # 實際鎖房狀態由 apply_voice_lock_state 控制。
+    everyone_overwrite.connect = False if hidden else True
 
     overwrites[guild.default_role] = everyone_overwrite
 
@@ -814,9 +813,8 @@ class VoiceRoomLimitModal(discord.ui.Modal, title="設定語音房人數"):
 
 
 def get_default_voice_room_locked(room_type: str) -> bool:
-    """陪玩房 / VIP 房預設鎖定，公共房預設未鎖定。"""
-    return str(room_type or "") in {"play", "vip"}
-
+    """所有臨時語音房預設未鎖定；入口頻道權限不受影響。"""
+    return False
 
 def get_default_voice_room_hidden(room_type: str) -> bool:
     """所有臨時語音房剛建立都預設顯示。"""
