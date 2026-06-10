@@ -205,7 +205,7 @@
         </article>
         <article class="wallet-ledger-stat">
             <span>最後更新 ◆</span>
-            <strong>{{ wallet.updated_at or "—" }}</strong>
+            <strong>{{ wallet.updated_at_text or "—" }}</strong>
         </article>
     </section>
 
@@ -234,7 +234,7 @@
                 <tbody>
                     {% for tx in transactions %}
                     <tr>
-                        <td>{{ tx.created_at or "—" }}</td>
+                        <td>{{ tx.created_at_text or "—" }}</td>
                         <td><span class="wallet-pill">{{ tx.type_label }}</span></td>
                         <td class="wallet-amount {% if tx.amount > 0 %}wallet-plus{% else %}wallet-minus{% endif %}">
                             {{ tx.amount_text }}

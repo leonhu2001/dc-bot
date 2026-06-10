@@ -270,7 +270,7 @@
                         <td>{{ wallet.transaction_count }}</td>
                         <td>{{ wallet.last_operator or "—" }}</td>
                         <td class="wallet-note">{{ wallet.last_note or "—" }}</td>
-                        <td>{{ wallet.updated_at or "—" }}</td>
+                        <td>{{ wallet.updated_at_text or "—" }}</td>
                         <td><a class="wallet-link" href="/admin/wallets/{{ wallet.customer_discord_id }}">查看流水</a></td>
                     </tr>
                     {% else %}

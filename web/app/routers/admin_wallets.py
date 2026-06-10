@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime
 import sqlite3
 
 from fastapi import APIRouter, Request, Query, HTTPException
@@ -90,6 +91,29 @@ def format_t_amount(amount: int | None) -> str:
     except (TypeError, ValueError):
         value = 0
     return f"{value:,}T"
+
+
+def format_wallet_datetime(value) -> str:
+    text = str(value or "").strip()
+
+    if not text:
+        return "—"
+
+    normalized = text.replace("Z", "+00:00")
+
+    try:
+        dt = datetime.fromisoformat(normalized)
+        return dt.strftime("%Y/%m/%d %H:%M")
+    except Exception:
+        pass
+
+    # fallback：處理 2026-06-10T23:34:41+08:00 這種字串
+    text = text.replace("T", " ")
+    if "+" in text:
+        text = text.split("+", 1)[0]
+    if len(text) >= 16:
+        text = text[:16]
+    return text.replace("-", "/")
 
 
 def wallet_type_label(tx_type: str | None) -> str:
@@ -200,6 +224,7 @@ def fetch_wallets(keyword: str | None = None) -> list[dict]:
         customer_id = str(data.get("customer_discord_id") or "")
         data["customer_display_name"] = display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
         data["balance_text"] = format_t_amount(data.get("balance"))
+        data["updated_at_text"] = format_wallet_datetime(data.get("updated_at"))
         wallets.append(data)
 
     return wallets
@@ -253,6 +278,7 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
     display_names = fetch_customer_display_names([customer_id])
     wallet["customer_display_name"] = display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
     wallet["balance_text"] = format_t_amount(wallet.get("balance"))
+    wallet["updated_at_text"] = format_wallet_datetime(wallet.get("updated_at"))
 
     transactions = []
     for row in tx_rows:
@@ -262,6 +288,7 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
         tx["balance_before_text"] = format_t_amount(tx.get("balance_before"))
         tx["balance_after_text"] = format_t_amount(tx.get("balance_after"))
         tx["type_label"] = wallet_type_label(tx.get("type"))
+        tx["created_at_text"] = format_wallet_datetime(tx.get("created_at"))
         transactions.append(tx)
 
     return wallet, transactions
