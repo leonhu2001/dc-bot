@@ -1592,7 +1592,226 @@ COMPANION_PREFERENCE_OPTIONS = [
 PAYMENT_METHOD_OPTIONS = [
     "街口",
     "轉帳",
+    "我的錢包",
 ]
+
+WALLET_PAYMENT_METHOD = "我的錢包"
+
+
+
+# ========= 顧客錢包系統 =========
+
+def ensure_wallet_tables() -> None:
+    """建立顧客錢包與錢包流水表。"""
+    conn = sqlite3.connect(DB_FILE)
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS customer_wallets (
+                customer_discord_id TEXT PRIMARY KEY,
+                balance INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS wallet_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_discord_id TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                balance_before INTEGER NOT NULL,
+                balance_after INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                order_channel_id TEXT,
+                order_no TEXT,
+                operator_discord_id TEXT,
+                operator_display_name TEXT,
+                note TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_wallet_balance(customer_id) -> int:
+    ensure_wallet_tables()
+    customer_id_text = str(customer_id)
+
+    conn = sqlite3.connect(DB_FILE)
+    try:
+        row = conn.execute(
+            "SELECT balance FROM customer_wallets WHERE customer_discord_id = ?",
+            (customer_id_text,),
+        ).fetchone()
+
+        if row is None:
+            return 0
+
+        return int(row[0] or 0)
+    finally:
+        conn.close()
+
+
+def adjust_customer_wallet_balance(
+    *,
+    customer_id,
+    amount: int,
+    tx_type: str,
+    operator=None,
+    order_channel_id=None,
+    order_no=None,
+    note: str | None = None,
+    allow_negative: bool = False,
+) -> dict:
+    """基於目前餘額加減，並寫入流水。amount 可正可負。"""
+    ensure_wallet_tables()
+
+    customer_id_text = str(customer_id)
+    amount = int(amount or 0)
+
+    if amount == 0:
+        raise ValueError("異動金額不能為 0。")
+
+    conn = sqlite3.connect(DB_FILE)
+
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+
+        row = conn.execute(
+            "SELECT balance FROM customer_wallets WHERE customer_discord_id = ?",
+            (customer_id_text,),
+        ).fetchone()
+
+        balance_before = int(row[0] or 0) if row is not None else 0
+        balance_after = balance_before + amount
+
+        if balance_after < 0 and not allow_negative:
+            raise ValueError(
+                f"錢包餘額不足，目前餘額 {format_t_amount(balance_before)}，"
+                f"無法扣除 {format_t_amount(abs(amount))}。"
+            )
+
+        now_text = get_taipei_now_iso()
+        operator_id = str(getattr(operator, "id", "") or "")
+        operator_name = (
+            getattr(operator, "display_name", None)
+            or getattr(operator, "name", None)
+            or operator_id
+            or None
+        )
+
+        conn.execute(
+            """
+            INSERT INTO customer_wallets (customer_discord_id, balance, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(customer_discord_id)
+            DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at
+            """,
+            (customer_id_text, balance_after, now_text),
+        )
+
+        cur = conn.execute(
+            """
+            INSERT INTO wallet_transactions (
+                customer_discord_id,
+                amount,
+                balance_before,
+                balance_after,
+                type,
+                order_channel_id,
+                order_no,
+                operator_discord_id,
+                operator_display_name,
+                note,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                customer_id_text,
+                amount,
+                balance_before,
+                balance_after,
+                str(tx_type or "adjustment"),
+                str(order_channel_id) if order_channel_id is not None else None,
+                str(order_no) if order_no is not None else None,
+                operator_id or None,
+                operator_name,
+                str(note or "").strip() or None,
+                now_text,
+            ),
+        )
+
+        tx_id = int(cur.lastrowid)
+        conn.commit()
+
+        return {
+            "id": tx_id,
+            "customer_discord_id": customer_id_text,
+            "amount": amount,
+            "balance_before": balance_before,
+            "balance_after": balance_after,
+            "type": tx_type,
+            "note": note,
+            "created_at": now_text,
+        }
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def build_customer_info_with_wallet_embed(member: discord.Member, *, show_staff_notes: bool = True) -> discord.Embed:
+    """顧客資訊 Embed：會員資訊 + 錢包餘額。"""
+    data = get_customer_reward_data(member.id)
+    embed = build_member_info_embed(member, data, show_points=True)
+
+    wallet_balance = get_wallet_balance(member.id)
+    embed.add_field(
+        name="錢包餘額",
+        value=format_t_amount(wallet_balance),
+        inline=True,
+    )
+
+    if show_staff_notes:
+        note_text = format_customer_notes_for_staff(member.id)
+        if note_text:
+            embed.add_field(
+                name="客服備註",
+                value=note_text[:1024],
+                inline=False,
+            )
+
+    return embed
+
+
+async def send_wallet_log(
+    guild: discord.Guild | None,
+    *,
+    title: str,
+    customer: discord.Member,
+    operator: discord.Member | discord.User,
+    tx: dict,
+) -> None:
+    try:
+        await send_order_log(
+            guild,
+            title=title,
+            fields=[
+                ("顧客", customer.mention, True),
+                ("操作人員", getattr(operator, "mention", str(getattr(operator, "id", "未知"))), True),
+                ("異動金額", format_t_amount(int(tx["amount"])), True),
+                ("原餘額", format_t_amount(int(tx["balance_before"])), True),
+                ("新餘額", format_t_amount(int(tx["balance_after"])), True),
+                ("備註", str(tx.get("note") or "未填寫"), False),
+            ],
+            color=discord.Color.gold(),
+        )
+    except Exception as exc:
+        print(f"錢包日誌送出失敗：{exc}")
+
 
 
 class OrderControlSelect(discord.ui.Select):
@@ -3280,6 +3499,46 @@ async def finalize_payment_and_dispatch(
         data["companion_preference"] = companion_preference
         remember_order_data(channel_id, data)
 
+    customer_member = guild.get_member(customer_id) if customer_id is not None else None
+
+
+    if payment_method == WALLET_PAYMENT_METHOD:
+        existing_wallet_tx_id = data.get("wallet_transaction_id")
+
+        if not existing_wallet_tx_id:
+            try:
+                wallet_tx = adjust_customer_wallet_balance(
+                    customer_id=customer_id,
+                    amount=-parsed_amount,
+                    tx_type="payment",
+                    operator=interaction.user,
+                    order_channel_id=channel_id,
+                    order_no=data.get("order_no") or data.get("receipt_id"),
+                    note=f"訂單扣款：{data.get('item') or item or '未紀錄'}",
+                )
+            except ValueError as e:
+                message = str(e)
+                if interaction.response.is_done():
+                    await interaction.followup.send(message, ephemeral=True)
+                else:
+                    await interaction.response.send_message(message, ephemeral=True)
+                return
+
+            data["wallet_transaction_id"] = wallet_tx["id"]
+            data["wallet_paid_amount"] = parsed_amount
+            data["wallet_balance_before"] = wallet_tx["balance_before"]
+            data["wallet_balance_after"] = wallet_tx["balance_after"]
+            remember_order_data(channel_id, data)
+
+            await send_wallet_log(
+                interaction.guild,
+                title="錢包訂單扣款",
+                customer=customer_member if customer_member is not None else interaction.user,
+                operator=interaction.user,
+                tx=wallet_tx,
+            )
+
+
     dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
 
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
@@ -3315,6 +3574,13 @@ async def finalize_payment_and_dispatch(
         staff_note=staff_note,
     )
     embed.add_field(name="訂單總價", value=format_t_amount(parsed_amount), inline=True)
+
+    if payment_method == WALLET_PAYMENT_METHOD:
+        wallet_after = data.get("wallet_balance_after")
+        wallet_value = f"已扣款 {format_t_amount(parsed_amount)}"
+        if wallet_after is not None:
+            wallet_value += f"\n扣款後餘額：{format_t_amount(int(wallet_after))}"
+        embed.add_field(name="錢包扣款", value=wallet_value, inline=False)
 
     data["dispatch_submitting"] = True
     remember_order_data(channel_id, data)
@@ -3611,6 +3877,31 @@ class PaymentMethodSelect(discord.ui.Select):
                 companion_preference=companion_preference,
                 amount=amount or None,
             )
+
+            if selected_method == WALLET_PAYMENT_METHOD:
+                wallet_balance = get_wallet_balance(self.customer_id)
+                if amount > 0:
+                    after_balance = wallet_balance - amount
+                    wallet_text = (
+                        f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
+                        f"本單金額：{format_t_amount(amount)}\n"
+                    )
+                    if after_balance >= 0:
+                        wallet_text += f"扣款後餘額：{format_t_amount(after_balance)}"
+                    else:
+                        wallet_text += f"尚不足：{format_t_amount(abs(after_balance))}"
+                else:
+                    wallet_text = (
+                        f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
+                        "本單金額：待客服填寫"
+                    )
+
+                payment_embed.add_field(
+                    name="我的錢包",
+                    value=wallet_text,
+                    inline=False,
+                )
+
             await interaction.response.edit_message(embed=payment_embed, view=self.view)
         else:
             await interaction.response.defer()
@@ -4267,6 +4558,7 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
+    ensure_wallet_tables()
     ensure_web_sync_event_worker_started()
     global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
     bot.add_view(MainPanelView())
@@ -4437,6 +4729,145 @@ def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool
         isinstance(interaction.user, discord.Member)
         and (is_customer_staff(interaction.user) or has_role(interaction.user, MANAGER_ROLE_ID) or interaction.user.guild_permissions.administrator)
     )
+
+
+
+@bot.tree.command(
+    name="wallet_add",
+    description="客服幫顧客錢包儲值",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要儲值的顧客",
+    amount="儲值金額，只能輸入正數",
+    note="備註，例如街口儲值、轉帳儲值"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def wallet_add(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    amount: int,
+    note: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以操作錢包。", ephemeral=True)
+        return
+
+    if amount <= 0:
+        await interaction.response.send_message("儲值金額必須大於 0。", ephemeral=True)
+        return
+
+    tx = adjust_customer_wallet_balance(
+        customer_id=customer.id,
+        amount=amount,
+        tx_type="topup",
+        operator=interaction.user,
+        note=note or "客服儲值",
+    )
+
+    embed = build_customer_info_with_wallet_embed(customer, show_staff_notes=True)
+    embed.title = "錢包儲值完成"
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await send_wallet_log(interaction.guild, title="錢包儲值", customer=customer, operator=interaction.user, tx=tx)
+
+
+@bot.tree.command(
+    name="wallet_adjust",
+    description="客服修正顧客錢包餘額，基於目前餘額加減",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要修正錢包的顧客",
+    amount="異動金額，可正可負，例如 500 或 -300",
+    note="修正原因"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def wallet_adjust(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    amount: int,
+    note: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以操作錢包。", ephemeral=True)
+        return
+
+    if amount == 0:
+        await interaction.response.send_message("異動金額不能為 0。", ephemeral=True)
+        return
+
+    try:
+        tx = adjust_customer_wallet_balance(
+            customer_id=customer.id,
+            amount=amount,
+            tx_type="adjustment",
+            operator=interaction.user,
+            note=note or "客服修正",
+        )
+    except ValueError as e:
+        await interaction.response.send_message(str(e), ephemeral=True)
+        return
+
+    embed = build_customer_info_with_wallet_embed(customer, show_staff_notes=True)
+    embed.title = "錢包餘額已修正"
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await send_wallet_log(interaction.guild, title="錢包餘額修正", customer=customer, operator=interaction.user, tx=tx)
+
+
+@bot.tree.command(
+    name="wallet_refund",
+    description="客服手動退回顧客錢包餘額",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要退款的顧客",
+    amount="退款金額，只能輸入正數",
+    note="退款原因"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def wallet_refund(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    amount: int,
+    note: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以操作錢包。", ephemeral=True)
+        return
+
+    if amount <= 0:
+        await interaction.response.send_message("退款金額必須大於 0。", ephemeral=True)
+        return
+
+    tx = adjust_customer_wallet_balance(
+        customer_id=customer.id,
+        amount=amount,
+        tx_type="refund",
+        operator=interaction.user,
+        note=note or "客服退款",
+    )
+
+    embed = build_customer_info_with_wallet_embed(customer, show_staff_notes=True)
+    embed.title = "錢包退款完成"
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await send_wallet_log(interaction.guild, title="錢包退款", customer=customer, operator=interaction.user, tx=tx)
+
+@bot.tree.command(
+    name="my_info",
+    description="查詢自己的會員資訊、點數與錢包餘額",
+    guild=discord.Object(id=GUILD_ID)
+)
+async def my_info(interaction: discord.Interaction):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的伺服器身分。", ephemeral=True)
+        return
+
+    embed = build_customer_info_with_wallet_embed(interaction.user, show_staff_notes=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 
 # 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py
