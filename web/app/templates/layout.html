@@ -34,11 +34,11 @@
                             <span class="mw-sidebar-label">客服</span>
                             <a class="mw-sidebar-link {% if current_path == '/admin' %}is-active{% endif %}" data-icon="✦" href="/admin">總控</a>
                             <a class="mw-sidebar-link {% if current_path.startswith('/admin/orders/history') %}is-active{% endif %}" data-icon="☷" href="/admin/orders/history">歷史訂單</a>
+                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/wallets') %}is-active{% endif %}" data-icon="◈" href="/admin/wallets">顧客錢包</a>
                             <a class="mw-sidebar-link {% if current_path.startswith('/admin/payouts/summary') %}is-active{% endif %}" data-icon="◎" href="/admin/payouts/summary">人員總表</a>
                             <a class="mw-sidebar-link {% if current_path.startswith('/admin/staff') %}is-active{% endif %}" data-icon="◇" href="/admin/staff">人員名單</a>
                         </div>
                     {% endif %}
-                        <a href="/admin/wallets">顧客錢包</a>
       </nav>
 
                 <div class="mw-sidebar-footer">

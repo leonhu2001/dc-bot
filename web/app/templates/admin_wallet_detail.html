@@ -1,327 +1,334 @@
 
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8">
-  <title>錢包流水｜魔丸娛樂後台</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    :root {
-      --bg: #07080c;
-      --panel: rgba(12, 14, 20, .78);
-      --red: #651014;
-      --gold: #e6c074;
-      --line: rgba(230, 192, 116, .24);
-      --text: #f8ead0;
-      --muted: rgba(248, 234, 208, .66);
-      --blue: #7cc3ff;
+{% extends "layout.html" %}
+
+{% block page_title %}錢包流水{% endblock %}
+
+{% block content %}
+<style>
+
+/* Wallet page shared-layout width fix */
+.wallet-ledger-page {
+    width: min(1480px, calc(100vw - 330px)) !important;
+    max-width: none !important;
+    min-width: 980px;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+.wallet-ledger-hero,
+.wallet-ledger-filter,
+.wallet-ledger-stats,
+.wallet-ledger-panel {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.wallet-ledger-table-wrap {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.wallet-ledger-table {
+    width: 100% !important;
+}
+
+@media (max-width: 1100px) {
+    .wallet-ledger-page {
+        width: calc(100vw - 280px) !important;
+        min-width: 720px;
     }
+}
 
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 12% 8%, rgba(120, 15, 22, .32), transparent 30%),
-        radial-gradient(circle at 82% 78%, rgba(120, 15, 22, .24), transparent 34%),
-        linear-gradient(90deg, rgba(3, 5, 10, .96), rgba(10, 11, 16, .86)),
-        #07080c;
-      font-family: "Noto Serif TC", "Microsoft JhengHei", serif;
+@media (max-width: 900px) {
+    .wallet-ledger-page {
+        width: calc(100vw - 32px) !important;
+        min-width: 0;
     }
+}
 
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background:
-        linear-gradient(90deg, rgba(0,0,0,.2), transparent 28%, rgba(255,255,255,.04)),
-        radial-gradient(circle at 72% 20%, rgba(255,255,255,.05), transparent 22%);
-      opacity: .9;
-    }
 
-    .page {
-      position: relative;
-      width: min(1500px, calc(100vw - 72px));
-      margin: 0 auto;
-      padding: 42px 30px 72px;
-    }
+.wallet-ledger-page {
+    display: grid;
+    gap: 18px;
+}
 
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 24px;
-      margin-bottom: 26px;
-    }
+.wallet-ledger-hero {
+    padding: 18px 22px;
+    border: 1px solid rgba(183, 143, 82, 0.34);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 85% 20%, rgba(132, 28, 24, 0.22), transparent 34%),
+        linear-gradient(135deg, rgba(10, 10, 11, 0.62), rgba(22, 16, 14, 0.24));
+}
 
-    .eyebrow {
-      margin: 0 0 10px;
-      color: var(--blue);
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      font-size: 13px;
-      font-weight: 900;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      text-shadow: 0 0 18px rgba(124,195,255,.5);
-    }
+.wallet-ledger-title {
+    margin: 0;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 1;
+    letter-spacing: 0.08em;
+}
 
-    h1 {
-      margin: 0;
-      font-size: clamp(48px, 5vw, 82px);
-      line-height: .95;
-      letter-spacing: .08em;
-      color: #fff4de;
-      text-shadow: 0 4px 16px rgba(0,0,0,.82);
-    }
+.wallet-ledger-desc {
+    margin: 12px 0 0;
+    color: rgba(246, 232, 204, 0.72);
+    font-weight: 700;
+}
 
-    .desc {
-      margin: 16px 0 0;
-      color: var(--muted);
-      font-size: 15px;
-    }
+.wallet-ledger-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
 
-    .boss-name {
-      color: #fff3d8;
-      font-weight: 900;
-    }
+.wallet-ledger-button {
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(190, 151, 86, 0.42);
+    background: rgba(128, 24, 18, 0.88);
+    color: #fff1d0;
+    padding: 0 18px;
+    font-weight: 900;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 
-    .boss-id,
-    code {
-      color: #f3cf7a;
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    }
+.wallet-ledger-button.is-dark {
+    background: rgba(12, 12, 12, 0.86);
+}
 
-    .nav {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      padding-top: 4px;
-    }
+.wallet-ledger-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
 
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 42px;
-      border: 1px solid rgba(230,192,116,.42);
-      background: linear-gradient(135deg, rgba(230,192,116,.18), rgba(115,77,24,.16));
-      color: #f6d98e;
-      text-decoration: none;
-      border-radius: 12px;
-      padding: 10px 16px;
-      font-weight: 900;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 24px rgba(0,0,0,.22);
-      white-space: nowrap;
-    }
+.wallet-ledger-stat {
+    min-height: 112px;
+    padding: 18px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(116, 78, 42, 0.46);
+    background:
+        linear-gradient(135deg, rgba(238, 218, 178, 0.92), rgba(203, 180, 137, 0.82)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%);
+    color: #130f0c;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.28);
+    position: relative;
+    overflow: hidden;
+}
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px;
-      margin: 24px 0;
-    }
+.wallet-ledger-stat::after {
+    content: "魔丸";
+    position: absolute;
+    right: 16px;
+    bottom: 12px;
+    color: rgba(128, 24, 18, 0.72);
+    border: 2px solid rgba(128, 24, 18, 0.48);
+    padding: 4px;
+    font-weight: 900;
+    font-size: 15px;
+    transform: rotate(-3deg);
+}
 
-    .stat {
-      border: 1px solid var(--line);
-      background:
-        linear-gradient(135deg, rgba(95,14,20,.66), rgba(14,16,23,.82)),
-        rgba(12,14,20,.78);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 20px 52px rgba(0,0,0,.38);
-    }
+.wallet-ledger-stat span {
+    display: block;
+    color: #5b1714;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
 
-    .stat span {
-      display: block;
-      color: var(--gold);
-      font-weight: 900;
-      margin-bottom: 12px;
-      letter-spacing: .04em;
-    }
+.wallet-ledger-stat strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 28px;
+    line-height: 1.1;
+}
 
-    .stat strong {
-      display: block;
-      font-size: 30px;
-      color: #fff7e6;
-      text-shadow: 0 4px 14px rgba(0,0,0,.72);
-    }
+.wallet-ledger-panel {
+    border: 1px solid rgba(183, 143, 82, 0.36);
+    border-radius: 16px;
+    background:
+        linear-gradient(180deg, rgba(8, 9, 11, 0.45), rgba(8, 7, 6, 0.30)),
+        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
+    overflow: hidden;
+}
 
-    .table-card {
-      width: 100%;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      background: rgba(7,9,14,.74);
-      border-radius: 20px;
-      box-shadow: 0 24px 68px rgba(0,0,0,.42);
-    }
+.wallet-ledger-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(183, 143, 82, 0.26);
+}
 
-    .table-scroll {
-      overflow-x: auto;
-      width: 100%;
-    }
+.wallet-ledger-head h3 {
+    margin: 0;
+    font-size: 25px;
+    letter-spacing: 0.08em;
+}
 
-    table {
-      width: 100%;
-      min-width: 1240px;
-      border-collapse: collapse;
-    }
+.wallet-ledger-table-wrap {
+    overflow-x: auto;
+}
 
-    th, td {
-      text-align: left;
-      padding: 16px 14px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
-      vertical-align: middle;
-    }
+.wallet-ledger-table {
+    width: 100%;
+    min-width: 1120px;
+    border-collapse: collapse;
+}
 
-    th {
-      background: linear-gradient(180deg, rgba(110,16,22,.95), rgba(84,12,18,.95));
-      color: #f1d28a;
-      font-weight: 900;
-      letter-spacing: .04em;
-    }
+.wallet-ledger-table th,
+.wallet-ledger-table td {
+    padding: 14px 14px;
+    border-bottom: 1px solid rgba(183, 143, 82, 0.22);
+    text-align: left;
+}
 
-    td {
-      color: #f9ead0;
-    }
+.wallet-ledger-table th {
+    color: #f1d58f;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    background: rgba(58, 14, 13, 0.48);
+}
 
-    tr:hover td {
-      background: rgba(230,192,116,.04);
-    }
+.wallet-ledger-table td {
+    color: #f7ead2;
+    font-weight: 800;
+}
 
-    .amount {
-      font-weight: 900;
-    }
+.wallet-amount {
+    font-weight: 900 !important;
+}
 
-    .plus { color: #86efac; }
-    .minus { color: #fca5a5; }
+.wallet-plus {
+    color: #8ee6a3 !important;
+}
 
-    .pill {
-      display: inline-flex;
-      border: 1px solid rgba(255,255,255,.15);
-      background: rgba(255,255,255,.06);
-      border-radius: 999px;
-      padding: 4px 10px;
-      color: #f7e2a6;
-      font-size: 13px;
-      font-weight: 900;
-    }
+.wallet-minus {
+    color: #f29b9b !important;
+}
 
-    .note {
-      max-width: 380px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: rgba(248,234,208,.82);
-    }
+.wallet-pill {
+    display: inline-flex;
+    border: 1px solid rgba(190, 151, 86, 0.42);
+    background: rgba(190, 151, 86, 0.12);
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: #f1d58f;
+    font-weight: 900;
+}
 
-    .empty {
-      text-align: center;
-      padding: 38px;
-      color: rgba(255,255,255,.55);
-    }
+.wallet-note {
+    max-width: 360px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
-    @media (max-width: 800px) {
-      .page {
-        width: calc(100vw - 24px);
-        padding: 28px 12px 48px;
-      }
+.wallet-empty {
+    text-align: center !important;
+    padding: 30px !important;
+    color: rgba(246, 232, 204, 0.62) !important;
+}
 
-      .topbar {
-        flex-direction: column;
-      }
+.wallet-code {
+    color: #f2d27f;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
 
-      .stats {
+@media (max-width: 900px) {
+    .wallet-ledger-stats {
         grid-template-columns: 1fr;
-      }
     }
-  </style>
-</head>
-<body>
-  <main class="page">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Wallet Ledger</p>
-        <h1>錢包流水</h1>
-        <p class="desc">
-          老闆名稱：
-          <span class="boss-name">{{ wallet.customer_display_name }}</span>
-          <br>
-          Discord ID：
-          <span class="boss-id">{{ wallet.customer_discord_id }}</span>
+}
+</style>
+
+<section class="wallet-ledger-page">
+    <header class="wallet-ledger-hero">
+        <p class="eyebrow">WALLET LEDGER</p>
+        <h1 class="wallet-ledger-title">錢包流水</h1>
+        <p class="wallet-ledger-desc">
+            老闆名稱：{{ wallet.customer_display_name }}<br>
+            Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span>
         </p>
-      </div>
-      <nav class="nav">
-        <a class="btn" href="/admin/wallets">返回錢包總覽</a>
-        <a class="btn" href="/admin">返回後台</a>
-      </nav>
     </header>
 
-    <section class="stats">
-      <article class="stat">
-        <span>目前餘額</span>
-        <strong>{{ wallet.balance_text }}</strong>
-      </article>
-      <article class="stat">
-        <span>最後更新</span>
-        <strong>{{ wallet.updated_at or "—" }}</strong>
-      </article>
+    <div class="wallet-ledger-actions">
+        <a class="wallet-ledger-button" href="/admin/wallets">返回錢包總覽</a>
+        <a class="wallet-ledger-button is-dark" href="/admin">返回後台</a>
+    </div>
+
+    <section class="wallet-ledger-stats">
+        <article class="wallet-ledger-stat">
+            <span>目前餘額 ◆</span>
+            <strong>{{ wallet.balance_text }}</strong>
+        </article>
+        <article class="wallet-ledger-stat">
+            <span>最後更新 ◆</span>
+            <strong>{{ wallet.updated_at or "—" }}</strong>
+        </article>
     </section>
 
-    <section class="table-card">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>時間</th>
-              <th>類型</th>
-              <th>異動</th>
-              <th>異動前</th>
-              <th>異動後</th>
-              <th>訂單</th>
-              <th>操作人</th>
-              <th>備註</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for tx in transactions %}
-              <tr>
-                <td>{{ tx.created_at or "—" }}</td>
-                <td><span class="pill">{{ tx.type_label }}</span></td>
-                <td class="amount {% if tx.amount > 0 %}plus{% else %}minus{% endif %}">
-                  {{ tx.amount_text }}
-                </td>
-                <td>{{ tx.balance_before_text }}</td>
-                <td>{{ tx.balance_after_text }}</td>
-                <td>
-                  {% if tx.order_no %}
-                    <code>{{ tx.order_no }}</code>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
-                <td>
-                  {% if tx.operator_display_name %}
-                    {{ tx.operator_display_name }}
-                  {% elif tx.operator_discord_id %}
-                    <code>{{ tx.operator_discord_id }}</code>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
-                <td class="note">{{ tx.note or "—" }}</td>
-              </tr>
-            {% else %}
-              <tr>
-                <td colspan="8" class="empty">目前沒有錢包流水。</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+    <section class="wallet-ledger-panel">
+        <div class="wallet-ledger-head">
+            <div>
+                <p class="eyebrow">TRANSACTION LOG</p>
+                <h3>錢包異動紀錄</h3>
+            </div>
+        </div>
+
+        <div class="wallet-ledger-table-wrap">
+            <table class="wallet-ledger-table">
+                <thead>
+                    <tr>
+                        <th>時間</th>
+                        <th>類型</th>
+                        <th>異動</th>
+                        <th>異動前</th>
+                        <th>異動後</th>
+                        <th>訂單</th>
+                        <th>操作人</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.created_at or "—" }}</td>
+                        <td><span class="wallet-pill">{{ tx.type_label }}</span></td>
+                        <td class="wallet-amount {% if tx.amount > 0 %}wallet-plus{% else %}wallet-minus{% endif %}">
+                            {{ tx.amount_text }}
+                        </td>
+                        <td>{{ tx.balance_before_text }}</td>
+                        <td>{{ tx.balance_after_text }}</td>
+                        <td>
+                            {% if tx.order_no %}
+                                <span class="wallet-code">{{ tx.order_no }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tx.operator_display_name %}
+                                {{ tx.operator_display_name }}
+                            {% elif tx.operator_discord_id %}
+                                <span class="wallet-code">{{ tx.operator_discord_id }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="wallet-note">{{ tx.note or "—" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="wallet-empty">目前沒有錢包流水。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
-  </main>
-</body>
-</html>
+</section>
+{% endblock %}

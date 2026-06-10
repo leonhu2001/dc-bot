@@ -7,16 +7,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
-      --bg: #07080c;
-      --panel: rgba(12, 14, 20, .78);
-      --panel-soft: rgba(18, 20, 28, .66);
-      --red: #651014;
-      --red-soft: rgba(95, 14, 20, .54);
       --gold: #e6c074;
-      --gold-soft: rgba(230, 192, 116, .18);
-      --line: rgba(230, 192, 116, .24);
+      --line: rgba(230, 192, 116, .26);
       --text: #f8ead0;
       --muted: rgba(248, 234, 208, .66);
+      --red: #731217;
+      --panel: rgba(8, 9, 13, .76);
       --blue: #7cc3ff;
     }
 
@@ -27,29 +23,17 @@
       min-height: 100vh;
       color: var(--text);
       background:
-        radial-gradient(circle at 12% 8%, rgba(120, 15, 22, .32), transparent 30%),
-        radial-gradient(circle at 82% 78%, rgba(120, 15, 22, .24), transparent 34%),
-        linear-gradient(90deg, rgba(3, 5, 10, .96), rgba(10, 11, 16, .86)),
-        #07080c;
+        radial-gradient(circle at 14% 8%, rgba(122, 18, 24, .35), transparent 32%),
+        radial-gradient(circle at 88% 80%, rgba(122, 18, 24, .26), transparent 38%),
+        linear-gradient(90deg, rgba(3,5,10,.95), rgba(9,10,14,.88)),
+        #06070b;
       font-family: "Noto Serif TC", "Microsoft JhengHei", serif;
     }
 
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background:
-        linear-gradient(90deg, rgba(0,0,0,.2), transparent 28%, rgba(255,255,255,.04)),
-        radial-gradient(circle at 72% 20%, rgba(255,255,255,.05), transparent 22%);
-      opacity: .9;
-    }
-
     .page {
-      position: relative;
-      width: min(1500px, calc(100vw - 72px));
+      width: min(1540px, calc(100vw - 64px));
       margin: 0 auto;
-      padding: 42px 30px 72px;
+      padding: 42px 32px 72px;
     }
 
     .topbar {
@@ -57,7 +41,7 @@
       justify-content: space-between;
       align-items: flex-start;
       gap: 24px;
-      margin-bottom: 26px;
+      margin-bottom: 24px;
     }
 
     .eyebrow {
@@ -73,7 +57,7 @@
 
     h1 {
       margin: 0;
-      font-size: clamp(48px, 5vw, 82px);
+      font-size: clamp(52px, 5vw, 84px);
       line-height: .95;
       letter-spacing: .08em;
       color: #fff4de;
@@ -84,13 +68,13 @@
       margin: 16px 0 0;
       color: var(--muted);
       font-size: 15px;
+      font-weight: 700;
     }
 
     .nav {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
-      padding-top: 4px;
     }
 
     .btn,
@@ -111,6 +95,43 @@
       white-space: nowrap;
     }
 
+    .filter {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) auto auto;
+      gap: 12px;
+      align-items: end;
+      padding: 16px;
+      border: 1px solid rgba(183, 143, 82, 0.36);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(8, 9, 11, 0.55), rgba(8, 7, 6, 0.34)),
+        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.14), transparent 38%);
+      margin: 22px 0;
+    }
+
+    .filter label {
+      display: grid;
+      gap: 8px;
+    }
+
+    .filter span {
+      color: #f1d58f;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .filter input {
+      width: 100%;
+      height: 44px;
+      color: #fff4dd;
+      border: 1px solid rgba(230,192,116,.22);
+      background: rgba(7,9,14,.76);
+      border-radius: 14px;
+      padding: 0 15px;
+      outline: none;
+      font-weight: 800;
+    }
+
     .stats {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -119,61 +140,77 @@
     }
 
     .stat {
-      border: 1px solid var(--line);
+      min-height: 112px;
+      padding: 22px 24px;
+      border-radius: 8px;
+      border: 1px solid rgba(116, 78, 42, 0.46);
       background:
-        linear-gradient(135deg, rgba(95,14,20,.66), rgba(14,16,23,.82)),
-        var(--panel);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 20px 52px rgba(0,0,0,.38);
+        linear-gradient(135deg, rgba(238, 218, 178, 0.92), rgba(203, 180, 137, 0.82)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%);
+      color: #130f0c;
+      box-shadow: 0 18px 42px rgba(0,0,0,0.28);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat::after {
+      content: "魔丸";
+      position: absolute;
+      right: 16px;
+      bottom: 12px;
+      color: rgba(128, 24, 18, 0.72);
+      border: 2px solid rgba(128, 24, 18, 0.48);
+      padding: 4px;
+      font-weight: 900;
+      font-size: 15px;
+      transform: rotate(-3deg);
     }
 
     .stat span {
       display: block;
-      color: var(--gold);
+      color: #5b1714;
       font-weight: 900;
-      margin-bottom: 12px;
-      letter-spacing: .04em;
+      letter-spacing: .08em;
     }
 
     .stat strong {
       display: block;
-      font-size: 36px;
-      color: #fff7e6;
-      text-shadow: 0 4px 14px rgba(0,0,0,.72);
+      margin-top: 10px;
+      font-size: 38px;
+      line-height: 1;
     }
 
-    .filter {
-      display: flex;
-      gap: 12px;
-      margin: 24px 0;
-    }
-
-    .filter input {
-      flex: 1;
-      min-width: 260px;
-      color: #fff4dd;
-      border: 1px solid rgba(230,192,116,.22);
-      background: rgba(7,9,14,.76);
-      border-radius: 14px;
-      padding: 13px 15px;
-      outline: none;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
-    }
-
-    .table-card {
-      width: 100%;
+    .panel {
+      border: 1px solid rgba(183, 143, 82, 0.36);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(8, 9, 11, 0.50), rgba(8, 7, 6, 0.34)),
+        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
       overflow: hidden;
-      border: 1px solid var(--line);
-      background: rgba(7,9,14,.74);
-      border-radius: 20px;
       box-shadow: 0 24px 68px rgba(0,0,0,.42);
     }
 
-    .table-scroll {
-      overflow-x: auto;
-      width: 100%;
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(183, 143, 82, 0.26);
     }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: .08em;
+    }
+
+    .panel-head small {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .table-wrap { overflow-x: auto; }
 
     table {
       width: 100%;
@@ -184,7 +221,7 @@
     th, td {
       text-align: left;
       padding: 16px 14px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
+      border-bottom: 1px solid rgba(183,143,82,.22);
       vertical-align: middle;
     }
 
@@ -197,16 +234,15 @@
 
     td {
       color: #f9ead0;
+      font-weight: 800;
     }
 
-    tr:hover td {
-      background: rgba(230,192,116,.04);
-    }
+    tr:hover td { background: rgba(230,192,116,.04); }
 
     .boss-name {
-      font-weight: 900;
       color: #fff2d8;
       font-size: 16px;
+      font-weight: 900;
       margin-bottom: 4px;
     }
 
@@ -242,26 +278,10 @@
       color: rgba(255,255,255,.55);
     }
 
-    @media (max-width: 800px) {
-      .page {
-        width: calc(100vw - 24px);
-        padding: 28px 12px 48px;
-      }
-
-      .topbar,
-      .filter {
-        flex-direction: column;
-      }
-
-      .stats {
-        grid-template-columns: 1fr;
-      }
-
-      .filter input,
-      .filter button,
-      .filter a {
-        width: 100%;
-      }
+    @media (max-width: 900px) {
+      .page { width: calc(100vw - 24px); padding: 28px 12px 48px; }
+      .topbar, .filter { grid-template-columns: 1fr; flex-direction: column; }
+      .stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -279,27 +299,36 @@
       </nav>
     </header>
 
+    <form class="filter" method="get" action="/admin/wallets">
+      <label>
+        <span>搜尋老闆 / 訂單 / 備註 / 操作人</span>
+        <input type="text" name="q" value="{{ q }}" placeholder="輸入關鍵字">
+      </label>
+      <button type="submit">套用篩選</button>
+      <a href="/admin/wallets">重設條件</a>
+    </form>
+
     <section class="stats">
       <article class="stat">
-        <span>錢包人數</span>
+        <span>錢包人數 ◆</span>
         <strong>{{ wallet_count }}</strong>
       </article>
       <article class="stat">
-        <span>總餘額</span>
+        <span>總餘額 ◆</span>
         <strong>{{ total_balance_text }}</strong>
       </article>
     </section>
 
-    <form class="filter" method="get" action="/admin/wallets">
-      <input type="text" name="q" value="{{ q }}" placeholder="搜尋老闆名稱、Discord ID、訂單編號、備註、操作人">
-      <button type="submit">搜尋</button>
-      {% if q %}
-        <a href="/admin/wallets">清除</a>
-      {% endif %}
-    </form>
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Wallet Ledger</p>
+          <h3>顧客錢包總覽</h3>
+        </div>
+        <small>共 {{ wallet_count }} 位老闆</small>
+      </div>
 
-    <section class="table-card">
-      <div class="table-scroll">
+      <div class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -314,22 +343,22 @@
           </thead>
           <tbody>
             {% for wallet in wallets %}
-              <tr>
-                <td>
-                  <div class="boss-name">{{ wallet.customer_display_name }}</div>
-                  <div class="boss-id">{{ wallet.customer_discord_id }}</div>
-                </td>
-                <td class="amount">{{ wallet.balance_text }}</td>
-                <td>{{ wallet.transaction_count }}</td>
-                <td>{{ wallet.last_operator or "—" }}</td>
-                <td class="note">{{ wallet.last_note or "—" }}</td>
-                <td>{{ wallet.updated_at or "—" }}</td>
-                <td><a class="link" href="/admin/wallets/{{ wallet.customer_discord_id }}">查看流水</a></td>
-              </tr>
+            <tr>
+              <td>
+                <div class="boss-name">{{ wallet.customer_display_name }}</div>
+                <div class="boss-id">{{ wallet.customer_discord_id }}</div>
+              </td>
+              <td class="amount">{{ wallet.balance_text }}</td>
+              <td>{{ wallet.transaction_count }}</td>
+              <td>{{ wallet.last_operator or "—" }}</td>
+              <td class="note">{{ wallet.last_note or "—" }}</td>
+              <td>{{ wallet.updated_at or "—" }}</td>
+              <td><a class="link" href="/admin/wallets/{{ wallet.customer_discord_id }}">查看流水</a></td>
+            </tr>
             {% else %}
-              <tr>
-                <td colspan="7" class="empty">目前沒有錢包資料。</td>
-              </tr>
+            <tr>
+              <td colspan="7" class="empty">目前沒有錢包資料。</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
