@@ -92,4 +92,6 @@ async def health():
     }
 
 from web.app.routers import dispatch_state
+from web.app.routers import admin_wallets
 app.include_router(dispatch_state.router)
+app.include_router(admin_wallets.router)
