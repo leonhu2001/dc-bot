@@ -1814,6 +1814,118 @@ async def send_wallet_log(
 
 
 
+def get_wallet_transactions(customer_id, limit: int = 10) -> list[dict]:
+    ensure_wallet_tables()
+
+    safe_limit = max(1, min(int(limit or 10), 25))
+
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                customer_discord_id,
+                amount,
+                balance_before,
+                balance_after,
+                type,
+                order_channel_id,
+                order_no,
+                operator_discord_id,
+                operator_display_name,
+                note,
+                created_at
+            FROM wallet_transactions
+            WHERE customer_discord_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (str(customer_id), safe_limit),
+        ).fetchall()
+
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def wallet_transaction_type_label(tx_type: str) -> str:
+    mapping = {
+        "topup": "儲值",
+        "payment": "訂單扣款",
+        "refund": "退款",
+        "adjustment": "修正",
+    }
+    return mapping.get(str(tx_type or "").strip(), str(tx_type or "未知"))
+
+
+def build_wallet_history_embed(
+    customer: discord.Member | discord.User,
+    *,
+    limit: int = 10,
+    staff_view: bool = False,
+) -> discord.Embed:
+    balance = get_wallet_balance(customer.id)
+    transactions = get_wallet_transactions(customer.id, limit=limit)
+
+    embed = discord.Embed(
+        title=f"錢包流水｜{getattr(customer, 'display_name', getattr(customer, 'name', customer.id))}",
+        color=discord.Color.gold(),
+    )
+
+    embed.add_field(name="顧客", value=getattr(customer, "mention", f"<@{customer.id}>"), inline=True)
+    embed.add_field(name="目前餘額", value=format_t_amount(balance), inline=True)
+
+    if not transactions:
+        embed.add_field(name="最近流水", value="目前沒有錢包流水。", inline=False)
+        return embed
+
+    lines = []
+
+    for index, tx in enumerate(transactions, start=1):
+        amount = int(tx.get("amount") or 0)
+        sign = "+" if amount > 0 else "-"
+        tx_type = wallet_transaction_type_label(str(tx.get("type") or ""))
+        before = int(tx.get("balance_before") or 0)
+        after = int(tx.get("balance_after") or 0)
+        created_at = str(tx.get("created_at") or "未紀錄時間")
+        order_no = str(tx.get("order_no") or "").strip()
+        note = str(tx.get("note") or "").strip()
+        operator_id = str(tx.get("operator_discord_id") or "").strip()
+        operator_name = str(tx.get("operator_display_name") or "").strip()
+
+        block = [
+            f"**{index}. {tx_type}｜{sign}{format_t_amount(abs(amount))}**",
+            f"{format_t_amount(before)} → {format_t_amount(after)}",
+        ]
+
+        if order_no:
+            block.append(f"訂單：`{order_no}`")
+
+        if staff_view and operator_id:
+            block.append(f"操作人：<@{operator_id}>")
+        elif staff_view and operator_name:
+            block.append(f"操作人：{operator_name}")
+
+        if note:
+            block.append(f"備註：{note}")
+
+        block.append(f"時間：{created_at}")
+
+        lines.append("\n".join(block))
+
+    text = "\n\n".join(lines)
+
+    if len(text) > 3900:
+        text = text[:3900] + "\n…（流水太長，已截斷）"
+
+    embed.add_field(name=f"最近 {len(transactions)} 筆流水", value=text, inline=False)
+    return embed
+
+
+
 class OrderControlSelect(discord.ui.Select):
     def __init__(self):
         options = [
@@ -4854,6 +4966,109 @@ async def wallet_refund(
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
     await send_wallet_log(interaction.guild, title="錢包退款", customer=customer, operator=interaction.user, tx=tx)
+
+
+
+@bot.tree.command(
+    name="wallet_history",
+    description="客服查詢顧客錢包流水",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要查詢的顧客",
+    limit="顯示最近幾筆，最多 25 筆"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def wallet_history(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    limit: int = 10,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以查詢錢包流水。", ephemeral=True)
+        return
+
+    embed = build_wallet_history_embed(customer, limit=limit, staff_view=True)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="my_wallet_history",
+    description="查詢自己的錢包流水",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(limit="顯示最近幾筆，最多 25 筆")
+async def my_wallet_history(
+    interaction: discord.Interaction,
+    limit: int = 10,
+):
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的伺服器身分。", ephemeral=True)
+        return
+
+    embed = build_wallet_history_embed(interaction.user, limit=limit, staff_view=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(
+    name="wallet_refund_order",
+    description="客服針對指定訂單手動退款到顧客錢包",
+    guild=discord.Object(id=GUILD_ID)
+)
+@app_commands.describe(
+    customer="要退款的顧客",
+    order_no="訂單編號，例如 MO20260610001",
+    amount="退款金額，只能輸入正數",
+    note="退款原因"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def wallet_refund_order(
+    interaction: discord.Interaction,
+    customer: discord.Member,
+    order_no: str,
+    amount: int,
+    note: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以操作錢包退款。", ephemeral=True)
+        return
+
+    order_no = str(order_no or "").strip()
+
+    if not order_no:
+        await interaction.response.send_message("請填寫訂單編號。", ephemeral=True)
+        return
+
+    if amount <= 0:
+        await interaction.response.send_message("退款金額必須大於 0。", ephemeral=True)
+        return
+
+    refund_note = str(note or "").strip() or f"訂單 {order_no} 手動退款"
+
+    tx = adjust_customer_wallet_balance(
+        customer_id=customer.id,
+        amount=amount,
+        tx_type="refund",
+        operator=interaction.user,
+        order_no=order_no,
+        note=refund_note,
+    )
+
+    embed = build_wallet_history_embed(customer, limit=5, staff_view=True)
+    embed.title = "訂單退款已加回錢包"
+    embed.add_field(name="退款訂單", value=f"`{order_no}`", inline=True)
+    embed.add_field(name="退款金額", value=format_t_amount(amount), inline=True)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await send_wallet_log(
+        interaction.guild,
+        title="錢包訂單退款",
+        customer=customer,
+        operator=interaction.user,
+        tx=tx,
+    )
+
+
 
 @bot.tree.command(
     name="my_info",
