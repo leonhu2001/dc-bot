@@ -170,7 +170,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
-            connect=True,
+            connect=False,
             send_messages=False,
             read_message_history=False,
         ),
@@ -200,7 +200,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
 
     employee_family_role = get_employee_family_role(guild)
     if employee_family_role is not None:
-        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=True)
+        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=False)
 
     return overwrites
 
@@ -244,7 +244,7 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
-            connect=True,
+            connect=False,
             send_messages=False,
             read_message_history=False,
         ),
@@ -670,9 +670,10 @@ async def apply_voice_hidden_state(
     everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
     everyone_overwrite.view_channel = not hidden
 
-    # 隱藏時不能加入；顯示時三種臨時房都預設可加入。
-    # 實際鎖房狀態由 apply_voice_lock_state 控制。
-    everyone_overwrite.connect = False if hidden else True
+    if str(room_type or "") == "public":
+        everyone_overwrite.connect = False if hidden else True
+    else:
+        everyone_overwrite.connect = False
 
     overwrites[guild.default_role] = everyone_overwrite
 
