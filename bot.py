@@ -1112,7 +1112,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
         parsed_amount = _to_int(order_data.get("amount"), 0) or _to_int(order_data.get("total_amount"), 0) or 0
-        if parsed_amount <= 0:
+        if parsed_amount < 0:
             await interaction.response.send_message(
                 "這張單還沒有訂單價格，請先在付款面板按「填寫訂單價格」讓客服輸入金額。",
                 ephemeral=True
@@ -1228,6 +1228,199 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
                 everyone=False
             )
         )
+
+
+def get_stored_order_amount_or_none(order_data: dict) -> int | None:
+    for key in ("amount", "total_amount", "amount_text"):
+        raw = order_data.get(key)
+        if raw is None or str(raw).strip() == "":
+            continue
+
+        if isinstance(raw, int):
+            return raw
+
+        parsed = parse_receipt_amount(str(raw))
+        if parsed is not None:
+            return parsed
+
+    return None
+
+
+async def close_order_without_receipt_modal(interaction: discord.Interaction) -> None:
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return
+
+    if not is_customer_staff(interaction.user):
+        await interaction.response.send_message("只有客服可以操作已結單。", ephemeral=True)
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not isinstance(interaction.channel, discord.TextChannel):
+        await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+        return
+
+    order_channel = interaction.channel
+    customer_id = get_order_customer_id_from_channel(order_channel)
+
+    if customer_id is None:
+        await interaction.response.send_message(
+            "無法辨識這張票口的下單顧客，因此無法結單。",
+            ephemeral=True,
+        )
+        return
+
+    customer_member = guild.get_member(customer_id)
+    order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+
+    parsed_amount = get_stored_order_amount_or_none(order_data)
+    if parsed_amount is None:
+        await interaction.response.send_message(
+            "這張單還沒有訂單價格，請先讓客服填寫金額；贈送單請填 0。",
+            ephemeral=True,
+        )
+        return
+
+    if parsed_amount < 0:
+        await interaction.response.send_message(
+            "訂單金額不可為負數，請先修正金額後再結單。",
+            ephemeral=True,
+        )
+        return
+
+    order_content, detected_payment_method = get_order_summary_from_channel(order_channel.id)
+    payment_method = str(
+        order_data.get("payment_method")
+        or detected_payment_method
+        or "未填寫"
+    ).strip()
+
+    amount_text = str(order_data.get("amount_text") or format_t_amount(parsed_amount))
+    existing_receipt_id = str(order_data.get("receipt_id") or order_data.get("order_no") or "").strip()
+    receipt_already_created = bool(existing_receipt_id)
+
+    receipt_id = existing_receipt_id
+
+    # 新流程通常在付款送出時已產生收據；如果舊單沒有收據，這裡自動補一張，不再要求客服填 Modal。
+    if not receipt_id:
+        category = order_data.get("category")
+        item = order_data.get("item")
+        quantity = _to_int(order_data.get("quantity"), 1) or 1
+        category_label = str(order_data.get("category_label") or ORDER_CATEGORY_LABELS.get(category, str(category or "訂單")))
+
+        if category is not None and item is not None:
+            try:
+                receipt_id, _receipt_message = await ensure_payment_submit_receipt(
+                    guild=guild,
+                    order_channel=order_channel,
+                    customer_id=customer_id,
+                    customer_member=customer_member,
+                    staff_member=interaction.user,
+                    category_label=category_label,
+                    item=str(item),
+                    quantity=quantity,
+                    amount=parsed_amount,
+                    payment_method=payment_method,
+                    companion_preference=order_data.get("companion_preference"),
+                )
+                order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+            except ValueError as exc:
+                await interaction.response.send_message(str(exc), ephemeral=True)
+                return
+        else:
+            receipt_id = generate_order_receipt_id()
+            order_data["receipt_id"] = receipt_id
+            order_data["order_no"] = receipt_id
+
+    closed_at_text = get_taipei_now_iso()
+    order_data["receipt_id"] = receipt_id
+    order_data["order_no"] = receipt_id
+    order_data.setdefault("receipt_created_at", closed_at_text)
+    order_data["closed_at"] = closed_at_text
+    order_data["closed"] = True
+    order_data["status"] = "closed"
+    order_data["amount"] = parsed_amount
+    order_data["total_amount"] = parsed_amount
+    order_data["amount_text"] = amount_text
+    order_data["payment_method"] = payment_method
+    remember_order_data(order_channel.id, order_data)
+
+    sync_web_order_closed_from_bot(
+        ticket_channel_id=order_channel.id,
+        dispatch_message_id=order_data.get("dispatch_message_id"),
+    )
+
+    await lock_dispatch_claim_panel(guild, order_channel.id)
+    await rename_ticket_channel(order_channel, "已結單", member=customer_member)
+
+    reward_result = (
+        "會員累積已在顧客送出付款方式時處理。"
+        if order_data.get("reward_counted")
+        else "提醒：這張單尚未標記會員累積，請確認顧客是否已送出付款方式。"
+    )
+
+    await send_order_log(
+        guild,
+        title="訂單已結單",
+        fields=[
+            ("訂單編號", receipt_id or "未產生", True),
+            ("顧客", f"<@{customer_id}>", True),
+            ("客服", interaction.user.mention, True),
+            ("金額", amount_text, True),
+            ("付款方式", payment_method, True),
+            ("票口", order_channel.mention, False),
+            ("內容", order_content, False),
+        ],
+        color=discord.Color.green(),
+    )
+
+    close_receipt_text = "收據已於付款送出時產生，本次不重複送出。" if receipt_already_created else "收據已自動產生或補登。"
+
+    await interaction.response.send_message(
+        f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
+        f"{reward_result}\n\n"
+        f"請闆闆留下評論",
+        view=ReviewButtonView(customer_id=customer_id),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+
+class ConfirmCloseOrderView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+
+    @discord.ui.button(
+        label="是，確認結單",
+        style=discord.ButtonStyle.success,
+        custom_id="confirm_close_order_yes",
+    )
+    async def confirm_close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await close_order_without_receipt_modal(interaction)
+
+    @discord.ui.button(
+        label="否，保留訂單",
+        style=discord.ButtonStyle.secondary,
+        custom_id="confirm_close_order_no",
+    )
+    async def keep_order(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            return
+
+        if not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以操作。", ephemeral=True)
+            return
+
+        await interaction.response.send_message("已保留訂單。", ephemeral=True)
+
 
 
 # ========= 下單操作按鈕 =========
@@ -3377,7 +3570,7 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
             return
 
         parsed_amount = parse_receipt_amount(str(self.amount.value))
-        if parsed_amount is None or parsed_amount <= 0:
+        if parsed_amount is None or parsed_amount < 0:
             await interaction.response.send_message(
                 "金額欄位無法辨識，請輸入可辨識的數字，例如：1275、NT$1275、1275T。",
                 ephemeral=True,
@@ -3545,7 +3738,7 @@ async def finalize_payment_and_dispatch(
         await interaction.response.send_message("請先選擇付款方式，再按送出。", ephemeral=True)
         return
 
-    if parsed_amount <= 0:
+    if parsed_amount < 0:
         if isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user):
             await interaction.response.send_modal(OrderAmountModal(customer_id, channel_id))
         else:
@@ -4156,7 +4349,7 @@ class StaffOrderOperationSelect(discord.ui.Select):
             discord.SelectOption(
                 label="已結單",
                 value="done",
-                description="填寫收據並送出評論按鈕"
+                description="二次確認後直接結單並送出評論按鈕"
             ),
             discord.SelectOption(
                 label="存單",
@@ -4238,7 +4431,11 @@ class StaffOrderOperationView(discord.ui.View):
         STAFF_ORDER_OPERATION_SELECTIONS.pop((interaction.channel.id, interaction.user.id), None)
 
         if selected == "done":
-            await interaction.response.send_modal(ReceiptModal())
+            await interaction.response.send_message(
+                "是否確定要將這筆訂單標記為已結單？",
+                view=ConfirmCloseOrderView(),
+                ephemeral=True,
+            )
         elif selected == "store":
             await interaction.response.send_modal(StoreOrderModal())
         elif selected == "resume":
