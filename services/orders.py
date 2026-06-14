@@ -4,7 +4,6 @@ from typing import Callable, Any
 
 import discord
 
-
 def _to_int(value, default: int | None = None) -> int | None:
     try:
         if value is None or value == "":
@@ -12,7 +11,6 @@ def _to_int(value, default: int | None = None) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return default
-
 
 ORDER_CATEGORY_LABELS = {
     "basic": "基礎單",
@@ -29,7 +27,7 @@ ORDER_ITEMS_BY_CATEGORY = {
         "娛樂陪",
         "甜蜜單",
         "技術陪",
-        "保底單",
+        
         "節日特別單",
         "教學單",
         "賭約單",
@@ -37,7 +35,7 @@ ORDER_ITEMS_BY_CATEGORY = {
     ],
     "fun": [
         "豪到你了嗎",
-        "瘋狗嘶咬",
+        
         "想吃自己打",
         "大紅拉霸機",
         "比翼雙飛",
@@ -71,7 +69,7 @@ SPECIAL_COMPANION_ITEMS = {
     "娛樂陪",
     "甜蜜單",
     "技術陪",
-    "保底單",
+    
     "陪打",
     "已讀亂回",
     "真心話大冒險",
@@ -89,7 +87,6 @@ QUANTITY_SELECT_ITEMS = {
 
 QUANTITY_OPTIONS = list(range(1, 25))
 
-
 _ORDER_SELECTIONS: dict[int, dict] = {}
 _PARSE_RECEIPT_AMOUNT = None
 _GUILD_ID = 0
@@ -97,12 +94,10 @@ _DISPATCH_CHANNEL_ID = 0
 _FORMAT_AMOUNT: Callable[[int], str] | None = None
 _GET_NOW: Callable[[], Any] | None = None
 
-
 def _format_amount(amount: int) -> str:
     if _FORMAT_AMOUNT is not None:
         return _FORMAT_AMOUNT(amount)
     return f"{int(amount or 0):,}T"
-
 
 def configure_order_helpers(
     order_selections: dict[int, dict],
@@ -120,7 +115,6 @@ def configure_order_helpers(
     _DISPATCH_CHANNEL_ID = int(dispatch_channel_id or 0)
     _FORMAT_AMOUNT = format_amount_func
     _GET_NOW = get_now_func
-
 
 def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
     """用訂單編號或票口 ID 從記憶體訂單資料找單。"""
@@ -148,11 +142,9 @@ def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
 
     return None, None
 
-
 def is_order_closed_for_rewards(data: dict) -> bool:
     status = str(data.get("status") or "").lower()
     return bool(data.get("reward_counted") or data.get("closed") or status == "closed")
-
 
 def get_order_amount_for_maintenance(data: dict) -> int:
     """Safely parse order amount for maintenance commands."""
@@ -191,20 +183,17 @@ def get_order_amount_for_stats(data: dict) -> int:
                     return int(parsed)
     return 0
 
-
 def is_closed_order_for_stats(data: dict) -> bool:
     """Return whether an order should count as completed in sales stats."""
     if not isinstance(data, dict):
         return False
     return bool(data.get("closed")) or str(data.get("status", "")).lower() == "closed"
 
-
 def is_stored_order_for_stats(data: dict) -> bool:
     """Return whether an order is currently stored/paused."""
     if not isinstance(data, dict):
         return False
     return str(data.get("status", "")).lower() == "stored"
-
 
 def is_cancelled_order_for_stats(data: dict) -> bool:
     """Return whether an order is cancelled, accepting both spellings."""
@@ -240,7 +229,6 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
         parts.append(companion_preference)
 
     return "｜".join(parts), payment_method
-
 
 def build_self_service_order_embed(
     customer_mention: str,
@@ -317,7 +305,6 @@ def build_self_service_order_embed(
     embed.add_field(name="接單狀態", value="等待接單", inline=False)
     return embed
 
-
 def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
     """回傳目前記憶體中的存單，依存單時間新到舊排序。"""
     records: list[tuple[int, dict]] = []
@@ -335,7 +322,6 @@ def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
     )
     return records[:max(1, min(int(limit or 25), 25))]
 
-
 def format_stored_order_option_label(channel_id: int, data: dict) -> str:
     item = str(data.get("item") or "未紀錄")[:30]
     customer_id = data.get("customer_id") or "未紀錄"
@@ -343,13 +329,11 @@ def format_stored_order_option_label(channel_id: int, data: dict) -> str:
     amount_text = f"{amount}T" if amount else "未紀錄金額"
     return f"{item}｜{customer_id}｜{amount_text}"[:100]
 
-
 def format_stored_order_option_description(channel_id: int, data: dict) -> str:
     quantity = _to_int(data.get("quantity"), 1) or 1
     stored_at = str(data.get("stored_at") or "未紀錄時間")[:19]
     reason = str(data.get("stored_reason") or data.get("store_reason") or "未填寫原因")[:35]
     return f"{quantity} 單｜{stored_at}｜{reason}"[:100]
-
 
 def build_stored_order_detail_embed(
     guild: discord.Guild | None,
