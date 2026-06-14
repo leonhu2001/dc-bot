@@ -200,7 +200,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
 
     employee_family_role = get_employee_family_role(guild)
     if employee_family_role is not None:
-        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=False)
+        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=True)
 
     return overwrites
 
@@ -605,9 +605,12 @@ async def apply_voice_lock_state(
     room_type: str,
     locked: bool,
 ):
+    guild = voice_channel.guild
+    normalized_room_type = str(room_type or "public")
     overwrites = dict(voice_channel.overwrites)
 
-    for target in get_room_targets_for_control(voice_channel.guild, room_type):
+    # 公共房控制 @everyone；VIP / 陪玩房控制陪玩、打手、客服、員工家屬等允許身分組。
+    for target in get_room_targets_for_control(guild, normalized_room_type):
         overwrite = overwrites.get(target, discord.PermissionOverwrite())
         overwrite.view_channel = True
         overwrite.connect = not locked
@@ -618,8 +621,18 @@ async def apply_voice_lock_state(
         overwrite.read_message_history = False
         overwrites[target] = overwrite
 
-    if room_type == "play":
-        employee_family_role = get_employee_family_role(voice_channel.guild)
+    # VIP / 陪玩臨時房即使未鎖定，也不開放一般人直接進入。
+    if normalized_room_type != "public":
+        everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+        everyone_overwrite.view_channel = True
+        everyone_overwrite.connect = False
+        everyone_overwrite.send_messages = False
+        everyone_overwrite.read_message_history = False
+        overwrites[guild.default_role] = everyone_overwrite
+
+    # 陪玩房的員工家屬：未鎖定可進，上鎖後不可進。
+    if normalized_room_type == "play":
+        employee_family_role = get_employee_family_role(guild)
         if employee_family_role is not None:
             family_overwrite = overwrites.get(employee_family_role, discord.PermissionOverwrite())
             family_overwrite.view_channel = True
@@ -631,6 +644,27 @@ async def apply_voice_lock_state(
             family_overwrite.read_message_history = False
             overwrites[employee_family_role] = family_overwrite
 
+    bot_member = guild.me
+    bot_member_id = bot_member.id if bot_member is not None else None
+
+    # 重點：上鎖時清掉之前因進房產生的「個人 connect=True」權限。
+    # 不然有些人即使身分組被鎖，仍會因個人權限繼續進得去。
+    for target, overwrite in list(overwrites.items()):
+        if isinstance(target, discord.Member):
+            if target.id == owner.id or target.id == bot_member_id:
+                continue
+
+            if locked:
+                overwrite.connect = False
+                overwrite.send_messages = False
+                overwrite.read_message_history = False
+            else:
+                # 解鎖時不要讓個人 False 擋住身分組權限。
+                if overwrite.connect is False:
+                    overwrite.connect = None
+
+            overwrites[target] = overwrite
+
     owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
     owner_overwrite.view_channel = True
     owner_overwrite.connect = True
@@ -641,7 +675,6 @@ async def apply_voice_lock_state(
     owner_overwrite.read_message_history = True
     overwrites[owner] = owner_overwrite
 
-    bot_member = voice_channel.guild.me
     if bot_member is not None:
         bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
         bot_overwrite.view_channel = True
@@ -654,9 +687,8 @@ async def apply_voice_lock_state(
 
     await voice_channel.edit(
         overwrites=overwrites,
-        reason="Voice room lock state changed by owner",
+        reason="Update temporary voice room lock state",
     )
-
 
 async def apply_voice_hidden_state(
     voice_channel: discord.VoiceChannel,
