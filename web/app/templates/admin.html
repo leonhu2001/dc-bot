@@ -30,6 +30,250 @@ document.addEventListener("DOMContentLoaded", function () {
 {% endblock %}
 
 {% block content %}
+
+
+
+
+<style>
+/* 總控訂單卡片空間利用版 */
+.admin-order-list {
+    display: grid !important;
+    gap: 18px !important;
+}
+
+.admin-order-card {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 20px 22px !important;
+    margin-bottom: 18px !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+}
+
+.admin-order-card .order-card-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 18px !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 12px !important;
+}
+
+.admin-order-card .order-no {
+    margin: 0 0 6px !important;
+    font-size: 14px !important;
+}
+
+.admin-order-card h3 {
+    margin: 0 !important;
+    font-size: 24px !important;
+    line-height: 1.25 !important;
+}
+
+.admin-order-title-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+}
+
+.admin-order-card .badge {
+    padding: 7px 12px !important;
+    font-size: 14px !important;
+    white-space: nowrap !important;
+}
+
+.admin-order-cancel-form {
+    margin: 0 !important;
+}
+
+.admin-order-cancel-button {
+    min-height: 38px !important;
+    padding: 8px 14px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 103, 96, .45) !important;
+    background: rgba(130, 18, 16, .88) !important;
+    color: #ffe6dc !important;
+    font-weight: 900 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+}
+
+.admin-order-card .order-meta {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    margin: 0 !important;
+}
+
+.admin-order-card .order-meta > div {
+    min-height: 62px !important;
+    padding: 12px 14px !important;
+    border-radius: 13px !important;
+}
+
+.admin-order-card .order-meta span {
+    font-size: 13px !important;
+}
+
+.admin-order-card .order-meta strong {
+    display: block !important;
+    margin-top: 5px !important;
+    font-size: 17px !important;
+    line-height: 1.35 !important;
+}
+
+.admin-order-card .admin-section {
+    margin-top: 0 !important;
+    padding: 16px 18px !important;
+    border-radius: 15px !important;
+    min-height: unset !important;
+    height: auto !important;
+    overflow: hidden !important;
+}
+
+.admin-order-card .admin-section h4 {
+    margin: 0 0 10px !important;
+    font-size: 18px !important;
+}
+
+.admin-order-card .muted-text {
+    margin: 4px 0 12px !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+}
+
+.admin-section-cs-assign .admin-add-worker-form,
+.admin-section-add-worker .admin-add-worker-form {
+    display: grid !important;
+    grid-template-columns: minmax(260px, .8fr) minmax(360px, 1fr) 130px !important;
+    gap: 14px !important;
+    align-items: center !important;
+}
+
+.admin-order-card .input,
+.admin-order-card select.input {
+    min-height: 42px !important;
+    padding: 9px 12px !important;
+    border-radius: 11px !important;
+    font-size: 15px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.admin-order-card .button {
+    min-height: 42px !important;
+    padding: 9px 15px !important;
+    border-radius: 11px !important;
+    font-size: 15px !important;
+    white-space: nowrap !important;
+}
+
+.admin-order-card .admin-worker-list {
+    display: grid !important;
+    gap: 12px !important;
+}
+
+.admin-order-card .admin-worker-card {
+    min-height: unset !important;
+    padding: 14px 16px !important;
+    border-radius: 13px !important;
+    overflow: hidden !important;
+}
+
+.admin-section-workers .admin-worker-card {
+    display: grid !important;
+    grid-template-columns: minmax(220px, .42fr) minmax(320px, .58fr) minmax(520px, 1fr) !important;
+    gap: 16px !important;
+    align-items: center !important;
+}
+
+.admin-order-card .worker-payout-line {
+    display: flex !important;
+    gap: 10px 12px !important;
+    font-size: 14px !important;
+    flex-wrap: wrap !important;
+    min-width: 0 !important;
+}
+
+.admin-section-workers .admin-actions {
+    display: grid !important;
+    grid-template-columns: 135px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+}
+
+.admin-section-workers .admin-actions form {
+    margin: 0 !important;
+}
+
+.admin-section-workers .admin-actions form:not(.inline-form) {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+.admin-section-workers .inline-form {
+    display: grid !important;
+    grid-template-columns: minmax(150px, .35fr) minmax(220px, .65fr) 130px !important;
+    gap: 12px !important;
+    align-items: center !important;
+    min-width: 0 !important;
+}
+
+.admin-section-workers .inline-form input {
+    min-width: 0 !important;
+}
+
+.admin-section-workers .admin-actions > form:last-child {
+    grid-column: 1 / -1 !important;
+    justify-self: stretch !important;
+}
+
+.admin-section-workers .admin-actions > form:first-child {
+    grid-column: 1 / 2 !important;
+}
+
+.admin-order-card .empty-state {
+    padding: 16px !important;
+    min-height: unset !important;
+}
+
+@media (max-width: 1350px) {
+    .admin-section-workers .admin-worker-card {
+        grid-template-columns: 1fr !important;
+    }
+
+    .admin-section-workers .admin-actions {
+        grid-template-columns: 1fr !important;
+    }
+
+    .admin-section-workers .inline-form {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 980px) {
+    .admin-order-card .order-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .admin-section-cs-assign .admin-add-worker-form,
+    .admin-section-add-worker .admin-add-worker-form {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+
+
+
+
+
+
     {% if message %}
         <div class="notice success-box">
             {{ message }}
@@ -97,7 +341,18 @@ document.addEventListener("DOMContentLoaded", function () {
                                 <h3>{{ order.category }}｜{{ order.item }}</h3>
                             </div>
 
-                            <span class="badge">{{ order.status }}</span>
+                            <div class="admin-order-title-actions">
+                                <span class="badge">{{ order.status }}</span>
+
+                                <form
+                                    method="post"
+                                    action="/admin/orders/{{ order.id }}/cancel"
+                                    class="admin-order-cancel-form"
+                                    onsubmit="return confirm('確定要取消這筆訂單嗎？此操作只會讓網站總控不再顯示這筆單，不會刪除 Discord 票口。');"
+                                >
+                                    <button class="admin-order-cancel-button" type="submit">取消訂單</button>
+                                </form>
+                            </div>
                         </div>
 
                         <div class="order-meta">
@@ -122,7 +377,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             </div>
                         </div>
 
-                        <div class="admin-section">
+                        <div class="admin-section admin-section-cs-assign">
                             <h4>指定對接客服</h4>
                             <p class="muted-text">這張單的客服 5% 會發給這裡指定的客服。</p>
 
@@ -154,47 +409,8 @@ document.addEventListener("DOMContentLoaded", function () {
                             {% endif %}
                         </div>
 
-                        <div class="admin-section">
-                            <h4>客服分潤</h4>
-                            {% set service_payouts = customer_service_payouts_by_order.get(order.id, []) %}
 
-                            {% if service_payouts %}
-                                <div class="admin-worker-list">
-                                    {% for payout in service_payouts %}
-                                        <div class="admin-worker-card">
-                                            <div>
-                                                <strong>{{ payout.customer_service_display_name or payout.customer_service_discord_id }}</strong>
-                                                <p class="muted-text">ID：{{ payout.customer_service_discord_id }}</p>
-                                            </div>
-
-                                            <div class="worker-payout-line">
-                                                <span>比例 {{ (payout.rate * 100) | int }}%</span>
-                                                <strong>分潤 {{ payout.payout_amount }}T</strong>
-                                                <span>狀態 {{ payout.payout_status }}</span>
-                                            </div>
-
-                                            <div class="admin-actions">
-                                                {% if payout.payout_status == paid_status %}
-                                                    <form method="post" action="/admin/customer-service-payouts/{{ payout.id }}/status">
-                                                        <input type="hidden" name="status" value="{{ unpaid_status }}">
-                                                        <button class="button secondary" type="submit">改回未發放</button>
-                                                    </form>
-                                                {% else %}
-                                                    <form method="post" action="/admin/customer-service-payouts/{{ payout.id }}/status">
-                                                        <input type="hidden" name="status" value="{{ paid_status }}">
-                                                        <button class="button" type="submit">標記已發放</button>
-                                                    </form>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <div class="empty-state">目前沒有客服分潤紀錄。</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="admin-section">
+                        <div class="admin-section admin-section-workers">
                             <h4>接單打手</h4>
 
                             {% if active_assignments %}
@@ -298,7 +514,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             {% endif %}
                         </div>
 
-                        <div class="admin-section">
+                        <div class="admin-section admin-section-add-worker">
                             <h4>新增 / 更換打手</h4>
 
                             {% if worker_members %}

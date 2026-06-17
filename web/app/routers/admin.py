@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, PayoutStatus
@@ -188,7 +188,11 @@ async def admin_dashboard(
 
     try:
         create_demo_orders_if_empty(db)
-        orders = list_admin_orders(db)
+        orders = [
+            order
+            for order in list_admin_orders(db)
+            if str(getattr(order, "status", "") or "").lower() not in {"cancelled", "canceled"}
+        ]
         customer_service_members = list_customer_service_members(db)
         worker_members = list_admin_worker_dropdown_members()
 
@@ -221,6 +225,42 @@ async def admin_dashboard(
             "error": error,
         },
     )
+
+
+
+@router.post("/admin/orders/{order_id}/cancel")
+async def admin_cancel_order(
+    order_id: int,
+    request: Request,
+):
+    user = require_admin_user(request)
+
+    if not user:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    db = SessionLocal()
+
+    try:
+        row = db.execute(
+            text("SELECT id FROM web_orders WHERE id = :order_id"),
+            {"order_id": order_id},
+        ).fetchone()
+
+        if row is None:
+            return redirect_to_admin(error="找不到這筆訂單。")
+
+        db.execute(
+            text("UPDATE web_orders SET status = 'cancelled' WHERE id = :order_id"),
+            {"order_id": order_id},
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        return redirect_to_admin(error=f"取消訂單失敗：{exc}")
+    finally:
+        db.close()
+
+    return redirect_to_admin(message="訂單已取消，已從總控列表隱藏。")
 
 
 @router.post("/admin/staff/sync")
