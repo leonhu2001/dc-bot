@@ -1650,12 +1650,25 @@ async def bulk_update_order_history(request: Request):
                 ).fetchall()
             }
 
-            for index in range(1, 4):
-                new_worker_id = str(form.get(f"new_worker_{order_id}_{index}") or "").strip()
+            for index in range(0, 3):
+                raw_new_worker_id = str(form.get(f"new_worker_{order_id}_{index}") or "").strip()
+                new_worker_id, parsed_role_type = history_parse_worker_option(raw_new_worker_id)
                 new_named_bonus = 1 if str(form.get(f"new_worker_named_bonus_{order_id}_{index}") or "").strip() == "1" else 0
 
                 if not new_worker_id or new_worker_id in existing_active:
                     continue
+
+                worker_display_name = (
+                    worker_name_map.get(raw_new_worker_id)
+                    or worker_name_map.get(new_worker_id)
+                    or new_worker_id
+                )
+                worker_role_type = (
+                    parsed_role_type
+                    or worker_role_map.get(raw_new_worker_id)
+                    or worker_role_map.get(new_worker_id)
+                    or "worker"
+                )
 
                 conn.execute(
                     """
@@ -1673,8 +1686,8 @@ async def bulk_update_order_history(request: Request):
                     (
                         order_id,
                         new_worker_id,
-                        worker_name_map.get(new_worker_id, new_worker_id),
-                        worker_role_map.get(new_worker_id, "worker"),
+                        worker_display_name,
+                        worker_role_type,
                         new_named_bonus,
                     ),
                 )
