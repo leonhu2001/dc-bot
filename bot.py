@@ -249,7 +249,8 @@ OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = ["👑┃𝙑𝙄𝙋專用點我創建頻�
 PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 
 # VIP 語音入口可見 / 可進入身分組 ID
-VIP_VOICE_LOBBY_ROLE_ID = 1482080566760177706
+VIP_VOICE_LOBBY_ROLE_ID = 1516575040206929920
+VIP_VOICE_LOBBY_ROLE_IDS = [1516575040206929920, 1516575036973256738, 1516575034670583929, 1516575030648115200, 1516575026583961711, 1516575018807726150]
 
 # 身分組 ID
 CUSTOMER_ROLE_ID = 1482084782031638548
@@ -258,7 +259,15 @@ MANAGER_ROLE_ID = 1131128849443328030
 RECRUIT_APPLICANT_ROLE_ID = 1498829171042943057  # 入職票口開啟期間身分組
 
 # 會員制度 ID / 設定
-SILVER_MEMBER_ROLE_ID = 1482080566760177706
+SILVER_MEMBER_ROLE_ID = 1516575040206929920
+VIP_MEMBER_ROLE_TIERS = [
+    {"name": "銀級魔丸", "threshold": 2000, "role_id": 1516575040206929920},
+    {"name": "金級魔丸", "threshold": 6000, "role_id": 1516575036973256738},
+    {"name": "白金魔丸", "threshold": 12000, "role_id": 1516575034670583929},
+    {"name": "鑽石魔丸", "threshold": 25000, "role_id": 1516575030648115200},
+    {"name": "白鑽魔丸", "threshold": 50000, "role_id": 1516575026583961711},
+    {"name": "黑鑽魔丸", "threshold": 88888, "role_id": 1516575018807726150},
+]
 PLATINUM_PRIVATE_CATEGORY_ID = 1483871504419520654
 PLATINUM_CHAT_ROLE_IDS = [
     1503706721883783218,
@@ -271,8 +280,8 @@ MEMBER_LEVELS = [
     {"name": "金級魔丸", "threshold": 6000},
     {"name": "白金魔丸", "threshold": 12000},
     {"name": "鑽石魔丸", "threshold": 25000},
-    {"name": "星耀魔丸", "threshold": 50000},
-    {"name": "頂級魔丸", "threshold": 88888},
+    {"name": "白鑽魔丸", "threshold": 50000},
+    {"name": "黑鑽魔丸", "threshold": 88888},
 ]
 
 # 訂單日誌 / 備份設定
@@ -406,6 +415,7 @@ configure_voice_helpers(
     old_vip_voice_create_channel_names=OLD_VIP_VOICE_CREATE_CHANNEL_NAMES,
     public_voice_create_channel_name=PUBLIC_VOICE_CREATE_CHANNEL_NAME,
     vip_voice_lobby_role_id=VIP_VOICE_LOBBY_ROLE_ID,
+    vip_voice_lobby_role_ids=VIP_VOICE_LOBBY_ROLE_IDS,
     play_voice_allowed_role_ids=PLAY_VOICE_ALLOWED_ROLE_IDS,
     voice_room_hidden_visible_role_ids=VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS,
     temp_voice_control_panels=TEMP_VOICE_CONTROL_PANELS,
@@ -418,6 +428,7 @@ configure_rewards(
 
 configure_reward_benefits(
     silver_member_role_id=SILVER_MEMBER_ROLE_ID,
+    vip_role_tiers=VIP_MEMBER_ROLE_TIERS,
     platinum_private_category_id=PLATINUM_PRIVATE_CATEGORY_ID,
     platinum_chat_role_ids=PLATINUM_CHAT_ROLE_IDS,
 )

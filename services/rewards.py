@@ -21,6 +21,7 @@ _CUSTOMER_REWARDS: dict[int, dict[str, Any]] = {}
 _ORDER_SELECTIONS: dict[int, dict[str, Any]] = {}
 _SAVE_BOT_DATA: Callable[[], None] | None = None
 _SILVER_MEMBER_ROLE_ID: int | None = None
+_VIP_ROLE_TIERS: list[dict] = []
 _PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
 _PLATINUM_CHAT_ROLE_IDS: list[int] = []
 _REWARD_DB_FILE: Path | None = None
@@ -140,12 +141,14 @@ def configure_reward_database(db_file: str | Path | None) -> None:
 def configure_reward_benefits(
     *,
     silver_member_role_id: int | None = None,
+    vip_role_tiers: list[dict] | None = None,
     platinum_private_category_id: int | None = None,
     platinum_chat_role_ids: list[int] | None = None,
 ) -> None:
     """設定會員福利需要的身分組 / 類別 ID。"""
-    global _SILVER_MEMBER_ROLE_ID, _PLATINUM_PRIVATE_CATEGORY_ID, _PLATINUM_CHAT_ROLE_IDS
-    _SILVER_MEMBER_ROLE_ID = silver_member_role_id
+    global _SILVER_MEMBER_ROLE_ID, _VIP_ROLE_TIERS, _PLATINUM_PRIVATE_CATEGORY_ID, _PLATINUM_CHAT_ROLE_IDS
+    _VIP_ROLE_TIERS = list(vip_role_tiers or [])
+    _SILVER_MEMBER_ROLE_ID = None if _VIP_ROLE_TIERS else silver_member_role_id
     _PLATINUM_PRIVATE_CATEGORY_ID = platinum_private_category_id
     _PLATINUM_CHAT_ROLE_IDS = list(platinum_chat_role_ids or [])
 
@@ -462,11 +465,65 @@ async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Mem
         return None
 
 
+
+async def sync_vip_tier_roles(guild, member, data: dict) -> list[str]:
+    """依累積消費同步 VIP 階級，只保留最高符合的 VIP 身分組。"""
+    notices: list[str] = []
+
+    if guild is None or member is None or not _VIP_ROLE_TIERS:
+        return notices
+
+    try:
+        total_spent = int(data.get("total_spent", 0) or 0)
+    except Exception:
+        total_spent = 0
+
+    target_tier = None
+    for tier in _VIP_ROLE_TIERS:
+        try:
+            if total_spent >= int(tier.get("threshold", 0) or 0):
+                target_tier = tier
+        except Exception:
+            continue
+
+    tier_role_ids = {
+        int(tier.get("role_id"))
+        for tier in _VIP_ROLE_TIERS
+        if str(tier.get("role_id") or "").isdigit()
+    }
+
+    target_role_id = int(target_tier["role_id"]) if target_tier else None
+    current_role_ids = {role.id for role in getattr(member, "roles", [])}
+
+    roles_to_remove = [
+        role
+        for role in getattr(member, "roles", [])
+        if role.id in tier_role_ids and role.id != target_role_id
+    ]
+
+    roles_to_add = []
+    if target_role_id and target_role_id not in current_role_ids:
+        role = guild.get_role(target_role_id)
+        if role is not None:
+            roles_to_add.append(role)
+
+    if roles_to_remove:
+        await member.remove_roles(*roles_to_remove, reason="魔丸娛樂 VIP 階級同步")
+        notices.append("已移除其他 VIP 階級身分組")
+
+    if roles_to_add:
+        await member.add_roles(*roles_to_add, reason="魔丸娛樂 VIP 階級同步")
+        notices.append(f"已獲得 {target_tier.get('name', 'VIP')} 身分組")
+
+    return notices
+
+
 async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Member | None, data: dict) -> list[str]:
     if member is None:
         return []
 
     notices = []
+    notices.extend(await sync_vip_tier_roles(guild, member, data))
     level = get_effective_member_level(data)
     level_threshold = int(level.get("threshold", 0) or 0)
 

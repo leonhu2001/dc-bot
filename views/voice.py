@@ -10,6 +10,7 @@ VIP_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建VIP頻道"
 OLD_VIP_VOICE_CREATE_CHANNEL_NAMES: list[str] = []
 PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 VIP_VOICE_LOBBY_ROLE_ID = 0
+VIP_VOICE_LOBBY_ROLE_IDS: list[int] = []
 PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = []
 EMPLOYEE_FAMILY_ROLE_ID = 1507204925766242425
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS: list[int] = []
@@ -26,6 +27,7 @@ def configure_voice_helpers(
     old_vip_voice_create_channel_names: list[str],
     public_voice_create_channel_name: str,
     vip_voice_lobby_role_id: int,
+    vip_voice_lobby_role_ids: list[int] | None = None,
     play_voice_allowed_role_ids: list[int],
     voice_room_hidden_visible_role_ids: list[int],
     temp_voice_control_panels: dict[int, dict],
@@ -37,6 +39,7 @@ def configure_voice_helpers(
     global OLD_VIP_VOICE_CREATE_CHANNEL_NAMES
     global PUBLIC_VOICE_CREATE_CHANNEL_NAME
     global VIP_VOICE_LOBBY_ROLE_ID
+    global VIP_VOICE_LOBBY_ROLE_IDS
     global PLAY_VOICE_ALLOWED_ROLE_IDS
     global VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS
     global VOICE_VIEW_ONLY_ROLE_IDS
@@ -49,6 +52,7 @@ def configure_voice_helpers(
     OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = list(old_vip_voice_create_channel_names or [])
     PUBLIC_VOICE_CREATE_CHANNEL_NAME = str(public_voice_create_channel_name)
     VIP_VOICE_LOBBY_ROLE_ID = int(vip_voice_lobby_role_id)
+    VIP_VOICE_LOBBY_ROLE_IDS = [int(role_id) for role_id in (vip_voice_lobby_role_ids or [VIP_VOICE_LOBBY_ROLE_ID]) if int(role_id)]
     PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or [
     1507204925766242425,
 ])]
@@ -206,9 +210,7 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
 
 
 def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
-    """點我創建VIP頻道：只有 VIP 身分組可見可加入。"""
-    vip_role = guild.get_role(VIP_VOICE_LOBBY_ROLE_ID)
-
+    """點我創建VIP頻道：6 階 VIP 身分組皆可見可加入。"""
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=False,
@@ -225,16 +227,20 @@ def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
         ),
     }
 
-    if vip_role is not None:
-        overwrites[vip_role] = discord.PermissionOverwrite(
-            view_channel=True,
-            connect=True,
-            speak=True,
-            stream=True,
-            use_voice_activation=True,
-            send_messages=True,
-            read_message_history=True,
-        )
+    vip_role_ids = VIP_VOICE_LOBBY_ROLE_IDS or [VIP_VOICE_LOBBY_ROLE_ID]
+
+    for vip_role_id in vip_role_ids:
+        vip_role = guild.get_role(int(vip_role_id))
+        if vip_role is not None:
+            overwrites[vip_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                connect=True,
+                speak=True,
+                stream=True,
+                use_voice_activation=True,
+                send_messages=True,
+                read_message_history=True,
+            )
 
     return overwrites
 
