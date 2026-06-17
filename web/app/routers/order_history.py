@@ -356,7 +356,7 @@ def history_to_int(value, default: int = 0) -> int:
 
 def history_safe_status(value: str | None) -> str:
     value = str(value or "").strip()
-    return value if value in {"active", "stored", "closed"} else "closed"
+    return value if value in {"active", "stored", "closed", "cancelled"} else "closed"
 
 
 def history_effective_closed_date(order) -> str:
