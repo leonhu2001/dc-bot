@@ -99,8 +99,6 @@ document.addEventListener("click", function (event) {
 </script>
 
 
-
-
 {% endblock %}
 
 {% block content %}
@@ -529,357 +527,21 @@ document.addEventListener("click", function (event) {
 }
 
 
-/* === HISTORY LEDGER VISUAL POLISH START === */
 
-/* 歷史訂單頁：讓背景透出來，不再一整塊黑底壓死 */
-.history-ledger-page {
-    gap: 20px;
-}
+/* === HISTORY LEDGER CONSOLIDATED CLEANUP START === */
 
-/* 如果舊 hero 還存在，直接隱藏，避免兩個歷史訂單標題 */
-.history-ledger-hero {
-    display: none !important;
-}
-
-/* 篩選區透明化 */
-.history-ledger-page > .panel {
-    border: 1px solid rgba(183, 143, 82, 0.32) !important;
-    background:
-        radial-gradient(circle at 88% 20%, rgba(120, 24, 22, 0.14), transparent 36%),
-        rgba(5, 5, 7, 0.20) !important;
-    box-shadow: none !important;
-    backdrop-filter: blur(2px);
-}
-
-/* 統計卡改成暗色卷宗，不要大片米黃色 */
-.history-ledger-stat {
-    min-height: 104px !important;
-    border-radius: 14px !important;
-    border: 1px solid rgba(183, 143, 82, 0.34) !important;
-    background:
-        radial-gradient(circle at 88% 16%, rgba(140, 35, 28, 0.18), transparent 40%),
-        linear-gradient(135deg, rgba(12, 10, 9, 0.42), rgba(8, 8, 10, 0.18)) !important;
-    color: rgba(255, 244, 214, 0.94) !important;
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18) !important;
-    backdrop-filter: blur(2px);
-}
-
-.history-ledger-stat::after {
-    color: rgba(160, 42, 34, 0.42) !important;
-    border-color: rgba(160, 42, 34, 0.38) !important;
-    opacity: 0.75;
-}
-
-.history-ledger-stat span {
-    color: #d9bd80 !important;
-}
-
-.history-ledger-stat strong {
-    color: #fff1cc !important;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-}
-
-.history-ledger-stat small {
-    color: rgba(255, 244, 214, 0.52) !important;
-}
-
-/* 表格主框透明線框化 */
-.history-ledger-panel {
-    border: 1px solid rgba(183, 143, 82, 0.34) !important;
-    background:
-        radial-gradient(circle at 92% 12%, rgba(126, 23, 20, 0.13), transparent 38%),
-        linear-gradient(180deg, rgba(5, 5, 7, 0.22), rgba(5, 5, 7, 0.14)) !important;
-    box-shadow: none !important;
-    backdrop-filter: blur(2px);
-}
-
-.history-ledger-head {
-    background: rgba(5, 5, 7, 0.08) !important;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.24) !important;
-}
-
-.history-ledger-head h3 {
-    color: #fff1cc !important;
-    text-shadow: 0 0 14px rgba(255, 233, 183, 0.12);
-}
-
-/* 表格透明化，但保留可讀性 */
-.history-ledger-table th {
-    background:
-        linear-gradient(90deg, rgba(94, 22, 19, 0.38), rgba(14, 14, 16, 0.20)) !important;
-    color: #e6c981 !important;
-}
-
-.history-ledger-table td {
-    background: rgba(3, 4, 6, 0.10) !important;
-}
-
-.history-ledger-table tr:hover td {
-    background: rgba(146, 48, 39, 0.12) !important;
-}
-
-/* input/select 不要黑成一塊，改成玻璃感 */
-.history-ledger-table .input,
-.history-ledger-filter .input {
-    background: rgba(0, 0, 0, 0.24) !important;
-    border: 1px solid rgba(183, 143, 82, 0.34) !important;
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.16);
-}
-
-.history-ledger-table .input:focus,
-.history-ledger-filter .input:focus {
-    border-color: rgba(240, 94, 76, 0.72) !important;
-    box-shadow:
-        inset 0 0 18px rgba(0, 0, 0, 0.18),
-        0 0 0 2px rgba(240, 94, 76, 0.14) !important;
-}
-
-/* 卷宗展開區也透明化 */
-.history-dossier-detail-row td {
-    background:
-        radial-gradient(circle at 92% 18%, rgba(126, 23, 20, 0.12), transparent 36%),
-        rgba(5, 5, 6, 0.28) !important;
-}
-
-.history-dossier-box {
-    background: rgba(0, 0, 0, 0.16) !important;
-    border-color: rgba(183, 143, 82, 0.26) !important;
-}
-
-/* 底部保存列更像派單頁提示條 */
-.history-bulk-toolbar {
-    background:
-        radial-gradient(circle at 90% 30%, rgba(146, 35, 28, 0.18), transparent 42%),
-        rgba(5, 5, 7, 0.42) !important;
-    border: 1px solid rgba(183, 143, 82, 0.34) !important;
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22) !important;
-    backdrop-filter: blur(6px);
-}
-
-/* === HISTORY LEDGER VISUAL POLISH END === */
-
-
-/* === HISTORY TRANSPARENT TABLE FINAL START === */
-
-/* 統計卡保留米黃色羊皮紙 */
-.history-ledger-stat {
-    min-height: 112px !important;
-    padding: 18px 20px !important;
-    border-radius: 8px !important;
-    border: 1px solid rgba(116, 78, 42, 0.46) !important;
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
-    color: #130f0c !important;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
-    backdrop-filter: none !important;
-}
-
-.history-ledger-stat span {
-    color: #5b1714 !important;
-}
-
-.history-ledger-stat strong {
-    color: #130f0c !important;
-    text-shadow: none !important;
-}
-
-.history-ledger-stat small {
-    color: rgba(23, 18, 14, 0.72) !important;
-}
-
-.history-ledger-stat::after {
-    color: rgba(128, 24, 18, 0.72) !important;
-    border-color: rgba(128, 24, 18, 0.48) !important;
-    opacity: 1 !important;
-}
-
-/* 其他區塊全部透明：只留線條 */
-.history-ledger-page > .panel,
-.history-ledger-panel,
-.history-ledger-head,
-.history-ledger-table th,
-.history-ledger-table td,
-.history-ledger-table tr:hover td,
-.history-dossier-detail-row td,
-.history-dossier-box,
-.history-bulk-toolbar {
-    background: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
-/* 外框與分隔線保留 */
-.history-ledger-page > .panel,
-.history-ledger-panel,
-.history-bulk-toolbar {
-    border: 1px solid rgba(183, 143, 82, 0.36) !important;
-}
-
-.history-ledger-head,
-.history-ledger-pagination,
-.history-bulk-toolbar {
-    border-top-color: rgba(183, 143, 82, 0.22) !important;
-    border-bottom-color: rgba(183, 143, 82, 0.22) !important;
-}
-
-.history-ledger-table th,
-.history-ledger-table td {
-    border-color: rgba(183, 143, 82, 0.20) !important;
-}
-
-/* 表頭不要有色塊，只留金字 */
-.history-ledger-table th {
-    color: #e6c981 !important;
-}
-
-/* input / select 保留一點點深色可讀性，不然字會飄 */
-.history-ledger-table .input,
-.history-ledger-filter .input {
-    background: rgba(0, 0, 0, 0.16) !important;
-    border: 1px solid rgba(183, 143, 82, 0.36) !important;
-    box-shadow: none !important;
-}
-
-/* 展開卷宗區塊也只留框線 */
-.history-dossier-detail {
-    background: transparent !important;
-    border-top: 1px solid rgba(183, 143, 82, 0.24) !important;
-}
-
-.history-dossier-box {
-    border: 1px solid rgba(183, 143, 82, 0.26) !important;
-}
-
-/* 底部保存列不再是一整塊黑底 */
-.history-bulk-toolbar {
-    background: rgba(0, 0, 0, 0.06) !important;
-    backdrop-filter: none !important;
-}
-
-/* === HISTORY TRANSPARENT TABLE FINAL END === */
-
-
-/* === HISTORY REMOVE ALL BACKPLATES START === */
-
-/* 歷史訂單頁外層大底板全部拿掉 */
-body:has(.history-ledger-page) .content-card,
-body:has(.history-ledger-page) .content-shell,
-body:has(.history-ledger-page) .main-card,
-body:has(.history-ledger-page) .dashboard-card,
-body:has(.history-ledger-page) .page-card,
-body:has(.history-ledger-page) .admin-card,
-body:has(.history-ledger-page) .mw-content-card,
-body:has(.history-ledger-page) main,
-body:has(.history-ledger-page) .panel {
-    background: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-}
-
-/* 歷史頁自己的區塊也透明，只留線 */
-.history-ledger-page,
-.history-ledger-page > section,
-.history-ledger-page > .panel,
-.history-ledger-panel,
-.history-ledger-head,
-.history-ledger-table-wrap,
-.history-ledger-table,
-.history-ledger-table thead,
-.history-ledger-table tbody,
-.history-ledger-table tr,
-.history-ledger-table th,
-.history-ledger-table td,
-.history-ledger-pagination,
-.history-dossier-detail-row,
-.history-dossier-detail-row td,
-.history-dossier-detail,
-.history-dossier-box,
-.history-bulk-toolbar {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
-/* 保留外框線 */
-.history-ledger-page > .panel,
-.history-ledger-panel,
-.history-bulk-toolbar,
-.history-dossier-box {
-    border: 1px solid rgba(183, 143, 82, 0.34) !important;
-}
-
-/* 表格只剩線條 */
-.history-ledger-table th,
-.history-ledger-table td {
-    border-color: rgba(183, 143, 82, 0.22) !important;
-}
-
-/* 表頭只留金字，不留紅黑底 */
-.history-ledger-table th {
-    color: #e6c981 !important;
-}
-
-/* 統計卡例外：保留米黃色 */
-.history-ledger-stats .history-ledger-stat {
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
-    color: #130f0c !important;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
-    border: 1px solid rgba(116, 78, 42, 0.46) !important;
-}
-
-.history-ledger-stats .history-ledger-stat span {
-    color: #5b1714 !important;
-}
-
-.history-ledger-stats .history-ledger-stat strong {
-    color: #130f0c !important;
-    text-shadow: none !important;
-}
-
-.history-ledger-stats .history-ledger-stat small {
-    color: rgba(23, 18, 14, 0.72) !important;
-}
-
-/* input/select 只留極淡底，避免看不到字 */
-.history-ledger-page .input,
-.history-ledger-page input,
-.history-ledger-page select {
-    background: rgba(0, 0, 0, 0.14) !important;
-    background-image: none !important;
-    box-shadow: none !important;
-}
-
-/* === HISTORY REMOVE ALL BACKPLATES END === */
-
-
-/* === HISTORY OUTER SHELL TRANSPARENT START === */
-
-/* 只針對歷史訂單頁，把最外層大底板拿掉，只留邊框 */
+/* 歷史頁外層保持透明，只留下必要線條與底部保存列。 */
 body:has(.history-ledger-page) .content,
 body:has(.history-ledger-page) .content-area,
 body:has(.history-ledger-page) .page-content,
 body:has(.history-ledger-page) .main-content,
 body:has(.history-ledger-page) .dashboard-content,
-body:has(.history-ledger-page) .mw-main,
-body:has(.history-ledger-page) .mw-page,
-body:has(.history-ledger-page) .mw-page-shell,
-body:has(.history-ledger-page) .mw-dashboard-card,
-body:has(.history-ledger-page) .mw-dashboard-panel,
-body:has(.history-ledger-page) .dashboard-panel,
-body:has(.history-ledger-page) .dashboard-card,
 body:has(.history-ledger-page) .content-card,
+body:has(.history-ledger-page) .dashboard-card,
 body:has(.history-ledger-page) .page-card,
-body:has(.history-ledger-page) .panel-shell,
-body:has(.history-ledger-page) .admin-shell,
 body:has(.history-ledger-page) .admin-panel,
-body:has(.history-ledger-page) .app-panel,
 body:has(.history-ledger-page) .app-card,
+body:has(.history-ledger-page) main,
 body:has(.history-ledger-page) main > section,
 body:has(.history-ledger-page) main > div {
     background: transparent !important;
@@ -889,17 +551,6 @@ body:has(.history-ledger-page) main > div {
     backdrop-filter: none !important;
 }
 
-/* 如果這個大框本身就是外層卡片，保留它的金色邊框 */
-body:has(.history-ledger-page) .content-card,
-body:has(.history-ledger-page) .dashboard-card,
-body:has(.history-ledger-page) .page-card,
-body:has(.history-ledger-page) .app-card,
-body:has(.history-ledger-page) .admin-panel,
-body:has(.history-ledger-page) .mw-dashboard-card {
-    border: 1px solid rgba(183, 143, 82, 0.38) !important;
-}
-
-/* 有些底色是用 ::before / ::after 疊出來的，直接關掉 */
 body:has(.history-ledger-page) .content-card::before,
 body:has(.history-ledger-page) .content-card::after,
 body:has(.history-ledger-page) .dashboard-card::before,
@@ -910,185 +561,14 @@ body:has(.history-ledger-page) .app-card::before,
 body:has(.history-ledger-page) .app-card::after,
 body:has(.history-ledger-page) .admin-panel::before,
 body:has(.history-ledger-page) .admin-panel::after,
-body:has(.history-ledger-page) .mw-dashboard-card::before,
-body:has(.history-ledger-page) .mw-dashboard-card::after {
-    background: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    opacity: 0 !important;
-}
-
-/* 歷史訂單頁自己也不要再放任何大面積底色 */
-.history-ledger-page,
-.history-ledger-page::before,
-.history-ledger-page::after {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-}
-
-/* 統計卡仍保留米黃色 */
-.history-ledger-stats .history-ledger-stat {
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
-    color: #130f0c !important;
-}
-
-/* === HISTORY OUTER SHELL TRANSPARENT END === */
-
-
-/* === HISTORY MATCH DISPATCH TRANSPARENCY START === */
-
-/*
-    目標：歷史訂單頁跟派單頁一樣，
-    背景要透上來，只保留金色線框與必要的可讀性。
-*/
-
-/* 最外層整頁不要黑膜 */
-.history-ledger-page {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-}
-
-/* 歷史頁內所有大區塊預設透明 */
-.history-ledger-page .panel,
-.history-ledger-page > .panel,
-.history-ledger-panel,
-.history-ledger-head,
-.history-ledger-table-wrap,
-.history-ledger-pagination,
-.history-bulk-toolbar,
-.history-dossier-detail,
-.history-dossier-box {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
-/* section 只留線框，像派單頁 */
-.history-ledger-page > .panel,
-.history-ledger-panel,
-.history-bulk-toolbar {
-    border: 1px solid rgba(190, 151, 86, 0.42) !important;
-    border-radius: 18px !important;
-}
-
-/* 表格整體透明 */
-.history-ledger-table,
-.history-ledger-table thead,
-.history-ledger-table tbody,
-.history-ledger-table tr,
-.history-ledger-table th,
-.history-ledger-table td {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-}
-
-/* 表格線條保留，不要色塊 */
-.history-ledger-table th,
-.history-ledger-table td {
-    border-color: rgba(190, 151, 86, 0.23) !important;
-}
-
-/* 表頭不要紅底，只留金字 */
-.history-ledger-table th {
-    color: #e9cf8f !important;
-    text-shadow: 0 0 10px rgba(233, 207, 143, 0.14);
-}
-
-/* row hover 不要色塊 */
-.history-ledger-table tr:hover td {
-    background: transparent !important;
-}
-
-/* 篩選列改派單頁透明框 */
-.history-ledger-filter {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-}
-
-/* input/select 只留薄薄底，避免完全看不清 */
-.history-ledger-page .input,
-.history-ledger-page input,
-.history-ledger-page select {
-    background: rgba(0, 0, 0, 0.18) !important;
-    background-image: none !important;
-    border: 1px solid rgba(190, 151, 86, 0.36) !important;
-    box-shadow: none !important;
-}
-
-/* 卷宗展開區透明 */
-.history-dossier-detail-row,
-.history-dossier-detail-row td,
-.history-dossier-detail,
-.history-dossier-box {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-}
-
-/* 底部保存列也不要一整條黑底，只留外框 */
-.history-bulk-toolbar {
-    background: rgba(0, 0, 0, 0.08) !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
-/* 統計卡保留米黃色羊皮紙 */
-.history-ledger-stats .history-ledger-stat {
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
-    color: #130f0c !important;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
-    border: 1px solid rgba(116, 78, 42, 0.46) !important;
-}
-
-.history-ledger-stats .history-ledger-stat span {
-    color: #5b1714 !important;
-}
-
-.history-ledger-stats .history-ledger-stat strong {
-    color: #130f0c !important;
-    text-shadow: none !important;
-}
-
-.history-ledger-stats .history-ledger-stat small {
-    color: rgba(23, 18, 14, 0.72) !important;
-}
-
-/* 關鍵：把可能疊在歷史頁上的偽元素黑膜關掉 */
 .history-ledger-page::before,
 .history-ledger-page::after,
 .history-ledger-page .panel::before,
 .history-ledger-page .panel::after,
-.history-ledger-panel::before,
-.history-ledger-panel::after {
-    content: none !important;
+.history-bulk-toolbar::before,
+.history-bulk-toolbar::after {
     display: none !important;
-    background: transparent !important;
     opacity: 0 !important;
-}
-
-/* === HISTORY MATCH DISPATCH TRANSPARENCY END === */
-
-
-/* === HISTORY FORCE TRUE TRANSPARENT START === */
-
-/* 歷史頁自己全部不要底色 */
-.history-ledger-page,
-.history-ledger-page *:not(.history-ledger-stat):not(.history-ledger-stat *) {
-    box-shadow: none;
 }
 
 .history-ledger-page,
@@ -1105,22 +585,19 @@ body:has(.history-ledger-page) .mw-dashboard-card::after {
 .history-ledger-table td,
 .history-ledger-pagination,
 .history-dossier-detail,
-.history-dossier-box,
-.history-bulk-toolbar {
+.history-dossier-box {
     background: transparent !important;
     background-color: transparent !important;
     background-image: none !important;
+    box-shadow: none !important;
     backdrop-filter: none !important;
 }
 
-/* 只保留線 */
 .history-ledger-page > .panel,
-.history-ledger-panel,
-.history-bulk-toolbar {
+.history-ledger-panel {
     border: 1px solid rgba(190, 151, 86, 0.42) !important;
 }
 
-/* 統計卡例外：米黃色保留 */
 .history-ledger-stats .history-ledger-stat {
     background:
         linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
@@ -1130,23 +607,20 @@ body:has(.history-ledger-page) .mw-dashboard-card::after {
     box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
 }
 
-/* === HISTORY FORCE TRUE TRANSPARENT END === */
+.history-ledger-page .input,
+.history-ledger-page input,
+.history-ledger-page select {
+    background: rgba(18, 14, 11, 0.78) !important;
+    border-color: rgba(190, 151, 86, 0.42) !important;
+}
 
-
-
-
-
-
-
-
-/* === HISTORY STICKY TOOLBAR READABILITY START === */
-
-/* 底部保存列需要底色，不然蓋在表格上看不清楚 */
+.history-ledger-page .history-bulk-toolbar,
+form#historyBulkForm .history-bulk-toolbar,
 .history-bulk-toolbar {
     background:
-        radial-gradient(circle at 92% 30%, rgba(126, 23, 20, 0.24), transparent 42%),
-        linear-gradient(90deg, rgba(13, 10, 8, 0.92), rgba(22, 12, 10, 0.88)) !important;
-    background-color: rgba(10, 8, 7, 0.92) !important;
+        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%),
+        linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91)) !important;
+    background-color: rgba(10, 8, 7, 0.94) !important;
     border: 1px solid rgba(190, 151, 86, 0.42) !important;
     box-shadow:
         0 -12px 28px rgba(0, 0, 0, 0.34),
@@ -1163,64 +637,7 @@ body:has(.history-ledger-page) .mw-dashboard-card::after {
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
 }
 
-/* === HISTORY STICKY TOOLBAR READABILITY END === */
-
-
-
-
-
-/* === HISTORY BOTTOM TOOLBAR FINAL FIX START === */
-
-/* 底部保存列必須保留霧面底，不然壓在表格上看不清楚 */
-.history-ledger-page .history-bulk-toolbar,
-form#historyBulkForm .history-bulk-toolbar,
-.history-bulk-toolbar {
-    background:
-        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%),
-        linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91)) !important;
-    background-color: rgba(12, 9, 8, 0.94) !important;
-    background-image:
-        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%),
-        linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91)) !important;
-
-    border: 1px solid rgba(190, 151, 86, 0.48) !important;
-    border-radius: 16px !important;
-
-    box-shadow:
-        0 -12px 32px rgba(0, 0, 0, 0.42),
-        0 0 0 1px rgba(255, 214, 128, 0.05) inset !important;
-
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-}
-
-.history-bulk-toolbar .muted-text {
-    color: rgba(255, 244, 214, 0.86) !important;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85) !important;
-}
-
-.history-bulk-toolbar .button {
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34) !important;
-}
-
-/* 防止強制透明 JS 或全站 CSS 把它清掉 */
-.history-bulk-toolbar::before,
-.history-bulk-toolbar::after {
-    content: none !important;
-    display: none !important;
-}
-
-/* === HISTORY BOTTOM TOOLBAR FINAL FIX END === */
-
-
-
-
-
-
-
-
-
-
+/* === HISTORY LEDGER CONSOLIDATED CLEANUP END === */
 
 /* === HISTORY STATUS CLEAN FINAL START === */
 

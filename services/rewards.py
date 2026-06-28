@@ -12,6 +12,7 @@ import discord
 
 from core.time_utils import get_taipei_now, get_taipei_now_iso
 from core.database import init_database, _db_columns, _json_load_maybe
+from core.vip_levels import VIP_LEVEL_BENEFITS
 
 _MEMBER_LEVELS: list[dict[str, Any]] = [
     {"name": "普通魔丸", "threshold": 0},
@@ -34,67 +35,6 @@ NO_VIP_REWARD_ITEMS = {
     "代洗哈夫幣",
     "純綠代肝哈夫幣",
 }
-
-VIP_LEVEL_BENEFITS = {
-    "普通魔丸": "尚未解鎖 VIP 福利。",
-    "銀級魔丸": (
-        "累積消費 2000⤴️\n"
-        "・專屬 VIP 身分組，可使用VIP專屬包廂"
-    ),
-    "金級魔丸": (
-        "累積消費 6000⤴️\n"
-        "・專屬 VIP 身分組，可使用VIP專屬包廂\n"
-        "・優先客服回覆\n"
-        "・體驗單、趣味單及賽季限定單外全館98折"
-    ),
-    "白金魔丸": (
-        "累積消費 12000⤴️\n"
-        "・專屬 VIP 身分組，可使用VIP專屬包廂\n"
-        "・優先客服回覆\n"
-        "・體驗單、趣味單及賽季限定單外全館98折\n"
-        "・可建立 VIP 專屬私人文字頻道\n"
-        "・儲值返利2%\n"
-        "・每月一張折現券200T\n"
-        "・優先排單"
-    ),
-    "鑽石魔丸": (
-        "累積消費 25000⤴️\n"
-        "・專屬 VIP 身分組，可使用VIP專屬包廂\n"
-        "・優先客服回覆\n"
-        "・可建立 VIP 專屬私人文字頻道\n"
-        "・每月一張折現券200T\n"
-        "・優先排單\n"
-        "・優先安排熟悉打手\n"
-        "・儲值返利3%\n"
-        "・體驗單、趣味單及賽季限定單外全館96折"
-    ),
-    "白鑽魔丸": (
-        "累積消費 50000⤴️\n"
-        "・專屬 VIP 身分組，可使用VIP專屬包廂\n"
-        "・優先客服回覆\n"
-        "・可建立 VIP 專屬私人文字頻道\n"
-        "・每月一張折現券200T\n"
-        "・優先排單\n"
-        "・優先安排熟悉打手\n"
-        "・體驗單、趣味單及賽季限定單外全館96折\n"
-        "・儲值返利4%\n"
-        "・每月額外一張折現券500T"
-    ),
-    "黑鑽魔丸": (
-        "累積消費 88888⤴️\n"
-        "・專屬 VIP 身分組，可使用VIP專屬包廂\n"
-        "・優先客服回覆\n"
-        "・可建立 VIP 專屬私人文字頻道\n"
-        "・每月一張折現券200T\n"
-        "・優先排單\n"
-        "・優先安排熟悉打手\n"
-        "・每月額外一張折現券500T\n"
-        "・每月一次免費「機密航天保底1000w」\n"
-        "・儲值返利5%\n"
-        "・體驗單、趣味單及賽季限定單外全館94折"
-    ),
-}
-
 
 def recalculate_web_payout_after_close(order_no=None, web_order_id=None):
     """Discord 結單後同步重算 web dashboard 分潤。"""
@@ -137,14 +77,10 @@ def recalculate_web_payout_after_close(order_no=None, web_order_id=None):
     except Exception as exc:
         print(f"[rewards] web payout recalculate failed: {exc}")
 
-
 def get_member_level_benefits_text(level_name: str) -> str:
     return VIP_LEVEL_BENEFITS.get(str(level_name or "普通魔丸"), "尚未設定此等級福利。")
 
-
 # ========= end VIP display / reward exclusions =========
-
-
 
 def configure_reward_database(db_file: str | Path | None) -> None:
     """設定會員服務需要查詢的 SQLite 資料庫。"""
@@ -165,7 +101,6 @@ def configure_reward_benefits(
     _PLATINUM_PRIVATE_CATEGORY_ID = platinum_private_category_id
     _PLATINUM_CHAT_ROLE_IDS = list(platinum_chat_role_ids or [])
 
-
 def configure_reward_storage(customer_rewards: dict[int, dict[str, Any]]) -> None:
     """設定顧客會員資料來源。
 
@@ -174,9 +109,6 @@ def configure_reward_storage(customer_rewards: dict[int, dict[str, Any]]) -> Non
     """
     global _CUSTOMER_REWARDS
     _CUSTOMER_REWARDS = customer_rewards
-
-
-
 
 def configure_reward_order_context(
     order_selections: dict[int, dict[str, Any]],
@@ -196,13 +128,11 @@ def configure_rewards(*, member_levels: list[dict] | None = None, reward_point_d
     _MEMBER_LEVELS = list(member_levels or [{"name": "普通魔丸", "threshold": 0}])
     _REWARD_POINT_DIVISOR = int(reward_point_divisor or 100)
 
-
 def _to_int(value, default: int | None = None) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
         return default
-
 
 def get_member_level(total_spent: int) -> dict:
     current = _MEMBER_LEVELS[0]
@@ -213,13 +143,11 @@ def get_member_level(total_spent: int) -> dict:
             break
     return current
 
-
 def get_next_member_level(total_spent: int) -> dict | None:
     for level in _MEMBER_LEVELS:
         if total_spent < level["threshold"]:
             return level
     return None
-
 
 def get_member_level_index_by_total_spent(total_spent: int) -> int:
     index = 0
@@ -230,11 +158,9 @@ def get_member_level_index_by_total_spent(total_spent: int) -> int:
             break
     return index
 
-
 def get_member_level_by_index(index: int) -> dict:
     safe_index = max(0, min(int(index), len(_MEMBER_LEVELS) - 1))
     return _MEMBER_LEVELS[safe_index]
-
 
 def get_effective_member_level_index(data: dict) -> int:
     total_spent = int(data.get("total_spent", 0) or 0)
@@ -260,10 +186,8 @@ def get_effective_member_level_index(data: dict) -> int:
 
     return stored_index
 
-
 def get_effective_member_level(data: dict) -> dict:
     return get_member_level_by_index(get_effective_member_level_index(data))
-
 
 def get_next_member_level_for_data(data: dict) -> tuple[dict | None, int]:
     total_spent = int(data.get("total_spent", 0) or 0)
@@ -289,7 +213,6 @@ def get_next_member_level_for_data(data: dict) -> tuple[dict | None, int]:
 
     return next_level, max(0, int(next_level["threshold"]) - total_spent)
 
-
 def sync_vip_level_to_cumulative_if_higher(data: dict) -> tuple[dict, dict]:
     old_level = get_effective_member_level(data)
     current_stored_index = _to_int(data.get("vip_level_index"))
@@ -305,21 +228,17 @@ def sync_vip_level_to_cumulative_if_higher(data: dict) -> tuple[dict, dict]:
     new_level = get_effective_member_level(data)
     return old_level, new_level
 
-
 def format_t_amount(amount: int) -> str:
     return f"{amount:,}T"
 
-
 def calculate_reward_points(total_spent: int) -> int:
     return total_spent // _REWARD_POINT_DIVISOR
-
 
 def get_current_reward_points(data: dict) -> int:
     total_spent = int(data.get("total_spent", 0) or 0)
     base_points = calculate_reward_points(total_spent)
     adjustment = int(data.get("point_adjustment", 0) or 0)
     return max(0, base_points + adjustment)
-
 
 def get_customer_reward_data(user_id: int) -> dict:
     data = _CUSTOMER_REWARDS.setdefault(
@@ -362,7 +281,6 @@ def get_customer_reward_data(user_id: int) -> dict:
         data["vip_downgrade_logs"] = []
     return data
 
-
 def iter_customer_reward_items():
     """Return a snapshot of customer reward data items for reports/cogs."""
     return list(_CUSTOMER_REWARDS.items())
@@ -401,7 +319,6 @@ def build_member_info_embed(member: discord.abc.User, data: dict, show_points: b
 
     return embed
 
-
 def get_customer_notes(user_id: int) -> list[dict]:
     data = get_customer_reward_data(user_id)
     notes = data.setdefault("notes", [])
@@ -409,7 +326,6 @@ def get_customer_notes(user_id: int) -> list[dict]:
         data["notes"] = []
         notes = data["notes"]
     return notes
-
 
 def format_customer_notes_for_staff(user_id: int, limit: int = 8) -> str:
     notes = get_customer_notes(user_id)
@@ -429,7 +345,6 @@ def format_customer_notes_for_staff(user_id: int, limit: int = 8) -> str:
         lines.append(f"…還有 {len(notes) - limit} 筆")
 
     return "\n".join(lines)
-
 
 def format_customer_notes_for_ticket(user_id: int) -> str:
     data = get_customer_reward_data(user_id)
@@ -476,8 +391,6 @@ async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Mem
         return await guild.fetch_member(user_id)
     except (discord.NotFound, discord.Forbidden, discord.HTTPException):
         return None
-
-
 
 async def sync_vip_tier_roles(guild, member, data: dict) -> list[str]:
     """依累積消費同步 VIP 階級，只保留最高符合的 VIP 身分組。"""
@@ -530,7 +443,6 @@ async def sync_vip_tier_roles(guild, member, data: dict) -> list[str]:
 
     return notices
 
-
 async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Member | None, data: dict) -> list[str]:
     if member is None:
         return []
@@ -569,7 +481,6 @@ async def ensure_reward_member_benefits(guild: discord.Guild, member: discord.Me
 
     return notices
 
-
 def parse_receipt_amount(amount_text: str) -> int | None:
     """從收據金額欄位擷取金額。
     支援：1275、NT$1,275、1275T、750+595。
@@ -585,7 +496,6 @@ def parse_receipt_amount(amount_text: str) -> int | None:
         return sum(numbers)
 
     return numbers[0]
-
 
 async def add_customer_reward_from_order(
     guild: discord.Guild,
@@ -691,11 +601,9 @@ def parse_manual_purchase_date(date_text: str) -> tuple[str, str] | tuple[None, 
 
     return None, None
 
-
 def build_manual_purchase_key(customer_id: int, amount: int, date_iso: str, note: str | None = None) -> str:
     clean_note = (note or "").strip()
     return f"manual:{customer_id}:{amount}:{date_iso}:{clean_note}"
-
 
 async def add_manual_purchase(
     guild: discord.Guild,
@@ -820,7 +728,6 @@ async def adjust_customer_points(
         f"調整後：{after_points:,} 點"
     )
 
-
 def _normalize_reward_datetime_text(value: str | None) -> str | None:
     if not value:
         return None
@@ -843,7 +750,6 @@ def _normalize_reward_datetime_text(value: str | None) -> str | None:
 
     return dt.isoformat(timespec="seconds")
 
-
 def get_previous_calendar_month_range(now: datetime | None = None) -> tuple[datetime, datetime, str]:
     """取得上一個完整月份區間，以及本次檢查月份 key。"""
     now = now or get_taipei_now()
@@ -852,7 +758,6 @@ def get_previous_calendar_month_range(now: datetime | None = None) -> tuple[date
     first_prev_month = last_prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_key = first_this_month.strftime("%Y-%m")
     return first_prev_month, first_this_month, month_key
-
 
 def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_dt: datetime) -> int:
     """直接從 SQLite orders 查會員維持消費，避免只看 Bot 記憶體漏算補登資料。"""
@@ -903,8 +808,6 @@ def get_customer_closed_spend_between(customer_id: int, start_dt: datetime, end_
     except sqlite3.Error as e:
         print(f"查詢會員維持消費失敗：{e}")
         return 0
-
-
 
 async def run_vip_downgrade_check(
     guild: discord.Guild | None,

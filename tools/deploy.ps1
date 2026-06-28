@@ -30,10 +30,11 @@ $statusCmd = ($restart | ForEach-Object { "systemctl status $_ --no-pager -l | h
 $remoteCmd = @"
 cd $RemoteDir &&
 git pull --ff-only origin $Branch &&
-python3 -m py_compile bot.py services/rewards.py views/voice.py web/app/routers/order_history.py web/app/routers/admin.py &&
+python3 -m py_compile core/vip_levels.py bot.py services/rewards.py views/voice.py web/app/routers/order_history.py web/app/routers/admin.py &&
 $restartCmd &&
 $statusCmd
 "@
 
 Write-Host "Deploying to VPS..." -ForegroundColor Cyan
 ssh $Server $remoteCmd
+

@@ -168,6 +168,12 @@ from views.support import (
     FeedbackPanelView,
 )
 
+from core.vip_levels import (
+    BASE_MEMBER_LEVELS,
+    SILVER_MEMBER_ROLE_ID as DEFAULT_SILVER_MEMBER_ROLE_ID,
+    VIP_ROLE_IDS,
+    VIP_ROLE_TIERS,
+)
 from views.voice import (
     configure_voice_helpers,
     safe_voice_channel_name,
@@ -248,9 +254,15 @@ OLD_VIP_VOICE_CREATE_CHANNEL_NAMES = ["👑┃𝙑𝙄𝙋專用點我創建頻�
 # 公共語音入口頻道名稱
 PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 
+# VIP / 會員制度設定
+# 單一來源在 core/vip_levels.py，這裡只轉成 bot 既有邏輯需要的格式。
+VIP_MEMBER_ROLE_TIERS = [dict(level) for level in VIP_ROLE_TIERS]
+MEMBER_LEVELS = [dict(level) for level in BASE_MEMBER_LEVELS]
+SILVER_MEMBER_ROLE_ID = DEFAULT_SILVER_MEMBER_ROLE_ID
+
 # VIP 語音入口可見 / 可進入身分組 ID
-VIP_VOICE_LOBBY_ROLE_ID = 1516575040206929920
-VIP_VOICE_LOBBY_ROLE_IDS = [1516575040206929920, 1516575036973256738, 1516575034670583929, 1516575030648115200, 1516575026583961711, 1516575018807726150]
+VIP_VOICE_LOBBY_ROLE_ID = DEFAULT_SILVER_MEMBER_ROLE_ID
+VIP_VOICE_LOBBY_ROLE_IDS = list(VIP_ROLE_IDS)
 
 # 身分組 ID
 CUSTOMER_ROLE_ID = 1482084782031638548
@@ -258,31 +270,12 @@ EXAMINER_ROLE_ID = 1497427024644411543
 MANAGER_ROLE_ID = 1131128849443328030
 RECRUIT_APPLICANT_ROLE_ID = 1498829171042943057  # 入職票口開啟期間身分組
 
-# 會員制度 ID / 設定
-SILVER_MEMBER_ROLE_ID = 1516575040206929920
-VIP_MEMBER_ROLE_TIERS = [
-    {"name": "銀級魔丸", "threshold": 2000, "role_id": 1516575040206929920},
-    {"name": "金級魔丸", "threshold": 6000, "role_id": 1516575036973256738},
-    {"name": "白金魔丸", "threshold": 12000, "role_id": 1516575034670583929},
-    {"name": "鑽石魔丸", "threshold": 25000, "role_id": 1516575030648115200},
-    {"name": "白鑽魔丸", "threshold": 50000, "role_id": 1516575026583961711},
-    {"name": "黑鑽魔丸", "threshold": 88888, "role_id": 1516575018807726150},
-]
 PLATINUM_PRIVATE_CATEGORY_ID = 1483871504419520654
 PLATINUM_CHAT_ROLE_IDS = [
     1503706721883783218,
     1503701170504339458,
 ]
 REWARD_POINT_DIVISOR = 100
-MEMBER_LEVELS = [
-    {"name": "普通魔丸", "threshold": 0},
-    {"name": "銀級魔丸", "threshold": 2000},
-    {"name": "金級魔丸", "threshold": 6000},
-    {"name": "白金魔丸", "threshold": 12000},
-    {"name": "鑽石魔丸", "threshold": 25000},
-    {"name": "白鑽魔丸", "threshold": 50000},
-    {"name": "黑鑽魔丸", "threshold": 88888},
-]
 
 # 訂單日誌 / 備份設定
 ORDER_LOG_CATEGORY_ID = 1483895536938651809
