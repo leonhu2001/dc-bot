@@ -219,6 +219,47 @@ def filter_history_orders_by_month(orders, month_filter: str | None):
     ]
 
 
+
+def list_history_month_options() -> list[dict[str, str]]:
+    """月份選單只顯示歷史訂單實際存在的月份。"""
+    db = SessionLocal()
+
+    try:
+        statement = (
+            select(WebOrder)
+            .where(WebOrder.status != OrderStatus.ACTIVE.value)
+            .order_by(WebOrder.updated_at.desc(), WebOrder.created_at.desc(), WebOrder.id.desc())
+        )
+        orders = db.scalars(statement).all()
+    finally:
+        db.close()
+
+    month_values = sorted(
+        {
+            month_value
+            for order in orders
+            if (month_value := history_order_month_value(order))
+        },
+        reverse=True,
+    )
+
+    options: list[dict[str, str]] = []
+
+    for month_value in month_values:
+        try:
+            year_text, month_text = month_value.split("-", 1)
+            label = f"{int(year_text)} 年 {int(month_text)} 月"
+        except Exception:
+            label = month_value
+
+        options.append({
+            "value": month_value,
+            "label": label,
+        })
+
+    return options
+
+
 def history_to_int(value, default: int = 0) -> int:
     try:
         return int(str(value or "").strip())
@@ -1272,6 +1313,7 @@ async def admin_order_history(
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "current_status": status,
             "month_filter": month_filter,
+            "month_options": list_history_month_options(),
             "keyword": keyword or "",
             "message": message,
             "error": error,
