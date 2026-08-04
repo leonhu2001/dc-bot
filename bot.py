@@ -1388,7 +1388,7 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
         f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
         f"{reward_result}\n\n"
         f"請闆闆留下評論",
-        view=ReviewButtonView(customer_id=customer_id),
+        view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
         allowed_mentions=discord.AllowedMentions(
             users=True,
             roles=False,

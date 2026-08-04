@@ -186,13 +186,20 @@ class ReviewSubmitView(discord.ui.View):
                 inline=True
             )
 
-            order_content = str(draft.get("order_content") or "").strip()
-            if order_content:
-                embed.add_field(
-                    name="訂單內容",
-                    value=order_content[:1024],
-                    inline=False
-                )
+            order_content = str(
+                draft.get("order_content")
+                or self.order_content
+                or ""
+            ).strip()
+
+            if not order_content:
+                order_content = "未記錄"
+
+            embed.add_field(
+                name="訂單內容",
+                value=order_content[:1024],
+                inline=False
+            )
 
             embed.add_field(
                 name="評價內容",
