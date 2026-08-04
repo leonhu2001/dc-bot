@@ -61,6 +61,13 @@ def chunk_list(items: list, size: int):
 REVIEW_DRAFTS = {}
 
 
+def can_operate_review(interaction: discord.Interaction, customer_id: int) -> bool:
+    """點單顧客或客服可操作評價流程。"""
+    is_customer = interaction.user.id == customer_id
+    is_staff = isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user)
+    return is_customer or is_staff
+
+
 # ========= 評價 Modal / 按鈕 =========
 
 class ReviewSubmitView(discord.ui.View):
@@ -75,9 +82,9 @@ class ReviewSubmitView(discord.ui.View):
         style=discord.ButtonStyle.success
     )
     async def submit_review(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.customer_id:
+        if not can_operate_review(interaction, self.customer_id):
             await interaction.response.send_message(
-                "只有這張票口的點單顧客可以送出評論。",
+                "只有這張票口的點單顧客或客服可以送出評論。",
                 ephemeral=True
             )
             return
@@ -145,7 +152,14 @@ class ReviewSubmitView(discord.ui.View):
                 oldest_first=True,
                 limit=None
             ):
-                if message.author.id != self.customer_id:
+                allowed_review_author_ids = {self.customer_id}
+
+                try:
+                    allowed_review_author_ids.add(int(draft.get("review_operator_id") or 0))
+                except (TypeError, ValueError):
+                    pass
+
+                if message.author.id not in allowed_review_author_ids:
                     continue
 
                 for attachment in message.attachments:
@@ -157,7 +171,8 @@ class ReviewSubmitView(discord.ui.View):
             )
 
             is_anonymous = draft.get("is_anonymous", False)
-            review_customer_text = "匿名闆闆" if is_anonymous else interaction.user.mention
+            review_customer_id = draft.get("customer_id") or self.customer_id
+            review_customer_text = "匿名闆闆" if is_anonymous else f"<@{review_customer_id}>"
 
             embed.add_field(
                 name="客戶",
@@ -340,8 +355,8 @@ class ReviewModal(discord.ui.Modal, title="留下好評"):
             await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
             return
 
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有這張票口的點單顧客可以留下評論。", ephemeral=True)
+        if not can_operate_review(interaction, self.customer_id):
+            await interaction.response.send_message("只有這張票口的點單顧客或客服可以留下評論。", ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
@@ -356,6 +371,7 @@ class ReviewModal(discord.ui.Modal, title="留下好評"):
 
         REVIEW_DRAFTS[interaction.channel.id] = {
             "customer_id": self.customer_id,
+            "review_operator_id": interaction.user.id,
             "rating_number": rating_number,
             "stars": stars,
             "content": self.content.value,
@@ -391,8 +407,8 @@ class ReviewButtonView(discord.ui.View):
         row=0,
     )
     async def leave_review(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有這張票口的點單顧客可以留下評論。", ephemeral=True)
+        if not can_operate_review(interaction, self.customer_id):
+            await interaction.response.send_message("只有這張票口的點單顧客或客服可以留下評論。", ephemeral=True)
             return
 
         await interaction.response.send_modal(
