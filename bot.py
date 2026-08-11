@@ -4564,7 +4564,7 @@ class OrderControlView(discord.ui.View):
             description=(
                 f"下單用戶：{customer_mention}\n\n"
                 "請下單用戶選擇訂單類別與訂單項目，完成後按「取得訂單金額」。\n"
-                "如果選擇娛樂陪、甜蜜單、技術陪、教學單、真心話大冒險、Valorant 陪打，數量欄位會顯示 1～24 小時；系統後續仍依 1～24 單計算。\n"
+                "如果選擇娛樂陪、甜蜜單、技術陪、教學單、Valorant 陪打，數量欄位會顯示 1～24 小時；系統後續仍依 1～24 單計算。\n"
                 "如果選擇娛樂陪、甜蜜單、技術陪，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
             ),
             color=discord.Color.purple()
