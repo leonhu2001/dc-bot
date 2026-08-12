@@ -18,6 +18,7 @@ WORKER_ROLE_ID = next(iter(WORKER_ROLE_IDS))
 COMPANION_ROLE_ID = next(iter(COMPANION_ROLE_IDS))
 
 
+
 def get_staff_display_name(member: WebStaffMember) -> str:
     return str(
         member.display_name
