@@ -4989,22 +4989,35 @@ _REWARD_REDEEM_SELECTIONS: dict[tuple[int, int], str] = {}
 
 
 def build_reward_redeem_embed() -> discord.Embed:
-    lines = [
-        f"**{item['cost']} 點**｜{item['name']}"
-        for item in POINT_REDEEM_ITEMS
-    ]
+    shelf_text = """```text
+╔════════════════════════════╗
+║        魔丸點數商品架        ║
+╠════════╦═══════════════════╣
+║   5 點  ║ 20 元折價券        ║
+║  10 點  ║ 30 元折價券        ║
+║  15 點  ║ 加時 30 分鐘        ║
+║  20 點  ║ 加場一場保撤        ║
+║  25 點  ║ 免指定費 1 次       ║
+║  30 點  ║ 100 元折價券       ║
+║  40 點  ║ 加時一小時          ║
+╠════════╬═══════════════════╣
+║  80 點  ║ 免費陪玩 1 小時     ║
+╚════════╩═══════════════════╝
+```"""
 
     embed = discord.Embed(
         title="🎁 魔丸點數兌換",
         description=(
-            "請先使用下拉式清單選擇要兌換的項目，再按下「兌換」。\n\n"
-            + "\n".join(lines)
+            "請先使用下拉式清單選擇要兌換的項目，再按下「兌換」。
+
+"
+            f"{shelf_text}
+"
+            "兌換成功後會自動扣除點數，並寫入顧客備註。"
         ),
         color=discord.Color.gold(),
     )
-    embed.set_footer(text="兌換成功後會自動扣除點數，並寫入顧客備註。")
     return embed
-
 
 def append_reward_redeem_customer_note(
     data: dict,
