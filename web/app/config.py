@@ -31,12 +31,12 @@ class WebConfig:
 
     ADMIN_ROLE_IDS = _parse_role_ids(
         "ADMIN_ROLE_IDS",
-        "1131128849443328030,1482084782031638548",
+        "1482084782031638548",
     )
 
     CUSTOMER_SERVICE_ROLE_IDS = _parse_role_ids(
         "CUSTOMER_SERVICE_ROLE_IDS",
-        "1131128849443328030,1482084782031638548",
+        "1482084782031638548",
     )
 
     WORKER_ROLE_IDS = _parse_role_ids(
