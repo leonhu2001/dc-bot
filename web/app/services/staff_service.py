@@ -10,8 +10,12 @@ from web.app.config import config
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
 
-WORKER_ROLE_ID = "1503701170504339458"
-COMPANION_ROLE_ID = "1503706721883783218"
+WORKER_ROLE_IDS = {'1500234130871550004', '1500234170943934544', '1500751039060643990'}
+COMPANION_ROLE_IDS = {'1500751059239440575', '1482080315798192210'}
+
+# 舊變數保留相容用，實際分類使用上面的 set。
+WORKER_ROLE_ID = next(iter(WORKER_ROLE_IDS))
+COMPANION_ROLE_ID = next(iter(COMPANION_ROLE_IDS))
 
 
 def get_staff_display_name(member: WebStaffMember) -> str:
@@ -76,8 +80,8 @@ def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
     }
 
     is_customer_service = bool(role_set & customer_service_role_ids)
-    is_worker = WORKER_ROLE_ID in role_set
-    is_companion = COMPANION_ROLE_ID in role_set
+    is_worker = bool(role_set & WORKER_ROLE_IDS)
+    is_companion = bool(role_set & COMPANION_ROLE_IDS)
 
     return is_customer_service, is_worker, is_companion
 
