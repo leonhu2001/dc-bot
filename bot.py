@@ -4991,7 +4991,7 @@ _REWARD_REDEEM_SELECTIONS: dict[tuple[int, int], str] = {}
 def build_reward_redeem_embed() -> discord.Embed:
     shelf_text = """```text
 ╔════════════════════════════╗
-║        魔丸點數商品架        ║
+║        魔丸點數兌換        ║
 ╠════════╦═══════════════════╣
 ║   5 點  ║ 20 元折價券        ║
 ║  10 點  ║ 30 元折價券        ║
