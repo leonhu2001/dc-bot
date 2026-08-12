@@ -660,6 +660,7 @@ def get_room_targets_for_control(guild: discord.Guild, room_type: str) -> list[d
     return get_play_voice_allowed_roles(guild)
 
 
+
 async def apply_voice_lock_state(
     voice_channel: discord.VoiceChannel,
     owner: discord.Member,
@@ -667,14 +668,16 @@ async def apply_voice_lock_state(
     locked: bool,
     room_type: str,
 ) -> None:
+    """只切換 connect，不改 view_channel，避免鎖定時把隱藏狀態洗掉。"""
     guild = voice_channel.guild
     overwrites = dict(voice_channel.overwrites)
     normalized_room_type = str(room_type or "public")
+
     targets = get_room_targets_for_control(guild, normalized_room_type)
 
     for target in targets:
         overwrite = overwrites.get(target, discord.PermissionOverwrite())
-        overwrite.view_channel = True
+
         overwrite.connect = not locked
         overwrite.speak = True
         overwrite.stream = True
@@ -685,36 +688,23 @@ async def apply_voice_lock_state(
         overwrite.add_reactions = True
         overwrite.use_external_emojis = True
         overwrite.use_external_stickers = True
-        if isinstance(target, discord.Role) and is_receiver_voice_role(target):
+
+        if isinstance(target, discord.Role) and "is_receiver_voice_role" in globals() and is_receiver_voice_role(target):
             overwrite.move_members = True
+
         overwrites[target] = overwrite
 
     if normalized_room_type != "public":
         everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-        everyone_overwrite.view_channel = True
+
+        # 非公共房 @everyone 永遠不能連接；但不改 view_channel，避免影響隱藏/顯示。
         everyone_overwrite.connect = False
         everyone_overwrite.send_messages = False
         everyone_overwrite.read_message_history = False
+
         overwrites[guild.default_role] = everyone_overwrite
 
-    if normalized_room_type == "play":
-        employee_family_role = get_employee_family_role(guild)
-        if employee_family_role is not None:
-            family_overwrite = overwrites.get(employee_family_role, discord.PermissionOverwrite())
-            family_overwrite.view_channel = True
-            family_overwrite.connect = not locked
-            family_overwrite.speak = True
-            family_overwrite.stream = True
-            family_overwrite.use_voice_activation = True
-            family_overwrite.send_messages = True
-            family_overwrite.read_message_history = True
-            family_overwrite.attach_files = True
-            family_overwrite.add_reactions = True
-            family_overwrite.use_external_emojis = True
-            family_overwrite.use_external_stickers = True
-            overwrites[employee_family_role] = family_overwrite
-
-    # 上鎖時清掉之前因進房產生的個人 connect=True 權限；解鎖後由進房事件再補。
+    # 上鎖時清掉之前因進房產生的個人 connect=True 權限；解鎖時不強制改 view_channel。
     for target, overwrite in list(overwrites.items()):
         if not isinstance(target, discord.Member):
             continue
@@ -731,6 +721,7 @@ async def apply_voice_lock_state(
         else:
             if overwrite.connect is False:
                 overwrite.connect = None
+
             if not _overwrite_has_any_explicit_value(overwrite):
                 overwrites.pop(target, None)
             else:
@@ -751,6 +742,7 @@ async def apply_voice_lock_state(
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
+
     if bot_member is not None:
         bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
         bot_overwrite.view_channel = True
@@ -781,44 +773,58 @@ async def apply_voice_hidden_state(
     hidden: bool,
     room_type: str,
 ) -> None:
+    """只切換 view_channel，不改 connect，避免隱藏時把鎖定狀態洗掉。"""
     guild = voice_channel.guild
     overwrites = dict(voice_channel.overwrites)
     normalized_room_type = str(room_type or "public")
 
-    everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-    everyone_overwrite.view_channel = False if hidden else True
-
     if normalized_room_type == "public":
-        everyone_overwrite.connect = True
+        everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+        everyone_overwrite.view_channel = False if hidden else True
+
+        # 公共房沒有鎖定時預設可進；這裡不強制解鎖，只在沒設定過 connect 時補預設值。
+        if everyone_overwrite.connect is None:
+            everyone_overwrite.connect = True
+
         everyone_overwrite.speak = True
         everyone_overwrite.stream = True
         everyone_overwrite.use_voice_activation = True
         everyone_overwrite.send_messages = True
         everyone_overwrite.read_message_history = True
+        overwrites[guild.default_role] = everyone_overwrite
+
     else:
+        everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+        everyone_overwrite.view_channel = False if hidden else True
         everyone_overwrite.connect = False
         everyone_overwrite.send_messages = False
         everyone_overwrite.read_message_history = False
+        overwrites[guild.default_role] = everyone_overwrite
 
-    overwrites[guild.default_role] = everyone_overwrite
+        targets = get_room_targets_for_control(guild, normalized_room_type)
 
-    for role in get_room_targets_for_control(guild, normalized_room_type):
-        if role == guild.default_role:
-            continue
+        for target in targets:
+            overwrite = overwrites.get(target, discord.PermissionOverwrite())
 
-        overwrite = overwrites.get(role, discord.PermissionOverwrite())
-        overwrite.view_channel = False if hidden else True
-        overwrite.connect = True
-        overwrite.speak = True
-        overwrite.stream = True
-        overwrite.use_voice_activation = True
-        overwrite.send_messages = True
-        overwrite.read_message_history = True
-        overwrite.attach_files = True
-        overwrite.add_reactions = True
-        overwrite.use_external_emojis = True
-        overwrite.use_external_stickers = True
-        overwrites[role] = overwrite
+            overwrite.view_channel = False if hidden else True
+            overwrite.speak = True
+            overwrite.stream = True
+            overwrite.use_voice_activation = True
+            overwrite.send_messages = True
+            overwrite.read_message_history = True
+            overwrite.attach_files = True
+            overwrite.add_reactions = True
+            overwrite.use_external_emojis = True
+            overwrite.use_external_stickers = True
+
+            # 不改 connect，避免「隱藏」把已鎖定的房間打開。
+            if overwrite.connect is None:
+                overwrite.connect = True
+
+            if isinstance(target, discord.Role) and "is_receiver_voice_role" in globals() and is_receiver_voice_role(target):
+                overwrite.move_members = True
+
+            overwrites[target] = overwrite
 
     owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
     owner_overwrite.view_channel = True
@@ -835,6 +841,7 @@ async def apply_voice_hidden_state(
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
+
     if bot_member is not None:
         bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
         bot_overwrite.view_channel = True
@@ -846,6 +853,10 @@ async def apply_voice_hidden_state(
         bot_overwrite.manage_channels = True
         bot_overwrite.send_messages = True
         bot_overwrite.read_message_history = True
+        bot_overwrite.attach_files = True
+        bot_overwrite.add_reactions = True
+        bot_overwrite.use_external_emojis = True
+        bot_overwrite.use_external_stickers = True
         overwrites[bot_member] = bot_overwrite
 
     await voice_channel.edit(
