@@ -137,6 +137,41 @@ def build_employee_family_play_overwrite(connect: bool = True) -> discord.Permis
     )
 
 
+
+def build_full_temp_voice_overwrite(
+    *,
+    connect: bool = True,
+    move_members: bool = False,
+    manage_channels: bool = False,
+) -> discord.PermissionOverwrite:
+    return discord.PermissionOverwrite(
+        view_channel=True,
+        connect=connect,
+        speak=True,
+        stream=True,
+        use_voice_activation=True,
+        send_messages=True,
+        read_message_history=True,
+        attach_files=True,
+        add_reactions=True,
+        use_external_emojis=True,
+        use_external_stickers=True,
+        move_members=move_members,
+        manage_channels=manage_channels,
+    )
+
+
+def get_vip_voice_allowed_roles(guild: discord.Guild) -> list[discord.Role]:
+    """VIP 臨時房固定放行：陪玩、打手、客服；不包含員工家屬。"""
+    excluded_role_ids = {int(EMPLOYEE_FAMILY_ROLE_ID or 0)}
+    return [
+        role
+        for role_id in PLAY_VOICE_ALLOWED_ROLE_IDS
+        if int(role_id) not in excluded_role_ids
+        if (role := guild.get_role(int(role_id))) is not None
+    ]
+
+
 def build_play_lobby_overwrites(guild: discord.Guild) -> dict:
     """點我創建陪玩頻道：只有陪玩/打手身分組可見可加入。"""
     overwrites = {
@@ -169,8 +204,9 @@ def build_play_lobby_overwrites(guild: discord.Guild) -> dict:
     return overwrites
 
 
+
 def build_play_voice_overwrites(guild: discord.Guild) -> dict:
-    """臨時陪玩房：所有人可見，但預設未鎖定；陪玩/打手可見但可加入。"""
+    """陪玩臨時房：陪玩 / 打手 / 客服 / 員工家屬完整權限；其他人需被移入後才給個人權限。"""
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
@@ -178,36 +214,22 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
             send_messages=False,
             read_message_history=False,
         ),
-        guild.me: discord.PermissionOverwrite(
-            view_channel=True,
+        guild.me: build_full_temp_voice_overwrite(
             connect=True,
-            speak=True,
             move_members=True,
             manage_channels=True,
-            send_messages=True,
-            read_message_history=True,
         ),
     }
 
     for role in get_play_voice_allowed_roles(guild):
-        overwrites[role] = discord.PermissionOverwrite(
-            view_channel=True,
-            connect=True,
-            speak=True,
-            stream=True,
-            use_voice_activation=True,
-            send_messages=False,
-            read_message_history=False,
-        )
-
-    apply_voice_view_only_role_overwrites(guild, overwrites)
+        overwrites[role] = build_full_temp_voice_overwrite(connect=True)
 
     employee_family_role = get_employee_family_role(guild)
     if employee_family_role is not None:
-        overwrites[employee_family_role] = build_employee_family_play_overwrite(connect=True)
+        overwrites[employee_family_role] = build_full_temp_voice_overwrite(connect=True)
 
+    apply_voice_view_only_role_overwrites(guild, overwrites)
     return overwrites
-
 
 def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
     """點我創建VIP頻道：6 階 VIP 身分組皆可見可加入。"""
@@ -245,8 +267,9 @@ def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
     return overwrites
 
 
+
 def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> dict:
-    """臨時 VIP 房：所有人可見，但預設未鎖定；房主可加入。"""
+    """VIP 臨時房：陪玩 / 打手 / 客服 / 創建者完整權限；員工家屬不作為固定放行角色。"""
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
@@ -254,44 +277,23 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
             send_messages=False,
             read_message_history=False,
         ),
-        guild.me: discord.PermissionOverwrite(
-            view_channel=True,
+        guild.me: build_full_temp_voice_overwrite(
             connect=True,
-            speak=True,
             move_members=True,
             manage_channels=True,
-            send_messages=True,
-            read_message_history=True,
         ),
-        member: discord.PermissionOverwrite(
-            view_channel=True,
-            connect=True,
-            speak=True,
-            stream=True,
-            use_voice_activation=True,
-            send_messages=True,
-            read_message_history=True,
-        ),
+        member: build_full_temp_voice_overwrite(connect=True),
     }
 
-    # 讓管理/陪玩/打手可看見 VIP 臨時房，但預設可加入。
-    for role in get_play_voice_allowed_roles(guild):
-        overwrites[role] = discord.PermissionOverwrite(
-            view_channel=True,
-            connect=True,
-            speak=True,
-            stream=True,
-            use_voice_activation=True,
-            send_messages=False,
-            read_message_history=False,
-        )
+    for role in get_vip_voice_allowed_roles(guild):
+        overwrites[role] = build_full_temp_voice_overwrite(connect=True)
 
     apply_voice_view_only_role_overwrites(guild, overwrites)
     return overwrites
 
 
-def build_public_voice_overwrites(guild: discord.Guild) -> dict:
-    """公共入口 / 公共臨時房：所有人可見可加入。"""
+def build_public_lobby_overwrites(guild: discord.Guild) -> dict:
+    """公共入口頻道：維持原本入口權限，不受公共臨時房完整文字權限影響。"""
     return {
         guild.default_role: discord.PermissionOverwrite(
             view_channel=True,
@@ -313,6 +315,19 @@ def build_public_voice_overwrites(guild: discord.Guild) -> dict:
         ),
     }
 
+
+
+
+def build_public_voice_overwrites(guild: discord.Guild) -> dict:
+    """公共臨時房：所有人完整權限。"""
+    return {
+        guild.default_role: build_full_temp_voice_overwrite(connect=True),
+        guild.me: build_full_temp_voice_overwrite(
+            connect=True,
+            move_members=True,
+            manage_channels=True,
+        ),
+    }
 
 async def get_or_create_play_voice_lobby(guild: discord.Guild) -> discord.VoiceChannel | None:
     category = guild.get_channel(PLAY_VOICE_LOBBY_CATEGORY_ID)
@@ -386,7 +401,7 @@ async def get_or_create_public_voice_lobby(guild: discord.Guild) -> discord.Voic
     for channel in category.voice_channels:
         if channel.name == PUBLIC_VOICE_CREATE_CHANNEL_NAME:
             await channel.edit(
-                overwrites=build_public_voice_overwrites(guild),
+                overwrites=build_public_lobby_overwrites(guild),
                 reason="Update public voice lobby permissions",
             )
             return channel
@@ -394,7 +409,7 @@ async def get_or_create_public_voice_lobby(guild: discord.Guild) -> discord.Voic
     return await guild.create_voice_channel(
         name=PUBLIC_VOICE_CREATE_CHANNEL_NAME,
         category=category,
-        overwrites=build_public_voice_overwrites(guild),
+        overwrites=build_public_lobby_overwrites(guild),
         reason="Create public voice lobby",
     )
 
@@ -595,12 +610,18 @@ async def delete_voice_control_panel(guild: discord.Guild, voice_channel_id: int
     TEMP_VOICE_CONTROL_PANELS.pop(voice_channel_id, None)
 
 
-def get_room_targets_for_control(
-    guild: discord.Guild,
-    room_type: str
-) -> list[discord.abc.Snowflake]:
-    if room_type == "public":
+
+def get_room_targets_for_control(guild: discord.Guild, room_type: str) -> list[discord.abc.Snowflake]:
+    normalized_room_type = str(room_type or "public")
+
+    if normalized_room_type == "public":
         return [guild.default_role]
+
+    if normalized_room_type == "vip":
+        return get_vip_voice_allowed_roles(guild)
+
+    if normalized_room_type == "play":
+        return get_play_voice_allowed_roles(guild)
 
     return get_play_voice_allowed_roles(guild)
 
@@ -608,26 +629,30 @@ def get_room_targets_for_control(
 async def apply_voice_lock_state(
     voice_channel: discord.VoiceChannel,
     owner: discord.Member,
-    room_type: str,
+    *,
     locked: bool,
-):
+    room_type: str,
+) -> None:
     guild = voice_channel.guild
-    normalized_room_type = str(room_type or "public")
     overwrites = dict(voice_channel.overwrites)
+    normalized_room_type = str(room_type or "public")
+    targets = get_room_targets_for_control(guild, normalized_room_type)
 
-    # 公共房控制 @everyone；VIP / 陪玩房控制陪玩、打手、客服、員工家屬等允許身分組。
-    for target in get_room_targets_for_control(guild, normalized_room_type):
+    for target in targets:
         overwrite = overwrites.get(target, discord.PermissionOverwrite())
         overwrite.view_channel = True
         overwrite.connect = not locked
         overwrite.speak = True
         overwrite.stream = True
         overwrite.use_voice_activation = True
-        overwrite.send_messages = False
-        overwrite.read_message_history = False
+        overwrite.send_messages = True
+        overwrite.read_message_history = True
+        overwrite.attach_files = True
+        overwrite.add_reactions = True
+        overwrite.use_external_emojis = True
+        overwrite.use_external_stickers = True
         overwrites[target] = overwrite
 
-    # VIP / 陪玩臨時房即使未鎖定，也不開放一般人直接進入。
     if normalized_room_type != "public":
         everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
         everyone_overwrite.view_channel = True
@@ -636,7 +661,6 @@ async def apply_voice_lock_state(
         everyone_overwrite.read_message_history = False
         overwrites[guild.default_role] = everyone_overwrite
 
-    # 陪玩房的員工家屬：未鎖定可進，上鎖後不可進。
     if normalized_room_type == "play":
         employee_family_role = get_employee_family_role(guild)
         if employee_family_role is not None:
@@ -646,30 +670,35 @@ async def apply_voice_lock_state(
             family_overwrite.speak = True
             family_overwrite.stream = True
             family_overwrite.use_voice_activation = True
-            family_overwrite.send_messages = False
-            family_overwrite.read_message_history = False
+            family_overwrite.send_messages = True
+            family_overwrite.read_message_history = True
+            family_overwrite.attach_files = True
+            family_overwrite.add_reactions = True
+            family_overwrite.use_external_emojis = True
+            family_overwrite.use_external_stickers = True
             overwrites[employee_family_role] = family_overwrite
 
-    bot_member = guild.me
-    bot_member_id = bot_member.id if bot_member is not None else None
-
-    # 重點：上鎖時清掉之前因進房產生的「個人 connect=True」權限。
-    # 不然有些人即使身分組被鎖，仍會因個人權限繼續進得去。
+    # 上鎖時清掉之前因進房產生的個人 connect=True 權限；解鎖後由進房事件再補。
     for target, overwrite in list(overwrites.items()):
-        if isinstance(target, discord.Member):
-            if target.id == owner.id or target.id == bot_member_id:
-                continue
+        if not isinstance(target, discord.Member):
+            continue
 
-            if locked:
-                overwrite.connect = False
-                overwrite.send_messages = False
-                overwrite.read_message_history = False
-            else:
-                # 解鎖時不要讓個人 False 擋住身分組權限。
-                if overwrite.connect is False:
-                    overwrite.connect = None
+        is_owner = target.id == owner.id
+        is_bot = guild.me is not None and target.id == guild.me.id
 
+        if is_owner or is_bot:
+            continue
+
+        if locked:
+            overwrite.connect = False
             overwrites[target] = overwrite
+        else:
+            if overwrite.connect is False:
+                overwrite.connect = None
+            if not _overwrite_has_any_explicit_value(overwrite):
+                overwrites.pop(target, None)
+            else:
+                overwrites[target] = overwrite
 
     owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
     owner_overwrite.view_channel = True
@@ -679,53 +708,81 @@ async def apply_voice_lock_state(
     owner_overwrite.use_voice_activation = True
     owner_overwrite.send_messages = True
     owner_overwrite.read_message_history = True
+    owner_overwrite.attach_files = True
+    owner_overwrite.add_reactions = True
+    owner_overwrite.use_external_emojis = True
+    owner_overwrite.use_external_stickers = True
     overwrites[owner] = owner_overwrite
 
+    bot_member = guild.me
     if bot_member is not None:
         bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
         bot_overwrite.view_channel = True
         bot_overwrite.connect = True
-        bot_overwrite.manage_channels = True
+        bot_overwrite.speak = True
+        bot_overwrite.stream = True
+        bot_overwrite.use_voice_activation = True
         bot_overwrite.move_members = True
+        bot_overwrite.manage_channels = True
         bot_overwrite.send_messages = True
         bot_overwrite.read_message_history = True
+        bot_overwrite.attach_files = True
+        bot_overwrite.add_reactions = True
+        bot_overwrite.use_external_emojis = True
+        bot_overwrite.use_external_stickers = True
         overwrites[bot_member] = bot_overwrite
 
     await voice_channel.edit(
         overwrites=overwrites,
-        reason="Update temporary voice room lock state",
+        reason=f"Voice room {'locked' if locked else 'unlocked'} by control panel",
     )
+
 
 async def apply_voice_hidden_state(
     voice_channel: discord.VoiceChannel,
     owner: discord.Member,
-    room_type: str,
+    *,
     hidden: bool,
-):
-    overwrites = dict(voice_channel.overwrites)
+    room_type: str,
+) -> None:
     guild = voice_channel.guild
+    overwrites = dict(voice_channel.overwrites)
+    normalized_room_type = str(room_type or "public")
 
     everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-    everyone_overwrite.view_channel = not hidden
+    everyone_overwrite.view_channel = False if hidden else True
 
-    if str(room_type or "") == "public":
-        everyone_overwrite.connect = False if hidden else True
+    if normalized_room_type == "public":
+        everyone_overwrite.connect = True
+        everyone_overwrite.speak = True
+        everyone_overwrite.stream = True
+        everyone_overwrite.use_voice_activation = True
+        everyone_overwrite.send_messages = True
+        everyone_overwrite.read_message_history = True
     else:
         everyone_overwrite.connect = False
+        everyone_overwrite.send_messages = False
+        everyone_overwrite.read_message_history = False
 
     overwrites[guild.default_role] = everyone_overwrite
 
-    if hidden:
-        for role in get_voice_room_hidden_visible_roles(guild):
-            overwrite = overwrites.get(role, discord.PermissionOverwrite())
-            overwrite.view_channel = True
-            overwrite.connect = room_type == "public"
-            overwrite.speak = True
-            overwrite.stream = True
-            overwrite.use_voice_activation = True
-            overwrite.send_messages = False
-            overwrite.read_message_history = False
-            overwrites[role] = overwrite
+    for role in get_room_targets_for_control(guild, normalized_room_type):
+        if role == guild.default_role:
+            continue
+
+        overwrite = overwrites.get(role, discord.PermissionOverwrite())
+        overwrite.view_channel = False if hidden else True
+        overwrite.connect = True
+        overwrite.speak = True
+        overwrite.stream = True
+        overwrite.use_voice_activation = True
+        overwrite.send_messages = True
+        overwrite.read_message_history = True
+        overwrite.attach_files = True
+        overwrite.add_reactions = True
+        overwrite.use_external_emojis = True
+        overwrite.use_external_stickers = True
+        overwrites[role] = overwrite
 
     owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
     owner_overwrite.view_channel = True
@@ -735,6 +792,10 @@ async def apply_voice_hidden_state(
     owner_overwrite.use_voice_activation = True
     owner_overwrite.send_messages = True
     owner_overwrite.read_message_history = True
+    owner_overwrite.attach_files = True
+    owner_overwrite.add_reactions = True
+    owner_overwrite.use_external_emojis = True
+    owner_overwrite.use_external_stickers = True
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
@@ -742,15 +803,18 @@ async def apply_voice_hidden_state(
         bot_overwrite = overwrites.get(bot_member, discord.PermissionOverwrite())
         bot_overwrite.view_channel = True
         bot_overwrite.connect = True
-        bot_overwrite.manage_channels = True
+        bot_overwrite.speak = True
+        bot_overwrite.stream = True
+        bot_overwrite.use_voice_activation = True
         bot_overwrite.move_members = True
+        bot_overwrite.manage_channels = True
         bot_overwrite.send_messages = True
         bot_overwrite.read_message_history = True
         overwrites[bot_member] = bot_overwrite
 
     await voice_channel.edit(
         overwrites=overwrites,
-        reason="Voice room visibility changed by owner",
+        reason=f"Voice room {'hidden' if hidden else 'shown'} by control panel",
     )
 
 class VoiceRoomRenameModal(discord.ui.Modal, title="更改語音房名稱"):
