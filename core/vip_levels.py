@@ -6,7 +6,6 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "vip_room": "・專屬 VIP 身分組，可使用VIP專屬包廂",
     "priority_cs": "・優先客服回覆",
     "discount_98": "・體驗單、趣味單及賽季限定單外全館98折",
-    "private_text_channel": "・可建立 VIP 專屬私人文字頻道",
     "rebate_2": "・儲值返利2%",
     "monthly_coupon_200": "・每月一張折現券200T",
     "priority_order": "・優先排單",
@@ -41,7 +40,6 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "vip_room",
             "priority_cs",
             "discount_98",
-            "private_text_channel",
             "rebate_2",
             "monthly_coupon_200",
             "priority_order",
@@ -54,7 +52,6 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "benefit_keys": [
             "vip_room",
             "priority_cs",
-            "private_text_channel",
             "monthly_coupon_200",
             "priority_order",
             "familiar_worker",
@@ -69,7 +66,6 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "benefit_keys": [
             "vip_room",
             "priority_cs",
-            "private_text_channel",
             "monthly_coupon_200",
             "priority_order",
             "familiar_worker",
@@ -85,7 +81,6 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "benefit_keys": [
             "vip_room",
             "priority_cs",
-            "private_text_channel",
             "monthly_coupon_200",
             "priority_order",
             "familiar_worker",

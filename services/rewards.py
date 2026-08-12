@@ -23,8 +23,6 @@ _ORDER_SELECTIONS: dict[int, dict[str, Any]] = {}
 _SAVE_BOT_DATA: Callable[[], None] | None = None
 _SILVER_MEMBER_ROLE_ID: int | None = None
 _VIP_ROLE_TIERS: list[dict] = []
-_PLATINUM_PRIVATE_CATEGORY_ID: int | None = None
-_PLATINUM_CHAT_ROLE_IDS: list[int] = []
 _REWARD_DB_FILE: Path | None = None
 VIP_PROGRESS_EXCLUDED_ITEMS = {"幣號"}
 
@@ -91,15 +89,11 @@ def configure_reward_benefits(
     *,
     silver_member_role_id: int | None = None,
     vip_role_tiers: list[dict] | None = None,
-    platinum_private_category_id: int | None = None,
-    platinum_chat_role_ids: list[int] | None = None,
 ) -> None:
-    """設定會員福利需要的身分組 / 類別 ID。"""
-    global _SILVER_MEMBER_ROLE_ID, _VIP_ROLE_TIERS, _PLATINUM_PRIVATE_CATEGORY_ID, _PLATINUM_CHAT_ROLE_IDS
+    """設定會員福利需要的 VIP 身分組。"""
+    global _SILVER_MEMBER_ROLE_ID, _VIP_ROLE_TIERS
     _VIP_ROLE_TIERS = list(vip_role_tiers or [])
     _SILVER_MEMBER_ROLE_ID = None if _VIP_ROLE_TIERS else silver_member_role_id
-    _PLATINUM_PRIVATE_CATEGORY_ID = platinum_private_category_id
-    _PLATINUM_CHAT_ROLE_IDS = list(platinum_chat_role_ids or [])
 
 def configure_reward_storage(customer_rewards: dict[int, dict[str, Any]]) -> None:
     """設定顧客會員資料來源。
