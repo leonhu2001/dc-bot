@@ -1157,7 +1157,7 @@ class VoiceRoomControlView(discord.ui.View):
         data["locked"] = not data.get("locked", False)
 
         try:
-            await apply_voice_lock_state(voice_channel, owner, self.room_type, data["locked"])
+            await apply_voice_lock_state(voice_channel, owner, locked=data["locked"], room_type=self.room_type)
         except discord.Forbidden:
             await interaction.response.send_message("Bot 權限不足，無法鎖定/解鎖語音房。", ephemeral=True)
             return
@@ -1201,7 +1201,7 @@ class VoiceRoomControlView(discord.ui.View):
         data["hidden"] = not data.get("hidden", False)
 
         try:
-            await apply_voice_hidden_state(voice_channel, owner, self.room_type, data["hidden"])
+            await apply_voice_hidden_state(voice_channel, owner, hidden=data["hidden"], room_type=self.room_type)
         except discord.Forbidden:
             await interaction.response.send_message("Bot 權限不足，無法隱藏/顯示語音房。", ephemeral=True)
             return

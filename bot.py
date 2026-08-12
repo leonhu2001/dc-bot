@@ -4773,7 +4773,7 @@ async def on_voice_state_update(
         await grant_play_voice_room_chat_access(after.channel, member)
 
     # 進入一般陪玩入口：建立一般陪玩語音房
-    if play_lobby_channel is not None and after.channel.id == play_lobby_channel.id:
+    if after.channel is not None and play_lobby_channel is not None and after.channel.id == play_lobby_channel.id:
         try:
             category = guild.get_channel(PLAY_VOICE_LOBBY_CATEGORY_ID)
             if category is None or not isinstance(category, discord.CategoryChannel):
@@ -4810,7 +4810,7 @@ async def on_voice_state_update(
         return
 
     # 進入 VIP 入口：建立 VIP 專用語音房
-    if vip_lobby_channel is not None and after.channel.id == vip_lobby_channel.id:
+    if after.channel is not None and vip_lobby_channel is not None and after.channel.id == vip_lobby_channel.id:
         try:
             category = guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
             if category is None or not isinstance(category, discord.CategoryChannel):
@@ -4844,7 +4844,7 @@ async def on_voice_state_update(
         return
 
     # 進入公共入口：建立所有人可見 / 可加入的公共語音房
-    if public_lobby_channel is not None and after.channel.id == public_lobby_channel.id:
+    if after.channel is not None and public_lobby_channel is not None and after.channel.id == public_lobby_channel.id:
         try:
             category = guild.get_channel(PLAY_VOICE_CATEGORY_ID)
             if category is None or not isinstance(category, discord.CategoryChannel):
