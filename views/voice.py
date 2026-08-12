@@ -12,6 +12,15 @@ PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 VIP_VOICE_LOBBY_ROLE_ID = 0
 VIP_VOICE_LOBBY_ROLE_IDS: list[int] = []
 PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = []
+DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = [
+    1500751059239440575,
+    1482080315798192210,
+    1500234130871550004,
+    1500234170943934544,
+    1500751039060643990,
+    1482084782031638548,
+    1507204925766242425,
+]
 EMPLOYEE_FAMILY_ROLE_ID = 1507204925766242425
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS: list[int] = []
 VOICE_VIEW_ONLY_ROLE_IDS = []
@@ -53,9 +62,7 @@ def configure_voice_helpers(
     PUBLIC_VOICE_CREATE_CHANNEL_NAME = str(public_voice_create_channel_name)
     VIP_VOICE_LOBBY_ROLE_ID = int(vip_voice_lobby_role_id)
     VIP_VOICE_LOBBY_ROLE_IDS = [int(role_id) for role_id in (vip_voice_lobby_role_ids or [VIP_VOICE_LOBBY_ROLE_ID]) if int(role_id)]
-    PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or [
-    1507204925766242425,
-])]
+    PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS)]
     VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [int(role_id) for role_id in (voice_room_hidden_visible_role_ids or [])]
     TEMP_VOICE_CONTROL_PANELS = temp_voice_control_panels
 
@@ -79,9 +86,17 @@ def safe_public_voice_channel_name(member: discord.Member) -> str:
 
 
 def get_play_voice_allowed_roles(guild: discord.Guild) -> list[discord.Role]:
+    role_ids: list[int] = []
+
+    for raw_role_id in [*PLAY_VOICE_ALLOWED_ROLE_IDS, *DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS]:
+        role_id = int(raw_role_id)
+
+        if role_id and role_id not in role_ids:
+            role_ids.append(role_id)
+
     return [
         role
-        for role_id in PLAY_VOICE_ALLOWED_ROLE_IDS
+        for role_id in role_ids
         if (role := guild.get_role(role_id)) is not None
     ]
 
@@ -166,9 +181,8 @@ def get_vip_voice_allowed_roles(guild: discord.Guild) -> list[discord.Role]:
     excluded_role_ids = {int(EMPLOYEE_FAMILY_ROLE_ID or 0)}
     return [
         role
-        for role_id in PLAY_VOICE_ALLOWED_ROLE_IDS
-        if int(role_id) not in excluded_role_ids
-        if (role := guild.get_role(int(role_id))) is not None
+        for role in get_play_voice_allowed_roles(guild)
+        if int(role.id) not in excluded_role_ids
     ]
 
 
@@ -1215,6 +1229,32 @@ class VoiceRoomControlView(discord.ui.View):
         )
 
 
+
+async def sync_temp_voice_room_permissions_on_create(
+    voice_channel: discord.VoiceChannel,
+    owner: discord.Member,
+    room_type: str,
+) -> None:
+    """建立臨時語音房後，強制寫入最新角色權限；不影響入口頻道。"""
+    normalized_room_type = str(room_type or "public")
+
+    if normalized_room_type == "public":
+        overwrites = build_public_voice_overwrites(voice_channel.guild)
+    elif normalized_room_type == "vip":
+        overwrites = build_vip_room_overwrites(voice_channel.guild, owner)
+    else:
+        overwrites = build_play_voice_overwrites(voice_channel.guild)
+
+    try:
+        await voice_channel.edit(
+            overwrites=overwrites,
+            reason="Sync temporary voice room permissions on create",
+        )
+    except discord.Forbidden:
+        print(f"Bot 權限不足，無法同步語音房權限：{voice_channel.name} ({voice_channel.id})")
+    except discord.HTTPException as exc:
+        print(f"同步語音房權限失敗：{voice_channel.name} ({voice_channel.id}) {exc}")
+
 async def create_voice_control_panel(
     guild: discord.Guild,
     category: discord.CategoryChannel,
@@ -1231,6 +1271,7 @@ async def create_voice_control_panel(
         "hidden": get_default_voice_room_hidden(room_type),
     }
 
+    await sync_temp_voice_room_permissions_on_create(voice_channel, member, room_type)
     await grant_play_voice_room_chat_access(voice_channel, member)
     sync_voice_control_panel_state_from_channel(voice_channel)
 
