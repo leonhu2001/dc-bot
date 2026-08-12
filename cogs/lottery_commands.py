@@ -1,288 +1,206 @@
+
 from __future__ import annotations
 
-import discord
-from discord.ext import commands
-from discord import app_commands
+import random
+from typing import Iterable
 
-from core.permissions import has_role, is_customer_staff
-from services.logging_service import send_order_log
-from services.lottery import (
-    LOTTERY_COST_PER_CHANCE_DEFAULT,
-    LOTTERY_MAX_CHANCES_PER_USER_DEFAULT,
-    get_default_lottery_period,
-    get_lottery_settings,
-    save_lottery_settings,
-    get_lottery_entries,
-    get_lottery_drawn_user_ids,
-    get_lottery_entry,
-    upsert_lottery_entry,
-    clear_lottery_entries,
-    record_lottery_draw,
-    build_lottery_info_embed,
-    build_lottery_status_embed,
-    pick_weighted_lottery_winners,
-    send_lottery_announcement,
-)
-from services.rewards import (
-    get_customer_reward_data,
-    get_current_reward_points,
-    adjust_customer_points,
-)
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+from core.permissions import is_customer_staff, is_manager_or_admin
+from services.lottery import record_lottery_draw
+
+
+GIVEAWAY_EMOJI = "🎉"
 
 
 class LotteryCommands(commands.Cog):
-    lottery = app_commands.Group(name="lottery", description="魔丸點數抽獎")
+    """全店免費反應抽獎。
+
+    參加方式：
+    - 管理 / 客服使用 /lottery panel 發送抽獎訊息
+    - 顧客在訊息底下按 🎉
+    - 每個 Discord 帳號同一個表情只能按一次，所以自然每人只算一次
+    """
+
+    lottery = app_commands.Group(
+        name="lottery",
+        description="魔丸全店反應抽獎",
+    )
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     def is_lottery_admin(self, member: discord.Member) -> bool:
-        manager_role_id = int(getattr(self.bot, "manager_role_id_value", 0) or 0)
-        return is_customer_staff(member) or has_role(member, manager_role_id) or member.guild_permissions.administrator
+        return is_customer_staff(member) or is_manager_or_admin(member)
 
-    @lottery.command(
-        name="info",
-        description="查看目前魔丸點數抽獎活動",
-    )
-    async def lottery_info(self, interaction: discord.Interaction):
-        settings = get_lottery_settings()
-        await interaction.response.send_message(embed=build_lottery_info_embed(settings), ephemeral=True)
+    async def _fetch_giveaway_message(
+        self,
+        interaction: discord.Interaction,
+        message_id: str,
+        channel: discord.TextChannel | discord.Thread | None = None,
+    ) -> discord.Message | None:
+        target_channel = channel or interaction.channel
 
-    @lottery.command(
-        name="join",
-        description="使用魔丸點數參加抽獎，5 點 = 1 次抽獎機會",
-    )
-    @app_commands.describe(chances="要參加幾次抽獎，每次會消耗 5 點")
-    async def join_lottery(self, interaction: discord.Interaction, chances: int):
-        if chances <= 0:
-            await interaction.response.send_message("抽獎次數必須大於 0。", ephemeral=True)
-            return
+        if not isinstance(target_channel, (discord.TextChannel, discord.Thread)):
+            await interaction.followup.send("請在文字頻道使用，或指定抽獎訊息所在頻道。", ephemeral=True)
+            return None
 
-        settings = get_lottery_settings()
-        if settings.get("status") != "open":
-            await interaction.response.send_message("目前抽獎尚未開放報名。", ephemeral=True)
-            return
+        try:
+            snowflake = int(str(message_id).strip())
+        except ValueError:
+            await interaction.followup.send("訊息 ID 格式不正確。", ephemeral=True)
+            return None
 
-        period = str(settings.get("period", get_default_lottery_period()))
-        cost = int(settings.get("cost_per_chance", LOTTERY_COST_PER_CHANCE_DEFAULT))
-        max_chances = int(settings.get("max_chances_per_user", LOTTERY_MAX_CHANCES_PER_USER_DEFAULT))
-        current_entry = get_lottery_entry(period, interaction.user.id)
-        current_chances = int(current_entry["chances"]) if current_entry else 0
+        try:
+            return await target_channel.fetch_message(snowflake)
+        except discord.NotFound:
+            await interaction.followup.send("找不到這則抽獎訊息，請確認訊息 ID 和頻道是否正確。", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.followup.send("Bot 沒有權限讀取這個頻道的訊息。", ephemeral=True)
+        except discord.HTTPException as exc:
+            await interaction.followup.send(f"讀取抽獎訊息失敗：{exc}", ephemeral=True)
 
-        if current_chances + chances > max_chances:
-            await interaction.response.send_message(
-                f"本期每人最多 {max_chances} 次，你目前已有 {current_chances} 次，最多還能加 {max(0, max_chances - current_chances)} 次。",
-                ephemeral=True,
-            )
-            return
+        return None
 
-        points_needed = chances * cost
-        data = get_customer_reward_data(interaction.user.id)
-        current_points = get_current_reward_points(data)
+    async def _collect_participants(self, message: discord.Message) -> list[discord.User | discord.Member]:
+        participants: dict[int, discord.User | discord.Member] = {}
 
-        if current_points < points_needed:
-            await interaction.response.send_message(
-                f"點數不足。你目前有 {current_points:,} 點，本次需要 {points_needed:,} 點。",
-                ephemeral=True,
-            )
-            return
+        for reaction in message.reactions:
+            if str(reaction.emoji) != GIVEAWAY_EMOJI:
+                continue
 
-        ok, message = await adjust_customer_points(
-            customer_id=interaction.user.id,
-            delta_points=-points_needed,
-            operator_id=interaction.user.id,
-            reason=f"參加 {period} 點數抽獎 {chances} 次",
-        )
-        if not ok:
-            await interaction.response.send_message(message, ephemeral=True)
-            return
+            async for user in reaction.users(limit=None):
+                if user.bot:
+                    continue
 
-        upsert_lottery_entry(period, interaction.user.id, chances, points_needed)
+                participants[int(user.id)] = user
 
-        await send_order_log(
-            interaction.guild,
-            title="抽獎報名",
-            fields=[
-                ("顧客", interaction.user.mention, True),
-                ("期別", period, True),
-                ("抽獎次數", f"{chances} 次", True),
-                ("消耗點數", f"{points_needed:,} 點", True),
-            ],
+        return list(participants.values())
+
+    def _build_panel_embed(
+        self,
+        *,
+        prize: str,
+        description: str | None = None,
+    ) -> discord.Embed:
+        embed = discord.Embed(
+            title="🎁 魔丸全店抽獎活動",
+            description=(
+                f"**獎品：** {prize}\n\n"
+                f"**參加方式：** 按下方 {GIVEAWAY_EMOJI} 表情即可參加\n"
+                "**參加限制：** 每人限參加 1 次\n"
+                "**消耗：** 不消耗點數、不消耗任何東西"
+            ),
             color=discord.Color.gold(),
         )
 
-        await interaction.response.send_message(
-            f"已成功參加 **{period}** 抽獎 {chances} 次，消耗 {points_needed:,} 點。\n"
-            f"你本期目前共 {current_chances + chances} 次抽獎機會。",
+        if description:
+            embed.add_field(name="活動說明", value=description[:1024], inline=False)
+
+        embed.set_footer(text="開獎時會從按下 🎉 的成員中隨機抽出得獎者。")
+        return embed
+
+    @lottery.command(
+        name="panel",
+        description="發送全店免費反應抽獎面板",
+    )
+    @app_commands.describe(
+        prize="抽獎獎品，例如：免費陪玩 1 小時",
+        description="活動說明，可不填",
+    )
+    async def giveaway_panel(
+        self,
+        interaction: discord.Interaction,
+        prize: str,
+        description: str | None = None,
+    ):
+        if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
+            await interaction.response.send_message("只有客服、店長或管理員可以發送抽獎面板。", ephemeral=True)
+            return
+
+        if not isinstance(interaction.channel, (discord.TextChannel, discord.Thread)):
+            await interaction.response.send_message("請在文字頻道使用這個指令。", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        embed = self._build_panel_embed(
+            prize=str(prize).strip(),
+            description=str(description or "").strip() or None,
+        )
+
+        message = await interaction.channel.send(
+            content="@everyone 🎁 魔丸全店抽獎開始！按下 🎉 參加抽獎！",
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(everyone=True, roles=False, users=False),
+        )
+        await message.add_reaction(GIVEAWAY_EMOJI)
+
+        await interaction.followup.send(
+            f"已發送抽獎面板。\n訊息 ID：`{message.id}`\n開獎請用：`/lottery draw message_id:{message.id}`",
             ephemeral=True,
         )
 
     @lottery.command(
         name="status",
-        description="客服查看目前抽獎池狀態",
-    )
-    async def lottery_status(self, interaction: discord.Interaction):
-        if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
-            await interaction.response.send_message("只有客服、店長或管理員可以查看抽獎池。", ephemeral=True)
-            return
-
-        settings = get_lottery_settings()
-        await interaction.response.send_message(embed=build_lottery_status_embed(settings), ephemeral=True)
-
-    @lottery.command(
-        name="open",
-        description="管理層設定或開啟本期點數抽獎",
+        description="查看某則抽獎訊息目前參加人數",
     )
     @app_commands.describe(
-        period="期別，例如 2026-05；不填則使用本月",
-        title="抽獎活動名稱，可不填",
-        note="活動備註，可先寫：獎品內部討論中",
-        max_chances_per_user="每人本期最多可投入幾次，預設 20",
-        announce_channel="抽獎開始公告要發到哪個頻道；不填則用預設公告頻道",
+        message_id="抽獎面板訊息 ID",
+        channel="抽獎訊息所在頻道，不填則使用目前頻道",
     )
-    @app_commands.default_permissions(manage_messages=True)
-    async def lottery_open(
+    async def giveaway_status(
         self,
         interaction: discord.Interaction,
-        period: str | None = None,
-        title: str | None = None,
-        note: str | None = None,
-        max_chances_per_user: int | None = None,
-        announce_channel: discord.TextChannel | None = None,
+        message_id: str,
+        channel: discord.TextChannel | None = None,
     ):
         if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
-            await interaction.response.send_message("只有客服、店長或管理員可以設定抽獎。", ephemeral=True)
+            await interaction.response.send_message("只有客服、店長或管理員可以查看抽獎狀態。", ephemeral=True)
             return
 
-        if max_chances_per_user is not None and max_chances_per_user <= 0:
-            await interaction.response.send_message("每人上限必須大於 0。", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+
+        message = await self._fetch_giveaway_message(interaction, message_id, channel)
+
+        if message is None:
             return
 
-        settings = get_lottery_settings()
-        settings["period"] = (period or get_default_lottery_period()).strip()
-        settings["title"] = (title or settings.get("title") or "魔丸點數抽獎").strip()
-        settings["note"] = (note or settings.get("note") or "獎品由管理層討論後設定。").strip()
-        settings["status"] = "open"
-        settings["cost_per_chance"] = LOTTERY_COST_PER_CHANCE_DEFAULT
-        settings["max_chances_per_user"] = int(max_chances_per_user or LOTTERY_MAX_CHANCES_PER_USER_DEFAULT)
-        save_lottery_settings(settings)
+        participants = await self._collect_participants(message)
+        preview = "\n".join(user.mention for user in participants[:25]) or "目前沒有人參加"
 
-        await send_order_log(
-            interaction.guild,
-            title="抽獎已開啟 / 設定",
-            fields=[
-                ("期別", settings["period"], True),
-                ("名稱", settings["title"], True),
-                ("每人上限", f"{settings['max_chances_per_user']} 次", True),
-                ("設定人員", interaction.user.mention, True),
-                ("備註", settings["note"], False),
-            ],
-            color=discord.Color.gold(),
+        if len(participants) > 25:
+            preview += f"\n...另有 {len(participants) - 25} 人"
+
+        embed = discord.Embed(
+            title="🎉 抽獎參加狀態",
+            description=f"目前參加人數：**{len(participants)} 人**",
+            color=discord.Color.blurple(),
         )
+        embed.add_field(name="參加名單預覽", value=preview[:1024], inline=False)
+        embed.add_field(name="抽獎訊息", value=f"[點我查看]({message.jump_url})", inline=False)
 
-        announcement_embed = build_lottery_info_embed(settings)
-        announcement_embed.title = f"🎁 {settings['title']} 開始報名"
-        announced = await send_lottery_announcement(
-            interaction.guild,
-            content="@everyone 🎁 魔丸點數抽獎已開放報名！使用 `/lottery info` 查看活動，使用 `/lottery join` 參加抽獎。",
-            embed=announcement_embed,
-            channel=announce_channel,
-        )
-
-        announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
-        await interaction.response.send_message(f"抽獎已設定並開放報名，{announce_text}", embed=build_lottery_info_embed(settings), ephemeral=True)
-
-    @lottery.command(
-        name="set_prizes",
-        description="管理層設定本期抽獎獎池內容",
-    )
-    @app_commands.describe(
-        prizes="獎池內容，例如：一獎：500T折抵券 x1｜二獎：指定費免費 x2",
-        announce="是否發公告，預設否",
-        announce_channel="獎池公告要發到哪個頻道；不填則用預設公告頻道",
-    )
-    @app_commands.default_permissions(manage_messages=True)
-    async def lottery_set_prizes(
-        self,
-        interaction: discord.Interaction,
-        prizes: str,
-        announce: bool = False,
-        announce_channel: discord.TextChannel | None = None,
-    ):
-        if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
-            await interaction.response.send_message("只有客服、店長或管理員可以設定獎池。", ephemeral=True)
-            return
-
-        prize_text = prizes.strip()
-        if not prize_text:
-            await interaction.response.send_message("獎池內容不能是空的。", ephemeral=True)
-            return
-
-        if len(prize_text) > 1000:
-            await interaction.response.send_message("獎池內容太長，請控制在 1000 字以內。", ephemeral=True)
-            return
-
-        settings = get_lottery_settings()
-        settings["prizes"] = prize_text
-        save_lottery_settings(settings)
-
-        await send_order_log(
-            interaction.guild,
-            title="抽獎獎池已設定",
-            fields=[
-                ("期別", str(settings.get("period", get_default_lottery_period())), True),
-                ("設定人員", interaction.user.mention, True),
-                ("獎池內容", prize_text, False),
-            ],
-            color=discord.Color.gold(),
-        )
-
-        embed = build_lottery_info_embed(settings)
-        embed.title = f"🎁 {settings.get('title', '魔丸點數抽獎')} 獎池更新"
-
-        if announce:
-            announced = await send_lottery_announcement(
-                interaction.guild,
-                content="@everyone 🎁 魔丸點數抽獎獎池已更新！使用 `/lottery info` 查看活動詳情。",
-                embed=embed,
-                channel=announce_channel,
-            )
-            announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
-            await interaction.response.send_message(f"獎池已設定，{announce_text}", embed=embed, ephemeral=True)
-        else:
-            await interaction.response.send_message("獎池已設定。", embed=embed, ephemeral=True)
-
-    @lottery.command(
-        name="close",
-        description="管理層關閉本期抽獎報名",
-    )
-    @app_commands.default_permissions(manage_messages=True)
-    async def lottery_close(self, interaction: discord.Interaction):
-        if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
-            await interaction.response.send_message("只有客服、店長或管理員可以關閉抽獎。", ephemeral=True)
-            return
-
-        settings = get_lottery_settings()
-        settings["status"] = "closed"
-        save_lottery_settings(settings)
-        await interaction.response.send_message(f"已關閉 **{settings['period']}** 抽獎報名。", ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @lottery.command(
         name="draw",
-        description="客服開獎；可依照已設定獎池輸入本次要抽的獎品",
+        description="從抽獎訊息的 🎉 反應名單中開獎",
     )
     @app_commands.describe(
-        prize="本次要抽的獎品名稱，例如 一獎：500T折抵券",
-        winners="要抽出幾位得主，預設 1",
-        announce_channel="開獎公告要發到哪個頻道；不填則用預設公告頻道",
+        message_id="抽獎面板訊息 ID",
+        winners="得獎人數，預設 1",
+        prize="本次開出的獎品名稱，可不填",
+        channel="抽獎訊息所在頻道，不填則使用目前頻道",
     )
-    @app_commands.default_permissions(manage_messages=True)
-    async def draw_lottery(
+    async def giveaway_draw(
         self,
         interaction: discord.Interaction,
-        prize: str,
+        message_id: str,
         winners: int = 1,
-        announce_channel: discord.TextChannel | None = None,
+        prize: str | None = None,
+        channel: discord.TextChannel | None = None,
     ):
         if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
             await interaction.response.send_message("只有客服、店長或管理員可以開獎。", ephemeral=True)
@@ -292,134 +210,50 @@ class LotteryCommands(commands.Cog):
             await interaction.response.send_message("得獎人數必須大於 0。", ephemeral=True)
             return
 
-        settings = get_lottery_settings()
-        period = str(settings.get("period", get_default_lottery_period()))
-        entries = get_lottery_entries(period)
-        drawn_user_ids = get_lottery_drawn_user_ids(period)
-        entries = [row for row in entries if int(row.get("user_id", 0) or 0) not in drawn_user_ids]
+        await interaction.response.defer(ephemeral=False)
 
-        if not entries:
-            await interaction.response.send_message("目前抽獎池沒有可開獎名單，或本期所有參加者都已中過獎。", ephemeral=True)
+        message = await self._fetch_giveaway_message(interaction, message_id, channel)
+
+        if message is None:
             return
 
-        if winners > len(entries):
-            winners = len(entries)
+        participants = await self._collect_participants(message)
 
-        picked = pick_weighted_lottery_winners(entries, winners)
-        for winner_id in picked:
-            record_lottery_draw(period, prize, winner_id, interaction.user.id)
+        if not participants:
+            await interaction.followup.send("目前沒有人按 🎉 參加抽獎。", ephemeral=True)
+            return
 
-        result_lines = [f"{index}. <@{winner_id}>" for index, winner_id in enumerate(picked, start=1)]
+        picked_count = min(int(winners), len(participants))
+        picked = random.sample(participants, picked_count)
+
+        prize_text = str(prize or "抽獎獎品").strip() or "抽獎獎品"
+        winner_mentions = "\n".join(f"{index}. {user.mention}" for index, user in enumerate(picked, start=1))
+
+        for user in picked:
+            try:
+                record_lottery_draw("free-reaction", prize_text, int(user.id), int(interaction.user.id))
+            except Exception as exc:
+                print(f"保存免費反應抽獎結果失敗：{exc}")
+
         embed = discord.Embed(
-            title="🎁 魔丸點數抽獎開獎",
-            color=discord.Color.gold(),
+            title="🎉 魔丸全店抽獎開獎",
+            description=(
+                f"**獎品：** {prize_text}\n"
+                f"**參加人數：** {len(participants)} 人\n"
+                f"**得獎人數：** {picked_count} 人\n\n"
+                f"{winner_mentions}"
+            ),
+            color=discord.Color.green(),
         )
-        embed.add_field(name="期別", value=period, inline=True)
-        embed.add_field(name="獎品", value=prize, inline=True)
-        embed.add_field(name="開獎人", value=interaction.user.mention, inline=True)
-        embed.add_field(name="得獎者", value="\n".join(result_lines), inline=False)
+        embed.add_field(name="抽獎訊息", value=f"[點我查看]({message.jump_url})", inline=False)
+        embed.set_footer(text="本次抽獎不消耗點數，每人依 🎉 反應限算一次。")
 
-        await send_order_log(
-            interaction.guild,
-            title="抽獎開獎",
-            fields=[
-                ("期別", period, True),
-                ("獎品", prize, True),
-                ("開獎人", interaction.user.mention, True),
-                ("得獎者", "\n".join(result_lines), False),
-            ],
-            color=discord.Color.gold(),
-        )
-
-        announced = await send_lottery_announcement(
-            interaction.guild,
-            content="@everyone 🎉 魔丸點數抽獎開獎啦！恭喜得獎者！",
+        await interaction.followup.send(
+            content="@everyone 🎉 魔丸全店抽獎開獎啦！恭喜得獎者！",
             embed=embed,
-            channel=announce_channel,
+            allowed_mentions=discord.AllowedMentions(everyone=True, roles=False, users=True),
         )
-
-        announce_text = f"公告已送出到 {announce_channel.mention if announce_channel else '預設公告頻道'}。" if announced else "公告送出失敗，請確認 Bot 權限與公告頻道設定。"
-        await interaction.response.send_message(f"開獎完成，{announce_text}", embed=embed, ephemeral=True)
-
-    @lottery.command(
-        name="cancel",
-        description="客服取消顧客本期抽獎報名並退還點數",
-    )
-    @app_commands.describe(customer="要取消報名的顧客", reason="取消原因，可不填")
-    async def cancel_lottery_entry(self, interaction: discord.Interaction, customer: discord.Member, reason: str | None = None):
-        if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
-            await interaction.response.send_message("只有客服、店長或管理員可以取消抽獎報名。", ephemeral=True)
-            return
-
-        settings = get_lottery_settings()
-        period = str(settings.get("period", get_default_lottery_period()))
-        entry = get_lottery_entry(period, customer.id)
-
-        if entry is None or int(entry.get("chances", 0)) <= 0:
-            await interaction.response.send_message(f"{customer.mention} 本期沒有抽獎報名紀錄。", ephemeral=True)
-            return
-
-        refund_points = int(entry["points_used"])
-        upsert_lottery_entry(period, customer.id, -int(entry["chances"]), -refund_points)
-        ok, message = await adjust_customer_points(
-            customer_id=customer.id,
-            delta_points=refund_points,
-            operator_id=interaction.user.id,
-            reason=f"取消 {period} 抽獎報名退點：{reason or '未填寫'}",
-        )
-
-        await send_order_log(
-            interaction.guild,
-            title="抽獎報名已取消",
-            fields=[
-                ("顧客", customer.mention, True),
-                ("期別", period, True),
-                ("退還點數", f"{refund_points:,} 點", True),
-                ("操作人員", interaction.user.mention, True),
-                ("原因", reason or "未填寫", False),
-            ],
-            color=discord.Color.orange(),
-        )
-
-        await interaction.response.send_message(message, ephemeral=True)
-
-    @lottery.command(
-        name="reset",
-        description="清空本期抽獎池，不自動退點。需輸入確認文字",
-    )
-    @app_commands.describe(confirm_text="請輸入：確認清空", reason="清空原因，可不填")
-    @app_commands.default_permissions(manage_messages=True)
-    async def reset_lottery(self, interaction: discord.Interaction, confirm_text: str, reason: str | None = None):
-        if not isinstance(interaction.user, discord.Member) or not self.is_lottery_admin(interaction.user):
-            await interaction.response.send_message("只有客服、店長或管理員可以清空抽獎池。", ephemeral=True)
-            return
-
-        if confirm_text != "確認清空":
-            await interaction.response.send_message("未清空。若確定要清空，confirm_text 請輸入：確認清空", ephemeral=True)
-            return
-
-        settings = get_lottery_settings()
-        period = str(settings.get("period", get_default_lottery_period()))
-        entries = get_lottery_entries(period)
-        clear_lottery_entries(period)
-
-        await send_order_log(
-            interaction.guild,
-            title="抽獎池已清空",
-            fields=[
-                ("期別", period, True),
-                ("清空人員", interaction.user.mention, True),
-                ("原參與人數", f"{len(entries)} 人", True),
-                ("原因", reason or "未填寫", False),
-            ],
-            color=discord.Color.red(),
-        )
-
-        await interaction.response.send_message(f"已清空 **{period}** 抽獎池。注意：此操作不會自動退點。", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(LotteryCommands(bot))
-    guild_id = int(getattr(bot, "guild_id_value", 0) or 0)
-    if guild_id:
-        bot.tree.copy_global_to(guild=discord.Object(id=guild_id))
