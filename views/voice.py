@@ -21,6 +21,14 @@ DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = [
     1482084782031638548,
     1507204925766242425,
 ]
+
+DEFAULT_RECEIVER_ROLE_IDS: list[int] = [
+    1500751059239440575,
+    1482080315798192210,
+    1500234130871550004,
+    1500234170943934544,
+    1500751039060643990,
+]
 EMPLOYEE_FAMILY_ROLE_ID = 1507204925766242425
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS: list[int] = []
 VOICE_VIEW_ONLY_ROLE_IDS = []
@@ -176,6 +184,12 @@ def build_full_temp_voice_overwrite(
     )
 
 
+
+def is_receiver_voice_role(role: discord.Role | None) -> bool:
+    return role is not None and int(role.id) in {int(role_id) for role_id in DEFAULT_RECEIVER_ROLE_IDS}
+
+
+
 def get_vip_voice_allowed_roles(guild: discord.Guild) -> list[discord.Role]:
     """VIP 臨時房固定放行：陪玩、打手、客服；不包含員工家屬。"""
     excluded_role_ids = {int(EMPLOYEE_FAMILY_ROLE_ID or 0)}
@@ -236,7 +250,10 @@ def build_play_voice_overwrites(guild: discord.Guild) -> dict:
     }
 
     for role in get_play_voice_allowed_roles(guild):
-        overwrites[role] = build_full_temp_voice_overwrite(connect=True)
+        overwrites[role] = build_full_temp_voice_overwrite(
+            connect=True,
+            move_members=is_receiver_voice_role(role),
+        )
 
     employee_family_role = get_employee_family_role(guild)
     if employee_family_role is not None:
@@ -300,7 +317,10 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
     }
 
     for role in get_vip_voice_allowed_roles(guild):
-        overwrites[role] = build_full_temp_voice_overwrite(connect=True)
+        overwrites[role] = build_full_temp_voice_overwrite(
+            connect=True,
+            move_members=is_receiver_voice_role(role),
+        )
 
     apply_voice_view_only_role_overwrites(guild, overwrites)
     return overwrites
@@ -665,6 +685,8 @@ async def apply_voice_lock_state(
         overwrite.add_reactions = True
         overwrite.use_external_emojis = True
         overwrite.use_external_stickers = True
+        if isinstance(target, discord.Role) and is_receiver_voice_role(target):
+            overwrite.move_members = True
         overwrites[target] = overwrite
 
     if normalized_room_type != "public":
