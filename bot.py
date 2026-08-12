@@ -4972,11 +4972,11 @@ async def on_ready():
 POINT_REDEEM_ITEMS = [
     {"key": "discount_20", "cost": 5, "name": "20 元折價券"},
     {"key": "discount_30", "cost": 10, "name": "30 元折價券"},
-    {"key": "extra_10", "cost": 15, "name": "加時 10 分鐘"},
-    {"key": "extra_15", "cost": 20, "name": "加時 15 分鐘"},
+    {"key": "extra_10", "cost": 15, "name": "加時 30 分鐘"},
+    {"key": "extra_15", "cost": 20, "name": "加場一場保撤"},
     {"key": "free_specify_fee", "cost": 25, "name": "免指定費 1 次"},
     {"key": "discount_100", "cost": 30, "name": "100 元折價券"},
-    {"key": "extra_30", "cost": 40, "name": "加時 30 分鐘"},
+    {"key": "extra_30", "cost": 40, "name": "加時一小時"},
     {"key": "free_play_1h", "cost": 80, "name": "免費陪玩 1 小時"},
 ]
 
