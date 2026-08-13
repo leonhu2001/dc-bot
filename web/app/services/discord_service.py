@@ -2,6 +2,16 @@ import requests
 from fastapi import HTTPException
 
 from web.app.config import config
+from web.app.services.role_catalog import (
+    COMPANION_ROLE_IDS,
+    PROTECTOR_ROLE_IDS,
+    RECEIVER_ROLE_IDS,
+    can_login_dashboard,
+    is_companion as catalog_is_companion,
+    is_customer_service as catalog_is_customer_service,
+    is_protector,
+    normalize_role_ids,
+)
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
 
@@ -65,31 +75,20 @@ def get_member_role_ids(discord_user_id: str) -> list[str]:
 
 
 def get_dashboard_access(role_ids: list[str]) -> dict:
-    roles = _normalize_role_ids(role_ids)
+    roles = normalize_role_ids(role_ids)
 
-    fallback_worker_role_ids = _normalize_role_ids({
-        "1500234130871550004",
-        "1500234170943934544",
-        "1500751039060643990",
-    })
-
-    fallback_companion_role_ids = _normalize_role_ids({
-        "1500751059239440575",
-        "1482080315798192210",
-    })
-
-    admin_role_ids = _normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
-    customer_service_role_ids = _normalize_role_ids(getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set()))
-
-    worker_role_ids = _normalize_role_ids(getattr(config, "WORKER_ROLE_IDS", set())) | fallback_worker_role_ids
-    companion_role_ids = _normalize_role_ids(getattr(config, "COMPANION_ROLE_IDS", set())) | fallback_companion_role_ids
+    admin_role_ids = normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
+    customer_service_role_ids = normalize_role_ids(getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set()))
 
     is_admin = bool(roles & admin_role_ids)
-    is_customer_service = bool(roles & customer_service_role_ids)
-    is_worker = bool(roles & worker_role_ids)
-    is_companion = bool(roles & companion_role_ids)
-
-    can_access = is_admin or is_customer_service or is_worker or is_companion
+    is_customer_service = catalog_is_customer_service(roles, customer_service_role_ids)
+    is_worker = is_protector(roles) or catalog_is_companion(roles)
+    is_companion = catalog_is_companion(roles)
+    can_access = can_login_dashboard(
+        roles,
+        admin_role_ids=admin_role_ids,
+        customer_service_role_ids=customer_service_role_ids,
+    )
 
     print(
         "[dashboard_access]",

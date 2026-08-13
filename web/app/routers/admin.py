@@ -281,7 +281,7 @@ async def admin_sync_staff(request: Request):
         db.close()
 
     return redirect_to_admin(
-        message=f"成員同步完成：掃描 {result['total_seen']} 人，寫入 {result['synced_count']} 人。"
+        message=result.get("message") or f"成員同步完成：掃描 {result.get('total_seen', result.get('scanned', '?'))} 人，寫入 {result.get('synced_count', result.get('written', '?'))} 人。"
     )
 
 
