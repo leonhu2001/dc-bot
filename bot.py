@@ -2183,30 +2183,11 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
 
         options = [
             discord.SelectOption(
-                label="基礎單",
-                value="basic",
-                default=selected_category == "basic"
-            ),
-            discord.SelectOption(
-                label="趣味單",
-                value="fun",
-                default=selected_category == "fun"
-            ),
-            discord.SelectOption(
-                label="代解代肝",
-                value="farm",
-                default=selected_category == "farm"
-            ),
-            discord.SelectOption(
-                label="賽季限定活動",
-                value="season",
-                default=selected_category == "season"
-            ),
-            discord.SelectOption(
-                label="Valorant",
-                value="valorant",
-                default=selected_category == "valorant"
-            ),
+                label=label,
+                value=category_key,
+                default=selected_category == category_key
+            )
+            for category_key, label in ORDER_CATEGORY_LABELS.items()
         ]
 
         super().__init__(
@@ -2229,7 +2210,10 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         data["customer_id"] = self.customer_id
         data["category"] = selected_category
         data.pop("item", None)
+        data.pop("order_rule_key", None)
         data.pop("quantity", None)
+        data.pop("player_count", None)
+        data.pop("specified_staff_ids", None)
         data.pop("companion_preference", None)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
@@ -2241,6 +2225,7 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         )
 
         await interaction.response.edit_message(
+            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
             view=SelfServiceOrderView(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
@@ -2303,7 +2288,21 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         data["item"] = selected_item
+
+        try:
+            from services.orders import ORDER_RULE_KEY_BY_LABEL
+            rule_key = ORDER_RULE_KEY_BY_LABEL.get(selected_item)
+        except Exception:
+            rule_key = None
+
+        if rule_key:
+            data["order_rule_key"] = rule_key
+        else:
+            data.pop("order_rule_key", None)
+
         data["quantity"] = 1
+        data.pop("player_count", None)
+        data.pop("specified_staff_ids", None)
         data.pop("payment_method", None)
 
         if selected_item in SPECIAL_COMPANION_ITEMS:
@@ -2319,6 +2318,7 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         )
 
         await interaction.response.edit_message(
+            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
             view=SelfServiceOrderView(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
@@ -2432,6 +2432,8 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         data["companion_preference"] = self.values[0]
+        if "指定" not in str(self.values[0] or ""):
+            data.pop("specified_staff_ids", None)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
         await log_self_service_proxy_action(
@@ -2442,6 +2444,7 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         )
 
         await interaction.response.edit_message(
+            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
             view=SelfServiceOrderView(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
@@ -2449,48 +2452,61 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             )
         )
 
-HOUR_QUANTITY_ITEMS = {
-    "教學單",
-    "娛樂陪",
-    "甜蜜單",
-    "技術陪",
-    "陪打",
-    "真心話大冒險",
-}
+def _get_order_rule_by_item_label(item: str | None):
+    item_text = str(item or "")
+
+    if not item_text:
+        return None
+
+    try:
+        from services.order_rules import ORDER_RULES
+    except Exception:
+        return None
+
+    for rule in ORDER_RULES.values():
+        if rule.label == item_text:
+            return rule
+
+    return None
 
 
 def get_self_service_quantity_limit(item: str | None) -> int:
-    if str(item or "") == "幣號":
-        return 10
+    rule = _get_order_rule_by_item_label(item)
 
-    if str(item or "") in HOUR_QUANTITY_ITEMS:
-        return 24
+    if rule is None:
+        return 1
+
+    if rule.pricing_type in {"hourly", "game"}:
+        return int(rule.max_quantity or 24)
+
+    if rule.pricing_type == "unit":
+        return int(rule.max_quantity or 99)
 
     return 1
 
 
 def get_self_service_quantity_unit(item: str | None) -> str:
-    """只控制自助下單數量選單顯示單位。
+    rule = _get_order_rule_by_item_label(item)
 
-    內部 quantity 仍維持整數：
-    - 小時制品項：1～24 小時，但後續仍以 1～24 單計算。
-    - 幣號：1～10 隻。
-    - 其他：1 單。
-    """
-    item_text = str(item or "")
+    if rule is None:
+        return "單"
 
-    if item_text == "幣號":
-        return "隻"
-
-    if item_text in HOUR_QUANTITY_ITEMS:
+    if rule.unit_label == "H":
         return "小時"
 
-    return "單"
+    return str(rule.unit_label or "單")
 
 
 def get_self_service_quantity_options(item: str | None) -> list[int]:
-    return list(range(1, get_self_service_quantity_limit(item) + 1))
+    rule = _get_order_rule_by_item_label(item)
+    limit = get_self_service_quantity_limit(item)
 
+    if rule is not None and int(getattr(rule, "min_quantity", 1) or 1) > 1:
+        start = int(rule.min_quantity)
+    else:
+        start = 1
+
+    return list(range(start, limit + 1))
 
 class SelfServiceOrderQuantitySelect(discord.ui.Select):
     def __init__(
@@ -2596,6 +2612,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
         await interaction.response.edit_message(
+            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
             view=SelfServiceOrderView(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
@@ -2687,6 +2704,856 @@ def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action:
             f"claim_type={claim_type} action={action}: {exc}"
         )
 
+
+def _member_role_id_texts(member: discord.Member) -> list[str]:
+    return [
+        str(role.id)
+        for role in getattr(member, "roles", [])
+        if getattr(role, "id", None) is not None
+    ]
+
+
+def _member_display_name(member: discord.Member) -> str:
+    return str(
+        getattr(member, "display_name", None)
+        or getattr(member, "global_name", None)
+        or getattr(member, "name", None)
+        or getattr(member, "id", None)
+        or "未知使用者"
+    )
+
+
+def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
+    receiver_ids: set[int] = set()
+
+    for claim in getattr(state, "claims", ()):
+        parsed_id = _to_int(getattr(claim, "staff_discord_id", None))
+        if parsed_id is not None:
+            receiver_ids.add(parsed_id)
+
+    claim_data["companion"] = set()
+    claim_data["booster"] = receiver_ids
+    claim_data["acceptance_order_id"] = int(getattr(state, "order_id", 0) or 0)
+    claim_data["accepted_count"] = int(getattr(state, "accepted_count", 0) or 0)
+    claim_data["required_staff_count"] = int(getattr(state, "required_staff_count", 1) or 1)
+    claim_data["protector_count"] = int(getattr(state, "protector_count", 0) or 0)
+    claim_data["min_protector_count"] = int(getattr(state, "min_protector_count", 0) or 0)
+    claim_data["status"] = str(getattr(state, "status", None) or claim_data.get("status") or "waiting_acceptance")
+
+
+async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order_id: int) -> None:
+    from shared.db import SessionLocal
+    from shared.models import WebOrder
+    from shared.order_acceptance import ACCEPTED_PENDING_PAY, get_acceptance_state
+
+    db = SessionLocal()
+
+    try:
+        order = db.get(WebOrder, int(order_id))
+
+        if order is None:
+            raise ValueError(f"找不到網站訂單：{order_id}")
+
+        dispatch_message_id = _to_int(order.dispatch_message_id)
+        dispatch_channel_id = _to_int(order.dispatch_channel_id, DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+        ticket_channel_id = _to_int(order.ticket_channel_id)
+        customer_id = _to_int(order.customer_discord_id)
+        category_label = str(order.category or "未紀錄")
+        item = str(order.item or "未紀錄")
+        quantity = _to_int(order.quantity, 1) or 1
+        amount = _to_int(order.amount, 0) or 0
+        payment_method = str(order.payment_method or "待付款")
+    finally:
+        db.close()
+
+    if dispatch_message_id is None or ticket_channel_id is None or customer_id is None:
+        raise ValueError(f"網站訂單缺少必要頻道或顧客資料：{order_id}")
+
+    state = get_acceptance_state(int(order_id))
+
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+    ticket_channel = guild.get_channel(ticket_channel_id)
+
+    if not isinstance(dispatch_channel, discord.TextChannel):
+        raise ValueError(f"找不到派單頻道：{dispatch_channel_id}")
+
+    if not isinstance(ticket_channel, discord.TextChannel):
+        raise ValueError(f"找不到票口頻道：{ticket_channel_id}")
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
+    claim_data = ORDER_CLAIMS.setdefault(
+        dispatch_message_id,
+        {
+            "companion": set(),
+            "booster": set(),
+            "locked": False,
+        },
+    )
+
+    _apply_acceptance_state_to_claim_data(claim_data, state)
+
+    companion_preference = data.get("companion_preference") or claim_data.get("companion_preference") or "不指定陪玩/打手"
+
+    claim_data["locked"] = False
+    claim_data["customer_id"] = customer_id
+    claim_data["category_label"] = category_label
+    claim_data["item"] = item
+    claim_data["quantity"] = quantity
+    claim_data["payment_method"] = payment_method
+    claim_data["amount"] = amount
+    claim_data["total_amount"] = amount
+    claim_data["source_channel_id"] = ticket_channel_id
+    claim_data["dispatch_channel_id"] = dispatch_channel_id
+    claim_data["companion_preference"] = companion_preference
+    claim_data["status"] = str(state.status)
+
+    data["customer_id"] = customer_id
+    data["category_label"] = category_label
+    data["item"] = item
+    data["quantity"] = quantity
+    data["amount"] = amount
+    data["total_amount"] = amount
+    data["amount_text"] = _format_plain_amount(amount) if "_format_plain_amount" in globals() else str(amount)
+    data["dispatch_message_id"] = dispatch_message_id
+    data["dispatch_channel_id"] = dispatch_channel_id
+    data["web_order_id"] = int(order_id)
+    data["status"] = str(state.status)
+    data.setdefault("payment_method", None)
+
+    receiver_text = _build_receiver_text_from_claim_data(claim_data)
+
+    dispatch_embed = build_self_service_order_embed(
+        customer_mention=f"<@{customer_id}>",
+        category_label=category_label,
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        source_channel=ticket_channel,
+        companion_preference=companion_preference,
+        receiver_text=receiver_text,
+    )
+
+    dispatch_embed.add_field(name="訂單總價", value=_format_plain_amount(amount) if "_format_plain_amount" in globals() else str(amount), inline=True)
+    dispatch_embed.add_field(name="接單進度", value=f"{state.accepted_count}/{state.required_staff_count}", inline=True)
+
+    if int(getattr(state, "min_protector_count", 0) or 0) > 0:
+        dispatch_embed.add_field(
+            name="護級需求",
+            value=f"{state.protector_count}/{state.min_protector_count}",
+            inline=True,
+        )
+
+    dispatch_embed.add_field(
+        name="接單狀態",
+        value="人數已滿，等待顧客付款" if str(state.status) == ACCEPTED_PENDING_PAY else "等待接單中",
+        inline=False,
+    )
+
+    try:
+        dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+        await dispatch_message.edit(
+            embed=dispatch_embed,
+            view=DispatchClaimView(
+                customer_id=customer_id,
+                category_label=category_label,
+                item=item,
+                quantity=quantity,
+                payment_method=payment_method,
+                source_channel_id=ticket_channel_id,
+                companion_preference=companion_preference,
+                locked=False,
+                status=str(state.status),
+            ),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+    except discord.HTTPException as exc:
+        raise ValueError(f"更新 Discord 派單 panel 失敗：{exc}") from exc
+
+    remember_claim_data(dispatch_message_id, claim_data)
+
+    if str(state.status) == ACCEPTED_PENDING_PAY:
+        if _to_int(data.get("payment_message_id")) is None:
+            payment_embed = build_payment_method_embed(
+                customer_id=customer_id,
+                category_label=category_label,
+                item=item,
+                quantity=quantity,
+                companion_preference=companion_preference,
+                amount=amount,
+            )
+
+            payment_message = await ticket_channel.send(
+                content=f"<@{customer_id}> 接單人數已滿，請選擇付款方式。",
+                embed=payment_embed,
+                view=PaymentMethodView(
+                    customer_id=customer_id,
+                    channel_id=ticket_channel_id,
+                ),
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+
+            data["payment_channel_id"] = ticket_channel.id
+            data["payment_message_id"] = payment_message.id
+            data["accepted_pending_pay_at"] = get_taipei_now_iso()
+
+            await send_order_log(
+                guild,
+                title="網站接單滿人｜開放付款",
+                fields=[
+                    ("顧客", f"<@{customer_id}>", True),
+                    ("訂單", f"{category_label}｜{item} x{quantity}", False),
+                    ("接單進度", f"{state.accepted_count}/{state.required_staff_count}", True),
+                    ("票口", ticket_channel.mention, False),
+                ],
+                color=discord.Color.gold(),
+            )
+    else:
+        old_payment_message_id = _to_int(data.get("payment_message_id"))
+        old_payment_channel_id = _to_int(data.get("payment_channel_id"), ticket_channel.id) or ticket_channel.id
+
+        if old_payment_message_id is not None:
+            old_payment_channel = guild.get_channel(old_payment_channel_id)
+
+            if isinstance(old_payment_channel, discord.TextChannel):
+                try:
+                    old_payment_message = await old_payment_channel.fetch_message(old_payment_message_id)
+                    disabled_embed = build_payment_method_embed(
+                        customer_id=customer_id,
+                        category_label=category_label,
+                        item=item,
+                        quantity=quantity,
+                        payment_method="等待接單人數補滿",
+                        companion_preference=companion_preference,
+                        amount=amount,
+                        submitted=True,
+                    )
+                    disabled_embed.add_field(
+                        name="付款狀態",
+                        value="接單人數目前不足，這個付款面板已失效。人數再次補滿時會重新開付款面板。",
+                        inline=False,
+                    )
+                    await old_payment_message.edit(
+                        embed=disabled_embed,
+                        view=PaymentMethodView(
+                            customer_id=customer_id,
+                            channel_id=ticket_channel_id,
+                            submitted=True,
+                        ),
+                        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                    )
+                except discord.HTTPException:
+                    pass
+
+        data.pop("payment_message_id", None)
+        data.pop("payment_channel_id", None)
+        data.pop("accepted_pending_pay_at", None)
+
+    remember_order_data(ticket_channel_id, data)
+    save_bot_data()
+
+
+async def process_acceptance_sync_events_once() -> None:
+    import json
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from shared.db import SessionLocal
+    from shared.models import SyncEvent, SyncEventStatus, SyncEventType
+
+    guild = bot.get_guild(GUILD_ID)
+
+    if guild is None:
+        return
+
+    db = SessionLocal()
+
+    try:
+        events = list(
+            db.scalars(
+                select(SyncEvent)
+                .where(SyncEvent.status == SyncEventStatus.PENDING.value)
+                .where(SyncEvent.event_type.in_([
+                    SyncEventType.ORDER_CLAIMED.value,
+                    SyncEventType.ORDER_UNCLAIMED.value,
+                ]))
+                .order_by(SyncEvent.created_at.asc())
+                .limit(10)
+            ).all()
+        )
+
+        for event in events:
+            try:
+                payload = json.loads(event.payload_json or "{}")
+            except Exception:
+                payload = {}
+
+            if not payload.get("prepay_acceptance"):
+                continue
+
+            event.status = SyncEventStatus.PROCESSING.value
+            event.retry_count = int(event.retry_count or 0) + 1
+            db.commit()
+
+            try:
+                await refresh_acceptance_dispatch_from_web_order(guild, int(event.order_id))
+                event.status = SyncEventStatus.DONE.value
+                event.error_message = None
+                event.processed_at = datetime.utcnow()
+                db.commit()
+            except Exception as exc:
+                event.status = SyncEventStatus.FAILED.value
+                event.error_message = f"{type(exc).__name__}: {exc}"
+                event.processed_at = datetime.utcnow()
+                db.commit()
+                print(f"[acceptance-sync] 處理網站接單事件失敗 event_id={event.id}: {exc}")
+    finally:
+        db.close()
+
+
+async def acceptance_sync_event_worker() -> None:
+    await bot.wait_until_ready()
+    print("[acceptance-sync] worker loop running", flush=True)
+
+    while not bot.is_closed():
+        try:
+            await process_acceptance_sync_events_once()
+        except Exception as exc:
+            print(f"[acceptance-sync] 背景同步失敗：{exc}")
+
+        await asyncio.sleep(5)
+
+async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Interaction, state) -> None:
+    try:
+        from shared.order_acceptance import ACCEPTED_PENDING_PAY
+    except Exception:
+        ACCEPTED_PENDING_PAY = "accepted_pending_pay"
+
+    if str(getattr(state, "status", "")) != ACCEPTED_PENDING_PAY:
+        return
+
+    guild = interaction.guild
+    if guild is None:
+        return
+
+    ticket_channel = guild.get_channel(view.source_channel_id)
+    if not isinstance(ticket_channel, discord.TextChannel):
+        return
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(view.source_channel_id, {})
+
+    if _to_int(data.get("payment_message_id")) is not None:
+        return
+
+    amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
+    quantity = _to_int(data.get("quantity"), view.quantity) or view.quantity
+    category_label = str(data.get("category_label") or view.category_label)
+    item = str(data.get("item") or view.item)
+    companion_preference = data.get("companion_preference") or view.companion_preference
+
+    if str(data.get("payment_method") or "") == "待付款":
+        data.pop("payment_method", None)
+
+    payment_embed = build_payment_method_embed(
+        customer_id=view.customer_id,
+        category_label=category_label,
+        item=item,
+        quantity=quantity,
+        companion_preference=companion_preference,
+        amount=amount,
+    )
+
+    payment_message = await ticket_channel.send(
+        content=f"<@{view.customer_id}> 接單人數已滿，請選擇付款方式。",
+        embed=payment_embed,
+        view=PaymentMethodView(
+            customer_id=view.customer_id,
+            channel_id=view.source_channel_id,
+        ),
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+    data["status"] = ACCEPTED_PENDING_PAY
+    data["payment_channel_id"] = ticket_channel.id
+    data["payment_message_id"] = payment_message.id
+    data["accepted_pending_pay_at"] = get_taipei_now_iso()
+
+    remember_order_data(view.source_channel_id, data)
+    save_bot_data()
+
+    await send_order_log(
+        guild,
+        title="接單人數已滿｜開放付款",
+        fields=[
+            ("顧客", f"<@{view.customer_id}>", True),
+            ("訂單", f"{category_label}｜{item} x{quantity}", False),
+            ("接單進度", f"{state.accepted_count}/{state.required_staff_count}", True),
+            ("票口", ticket_channel.mention, False),
+        ],
+        color=discord.Color.gold(),
+    )
+
+
+def _build_receiver_text_from_claim_data(claim_data: dict) -> str | None:
+    receiver_ids = sorted(
+        set(claim_data.get("companion", set()))
+        | set(claim_data.get("booster", set()))
+    )
+
+    if not receiver_ids:
+        return None
+
+    return "、".join(f"<@{user_id}>" for user_id in receiver_ids)
+
+
+async def finalize_accepted_pending_payment(
+    *,
+    interaction: discord.Interaction,
+    customer_id: int,
+    channel_id: int,
+) -> None:
+    guild = interaction.guild
+
+    if guild is None:
+        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not isinstance(interaction.channel, discord.TextChannel):
+        await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+        return
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+
+    if str(data.get("status") or "").lower() != "accepted_pending_pay":
+        await interaction.response.send_message("這張單目前不是等待付款狀態。", ephemeral=True)
+        return
+
+    if data.get("payment_finalizing"):
+        await interaction.response.send_message("這張單正在確認付款，請稍等，不要重複送出。", ephemeral=True)
+        return
+
+    payment_method = data.get("payment_method")
+
+    if not payment_method or str(payment_method) in {"待付款", "未紀錄"}:
+        await interaction.response.send_message("請先選擇付款方式，再按送出。", ephemeral=True)
+        return
+
+    amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
+
+    if amount < 0:
+        await interaction.response.send_message("訂單金額異常，請通知客服確認。", ephemeral=True)
+        return
+
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+
+    if dispatch_message_id is None:
+        await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
+        return
+
+    data["payment_finalizing"] = True
+    remember_order_data(channel_id, data)
+
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True)
+
+    try:
+        category_label = str(data.get("category_label") or ORDER_CATEGORY_LABELS.get(data.get("category"), data.get("category") or "未紀錄"))
+        item = str(data.get("item") or "未紀錄")
+        quantity = _to_int(data.get("quantity"), 1) or 1
+        companion_preference = data.get("companion_preference")
+        staff_note = str(data.get("staff_note") or data.get("customer_service_note") or "").strip() or None
+
+        customer_member = guild.get_member(customer_id)
+        if customer_member is None:
+            try:
+                customer_member = await fetch_member_safely(guild, customer_id)
+            except Exception:
+                customer_member = None
+
+        if payment_method == WALLET_PAYMENT_METHOD:
+            existing_wallet_tx_id = data.get("wallet_transaction_id")
+
+            if not existing_wallet_tx_id:
+                try:
+                    wallet_tx = adjust_customer_wallet_balance(
+                        customer_id=customer_id,
+                        amount=-amount,
+                        tx_type="payment",
+                        operator=interaction.user,
+                        order_channel_id=channel_id,
+                        order_no=data.get("order_no") or data.get("receipt_id"),
+                        note=f"訂單扣款：{item}",
+                    )
+                except ValueError as exc:
+                    data.pop("payment_finalizing", None)
+                    remember_order_data(channel_id, data)
+                    await interaction.followup.send(str(exc), ephemeral=True)
+                    return
+
+                data["wallet_transaction_id"] = wallet_tx["id"]
+                data["wallet_paid_amount"] = amount
+                data["wallet_balance_before"] = wallet_tx["balance_before"]
+                data["wallet_balance_after"] = wallet_tx["balance_after"]
+                remember_order_data(channel_id, data)
+
+                await send_wallet_log(
+                    guild,
+                    title="錢包訂單扣款",
+                    customer=customer_member if customer_member is not None else interaction.user,
+                    operator=interaction.user,
+                    tx=wallet_tx,
+                )
+
+        data["amount"] = amount
+        data["total_amount"] = amount
+        data["amount_text"] = _format_plain_amount(amount) if "_format_plain_amount" in globals() else format_t_amount(amount)
+        data["payment_submitted_at"] = get_taipei_now_iso()
+        data["payment_submitted_by"] = interaction.user.id
+        data["status"] = "active"
+        data["closed"] = False
+        remember_order_data(channel_id, data)
+
+        reward_result = await add_customer_reward_from_order(
+            guild=guild,
+            order_channel_id=channel_id,
+            customer_id=customer_id,
+            amount_text=str(amount),
+            notify_channel=interaction.channel,
+        )
+
+        receipt_staff_member = interaction.user
+        amount_set_by = _to_int(data.get("amount_set_by"))
+
+        if amount_set_by is not None:
+            possible_staff_member = guild.get_member(amount_set_by)
+            if possible_staff_member is not None:
+                receipt_staff_member = possible_staff_member
+
+        receipt_id, receipt_message = await ensure_payment_submit_receipt(
+            guild=guild,
+            order_channel=interaction.channel,
+            customer_id=customer_id,
+            customer_member=customer_member,
+            staff_member=receipt_staff_member,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            amount=amount,
+            payment_method=payment_method,
+            companion_preference=companion_preference,
+        )
+
+        if receipt_id:
+            data["receipt_id"] = receipt_id
+            data["order_no"] = receipt_id
+
+        if receipt_message is not None:
+            data["receipt_message_id"] = receipt_message.id
+            data["receipt_channel_id"] = receipt_message.channel.id
+
+        web_order_id = _to_int(data.get("web_order_id"))
+
+        if web_order_id is None:
+            try:
+                from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
+                web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+            except Exception:
+                web_order_id = None
+
+        if web_order_id is not None:
+            from shared.order_acceptance import promote_acceptance_claims_to_assignments
+            payout_base_amount = _to_int(data.get("payout_base_amount"), amount) or amount
+            promoted_count = promote_acceptance_claims_to_assignments(
+                order_id=web_order_id,
+                payment_method=str(payment_method),
+                amount=amount,
+                payout_base_amount=payout_base_amount,
+                original_amount=_to_int(data.get("original_amount"), payout_base_amount) or payout_base_amount,
+                manual_discount_amount=_to_int(data.get("manual_discount_amount"), 0) or 0,
+                cash_coupon_amount=_to_int(data.get("cash_coupon_amount"), 0) or 0,
+                store_absorbed_amount=_to_int(data.get("store_absorbed_amount"), 0) or 0,
+                customer_pay_amount=amount,
+                bot_order_no=data.get("order_no") or data.get("receipt_id"),
+            )
+            data["promoted_assignment_count"] = promoted_count
+
+        dispatch_channel = guild.get_channel(dispatch_channel_id)
+        dispatch_url = None
+
+        if isinstance(dispatch_channel, discord.TextChannel):
+            try:
+                dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+                dispatch_url = dispatch_message.jump_url
+
+                claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+                claim_data["locked"] = True
+                claim_data["status"] = "active"
+                claim_data["payment_method"] = str(payment_method)
+                claim_data["amount"] = amount
+                claim_data["total_amount"] = amount
+                claim_data["customer_id"] = customer_id
+                claim_data["category_label"] = category_label
+                claim_data["item"] = item
+                claim_data["quantity"] = quantity
+                claim_data["source_channel_id"] = channel_id
+                claim_data["dispatch_channel_id"] = dispatch_channel_id
+
+                receiver_text = _build_receiver_text_from_claim_data(claim_data)
+
+                dispatch_embed = build_self_service_order_embed(
+                    customer_mention=f"<@{customer_id}>",
+                    category_label=category_label,
+                    item=item,
+                    quantity=quantity,
+                    payment_method=str(payment_method),
+                    source_channel=interaction.channel,
+                    companion_preference=companion_preference,
+                    receiver_text=receiver_text,
+                    staff_note=staff_note,
+                )
+                payout_base_amount = _to_int(data.get("payout_base_amount"), amount) or amount
+                dispatch_embed.add_field(name="顧客實付", value=_format_plain_amount(amount) if "_format_plain_amount" in globals() else format_t_amount(amount), inline=True)
+                dispatch_embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout_base_amount) if "_format_plain_amount" in globals() else format_t_amount(payout_base_amount), inline=True)
+
+                coupon_amount = _to_int(data.get("cash_coupon_amount"), 0) or 0
+                if coupon_amount > 0:
+                    dispatch_embed.add_field(
+                        name="折現券",
+                        value=f"-{_format_plain_amount(coupon_amount) if '_format_plain_amount' in globals() else format_t_amount(coupon_amount)}｜店內吸收，不扣打手分潤",
+                        inline=False,
+                    )
+
+                discount_amount = _to_int(data.get("manual_discount_amount"), 0) or 0
+                if discount_amount > 0:
+                    dispatch_embed.add_field(
+                        name="客服折扣",
+                        value=f"{_format_percent_value(data.get('manual_discount_percent'))}%｜-{_format_plain_amount(discount_amount) if '_format_plain_amount' in globals() else format_t_amount(discount_amount)}",
+                        inline=False,
+                    )
+
+                dispatch_embed.add_field(name="付款狀態", value="已付款，接單人員已確認", inline=False)
+
+                await dispatch_message.edit(
+                    embed=dispatch_embed,
+                    view=DispatchClaimView(
+                        customer_id=customer_id,
+                        category_label=category_label,
+                        item=item,
+                        quantity=quantity,
+                        payment_method=str(payment_method),
+                        source_channel_id=channel_id,
+                        companion_preference=companion_preference,
+                        locked=True,
+                        status="active",
+                    ),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+
+                remember_claim_data(dispatch_message_id, claim_data)
+            except discord.HTTPException:
+                pass
+
+        await rename_ticket_channel(interaction.channel, item, member=customer_member)
+
+        payment_channel_id = _to_int(data.get("payment_channel_id"), interaction.channel.id) or interaction.channel.id
+        payment_message_id = _to_int(data.get("payment_message_id"))
+        payment_channel = guild.get_channel(payment_channel_id)
+
+        submitted_embed = build_payment_method_embed(
+            customer_id=customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            payment_method=str(payment_method),
+            companion_preference=companion_preference,
+            amount=amount,
+            submitted=True,
+            dispatch_url=dispatch_url,
+        )
+
+        if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
+            try:
+                payment_message = await payment_channel.fetch_message(payment_message_id)
+                await payment_message.edit(
+                    embed=submitted_embed,
+                    view=PaymentMethodView(customer_id=customer_id, channel_id=channel_id, submitted=True),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+            except discord.HTTPException:
+                pass
+
+        if _to_int(data.get("operation_panel_message_id")) is None:
+            operation_embed = discord.Embed(
+                title="訂單操作",
+                description="請客服從下拉式清單選擇後，按下確認。",
+                color=discord.Color.green(),
+            )
+            operation_message = await interaction.channel.send(embed=operation_embed, view=StaffOrderOperationView())
+            data["operation_panel_message_id"] = operation_message.id
+
+        data.pop("payment_finalizing", None)
+        remember_order_data(channel_id, data)
+        save_bot_data()
+
+        response_text = f"已確認付款方式：{payment_method}，訂單正式成立。"
+        if data.get("receipt_id"):
+            response_text += f"\n交易收據已產生：{data.get('receipt_id')}"
+        if reward_result:
+            response_text += f"\n\n{reward_result}"
+
+        await interaction.followup.send(response_text, ephemeral=True)
+
+        await send_order_log(
+            guild,
+            title="等待接單訂單已付款成立",
+            fields=[
+                ("顧客", f"<@{customer_id}>", True),
+                ("訂單", f"{category_label}｜{item} x{quantity}", False),
+                ("訂單總價", _format_plain_amount(amount) if "_format_plain_amount" in globals() else format_t_amount(amount), True),
+                ("付款方式", str(payment_method), True),
+                ("票口", interaction.channel.mention, False),
+            ],
+            color=discord.Color.green(),
+        )
+
+    except Exception as exc:
+        data.pop("payment_finalizing", None)
+        remember_order_data(channel_id, data)
+        save_bot_data()
+        print(f"[acceptance] waiting_acceptance 付款成立失敗 channel_id={channel_id}: {exc}")
+        await interaction.followup.send(f"付款成立失敗：`{type(exc).__name__}: {exc}`", ephemeral=True)
+
+async def maybe_handle_prepay_acceptance_claim(
+    view: "DispatchClaimView",
+    interaction: discord.Interaction,
+) -> bool:
+    if interaction.message is None:
+        return False
+
+    try:
+        from shared.order_acceptance import (
+            ACCEPTED_PENDING_PAY,
+            claim_acceptance_order,
+            find_acceptance_order_id_by_dispatch_message_id,
+        )
+
+        acceptance_order_id = find_acceptance_order_id_by_dispatch_message_id(interaction.message.id)
+    except Exception as exc:
+        print(f"[acceptance] 查詢 Discord 派單是否為新流程失敗 message_id={getattr(interaction.message, 'id', None)}: {exc}")
+        return False
+
+    if acceptance_order_id is None:
+        return False
+
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return True
+
+    try:
+        state = claim_acceptance_order(
+            order_id=acceptance_order_id,
+            staff_discord_id=str(interaction.user.id),
+            staff_display_name=_member_display_name(interaction.user),
+            staff_role_ids=_member_role_id_texts(interaction.user),
+            source="discord",
+        )
+    except ValueError as exc:
+        await interaction.response.send_message(str(exc), ephemeral=True)
+        return True
+    except Exception as exc:
+        print(f"[acceptance] Discord 新流程接單失敗 order_id={acceptance_order_id}: {exc}")
+        await interaction.response.send_message("接單失敗，請稍後再試或通知客服。", ephemeral=True)
+        return True
+
+    claim_data = view.get_claim_data(interaction.message.id)
+    _apply_acceptance_state_to_claim_data(claim_data, state)
+    remember_claim_data(interaction.message.id, claim_data)
+
+    try:
+        await send_order_log(
+            interaction.guild,
+            title="我要接單｜待付款",
+            fields=[
+                ("接單人員", interaction.user.mention, True),
+                ("顧客", f"<@{view.customer_id}>", True),
+                ("訂單", f"{view.category_label}｜{view.item} x{view.quantity}", False),
+                ("接單進度", f"{state.accepted_count}/{state.required_staff_count}", True),
+                ("狀態", "人數已滿，等待付款" if state.status == ACCEPTED_PENDING_PAY else "等待接單", True),
+            ],
+            color=discord.Color.green(),
+        )
+    except Exception as exc:
+        print(f"[acceptance] 接單日誌送出失敗：{exc}")
+
+    await view.refresh_panel(interaction)
+
+    if str(getattr(state, "status", "")) == "accepted_pending_pay":
+        await send_acceptance_payment_panel_if_ready(view, interaction, state)
+
+    return True
+
+
+async def maybe_handle_prepay_acceptance_unclaim(
+    view: "DispatchClaimView",
+    interaction: discord.Interaction,
+) -> bool:
+    if interaction.message is None:
+        return False
+
+    try:
+        from shared.order_acceptance import (
+            find_acceptance_order_id_by_dispatch_message_id,
+            unclaim_acceptance_order,
+        )
+
+        acceptance_order_id = find_acceptance_order_id_by_dispatch_message_id(interaction.message.id)
+    except Exception as exc:
+        print(f"[acceptance] 查詢 Discord 派單是否為新流程失敗 message_id={getattr(interaction.message, 'id', None)}: {exc}")
+        return False
+
+    if acceptance_order_id is None:
+        return False
+
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return True
+
+    try:
+        state = unclaim_acceptance_order(
+            order_id=acceptance_order_id,
+            staff_discord_id=str(interaction.user.id),
+            source="discord",
+        )
+    except ValueError as exc:
+        await interaction.response.send_message(str(exc), ephemeral=True)
+        return True
+    except Exception as exc:
+        print(f"[acceptance] Discord 新流程取消接單失敗 order_id={acceptance_order_id}: {exc}")
+        await interaction.response.send_message("取消接單失敗，請稍後再試或通知客服。", ephemeral=True)
+        return True
+
+    claim_data = view.get_claim_data(interaction.message.id)
+    _apply_acceptance_state_to_claim_data(claim_data, state)
+    remember_claim_data(interaction.message.id, claim_data)
+
+    try:
+        await send_order_log(
+            interaction.guild,
+            title="取消接單｜待付款",
+            fields=[
+                ("操作人", interaction.user.mention, True),
+                ("顧客", f"<@{view.customer_id}>", True),
+                ("訂單", f"{view.category_label}｜{view.item} x{view.quantity}", False),
+                ("接單進度", f"{state.accepted_count}/{state.required_staff_count}", True),
+            ],
+            color=discord.Color.orange(),
+        )
+    except Exception as exc:
+        print(f"[acceptance] 取消接單日誌送出失敗：{exc}")
+
+    await view.refresh_panel(interaction)
+    return True
 
 class DispatchClaimView(discord.ui.View):
     def __init__(
@@ -2846,6 +3713,9 @@ class DispatchClaimView(discord.ui.View):
             await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
             return
 
+        if await maybe_handle_prepay_acceptance_claim(self, interaction):
+            return
+
         allowed_role_ids = tuple(COMPANION_RECEIVER_ROLE_IDS + BOOSTER_RECEIVER_ROLE_IDS)
 
         if not any(has_role(interaction.user, role_id) for role_id in allowed_role_ids):
@@ -2903,6 +3773,9 @@ class DispatchClaimView(discord.ui.View):
             await interaction.response.send_message("此單已結單，接單面板已鎖定。", ephemeral=True)
             return
 
+        if await maybe_handle_prepay_acceptance_unclaim(self, interaction):
+            return
+
         claim_data = self.get_claim_data(interaction.message.id)
 
         if claim_data.get("locked"):
@@ -2958,6 +3831,19 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
     dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
 
     if dispatch_message_id is not None:
+        try:
+            from shared.order_acceptance import (
+                cancel_acceptance_order,
+                find_acceptance_order_id_by_dispatch_message_id,
+            )
+
+            acceptance_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+            if acceptance_order_id is not None:
+                cancel_acceptance_order(acceptance_order_id, source="discord_cancel")
+                print(f"[acceptance] cancelled order_id={acceptance_order_id} dispatch_message_id={dispatch_message_id}")
+        except Exception as exc:
+            print(f"[acceptance] 取消訂單同步付款前接單狀態失敗 dispatch_message_id={dispatch_message_id}: {exc}")
+
         dispatch_channel = guild.get_channel(dispatch_channel_id)
 
         if isinstance(dispatch_channel, discord.TextChannel):
@@ -3229,6 +4115,20 @@ async def store_dispatch_claim_panel(
     data["stored_reminders_sent"] = []
 
     remember_order_data(order_channel.id, data)
+
+    try:
+        from shared.order_acceptance import (
+            find_acceptance_order_id_by_dispatch_message_id,
+            pause_acceptance_order,
+        )
+
+        acceptance_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+        if acceptance_order_id is not None:
+            pause_acceptance_order(acceptance_order_id, source="discord_store")
+            print(f"[acceptance] stored order_id={acceptance_order_id} dispatch_message_id={dispatch_message_id}")
+    except Exception as exc:
+        print(f"[acceptance] 存單同步付款前接單狀態失敗 dispatch_message_id={dispatch_message_id}: {exc}")
+
     sync_web_order_status_from_bot(
         ticket_channel_id=order_channel.id,
         status="stored",
@@ -3353,8 +4253,38 @@ async def resume_stored_order(
     companion_preference = claim_data.get("companion_preference") or data.get("companion_preference")
     customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
 
+    resume_status = "active"
+    acceptance_state = None
+
+    try:
+        from shared.order_acceptance import (
+            find_acceptance_order_id_by_dispatch_message_id,
+            resume_acceptance_order,
+        )
+
+        acceptance_order_id = None
+        for candidate_message_id in [old_dispatch_message_id, *old_dispatch_message_ids]:
+            parsed_candidate_id = _to_int(candidate_message_id)
+            if parsed_candidate_id is None:
+                continue
+
+            acceptance_order_id = find_acceptance_order_id_by_dispatch_message_id(parsed_candidate_id)
+            if acceptance_order_id is not None:
+                break
+
+        if acceptance_order_id is not None:
+            acceptance_state = resume_acceptance_order(acceptance_order_id, source="discord_resume")
+            resume_status = str(acceptance_state.status or "waiting_acceptance")
+            _apply_acceptance_state_to_claim_data(claim_data, acceptance_state)
+            print(
+                f"[acceptance] resumed order_id={acceptance_order_id} "
+                f"status={resume_status} old_dispatch={old_dispatch_message_id}"
+            )
+    except Exception as exc:
+        raise ValueError(f"恢復付款前接單狀態失敗：{exc}") from exc
+
     claim_data["locked"] = False
-    claim_data["status"] = "active"
+    claim_data["status"] = resume_status
     claim_data["customer_id"] = customer_id
     claim_data["category_label"] = str(category_label)
     claim_data["item"] = str(item)
@@ -3364,9 +4294,9 @@ async def resume_stored_order(
     claim_data["companion_preference"] = companion_preference
     claim_data["dispatch_channel_id"] = dispatch_channel.id
 
-    # 存單相關資料保留在資料中當紀錄，但狀態改回 active。
+    # 存單相關資料保留在資料中當紀錄；舊單回 active，新流程回 waiting_acceptance / accepted_pending_pay。
     data["closed"] = False
-    data["status"] = "active"
+    data["status"] = resume_status
     data["quantity"] = quantity
     data["dispatch_channel_id"] = dispatch_channel.id
     data["stored_at"] = None
@@ -3414,7 +4344,7 @@ async def resume_stored_order(
             source_channel_id=order_channel.id,
             companion_preference=companion_preference,
             locked=False,
-            status="active"
+            status=resume_status
         ),
         allowed_mentions=discord.AllowedMentions(
             users=True,
@@ -3452,7 +4382,7 @@ async def resume_stored_order(
     remember_order_data(order_channel.id, data)
     sync_web_order_status_from_bot(
         ticket_channel_id=order_channel.id,
-        status="active",
+        status=resume_status,
         dispatch_message_id=data.get("dispatch_message_id"),
         note="由 DC bot 恢復存單同步。",
     )
@@ -3566,10 +4496,11 @@ class OrderAmountModal(discord.ui.Modal, title="填寫訂單價格"):
         max_length=800,
     )
 
-    def __init__(self, customer_id: int, channel_id: int):
+    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
         super().__init__()
         self.customer_id = customer_id
         self.channel_id = channel_id
+        self.panel_message_id = panel_message_id
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member):
@@ -3737,6 +4668,15 @@ async def finalize_payment_and_dispatch(
         return
 
     data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+
+    if str(data.get("status") or "").lower() == "accepted_pending_pay":
+        await finalize_accepted_pending_payment(
+            interaction=interaction,
+            customer_id=customer_id,
+            channel_id=channel_id,
+        )
+        return
+
     category = data.get("category")
     item = data.get("item")
     quantity = _to_int(data.get("quantity"), 1) or 1
@@ -4259,6 +5199,1155 @@ class PaymentMethodView(discord.ui.View):
             channel_id=self.channel_id,
         )
 
+def _format_plain_amount(amount: int | None) -> str:
+    if amount is None:
+        return "客服待填價"
+    return f"{int(amount or 0):,}"
+
+
+def _extract_discord_ids_from_text(text_value: str) -> list[str]:
+    import re
+
+    ids = re.findall(r"\d{15,25}", str(text_value or ""))
+    return list(dict.fromkeys(ids))
+
+
+def _get_rule_from_self_service_data(data: dict):
+    try:
+        from services.order_rules import ORDER_RULES, get_rule
+    except Exception as exc:
+        raise ValueError(f"讀取訂單規則失敗：{exc}") from exc
+
+    rule_key = str(data.get("order_rule_key") or "").strip()
+    if rule_key:
+        try:
+            return get_rule(rule_key)
+        except Exception:
+            pass
+
+    item_text = str(data.get("item") or "")
+    for rule in ORDER_RULES.values():
+        if rule.label == item_text:
+            data["order_rule_key"] = rule.key
+            return rule
+
+    raise ValueError("找不到這個訂單項目的規則，請重新選擇品項。")
+
+
+def _is_specify_preference(value: str | None) -> bool:
+    return "指定" in str(value or "")
+
+
+def _role_key_for_member(rule, member: discord.Member):
+    from services.order_rules import ROLE_IDS
+
+    member_role_ids = {
+        str(role.id)
+        for role in getattr(member, "roles", [])
+        if getattr(role, "id", None) is not None
+    }
+
+    matched = [
+        role_key
+        for role_key in rule.allowed_roles
+        if str(ROLE_IDS.get(role_key)) in member_role_ids
+    ]
+
+    if not matched:
+        return None
+
+    fee_map = getattr(rule, "specify_fee_by_role", {}) or {}
+    matched.sort(key=lambda role_key: int(fee_map.get(role_key, getattr(rule, "specify_fee_default", 0) or 0)), reverse=True)
+    return matched[0]
+
+
+async def _resolve_specified_roles_for_price(
+    guild: discord.Guild,
+    rule,
+    specified_staff_ids: list[str],
+):
+    specified_roles = []
+    resolved_mentions = []
+
+    for staff_id in specified_staff_ids:
+        try:
+            member_id = int(staff_id)
+        except (TypeError, ValueError):
+            raise ValueError(f"指定人員 ID 無效：{staff_id}")
+
+        member = guild.get_member(member_id)
+
+        if member is None:
+            try:
+                member = await guild.fetch_member(member_id)
+            except Exception:
+                member = None
+
+        if member is None:
+            raise ValueError(f"找不到指定人員：{staff_id}")
+
+        role_key = _role_key_for_member(rule, member)
+
+        if role_key is None:
+            raise ValueError(f"{member.mention} 的職位不符合這張單的可指定 / 可接條件。")
+
+        specified_roles.append(role_key)
+        resolved_mentions.append(member.mention)
+
+    return specified_roles, resolved_mentions
+
+
+class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
+    player_count = discord.ui.TextInput(
+        label="陪玩人數",
+        placeholder="例如：1、2、3、4",
+        required=True,
+        max_length=3,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int):
+        super().__init__()
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以操作訂單。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        try:
+            rule = _get_rule_from_self_service_data(data)
+            value = int(str(self.player_count.value).strip())
+        except ValueError:
+            await interaction.response.send_message("陪玩人數請輸入數字。", ephemeral=True)
+            return
+
+        if value < int(rule.min_player_count or 1):
+            await interaction.response.send_message(f"陪玩人數至少需要 {rule.min_player_count} 位。", ephemeral=True)
+            return
+
+        if rule.max_player_count is not None and value > int(rule.max_player_count):
+            await interaction.response.send_message(f"{rule.label} 最多只能點 {rule.max_player_count} 位。", ephemeral=True)
+            return
+
+        data["player_count"] = value
+        data.pop("payment_method", None)
+        remember_order_data(self.channel_id, data)
+
+        await interaction.response.send_message(
+            f"已填寫陪玩人數：**{value} 位**。\n請再按一次「送出等待接單」。",
+            ephemeral=True,
+        )
+
+
+class SelfServiceSpecifiedStaffModal(discord.ui.Modal, title="填寫指定人員"):
+    staff_ids = discord.ui.TextInput(
+        label="指定人員 ID 或提及",
+        placeholder="可填 Discord ID 或直接貼 @提及；多位請用空格或換行分開",
+        style=discord.TextStyle.paragraph,
+        required=True,
+        max_length=500,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
+        super().__init__()
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+        self.panel_message_id = panel_message_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以操作訂單。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        try:
+            rule = _get_rule_from_self_service_data(data)
+            from services.order_rules import get_required_staff_count
+            player_count = _to_int(data.get("player_count"), 1) or 1
+            required_staff_count = get_required_staff_count(rule, player_count)
+        except Exception as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        ids = _extract_discord_ids_from_text(str(self.staff_ids.value or ""))
+
+        if not ids:
+            await interaction.response.send_message("請至少填寫一位指定人員的 Discord ID 或提及。", ephemeral=True)
+            return
+
+        max_specified = rule.max_specified_count or required_staff_count
+
+        if len(ids) > int(max_specified):
+            await interaction.response.send_message(f"{rule.label} 最多只能指定 {max_specified} 位。", ephemeral=True)
+            return
+
+        if len(ids) > int(required_staff_count):
+            await interaction.response.send_message("指定人數不能超過需要接單人數。", ephemeral=True)
+            return
+
+        data["specified_staff_ids"] = ids
+        data["companion_preference"] = "指定陪玩/打手"
+        data.pop("payment_method", None)
+        remember_order_data(self.channel_id, data)
+
+        await interaction.response.defer(ephemeral=True)
+
+        edited_panel = False
+
+        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
+            try:
+                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
+                await panel_message.edit(
+                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                    view=SelfServiceOrderView(
+                        customer_id=self.customer_id,
+                        channel_id=self.channel_id,
+                        selected_category=data.get("category"),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+                edited_panel = True
+            except discord.HTTPException:
+                edited_panel = False
+
+        await interaction.followup.send(
+            "已填寫指定人員：\n"
+            + "\n".join(f"- <@{staff_id}>" for staff_id in ids)
+            + ("\n\n面板已更新。" if edited_panel else "\n\n提醒：面板沒有自動刷新，請重新選一次數量即可刷新試算。"),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+async def create_waiting_acceptance_order_from_self_service(
+    interaction: discord.Interaction,
+    *,
+    customer_id: int,
+    channel_id: int,
+) -> str:
+    guild = interaction.guild
+
+    if guild is None:
+        raise ValueError("這個功能只能在伺服器內使用。")
+
+    if not isinstance(interaction.channel, discord.TextChannel):
+        raise ValueError("無法確認目前票口頻道。")
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(channel_id, {})
+
+    if data.get("dispatch_message_id") is not None:
+        dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+        dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+        if dispatch_message_id:
+            return f"這張單已經送出等待接單，請不要重複送出。\n派單訊息：https://discord.com/channels/{guild.id}/{dispatch_channel_id}/{dispatch_message_id}"
+        return "這張單已經送出等待接單，請不要重複送出。"
+
+    rule = _get_rule_from_self_service_data(data)
+
+    from services.order_rules import (
+        ROLE_IDS,
+        calculate_price,
+        get_required_staff_count,
+        role_labels,
+    )
+    from shared.order_acceptance import WAITING_ACCEPTANCE, create_or_update_acceptance_meta
+    from shared.web_order_sync import upsert_web_order_from_dispatch
+
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    player_count = _to_int(data.get("player_count"), 1) or 1
+    specified_staff_ids = [str(item) for item in data.get("specified_staff_ids") or []]
+
+    specified_roles, specified_mentions = await _resolve_specified_roles_for_price(
+        guild,
+        rule,
+        specified_staff_ids,
+    )
+
+    price_result = calculate_price(
+        rule,
+        quantity=quantity,
+        player_count=player_count,
+        specified_roles=specified_roles,
+    )
+
+    required_staff_count = get_required_staff_count(rule, player_count)
+    original_rule_amount = int(price_result.total_amount or 0)
+    price_adjustment = apply_manual_price_adjustment_to_order_data(data, original_rule_amount)
+    amount = int(price_adjustment["customer_pay_amount"] or 0)
+    payout_base_amount = int(price_adjustment["payout_base_amount"] or amount)
+
+    dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
+
+    if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
+        raise ValueError("找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。")
+
+    category_label = ORDER_CATEGORY_LABELS.get(rule.category, rule.category)
+    customer_member = guild.get_member(customer_id)
+
+    if customer_member is None:
+        try:
+            customer_member = await guild.fetch_member(customer_id)
+        except Exception:
+            customer_member = None
+
+    companion_preference = data.get("companion_preference") or "不指定陪玩/打手"
+
+    embed = build_self_service_order_embed(
+        customer_mention=f"<@{customer_id}>",
+        category_label=category_label,
+        item=rule.label,
+        quantity=quantity,
+        payment_method="待付款",
+        source_channel=interaction.channel,
+        companion_preference=companion_preference,
+        receiver_text="尚未接單",
+    )
+
+    embed.add_field(name="顧客應付", value=_format_plain_amount(amount), inline=True)
+    embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout_base_amount), inline=True)
+    embed.add_field(name="接單需求", value=f"{required_staff_count} 位", inline=True)
+    embed.add_field(name="可接職位", value=role_labels(rule.allowed_roles), inline=False)
+
+    if price_adjustment["manual_discount_amount"] > 0:
+        embed.add_field(
+            name="客服折扣",
+            value=(
+                f"{_format_percent_value(price_adjustment['manual_discount_percent'])}%"
+                f"｜-{_format_plain_amount(price_adjustment['manual_discount_amount'])}\n"
+                f"原因：{price_adjustment['manual_discount_reason'] or '未填'}"
+            ),
+            inline=True,
+        )
+
+    if price_adjustment["cash_coupon_amount"] > 0:
+        embed.add_field(
+            name="折現券",
+            value=(
+                f"-{_format_plain_amount(price_adjustment['cash_coupon_amount'])}\n"
+                f"原因：{price_adjustment['cash_coupon_reason'] or '未填'}\n"
+                "店內吸收，不扣打手分潤"
+            ),
+            inline=True,
+        )
+
+    if rule.player_count_enabled:
+        embed.add_field(name="陪玩人數", value=f"{player_count} 位", inline=True)
+
+    if specified_mentions:
+        embed.add_field(name="指定人員", value="、".join(specified_mentions), inline=False)
+
+    if price_result.free_specify_fee:
+        embed.add_field(name="指定費", value="已達兩單以上，免指定費", inline=True)
+    elif price_result.specify_fee:
+        embed.add_field(name="指定費", value=_format_plain_amount(price_result.specify_fee), inline=True)
+
+    if not rule.point_benefits_allowed:
+        embed.add_field(name="點數福利", value="此分類不可使用點數福利", inline=False)
+
+    dispatch_message = await dispatch_channel.send(
+        embed=embed,
+        view=DispatchClaimView(
+            customer_id=customer_id,
+            category_label=category_label,
+            item=rule.label,
+            quantity=quantity,
+            payment_method="待付款",
+            source_channel_id=interaction.channel.id,
+            companion_preference=companion_preference,
+            locked=False,
+            status=WAITING_ACCEPTANCE,
+        ),
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+    web_order = upsert_web_order_from_dispatch(
+        ticket_channel_id=interaction.channel.id,
+        dispatch_channel_id=dispatch_channel.id,
+        dispatch_message_id=dispatch_message.id,
+        customer_discord_id=customer_id,
+        customer_display_name=getattr(customer_member, "display_name", None) or str(customer_id),
+        category=category_label,
+        item=rule.label,
+        quantity=quantity,
+        amount=amount,
+        payment_method="待付款",
+        original_amount=price_adjustment["original_amount"],
+        payout_base_amount=payout_base_amount,
+        customer_pay_amount=price_adjustment["customer_pay_amount"],
+        manual_discount_amount=price_adjustment["manual_discount_amount"],
+        cash_coupon_amount=price_adjustment["cash_coupon_amount"],
+        store_absorbed_amount=price_adjustment["store_absorbed_amount"],
+        status=WAITING_ACCEPTANCE,
+        customer_service_discord_id=getattr(interaction.user, "id", None) if isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user) else None,
+        customer_service_display_name=getattr(interaction.user, "display_name", None) if isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user) else None,
+        bot_order_no=data.get("order_no") or data.get("receipt_id"),
+        note=(
+            data.get("staff_note")
+            or data.get("customer_service_note")
+            or (
+                f"原價={price_adjustment['original_amount']}; "
+                f"客服折扣={_format_percent_value(price_adjustment['manual_discount_percent'])}%; "
+                f"折扣金額={price_adjustment['manual_discount_amount']}; "
+                f"分潤基準={price_adjustment['payout_base_amount']}; "
+                f"折現券={price_adjustment['cash_coupon_amount']}; "
+                f"顧客應付={price_adjustment['customer_pay_amount']}"
+            )
+        ),
+    )
+
+    create_or_update_acceptance_meta(
+        order_id=int(web_order.id),
+        order_rule_key=rule.key,
+        required_staff_count=required_staff_count,
+        min_protector_count=int(rule.min_protector_count or 0),
+        allowed_role_ids=[ROLE_IDS[role_key] for role_key in rule.allowed_roles],
+        specified_staff_ids=specified_staff_ids,
+        point_benefits_allowed=bool(rule.point_benefits_allowed),
+        status=WAITING_ACCEPTANCE,
+    )
+
+    ORDER_CLAIMS[dispatch_message.id] = {
+        "companion": set(),
+        "booster": set(),
+        "locked": False,
+        "customer_id": customer_id,
+        "category_label": category_label,
+        "category": rule.category,
+        "item": rule.label,
+        "order_rule_key": rule.key,
+        "quantity": quantity,
+        "player_count": player_count,
+        "payment_method": "待付款",
+        "amount": amount,
+        "total_amount": amount,
+        "source_channel_id": interaction.channel.id,
+        "companion_preference": companion_preference,
+        "dispatch_channel_id": dispatch_channel.id,
+        "status": WAITING_ACCEPTANCE,
+        "accepted_count": 0,
+        "required_staff_count": required_staff_count,
+        "min_protector_count": int(rule.min_protector_count or 0),
+        "specified_staff_ids": specified_staff_ids,
+    }
+
+    data["customer_id"] = customer_id
+    data["category"] = rule.category
+    data["category_label"] = category_label
+    data["item"] = rule.label
+    data["order_rule_key"] = rule.key
+    data["quantity"] = quantity
+    data["player_count"] = player_count
+    data["original_amount"] = price_adjustment["original_amount"]
+    data["manual_discount_percent"] = price_adjustment["manual_discount_percent"]
+    data["manual_discount_amount"] = price_adjustment["manual_discount_amount"]
+    data["manual_discount_reason"] = price_adjustment["manual_discount_reason"]
+    data["payout_base_amount"] = payout_base_amount
+    data["cash_coupon_amount"] = price_adjustment["cash_coupon_amount"]
+    data["cash_coupon_reason"] = price_adjustment["cash_coupon_reason"]
+    data["store_absorbed_amount"] = price_adjustment["store_absorbed_amount"]
+    data["customer_pay_amount"] = price_adjustment["customer_pay_amount"]
+    data["amount"] = amount
+    data["total_amount"] = amount
+    data["amount_text"] = _format_plain_amount(amount)
+    data["payment_method"] = "待付款"
+    data["dispatch_message_id"] = dispatch_message.id
+    data["dispatch_channel_id"] = dispatch_channel.id
+    data["web_order_id"] = int(web_order.id)
+    data["status"] = WAITING_ACCEPTANCE
+    data["closed"] = False
+    data["specified_staff_ids"] = specified_staff_ids
+    data["waiting_acceptance_created_at"] = get_taipei_now_iso()
+
+    remember_order_data(interaction.channel.id, data)
+    remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
+    save_bot_data()
+
+    await send_order_log(
+        guild,
+        title="新自助下單｜等待接單",
+        fields=[
+            ("顧客", f"<@{customer_id}>", True),
+            ("訂單類別", category_label, True),
+            ("訂單項目", rule.label, True),
+            ("數量", f"{quantity} {get_self_service_quantity_unit(rule.label)}", True),
+            ("訂單總價", _format_plain_amount(amount), True),
+            ("接單需求", f"{required_staff_count} 位", True),
+            ("票口", interaction.channel.mention, False),
+            ("派單訊息", dispatch_message.jump_url, False),
+        ],
+        color=discord.Color.blue(),
+    )
+
+    await log_self_service_proxy_action(
+        interaction,
+        customer_id,
+        "送出等待接單",
+        f"{category_label}｜{rule.label}｜{quantity} {get_self_service_quantity_unit(rule.label)}｜{_format_plain_amount(amount)}",
+    )
+
+    return f"已送出等待接單：{dispatch_message.jump_url}"
+
+def _format_percent_value(value) -> str:
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        number = 0.0
+
+    if number.is_integer():
+        return str(int(number))
+
+    return f"{number:.2f}".rstrip("0").rstrip(".")
+
+
+def _parse_discount_percent_text(value: str | None) -> float:
+    raw = str(value or "").strip().replace("%", "")
+
+    if not raw:
+        return 0.0
+
+    try:
+        percent = float(raw)
+    except ValueError as exc:
+        raise ValueError("折扣百分比請輸入數字，例如 10 代表 9 折。") from exc
+
+    if percent < 0 or percent > 100:
+        raise ValueError("折扣百分比只能輸入 0～100。")
+
+    return percent
+
+
+def _parse_cash_amount_text(value: str | None) -> int:
+    raw = str(value or "").strip().replace(",", "")
+
+    if not raw:
+        return 0
+
+    try:
+        amount = int(float(raw))
+    except ValueError as exc:
+        raise ValueError("折現券金額請輸入數字，例如 100。") from exc
+
+    if amount < 0:
+        raise ValueError("折現券金額不能小於 0。")
+
+    return amount
+
+
+def calculate_manual_price_adjustment(base_amount: int, data: dict) -> dict:
+    original_amount = max(0, int(base_amount or 0))
+
+    try:
+        discount_percent = float(data.get("manual_discount_percent") or 0)
+    except (TypeError, ValueError):
+        discount_percent = 0.0
+
+    discount_percent = max(0.0, min(100.0, discount_percent))
+    discount_amount = int(round(original_amount * discount_percent / 100))
+    payout_base_amount = max(0, original_amount - discount_amount)
+
+    coupon_amount = _to_int(data.get("cash_coupon_amount"), 0) or 0
+    coupon_amount = max(0, min(int(coupon_amount), payout_base_amount))
+
+    customer_pay_amount = max(0, payout_base_amount - coupon_amount)
+
+    return {
+        "original_amount": original_amount,
+        "manual_discount_percent": discount_percent,
+        "manual_discount_amount": discount_amount,
+        "payout_base_amount": payout_base_amount,
+        "cash_coupon_amount": coupon_amount,
+        "store_absorbed_amount": coupon_amount,
+        "customer_pay_amount": customer_pay_amount,
+        "manual_discount_reason": str(data.get("manual_discount_reason") or "").strip(),
+        "cash_coupon_reason": str(data.get("cash_coupon_reason") or "").strip(),
+    }
+
+
+def apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) -> dict:
+    adjustment = calculate_manual_price_adjustment(base_amount, data)
+
+    for key, value in adjustment.items():
+        data[key] = value
+
+    data["amount"] = adjustment["customer_pay_amount"]
+    data["total_amount"] = adjustment["customer_pay_amount"]
+    data["amount_text"] = _format_plain_amount(adjustment["customer_pay_amount"])
+
+    return adjustment
+
+def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | None = None) -> list[tuple[str, str]]:
+    if not data.get("item"):
+        return []
+
+    try:
+        rule = _get_rule_from_self_service_data(data)
+        from services.order_rules import calculate_price, get_required_staff_count, role_labels
+    except Exception:
+        return []
+
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    player_count = _to_int(data.get("player_count"), 1) or 1
+    specified_staff_ids = [str(item) for item in data.get("specified_staff_ids") or []]
+
+    specified_roles = []
+    specified_mentions = []
+
+    if guild is not None and specified_staff_ids:
+        for staff_id in specified_staff_ids:
+            member = None
+            try:
+                member = guild.get_member(int(staff_id))
+            except Exception:
+                member = None
+
+            if member is not None:
+                role_key = _role_key_for_member(rule, member)
+                if role_key:
+                    specified_roles.append(role_key)
+                specified_mentions.append(member.mention)
+            else:
+                specified_mentions.append(f"<@{staff_id}>")
+
+    try:
+        price = calculate_price(
+            rule,
+            quantity=quantity,
+            player_count=player_count,
+            specified_roles=specified_roles,
+        )
+    except Exception:
+        price = None
+
+    required_staff_count = get_required_staff_count(rule, player_count)
+
+    lines: list[tuple[str, str]] = []
+
+    if price is None:
+        lines.append(("預估金額", "客服待填價"))
+    else:
+        adjustment = calculate_manual_price_adjustment(int(price.total_amount or 0), data)
+
+        lines.append(("顧客應付", _format_plain_amount(adjustment["customer_pay_amount"])))
+
+        detail_parts = [
+            f"原價 {_format_plain_amount(adjustment['original_amount'])}",
+        ]
+
+        if int(price.specify_fee or 0) > 0:
+            detail_parts.append(f"指定費已含 {_format_plain_amount(price.specify_fee)}")
+
+        if getattr(price, "free_specify_fee", False):
+            detail_parts.append("兩單以上免指定費")
+
+        if adjustment["manual_discount_amount"] > 0:
+            reason = adjustment["manual_discount_reason"] or "未填原因"
+            detail_parts.append(
+                f"客服折扣 {_format_percent_value(adjustment['manual_discount_percent'])}%"
+                f" -{_format_plain_amount(adjustment['manual_discount_amount'])}"
+                f"（{reason}）"
+            )
+
+        detail_parts.append(f"打手分潤基準 {_format_plain_amount(adjustment['payout_base_amount'])}")
+
+        if adjustment["cash_coupon_amount"] > 0:
+            reason = adjustment["cash_coupon_reason"] or "未填原因"
+            detail_parts.append(
+                f"折現券 -{_format_plain_amount(adjustment['cash_coupon_amount'])}"
+                f"（{reason}，店內吸收）"
+            )
+
+        lines.append(("金額明細", "｜".join(detail_parts)))
+
+    unit = get_self_service_quantity_unit(rule.label)
+    lines.append(("數量", f"{quantity} {unit}"))
+
+    if getattr(rule, "player_count_enabled", False):
+        lines.append(("陪玩人數", f"{player_count} 位"))
+
+    lines.append(("接單需求", f"{required_staff_count} 位"))
+    lines.append(("可接職位", role_labels(rule.allowed_roles)))
+
+    if rule.allow_specify:
+        max_spec = rule.max_specified_count or required_staff_count
+        lines.append(("指定人員", "、".join(specified_mentions) if specified_mentions else f"可指定，最多 {max_spec} 位"))
+    else:
+        lines.append(("指定人員", "不可指定"))
+
+    if not rule.point_benefits_allowed:
+        lines.append(("點數福利", "此分類不可使用點數福利"))
+
+    if rule.min_quantity and int(rule.min_quantity) > 1:
+        lines.append(("最低數量", f"{rule.min_quantity} {unit}"))
+
+    return lines
+
+
+def add_self_service_quote_preview(embed: discord.Embed, data: dict, guild: discord.Guild | None = None) -> discord.Embed:
+    lines = _quote_preview_lines_for_self_service(data, guild)
+
+    if not lines:
+        return embed
+
+    preview_text = "\n".join(
+        f"**{name}：** {value}"
+        for name, value in lines
+    )
+
+    embed.add_field(
+        name="訂單試算",
+        value=preview_text[:1024],
+        inline=False,
+    )
+
+    return embed
+
+
+def build_self_service_panel_embed(
+    customer_id: int,
+    data: dict,
+    guild: discord.Guild | None = None,
+) -> discord.Embed:
+    category = data.get("category")
+    category_label = ORDER_CATEGORY_LABELS.get(category, "尚未選擇")
+    item = data.get("item") or "尚未選擇"
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    companion_preference = data.get("companion_preference") or "尚未選擇"
+
+    embed = discord.Embed(
+        title="自助下單",
+        description=(
+            f"下單用戶：<@{customer_id}>\n\n"
+            "請依序選擇訂單類別、訂單項目、指定選項與數量。\n"
+            "畫面會即時顯示試算金額、可接職位與接單需求。\n"
+            "送出後會先派單等待接單，人數滿後才會開放付款。"
+        ),
+        color=discord.Color.purple(),
+    )
+
+    embed.add_field(name="目前類別", value=str(category_label), inline=True)
+    embed.add_field(name="目前項目", value=str(item), inline=True)
+
+    if data.get("item"):
+        embed.add_field(
+            name="目前數量",
+            value=f"{quantity} {get_self_service_quantity_unit(data.get('item'))}",
+            inline=True,
+        )
+
+    embed.add_field(name="指定選項", value=str(companion_preference), inline=False)
+
+    return add_self_service_quote_preview(embed, data, guild)
+
+
+SPECIFIED_STAFF_SELECT_PAGE_SIZE = 25
+
+SPECIFIED_STAFF_ROLE_LABELS = {
+    "top_protector": "魔丸♛頂護",
+    "female_protector": "魔丸♝女護",
+    "male_protector": "魔丸♜男護",
+    "male_companion": "魔丸♞男陪",
+    "female_companion": "魔丸♟女陪",
+}
+
+
+def _truncate_select_text(value: str, limit: int = 100) -> str:
+    text_value = str(value or "").strip()
+
+    if len(text_value) <= limit:
+        return text_value
+
+    return text_value[: limit - 1] + "…"
+
+
+def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dict]:
+    from services.order_rules import ROLE_IDS
+
+    entries = []
+
+    for member in guild.members:
+        if getattr(member, "bot", False):
+            continue
+
+        member_role_ids = {
+            str(role.id)
+            for role in getattr(member, "roles", [])
+            if getattr(role, "id", None) is not None
+        }
+
+        matched_role_keys = [
+            role_key
+            for role_key in rule.allowed_roles
+            if str(ROLE_IDS.get(role_key)) in member_role_ids
+        ]
+
+        if not matched_role_keys:
+            continue
+
+        display_role_key = _role_key_for_member(rule, member) or matched_role_keys[0]
+        role_label = SPECIFIED_STAFF_ROLE_LABELS.get(display_role_key, display_role_key)
+
+        entries.append({
+            "id": str(member.id),
+            "label": _truncate_select_text(getattr(member, "display_name", None) or getattr(member, "name", None) or str(member.id)),
+            "description": _truncate_select_text(role_label),
+            "role_order": list(rule.allowed_roles).index(display_role_key) if display_role_key in rule.allowed_roles else 999,
+        })
+
+    entries.sort(key=lambda item: (item["role_order"], item["label"].casefold(), item["id"]))
+    return entries
+
+
+class SelfServiceSpecifiedStaffDropdown(discord.ui.Select):
+    def __init__(self, parent_view: "SelfServiceSpecifiedStaffDropdownView"):
+        entries = parent_view.page_entries()
+        selected_ids = set(parent_view.selected_ids)
+
+        if entries:
+            options = [
+                discord.SelectOption(
+                    label=entry["label"],
+                    value=entry["id"],
+                    description=entry["description"],
+                    default=entry["id"] in selected_ids,
+                )
+                for entry in entries
+            ]
+            disabled = False
+            max_values = min(parent_view.max_specified_count, len(options))
+        else:
+            options = [
+                discord.SelectOption(
+                    label="這一頁沒有可指定人員",
+                    value="none",
+                    description="請換頁或通知客服確認身分組",
+                )
+            ]
+            disabled = True
+            max_values = 1
+
+        super().__init__(
+            placeholder=f"選擇指定人員，最多 {parent_view.max_specified_count} 位",
+            min_values=1,
+            max_values=max_values,
+            options=options,
+            disabled=disabled,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if not isinstance(view, SelfServiceSpecifiedStaffDropdownView):
+            await interaction.response.send_message("指定人員選單狀態異常，請重新按一次按鈕。", ephemeral=True)
+            return
+
+        if "none" in self.values:
+            await interaction.response.defer()
+            return
+
+        page_ids = {entry["id"] for entry in view.page_entries()}
+        current_ids = [
+            staff_id
+            for staff_id in view.selected_ids
+            if staff_id not in page_ids
+        ]
+
+        for staff_id in self.values:
+            if staff_id not in current_ids:
+                current_ids.append(staff_id)
+
+        if len(current_ids) > view.max_specified_count:
+            await interaction.response.send_message(
+                f"這張單最多只能指定 {view.max_specified_count} 位。",
+                ephemeral=True,
+            )
+            return
+
+        view.selected_ids = current_ids
+        await view.save_selection_and_refresh_panel(interaction)
+
+        view.refresh_items()
+
+        await interaction.response.edit_message(
+            content=view.build_message_content(),
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+class SelfServiceSpecifiedStaffPageButton(discord.ui.Button):
+    def __init__(self, direction: int):
+        self.direction = direction
+        label = "上一頁" if direction < 0 else "下一頁"
+        super().__init__(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if not isinstance(view, SelfServiceSpecifiedStaffDropdownView):
+            await interaction.response.send_message("指定人員選單狀態異常，請重新按一次按鈕。", ephemeral=True)
+            return
+
+        view.page = max(0, min(view.max_page, view.page + self.direction))
+        view.refresh_items()
+
+        await interaction.response.edit_message(
+            content=view.build_message_content(),
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+class SelfServiceSpecifiedStaffClearButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="清除指定",
+            style=discord.ButtonStyle.danger,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if not isinstance(view, SelfServiceSpecifiedStaffDropdownView):
+            await interaction.response.send_message("指定人員選單狀態異常，請重新按一次按鈕。", ephemeral=True)
+            return
+
+        view.selected_ids = []
+        await view.save_selection_and_refresh_panel(interaction)
+        view.refresh_items()
+
+        await interaction.response.edit_message(
+            content=view.build_message_content(),
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+class SelfServiceSpecifiedStaffDoneButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="完成",
+            style=discord.ButtonStyle.success,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if not isinstance(view, SelfServiceSpecifiedStaffDropdownView):
+            await interaction.response.send_message("指定人員選單狀態異常，請重新按一次按鈕。", ephemeral=True)
+            return
+
+        await view.save_selection_and_refresh_panel(interaction)
+
+        await interaction.response.edit_message(
+            content="已完成指定人員設定，原本的自助下單面板已更新。",
+            view=None,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+class SelfServiceSpecifiedStaffDropdownView(discord.ui.View):
+    def __init__(
+        self,
+        *,
+        customer_id: int,
+        channel_id: int,
+        panel_message_id: int | None,
+        rule_key: str,
+        max_specified_count: int,
+        entries: list[dict],
+        selected_ids: list[str] | None = None,
+    ):
+        super().__init__(timeout=300)
+        self.customer_id = int(customer_id)
+        self.channel_id = int(channel_id)
+        self.panel_message_id = panel_message_id
+        self.rule_key = str(rule_key)
+        self.max_specified_count = max(1, int(max_specified_count or 1))
+        self.entries = entries
+        self.selected_ids = list(dict.fromkeys(str(item) for item in (selected_ids or []) if str(item).strip()))
+        self.page = 0
+        self.refresh_items()
+
+    @property
+    def max_page(self) -> int:
+        if not self.entries:
+            return 0
+        return max(0, (len(self.entries) - 1) // SPECIFIED_STAFF_SELECT_PAGE_SIZE)
+
+    def page_entries(self) -> list[dict]:
+        start = self.page * SPECIFIED_STAFF_SELECT_PAGE_SIZE
+        end = start + SPECIFIED_STAFF_SELECT_PAGE_SIZE
+        return self.entries[start:end]
+
+    def refresh_items(self):
+        self.clear_items()
+        self.add_item(SelfServiceSpecifiedStaffDropdown(self))
+
+        previous_button = SelfServiceSpecifiedStaffPageButton(-1)
+        previous_button.disabled = self.page <= 0
+        self.add_item(previous_button)
+
+        next_button = SelfServiceSpecifiedStaffPageButton(1)
+        next_button.disabled = self.page >= self.max_page
+        self.add_item(next_button)
+
+        self.add_item(SelfServiceSpecifiedStaffClearButton())
+        self.add_item(SelfServiceSpecifiedStaffDoneButton())
+
+    def selected_mentions(self) -> list[str]:
+        return [f"<@{staff_id}>" for staff_id in self.selected_ids]
+
+    def build_message_content(self) -> str:
+        selected_text = "、".join(self.selected_mentions()) if self.selected_ids else "尚未指定"
+
+        return (
+            f"請從下拉式清單選擇指定人員。\n"
+            f"目前頁數：{self.page + 1}/{self.max_page + 1}\n"
+            f"最多可指定：{self.max_specified_count} 位\n"
+            f"目前指定：{selected_text}"
+        )
+
+    async def save_selection_and_refresh_panel(self, interaction: discord.Interaction):
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        data["specified_staff_ids"] = self.selected_ids
+
+        if self.selected_ids:
+            data["companion_preference"] = "指定陪玩/打手"
+        else:
+            data["companion_preference"] = "不指定陪玩/打手"
+
+        data.pop("payment_method", None)
+        remember_order_data(self.channel_id, data)
+
+        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
+            try:
+                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
+                await panel_message.edit(
+                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                    view=SelfServiceOrderView(
+                        customer_id=self.customer_id,
+                        channel_id=self.channel_id,
+                        selected_category=data.get("category"),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+            except discord.HTTPException:
+                pass
+
+class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定折扣 / 折現券"):
+    discount_percent = discord.ui.TextInput(
+        label="客服折扣百分比",
+        placeholder="例如 10 = 9 折；不折扣可留空或填 0",
+        required=False,
+        max_length=10,
+    )
+
+    discount_reason = discord.ui.TextInput(
+        label="折扣原因",
+        placeholder="例如 VIP折扣、店內活動、老客優惠、補償折扣",
+        required=False,
+        max_length=100,
+    )
+
+    cash_coupon_amount = discord.ui.TextInput(
+        label="折現券金額",
+        placeholder="例如 100；沒有折現券可留空或填 0",
+        required=False,
+        max_length=10,
+    )
+
+    cash_coupon_reason = discord.ui.TextInput(
+        label="折現券原因 / 名稱",
+        placeholder="例如 VIP折現券、活動折現券、生日券",
+        required=False,
+        max_length=100,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
+        super().__init__()
+        self.customer_id = customer_id
+        self.channel_id = channel_id
+        self.panel_message_id = panel_message_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以設定折扣與折現券。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        if not data.get("item"):
+            await interaction.response.send_message("請先選擇訂單項目，再設定折扣或折現券。", ephemeral=True)
+            return
+
+        try:
+            discount_percent = _parse_discount_percent_text(str(self.discount_percent.value or ""))
+            coupon_amount = _parse_cash_amount_text(str(self.cash_coupon_amount.value or ""))
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        data["manual_discount_percent"] = discount_percent
+        data["manual_discount_reason"] = str(self.discount_reason.value or "").strip()
+        data["cash_coupon_amount"] = coupon_amount
+        data["cash_coupon_reason"] = str(self.cash_coupon_reason.value or "").strip()
+        data["manual_price_adjustment_set_by"] = interaction.user.id
+        data["manual_price_adjustment_set_at"] = get_taipei_now_iso()
+
+        remember_order_data(self.channel_id, data)
+
+        await interaction.response.defer(ephemeral=True)
+
+        edited_panel = False
+
+        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
+            try:
+                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
+                await panel_message.edit(
+                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                    view=SelfServiceOrderView(
+                        customer_id=self.customer_id,
+                        channel_id=self.channel_id,
+                        selected_category=data.get("category"),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+                edited_panel = True
+            except discord.HTTPException:
+                edited_panel = False
+
+        adjustment_note = []
+        if discount_percent > 0:
+            adjustment_note.append(f"客服折扣：{_format_percent_value(discount_percent)}%")
+        if coupon_amount > 0:
+            adjustment_note.append(f"折現券：{_format_plain_amount(coupon_amount)}（店內吸收，不扣打手分潤）")
+
+        await interaction.followup.send(
+            "已設定折扣 / 折現券。"
+            + ("\n" + "\n".join(adjustment_note) if adjustment_note else "\n目前無折扣、無折現券。")
+            + ("" if edited_panel else "\n\n提醒：面板沒有自動刷新，請重新選一次數量即可刷新試算。"),
+            ephemeral=True,
+        )
+
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "設定折扣 / 折現券",
+            "｜".join(adjustment_note) if adjustment_note else "無折扣、無折現券",
+        )
+
 class SelfServiceOrderView(discord.ui.View):
     def __init__(self, customer_id: int, channel_id: int, selected_category: str | None = None):
         super().__init__(timeout=86400)
@@ -4277,7 +6366,98 @@ class SelfServiceOrderView(discord.ui.View):
         self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
 
     @discord.ui.button(
-        label="取得訂單金額",
+        label="填寫指定人員",
+        style=discord.ButtonStyle.secondary,
+        custom_id="self_service_order_specified_staff_button",
+        row=4,
+    )
+    async def specified_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以填寫指定人員。", ephemeral=True)
+            return
+
+        if interaction.guild is None:
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        if not data.get("item"):
+            await interaction.response.send_message("請先選擇訂單項目，再填寫指定人員。", ephemeral=True)
+            return
+
+        try:
+            rule = _get_rule_from_self_service_data(data)
+            from services.order_rules import get_required_staff_count
+            player_count = _to_int(data.get("player_count"), 1) or 1
+            required_staff_count = get_required_staff_count(rule, player_count)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.response.send_message(f"讀取指定規則失敗：{exc}", ephemeral=True)
+            return
+
+        if not getattr(rule, "allow_specify", False):
+            await interaction.response.send_message("這個項目不開放指定人員。", ephemeral=True)
+            return
+
+        max_specified_count = int(rule.max_specified_count or required_staff_count or 1)
+        entries = get_specified_staff_entries_for_rule(interaction.guild, rule)
+
+        if not entries:
+            await interaction.response.send_message("目前找不到符合這張單可指定職位的人員，請確認打手身分組。", ephemeral=True)
+            return
+
+        panel_message_id = interaction.message.id if interaction.message is not None else None
+
+        view = SelfServiceSpecifiedStaffDropdownView(
+            customer_id=self.customer_id,
+            channel_id=self.channel_id,
+            panel_message_id=panel_message_id,
+            rule_key=rule.key,
+            max_specified_count=max_specified_count,
+            entries=entries,
+            selected_ids=[str(item) for item in data.get("specified_staff_ids") or []],
+        )
+
+        await interaction.response.send_message(
+            content=view.build_message_content(),
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+    @discord.ui.button(
+        label="客服設定折扣/折現券",
+        style=discord.ButtonStyle.secondary,
+        custom_id="self_service_order_staff_discount_coupon_button",
+        row=4,
+    )
+    async def staff_discount_coupon(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以設定折扣與折現券。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
+
+        if not data.get("item"):
+            await interaction.response.send_message("請先選擇訂單項目，再設定折扣或折現券。", ephemeral=True)
+            return
+
+        panel_message_id = interaction.message.id if interaction.message is not None else None
+        await interaction.response.send_modal(
+            SelfServiceStaffDiscountCouponModal(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+                panel_message_id=panel_message_id,
+            )
+        )
+
+
+    @discord.ui.button(
+        label="送出等待接單",
         style=discord.ButtonStyle.success,
         custom_id="self_service_order_go_payment_button",
         row=4
@@ -4334,29 +6514,51 @@ class SelfServiceOrderView(discord.ui.View):
             data["companion_preference"] = companion_preference
             remember_order_data(self.channel_id, data)
 
-        category_label = ORDER_CATEGORY_LABELS[category]
+        try:
+            rule = _get_rule_from_self_service_data(data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        if getattr(rule, "player_count_enabled", False) and not _to_int(data.get("player_count")):
+            await interaction.response.send_modal(SelfServicePlayerCountModal(self.customer_id, self.channel_id))
+            return
+
+        if getattr(rule, "allow_specify", False) and _is_specify_preference(companion_preference) and not data.get("specified_staff_ids"):
+            panel_message_id = interaction.message.id if interaction.message is not None else None
+            await interaction.response.send_modal(
+                SelfServiceSpecifiedStaffModal(
+                    self.customer_id,
+                    self.channel_id,
+                    panel_message_id=panel_message_id,
+                )
+            )
+            return
 
         await interaction.response.defer(ephemeral=True)
 
-        await send_staff_amount_panel(
-            interaction=interaction,
-            customer_id=self.customer_id,
-            channel_id=self.channel_id,
-        )
+        try:
+            response_text = await create_waiting_acceptance_order_from_self_service(
+                interaction,
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+            )
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            print(f"[acceptance] 建立 waiting_acceptance 自助單失敗 channel_id={self.channel_id}: {exc}")
+            await interaction.followup.send("送出等待接單失敗，請通知客服確認後台紀錄。", ephemeral=True)
+            return
 
         button.disabled = True
-        button.label = "已送出，等待客服填價"
+        button.label = "已送出等待接單"
         try:
             await interaction.message.edit(view=self)
         except discord.HTTPException:
             pass
 
-        await log_self_service_proxy_action(
-            interaction,
-            self.customer_id,
-            "取得訂單金額",
-            f"{category_label}｜{item} x{quantity}｜{companion_preference}",
-        )
+        await interaction.followup.send(response_text, ephemeral=True)
 
 class StaffOrderOperationSelect(discord.ui.Select):
     def __init__(self):
@@ -4574,9 +6776,9 @@ class OrderControlView(discord.ui.View):
             title="自助下單",
             description=(
                 f"下單用戶：{customer_mention}\n\n"
-                "請下單用戶選擇訂單類別與訂單項目，完成後按「取得訂單金額」。\n"
-                "如果選擇娛樂陪、甜蜜單、技術陪、教學單、Valorant 陪打，數量欄位會顯示 1～24 小時；系統後續仍依 1～24 單計算。\n"
-                "如果選擇娛樂陪、甜蜜單、技術陪，請額外選擇是否指定陪玩/打手；Valorant 陪打可選擇指定或不指定打手。"
+                "請下單用戶依序選擇訂單類別、訂單項目、指定選項與數量。\n"
+                "畫面會即時顯示試算金額、可接職位與接單需求。\n"
+                "送出後會先派單等待接單，人數滿後才會開放付款。"
             ),
             color=discord.Color.purple()
         )
@@ -4882,6 +7084,11 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
+    if not getattr(bot, '_acceptance_sync_worker_started', False):
+        bot._acceptance_sync_worker_started = True
+        bot.loop.create_task(acceptance_sync_event_worker())
+        print('[acceptance-sync] worker started', flush=True)
+
     if not getattr(bot, "_reward_redeem_view_registered", False):
         bot.add_view(RewardRedeemView())
         bot._reward_redeem_view_registered = True
@@ -4989,35 +7196,22 @@ _REWARD_REDEEM_SELECTIONS: dict[tuple[int, int], str] = {}
 
 
 def build_reward_redeem_embed() -> discord.Embed:
-    shelf_text = """```text
-╔════════════════════════════╗
-║        魔丸點數兌換        ║
-╠════════╦═══════════════════╣
-║   5 點  ║ 20 元折價券        ║
-║  10 點  ║ 30 元折價券        ║
-║  15 點  ║ 加時 30 分鐘        ║
-║  20 點  ║ 加場一場保撤        ║
-║  25 點  ║ 免指定費 1 次       ║
-║  30 點  ║ 100 元折價券       ║
-║  40 點  ║ 加時一小時          ║
-╠════════╬═══════════════════╣
-║  80 點  ║ 免費陪玩 1 小時     ║
-╚════════╩═══════════════════╝
-```"""
+    lines = [
+        f"**{item['cost']} 點**｜{item['name']}"
+        for item in POINT_REDEEM_ITEMS
+    ]
 
     embed = discord.Embed(
         title="🎁 魔丸點數兌換",
         description=(
-            "請先使用下拉式清單選擇要兌換的項目，再按下「兌換」。
-
-"
-            f"{shelf_text}
-"
-            "兌換成功後會自動扣除點數，並寫入顧客備註。"
+            "請先使用下拉式清單選擇要兌換的項目，再按下「兌換」。\n\n"
+            + "\n".join(lines)
         ),
         color=discord.Color.gold(),
     )
+    embed.set_footer(text="兌換成功後會自動扣除點數，並寫入顧客備註。")
     return embed
+
 
 def append_reward_redeem_customer_note(
     data: dict,

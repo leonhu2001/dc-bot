@@ -41,6 +41,12 @@ def upsert_web_order_from_dispatch(
     quantity,
     amount,
     payment_method: str | None,
+    original_amount=None,
+    payout_base_amount=None,
+    customer_pay_amount=None,
+    manual_discount_amount=None,
+    cash_coupon_amount=None,
+    store_absorbed_amount=None,
     status: str = "active",
     customer_service_discord_id=None,
     customer_service_display_name: str | None = None,
@@ -97,6 +103,31 @@ def upsert_web_order_from_dispatch(
         order.item = str(item or "未紀錄")
         order.quantity = _to_int(quantity, 1) or 1
         order.amount = _to_int(amount, 0)
+
+        if original_amount is not None:
+            order.original_amount = _to_int(original_amount, order.amount)
+        elif getattr(order, "original_amount", None) is None:
+            order.original_amount = order.amount
+
+        if payout_base_amount is not None:
+            order.payout_base_amount = _to_int(payout_base_amount, order.amount)
+        elif getattr(order, "payout_base_amount", None) is None:
+            order.payout_base_amount = order.amount
+
+        if customer_pay_amount is not None:
+            order.customer_pay_amount = _to_int(customer_pay_amount, order.amount)
+        elif getattr(order, "customer_pay_amount", None) is None:
+            order.customer_pay_amount = order.amount
+
+        if manual_discount_amount is not None:
+            order.manual_discount_amount = _to_int(manual_discount_amount, 0)
+
+        if cash_coupon_amount is not None:
+            order.cash_coupon_amount = _to_int(cash_coupon_amount, 0)
+
+        if store_absorbed_amount is not None:
+            order.store_absorbed_amount = _to_int(store_absorbed_amount, 0)
+
         order.payment_method = payment_method or "未紀錄"
         next_status = str(status or "active")
         order.status = next_status
@@ -225,7 +256,11 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
     ]
 
     payout_result = calculate_order_payout(
-        total_amount=int(order.amount or 0),
+        total_amount=int(
+            getattr(order, "payout_base_amount", None)
+            or order.amount
+            or 0
+        ),
         worker_discord_ids=worker_ids,
         named_bonus_worker_ids=named_bonus_worker_ids,
     )

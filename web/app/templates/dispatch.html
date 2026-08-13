@@ -498,6 +498,8 @@
                                 <div>
                                     <span class="dispatch-muted">接單人員</span>
 
+                                    {% set prepay_claims = order.prepay_claims or [] %}
+
                                     {% if active_assignments %}
                                         <div class="dispatch-chip-list">
                                             {% for assignment in active_assignments %}
@@ -509,14 +511,38 @@
                                                 </span>
                                             {% endfor %}
                                         </div>
+                                    {% elif prepay_claims %}
+                                        <div class="dispatch-chip-list">
+                                            {% for assignment in prepay_claims %}
+                                                <span class="dispatch-chip">
+                                                    @{{ assignment.worker_display_name or assignment.worker_discord_id }}
+                                                </span>
+                                            {% endfor %}
+                                        </div>
                                     {% else %}
                                         <p class="dispatch-muted">尚未有人接單</p>
+                                    {% endif %}
+
+                                    {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
+                                        <p class="dispatch-muted">
+                                            付款前接單進度：
+                                            {{ order.prepay_claim_count or 0 }}/{{ order.prepay_required_count or "?" }}
+                                            {% if order.prepay_min_protector_count %}
+                                                ｜護級 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}
+                                            {% endif %}
+                                        </p>
                                     {% endif %}
                                 </div>
 
                                 <div class="dispatch-worker-count">
                                     <span>人數</span>
-                                    <strong>{{ active_assignments | length }}</strong>
+                                    <strong>
+                                            {% if active_assignments %}
+                                                {{ active_assignments | length }}
+                                            {% else %}
+                                                {{ order.prepay_claim_count or 0 }}
+                                            {% endif %}
+                                        </strong>
                                 </div>
                             </div>
 

@@ -4,6 +4,12 @@ from typing import Callable, Any
 
 import discord
 
+from services.order_rules import (
+    CATEGORY_LABELS as RULE_CATEGORY_LABELS,
+    ORDER_RULES,
+    get_rules_by_category,
+)
+
 def _to_int(value, default: int | None = None) -> int | None:
     try:
         if value is None or value == "":
@@ -12,70 +18,36 @@ def _to_int(value, default: int | None = None) -> int | None:
     except (TypeError, ValueError):
         return default
 
-ORDER_CATEGORY_LABELS = {
-    "basic": "基礎單",
-    "fun": "趣味單",
-    "farm": "代解代肝",
-    "season": "賽季限定活動",
-    "valorant": "Valorant",
-}
+ORDER_CATEGORY_LABELS = dict(RULE_CATEGORY_LABELS)
 
 ORDER_ITEMS_BY_CATEGORY = {
-    # 使用者要求「由下到上」，所以下拉式顯示會從體驗單開始往上排到油鍋單
-    "basic": [
-        "體驗單",
-        "娛樂陪",
-        "甜蜜單",
-        "技術陪",
-        
-        "節日特別單",
-        "教學單",
-        "賭約單",
-        "油鍋單",
-    ],
-    "fun": [
-        "豪到你了嗎",
-        
-        "想吃自己打",
-        "比翼雙飛",
-        "已讀亂回",
-    ],
-    "farm": [
-        "代解部門任務",
-        "賽季3x3",
-        "哈夫幣代洗",
-    ],
-    "season": [
-        "勇敢者行動",
-        "S9炫彩勇敢者行動",
-    ],
-    "valorant": [
-        "陪打",
-        "代打",
-    ],
+    category: [
+        rule.label
+        for rule in get_rules_by_category(category)
+    ]
+    for category in ORDER_CATEGORY_LABELS
+}
+
+ORDER_RULE_KEY_BY_LABEL = {
+    rule.label: rule.key
+    for rule in ORDER_RULES.values()
 }
 
 ORDER_ITEM_TO_CATEGORY = {
-    item: category
-    for category, items in ORDER_ITEMS_BY_CATEGORY.items()
-    for item in items
+    rule.label: rule.category
+    for rule in ORDER_RULES.values()
 }
 
 SPECIAL_COMPANION_ITEMS = {
-    "娛樂陪",
-    "甜蜜單",
-    "技術陪",
-    
-    "陪打",
-    "已讀亂回",
+    rule.label
+    for rule in ORDER_RULES.values()
+    if rule.allow_specify
 }
 
 QUANTITY_SELECT_ITEMS = {
-    "教學單",
-    "娛樂陪",
-    "甜蜜單",
-    "技術陪",
-    "陪打",
+    rule.label
+    for rule in ORDER_RULES.values()
+    if rule.pricing_type in {"hourly", "game", "unit"}
 }
 
 QUANTITY_OPTIONS = list(range(1, 25))

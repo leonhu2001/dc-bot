@@ -42,7 +42,7 @@ async def dispatch_state(request: Request):
                 updated_at,
                 created_at
             FROM web_orders
-            WHERE status = 'active'
+            WHERE status IN ('active', 'waiting_acceptance', 'accepted_pending_pay')
             ORDER BY id ASC
             """
         ).fetchall()
