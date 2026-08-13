@@ -1,224 +1,276 @@
-
 {% extends "layout.html" %}
 
 {% block page_title %}錢包流水{% endblock %}
 
 {% block content %}
 <style>
-.wallet-ledger-page {
+.wallet-detail-page {
     display: grid;
     gap: 18px;
-    width: 100%;
 }
 
-.wallet-ledger-desc {
-    color: rgba(246, 232, 204, 0.72);
-    font-weight: 700;
+.wallet-detail-command {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: stretch;
 }
 
-.wallet-ledger-actions {
+.wallet-detail-identity,
+.wallet-detail-actions,
+.wallet-detail-panel,
+.wallet-detail-stat {
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
+}
+
+.wallet-detail-identity {
+    position: relative;
+    overflow: hidden;
+    padding: 22px;
+}
+
+.wallet-detail-identity::after {
+    content: "LOG";
+    position: absolute;
+    right: 18px;
+    bottom: 8px;
+    color: rgba(255,255,255,.045);
+    font-size: 82px;
+    font-weight: 950;
+    letter-spacing: .18em;
+    pointer-events: none;
+}
+
+.wallet-detail-identity .order-no {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .16em;
+}
+
+.wallet-detail-identity h2 {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 8px;
+    font-size: 30px;
+    letter-spacing: .08em;
+    word-break: break-word;
+}
+
+.wallet-detail-identity p {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: var(--mw-muted, #a7a0b5);
+    line-height: 1.8;
+}
+
+.wallet-code {
+    color: rgba(255,255,255,.58);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    word-break: break-all;
+}
+
+.wallet-detail-actions {
+    padding: 18px;
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    align-content: center;
+    justify-content: flex-end;
 }
 
-.wallet-ledger-button {
-    min-height: 44px;
-    border-radius: 12px;
-    border: 1px solid rgba(190, 151, 86, 0.42);
-    background: rgba(128, 24, 18, 0.88);
-    color: #fff1d0;
-    padding: 0 18px;
-    font-weight: 900;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.wallet-ledger-button.is-dark {
-    background: rgba(12, 12, 12, 0.86);
-}
-
-.wallet-ledger-stats {
+.wallet-detail-stats {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 12px;
 }
 
-.wallet-ledger-stat {
-    min-height: 112px;
-    padding: 18px 20px;
-    border-radius: 8px;
-    border: 1px solid rgba(116, 78, 42, 0.46);
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.92), rgba(203, 180, 137, 0.82)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%);
-    color: #130f0c;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.28);
+.wallet-detail-stat {
+    min-height: 118px;
+    padding: 18px;
     position: relative;
     overflow: hidden;
 }
 
-.wallet-ledger-stat::after {
-    content: "魔丸";
-    position: absolute;
-    right: 16px;
-    bottom: 12px;
-    color: rgba(128, 24, 18, 0.72);
-    border: 2px solid rgba(128, 24, 18, 0.48);
-    padding: 4px;
-    font-weight: 900;
-    font-size: 15px;
-    transform: rotate(-3deg);
-}
-
-.wallet-ledger-stat span {
+.wallet-detail-stat span {
     display: block;
-    color: #5b1714;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
     font-weight: 900;
-    letter-spacing: 0.08em;
+    margin-bottom: 10px;
 }
 
-.wallet-ledger-stat strong {
+.wallet-detail-stat strong {
     display: block;
-    margin-top: 10px;
-    font-size: 28px;
-    line-height: 1.1;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 950;
 }
 
-.wallet-ledger-panel {
-    border: 1px solid rgba(183, 143, 82, 0.36);
-    border-radius: 16px;
-    background:
-        linear-gradient(180deg, rgba(8, 9, 11, 0.45), rgba(8, 7, 6, 0.30)),
-        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
+.wallet-detail-panel {
     overflow: hidden;
 }
 
-.wallet-ledger-head {
+.wallet-detail-head {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
+}
+
+.wallet-detail-head h3 {
+    margin: 4px 0 0;
+    font-size: 24px;
+    letter-spacing: .08em;
+}
+
+.wallet-limit-form {
+    display: flex;
+    gap: 8px;
     align-items: center;
-    gap: 16px;
-    padding: 16px 18px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.26);
 }
 
-.wallet-ledger-head h3 {
-    margin: 0;
-    font-size: 25px;
-    letter-spacing: 0.08em;
+.wallet-limit-form input {
+    width: 90px;
+    min-height: 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.3);
+    color: var(--mw-text, #f4f0e8);
+    padding: 8px 10px;
 }
 
-.wallet-ledger-table-wrap {
+.wallet-table-wrap {
     overflow-x: auto;
 }
 
-.wallet-ledger-table {
+.wallet-table {
     width: 100%;
     min-width: 1120px;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-.wallet-ledger-table th,
-.wallet-ledger-table td {
-    padding: 14px 14px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.22);
+.wallet-table th,
+.wallet-table td {
+    padding: 13px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
     text-align: left;
+    vertical-align: middle;
 }
 
-.wallet-ledger-table th {
-    color: #f1d58f;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    background: rgba(58, 14, 13, 0.48);
+.wallet-table th {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .08em;
+    background: rgba(255,255,255,.025);
+    white-space: nowrap;
 }
 
-.wallet-ledger-table td {
-    color: #f7ead2;
-    font-weight: 800;
+.wallet-table tbody tr:hover td {
+    background: rgba(245,198,107,.045);
 }
 
 .wallet-amount {
-    font-weight: 900 !important;
+    font-weight: 950 !important;
 }
 
 .wallet-plus {
-    color: #8ee6a3 !important;
+    color: #d9ffe8 !important;
 }
 
 .wallet-minus {
-    color: #f29b9b !important;
+    color: #ffd7df !important;
 }
 
 .wallet-pill {
     display: inline-flex;
-    border: 1px solid rgba(190, 151, 86, 0.42);
-    background: rgba(190, 151, 86, 0.12);
+    border: 1px solid rgba(245,198,107,.25);
+    background: rgba(245,198,107,.08);
     border-radius: 999px;
-    padding: 4px 10px;
-    color: #f1d58f;
-    font-weight: 900;
+    padding: 5px 10px;
+    color: #ffe3a3;
+    font-weight: 950;
 }
 
 .wallet-note {
-    max-width: 360px;
+    max-width: 380px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--mw-muted, #a7a0b5);
 }
 
 .wallet-empty {
     text-align: center !important;
-    padding: 30px !important;
-    color: rgba(246, 232, 204, 0.62) !important;
+    padding: 34px !important;
+    color: var(--mw-muted, #a7a0b5) !important;
 }
 
-.wallet-code {
-    color: #f2d27f;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-
-@media (max-width: 900px) {
-    .wallet-ledger-stats {
+@media (max-width: 920px) {
+    .wallet-detail-command,
+    .wallet-detail-stats,
+    .wallet-detail-head {
         grid-template-columns: 1fr;
+        flex-direction: column;
+    }
+
+    .wallet-detail-actions {
+        justify-content: flex-start;
     }
 }
 </style>
 
-<section class="wallet-ledger-page">
-    <p class="wallet-ledger-desc">
-        老闆名稱：{{ wallet.customer_display_name }}<br>
-        Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span>
-    </p>
+<section class="wallet-detail-page">
+    <section class="wallet-detail-command">
+        <div class="wallet-detail-identity">
+            <p class="order-no">CUSTOMER WALLET</p>
+            <h2>{{ wallet.customer_display_name }}</h2>
+            <p>Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span></p>
+        </div>
 
-    <div class="wallet-ledger-actions">
-        <a class="wallet-ledger-button" href="/admin/wallets">返回錢包總覽</a>
-        <a class="wallet-ledger-button is-dark" href="/admin">返回後台</a>
-    </div>
+        <div class="wallet-detail-actions">
+            <a class="button" href="/admin/wallets">返回錢包總覽</a>
+            <a class="button secondary" href="/admin">返回後台</a>
+        </div>
+    </section>
 
-    <section class="wallet-ledger-stats">
-        <article class="wallet-ledger-stat">
-            <span>目前餘額 ◆</span>
+    <section class="wallet-detail-stats">
+        <article class="wallet-detail-stat">
+            <span>目前餘額</span>
             <strong>{{ wallet.balance_text }}</strong>
         </article>
-        <article class="wallet-ledger-stat">
-            <span>最後更新 ◆</span>
+
+        <article class="wallet-detail-stat">
+            <span>最後更新</span>
             <strong>{{ wallet.updated_at_text or "—" }}</strong>
         </article>
     </section>
 
-    <section class="wallet-ledger-panel">
-        <div class="wallet-ledger-head">
+    <section class="wallet-detail-panel">
+        <div class="wallet-detail-head">
             <div>
-                <p class="eyebrow">TRANSACTION LOG</p>
-                <h3>錢包異動紀錄</h3>
+                <p class="order-no">TRANSACTION LOG</p>
+                <h3>錢包異動流水</h3>
             </div>
+
+            <form class="wallet-limit-form" method="get" action="/admin/wallets/{{ wallet.customer_discord_id }}">
+                <input type="number" name="limit" min="1" max="300" value="{{ limit }}">
+                <button class="button" type="submit">筆數</button>
+            </form>
         </div>
 
-        <div class="wallet-ledger-table-wrap">
-            <table class="wallet-ledger-table">
+        <div class="wallet-table-wrap">
+            <table class="wallet-table">
                 <thead>
                     <tr>
                         <th>時間</th>

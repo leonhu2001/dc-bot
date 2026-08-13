@@ -1,253 +1,304 @@
-
 {% extends "layout.html" %}
 
 {% block page_title %}顧客錢包{% endblock %}
 
 {% block content %}
 <style>
-.wallet-ledger-page {
+.wallet-page {
     display: grid;
     gap: 18px;
-    width: 100%;
 }
 
-.wallet-ledger-filter {
+.wallet-command {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto auto;
-    gap: 12px;
-    align-items: end;
-    padding: 16px;
-    border: 1px solid rgba(183, 143, 82, 0.36);
-    border-radius: 16px;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, .82fr);
+    gap: 16px;
+    align-items: stretch;
+}
+
+.wallet-card {
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 24px;
     background:
-        linear-gradient(180deg, rgba(8, 9, 11, 0.45), rgba(8, 7, 6, 0.30)),
-        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
 }
 
-.wallet-ledger-filter label {
-    display: grid;
-    gap: 6px;
-}
-
-.wallet-ledger-filter span {
-    color: #f1d58f;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-}
-
-.wallet-ledger-filter input {
-    width: 100%;
-    height: 44px;
-    border-radius: 12px;
-    border: 1px solid rgba(190, 151, 86, 0.42);
-    background: rgba(12, 12, 12, 0.72);
-    color: #f7ead2;
-    padding: 0 14px;
-    font-weight: 800;
-}
-
-.wallet-ledger-button {
-    min-height: 44px;
-    border-radius: 12px;
-    border: 1px solid rgba(190, 151, 86, 0.42);
-    background: rgba(128, 24, 18, 0.88);
-    color: #fff1d0;
-    padding: 0 18px;
-    font-weight: 900;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.wallet-ledger-button.is-dark {
-    background: rgba(12, 12, 12, 0.86);
-}
-
-.wallet-ledger-stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.wallet-ledger-stat {
-    min-height: 112px;
-    padding: 18px 20px;
-    border-radius: 8px;
-    border: 1px solid rgba(116, 78, 42, 0.46);
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.92), rgba(203, 180, 137, 0.82)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%);
-    color: #130f0c;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.28);
+.wallet-intro {
     position: relative;
     overflow: hidden;
+    padding: 22px;
 }
 
-.wallet-ledger-stat::after {
-    content: "魔丸";
+.wallet-intro::after {
+    content: "WALLET";
     position: absolute;
-    right: 16px;
-    bottom: 12px;
-    color: rgba(128, 24, 18, 0.72);
-    border: 2px solid rgba(128, 24, 18, 0.48);
-    padding: 4px;
+    right: 18px;
+    bottom: 8px;
+    color: rgba(255,255,255,.045);
+    font-size: 72px;
+    font-weight: 950;
+    letter-spacing: .16em;
+    pointer-events: none;
+}
+
+.wallet-intro .order-no {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .16em;
+}
+
+.wallet-intro h2 {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 8px;
+    font-size: 30px;
+    letter-spacing: .08em;
+}
+
+.wallet-intro p {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: var(--mw-muted, #a7a0b5);
+    line-height: 1.8;
+}
+
+.wallet-filter-card {
+    padding: 18px;
+}
+
+.wallet-filter {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.wallet-filter label {
+    display: grid;
+    gap: 7px;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
     font-weight: 900;
-    font-size: 15px;
-    transform: rotate(-3deg);
 }
 
-.wallet-ledger-stat span {
-    display: block;
-    color: #5b1714;
-    font-weight: 900;
-    letter-spacing: 0.08em;
+.wallet-filter input {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.3) !important;
+    color: var(--mw-text, #f4f0e8) !important;
+    padding: 9px 12px;
 }
 
-.wallet-ledger-stat strong {
-    display: block;
-    margin-top: 10px;
-    font-size: 36px;
-    line-height: 1;
-    letter-spacing: 0.02em;
+.wallet-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
 }
 
-.wallet-ledger-panel {
-    border: 1px solid rgba(183, 143, 82, 0.36);
-    border-radius: 16px;
+.wallet-stat {
+    position: relative;
+    overflow: hidden;
+    min-height: 118px;
+    border: 1px solid rgba(245,198,107,.18);
+    border-radius: 22px;
     background:
-        linear-gradient(180deg, rgba(8, 9, 11, 0.45), rgba(8, 7, 6, 0.30)),
-        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
+        radial-gradient(circle at 92% 15%, rgba(245,198,107,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+    padding: 18px;
+}
+
+.wallet-stat span {
+    display: block;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
+    font-weight: 900;
+    margin-bottom: 10px;
+}
+
+.wallet-stat strong {
+    display: block;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 950;
+}
+
+.wallet-panel {
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
     overflow: hidden;
 }
 
-.wallet-ledger-head {
+.wallet-panel-head {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 18px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.26);
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
 }
 
-.wallet-ledger-head h3 {
-    margin: 0;
-    font-size: 25px;
-    letter-spacing: 0.08em;
+.wallet-panel-head h3 {
+    margin: 4px 0 0;
+    font-size: 24px;
+    letter-spacing: .08em;
 }
 
-.wallet-ledger-head small {
-    color: rgba(246, 232, 204, 0.72);
+.wallet-panel-head small {
+    color: var(--mw-muted, #a7a0b5);
     font-weight: 800;
 }
 
-.wallet-ledger-table-wrap {
+.wallet-table-wrap {
     overflow-x: auto;
 }
 
-.wallet-ledger-table {
+.wallet-table {
     width: 100%;
     min-width: 1060px;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-.wallet-ledger-table th,
-.wallet-ledger-table td {
-    padding: 14px 14px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.22);
+.wallet-table th,
+.wallet-table td {
+    padding: 13px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
     text-align: left;
+    vertical-align: middle;
 }
 
-.wallet-ledger-table th {
-    color: #f1d58f;
-    font-weight: 900;
-    letter-spacing: 0.08em;
-    background: rgba(58, 14, 13, 0.48);
+.wallet-table th {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .08em;
+    background: rgba(255,255,255,.025);
+    white-space: nowrap;
 }
 
-.wallet-ledger-table td {
-    color: #f7ead2;
-    font-weight: 800;
+.wallet-table tbody tr:hover td {
+    background: rgba(245,198,107,.045);
 }
 
 .wallet-boss-name {
-    color: #fff2d2;
+    color: var(--mw-text, #f4f0e8);
     font-size: 16px;
-    font-weight: 900;
+    font-weight: 950;
 }
 
-.wallet-boss-id {
+.wallet-boss-id,
+.wallet-code {
     margin-top: 4px;
-    color: rgba(246, 232, 204, 0.58);
+    color: rgba(255,255,255,.45);
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
     font-size: 12px;
+    word-break: break-all;
 }
 
 .wallet-amount {
-    color: #f2d27f !important;
-    font-weight: 900 !important;
+    color: var(--mw-gold, #f5c66b) !important;
+    font-weight: 950 !important;
+    font-size: 16px;
 }
 
 .wallet-note {
-    max-width: 320px;
+    max-width: 340px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--mw-muted, #a7a0b5);
 }
 
 .wallet-link {
-    color: #f2d27f;
-    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(245,198,107,.28);
+    border-radius: 999px;
+    background: rgba(245,198,107,.08);
+    color: #ffe3a3;
+    padding: 8px 12px;
+    font-weight: 950;
     text-decoration: none;
 }
 
 .wallet-empty {
     text-align: center !important;
-    padding: 30px !important;
-    color: rgba(246, 232, 204, 0.62) !important;
+    padding: 34px !important;
+    color: var(--mw-muted, #a7a0b5) !important;
 }
 
-@media (max-width: 900px) {
-    .wallet-ledger-filter,
-    .wallet-ledger-stats {
+@media (max-width: 1080px) {
+    .wallet-command {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .wallet-filter,
+    .wallet-stats,
+    .wallet-panel-head {
+        grid-template-columns: 1fr;
+        flex-direction: column;
     }
 }
 </style>
 
-<section class="wallet-ledger-page">
-    <form class="wallet-ledger-filter" method="get" action="/admin/wallets">
-        <label>
-            <span>搜尋老闆 / 訂單 / 備註 / 操作人</span>
-            <input type="text" name="q" value="{{ q }}" placeholder="輸入關鍵字">
-        </label>
-        <button class="wallet-ledger-button" type="submit">套用篩選</button>
-        <a class="wallet-ledger-button is-dark" href="/admin/wallets">重設條件</a>
-    </form>
+<section class="wallet-page">
+    <section class="wallet-command">
+        <div class="wallet-card wallet-intro">
+            <p class="order-no">CUSTOMER WALLET</p>
+            <h2>顧客錢包總覽</h2>
+            <p>查看老闆錢包餘額、最後異動、操作人與備註，點進流水可查看完整錢包異動紀錄。</p>
+        </div>
 
-    <section class="wallet-ledger-stats">
-        <article class="wallet-ledger-stat">
-            <span>錢包人數 ◆</span>
+        <div class="wallet-card wallet-filter-card">
+            <form class="wallet-filter" method="get" action="/admin/wallets">
+                <label>
+                    <span>搜尋老闆 / 訂單 / 備註 / 操作人</span>
+                    <input type="text" name="q" value="{{ q }}" placeholder="輸入關鍵字">
+                </label>
+
+                <button class="button" type="submit">套用篩選</button>
+                <a class="button secondary" href="/admin/wallets">重設</a>
+            </form>
+        </div>
+    </section>
+
+    <section class="wallet-stats">
+        <article class="wallet-stat">
+            <span>錢包人數</span>
             <strong>{{ wallet_count }}</strong>
         </article>
-        <article class="wallet-ledger-stat">
-            <span>總餘額 ◆</span>
+
+        <article class="wallet-stat">
+            <span>總餘額</span>
             <strong>{{ total_balance_text }}</strong>
         </article>
     </section>
 
-    <section class="wallet-ledger-panel">
-        <div class="wallet-ledger-head">
+    <section class="wallet-panel">
+        <div class="wallet-panel-head">
             <div>
-                <p class="eyebrow">WALLET LEDGER</p>
-                <h3>顧客錢包總覽</h3>
+                <p class="order-no">WALLET LEDGER</p>
+                <h3>錢包名冊</h3>
             </div>
             <small>共 {{ wallet_count }} 位老闆</small>
         </div>
 
-        <div class="wallet-ledger-table-wrap">
-            <table class="wallet-ledger-table">
+        <div class="wallet-table-wrap">
+            <table class="wallet-table">
                 <thead>
                     <tr>
                         <th>老闆名稱</th>
