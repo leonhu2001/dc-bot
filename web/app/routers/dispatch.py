@@ -32,7 +32,7 @@ def can_use_dispatch(user: dict | None) -> bool:
 
 
 def get_dispatch_role_type(user: dict | None) -> str:
-    # 網站派單頁不再分打手 / 陪玩，統一視為接單人員。
+    # 網站派單頁不再分舊職位名稱，統一視為接單人員。
     return "booster"
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"

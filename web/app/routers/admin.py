@@ -67,7 +67,7 @@ def require_admin_user(request: Request) -> dict | None:
 
 
 def dedupe_admin_worker_members(members):
-    """Admin 首頁新增 / 更換打手下拉：打手或陪玩都顯示，同一人只出現一次。"""
+    """Admin 首頁新增 / 更換護級 / 陪級下拉：護級或陪級都顯示，同一人只出現一次。"""
     result = {}
     for member in members or []:
         discord_id = str(getattr(member, "discord_id", "") or member.get("discord_id", "") if isinstance(member, dict) else getattr(member, "discord_id", "")).strip()
@@ -91,9 +91,9 @@ def dedupe_admin_worker_members(members):
 
 
 def list_admin_worker_dropdown_members() -> list[dict]:
-    """Admin 首頁新增 / 更換打手下拉。
+    """Admin 首頁新增 / 更換護級 / 陪級下拉。
 
-    只要有打手或陪玩身分就顯示；同一人只出現一次。
+    只要有護級或陪級身分就顯示；同一人只出現一次。
     """
     db_path = Path(__file__).resolve().parents[3] / "web_dashboard.db"
 
@@ -380,7 +380,7 @@ async def admin_remove_worker(
     finally:
         db.close()
 
-    return redirect_to_admin(message="已移除這位打手，分潤已重新計算。")
+    return redirect_to_admin(message="已移除這位護級 / 陪級，分潤已重新計算。")
 
 
 @router.post("/admin/orders/{order_id}/add-worker")
@@ -419,7 +419,7 @@ async def admin_add_worker(
     finally:
         db.close()
 
-    return redirect_to_admin(message="已新增/更換打手，分潤已重新計算。")
+    return redirect_to_admin(message="已新增/更換護級 / 陪級，分潤已重新計算。")
 
 
 @router.post("/admin/orders/{order_id}/manual-payout")
@@ -454,7 +454,7 @@ async def admin_manual_payout(
     finally:
         db.close()
 
-    return redirect_to_admin(message="已手動更新打手分潤金額。")
+    return redirect_to_admin(message="已手動更新護級 / 陪級分潤金額。")
 
 
 @router.post("/admin/worker-payouts/{payout_id}/status")
@@ -483,7 +483,7 @@ async def admin_set_worker_payout_status(
     finally:
         db.close()
 
-    return redirect_to_admin(message="打手分潤狀態已更新。")
+    return redirect_to_admin(message="護級 / 陪級分潤狀態已更新。")
 
 
 @router.post("/admin/customer-service-payouts/{payout_id}/status")
@@ -512,4 +512,4 @@ async def admin_set_customer_service_payout_status(
     finally:
         db.close()
 
-    return redirect_to_admin(message="客服分潤狀態已更新。")
+    return redirect_to_admin(message="魔丸♫魔丸♫客服分潤狀態已更新。")

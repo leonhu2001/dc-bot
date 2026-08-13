@@ -107,7 +107,7 @@ def add_person(people: dict[str, dict], *, discord_id, display_name, role, amoun
         "item": item or "",
         "customer_name": customer_name,
         "closed_date": closed_date,
-        "role": "打手" if role == "worker" else "客服",
+        "role": "護級 / 陪級" if role == "worker" else "客服",
         "amount": amount,
         "payout_status": payout_status,
         "status_label": "已支付" if payout_status == "paid" else "未支付",
@@ -123,7 +123,7 @@ def finalize_people(people: dict[str, dict], q: str | None, status: str | None =
         roles = person.pop("roles", set())
 
         if roles == {"worker"}:
-            person["role_label"] = "打手"
+            person["role_label"] = "護級 / 陪級"
             person["role"] = "worker"
         elif roles == {"customer_service"}:
             person["role_label"] = "客服"
@@ -376,8 +376,8 @@ def update_summary_payout_status(month: str | None, role: str | None, target_sta
             order_filter += " AND substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
             params.append(month)
 
-        # 打手
-        if role in {"all", "", "worker", "打手"}:
+        # 護級 / 陪級
+        if role in {"all", "", "worker", "護級 / 陪級"}:
             conn.execute(
                 f"""
                 UPDATE worker_payouts
@@ -420,7 +420,7 @@ def update_summary_payout_status(month: str | None, role: str | None, target_sta
 def update_summary_person_payout_status(month: str, person_role: str, person_id: str, target_status: str):
     """更新單一人員分潤狀態。
 
-    混合身分要同時更新打手分潤與客服分潤。
+    混合身分要同時更新護級 / 陪級分潤與魔丸♫客服分潤。
     """
     person_id = str(person_id or "").strip()
     if not person_id:
@@ -433,18 +433,18 @@ def update_summary_person_payout_status(month: str, person_role: str, person_id:
 
     update_worker = role_text in {
         "worker",
-        "打手",
+        "護級 / 陪級",
         "worker_payout",
-        "打手分潤",
+        "護級 / 陪級分潤",
         "mixed",
         "mix",
         "both",
         "hybrid",
         "混合",
         "混合身分",
-        "客服打手",
-        "打手客服",
-        "總控 / 客服 打手",
+        "客服 / 護級",
+        "護級 / 客服",
+        "總控 / 客服 / 護級",
     }
 
     update_customer_service = role_text in {
@@ -452,20 +452,20 @@ def update_summary_person_payout_status(month: str, person_role: str, person_id:
         "customer-service",
         "cs",
         "客服",
-        "客服分潤",
+        "魔丸♫客服分潤",
         "mixed",
         "mix",
         "both",
         "hybrid",
         "混合",
         "混合身分",
-        "客服打手",
-        "打手客服",
-        "總控 / 客服 打手",
+        "客服 / 護級",
+        "護級 / 客服",
+        "總控 / 客服 / 護級",
     }
 
     # 有些舊資料 role_label 可能只寫「混合」或畫面顯示「混合」，
-    # 保底：只要不是明確客服或明確打手，就兩邊都嘗試更新。
+    # 保底：只要不是明確客服或明確護級 / 陪級，就兩邊都嘗試更新。
     if not update_worker and not update_customer_service:
         update_worker = True
         update_customer_service = True
