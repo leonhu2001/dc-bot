@@ -341,7 +341,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
             result.setdefault(order_id, []).append(
                 {
                     "kind": "worker",
-                    "label": "打手",
+                    "label": "護級 / 陪級",
                     "id": int(row["id"]),
                     "person_id": row["person_id"],
                     "person_name": row["person_name"] or row["person_id"],
@@ -624,7 +624,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
             result.setdefault(order_id, []).append(
                 {
                     "kind": "worker",
-                    "label": "打手",
+                    "label": "護級 / 陪級",
                     "person_id": person_id,
                     "person_name": row["person_name"] or person_id,
                     "amount": int(row["amount"] or 0),

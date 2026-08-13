@@ -37,66 +37,8 @@ document.addEventListener("click", function (event) {
 </script>
 
 
-<script>
-(function () {
-    function clearHistoryBackplates() {
-        const page = document.querySelector(".history-ledger-page");
-        if (!page) return;
-
-        let node = page.parentElement;
-        while (node && node !== document.body) {
-            node.style.setProperty("background", "transparent", "important");
-            node.style.setProperty("background-color", "transparent", "important");
-            node.style.setProperty("background-image", "none", "important");
-            node.style.setProperty("box-shadow", "none", "important");
-            node.style.setProperty("backdrop-filter", "none", "important");
-
-            const border = window.getComputedStyle(node).borderStyle;
-            if (border && border !== "none") {
-                node.style.setProperty("border-color", "rgba(190, 151, 86, 0.42)", "important");
-            }
-
-            node = node.parentElement;
-        }
-
-        page.querySelectorAll(".panel, .history-ledger-panel, .history-ledger-head, .history-ledger-table-wrap, table, thead, tbody, tr, th, td").forEach(function (el) {
-            el.style.setProperty("background", "transparent", "important");
-            el.style.setProperty("background-color", "transparent", "important");
-            el.style.setProperty("background-image", "none", "important");
-            el.style.setProperty("box-shadow", "none", "important");
-            el.style.setProperty("backdrop-filter", "none", "important");
-        });
-    }
-
-    document.addEventListener("DOMContentLoaded", clearHistoryBackplates);
-    window.addEventListener("load", clearHistoryBackplates);
-    setTimeout(clearHistoryBackplates, 300);
-})();
-</script>
 
 
-<script>
-(function () {
-    function restoreHistoryBottomToolbar() {
-        const toolbar = document.querySelector(".history-bulk-toolbar");
-        if (!toolbar) return;
-
-        toolbar.style.setProperty(
-            "background",
-            "radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%), linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91))",
-            "important"
-        );
-        toolbar.style.setProperty("background-color", "rgba(12, 9, 8, 0.94)", "important");
-        toolbar.style.setProperty("border", "1px solid rgba(190, 151, 86, 0.48)", "important");
-        toolbar.style.setProperty("box-shadow", "0 -12px 32px rgba(0, 0, 0, 0.42)", "important");
-        toolbar.style.setProperty("backdrop-filter", "blur(10px)", "important");
-    }
-
-    document.addEventListener("DOMContentLoaded", restoreHistoryBottomToolbar);
-    window.addEventListener("load", restoreHistoryBottomToolbar);
-    setTimeout(restoreHistoryBottomToolbar, 400);
-})();
-</script>
 
 
 {% endblock %}
@@ -109,31 +51,70 @@ document.addEventListener("click", function (event) {
 }
 
 .history-ledger-hero {
-    padding: 18px 22px;
-    border: 1px solid rgba(183, 143, 82, 0.34);
-    border-radius: 18px;
+    position: relative;
+    overflow: hidden;
+    padding: 28px;
+    border: 1px solid rgba(245, 198, 107, .2);
+    border-radius: 28px;
     background:
-        radial-gradient(circle at 85% 20%, rgba(132, 28, 24, 0.22), transparent 34%),
-        linear-gradient(135deg, rgba(10, 10, 11, 0.62), rgba(22, 16, 14, 0.24));
+        radial-gradient(circle at 88% 18%, rgba(207, 62, 62, .22), transparent 35%),
+        radial-gradient(circle at 12% 0%, rgba(245, 198, 107, .16), transparent 35%),
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(8, 10, 18, .94);
+    box-shadow: 0 28px 78px rgba(0,0,0,.34);
+}
+
+.history-ledger-hero::after {
+    content: "ORDER ARCHIVE";
+    position: absolute;
+    right: 22px;
+    bottom: 18px;
+    color: rgba(255,255,255,.055);
+    font-size: clamp(34px, 7vw, 92px);
+    font-weight: 950;
+    letter-spacing: .12em;
+    pointer-events: none;
 }
 
 .history-ledger-title {
+    position: relative;
+    z-index: 1;
     margin: 0;
-    font-size: clamp(42px, 5vw, 72px);
+    font-size: clamp(34px, 5vw, 68px);
     line-height: 1;
-    letter-spacing: 0.08em;
+    letter-spacing: .08em;
+    font-weight: 950;
 }
 
 .history-ledger-filter {
     display: grid;
-    grid-template-columns: minmax(180px, 220px) minmax(160px, 210px) minmax(260px, 1fr) auto auto;
+    grid-template-columns: minmax(170px, 220px) minmax(150px, 210px) minmax(260px, 1fr) auto auto;
     gap: 12px;
     align-items: end;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 22px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.022)),
+        rgba(10, 13, 22, .88);
 }
 
 .history-ledger-filter label {
     display: grid;
-    gap: 6px;
+    gap: 7px;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.history-ledger-filter .input,
+.history-ledger-filter select,
+.history-ledger-filter input {
+    min-height: 42px;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.3) !important;
+    color: var(--mw-text, #f4f0e8) !important;
 }
 
 .history-ledger-stats {
@@ -143,15 +124,14 @@ document.addEventListener("click", function (event) {
 }
 
 .history-ledger-stat {
-    min-height: 112px;
+    min-height: 118px;
     padding: 18px 20px;
-    border-radius: 8px;
-    border: 1px solid rgba(116, 78, 42, 0.46);
+    border-radius: 22px;
+    border: 1px solid rgba(245, 198, 107, .18);
     background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.92), rgba(203, 180, 137, 0.82)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%);
-    color: #130f0c;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.28);
+        linear-gradient(145deg, rgba(245,198,107,.12), rgba(255,255,255,.025)),
+        rgba(10, 13, 22, .92);
+    box-shadow: 0 20px 56px rgba(0,0,0,.28);
     position: relative;
     overflow: hidden;
 }
@@ -159,21 +139,22 @@ document.addEventListener("click", function (event) {
 .history-ledger-stat::after {
     content: "魔丸";
     position: absolute;
-    right: 16px;
+    right: 14px;
     bottom: 12px;
-    color: rgba(128, 24, 18, 0.72);
-    border: 2px solid rgba(128, 24, 18, 0.48);
-    padding: 4px;
-    font-weight: 900;
+    color: rgba(245, 198, 107, .2);
+    border: 1px solid rgba(245, 198, 107, .14);
+    border-radius: 8px;
+    padding: 4px 6px;
+    font-weight: 950;
     font-size: 15px;
     transform: rotate(-3deg);
 }
 
 .history-ledger-stat span {
     display: block;
-    color: #5b1714;
-    font-weight: 900;
-    letter-spacing: 0.08em;
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .08em;
 }
 
 .history-ledger-stat strong {
@@ -181,22 +162,23 @@ document.addEventListener("click", function (event) {
     margin-top: 10px;
     font-size: 36px;
     line-height: 1;
-    letter-spacing: 0.02em;
+    letter-spacing: .02em;
 }
 
 .history-ledger-stat small {
     display: block;
     margin-top: 10px;
-    color: rgba(23, 18, 14, 0.72);
+    color: var(--mw-muted, #a7a0b5);
     font-weight: 800;
 }
 
 .history-ledger-panel {
-    border: 1px solid rgba(183, 143, 82, 0.36);
-    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px;
     background:
-        linear-gradient(180deg, rgba(8, 9, 11, 0.45), rgba(8, 7, 6, 0.30)),
-        radial-gradient(circle at 90% 20%, rgba(126, 23, 20, 0.13), transparent 38%);
+        linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.022)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.3);
     overflow: hidden;
 }
 
@@ -205,14 +187,15 @@ document.addEventListener("click", function (event) {
     justify-content: space-between;
     align-items: center;
     gap: 16px;
-    padding: 16px 18px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.26);
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
 }
 
 .history-ledger-head h3 {
     margin: 0;
-    font-size: 25px;
-    letter-spacing: 0.08em;
+    font-size: 24px;
+    letter-spacing: .08em;
 }
 
 .history-ledger-table-wrap {
@@ -221,36 +204,47 @@ document.addEventListener("click", function (event) {
 
 .history-ledger-table {
     width: 100%;
-    border-collapse: collapse;
-    min-width: 1120px;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1160px;
 }
 
 .history-ledger-table th,
 .history-ledger-table td {
-    padding: 11px 12px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.18);
-    border-right: 1px solid rgba(183, 143, 82, 0.14);
+    padding: 12px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
     vertical-align: middle;
 }
 
 .history-ledger-table th {
-    color: #d9bd80;
-    font-weight: 900;
-    letter-spacing: 0.12em;
-    background: rgba(12, 10, 9, 0.36);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .1em;
+    background: rgba(8, 10, 18, .96);
     white-space: nowrap;
 }
 
 .history-ledger-table td {
-    color: rgba(255, 247, 226, 0.9);
+    color: rgba(255, 247, 226, .92);
 }
 
-.history-ledger-table .input {
+.history-ledger-table tbody tr:hover td {
+    background: rgba(245, 198, 107, .045);
+}
+
+.history-ledger-table .input,
+.history-ledger-table select,
+.history-ledger-table input {
     width: 100%;
     min-width: 0;
-    background: rgba(3, 5, 8, 0.22) !important;
-    border-color: rgba(183, 143, 82, 0.28) !important;
-    color: rgba(255, 247, 226, 0.94) !important;
+    min-height: 38px;
+    border-radius: 12px !important;
+    background: rgba(0,0,0,.28) !important;
+    border-color: rgba(255,255,255,.12) !important;
+    color: rgba(255, 247, 226, .94) !important;
 }
 
 .history-ledger-table input[type="number"] {
@@ -258,8 +252,8 @@ document.addEventListener("click", function (event) {
 }
 
 .history-ledger-no {
-    font-weight: 900;
-    color: #f3db9a;
+    font-weight: 950;
+    color: var(--mw-gold, #f5c66b);
     white-space: nowrap;
 }
 
@@ -285,7 +279,7 @@ document.addEventListener("click", function (event) {
 .history-ledger-person small {
     display: block;
     margin-top: 3px;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,.45);
     font-size: 12px;
 }
 
@@ -300,12 +294,12 @@ document.addEventListener("click", function (event) {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
-    padding: 4px 8px;
-    border: 1px solid rgba(183, 143, 82, 0.26);
-    background: rgba(183, 143, 82, 0.09);
+    padding: 5px 9px;
+    border: 1px solid rgba(245, 198, 107, .24);
+    background: rgba(245, 198, 107, .08);
     color: #f2dfb0;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 900;
 }
 
 .history-ledger-status select {
@@ -321,17 +315,19 @@ document.addEventListener("click", function (event) {
     white-space: nowrap;
 }
 
-.history-ledger-action .seal-button {
+.history-ledger-action .seal-button,
+.seal-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(214, 67, 50, 0.58);
-    color: #ff8a72;
-    background: rgba(96, 18, 15, 0.28);
-    border-radius: 8px;
-    padding: 7px 10px;
-    font-weight: 900;
-    letter-spacing: 0.08em;
+    border: 1px solid rgba(245, 198, 107, .38);
+    color: var(--mw-text, #f4f0e8);
+    background: linear-gradient(135deg, rgba(245,198,107,.18), rgba(207,62,62,.16));
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 950;
+    letter-spacing: .06em;
+    cursor: pointer;
 }
 
 .history-ledger-hidden-fields {
@@ -345,7 +341,7 @@ document.addEventListener("click", function (event) {
     justify-content: space-between;
     gap: 16px;
     padding: 14px 18px;
-    border-top: 1px solid rgba(183, 143, 82, 0.18);
+    border-top: 1px solid rgba(255,255,255,.08);
 }
 
 .history-page-links {
@@ -360,15 +356,15 @@ document.addEventListener("click", function (event) {
     height: 34px;
     display: grid;
     place-items: center;
-    border-radius: 8px;
-    border: 1px solid rgba(183, 143, 82, 0.22);
+    border-radius: 999px;
+    border: 1px solid rgba(245, 198, 107, .22);
     color: #e9d6a7;
     text-decoration: none;
 }
 
 .history-page-links .active {
-    background: rgba(145, 35, 28, 0.74);
-    border-color: rgba(238, 86, 70, 0.58);
+    background: rgba(145, 35, 28, .74);
+    border-color: rgba(238, 86, 70, .58);
     color: #fff4d7;
 }
 
@@ -377,20 +373,44 @@ document.addEventListener("click", function (event) {
     bottom: 14px;
     z-index: 5;
     margin-top: 12px;
-    border: 1px solid rgba(183, 143, 82, 0.32);
-    border-radius: 14px;
-    background: rgba(9, 8, 8, 0.88);
+    border: 1px solid rgba(245, 198, 107, .28);
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, .28), transparent 44%),
+        linear-gradient(90deg, rgba(13, 10, 8, .94), rgba(24, 13, 11, .91));
+    box-shadow: 0 -14px 36px rgba(0,0,0,.42);
     backdrop-filter: blur(12px);
 }
 
 .history-bulk-actions {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .history-date-input::-webkit-calendar-picker-indicator {
     filter: invert(1);
-    opacity: 0.9;
+    opacity: .9;
+}
+
+.history-dossier-toggle {
+    cursor: pointer;
+}
+
+.history-dossier-detail-row[hidden] {
+    display: none !important;
+}
+
+.history-dossier-detail-row td {
+    padding: 0 !important;
+}
+
+.history-dossier-detail {
+    padding: 18px !important;
+    background:
+        linear-gradient(145deg, rgba(245,198,107,.08), rgba(255,255,255,.025)),
+        rgba(0,0,0,.22);
+    border-bottom: 1px solid rgba(245,198,107,.14);
 }
 
 @media (max-width: 1100px) {
@@ -405,412 +425,290 @@ document.addEventListener("click", function (event) {
     .history-ledger-stats {
         grid-template-columns: 1fr;
     }
+
+    .history-ledger-head,
+    .history-ledger-pagination,
+    .history-bulk-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
 
-.history-dossier-toggle {
-    cursor: pointer;
-    font-family: var(--mw-kai-font) !important;
-}
-
-.history-dossier-detail-row[hidden] {
-    display: none !important;
-}
-
-.history-dossier-detail-row td {
-    padding: 0 !important;
-    background:
-        radial-gradient(circle at 92% 18%, rgba(126, 23, 20, 0.16), transparent 36%),
-        rgba(5, 5, 6, 0.72);
-}
-
+/* ===== 卷宗編輯器：卡片式操作面板 ===== */
 .history-dossier-detail {
-    margin: 0;
-    padding: 18px;
-    border-top: 1px solid rgba(183, 143, 82, 0.26);
-    display: grid;
-    gap: 16px;
+    padding: 20px !important;
+    background:
+        radial-gradient(circle at 92% 18%, rgba(207, 62, 62, .14), transparent 34%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(7, 9, 15, .96) !important;
+}
+
+.history-dossier-detail,
+.history-dossier-detail * {
+    box-sizing: border-box;
 }
 
 .history-dossier-detail-head {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: flex-start;
     gap: 14px;
-    border-bottom: 1px solid rgba(183, 143, 82, 0.18);
-    padding-bottom: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,.09);
 }
 
 .history-dossier-detail-head h4 {
-    margin: 0;
-    font-size: 22px;
-    color: #f2dfb0;
-    letter-spacing: 0.08em;
+    margin: 4px 0 0 !important;
+    color: var(--mw-gold, #f5c66b);
+    font-size: 19px;
+    letter-spacing: .06em;
 }
 
-.history-dossier-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 16px;
+.history-dossier-summary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
-.history-dossier-box {
-    border: 1px solid rgba(183, 143, 82, 0.24);
-    border-radius: 14px;
-    padding: 14px;
-    background: rgba(0, 0, 0, 0.22);
-}
-
-.history-dossier-box-title {
-    margin: 0 0 12px;
-    color: #d9bd80;
-    font-weight: 900;
-    letter-spacing: 0.1em;
-}
-
-.history-dossier-line {
-    display: grid;
-    grid-template-columns: minmax(180px, 1fr) auto auto;
-    gap: 10px;
-    align-items: center;
-    padding: 9px 0;
-    border-top: 1px dashed rgba(183, 143, 82, 0.14);
-}
-
-.history-dossier-line:first-of-type {
-    border-top: 0;
-}
-
-.history-dossier-new-line {
-    opacity: 0.94;
-}
-
-.history-dossier-check {
+.history-dossier-pill {
     display: inline-flex;
     align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(245,198,107,.25);
+    background: rgba(245,198,107,.08);
+    color: #ffe3a3;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 950;
+}
+
+.history-dossier-overview {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr .8fr .8fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.history-dossier-info-card {
+    min-width: 0;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.035);
+    padding: 12px;
+}
+
+.history-dossier-info-card span {
+    display: block;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.history-dossier-info-card strong {
+    display: block;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 15px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.history-dossier-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.history-dossier-card {
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.09);
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(0,0,0,.18);
+    padding: 14px;
+    min-width: 0;
+}
+
+.history-dossier-card-wide {
+    grid-column: 1 / -1;
+}
+
+.history-dossier-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.history-dossier-card-head h5 {
+    margin: 0 !important;
+    color: #fff3cf;
+    font-size: 16px;
+    letter-spacing: .06em;
+}
+
+.history-dossier-card-head p {
+    margin: 4px 0 0 !important;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.history-dossier-person-list,
+.history-dossier-add-list,
+.history-dossier-payout-list {
+    display: grid;
+    gap: 10px;
+}
+
+.history-dossier-person-row,
+.history-dossier-add-row {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.075);
+    background: rgba(255,255,255,.032);
+    padding: 11px;
+}
+
+.history-dossier-person-row {
+    grid-template-columns: minmax(260px, 1fr) 128px 92px;
+}
+
+.history-dossier-add-row {
+    grid-template-columns: minmax(260px, 1fr) 128px;
+}
+
+.history-dossier-field {
+    display: grid;
     gap: 6px;
-    white-space: nowrap;
-    color: rgba(255, 247, 226, 0.82);
-    font-size: 13px;
+    min-width: 0;
+}
+
+.history-dossier-field span {
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 12px;
     font-weight: 800;
 }
 
-.history-dossier-payout-row {
-    display: grid;
-    grid-template-columns: 92px minmax(150px, 1fr) 150px;
-    gap: 10px;
-    align-items: center;
-    padding: 9px 0;
-    border-top: 1px dashed rgba(183, 143, 82, 0.14);
-}
-
-.history-dossier-payout-row:first-of-type {
-    border-top: 0;
-}
-
-.history-dossier-payout-row strong {
-    color: #f2dfb0;
-}
-
-.history-dossier-payout-row small {
-    color: rgba(255,255,255,0.48);
-}
-
-@media (max-width: 1100px) {
-    .history-dossier-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .history-dossier-line,
-    .history-dossier-payout-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-
-
-/* === HISTORY LEDGER CONSOLIDATED CLEANUP START === */
-
-/* 歷史頁外層保持透明，只留下必要線條與底部保存列。 */
-body:has(.history-ledger-page) .content,
-body:has(.history-ledger-page) .content-area,
-body:has(.history-ledger-page) .page-content,
-body:has(.history-ledger-page) .main-content,
-body:has(.history-ledger-page) .dashboard-content,
-body:has(.history-ledger-page) .content-card,
-body:has(.history-ledger-page) .dashboard-card,
-body:has(.history-ledger-page) .page-card,
-body:has(.history-ledger-page) .admin-panel,
-body:has(.history-ledger-page) .app-card,
-body:has(.history-ledger-page) main,
-body:has(.history-ledger-page) main > section,
-body:has(.history-ledger-page) main > div {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
-body:has(.history-ledger-page) .content-card::before,
-body:has(.history-ledger-page) .content-card::after,
-body:has(.history-ledger-page) .dashboard-card::before,
-body:has(.history-ledger-page) .dashboard-card::after,
-body:has(.history-ledger-page) .page-card::before,
-body:has(.history-ledger-page) .page-card::after,
-body:has(.history-ledger-page) .app-card::before,
-body:has(.history-ledger-page) .app-card::after,
-body:has(.history-ledger-page) .admin-panel::before,
-body:has(.history-ledger-page) .admin-panel::after,
-.history-ledger-page::before,
-.history-ledger-page::after,
-.history-ledger-page .panel::before,
-.history-ledger-page .panel::after,
-.history-bulk-toolbar::before,
-.history-bulk-toolbar::after {
-    display: none !important;
-    opacity: 0 !important;
-}
-
-.history-ledger-page,
-.history-ledger-page > section,
-.history-ledger-page .panel,
-.history-ledger-panel,
-.history-ledger-head,
-.history-ledger-table-wrap,
-.history-ledger-table,
-.history-ledger-table thead,
-.history-ledger-table tbody,
-.history-ledger-table tr,
-.history-ledger-table th,
-.history-ledger-table td,
-.history-ledger-pagination,
-.history-dossier-detail,
-.history-dossier-box {
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
-.history-ledger-page > .panel,
-.history-ledger-panel {
-    border: 1px solid rgba(190, 151, 86, 0.42) !important;
-}
-
-.history-ledger-stats .history-ledger-stat {
-    background:
-        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
-        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
-    color: #130f0c !important;
-    border: 1px solid rgba(116, 78, 42, 0.46) !important;
-    box-shadow: 0 18px 42px rgba(0,0,0,0.20) !important;
-}
-
-.history-ledger-page .input,
-.history-ledger-page input,
-.history-ledger-page select {
-    background: rgba(18, 14, 11, 0.78) !important;
-    border-color: rgba(190, 151, 86, 0.42) !important;
-}
-
-.history-ledger-page .history-bulk-toolbar,
-form#historyBulkForm .history-bulk-toolbar,
-.history-bulk-toolbar {
-    background:
-        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, 0.28), transparent 44%),
-        linear-gradient(90deg, rgba(13, 10, 8, 0.94), rgba(24, 13, 11, 0.91)) !important;
-    background-color: rgba(10, 8, 7, 0.94) !important;
-    border: 1px solid rgba(190, 151, 86, 0.42) !important;
-    box-shadow:
-        0 -12px 28px rgba(0, 0, 0, 0.34),
-        0 0 0 1px rgba(0, 0, 0, 0.16) inset !important;
-    backdrop-filter: blur(8px) !important;
-}
-
-.history-bulk-toolbar .muted-text {
-    color: rgba(255, 244, 214, 0.82) !important;
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.72);
-}
-
-.history-bulk-toolbar .button {
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
-}
-
-/* === HISTORY LEDGER CONSOLIDATED CLEANUP END === */
-
-/* === HISTORY STATUS CLEAN FINAL START === */
-
-/* 狀態欄回歸正常表格，不再用 wrapper / 假 select */
-.history-ledger-table td.history-status-cell {
-    width: 100px !important;
-    min-width: 100px !important;
-    max-width: 100px !important;
-    padding: 10px 8px !important;
-    text-align: center !important;
-    vertical-align: middle !important;
-    background: transparent !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-}
-
-/* select 本體固定尺寸，不撐壞格線 */
-.history-ledger-table td.history-status-cell select.history-status-select {
-    box-sizing: border-box !important;
-    display: block !important;
-
-    width: 82px !important;
-    height: 34px !important;
-    min-height: 34px !important;
-    max-height: 34px !important;
-
-    margin: 0 auto !important;
-    padding: 0 6px !important;
-
-    border-radius: 8px !important;
-    border: 1px solid rgba(190, 151, 86, 0.52) !important;
-    background: rgba(0, 0, 0, 0.22) !important;
-    box-shadow: none !important;
-
-    color: rgba(255, 247, 226, 0.96) !important;
-    font-size: 13px !important;
-    font-weight: 800 !important;
-    font-family: var(--mw-kai-font), "DFKai-SB", "標楷體", serif !important;
-
-    text-align: center !important;
-    text-align-last: center !important;
-}
-
-.history-ledger-table td.history-status-cell select.history-status-select:focus {
-    outline: none !important;
-    border-color: rgba(240, 94, 76, 0.78) !important;
-}
-
-/* 移除殘留大膠囊 */
-.history-status-wrap,
-.history-status-label {
-    display: contents !important;
-}
-
-.history-ledger-table td.history-status-cell::before,
-.history-ledger-table td.history-status-cell::after {
-    content: none !important;
-    display: none !important;
-}
-
-/* === HISTORY STATUS CLEAN FINAL END === */
-
-
-/* === HISTORY FONT SIZE TUNE START === */
-
-/* 只調小字，不動大標題與統計卡大數字 */
-
-/* 篩選列標籤與輸入 */
-.history-ledger-filter label span {
-    font-size: 15px !important;
-    font-weight: 900 !important;
-}
-
-.history-ledger-filter .input,
-.history-ledger-filter input,
-.history-ledger-filter select {
-    font-size: 15px !important;
-}
-
-/* 統計卡小標與說明加大一點，但不動 strong 大數字 */
-.history-ledger-stat span {
-    font-size: 16px !important;
-    font-weight: 900 !important;
-}
-
-.history-ledger-stat small {
-    font-size: 14px !important;
-    font-weight: 800 !important;
-}
-
-/* 表格表頭 */
-.history-ledger-table th {
-    font-size: 16px !important;
-    font-weight: 900 !important;
-    letter-spacing: 0.08em !important;
-}
-
-/* 表格內容 */
-.history-ledger-table td {
-    font-size: 15px !important;
-}
-
-/* 契約編號目前略小，加大但不誇張 */
-.history-ledger-no {
-    font-size: 16px !important;
-    font-weight: 900 !important;
-}
-
-/* input / select 文字 */
-.history-ledger-table .input,
-.history-ledger-table input,
-.history-ledger-table select,
-.history-ledger-table .history-status-select {
-    font-size: 15px !important;
-    font-weight: 800 !important;
-}
-
-/* 委託人下方 ID 太小，稍微加大 */
-.history-ledger-person small {
-    font-size: 13px !important;
-    color: rgba(255, 247, 226, 0.62) !important;
-}
-
-/* 接單人員小徽章 */
-.history-ledger-chip {
-    font-size: 13px !important;
-    font-weight: 900 !important;
-    padding: 5px 9px !important;
-}
-
-/* 頁碼 / 右上說明 */
-.history-ledger-head .muted-text,
-.history-ledger-pagination,
-.history-ledger-pagination .muted-text,
-.history-page-links a,
-.history-page-links span {
-    font-size: 14px !important;
-}
-
-/* 底部保存列說明 */
-.history-bulk-toolbar .muted-text {
-    font-size: 14px !important;
-    font-weight: 800 !important;
-}
-
-/* 底部按鈕 */
-.history-bulk-toolbar .button {
-    font-size: 15px !important;
-    font-weight: 900 !important;
-}
-
-/* 檢視卷宗按鈕 */
-.history-ledger-action .seal-button {
-    font-size: 14px !important;
-    font-weight: 900 !important;
-}
-
-/* 卷宗展開區小字 */
-.history-dossier-detail,
-.history-dossier-detail .input,
 .history-dossier-detail select,
-.history-dossier-detail input,
-.history-dossier-check,
+.history-dossier-detail input:not([type="checkbox"]) {
+    width: 100% !important;
+    min-height: 42px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.32) !important;
+    color: var(--mw-text, #f4f0e8) !important;
+    padding: 9px 12px !important;
+}
+
+.history-dossier-toggle {
+    min-height: 42px;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 !important;
+    padding: 9px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(245,198,107,.2);
+    background: rgba(245,198,107,.06);
+    color: #fff1c4;
+    font-size: 12px;
+    font-weight: 950;
+    cursor: pointer;
+}
+
+.history-dossier-toggle.danger {
+    border-color: rgba(255,107,138,.28);
+    background: rgba(255,107,138,.08);
+    color: #ffd7df;
+}
+
+.history-dossier-toggle input {
+    width: 15px !important;
+    height: 15px !important;
+    margin: 0 !important;
+    accent-color: #f5c66b;
+}
+
 .history-dossier-payout-row {
-    font-size: 15px !important;
+    display: grid !important;
+    grid-template-columns: 130px minmax(260px, 1fr) 180px !important;
+    gap: 10px !important;
+    align-items: center !important;
+    padding: 12px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    background: rgba(255,255,255,.035) !important;
 }
 
-.history-dossier-box-title {
-    font-size: 16px !important;
+.history-dossier-payout-type {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
 }
 
-/* === HISTORY FONT SIZE TUNE END === */
+.history-dossier-payout-person {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
 
+.history-dossier-payout-person span {
+    color: var(--mw-text, #f4f0e8);
+    font-weight: 900;
+    word-break: break-word;
+}
+
+.history-dossier-payout-person small {
+    color: rgba(255,255,255,.42);
+    word-break: break-all;
+}
+
+.history-dossier-empty {
+    border-radius: 16px;
+    border: 1px dashed rgba(255,255,255,.14);
+    background: rgba(255,255,255,.025);
+    padding: 14px;
+    color: var(--mw-muted, #a7a0b5);
+}
+
+@media (max-width: 1180px) {
+    .history-dossier-overview,
+    .history-dossier-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .history-dossier-card-wide {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 860px) {
+    .history-dossier-detail-head,
+    .history-dossier-card-head {
+        flex-direction: column;
+    }
+
+    .history-dossier-summary {
+        justify-content: flex-start;
+    }
+
+    .history-dossier-person-row,
+    .history-dossier-add-row,
+    .history-dossier-payout-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    .history-dossier-toggle {
+        justify-content: flex-start;
+    }
+}
 </style>
 
 <div class="history-ledger-page">
@@ -969,97 +867,158 @@ form#historyBulkForm .history-bulk-toolbar,
                                         <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">檢視卷宗</button>
                                     </td>
                                 </tr>
+                                  <tr class="history-dossier-detail-row" id="dossier-{{ order.id }}" hidden>
+                                      <td colspan="9">
+                                          <div class="history-dossier-detail">
+                                              <div class="history-dossier-detail-head">
+                                                  <div>
+                                                      <p class="order-no">DOSSIER EDITOR</p>
+                                                      <h4>{{ order.bot_order_no or ("WEB-" ~ order.id) }}｜卷宗修改</h4>
+                                                  </div>
 
-                                <tr class="history-dossier-detail-row" id="dossier-{{ order.id }}" hidden>
-                                    <td colspan="9">
-                                        <div class="history-dossier-detail">
-                                            <div class="history-dossier-detail-head">
-                                                <div>
-                                                    <p class="order-no">DOSSIER EDITOR</p>
-                                                    <h4>{{ order.bot_order_no or ("WEB-" ~ order.id) }}｜卷宗修改</h4>
-                                                </div>
-                                                <p class="muted-text">可修改接單人員、掛名狀態與分潤金額。</p>
-                                            </div>
+                                                  <div class="history-dossier-summary">
+                                                      <span class="history-dossier-pill">{{ order.status }}</span>
+                                                      <span class="history-dossier-pill">{{ order.amount or 0 }}T</span>
+                                                      <span class="history-dossier-pill">{{ assignment_rows | length }} 位接單</span>
+                                                  </div>
+                                              </div>
 
-                                            <div class="history-dossier-grid">
-                                                <div class="history-dossier-box">
-                                                    <p class="history-dossier-box-title">接單人員</p>
+                                              <div class="history-dossier-overview">
+                                                  <div class="history-dossier-info-card">
+                                                      <span>委託人</span>
+                                                      <strong>{{ order.customer_display_name or "未記錄" }}</strong>
+                                                  </div>
 
-                                                    {% if assignment_rows %}
-                                                        {% for assignment in assignment_rows %}
-                                                            <div class="history-dossier-line">
-                                                                <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
+                                                  <div class="history-dossier-info-card">
+                                                      <span>訂單內容</span>
+                                                      <strong>{{ order.category }}｜{{ order.item }}</strong>
+                                                  </div>
 
-                                                                <select class="input" name="assignment_worker_{{ assignment.id }}">
-                                                                    {% for option in history_staff_options.workers %}
-                                                                        <option value="{{ option.value or option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
-                                                                    {% endfor %}
-                                                                </select>
+                                                  <div class="history-dossier-info-card">
+                                                      <span>魔丸♫客服</span>
+                                                      <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong>
+                                                  </div>
 
-                                                                <label class="history-dossier-check">
-                                                                    <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
-                                                                    <span>掛名 +5%</span>
-                                                                </label>
+                                                  <div class="history-dossier-info-card">
+                                                      <span>結單日期</span>
+                                                      <strong>{{ closed_dates_by_order_id.get(order.id, "未記錄") or "未記錄" }}</strong>
+                                                  </div>
+                                              </div>
 
-                                                                <label class="history-dossier-check">
-                                                                    <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
-                                                                    <span>移除</span>
-                                                                </label>
-                                                            </div>
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        <p class="muted-text">目前沒有接單人員，可使用下方欄位新增。</p>
-                                                    {% endif %}
+                                              <div class="history-dossier-layout">
+                                                  <section class="history-dossier-card">
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>目前接單人員</h5>
+                                                              <p>更換人員、調整掛名 +5%，或勾選移除。</p>
+                                                          </div>
+                                                          <span class="history-dossier-pill">{{ assignment_rows | length }} 人</span>
+                                                      </div>
 
-                                                    {% for i in range(3) %}
-                                                        <div class="history-dossier-line history-dossier-new-line">
-                                                            <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
-                                                                <option value="">新增接單人員</option>
-                                                                {% for option in history_staff_options.workers %}
-                                                                    <option value="{{ option.value or option.id }}">{{ option.name }}</option>
-                                                                {% endfor %}
-                                                            </select>
+                                                      {% if assignment_rows %}
+                                                          <div class="history-dossier-person-list">
+                                                              {% for assignment in assignment_rows %}
+                                                                  <div class="history-dossier-person-row">
+                                                                      <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
 
-                                                            <label class="history-dossier-check">
-                                                                <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
-                                                                <span>掛名 +5%</span>
-                                                            </label>
+                                                                      <label class="history-dossier-field">
+                                                                          <span>接單人員</span>
+                                                                          <select class="input" name="assignment_worker_{{ assignment.id }}">
+                                                                              {% for option in history_staff_options.workers %}
+                                                                                  <option value="{{ option.value or option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
+                                                                              {% endfor %}
+                                                                          </select>
+                                                                      </label>
 
-                                                            <span class="muted-text">新增</span>
-                                                        </div>
-                                                    {% endfor %}
-                                                </div>
+                                                                      <label class="history-dossier-toggle">
+                                                                          <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
+                                                                          掛名 +5%
+                                                                      </label>
 
-                                                <div class="history-dossier-box">
-                                                    <p class="history-dossier-box-title">分潤調整</p>
+                                                                      <label class="history-dossier-toggle danger">
+                                                                          <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
+                                                                          移除
+                                                                      </label>
+                                                                  </div>
+                                                              {% endfor %}
+                                                          </div>
+                                                      {% else %}
+                                                          <div class="history-dossier-empty">目前沒有接單人員，可使用右側新增欄位補上。</div>
+                                                      {% endif %}
+                                                  </section>
 
-                                                    {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
-                                                    {% if payout_rows %}
-                                                        {% for payout in payout_rows %}
-                                                            {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
-                                                            <div class="history-dossier-payout-row">
-                                                                <strong>{{ payout.label }}</strong>
-                                                                <div>
-                                                                    <span>{{ payout.person_name or payout.person_id }}</span>
-                                                                    <small>{{ payout.person_id }}</small>
-                                                                </div>
-                                                                <input
-                                                                    class="input"
-                                                                    type="number"
-                                                                    name="{{ payout.input_name }}"
-                                                                    value="{{ manual_payout_overrides.get(manual_key, '') }}"
-                                                                    placeholder="自動"
-                                                                >
-                                                            </div>
-                                                        {% endfor %}
-                                                    {% else %}
-                                                        <p class="muted-text">目前沒有分潤資料；儲存後系統會依接單人員重新計算。</p>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
+                                                  <section class="history-dossier-card">
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>新增護級 / 陪級</h5>
+                                                              <p>最多先提供 3 個新增欄位，儲存後重新計算分潤。</p>
+                                                          </div>
+                                                      </div>
+
+                                                      <div class="history-dossier-add-list">
+                                                          {% for i in range(3) %}
+                                                              <div class="history-dossier-add-row">
+                                                                  <label class="history-dossier-field">
+                                                                      <span>新增接單人員 {{ i + 1 }}</span>
+                                                                      <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
+                                                                          <option value="">不新增</option>
+                                                                          {% for option in history_staff_options.workers %}
+                                                                              <option value="{{ option.value or option.id }}">{{ option.name }}</option>
+                                                                          {% endfor %}
+                                                                      </select>
+                                                                  </label>
+
+                                                                  <label class="history-dossier-toggle">
+                                                                      <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
+                                                                      掛名 +5%
+                                                                  </label>
+                                                              </div>
+                                                          {% endfor %}
+                                                      </div>
+                                                  </section>
+
+                                                  <section class="history-dossier-card history-dossier-card-wide">
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>分潤調整</h5>
+                                                              <p>留空代表自動計算；填入金額後會以手動分潤覆蓋。</p>
+                                                          </div>
+                                                      </div>
+
+                                                      {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
+                                                      {% if payout_rows %}
+                                                          <div class="history-dossier-payout-list">
+                                                              {% for payout in payout_rows %}
+                                                                  {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
+                                                                  <div class="history-dossier-payout-row">
+                                                                      <strong class="history-dossier-payout-type">{{ payout.label }}</strong>
+
+                                                                      <div class="history-dossier-payout-person">
+                                                                          <span>{{ payout.person_name or payout.person_id }}</span>
+                                                                          <small>{{ payout.person_id }}</small>
+                                                                      </div>
+
+                                                                      <label class="history-dossier-field">
+                                                                          <span>手動金額</span>
+                                                                          <input
+                                                                              class="input"
+                                                                              type="number"
+                                                                              name="{{ payout.input_name }}"
+                                                                              value="{{ manual_payout_overrides.get(manual_key, '') }}"
+                                                                              placeholder="自動"
+                                                                          >
+                                                                      </label>
+                                                                  </div>
+                                                              {% endfor %}
+                                                          </div>
+                                                      {% else %}
+                                                          <div class="history-dossier-empty">目前沒有分潤資料；儲存後系統會依接單人員重新計算。</div>
+                                                      {% endif %}
+                                                  </section>
+                                              </div>
+                                          </div>
+                                      </td>
+                                  </tr>
                             {% endfor %}
                         </tbody>
                     </table>
