@@ -93,7 +93,7 @@
         </div>
 
         <div class="panel staff-stat-card">
-            <h2>客服</h2>
+            <h2>魔丸♫客服</h2>
             <p class="big-number">{{ stats.customer_service }}</p>
             <p>有客服身分組。</p>
         </div>
@@ -117,7 +117,7 @@
         <form class="staff-filter-form" method="get" action="/admin/staff">
             <select class="input" name="role">
                 <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
-                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>魔丸♫客服</option>
                 <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
                 <option value="companion" {% if role == "companion" %}selected{% endif %}>陪玩</option>
             </select>
@@ -156,7 +156,7 @@
                             </div>
 
                             <div class="staff-role-chips">
-                                {% if member.is_customer_service %}<span class="chip">客服</span>{% endif %}
+                                {% if member.is_customer_service %}<span class="chip">魔丸♫魔丸♫客服</span>{% endif %}
                                 {% for role_label in member.receiver_role_labels %}
                                     <span class="chip">{{ role_label }}</span>
                                 {% endfor %}
