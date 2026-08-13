@@ -656,7 +656,7 @@ select.input {
                             {% if worker_members %}
                                 <form method="post" action="/admin/orders/{{ order.id }}/add-worker" class="admin-add-worker-form">
                                     <select class="input" name="worker_discord_id" required>
-                                        <option value="">選擇護級 / 陪級 / 陪級</option>
+                                        <option value="">選擇護級 / 陪級</option>
                                         {% for staff in worker_members %}
                                             <option value="{{ staff.discord_id }}" data-staff-id="{{ staff.discord_id }}">
                                                 {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
@@ -676,7 +676,7 @@ select.input {
                                     <button class="button" type="submit">新增護級 / 陪級</button>
                                 </form>
                             {% else %}
-                                <div class="empty-state">尚未同步護級 / 陪級 / 陪級名單，請先按上方「立即同步 Discord 成員」。</div>
+                                <div class="empty-state">尚未同步護級 / 陪級名單，請先按上方「立即同步 Discord 成員」。</div>
                             {% endif %}
                         </div>
 
