@@ -67,12 +67,12 @@ def get_member_role_ids(discord_user_id: str) -> list[str]:
 def get_dashboard_access(role_ids: list[str]) -> dict:
     roles = _normalize_role_ids(role_ids)
 
-    # 固定保險：新的打手 / 陪玩身分組，避免 config 或 env 沒吃到時登入被擋。
     fallback_worker_role_ids = _normalize_role_ids({
         "1500234130871550004",
         "1500234170943934544",
         "1500751039060643990",
     })
+
     fallback_companion_role_ids = _normalize_role_ids({
         "1500751059239440575",
         "1482080315798192210",
@@ -80,26 +80,20 @@ def get_dashboard_access(role_ids: list[str]) -> dict:
 
     admin_role_ids = _normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
     customer_service_role_ids = _normalize_role_ids(getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set()))
+
     worker_role_ids = _normalize_role_ids(getattr(config, "WORKER_ROLE_IDS", set())) | fallback_worker_role_ids
-
-    companion_role_ids = fallback_companion_role_ids
-
-    if hasattr(config, "COMPANION_ROLE_IDS"):
-        companion_role_ids |= _normalize_role_ids(config.COMPANION_ROLE_IDS)
-    elif hasattr(config, "COMPANION_ROLE_ID") and config.COMPANION_ROLE_ID:
-        companion_role_ids |= _normalize_role_ids({config.COMPANION_ROLE_ID})
+    companion_role_ids = _normalize_role_ids(getattr(config, "COMPANION_ROLE_IDS", set())) | fallback_companion_role_ids
 
     is_admin = bool(roles & admin_role_ids)
     is_customer_service = bool(roles & customer_service_role_ids)
     is_worker = bool(roles & worker_role_ids)
     is_companion = bool(roles & companion_role_ids)
+
     can_access = is_admin or is_customer_service or is_worker or is_companion
 
     print(
         "[dashboard_access]",
         "roles=", sorted(roles),
-        "worker_ids=", sorted(worker_role_ids),
-        "companion_ids=", sorted(companion_role_ids),
         "admin=", is_admin,
         "cs=", is_customer_service,
         "worker=", is_worker,

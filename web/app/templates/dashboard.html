@@ -26,14 +26,14 @@
                     </a>
                 {% endif %}
 
-                {% if is_worker %}
+                {% if is_worker or is_companion %}
                     <a class="panel-link" href="/dispatch">
                         派單頁面
                         <span>查看可接訂單與我的接單狀態</span>
                     </a>
                 {% endif %}
 
-                {% if not is_admin and not is_worker %}
+                {% if not is_admin and not is_worker and not is_companion %}
                     <div class="no-access">
                         你目前沒有網站權限，請確認 Discord 身分組。
                     </div>

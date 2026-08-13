@@ -10,8 +10,15 @@ from web.app.config import config
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
 
-WORKER_ROLE_IDS = {'1500234130871550004', '1500234170943934544', '1500751039060643990'}
-COMPANION_ROLE_IDS = {'1500751059239440575', '1482080315798192210'}
+WORKER_ROLE_IDS = {
+    '1500234130871550004',
+    '1500234170943934544',
+    '1500751039060643990',
+}
+COMPANION_ROLE_IDS = {
+    '1500751059239440575',
+    '1482080315798192210',
+}
 
 # 舊變數保留相容用，實際分類使用上面的 set。
 WORKER_ROLE_ID = next(iter(WORKER_ROLE_IDS))
@@ -74,15 +81,15 @@ def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
 
     customer_service_role_ids = {
         str(role_id)
-        for role_id in (
-            getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
-            or getattr(config, "ADMIN_ROLE_IDS", set())
-        )
+        for role_id in getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
     }
 
+    worker_role_ids = {str(role_id) for role_id in WORKER_ROLE_IDS}
+    companion_role_ids = {str(role_id) for role_id in COMPANION_ROLE_IDS}
+
     is_customer_service = bool(role_set & customer_service_role_ids)
-    is_worker = bool(role_set & WORKER_ROLE_IDS)
-    is_companion = bool(role_set & COMPANION_ROLE_IDS)
+    is_worker = bool(role_set & worker_role_ids)
+    is_companion = bool(role_set & companion_role_ids)
 
     return is_customer_service, is_worker, is_companion
 

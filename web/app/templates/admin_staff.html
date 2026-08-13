@@ -157,8 +157,9 @@
 
                             <div class="staff-role-chips">
                                 {% if member.is_customer_service %}<span class="chip">客服</span>{% endif %}
-                                {% if member.is_worker %}<span class="chip">打手</span>{% endif %}
-                                {% if member.is_companion %}<span class="chip">陪玩</span>{% endif %}
+                                {% for role_label in member.receiver_role_labels %}
+                                    <span class="chip">{{ role_label }}</span>
+                                {% endfor %}
                             </div>
                         </div>
 

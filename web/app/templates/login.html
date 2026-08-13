@@ -22,8 +22,9 @@
                             <a class="button" href="/admin">進入總控後台</a>
                         {% endif %}
 
-                        {% if user.is_worker or user.is_admin %}
+                        {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
                             <a class="button secondary" href="/dispatch">進入派單頁面</a>
+                            <a class="button secondary" href="/my/payouts">我的分潤</a>
                         {% endif %}
 
                         <a class="button danger" href="/auth/logout">登出</a>
