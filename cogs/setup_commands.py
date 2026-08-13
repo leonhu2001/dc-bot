@@ -27,7 +27,10 @@ class SetupCommands(commands.Cog):
     async def setup_panel(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="魔丸娛樂客服中心",
-            description="歡迎來到魔丸娛樂，點擊下方按鈕聯絡客服",
+            description=(
+                "歡迎來到魔丸娛樂，點擊下方按鈕聯絡客服\n"
+                "客服上班時間為： **AM 10:00 - 隔日 AM 2:00**"
+            ),
             color=discord.Color.purple(),
         )
 
