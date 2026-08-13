@@ -131,3 +131,8 @@ async def discord_callback(
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
+
+
+@router.get("/discord")
+async def discord_login_alias():
+    return RedirectResponse(url="/auth/discord/login", status_code=303)
