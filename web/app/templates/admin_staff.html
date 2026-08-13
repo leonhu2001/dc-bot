@@ -1,457 +1,487 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="utf-8">
-    <title>{{ title or "人員名單" }}｜魔丸娛樂</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "layout.html" %}
 
-    <style>
-        :root {
-            --bg: #080b12;
-            --panel: rgba(18, 24, 38, 0.92);
-            --panel-soft: rgba(255, 255, 255, 0.055);
-            --line: rgba(255, 255, 255, 0.1);
-            --text: #eef3ff;
-            --muted: #9da9c2;
-            --gold: #f4c76b;
-            --cyan: #6ee7ff;
-            --danger: #ff6b8a;
-            --ok: #72f2a6;
-            --radius: 18px;
-        }
+{% block page_title %}人員名單{% endblock %}
 
-        * {
-            box-sizing: border-box;
-        }
+{% block content %}
+<style>
+.staff-page {
+    display: grid;
+    gap: 18px;
+}
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            color: var(--text);
-            font-family: "Microsoft JhengHei", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-            background:
-                radial-gradient(circle at top left, rgba(244, 199, 107, 0.16), transparent 34%),
-                radial-gradient(circle at top right, rgba(110, 231, 255, 0.13), transparent 32%),
-                linear-gradient(135deg, #05070c 0%, #101522 46%, #06080e 100%);
-        }
+.staff-command {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, .86fr);
+    gap: 16px;
+    align-items: stretch;
+}
 
-        a {
-            color: inherit;
-            text-decoration: none;
-        }
+.staff-card {
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
+}
 
-        .shell {
-            width: min(1440px, calc(100% - 36px));
-            margin: 0 auto;
-            padding: 28px 0 46px;
-        }
+.staff-intro {
+    position: relative;
+    overflow: hidden;
+    padding: 22px;
+}
 
-        .topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 22px;
-        }
+.staff-intro::after {
+    content: "STAFF";
+    position: absolute;
+    right: 18px;
+    bottom: 8px;
+    color: rgba(255,255,255,.045);
+    font-size: 76px;
+    font-weight: 950;
+    letter-spacing: .16em;
+    pointer-events: none;
+}
 
-        .brand {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
+.staff-intro .order-no,
+.staff-panel-head .order-no {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .16em;
+}
 
-        .brand-title {
-            font-size: 30px;
-            font-weight: 900;
-            letter-spacing: 0.08em;
-        }
+.staff-intro h2 {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 8px;
+    font-size: 30px;
+    letter-spacing: .08em;
+}
 
-        .brand-subtitle {
-            color: var(--muted);
-            font-size: 14px;
-        }
+.staff-intro p {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: var(--mw-muted, #a7a0b5);
+    line-height: 1.8;
+}
 
-        .nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: flex-end;
-        }
+.staff-filter-card {
+    padding: 18px;
+}
 
-        .btn,
-        button.btn {
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 10px 15px;
-            background: rgba(255, 255, 255, 0.07);
-            color: var(--text);
-            cursor: pointer;
-            font-weight: 700;
-            transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
-        }
+.staff-filter-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
 
-        .btn:hover,
-        button.btn:hover {
-            transform: translateY(-1px);
-            border-color: rgba(244, 199, 107, 0.55);
-            background: rgba(244, 199, 107, 0.12);
-        }
+.staff-filter-form label {
+    display: grid;
+    gap: 7px;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
+    font-weight: 900;
+}
 
-        .btn.primary {
-            background: linear-gradient(135deg, rgba(244, 199, 107, 0.28), rgba(110, 231, 255, 0.12));
-            border-color: rgba(244, 199, 107, 0.42);
-        }
+.staff-filter-form .input,
+.staff-filter-form select,
+.staff-filter-form input {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.3) !important;
+    color: var(--mw-text, #f4f0e8) !important;
+    padding: 9px 12px;
+}
 
-        .btn.danger {
-            border-color: rgba(255, 107, 138, 0.42);
-            color: #ffd7df;
-        }
+.staff-filter-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
 
-        .message {
-            margin-bottom: 16px;
-            padding: 13px 15px;
-            border-radius: 14px;
-            border: 1px solid rgba(114, 242, 166, 0.35);
-            background: rgba(114, 242, 166, 0.09);
-            color: #d9ffe7;
-        }
+.staff-filter-actions .button {
+    min-width: 120px;
+    justify-content: center;
+}
 
-        .error {
-            margin-bottom: 16px;
-            padding: 13px 15px;
-            border-radius: 14px;
-            border: 1px solid rgba(255, 107, 138, 0.35);
-            background: rgba(255, 107, 138, 0.1);
-            color: #ffd5df;
-        }
+.staff-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
 
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 18px;
-        }
+.staff-stat-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 112px;
+    border: 1px solid rgba(245,198,107,.18);
+    border-radius: 22px;
+    background:
+        radial-gradient(circle at 92% 15%, rgba(245,198,107,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+    padding: 18px;
+}
 
-        .stat-card {
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            background: var(--panel);
-            padding: 16px;
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
-        }
+.staff-stat-card.cs {
+    border-color: rgba(117,232,255,.22);
+    background:
+        radial-gradient(circle at 92% 15%, rgba(117,232,255,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+}
 
-        .stat-label {
-            color: var(--muted);
-            font-size: 13px;
-            margin-bottom: 8px;
-        }
+.staff-stat-card.receiver {
+    border-color: rgba(255,107,138,.22);
+    background:
+        radial-gradient(circle at 92% 15%, rgba(255,107,138,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+}
 
-        .stat-value {
-            font-size: 26px;
-            font-weight: 900;
-        }
+.staff-stat-card span {
+    display: block;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
+    font-weight: 900;
+    margin-bottom: 10px;
+}
 
-        .toolbar {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            align-items: end;
-            justify-content: space-between;
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            background: var(--panel);
-            padding: 16px;
-            margin-bottom: 18px;
-        }
+.staff-stat-card strong {
+    display: block;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 950;
+}
 
-        .filters {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: end;
-        }
+.staff-panel {
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
+    overflow: hidden;
+}
 
-        .field {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
+.staff-panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
+}
 
-        label {
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-        }
+.staff-panel-head h2 {
+    margin: 4px 0 0;
+    font-size: 24px;
+    letter-spacing: .08em;
+}
 
-        select,
-        input {
-            min-width: 180px;
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text);
-            padding: 11px 12px;
-            outline: none;
-        }
+.staff-panel-head p {
+    margin: 8px 0 0;
+    color: var(--mw-muted, #a7a0b5);
+}
 
-        option {
-            background: #101522;
-            color: var(--text);
-        }
+.staff-list {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+}
 
-        .members {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 14px;
-        }
+.staff-member-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 22px;
+    background: rgba(255,255,255,.028);
+    padding: 16px;
+}
 
-        .member-card {
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            background:
-                linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.035)),
-                var(--panel);
-            padding: 16px;
-            min-height: 150px;
-        }
+.staff-member-main {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    min-width: 0;
+}
 
-        .member-head {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            margin-bottom: 13px;
-        }
+.staff-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(245,198,107,.36);
+    background: rgba(245,198,107,.12);
+    color: #ffe3a3;
+    font-weight: 950;
+    flex: 0 0 auto;
+}
 
-        .avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 16px;
-            display: grid;
-            place-items: center;
-            background: linear-gradient(135deg, rgba(244,199,107,0.35), rgba(110,231,255,0.22));
-            color: var(--text);
-            font-weight: 900;
-            flex: 0 0 auto;
-        }
+.staff-name {
+    margin: 0;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 20px;
+    line-height: 1.35;
+    word-break: break-word;
+}
 
-        .member-name {
-            font-size: 17px;
-            font-weight: 900;
-            line-height: 1.25;
-        }
+.staff-id {
+    margin: 4px 0 0;
+    color: rgba(255,255,255,.45);
+    font-size: 13px;
+    word-break: break-all;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
 
-        .member-id {
-            color: var(--muted);
-            font-size: 12px;
-            margin-top: 4px;
-            word-break: break-all;
-        }
+.staff-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
 
-        .chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 7px;
-            margin-bottom: 12px;
-        }
+.staff-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(245,198,107,.24);
+    background: rgba(245,198,107,.08);
+    color: #ffe3a3;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 950;
+    white-space: nowrap;
+}
 
-        .chip {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            padding: 6px 9px;
-            font-size: 12px;
-            font-weight: 900;
-            border: 1px solid rgba(244, 199, 107, 0.32);
-            background: rgba(244, 199, 107, 0.11);
-            color: #ffe5a7;
-        }
+.staff-chip.cs {
+    border-color: rgba(117,232,255,.25);
+    background: rgba(117,232,255,.08);
+    color: #c9f8ff;
+}
 
-        .chip.cs {
-            border-color: rgba(110, 231, 255, 0.36);
-            background: rgba(110, 231, 255, 0.1);
-            color: #c9f8ff;
-        }
+.staff-chip.inactive {
+    border-color: rgba(255,255,255,.15);
+    background: rgba(255,255,255,.045);
+    color: rgba(255,255,255,.55);
+}
 
-        .meta {
-            color: var(--muted);
-            font-size: 12px;
-            display: grid;
-            gap: 5px;
-        }
+.staff-chip.active {
+    border-color: rgba(114,242,166,.28);
+    background: rgba(114,242,166,.08);
+    color: #d9ffe8;
+}
 
-        .empty {
-            border: 1px dashed var(--line);
-            border-radius: var(--radius);
-            padding: 36px;
-            text-align: center;
-            color: var(--muted);
-            background: rgba(255, 255, 255, 0.035);
-        }
+.staff-empty {
+    margin: 16px;
+    border: 1px dashed rgba(255,255,255,.16);
+    border-radius: 18px;
+    padding: 20px;
+    color: var(--mw-muted, #a7a0b5);
+    background: rgba(255,255,255,.025);
+}
 
-        @media (max-width: 1100px) {
-            .stats {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
+.staff-sync-form {
+    margin: 0;
+}
 
-            .members {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
+@media (max-width: 1080px) {
+    .staff-command,
+    .staff-stat-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
 
-        @media (max-width: 720px) {
-            .shell {
-                width: min(100% - 20px, 1440px);
-                padding-top: 18px;
-            }
+@media (max-width: 720px) {
+    .staff-command,
+    .staff-filter-form,
+    .staff-stat-grid,
+    .staff-member-card,
+    .staff-panel-head {
+        grid-template-columns: 1fr;
+    }
 
-            .topbar {
-                align-items: flex-start;
-                flex-direction: column;
-            }
+    .staff-tags {
+        justify-content: flex-start;
+    }
+}
+</style>
 
-            .stats,
-            .members {
-                grid-template-columns: 1fr;
-            }
+{% if members is defined %}
+    {% set staff_rows = members %}
+{% elif staff_members is defined %}
+    {% set staff_rows = staff_members %}
+{% else %}
+    {% set staff_rows = [] %}
+{% endif %}
 
-            select,
-            input {
-                min-width: 100%;
-            }
+{% set current_role = role if role is defined else "all" %}
+{% set current_status = status if status is defined else "active" %}
+{% set current_q = q if q is defined else "" %}
+{% set cs_label = customer_service_label if customer_service_label is defined else "魔丸♫客服" %}
 
-            .filters,
-            .field {
-                width: 100%;
-            }
-        }
-    </style>
-</head>
+{% set ns = namespace(active=0, inactive=0, cs=0, receiver=0) %}
+{% for member in staff_rows %}
+    {% set active_member = member.is_active if member.is_active is defined else true %}
+    {% if active_member %}
+        {% set ns.active = ns.active + 1 %}
+    {% else %}
+        {% set ns.inactive = ns.inactive + 1 %}
+    {% endif %}
 
-<body>
-    <main class="shell">
-        <header class="topbar">
-            <div class="brand">
-                <div class="brand-title">魔丸人員名單</div>
-                <div class="brand-subtitle">客服、護級、陪級身分組管理與篩選</div>
-            </div>
+    {% if member.is_customer_service %}
+        {% set ns.cs = ns.cs + 1 %}
+    {% endif %}
 
-            <nav class="nav">
-                <a class="btn" href="/admin">總控</a>
-                <a class="btn" href="/dispatch">派單頁</a>
-                <a class="btn" href="/order-history">歷史訂單</a>
-                <a class="btn danger" href="/auth/logout">登出</a>
-            </nav>
-        </header>
+    {% if member.receiver_role_labels is defined and member.receiver_role_labels %}
+        {% set ns.receiver = ns.receiver + 1 %}
+    {% elif member.is_worker or member.is_companion %}
+        {% set ns.receiver = ns.receiver + 1 %}
+    {% endif %}
+{% endfor %}
 
-        {% if message %}
-            <div class="message">{{ message }}</div>
-        {% endif %}
+{% if message %}
+    <div class="notice success-box">{{ message }}</div>
+{% endif %}
 
-        {% if error %}
-            <div class="error">{{ error }}</div>
-        {% endif %}
+{% if error %}
+    <div class="notice error-box">{{ error }}</div>
+{% endif %}
 
-        <section class="stats">
-            <div class="stat-card">
-                <div class="stat-label">全部人員</div>
-                <div class="stat-value">{{ stats.total }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">啟用中</div>
-                <div class="stat-value">{{ stats.active }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">魔丸♫客服</div>
-                <div class="stat-value">{{ stats.customer_service }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">護級 / 接單</div>
-                <div class="stat-value">{{ stats.worker }}</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">陪級</div>
-                <div class="stat-value">{{ stats.companion }}</div>
-            </div>
-        </section>
+<section class="staff-page">
+    <section class="staff-command">
+        <div class="staff-card staff-intro">
+            <p class="order-no">STAFF REGISTRY</p>
+            <h2>人員名單</h2>
+            <p>查看目前可進入後台的人員，包含魔丸♫客服、護級與陪級。同步成員會依 Discord 身分組重新整理。</p>
+        </div>
 
-        <section class="toolbar">
-            <form class="filters" method="get" action="/admin/staff">
-                <div class="field">
-                    <label>身分組</label>
-                    <select name="role">
-                        {% for option in role_filter_options %}
-                            <option value="{{ option.value }}" {% if role == option.value or (role == "all" and option.value == "") %}selected{% endif %}>{{ option.label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label>狀態</label>
-                    <select name="status">
-                        <option value="active" {% if status == "active" %}selected{% endif %}>啟用中</option>
-                        <option value="inactive" {% if status == "inactive" %}selected{% endif %}>已停用</option>
-                        <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label>搜尋</label>
-                    <input type="search" name="q" value="{{ q }}" placeholder="暱稱、帳號、Discord ID">
-                </div>
-
-                <button class="btn primary" type="submit">套用篩選</button>
-                <a class="btn" href="/admin/staff">清除</a>
-            </form>
-
-            <form method="post" action="/admin/staff/sync">
-                <button class="btn primary" type="submit">同步成員</button>
-            </form>
-        </section>
-
-        {% if members %}
-            <section class="members">
-                {% for member in members %}
-                    <article class="member-card">
-                        <div class="member-head">
-                            <div class="avatar">
-                                {{ (member.display_name or member.global_name or member.username or "?")[:1] }}
-                            </div>
-
-                            <div>
-                                <div class="member-name">
-                                    {{ member.display_name or member.global_name or member.username or member.discord_id }}
-                                </div>
-                                <div class="member-id">{{ member.discord_id }}</div>
-                            </div>
-                        </div>
-
-                        <div class="chips">
-                            {% if member.is_customer_service %}
-                                <span class="chip cs">{{ customer_service_label }}</span>
-                            {% endif %}
-
-                            {% for role_label in member.receiver_role_labels %}
-                                <span class="chip">{{ role_label }}</span>
+        <div class="staff-card staff-filter-card">
+            <form method="get" action="/admin/staff" class="staff-filter-form">
+                <label>
+                    <span>身分</span>
+                    <select class="input" name="role">
+                        {% if role_filter_options is defined %}
+                            {% for option in role_filter_options %}
+                                <option value="{{ option.value }}" {% if current_role == option.value or (current_role == "all" and option.value == "") %}selected{% endif %}>
+                                    {{ option.label }}
+                                </option>
                             {% endfor %}
+                        {% else %}
+                            <option value="all" {% if current_role == "all" %}selected{% endif %}>全部</option>
+                            <option value="customer_service" {% if current_role == "customer_service" %}selected{% endif %}>魔丸♫客服</option>
+                            <option value="worker" {% if current_role == "worker" %}selected{% endif %}>護級 / 陪級</option>
+                        {% endif %}
+                    </select>
+                </label>
 
-                            {% if not member.is_customer_service and not member.receiver_role_labels %}
-                                <span class="chip">未分類</span>
-                            {% endif %}
+                <label>
+                    <span>狀態</span>
+                    <select class="input" name="status">
+                        <option value="active" {% if current_status == "active" %}selected{% endif %}>啟用中</option>
+                        <option value="inactive" {% if current_status == "inactive" %}selected{% endif %}>已停用</option>
+                        <option value="all" {% if current_status == "all" %}selected{% endif %}>全部狀態</option>
+                    </select>
+                </label>
+
+                <label>
+                    <span>搜尋</span>
+                    <input class="input" type="text" name="q" value="{{ current_q }}" placeholder="輸入名稱或 Discord ID">
+                </label>
+
+                <div class="staff-filter-actions">
+                    <button class="button" type="submit">套用篩選</button>
+                    <a class="button secondary" href="/admin/staff">清除</a>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="staff-stat-grid">
+        <article class="staff-stat-card">
+            <span>目前顯示</span>
+            <strong>{{ staff_rows | length }}</strong>
+        </article>
+
+        <article class="staff-stat-card">
+            <span>啟用中</span>
+            <strong>{{ ns.active }}</strong>
+        </article>
+
+        <article class="staff-stat-card cs">
+            <span>{{ cs_label }}</span>
+            <strong>{{ ns.cs }}</strong>
+        </article>
+
+        <article class="staff-stat-card receiver">
+            <span>護級 / 陪級</span>
+            <strong>{{ ns.receiver }}</strong>
+        </article>
+    </section>
+
+    <section class="staff-panel">
+        <div class="staff-panel-head">
+            <div>
+                <p class="order-no">MEMBER LIST</p>
+                <h2>成員列表</h2>
+                <p>角色標籤會依目前 Discord 身分組顯示。</p>
+            </div>
+
+            <form class="staff-sync-form" method="post" action="/admin/staff/sync">
+                <button class="button" type="submit">同步成員</button>
+            </form>
+        </div>
+
+        {% if staff_rows %}
+            <div class="staff-list">
+                {% for member in staff_rows %}
+                    {% set display_name = member.display_name or member.name or member.username or member.discord_id %}
+                    {% set active_member = member.is_active if member.is_active is defined else true %}
+
+                    <article class="staff-member-card">
+                        <div class="staff-member-main">
+                            <div class="staff-avatar">{{ (display_name or "?")[:1] }}</div>
+                            <div>
+                                <h3 class="staff-name">{{ display_name }}</h3>
+                                <p class="staff-id">ID：{{ member.discord_id }}</p>
+                            </div>
                         </div>
 
-                        <div class="meta">
-                            <div>帳號：{{ member.username or "未記錄" }}</div>
-                            <div>全域名稱：{{ member.global_name or "未記錄" }}</div>
-                            <div>同步時間：{{ member.last_synced_at or "未同步" }}</div>
-                            <div>狀態：{% if member.is_active %}啟用中{% else %}已停用{% endif %}</div>
+                        <div class="staff-tags">
+                            {% if active_member %}
+                                <span class="staff-chip active">啟用中</span>
+                            {% else %}
+                                <span class="staff-chip inactive">已停用</span>
+                            {% endif %}
+
+                            {% if member.is_customer_service %}
+                                <span class="staff-chip cs">{{ cs_label }}</span>
+                            {% endif %}
+
+                            {% if member.receiver_role_labels is defined and member.receiver_role_labels %}
+                                {% for role_label in member.receiver_role_labels %}
+                                    <span class="staff-chip">{{ role_label }}</span>
+                                {% endfor %}
+                            {% elif member.is_worker or member.is_companion %}
+                                <span class="staff-chip">護級 / 陪級</span>
+                            {% endif %}
                         </div>
                     </article>
                 {% endfor %}
-            </section>
+            </div>
         {% else %}
-            <div class="empty">目前沒有符合篩選條件的人員。</div>
+            <div class="staff-empty">目前沒有符合條件的人員。</div>
         {% endif %}
-    </main>
-</body>
-</html>
+    </section>
+</section>
+{% endblock %}
