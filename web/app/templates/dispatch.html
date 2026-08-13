@@ -1,100 +1,457 @@
 {% extends "layout.html" %}
 
-{% block page_title %}派單頁面{% endblock %}
+{% block page_title %}派單中心{% endblock %}
 
 {% block content %}
+<style>
+    .dispatch-shell {
+        display: grid;
+        gap: 18px;
+    }
+
+    .dispatch-hero {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 18px;
+        align-items: stretch;
+    }
+
+    .dispatch-panel {
+        border: 1px solid var(--mw-line, rgba(255,255,255,.12));
+        border-radius: 24px;
+        background:
+            linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+            rgba(9, 12, 20, .92);
+        box-shadow: 0 22px 60px rgba(0,0,0,.3);
+    }
+
+    .dispatch-hero-main {
+        padding: 26px;
+    }
+
+    .dispatch-eyebrow {
+        margin: 0 0 8px;
+        color: var(--mw-gold, #f5c66b);
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: .18em;
+        text-transform: uppercase;
+    }
+
+    .dispatch-title {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 54px);
+        letter-spacing: .08em;
+        font-weight: 950;
+    }
+
+    .dispatch-desc {
+        margin: 12px 0 0;
+        color: var(--mw-muted, #a7a0b5);
+        line-height: 1.8;
+    }
+
+    .dispatch-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+    }
+
+    .dispatch-tag,
+    .dispatch-pill,
+    .dispatch-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(245, 198, 107, .28);
+        background: rgba(245, 198, 107, .09);
+        color: #ffe3a3;
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .dispatch-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        padding: 18px;
+    }
+
+    .dispatch-stat {
+        padding: 18px;
+        border-radius: 20px;
+        background: rgba(255,255,255,.055);
+        border: 1px solid rgba(255,255,255,.085);
+    }
+
+    .dispatch-stat span {
+        display: block;
+        color: var(--mw-muted, #a7a0b5);
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .dispatch-stat strong {
+        display: block;
+        font-size: 36px;
+        line-height: 1;
+        font-weight: 950;
+    }
+
+    .dispatch-notice {
+        border-radius: 18px;
+        padding: 14px 16px;
+        font-weight: 800;
+    }
+
+    .dispatch-notice.success {
+        border: 1px solid rgba(114, 242, 166, .34);
+        background: rgba(114, 242, 166, .1);
+        color: #d9ffe8;
+    }
+
+    .dispatch-notice.error {
+        border: 1px solid rgba(255, 107, 138, .34);
+        background: rgba(255, 107, 138, .1);
+        color: #ffd5df;
+    }
+
+    .dispatch-board {
+        display: grid;
+        grid-template-columns: minmax(320px, .72fr) minmax(0, 1.28fr);
+        gap: 18px;
+        align-items: start;
+    }
+
+    .dispatch-column {
+        padding: 18px;
+    }
+
+    .dispatch-column-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .dispatch-column-head h2 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: .06em;
+    }
+
+    .dispatch-count {
+        flex: 0 0 auto;
+    }
+
+    .dispatch-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .dispatch-my-card,
+    .dispatch-order-card,
+    .dispatch-empty {
+        border-radius: 20px;
+        border: 1px solid rgba(255,255,255,.09);
+        background:
+            linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.025)),
+            rgba(0,0,0,.18);
+    }
+
+    .dispatch-my-card {
+        padding: 15px;
+        display: grid;
+        gap: 12px;
+    }
+
+    .dispatch-my-card h3,
+    .dispatch-order-card h3 {
+        margin: 4px 0 0;
+        font-size: 17px;
+        line-height: 1.45;
+    }
+
+    .dispatch-money {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--mw-muted, #a7a0b5);
+        font-size: 13px;
+    }
+
+    .dispatch-money strong {
+        color: var(--mw-gold, #f5c66b);
+        font-size: 19px;
+    }
+
+    .dispatch-order-card {
+        padding: 16px;
+        display: grid;
+        gap: 14px;
+    }
+
+    .dispatch-order-top {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .dispatch-status {
+        border-color: rgba(117, 232, 255, .34);
+        background: rgba(117, 232, 255, .09);
+        color: #c9f8ff;
+    }
+
+    .dispatch-meta {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .dispatch-meta-item {
+        border: 1px solid rgba(255,255,255,.075);
+        border-radius: 16px;
+        padding: 12px;
+        background: rgba(255,255,255,.04);
+    }
+
+    .dispatch-meta-item span,
+    .dispatch-muted {
+        color: var(--mw-muted, #a7a0b5);
+        font-size: 12px;
+    }
+
+    .dispatch-meta-item strong {
+        display: block;
+        margin-top: 6px;
+        word-break: break-word;
+    }
+
+    .dispatch-assignment {
+        display: grid;
+        grid-template-columns: 1fr 92px;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid rgba(255,255,255,.075);
+        border-radius: 18px;
+        padding: 13px;
+        background: rgba(255,255,255,.035);
+    }
+
+    .dispatch-chip-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 8px;
+    }
+
+    .dispatch-worker-count {
+        text-align: center;
+        border-left: 1px solid rgba(255,255,255,.08);
+        color: var(--mw-muted, #a7a0b5);
+    }
+
+    .dispatch-worker-count strong {
+        display: block;
+        color: var(--mw-text, #f4f0e8);
+        font-size: 26px;
+        line-height: 1.1;
+    }
+
+    .dispatch-payout {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        border: 1px solid rgba(245, 198, 107, .18);
+        border-radius: 18px;
+        padding: 12px;
+        background: rgba(245, 198, 107, .07);
+    }
+
+    .dispatch-payout div {
+        display: grid;
+        gap: 5px;
+    }
+
+    .dispatch-payout span {
+        color: var(--mw-muted, #a7a0b5);
+        font-size: 12px;
+    }
+
+    .dispatch-payout strong {
+        color: var(--mw-gold, #f5c66b);
+        font-size: 18px;
+    }
+
+    .dispatch-note {
+        margin: 0;
+        border-left: 3px solid rgba(245, 198, 107, .55);
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(255,255,255,.045);
+        color: var(--mw-muted, #a7a0b5);
+        line-height: 1.7;
+    }
+
+    .dispatch-footer {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .dispatch-footer form {
+        margin: 0;
+    }
+
+    .dispatch-button {
+        border: 1px solid rgba(245, 198, 107, .4);
+        border-radius: 999px;
+        padding: 11px 18px;
+        color: var(--mw-text, #f4f0e8);
+        background: linear-gradient(135deg, rgba(245,198,107,.26), rgba(207,62,62,.16));
+        font-weight: 950;
+        cursor: pointer;
+    }
+
+    .dispatch-button.danger {
+        border-color: rgba(255,107,138,.4);
+        background: rgba(255,107,138,.13);
+        color: #ffd8df;
+    }
+
+    .dispatch-empty {
+        padding: 22px;
+        display: grid;
+        gap: 7px;
+        color: var(--mw-muted, #a7a0b5);
+    }
+
+    .dispatch-empty strong {
+        color: var(--mw-text, #f4f0e8);
+    }
+
+    @media (max-width: 1120px) {
+        .dispatch-hero,
+        .dispatch-board {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 760px) {
+        .dispatch-stats,
+        .dispatch-meta,
+        .dispatch-payout {
+            grid-template-columns: 1fr;
+        }
+
+        .dispatch-assignment {
+            grid-template-columns: 1fr;
+        }
+
+        .dispatch-worker-count {
+            border-left: 0;
+            border-top: 1px solid rgba(255,255,255,.08);
+            padding-top: 10px;
+        }
+
+        .dispatch-order-top,
+        .dispatch-column-head {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div class="dispatch-shell">
     {% if message %}
-        <div class="notice success-box dispatch-notice">
-            {{ message }}
-        </div>
+        <div class="dispatch-notice success">{{ message }}</div>
     {% endif %}
 
     {% if error %}
-        <div class="notice error-box dispatch-notice">
-            {{ error }}
-        </div>
+        <div class="dispatch-notice error">{{ error }}</div>
     {% endif %}
 
-    <section class="dispatch-v2-hero">
-        <div class="dispatch-v2-hero-main">
-            <p class="order-no">MISSION DISPATCH</p>
-            <h2>任務派單中心</h2>
-            <p class="muted-text">
-                查看目前可接任務、已接任務與預估分潤。接單後系統會同步紀錄。
+    <section class="dispatch-hero">
+        <div class="dispatch-panel dispatch-hero-main">
+            <p class="dispatch-eyebrow">MISSION DISPATCH</p>
+            <h1 class="dispatch-title">任務派單中心</h1>
+            <p class="dispatch-desc">
+                查看目前可接任務、已接任務與預估分潤。接單後系統會同步紀錄，客服與五個新接單身分組皆沿用原本派單頁權限。
             </p>
 
-            <div class="dispatch-v2-hero-tags">
-                <span>魔丸任務榜</span>
-                <span>即時同步</span>
-                <span>分潤預估</span>
+            <div class="dispatch-tags">
+                <span class="dispatch-tag">魔丸♫客服</span>
+                <span class="dispatch-tag">護級接單</span>
+                <span class="dispatch-tag">陪級接單</span>
+                <span class="dispatch-tag">即時提醒</span>
             </div>
         </div>
 
-        <div class="dispatch-v2-stat-grid">
-            <article class="dispatch-v2-stat-card">
-                <span>目前已接</span>
+        <div class="dispatch-panel dispatch-stats">
+            <article class="dispatch-stat">
+                <span>我的接單</span>
                 <strong>{{ claimed_orders | length }}</strong>
-                <small>MY MISSIONS</small>
             </article>
 
-            <article class="dispatch-v2-stat-card">
+            <article class="dispatch-stat">
                 <span>目前可接</span>
                 <strong>{{ orders | length }}</strong>
-                <small>AVAILABLE</small>
             </article>
         </div>
     </section>
 
-    <section class="dispatch-v2-board">
-        <div class="dispatch-v2-column dispatch-v2-column-my">
-            <div class="dispatch-v2-column-head">
+    <section class="dispatch-board">
+        <aside class="dispatch-panel dispatch-column">
+            <div class="dispatch-column-head">
                 <div>
-                    <p class="order-no">MY MISSIONS</p>
+                    <p class="dispatch-eyebrow">MY MISSIONS</p>
                     <h2>我的接單狀態</h2>
                 </div>
-                <span class="dispatch-count-pill">{{ claimed_orders | length }} 筆</span>
+                <span class="dispatch-pill dispatch-count">{{ claimed_orders | length }} 筆</span>
             </div>
 
             {% if claimed_orders %}
-                <div class="dispatch-v2-my-list">
+                <div class="dispatch-list">
                     {% for claimed_order in claimed_orders %}
-                        <article class="dispatch-v2-my-card">
+                        <article class="dispatch-my-card">
                             <div>
-                                <p class="order-no">
-                                    {{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}
-                                </p>
+                                <p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p>
                                 <h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3>
                             </div>
 
-                            <div class="dispatch-v2-money-chip">
-                                <span>金額</span>
+                            <div class="dispatch-money">
+                                <span>訂單金額</span>
                                 <strong>{{ claimed_order.amount }}T</strong>
                             </div>
                         </article>
                     {% endfor %}
                 </div>
             {% else %}
-                <div class="dispatch-v2-empty-card">
+                <div class="dispatch-empty">
                     <strong>目前尚未接任何訂單。</strong>
-                    <span>有任務可以接時，會顯示在右側任務榜。</span>
+                    <span>可接任務會顯示在右側任務榜。</span>
                 </div>
             {% endif %}
-        </div>
+        </aside>
 
-        <div class="dispatch-v2-column dispatch-v2-column-available">
-            <div class="dispatch-v2-column-head">
+        <section class="dispatch-panel dispatch-column">
+            <div class="dispatch-column-head">
                 <div>
-                    <p class="order-no">AVAILABLE MISSIONS</p>
+                    <p class="dispatch-eyebrow">AVAILABLE MISSIONS</p>
                     <h2>目前可接訂單</h2>
-                    <p class="muted-text">
-                        這裡目前先顯示網站資料庫測試訂單。之後 DC bot 派單後會自動寫入這裡。
-                    </p>
+                    <p class="dispatch-desc">保留原本接單功能，只翻新任務卡片與分潤資訊顯示。</p>
                 </div>
-                <span class="dispatch-count-pill">{{ orders | length }} 筆</span>
+                <span class="dispatch-pill dispatch-count">{{ orders | length }} 筆</span>
             </div>
 
             {% if orders %}
-                <div class="dispatch-v2-mission-list">
+                <div class="dispatch-list">
                     {% for order in orders %}
                         {% set active_assignments = [] %}
                         {% for assignment in order.assignments %}
@@ -105,50 +462,46 @@
 
                         {% set user_claimed_this_order = order.id in claimed_order_ids %}
 
-                        <article class="dispatch-v2-mission-card">
-                            <div class="dispatch-v2-mission-top">
+                        <article class="dispatch-order-card">
+                            <div class="dispatch-order-top">
                                 <div>
-                                    <p class="order-no">
-                                        {{ order.bot_order_no or ("WEB-" ~ order.id) }}
-                                    </p>
+                                    <p class="dispatch-eyebrow">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
                                     <h3>{{ order.category }}｜{{ order.item }}</h3>
                                 </div>
 
-                                <span class="badge dispatch-status-badge">
-                                    {{ order.status }}
-                                </span>
+                                <span class="dispatch-chip dispatch-status">{{ order.status }}</span>
                             </div>
 
-                            <div class="dispatch-v2-mission-meta">
-                                <div>
+                            <div class="dispatch-meta">
+                                <div class="dispatch-meta-item">
                                     <span>老闆</span>
                                     <strong>{{ order.customer_display_name or "未記錄" }}</strong>
                                 </div>
 
-                                <div>
+                                <div class="dispatch-meta-item">
                                     <span>數量</span>
                                     <strong>{{ order.quantity }} 單</strong>
                                 </div>
 
-                                <div>
+                                <div class="dispatch-meta-item">
                                     <span>金額</span>
                                     <strong>{{ order.amount }}T</strong>
                                 </div>
 
-                                <div>
-                                    <span>付款</span>
+                                <div class="dispatch-meta-item">
+                                    <span>付款方式</span>
                                     <strong>{{ order.payment_method or "未記錄" }}</strong>
                                 </div>
                             </div>
 
-                            <div class="dispatch-v2-assignment-row">
+                            <div class="dispatch-assignment">
                                 <div>
-                                    <span class="muted-text">接單人員</span>
+                                    <span class="dispatch-muted">接單人員</span>
 
                                     {% if active_assignments %}
-                                        <div class="chip-list">
+                                        <div class="dispatch-chip-list">
                                             {% for assignment in active_assignments %}
-                                                <span class="chip">
+                                                <span class="dispatch-chip">
                                                     @{{ assignment.worker_display_name or assignment.worker_discord_id }}
                                                     {% if assignment.has_named_bonus %}
                                                         +掛名
@@ -157,11 +510,11 @@
                                             {% endfor %}
                                         </div>
                                     {% else %}
-                                        <p class="muted-text">尚未有人接單</p>
+                                        <p class="dispatch-muted">尚未有人接單</p>
                                     {% endif %}
                                 </div>
 
-                                <div class="dispatch-v2-assignment-count">
+                                <div class="dispatch-worker-count">
                                     <span>人數</span>
                                     <strong>{{ active_assignments | length }}</strong>
                                 </div>
@@ -170,9 +523,9 @@
                             {% if user_claimed_this_order %}
                                 {% for payout in order.payouts %}
                                     {% if payout.worker_discord_id == user.id %}
-                                        <div class="dispatch-v2-payout">
+                                        <div class="dispatch-payout">
                                             <div>
-                                                <span>你的基本分潤</span>
+                                                <span>基本分潤</span>
                                                 <strong>{{ payout.base_amount }}T</strong>
                                             </div>
 
@@ -191,21 +544,17 @@
                             {% endif %}
 
                             {% if order.note %}
-                                <p class="dispatch-v2-note">{{ order.note }}</p>
+                                <p class="dispatch-note">{{ order.note }}</p>
                             {% endif %}
 
-                            <div class="dispatch-v2-mission-footer">
+                            <div class="dispatch-footer">
                                 {% if user_claimed_this_order %}
                                     <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
-                                        <button class="button danger" type="submit">
-                                            取消接單
-                                        </button>
+                                        <button class="dispatch-button danger" type="submit">取消接單</button>
                                     </form>
                                 {% else %}
                                     <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
-                                        <button class="button" type="submit">
-                                            接單
-                                        </button>
+                                        <button class="dispatch-button" type="submit">接單</button>
                                     </form>
                                 {% endif %}
                             </div>
@@ -213,13 +562,14 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <div class="dispatch-v2-empty-card dispatch-v2-empty-wide">
-                    <strong>目前沒有 active 訂單。</strong>
-                    <span>等 DC bot 或網站資料庫寫入可接訂單後，會自動顯示在這裡。</span>
+                <div class="dispatch-empty">
+                    <strong>目前沒有可接訂單。</strong>
+                    <span>等 DC bot 或網站資料庫寫入 active 訂單後，會自動顯示在這裡。</span>
                 </div>
             {% endif %}
-        </div>
+        </section>
     </section>
+</div>
 
 <script src="/static/js/dispatch_alerts.js"></script>
 {% endblock %}
