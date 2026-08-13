@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% from "_discord_avatar.html" import discord_avatar %}
 
 {% block page_title %}我的分潤{% endblock %}
 
@@ -338,6 +339,17 @@
         text-align: left;
     }
 }
+
+.summary-avatar {
+    overflow: hidden;
+}
+
+.summary-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
 </style>
 
 <div class="my-payout-page">
@@ -392,7 +404,7 @@
     <article class="summary-person-card">
         <div class="summary-person-head">
             <div class="summary-person-title">
-                <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
+                <div class="summary-avatar">{{ discord_avatar(row.discord_id, row.display_name, 128, "summary-avatar-img") }}</div>
                 <div>
                     <p class="order-no">{{ row.role_label }}</p>
                     <h3 class="summary-name">{{ row.display_name }}</h3>

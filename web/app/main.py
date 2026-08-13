@@ -95,3 +95,11 @@ from web.app.routers import dispatch_state
 from web.app.routers import admin_wallets
 app.include_router(dispatch_state.router)
 app.include_router(admin_wallets.router)
+
+# AUTO DISCORD AVATAR ROUTER
+try:
+    from web.app.routers.discord_avatars import router as discord_avatars_router
+    app.include_router(discord_avatars_router)
+except Exception as exc:
+    print(f"[discord_avatars] router load failed: {exc}")
+

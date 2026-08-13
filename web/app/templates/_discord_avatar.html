@@ -1,0 +1,9 @@
+{% macro discord_avatar(discord_id, display_name="", size=128, class_name="") -%}
+    <img
+        src="/discord-avatar/{{ discord_id }}?size={{ size }}"
+        alt="{{ display_name or discord_id }}"
+        class="{{ class_name }}"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+    >
+{%- endmacro %}
