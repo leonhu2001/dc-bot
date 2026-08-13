@@ -3106,6 +3106,138 @@ def _build_receiver_text_from_claim_data(claim_data: dict) -> str | None:
     return "、".join(f"<@{user_id}>" for user_id in receiver_ids)
 
 
+def _get_pending_order_point_benefit_info(data: dict) -> dict | None:
+    benefit_key = str(
+        data.get("point_benefit_key")
+        or data.get("selected_point_benefit_key")
+        or ""
+    ).strip()
+
+    if not benefit_key:
+        return None
+
+    item = get_order_point_item(benefit_key)
+
+    benefit_name = str(
+        data.get("point_benefit_name")
+        or (item or {}).get("name")
+        or benefit_key
+    )
+
+    benefit_cost = _to_int(
+        data.get("point_benefit_cost"),
+        _to_int((item or {}).get("cost"), 0) if item else 0,
+    ) or 0
+
+    if benefit_cost <= 0:
+        return None
+
+    return {
+        "key": benefit_key,
+        "name": benefit_name,
+        "cost": int(benefit_cost),
+    }
+
+
+def precheck_order_point_benefit_for_payment(data: dict, customer_id: int) -> None:
+    info = _get_pending_order_point_benefit_info(data)
+
+    if info is None:
+        return
+
+    if data.get("point_benefit_redeemed"):
+        return
+
+    reward_data = get_customer_reward_data(int(customer_id))
+    before_points = int(get_current_reward_points(reward_data))
+
+    if before_points < int(info["cost"]):
+        raise ValueError(
+            f"點數不足，無法使用「{info['name']}」。"
+            f"需要 {info['cost']} 點，目前只有 {before_points} 點。"
+        )
+
+
+async def redeem_order_point_benefit_on_payment(
+    *,
+    interaction: discord.Interaction,
+    data: dict,
+    customer_id: int,
+    channel_id: int,
+) -> str | None:
+    info = _get_pending_order_point_benefit_info(data)
+
+    if info is None:
+        return None
+
+    if data.get("point_benefit_redeemed"):
+        before_points = _to_int(data.get("point_benefit_before_points"), 0) or 0
+        after_points = _to_int(data.get("point_benefit_after_points"), 0) or 0
+        return f"點數福利已扣點：{info['cost']} 點｜{info['name']}（{before_points} → {after_points}）"
+
+    reward_data = get_customer_reward_data(int(customer_id))
+    before_points = int(get_current_reward_points(reward_data))
+
+    if before_points < int(info["cost"]):
+        raise ValueError(
+            f"點數不足，無法使用「{info['name']}」。"
+            f"需要 {info['cost']} 點，目前只有 {before_points} 點。"
+        )
+
+    logs = reward_data.setdefault("point_adjustment_logs", [])
+
+    if not isinstance(logs, list):
+        logs = []
+        reward_data["point_adjustment_logs"] = logs
+
+    reward_data["point_adjustment"] = int(reward_data.get("point_adjustment", 0) or 0) - int(info["cost"])
+    after_points = int(get_current_reward_points(reward_data))
+    reward_data["points"] = after_points
+
+    logs.append(
+        {
+            "created_at": get_taipei_now_iso(),
+            "delta": -int(info["cost"]),
+            "before_points": before_points,
+            "after_points": after_points,
+            "reason": f"訂單點數福利：{info['name']}",
+            "source": "order_point_benefit",
+            "order_channel_id": int(channel_id),
+            "order_no": data.get("order_no") or data.get("receipt_id"),
+            "benefit_key": info["key"],
+            "benefit_name": info["name"],
+            "operator_id": int(getattr(interaction.user, "id", 0) or 0),
+        }
+    )
+
+    CUSTOMER_REWARDS[int(customer_id)] = reward_data
+
+    data["point_benefit_redeemed"] = True
+    data["point_benefit_redeemed_at"] = get_taipei_now_iso()
+    data["point_benefit_before_points"] = before_points
+    data["point_benefit_after_points"] = after_points
+    data["point_benefit_redeemed_by"] = int(getattr(interaction.user, "id", 0) or 0)
+
+    remember_order_data(channel_id, data)
+    save_bot_data()
+
+    try:
+        await send_order_log(
+            interaction.guild,
+            title="訂單點數福利已扣點",
+            fields=[
+                ("顧客", f"<@{customer_id}>", True),
+                ("福利", f"{info['cost']} 點｜{info['name']}", True),
+                ("點數", f"{before_points} → {after_points}", True),
+                ("訂單", str(data.get("order_no") or data.get("receipt_id") or channel_id), False),
+            ],
+            color=discord.Color.gold(),
+        )
+    except Exception as exc:
+        print(f"[points] 訂單點數福利扣點日誌失敗 channel_id={channel_id}: {exc}")
+
+    return f"點數福利已扣 {info['cost']} 點：{info['name']}（{before_points} → {after_points}）"
+
 async def finalize_accepted_pending_payment(
     *,
     interaction: discord.Interaction,
@@ -3171,6 +3303,18 @@ async def finalize_accepted_pending_payment(
             except Exception:
                 customer_member = None
 
+        order_point_benefit_result = None
+
+        try:
+            precheck_order_point_benefit_for_payment(data, customer_id)
+        except ValueError as exc:
+            message = str(exc)
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+            return
+
         if payment_method == WALLET_PAYMENT_METHOD:
             existing_wallet_tx_id = data.get("wallet_transaction_id")
 
@@ -3204,6 +3348,21 @@ async def finalize_accepted_pending_payment(
                     operator=interaction.user,
                     tx=wallet_tx,
                 )
+
+        try:
+            order_point_benefit_result = await redeem_order_point_benefit_on_payment(
+                interaction=interaction,
+                data=data,
+                customer_id=customer_id,
+                channel_id=channel_id,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+            return
 
         data["amount"] = amount
         data["total_amount"] = amount
@@ -3332,6 +3491,28 @@ async def finalize_accepted_pending_payment(
                         inline=False,
                     )
 
+                paid_point_benefit_name = str(data.get("point_benefit_name") or "")
+                if paid_point_benefit_name:
+                    point_value = f"{_to_int(data.get('point_benefit_cost'), 0) or 0} 點｜{paid_point_benefit_name}"
+
+                    service_bonus_text = str(data.get("service_bonus_text") or "").strip()
+                    if service_bonus_text:
+                        point_value += f"\n{service_bonus_text}"
+
+                    if data.get("point_benefit_redeemed"):
+                        point_value += (
+                            f"\n已扣點："
+                            f"{_to_int(data.get('point_benefit_before_points'), 0) or 0}"
+                            f" → "
+                            f"{_to_int(data.get('point_benefit_after_points'), 0) or 0}"
+                        )
+
+                    dispatch_embed.add_field(
+                        name="點數福利",
+                        value=point_value,
+                        inline=False,
+                    )
+
                 dispatch_embed.add_field(name="付款狀態", value="已付款，接單人員已確認", inline=False)
 
                 await dispatch_message.edit(
@@ -3399,6 +3580,8 @@ async def finalize_accepted_pending_payment(
         response_text = f"已確認付款方式：{payment_method}，訂單正式成立。"
         if data.get("receipt_id"):
             response_text += f"\n交易收據已產生：{data.get('receipt_id')}"
+        if order_point_benefit_result:
+            response_text += f"\n\n{order_point_benefit_result}"
         if reward_result:
             response_text += f"\n\n{reward_result}"
 
@@ -5475,8 +5658,7 @@ async def create_waiting_acceptance_order_from_self_service(
     )
 
     required_staff_count = get_required_staff_count(rule, player_count)
-    original_rule_amount = int(price_result.total_amount or 0)
-    price_adjustment = apply_manual_price_adjustment_to_order_data(data, original_rule_amount)
+    price_adjustment = apply_self_service_financials_to_order_data(data, rule, price_result)
     amount = int(price_adjustment["customer_pay_amount"] or 0)
     payout_base_amount = int(price_adjustment["payout_base_amount"] or amount)
 
@@ -5533,6 +5715,21 @@ async def create_waiting_acceptance_order_from_self_service(
             ),
             inline=True,
         )
+
+    if price_adjustment.get("point_benefit_name"):
+        point_value = f"{price_adjustment['point_benefit_cost']} 點｜{price_adjustment['point_benefit_name']}"
+        if price_adjustment.get("service_bonus_text"):
+            point_value += f"\n{price_adjustment['service_bonus_text']}"
+        if price_adjustment.get("point_waived_specify_fee", 0) > 0:
+            point_value += "\n免指定費不列入顧客金額，也不列入打手分潤"
+        if price_adjustment.get("point_discount_coupon_amount", 0) > 0:
+            point_value += "\n點數折價由店內吸收，不扣打手分潤"
+        embed.add_field(
+            name="點數福利",
+            value=point_value,
+            inline=False,
+        )
+
 
     if rule.player_count_enabled:
         embed.add_field(name="陪玩人數", value=f"{player_count} 位", inline=True)
@@ -5594,6 +5791,11 @@ async def create_waiting_acceptance_order_from_self_service(
                 f"折扣金額={price_adjustment['manual_discount_amount']}; "
                 f"分潤基準={price_adjustment['payout_base_amount']}; "
                 f"折現券={price_adjustment['cash_coupon_amount']}; "
+                f"點數福利={price_adjustment.get('point_benefit_name') or '無'}; "
+                f"點數折價={price_adjustment.get('point_discount_coupon_amount') or 0}; "
+                f"點數免指定費={price_adjustment.get('point_waived_specify_fee') or 0}; "
+                f"首小時免費={price_adjustment.get('point_free_first_hour_amount') or 0}; "
+                f"服務加成={price_adjustment.get('service_bonus_text') or '無'}; "
                 f"顧客應付={price_adjustment['customer_pay_amount']}"
             )
         ),
@@ -5641,6 +5843,7 @@ async def create_waiting_acceptance_order_from_self_service(
     data["order_rule_key"] = rule.key
     data["quantity"] = quantity
     data["player_count"] = player_count
+    data["rule_original_amount"] = price_adjustment["rule_original_amount"]
     data["original_amount"] = price_adjustment["original_amount"]
     data["manual_discount_percent"] = price_adjustment["manual_discount_percent"]
     data["manual_discount_amount"] = price_adjustment["manual_discount_amount"]
@@ -5648,6 +5851,15 @@ async def create_waiting_acceptance_order_from_self_service(
     data["payout_base_amount"] = payout_base_amount
     data["cash_coupon_amount"] = price_adjustment["cash_coupon_amount"]
     data["cash_coupon_reason"] = price_adjustment["cash_coupon_reason"]
+    data["point_benefit_key"] = price_adjustment["point_benefit_key"]
+    data["point_benefit_name"] = price_adjustment["point_benefit_name"]
+    data["point_benefit_cost"] = price_adjustment["point_benefit_cost"]
+    data["point_discount_coupon_amount"] = price_adjustment["point_discount_coupon_amount"]
+    data["point_waived_specify_fee"] = price_adjustment["point_waived_specify_fee"]
+    data["point_free_first_hour_amount"] = price_adjustment["point_free_first_hour_amount"]
+    data["point_extra_hours"] = price_adjustment["point_extra_hours"]
+    data["point_extra_games"] = price_adjustment["point_extra_games"]
+    data["service_bonus_text"] = price_adjustment["service_bonus_text"]
     data["store_absorbed_amount"] = price_adjustment["store_absorbed_amount"]
     data["customer_pay_amount"] = price_adjustment["customer_pay_amount"]
     data["amount"] = amount
@@ -5829,16 +6041,22 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
     if price is None:
         lines.append(("預估金額", "客服待填價"))
     else:
-        adjustment = calculate_manual_price_adjustment(int(price.total_amount or 0), data)
+        adjustment = calculate_self_service_financials(rule, price, data)
 
         lines.append(("顧客應付", _format_plain_amount(adjustment["customer_pay_amount"])))
 
         detail_parts = [
-            f"原價 {_format_plain_amount(adjustment['original_amount'])}",
+            f"原價 {_format_plain_amount(adjustment['rule_original_amount'])}",
         ]
 
         if int(price.specify_fee or 0) > 0:
-            detail_parts.append(f"指定費已含 {_format_plain_amount(price.specify_fee)}")
+            detail_parts.append(f"指定費原本 {_format_plain_amount(price.specify_fee)}")
+
+        if adjustment["point_waived_specify_fee"] > 0:
+            detail_parts.append(f"點數免指定費 -{_format_plain_amount(adjustment['point_waived_specify_fee'])}")
+
+        if adjustment.get("point_free_first_hour_amount", 0) > 0:
+            detail_parts.append(f"首小時免費 -{_format_plain_amount(adjustment['point_free_first_hour_amount'])}")
 
         if getattr(price, "free_specify_fee", False):
             detail_parts.append("兩單以上免指定費")
@@ -5853,6 +6071,12 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
 
         detail_parts.append(f"打手分潤基準 {_format_plain_amount(adjustment['payout_base_amount'])}")
 
+        if adjustment["point_discount_coupon_amount"] > 0:
+            detail_parts.append(
+                f"點數折價 -{_format_plain_amount(adjustment['point_discount_coupon_amount'])}"
+                "（店內吸收）"
+            )
+
         if adjustment["cash_coupon_amount"] > 0:
             reason = adjustment["cash_coupon_reason"] or "未填原因"
             detail_parts.append(
@@ -5861,6 +6085,12 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
             )
 
         lines.append(("金額明細", "｜".join(detail_parts)))
+
+        if adjustment["point_benefit_name"]:
+            point_text = f"{adjustment['point_benefit_cost']} 點｜{adjustment['point_benefit_name']}"
+            if adjustment["service_bonus_text"]:
+                point_text += f"｜{adjustment['service_bonus_text']}"
+            lines.append(("點數福利", point_text))
 
     unit = get_self_service_quantity_unit(rule.label)
     lines.append(("數量", f"{quantity} {unit}"))
@@ -6156,6 +6386,442 @@ class SelfServiceSpecifiedStaffDoneButton(discord.ui.Button):
         )
 
 
+FREE_PLAY_FIRST_HOUR_RULE_KEYS = {
+    "basic_entertain_single",
+    "basic_entertain_double",
+    "basic_tech_secret_single",
+    "basic_tech_secret_double",
+}
+
+
+ORDER_POINT_BENEFIT_SPECS = {
+    "discount_20": {"kind": "cash_discount", "amount": 20, "summary": "20 元折價券，店內吸收，不影響打手分潤"},
+    "discount_30": {"kind": "cash_discount", "amount": 30, "summary": "30 元折價券，店內吸收，不影響打手分潤"},
+    "discount_100": {"kind": "cash_discount", "amount": 100, "summary": "100 元折價券，店內吸收，不影響打手分潤"},
+    "extra_10": {"kind": "extra_hours", "hours": 0.5, "summary": "服務時間 +30 分鐘，金額與打手分潤不變"},
+    "extra_30": {"kind": "extra_hours", "hours": 1, "summary": "服務時間 +1 小時，金額與打手分潤不變"},
+    "extra_15": {"kind": "extra_game", "games": 1, "summary": "加場 1 場保撤，金額與打手分潤不變"},
+    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費，顧客不用付指定費，打手分潤也不含指定費"},
+    "free_play_1h": {"kind": "free_first_hour", "hours": 1, "summary": "首小時免費，只適用娛樂陪單/雙陪與機密技術單/雙護"},
+}
+
+
+def _format_point_hours(hours) -> str:
+    try:
+        value = float(hours or 0)
+    except (TypeError, ValueError):
+        value = 0.0
+
+    if value <= 0:
+        return "0H"
+
+    if value == 0.5:
+        return "30 分鐘"
+
+    if value.is_integer():
+        return f"{int(value)}H"
+
+    return f"{value:g}H"
+
+
+def get_order_point_item(key: str | None) -> dict | None:
+    if not key:
+        return None
+
+    try:
+        return POINT_REDEEM_ITEMS_BY_KEY.get(str(key))
+    except Exception:
+        return None
+
+
+def get_customer_point_balance_for_order(customer_id: int) -> int:
+    try:
+        reward_data = get_customer_reward_data(int(customer_id))
+        return int(get_current_reward_points(reward_data))
+    except Exception:
+        return 0
+
+
+def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = None) -> tuple[bool, str]:
+    data = data or {}
+    key = str(key or "")
+    spec = ORDER_POINT_BENEFIT_SPECS.get(key)
+
+    if not spec:
+        return False, "這個點數福利不支援新下單流程。"
+
+    if not getattr(rule, "point_benefits_allowed", False):
+        return False, "此分類不可使用點數福利。"
+
+    category = str(getattr(rule, "category", "")).lower()
+    rule_key = str(getattr(rule, "key", "") or "")
+    rule_label = str(getattr(rule, "label", "") or "")
+
+    if category in {"steam", "valorant"}:
+        return False, "Steam / Valorant 不可使用點數福利。"
+
+    if category in {"fun", "title"}:
+        return False, "趣味單 / 高難度稱號不可使用點數福利。"
+
+    if rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單"):
+        return False, "體驗單不可使用點數福利。"
+
+    kind = spec.get("kind")
+    pricing_type = str(getattr(rule, "pricing_type", "") or "")
+
+    if kind == "free_specify_fee":
+        if not getattr(rule, "allow_specify", False):
+            return False, "此項目不開放指定，因此不能使用免指定費。"
+        if not data.get("specified_staff_ids"):
+            return False, "請先指定人員，再使用免指定費。"
+
+    if kind == "free_first_hour":
+        if str(getattr(rule, "key", "")) not in FREE_PLAY_FIRST_HOUR_RULE_KEYS:
+            return False, "免費陪玩 1 小時只適用娛樂陪單/雙陪與機密技術單/雙護。"
+        if pricing_type != "hourly":
+            return False, "免費陪玩 1 小時只適用小時計價項目。"
+
+    if kind == "extra_hours" and pricing_type != "hourly":
+        return False, "加時只適用小時計價項目。"
+
+    if kind == "extra_game" and pricing_type != "game":
+        return False, "加場保撤只適用局數計價項目。"
+
+    return True, ""
+
+
+def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
+    key = data.get("selected_point_benefit_key")
+    item = get_order_point_item(key)
+
+    if item is None:
+        return None
+
+    spec = ORDER_POINT_BENEFIT_SPECS.get(str(key))
+
+    if spec is None:
+        return None
+
+    if rule is not None:
+        allowed, _ = is_order_point_benefit_allowed_for_rule(rule, str(key), data)
+        if not allowed:
+            return None
+
+    merged = dict(item)
+    merged.update(spec)
+    return merged
+
+
+def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
+    rule_original_amount = max(0, int(getattr(price_result, "total_amount", 0) or 0))
+    specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
+
+    benefit = get_selected_order_point_benefit(data, rule)
+    benefit_key = str(benefit.get("key")) if benefit else None
+    benefit_name = str(benefit.get("name")) if benefit else ""
+    benefit_cost = int(benefit.get("cost") or 0) if benefit else 0
+    benefit_kind = str(benefit.get("kind")) if benefit else ""
+
+    point_waived_specify_fee = 0
+    point_discount_coupon_amount = 0
+    point_free_first_hour_amount = 0
+    point_extra_hours = 0.0
+    point_extra_games = 0
+
+    if benefit:
+        if benefit_kind == "free_specify_fee":
+            point_waived_specify_fee = specify_fee
+
+        elif benefit_kind == "cash_discount":
+            point_discount_coupon_amount = max(0, int(benefit.get("amount") or 0))
+
+        elif benefit_kind == "free_first_hour":
+            try:
+                from services.order_rules import calculate_price
+                player_count = _to_int(data.get("player_count"), 1) or 1
+                first_hour_price = calculate_price(
+                    rule,
+                    quantity=1,
+                    player_count=player_count,
+                    specified_roles=[],
+                )
+                point_free_first_hour_amount = max(0, int(getattr(first_hour_price, "base_amount", 0) or 0))
+            except Exception:
+                quantity = _to_int(data.get("quantity"), 1) or 1
+                quantity = max(1, int(quantity))
+                point_free_first_hour_amount = max(0, int(getattr(price_result, "base_amount", 0) or 0) // quantity)
+
+        elif benefit_kind == "free_first_hour":
+            try:
+                from services.order_rules import calculate_price
+                player_count = _to_int(data.get("player_count"), 1) or 1
+                first_hour_price = calculate_price(
+                    rule,
+                    quantity=1,
+                    player_count=player_count,
+                    specified_roles=[],
+                )
+                point_free_first_hour_amount = max(0, int(getattr(first_hour_price, "base_amount", 0) or 0))
+            except Exception:
+                quantity = _to_int(data.get("quantity"), 1) or 1
+                quantity = max(1, int(quantity))
+                point_free_first_hour_amount = max(0, int(getattr(price_result, "base_amount", 0) or 0) // quantity)
+
+        elif benefit_kind == "extra_hours":
+            point_extra_hours = max(0.0, float(benefit.get("hours") or 0))
+
+        elif benefit_kind == "extra_game":
+            point_extra_games = max(0, int(benefit.get("games") or 0))
+
+    point_free_first_hour_amount = min(point_free_first_hour_amount, max(0, rule_original_amount - point_waived_specify_fee))
+    priced_amount = max(0, rule_original_amount - point_waived_specify_fee - point_free_first_hour_amount)
+
+    try:
+        discount_percent = float(data.get("manual_discount_percent") or 0)
+    except (TypeError, ValueError):
+        discount_percent = 0.0
+
+    discount_percent = max(0.0, min(100.0, discount_percent))
+    manual_discount_amount = int(round(priced_amount * discount_percent / 100))
+    payout_base_amount = max(0, priced_amount - manual_discount_amount)
+
+    point_discount_coupon_amount = min(point_discount_coupon_amount, payout_base_amount)
+
+    raw_cash_coupon = _to_int(data.get("cash_coupon_amount"), 0) or 0
+    raw_cash_coupon = max(0, int(raw_cash_coupon))
+    cash_coupon_amount = min(raw_cash_coupon, max(0, payout_base_amount - point_discount_coupon_amount))
+
+    store_absorbed_amount = point_discount_coupon_amount + cash_coupon_amount
+    customer_pay_amount = max(0, payout_base_amount - store_absorbed_amount)
+
+    service_bonus_parts = []
+
+    if point_free_first_hour_amount > 0:
+        service_bonus_parts.append(f"首小時免費 -{_format_plain_amount(point_free_first_hour_amount)}")
+
+    if point_free_first_hour_amount > 0:
+        service_bonus_parts.append(f"首小時免費 -{_format_plain_amount(point_free_first_hour_amount)}")
+
+    if point_extra_hours > 0:
+        service_bonus_parts.append(f"服務時間 +{_format_point_hours(point_extra_hours)}")
+
+    if point_extra_games > 0:
+        service_bonus_parts.append(f"加場 {point_extra_games} 場保撤")
+
+    if point_waived_specify_fee > 0:
+        service_bonus_parts.append(f"免指定費 -{_format_plain_amount(point_waived_specify_fee)}")
+
+    if point_discount_coupon_amount > 0:
+        service_bonus_parts.append(f"點數折價 -{_format_plain_amount(point_discount_coupon_amount)}，店內吸收")
+
+    return {
+        "rule_original_amount": rule_original_amount,
+        "original_amount": priced_amount,
+        "priced_amount": priced_amount,
+        "manual_discount_percent": discount_percent,
+        "manual_discount_amount": manual_discount_amount,
+        "manual_discount_reason": str(data.get("manual_discount_reason") or "").strip(),
+        "payout_base_amount": payout_base_amount,
+        "cash_coupon_amount": cash_coupon_amount,
+        "cash_coupon_reason": str(data.get("cash_coupon_reason") or "").strip(),
+        "point_discount_coupon_amount": point_discount_coupon_amount,
+        "point_waived_specify_fee": point_waived_specify_fee,
+        "point_free_first_hour_amount": point_free_first_hour_amount,
+        "point_extra_hours": point_extra_hours,
+        "point_extra_games": point_extra_games,
+        "point_benefit_key": benefit_key,
+        "point_benefit_name": benefit_name,
+        "point_benefit_cost": benefit_cost,
+        "point_benefit_summary": str(benefit.get("summary") or "") if benefit else "",
+        "service_bonus_text": "｜".join(service_bonus_parts),
+        "store_absorbed_amount": store_absorbed_amount,
+        "customer_pay_amount": customer_pay_amount,
+    }
+
+
+def apply_self_service_financials_to_order_data(data: dict, rule, price_result) -> dict:
+    adjustment = calculate_self_service_financials(rule, price_result, data)
+
+    for key, value in adjustment.items():
+        data[key] = value
+
+    data["amount"] = adjustment["customer_pay_amount"]
+    data["total_amount"] = adjustment["customer_pay_amount"]
+    data["amount_text"] = _format_plain_amount(adjustment["customer_pay_amount"])
+
+    return adjustment
+
+
+class SelfServicePointBenefitSelect(discord.ui.Select):
+    def __init__(self, parent_view: "SelfServicePointBenefitView"):
+        options = [
+            discord.SelectOption(
+                label="不使用點數福利",
+                value="none",
+                description="清除這張單目前選擇的點數福利",
+                default=parent_view.selected_key is None,
+            )
+        ]
+
+        for item in parent_view.available_items:
+            options.append(
+                discord.SelectOption(
+                    label=_truncate_select_text(f"{item['cost']} 點｜{item['name']}"),
+                    value=str(item["key"]),
+                    description=_truncate_select_text(item.get("summary") or f"兌換 {item['name']}"),
+                    default=str(item["key"]) == str(parent_view.selected_key),
+                )
+            )
+
+        if len(options) == 1:
+            options[0].description = "目前沒有符合點數與訂單條件的福利"
+
+        super().__init__(
+            placeholder="選擇這張單要使用的點數福利",
+            min_values=1,
+            max_values=1,
+            options=options[:25],
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if not isinstance(view, SelfServicePointBenefitView):
+            await interaction.response.send_message("點數福利選單狀態異常，請重新按一次按鈕。", ephemeral=True)
+            return
+
+        selected = self.values[0]
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(view.channel_id, {})
+
+        if selected == "none":
+            for key in (
+                "selected_point_benefit_key",
+                "point_benefit_key",
+                "point_benefit_name",
+                "point_benefit_cost",
+                "point_discount_coupon_amount",
+                "point_waived_specify_fee",
+                "point_extra_hours",
+                "point_extra_games",
+                "service_bonus_text",
+            ):
+                data.pop(key, None)
+        else:
+            item = get_order_point_item(selected)
+
+            if item is None:
+                await interaction.response.send_message("找不到這個點數福利，請重新選擇。", ephemeral=True)
+                return
+
+            data["selected_point_benefit_key"] = str(selected)
+            data["point_benefit_key"] = str(selected)
+            data["point_benefit_name"] = str(item.get("name") or selected)
+            data["point_benefit_cost"] = int(item.get("cost") or 0)
+
+        data.pop("payment_method", None)
+        remember_order_data(view.channel_id, data)
+
+        await view.refresh_source_panel(interaction)
+
+        await interaction.response.edit_message(
+            content=view.build_message_content(data),
+            view=SelfServicePointBenefitView(
+                customer_id=view.customer_id,
+                channel_id=view.channel_id,
+                panel_message_id=view.panel_message_id,
+                rule=view.rule,
+            ),
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+class SelfServicePointBenefitView(discord.ui.View):
+    def __init__(
+        self,
+        *,
+        customer_id: int,
+        channel_id: int,
+        panel_message_id: int | None,
+        rule,
+    ):
+        super().__init__(timeout=300)
+        self.customer_id = int(customer_id)
+        self.channel_id = int(channel_id)
+        self.panel_message_id = panel_message_id
+        self.rule = rule
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        self.selected_key = data.get("selected_point_benefit_key")
+        self.point_balance = get_customer_point_balance_for_order(customer_id)
+        self.available_items = self.build_available_items(data)
+
+        self.add_item(SelfServicePointBenefitSelect(self))
+
+    def build_available_items(self, data: dict) -> list[dict]:
+        result = []
+
+        try:
+            source_items = POINT_REDEEM_ITEMS
+        except Exception:
+            source_items = []
+
+        for item in source_items:
+            key = str(item.get("key") or "")
+            spec = ORDER_POINT_BENEFIT_SPECS.get(key)
+
+            if not spec:
+                continue
+
+            cost = int(item.get("cost") or 0)
+
+            if cost > self.point_balance:
+                continue
+
+            allowed, _ = is_order_point_benefit_allowed_for_rule(self.rule, key, data)
+
+            if not allowed:
+                continue
+
+            merged = dict(item)
+            merged.update(spec)
+            result.append(merged)
+
+        return result
+
+    def build_message_content(self, data: dict | None = None) -> str:
+        data = data or SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
+        benefit = get_selected_order_point_benefit(data, self.rule)
+        selected_text = "尚未使用"
+
+        if benefit:
+            selected_text = f"{benefit['cost']} 點｜{benefit['name']}"
+
+        return (
+            f"請選擇這張單要使用的點數福利。\n"
+            f"目前可用點數：{self.point_balance} 點\n"
+            f"目前選擇：{selected_text}\n\n"
+            "提醒：這裡只是先保留在訂單上，付款成立時才會正式扣點。"
+        )
+
+    async def refresh_source_panel(self, interaction: discord.Interaction):
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
+
+        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
+            try:
+                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
+                await panel_message.edit(
+                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                    view=SelfServiceOrderView(
+                        customer_id=self.customer_id,
+                        channel_id=self.channel_id,
+                        selected_category=data.get("category"),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+            except discord.HTTPException:
+                pass
+
 class SelfServiceSpecifiedStaffDropdownView(discord.ui.View):
     def __init__(
         self,
@@ -6423,6 +7089,55 @@ class SelfServiceOrderView(discord.ui.View):
 
         await interaction.response.send_message(
             content=view.build_message_content(),
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+
+    @discord.ui.button(
+        label="選擇點數福利",
+        style=discord.ButtonStyle.secondary,
+        custom_id="self_service_order_point_benefit_button",
+        row=4,
+    )
+    async def point_benefit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not can_operate_self_service_order(interaction.user, self.customer_id):
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇點數福利。", ephemeral=True)
+            return
+
+        if interaction.guild is None:
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        if not data.get("item"):
+            await interaction.response.send_message("請先選擇訂單項目，再選擇點數福利。", ephemeral=True)
+            return
+
+        try:
+            rule = _get_rule_from_self_service_data(data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        allowed, reason = is_order_point_benefit_allowed_for_rule(rule, "discount_20", data)
+        if not allowed:
+            await interaction.response.send_message(reason or "這個分類不可使用點數福利。", ephemeral=True)
+            return
+
+        panel_message_id = interaction.message.id if interaction.message is not None else None
+
+        view = SelfServicePointBenefitView(
+            customer_id=self.customer_id,
+            channel_id=self.channel_id,
+            panel_message_id=panel_message_id,
+            rule=rule,
+        )
+
+        await interaction.response.send_message(
+            content=view.build_message_content(data),
             view=view,
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
