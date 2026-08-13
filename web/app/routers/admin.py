@@ -274,6 +274,7 @@ async def admin_sync_staff(request: Request):
 
     try:
         result = sync_staff_members_from_discord(db)
+        db.commit()
     except Exception as e:
         db.rollback()
         return redirect_to_admin(error=f"同步成員失敗：{e}")

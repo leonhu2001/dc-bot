@@ -35,7 +35,105 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 <style>
-/* 總控訂單卡片空間利用版 */
+.admin-dashboard-shell {
+    display: grid;
+    gap: 18px;
+}
+
+.admin-redesign-hero {
+    border: 1px solid var(--mw-line, rgba(255,255,255,.12));
+    border-radius: 28px;
+    padding: 26px;
+    margin-bottom: 18px;
+    background:
+        radial-gradient(circle at top left, rgba(245, 198, 107, .18), transparent 34%),
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(8, 10, 18, .94);
+    box-shadow: 0 26px 70px rgba(0,0,0,.34);
+}
+
+.admin-redesign-hero small {
+    display: block;
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .18em;
+    margin-bottom: 8px;
+}
+
+.admin-redesign-hero h1 {
+    margin: 0;
+    font-size: clamp(32px, 4vw, 56px);
+    letter-spacing: .08em;
+}
+
+.admin-redesign-hero p {
+    margin: 10px 0 0;
+    color: var(--mw-muted, #a7a0b5);
+    line-height: 1.8;
+}
+
+.notice,
+.success-box,
+.error-box {
+    border-radius: 18px !important;
+    padding: 14px 16px !important;
+    font-weight: 800 !important;
+}
+
+.success-box {
+    border: 1px solid rgba(114, 242, 166, .35) !important;
+    background: rgba(114, 242, 166, .1) !important;
+    color: #d9ffe8 !important;
+}
+
+.error-box {
+    border: 1px solid rgba(255, 107, 138, .35) !important;
+    background: rgba(255, 107, 138, .1) !important;
+    color: #ffd5df !important;
+}
+
+.panel {
+    border: 1px solid var(--mw-line, rgba(255,255,255,.1)) !important;
+    border-radius: 22px !important;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.07), rgba(255,255,255,.025)),
+        rgba(10, 13, 22, .92) !important;
+    box-shadow: 0 22px 58px rgba(0,0,0,.28) !important;
+}
+
+.panel h2 {
+    letter-spacing: .06em !important;
+}
+
+.grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+}
+
+.big-number {
+    color: var(--mw-gold, #f5c66b) !important;
+    font-size: 36px !important;
+    font-weight: 950 !important;
+}
+
+.admin-sync-panel {
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-sync-panel::after {
+    content: "STAFF SYNC";
+    position: absolute;
+    right: 18px;
+    top: 14px;
+    color: rgba(255,255,255,.055);
+    font-size: 42px;
+    font-weight: 950;
+    letter-spacing: .12em;
+    pointer-events: none;
+}
+
 .admin-order-list {
     display: grid !important;
     gap: 18px !important;
@@ -47,41 +145,55 @@ document.addEventListener("DOMContentLoaded", function () {
     gap: 16px !important;
     padding: 20px 22px !important;
     margin-bottom: 18px !important;
-    border-radius: 18px !important;
+    border-radius: 22px !important;
+    border: 1px solid rgba(255,255,255,.1) !important;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.022)),
+        rgba(8, 11, 19, .95) !important;
     overflow: hidden !important;
 }
 
 .admin-order-card .order-card-header {
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-start !important;
     justify-content: space-between !important;
     gap: 18px !important;
     margin-bottom: 0 !important;
-    padding-bottom: 12px !important;
+    padding-bottom: 14px !important;
+    border-bottom: 1px solid rgba(255,255,255,.08) !important;
 }
 
 .admin-order-card .order-no {
     margin: 0 0 6px !important;
-    font-size: 14px !important;
+    color: var(--mw-gold, #f5c66b) !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+    letter-spacing: .14em !important;
 }
 
 .admin-order-card h3 {
     margin: 0 !important;
-    font-size: 24px !important;
-    line-height: 1.25 !important;
+    font-size: 23px !important;
+    line-height: 1.35 !important;
 }
 
 .admin-order-title-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 10px !important;
     flex-wrap: wrap !important;
     justify-content: flex-end !important;
 }
 
+.badge,
 .admin-order-card .badge {
+    border-radius: 999px !important;
+    border: 1px solid rgba(117,232,255,.32) !important;
+    background: rgba(117,232,255,.09) !important;
+    color: #c9f8ff !important;
     padding: 7px 12px !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
+    font-weight: 900 !important;
     white-space: nowrap !important;
 }
 
@@ -104,31 +216,36 @@ document.addEventListener("DOMContentLoaded", function () {
 .admin-order-card .order-meta {
     display: grid !important;
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 14px !important;
+    gap: 12px !important;
     margin: 0 !important;
 }
 
 .admin-order-card .order-meta > div {
-    min-height: 62px !important;
+    min-height: 64px !important;
     padding: 12px 14px !important;
-    border-radius: 13px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255,255,255,.075) !important;
+    background: rgba(255,255,255,.04) !important;
 }
 
 .admin-order-card .order-meta span {
-    font-size: 13px !important;
+    color: var(--mw-muted, #a7a0b5) !important;
+    font-size: 12px !important;
 }
 
 .admin-order-card .order-meta strong {
     display: block !important;
-    margin-top: 5px !important;
-    font-size: 17px !important;
+    margin-top: 6px !important;
+    font-size: 16px !important;
     line-height: 1.35 !important;
 }
 
 .admin-order-card .admin-section {
     margin-top: 0 !important;
     padding: 16px 18px !important;
-    border-radius: 15px !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    background: rgba(255,255,255,.035) !important;
     min-height: unset !important;
     height: auto !important;
     overflow: hidden !important;
@@ -141,33 +258,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
 .admin-order-card .muted-text {
     margin: 4px 0 12px !important;
+    color: var(--mw-muted, #a7a0b5) !important;
     font-size: 13px !important;
-    line-height: 1.45 !important;
+    line-height: 1.55 !important;
 }
 
 .admin-section-cs-assign .admin-add-worker-form,
 .admin-section-add-worker .admin-add-worker-form {
     display: grid !important;
-    grid-template-columns: minmax(260px, .8fr) minmax(360px, 1fr) 130px !important;
-    gap: 14px !important;
+    grid-template-columns: minmax(240px, .8fr) minmax(320px, 1fr) 130px !important;
+    gap: 12px !important;
     align-items: center !important;
 }
 
 .admin-order-card .input,
-.admin-order-card select.input {
+.admin-order-card select.input,
+.input,
+select.input {
     min-height: 42px !important;
     padding: 9px 12px !important;
-    border-radius: 11px !important;
+    border-radius: 13px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.24) !important;
+    color: var(--mw-text, #f4f0e8) !important;
     font-size: 15px !important;
     width: 100% !important;
     min-width: 0 !important;
 }
 
-.admin-order-card .button {
-    min-height: 42px !important;
+.admin-order-card .button,
+.button {
+    min-height: 40px !important;
     padding: 9px 15px !important;
-    border-radius: 11px !important;
-    font-size: 15px !important;
+    border-radius: 999px !important;
+    font-size: 14px !important;
+    font-weight: 900 !important;
     white-space: nowrap !important;
 }
 
@@ -179,7 +304,9 @@ document.addEventListener("DOMContentLoaded", function () {
 .admin-order-card .admin-worker-card {
     min-height: unset !important;
     padding: 14px 16px !important;
-    border-radius: 13px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    background: rgba(0,0,0,.16) !important;
     overflow: hidden !important;
 }
 
@@ -192,7 +319,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 .admin-order-card .worker-payout-line {
     display: flex !important;
-    gap: 10px 12px !important;
+    gap: 8px 12px !important;
     font-size: 14px !important;
     flex-wrap: wrap !important;
     min-width: 0 !important;
@@ -238,9 +365,12 @@ document.addEventListener("DOMContentLoaded", function () {
     grid-column: 1 / 2 !important;
 }
 
-.admin-order-card .empty-state {
-    padding: 16px !important;
+.empty-state {
+    padding: 18px !important;
     min-height: unset !important;
+    border-radius: 16px !important;
+    border: 1px dashed rgba(255,255,255,.16) !important;
+    background: rgba(255,255,255,.035) !important;
 }
 
 @media (max-width: 1350px) {
@@ -248,23 +378,29 @@ document.addEventListener("DOMContentLoaded", function () {
         grid-template-columns: 1fr !important;
     }
 
-    .admin-section-workers .admin-actions {
-        grid-template-columns: 1fr !important;
-    }
-
+    .admin-section-workers .admin-actions,
     .admin-section-workers .inline-form {
         grid-template-columns: 1fr !important;
     }
 }
 
 @media (max-width: 980px) {
+    .grid,
     .admin-order-card .order-meta {
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        grid-template-columns: 1fr !important;
     }
 
     .admin-section-cs-assign .admin-add-worker-form,
     .admin-section-add-worker .admin-add-worker-form {
         grid-template-columns: 1fr !important;
+    }
+
+    .admin-order-card .order-card-header {
+        flex-direction: column !important;
+    }
+
+    .admin-order-title-actions {
+        justify-content: flex-start !important;
     }
 }
 </style>
@@ -288,7 +424,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     <div class="panel">
         <h2>成員同步</h2>
-        <p>使用 DC bot 讀取伺服器成員，更新客服、打手、陪玩下拉選單。</p>
+        <p>使用 DC bot 讀取伺服器成員，更新魔丸♫客服、護級、陪級下拉選單。</p>
 
         <form method="post" action="/admin/staff/sync">
             <button class="button" type="submit">
@@ -297,7 +433,7 @@ document.addEventListener("DOMContentLoaded", function () {
         </form>
 
         <p class="muted-text">
-            目前客服選單 {{ customer_service_members | length }} 人，打手/陪玩選單 {{ worker_members | length }} 人。
+            目前魔丸♫客服選單 {{ customer_service_members | length }} 人，護級 / 陪級選單 {{ worker_members | length }} 人。
         </p>
     </div>
 
@@ -309,15 +445,15 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>
 
         <div class="panel">
-            <h2>打手基本分潤</h2>
+            <h2>接單基本分潤</h2>
             <p class="big-number">80%</p>
-            <p>依訂單人數平均後計算。</p>
+            <p>護級 / 陪級依訂單人數平均後計算。</p>
         </div>
 
         <div class="panel">
-            <h2>客服分潤</h2>
+            <h2>魔丸♫客服分潤</h2>
             <p class="big-number">5%</p>
-            <p>發給每單指定的對接客服。</p>
+            <p>發給每單指定的魔丸♫客服。</p>
         </div>
     </div>
 
@@ -411,7 +547,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                         <div class="admin-section admin-section-workers">
-                            <h4>接單打手</h4>
+                            <h4>接單護級 / 陪級</h4>
 
                             {% if active_assignments %}
                                 <div class="admin-worker-list">
@@ -475,7 +611,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                                         class="input"
                                                         type="text"
                                                         name="reason"
-                                                        placeholder="原因，例如中途換打手"
+                                                        placeholder="原因，例如中途換護級 / 陪級"
                                                     >
 
                                                     <button class="button secondary" type="submit">手動改分潤</button>
@@ -503,24 +639,24 @@ document.addEventListener("DOMContentLoaded", function () {
                                                         placeholder="移除原因，例如中途換人"
                                                     >
 
-                                                    <button class="button danger" type="submit">移除此打手</button>
+                                                    <button class="button danger" type="submit">移除此護級 / 陪級</button>
                                                 </form>
                                             </div>
                                         </div>
                                     {% endfor %}
                                 </div>
                             {% else %}
-                                <div class="empty-state">目前沒有 active 打手。</div>
+                                <div class="empty-state">目前沒有 active 護級 / 陪級。</div>
                             {% endif %}
                         </div>
 
                         <div class="admin-section admin-section-add-worker">
-                            <h4>新增 / 更換打手</h4>
+                            <h4>新增 / 更換護級 / 陪級</h4>
 
                             {% if worker_members %}
                                 <form method="post" action="/admin/orders/{{ order.id }}/add-worker" class="admin-add-worker-form">
                                     <select class="input" name="worker_discord_id" required>
-                                        <option value="">選擇打手 / 陪玩</option>
+                                        <option value="">選擇護級 / 陪級 / 陪級</option>
                                         {% for staff in worker_members %}
                                             <option value="{{ staff.discord_id }}" data-staff-id="{{ staff.discord_id }}">
                                                 {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
@@ -534,13 +670,13 @@ document.addEventListener("DOMContentLoaded", function () {
                                         class="input"
                                         type="text"
                                         name="reason"
-                                        placeholder="原因，例如中途換打手"
+                                        placeholder="原因，例如中途換護級 / 陪級"
                                     >
 
-                                    <button class="button" type="submit">新增打手</button>
+                                    <button class="button" type="submit">新增護級 / 陪級</button>
                                 </form>
                             {% else %}
-                                <div class="empty-state">尚未同步打手 / 陪玩名單，請先按上方「立即同步 Discord 成員」。</div>
+                                <div class="empty-state">尚未同步護級 / 陪級 / 陪級名單，請先按上方「立即同步 Discord 成員」。</div>
                             {% endif %}
                         </div>
 
