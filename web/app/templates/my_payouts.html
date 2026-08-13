@@ -9,82 +9,81 @@
     gap: 18px;
 }
 
-.my-payout-hero {
-    position: relative;
-    overflow: hidden;
-    padding: 28px;
-    border: 1px solid rgba(245, 198, 107, .2);
-    border-radius: 28px;
-    background:
-        radial-gradient(circle at 88% 18%, rgba(207, 62, 62, .18), transparent 34%),
-        radial-gradient(circle at 12% 0%, rgba(245, 198, 107, .14), transparent 35%),
-        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
-        rgba(8, 10, 18, .94);
-    box-shadow: 0 28px 78px rgba(0,0,0,.34);
+.my-payout-command {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(420px, .9fr);
+    gap: 16px;
+    align-items: stretch;
 }
 
-.my-payout-hero::after {
-    content: "PAYOUTS";
+.my-payout-card {
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
+}
+
+.my-payout-intro {
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+}
+
+.my-payout-intro::after {
+    content: "PAYOUT";
     position: absolute;
-    right: 22px;
-    bottom: 16px;
-    color: rgba(255,255,255,.055);
-    font-size: clamp(42px, 8vw, 110px);
+    right: 18px;
+    bottom: 10px;
+    color: rgba(255,255,255,.045);
+    font-size: 76px;
     font-weight: 950;
     letter-spacing: .16em;
     pointer-events: none;
 }
 
-.my-payout-hero .order-no,
-.my-payout-section-title .order-no {
+.my-payout-intro .order-no {
     color: var(--mw-gold, #f5c66b);
     font-weight: 950;
     letter-spacing: .16em;
 }
 
-.my-payout-hero h1 {
+.my-payout-intro h2 {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 8px;
+    font-size: 30px;
+    letter-spacing: .08em;
+}
+
+.my-payout-intro p {
     position: relative;
     z-index: 1;
     margin: 0;
-    font-size: clamp(34px, 5vw, 68px);
-    line-height: 1;
-    letter-spacing: .08em;
-    font-weight: 950;
-}
-
-.my-payout-hero p {
-    position: relative;
-    z-index: 1;
-    margin: 12px 0 0;
     color: var(--mw-muted, #a7a0b5);
     line-height: 1.8;
 }
 
-.my-payout-filter-panel,
-.my-payout-total-panel,
-.payout-summary-list-section {
-    border: 1px solid rgba(255,255,255,.1) !important;
-    border-radius: 24px !important;
-    background:
-        linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.022)),
-        rgba(8, 11, 19, .94) !important;
-    box-shadow: 0 24px 68px rgba(0,0,0,.28) !important;
+.my-payout-filter-card {
+    padding: 18px;
 }
 
 .my-payout-filter {
     display: grid;
-    grid-template-columns: minmax(180px, 240px) minmax(180px, 220px) auto auto;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
-    align-items: end;
 }
 
+.my-payout-filter .button,
 .my-payout-filter .input,
 .my-payout-filter select {
     min-height: 42px;
-    border-radius: 14px !important;
-    border: 1px solid rgba(255,255,255,.12) !important;
-    background: rgba(0,0,0,.3) !important;
-    color: var(--mw-text, #f4f0e8) !important;
+}
+
+.my-payout-filter .button {
+    width: 100%;
+    justify-content: center;
 }
 
 .my-payout-total-grid {
@@ -96,55 +95,85 @@
 .my-payout-total-card {
     position: relative;
     overflow: hidden;
+    min-height: 118px;
     border: 1px solid rgba(245, 198, 107, .18);
-    border-radius: 20px;
+    border-radius: 22px;
     background:
-        linear-gradient(145deg, rgba(245,198,107,.11), rgba(255,255,255,.025)),
-        rgba(10, 13, 22, .92);
+        radial-gradient(circle at 92% 15%, rgba(245,198,107,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
     padding: 18px;
 }
 
-.my-payout-total-card::after {
-    content: "魔丸";
-    position: absolute;
-    right: 14px;
-    bottom: 12px;
-    color: rgba(245,198,107,.16);
-    border: 1px solid rgba(245,198,107,.12);
-    border-radius: 8px;
-    padding: 4px 6px;
-    font-weight: 950;
-    transform: rotate(-3deg);
+.my-payout-total-card.due {
+    border-color: rgba(255, 107, 138, .22);
+    background:
+        radial-gradient(circle at 92% 15%, rgba(255,107,138,.18), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+}
+
+.my-payout-total-card.paid {
+    border-color: rgba(117, 232, 255, .22);
+    background:
+        radial-gradient(circle at 92% 15%, rgba(117,232,255,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
 }
 
 .my-payout-total-card span {
     display: block;
-    color: var(--mw-gold, #f5c66b);
+    color: var(--mw-muted, #a7a0b5);
     font-size: 13px;
-    font-weight: 950;
-    letter-spacing: .08em;
+    font-weight: 900;
     margin-bottom: 10px;
 }
 
 .my-payout-total-card strong {
     display: block;
-    font-size: 32px;
-    line-height: 1.1;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 34px;
+    line-height: 1;
     font-weight: 950;
 }
 
+.payout-summary-list-section {
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 24px !important;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94) !important;
+    box-shadow: 0 24px 68px rgba(0,0,0,.28) !important;
+}
+
+.summary-list-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
 .summary-list-title {
-    margin: 0 0 14px;
+    margin: 0;
     font-size: 24px;
     letter-spacing: .08em;
+}
+
+.summary-list-badge {
+    border: 1px solid rgba(245,198,107,.24);
+    border-radius: 999px;
+    background: rgba(245,198,107,.08);
+    color: #ffe3a3;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 950;
 }
 
 .summary-person-card {
     border: 1px solid rgba(255,255,255,.09);
     border-radius: 22px;
-    background:
-        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
-        rgba(0,0,0,.18);
+    background: rgba(255,255,255,.028);
     padding: 16px;
     margin-top: 14px;
 }
@@ -284,12 +313,19 @@
     background: rgba(255,255,255,.025);
 }
 
-@media (max-width: 960px) {
-    .my-payout-filter,
-    .my-payout-total-grid {
-        grid-template-columns: 1fr 1fr;
+@media (max-width: 1100px) {
+    .my-payout-command {
+        grid-template-columns: 1fr;
     }
 
+    .my-payout-total-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .my-payout-filter,
+    .my-payout-total-grid,
     .summary-person-head {
         grid-template-columns: 1fr;
     }
@@ -302,60 +338,53 @@
         text-align: left;
     }
 }
-
-@media (max-width: 640px) {
-    .my-payout-filter,
-    .my-payout-total-grid {
-        grid-template-columns: 1fr;
-    }
-}
 </style>
 
 <div class="my-payout-page">
-    <section class="my-payout-hero">
-        <p class="order-no">MY PAYOUTS</p>
-        <h1>我的分潤</h1>
-        <p>依月份與發放狀態查看個人分潤，未發放與已發放分開整理，方便對帳。</p>
+    <section class="my-payout-command">
+        <div class="my-payout-card my-payout-intro">
+            <p class="order-no">MY PAYOUTS</p>
+            <h2>分潤控制台</h2>
+            <p>依月份與發放狀態查看個人分潤，未發放與已發放分開整理，方便對帳。</p>
+        </div>
+
+        <div class="my-payout-card my-payout-filter-card">
+            <form method="get" action="/my/payouts" class="filter-form my-payout-filter">
+                <select class="input" name="month">
+                    <option value="" {% if not month %}selected{% endif %}>全部月份</option>
+                    {% for option in month_options %}
+                        <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+
+                <select class="input" name="status">
+                    <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
+                    <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>未發放</option>
+                    <option value="paid" {% if status == "paid" %}selected{% endif %}>已發放</option>
+                </select>
+
+                <button class="button" type="submit">套用篩選</button>
+                <a class="button secondary" href="/my/payouts">清除</a>
+            </form>
+        </div>
     </section>
 
-    <section class="panel my-payout-filter-panel">
-        <form method="get" action="/my/payouts" class="filter-form my-payout-filter">
-            <select class="input" name="month">
-                <option value="" {% if not month %}selected{% endif %}>全部月份</option>
-                {% for option in month_options %}
-                    <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
-                {% endfor %}
-            </select>
-
-            <select class="input" name="status">
-                <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
-                <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>未發放</option>
-                <option value="paid" {% if status == "paid" %}selected{% endif %}>已發放</option>
-            </select>
-
-            <button class="button" type="submit">套用篩選</button>
-            <a class="button secondary" href="/my/payouts">清除</a>
-        </form>
-    </section>
-
-    <section class="panel my-payout-total-panel">
-        <div class="my-payout-total-grid">
-            <div class="my-payout-total-card">
-                <span>未發放總額</span>
-                <strong>{{ summary.unpaid_total|round(0, 'common')|int }}T</strong>
-            </div>
-            <div class="my-payout-total-card">
-                <span>未發放筆數</span>
-                <strong>{{ summary.unpaid_count }}</strong>
-            </div>
-            <div class="my-payout-total-card">
-                <span>已發放總額</span>
-                <strong>{{ summary.paid_total|round(0, 'common')|int }}T</strong>
-            </div>
-            <div class="my-payout-total-card">
-                <span>已發放筆數</span>
-                <strong>{{ summary.paid_count }}</strong>
-            </div>
+    <section class="my-payout-total-grid">
+        <div class="my-payout-total-card due">
+            <span>未發放總額</span>
+            <strong>{{ summary.unpaid_total|round(0, 'common')|int }}T</strong>
+        </div>
+        <div class="my-payout-total-card due">
+            <span>未發放筆數</span>
+            <strong>{{ summary.unpaid_count }}</strong>
+        </div>
+        <div class="my-payout-total-card paid">
+            <span>已發放總額</span>
+            <strong>{{ summary.paid_total|round(0, 'common')|int }}T</strong>
+        </div>
+        <div class="my-payout-total-card paid">
+            <span>已發放筆數</span>
+            <strong>{{ summary.paid_count }}</strong>
         </div>
     </section>
 
@@ -424,7 +453,11 @@
 
     {% if status in ["all", "unpaid"] %}
     <section class="panel payout-summary-list-section">
-        <h2 class="summary-list-title">未發放明細</h2>
+        <div class="summary-list-head">
+            <h2 class="summary-list-title">未發放明細</h2>
+            <span class="summary-list-badge">{{ summary.unpaid_count }} 筆</span>
+        </div>
+
         {% if summary_unpaid_rows %}
             {% for row in summary_unpaid_rows %}
                 {{ person_card(row, "unpaid") }}
@@ -437,7 +470,11 @@
 
     {% if status in ["all", "paid"] %}
     <section class="panel payout-summary-list-section">
-        <h2 class="summary-list-title">已發放明細</h2>
+        <div class="summary-list-head">
+            <h2 class="summary-list-title">已發放明細</h2>
+            <span class="summary-list-badge">{{ summary.paid_count }} 筆</span>
+        </div>
+
         {% if summary_paid_rows %}
             {% for row in summary_paid_rows %}
                 {{ person_card(row, "paid") }}
