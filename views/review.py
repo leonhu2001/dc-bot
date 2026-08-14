@@ -96,6 +96,24 @@ def ensure_review_tables() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_order_review_skips_ticket
                 ON order_review_skips(ticket_channel_id);
+
+            CREATE TABLE IF NOT EXISTS staff_favorites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_discord_id TEXT NOT NULL,
+                staff_discord_id TEXT NOT NULL,
+                staff_display_name TEXT,
+                source TEXT NOT NULL DEFAULT 'post_close',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_favorites_unique
+                ON staff_favorites(customer_discord_id, staff_discord_id);
+
+            CREATE INDEX IF NOT EXISTS idx_staff_favorites_customer
+                ON staff_favorites(customer_discord_id);
+
+            CREATE INDEX IF NOT EXISTS idx_staff_favorites_staff
+                ON staff_favorites(staff_discord_id);
             """
         )
         conn.commit()
@@ -492,6 +510,70 @@ def record_member_review(
         conn.close()
 
 
+
+def get_staff_favorites(customer_id: int | str, staff_ids: list[str] | None = None) -> set[str]:
+    ensure_review_tables()
+    conn = _connect()
+    try:
+        params: list[str] = [str(customer_id)]
+        where = "customer_discord_id = ?"
+
+        if staff_ids:
+            placeholders = ",".join("?" for _ in staff_ids)
+            where += f" AND staff_discord_id IN ({placeholders})"
+            params.extend(str(item) for item in staff_ids)
+
+        rows = conn.execute(
+            f"""
+            SELECT staff_discord_id
+            FROM staff_favorites
+            WHERE {where}
+            """,
+            params,
+        ).fetchall()
+
+        return {str(row["staff_discord_id"]) for row in rows}
+    finally:
+        conn.close()
+
+
+def add_staff_favorite(
+    *,
+    customer_id: int | str,
+    staff_id: int | str,
+    staff_display_name: str | None = None,
+    source: str = "post_close",
+) -> bool:
+    ensure_review_tables()
+    now = _now_iso()
+    conn = _connect()
+    try:
+        before = conn.total_changes
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO staff_favorites (
+                customer_discord_id,
+                staff_discord_id,
+                staff_display_name,
+                source,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                str(customer_id),
+                str(staff_id),
+                str(staff_display_name or staff_id),
+                str(source or "post_close"),
+                now,
+            ),
+        )
+        conn.commit()
+        return conn.total_changes > before
+    finally:
+        conn.close()
+
+
 def _target_label(target: dict) -> str:
     name = str(target.get("display_name") or target.get("staff_id") or "成員")
     staff_id = str(target.get("staff_id") or "")
@@ -510,27 +592,12 @@ async def _send_review_channel_embed(
     is_public: bool,
     order_content: str | None,
 ) -> None:
-    channel = guild.get_channel(get_review_channel_id())
-    if channel is None or not isinstance(channel, discord.TextChannel):
-        return
+    """評價只寫入網站 DB，不再轉發到 Discord 評價頻道。
 
-    stars = "⭐" * rating
-    embed = discord.Embed(
-        title="成員服務評價",
-        color=discord.Color.gold(),
-        timestamp=datetime.now(),
-    )
-    embed.add_field(name="顧客", value=f"<@{customer_id}>", inline=True)
-    embed.add_field(name="評價對象", value=_target_label(target), inline=True)
-    embed.add_field(name="評分", value=f"{stars} ({rating}/5)", inline=True)
-    embed.add_field(name="公開到個人牆", value="是" if is_public else "否", inline=True)
-    embed.add_field(name="訂單內容", value=(order_content or "未記錄")[:1024], inline=False)
-    embed.add_field(name="評語", value=(comment.strip() or "未填寫")[:1024], inline=False)
-
-    await channel.send(
-        embed=embed,
-        allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
-    )
+    舊的 REVIEW_CHANNEL_ID 保留給相容設定用，但這裡不再發訊息，
+    之後刪除舊評價頻道也不會影響結單後評價流程。
+    """
+    return
 
 
 class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
@@ -706,6 +773,91 @@ class MemberReviewMenuView(discord.ui.View):
             )
 
 
+
+class FavoriteCurrentMembersSelect(discord.ui.Select):
+    def __init__(self, *, customer_id: int, targets: list[dict]):
+        self.customer_id = customer_id
+        self.targets = targets
+        favorite_ids = get_staff_favorites(
+            customer_id,
+            [str(item.get("staff_id") or "") for item in targets],
+        )
+
+        options = []
+        for target in targets[:25]:
+            staff_id = str(target.get("staff_id") or "")
+            if not staff_id:
+                continue
+
+            already = staff_id in favorite_ids
+            label = str(target.get("display_name") or staff_id or "成員")[:80]
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=staff_id,
+                    description="已收藏" if already else "加入我的收藏",
+                    emoji="❤️" if already else "♡",
+                    default=False,
+                )
+            )
+
+        super().__init__(
+            placeholder="選擇要收藏的本次成員",
+            min_values=1,
+            max_values=max(1, min(len(options), 25)),
+            options=options,
+            disabled=not bool(options),
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message("只有這張票口的老闆可以收藏成員。", ephemeral=True)
+            return
+
+        selected_ids = {str(value) for value in self.values}
+        added = []
+        already = []
+
+        for target in self.targets:
+            staff_id = str(target.get("staff_id") or "")
+            if staff_id not in selected_ids:
+                continue
+
+            display_name = str(target.get("display_name") or staff_id)
+            inserted = add_staff_favorite(
+                customer_id=self.customer_id,
+                staff_id=staff_id,
+                staff_display_name=display_name,
+                source="post_close",
+            )
+
+            if inserted:
+                added.append(display_name)
+            else:
+                already.append(display_name)
+
+        lines = []
+        if added:
+            lines.append("已收藏：" + "、".join(added))
+        if already:
+            lines.append("原本已收藏：" + "、".join(already))
+
+        if not lines:
+            lines.append("沒有新增收藏。")
+
+        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+
+
+class FavoriteCurrentMembersView(discord.ui.View):
+    def __init__(self, *, customer_id: int, targets: list[dict]):
+        super().__init__(timeout=300)
+        self.customer_id = customer_id
+        self.targets = targets
+
+        if targets:
+            self.add_item(FavoriteCurrentMembersSelect(customer_id=customer_id, targets=targets))
+
+
 class ConfirmCloseTicketView(discord.ui.View):
     def __init__(self, *, customer_id: int):
         super().__init__(timeout=60)
@@ -845,6 +997,55 @@ class ReviewButtonView(discord.ui.View):
             )
         except discord.HTTPException:
             pass
+
+    @discord.ui.button(
+        label="❤️ 收藏本次成員",
+        style=discord.ButtonStyle.secondary,
+        custom_id="review_favorite_members_button",
+        row=1,
+    )
+    async def favorite_members(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message("只有這張票口的老闆可以收藏成員。", ephemeral=True)
+            return
+
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            return
+
+        _order, targets = get_review_targets(channel.id)
+
+        if not targets:
+            await interaction.response.send_message(
+                "這張單目前找不到接單成員資料，暫時無法收藏本次成員。",
+                ephemeral=True,
+            )
+            return
+
+        favorite_ids = get_staff_favorites(
+            self.customer_id,
+            [str(item.get("staff_id") or "") for item in targets],
+        )
+
+        lines = [
+            "選擇要加入收藏的本次成員：",
+            "",
+        ]
+
+        for item in targets:
+            staff_id = str(item.get("staff_id") or "")
+            status = "已收藏" if staff_id in favorite_ids else "尚未收藏"
+            lines.append(f"{_target_label(item)}｜{status}")
+
+        await interaction.response.send_message(
+            "\n".join(lines),
+            ephemeral=True,
+            view=FavoriteCurrentMembersView(
+                customer_id=self.customer_id,
+                targets=targets,
+            ),
+        )
 
     @discord.ui.button(
         label="關閉票口",
