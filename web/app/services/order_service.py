@@ -47,6 +47,67 @@ PREPAY_DISPATCH_STATUSES = {
 }
 
 
+PENDING_PAYMENT_METHODS = {
+    "",
+    "待付款",
+    "未紀錄",
+    "未记录",
+    "pending",
+    "unpaid",
+}
+
+
+def _normalize_text(value) -> str:
+    return str(value or "").strip()
+
+
+def _is_pending_payment_method(value) -> bool:
+    return _normalize_text(value).lower() in PENDING_PAYMENT_METHODS
+
+
+def get_acceptance_meta_status_for_order(db: Session, order_id: int) -> str | None:
+    row = db.execute(
+        text("""
+            SELECT status
+            FROM order_acceptance_meta
+            WHERE order_id = :order_id
+            LIMIT 1
+        """),
+        {"order_id": int(order_id)},
+    ).mappings().first()
+
+    if row is None:
+        return None
+
+    return _normalize_text(row.get("status")) or None
+
+
+def ensure_not_unpaid_prepay_order_for_legacy_assignment(
+    db: Session,
+    order: WebOrder,
+    *,
+    action_label: str,
+) -> None:
+    """防止付款前接單流程誤走舊 active assignment / payout 流程。"""
+    meta_status = get_acceptance_meta_status_for_order(db, int(order.id))
+
+    if meta_status is None:
+        return
+
+    order_status = _normalize_text(order.status)
+    payment_method = _normalize_text(getattr(order, "payment_method", None))
+
+    if (
+        order_status in PREPAY_DISPATCH_STATUSES
+        or meta_status in PREPAY_DISPATCH_STATUSES
+        or _is_pending_payment_method(payment_method)
+    ):
+        raise ValueError(
+            f"這張訂單是付款前接單流程，尚未付款成立，不能用舊流程{action_label}。"
+            "請先補付款 panel，等顧客付款送出後再操作。"
+        )
+
+
 def _user_role_ids(user: dict) -> list[str]:
     role_ids: list[str] = []
 
@@ -268,6 +329,12 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
     if order is None:
         raise ValueError("找不到這張訂單，無法計算分潤。")
 
+    ensure_not_unpaid_prepay_order_for_legacy_assignment(
+        db,
+        order,
+        action_label="計算分潤",
+    )
+
     assignments = list(
         db.scalars(
             select(OrderAssignment)
@@ -423,8 +490,15 @@ def claim_order_for_worker(
 
         return refreshed_order
 
-    if has_acceptance_meta(order_id) and str(order.status) not in {OrderStatus.ACTIVE.value, OrderStatus.CLOSED.value}:
-        raise ValueError("這張訂單目前不能接單。")
+    if has_acceptance_meta(order_id):
+        ensure_not_unpaid_prepay_order_for_legacy_assignment(
+            db,
+            order,
+            action_label="接單",
+        )
+
+        if str(order.status) not in {OrderStatus.ACTIVE.value, OrderStatus.CLOSED.value}:
+            raise ValueError("這張訂單目前不能接單。")
 
     if order.status != OrderStatus.ACTIVE.value:
         raise ValueError("這張訂單不是 active 狀態，不能接單。")
@@ -531,8 +605,15 @@ def unclaim_order_for_worker(
 
         return refreshed_order
 
-    if has_acceptance_meta(order_id) and str(order.status) not in {OrderStatus.ACTIVE.value, OrderStatus.CLOSED.value}:
-        raise ValueError("這張訂單目前不能取消接單。")
+    if has_acceptance_meta(order_id):
+        ensure_not_unpaid_prepay_order_for_legacy_assignment(
+            db,
+            order,
+            action_label="取消接單",
+        )
+
+        if str(order.status) not in {OrderStatus.ACTIVE.value, OrderStatus.CLOSED.value}:
+            raise ValueError("這張訂單目前不能取消接單。")
 
     if order.status != OrderStatus.ACTIVE.value:
         raise ValueError("這張訂單不是 active 狀態，不能取消接單。")
