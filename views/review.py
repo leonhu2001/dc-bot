@@ -574,6 +574,41 @@ def add_staff_favorite(
         conn.close()
 
 
+
+def build_reorder_summary(order, targets: list[dict], order_content: str | None = None) -> str:
+    if order is None:
+        base_lines = [
+            "找不到網站訂單資料，請客服依照票口內容協助再約。",
+        ]
+    else:
+        base_lines = [
+            f"訂單：WEB-{order['id']}",
+            f"分類：{order['category'] or '未記錄'}",
+            f"項目：{order['item'] or '未記錄'}",
+            f"數量：{order['quantity'] or 1}",
+            f"原金額：{order['amount'] or 0}",
+            f"付款方式：{order['payment_method'] or '未記錄'}",
+        ]
+
+        note = str(order["note"] or "").strip()
+        if note:
+            base_lines.append(f"原備註：{note}")
+
+    if order_content:
+        base_lines.append(f"票口內容：{str(order_content).strip()}")
+
+    if targets:
+        base_lines.append("")
+        base_lines.append("本次接單成員：")
+        for target in targets:
+            base_lines.append(f"- {_target_label(target)}")
+    else:
+        base_lines.append("")
+        base_lines.append("本次接單成員：未找到網站接單資料")
+
+    return "\n".join(base_lines)
+
+
 def _target_label(target: dict) -> str:
     name = str(target.get("display_name") or target.get("staff_id") or "成員")
     staff_id = str(target.get("staff_id") or "")
@@ -1045,6 +1080,57 @@ class ReviewButtonView(discord.ui.View):
                 customer_id=self.customer_id,
                 targets=targets,
             ),
+        )
+
+    @discord.ui.button(
+        label="🔁 再約",
+        style=discord.ButtonStyle.primary,
+        custom_id="review_reorder_button",
+        row=1,
+    )
+    async def reorder(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message("只有這張票口的老闆可以送出再約需求。", ephemeral=True)
+            return
+
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            return
+
+        order, targets = get_review_targets(channel.id)
+        summary = build_reorder_summary(order, targets, self.order_content)
+
+        embed = discord.Embed(
+            title="🔁 老闆想再約",
+            description=(
+                f"{interaction.user.mention} 想依照這張已結單內容再約一次。\n\n"
+                "請客服確認時間、價格、指定成員是否可接，再重新開單。"
+            ),
+            color=discord.Color.blue(),
+            timestamp=datetime.now(),
+        )
+        embed.add_field(
+            name="再約參考資料",
+            value=summary[:1024],
+            inline=False,
+        )
+
+        if targets:
+            embed.add_field(
+                name="指定建議",
+                value="、".join(_target_label(target) for target in targets)[:1024],
+                inline=False,
+            )
+
+        await channel.send(
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
+
+        await interaction.response.send_message(
+            "已送出再約需求，客服會協助確認是否可接與重新開單。",
+            ephemeral=True,
         )
 
     @discord.ui.button(
