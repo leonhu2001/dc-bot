@@ -160,6 +160,17 @@ from views.review import (
     ReviewButtonView,
 )
 
+from views.staff_profiles import (
+    ensure_staff_profile_tables,
+    find_profile_card_image_url,
+    upsert_staff_profile,
+    get_staff_profile,
+    get_staff_profile_panel_rows,
+    save_staff_profile_panel_message,
+    build_staff_profile_embed,
+    StaffProfilePanelView,
+)
+
 from views.support import (
     configure_support_views,
     RecruitControlView,
@@ -8056,6 +8067,29 @@ async def on_ready():
     bot.add_view(FeedbackPanelView())
     bot.add_view(ComplaintResolveView())
 
+    if not getattr(bot, "_staff_profile_views_registered", False):
+        ensure_staff_profile_tables()
+        restored_profile_views = 0
+        for profile in get_staff_profile_panel_rows():
+            try:
+                panel_message_id = int(str(profile.get("panel_message_id") or "0"))
+            except (TypeError, ValueError):
+                panel_message_id = 0
+
+            staff_id = str(profile.get("staff_discord_id") or "").strip()
+            if not panel_message_id or not staff_id:
+                continue
+
+            try:
+                bot.add_view(StaffProfilePanelView(staff_id), message_id=panel_message_id)
+                restored_profile_views += 1
+            except ValueError:
+                pass
+
+        bot._staff_profile_views_registered = True
+        if restored_profile_views:
+            print(f"Restored staff profile views: {restored_profile_views}")
+
     restored_dispatch_views = 0
     for message_id in list(ORDER_CLAIMS.keys()):
         view = get_dispatch_claim_view_from_data(message_id)
@@ -8122,6 +8156,115 @@ async def on_ready():
 
 
 # ========= Slash 指令 =========
+
+
+@bot.tree.command(
+    name="staff_profile_panel",
+    description="客服在成員個人牆貼文內生成或更新成員 panel",
+    guild=discord.Object(id=GUILD_ID),
+)
+@app_commands.describe(
+    member="這個個人牆對應的成員",
+    role_title="階級，例如：護航、女護、頂護",
+    games="主要遊戲，例如：三角洲",
+    services="服務類型，例如：護航 / 技術陪",
+    bio="個人特色，例如：穩定、報點清楚、耐心",
+    profile_type="類型，例如：打手、陪玩、主播",
+    display_name="顯示名稱，可不填，預設使用 Discord 暱稱",
+)
+@app_commands.default_permissions(manage_messages=True)
+async def staff_profile_panel(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    role_title: str,
+    games: str,
+    services: str,
+    bio: str,
+    profile_type: str = "打手",
+    display_name: str | None = None,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以建立個人牆 panel。", ephemeral=True)
+        return
+
+    channel = interaction.channel
+    if channel is None or not hasattr(channel, "send"):
+        await interaction.response.send_message("請在成員個人牆貼文或文字頻道內使用此指令。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    parent_id = None
+    if isinstance(channel, discord.Thread):
+        parent_id = getattr(channel.parent, "id", None)
+
+    image_url = await find_profile_card_image_url(channel)
+    profile = upsert_staff_profile(
+        staff_id=member.id,
+        display_name=display_name or member.display_name,
+        profile_type=profile_type,
+        role_title=role_title,
+        main_games=games,
+        service_tags=services,
+        bio=bio,
+        card_image_url=image_url,
+        forum_thread_id=getattr(channel, "id", None),
+        forum_channel_id=parent_id or getattr(channel, "id", None),
+        is_public=True,
+    )
+
+    old_message_id = 0
+    try:
+        old_message_id = int(str(profile.get("panel_message_id") or "0"))
+    except (TypeError, ValueError):
+        old_message_id = 0
+
+    view = StaffProfilePanelView(member.id)
+    embed = build_staff_profile_embed(profile)
+    panel_message = None
+    action_text = "已生成"
+
+    if old_message_id and hasattr(channel, "fetch_message"):
+        try:
+            panel_message = await channel.fetch_message(old_message_id)
+            await panel_message.edit(
+                embed=embed,
+                view=view,
+                allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+            )
+            action_text = "已更新"
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            panel_message = None
+
+    if panel_message is None:
+        panel_message = await channel.send(
+            embed=embed,
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+        action_text = "已生成"
+
+    save_staff_profile_panel_message(
+        staff_id=member.id,
+        panel_message_id=panel_message.id,
+        forum_thread_id=getattr(channel, "id", None),
+        forum_channel_id=parent_id or getattr(channel, "id", None),
+    )
+
+    try:
+        bot.add_view(StaffProfilePanelView(member.id), message_id=panel_message.id)
+    except ValueError:
+        pass
+
+    image_note = "已抓到貼文圖片作為名片圖。" if image_url else "沒有抓到圖片；panel 仍已建立，可之後重新執行指令更新。"
+    await interaction.followup.send(
+        f"{action_text} {member.mention} 的個人牆 panel。\n{image_note}",
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+    )
+
+
+
 
 
 
