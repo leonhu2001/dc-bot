@@ -17,6 +17,7 @@ from web.app.routers.auth import router as auth_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
 from web.app.routers.order_history import router as order_history_router
+from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_payouts_grouped
 
 APP_DIR = Path(__file__).resolve().parent
@@ -37,6 +38,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
+app.include_router(admin_staff_profiles.router)
 app.include_router(admin_router)
 app.include_router(admin_staff_router)
 app.include_router(admin_audit_router)
