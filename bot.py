@@ -1235,7 +1235,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         await interaction.response.send_message(
             f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
             f"{reward_result}\n\n"
-            f"請闆闆留下評論",
+            f"可以選擇評價本次服務、不留評價，或關閉票口。",
             view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -1398,7 +1398,7 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
     await interaction.response.send_message(
         f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
         f"{reward_result}\n\n"
-        f"請闆闆留下評論",
+        f"可以選擇評價本次服務、不留評價，或關閉票口。",
         view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
         allowed_mentions=discord.AllowedMentions(
             users=True,

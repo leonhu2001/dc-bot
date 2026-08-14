@@ -103,3 +103,11 @@ try:
 except Exception as exc:
     print(f"[discord_avatars] router load failed: {exc}")
 
+
+
+# AUTO ORDER REVIEWS ROUTER
+try:
+    from web.app.routers.admin_reviews import router as admin_reviews_router
+    app.include_router(admin_reviews_router)
+except Exception as exc:
+    print(f"[admin_reviews] router load failed: {exc}")
