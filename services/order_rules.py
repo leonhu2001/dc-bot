@@ -506,3 +506,153 @@ __all__ = [
     "role_labels",
     "validate_rules",
 ]
+
+# ===== 魔丸 runtime rule overrides start =====
+# 這段放在 ORDER_RULES 建立完成後，用 runtime key / label 直接覆蓋顯示名稱、數量限制與自訂單。
+
+from dataclasses import fields as _mm_dataclass_fields
+from dataclasses import is_dataclass as _mm_is_dataclass
+from dataclasses import replace as _mm_dataclass_replace
+
+def _mm_order_rule_field_names(_rule):
+    if _mm_is_dataclass(_rule):
+        return {field.name for field in _mm_dataclass_fields(_rule)}
+    return set(getattr(_rule, "__dict__", {}).keys())
+
+def _mm_filter_rule_changes(_rule, _changes):
+    _fields = _mm_order_rule_field_names(_rule)
+    return {key: value for key, value in _changes.items() if key in _fields}
+
+def _mm_replace_order_rule(_rule, **_changes):
+    _filtered = _mm_filter_rule_changes(_rule, _changes)
+
+    if not _filtered:
+        return _rule
+
+    if _mm_is_dataclass(_rule):
+        try:
+            return _mm_dataclass_replace(_rule, **_filtered)
+        except Exception:
+            pass
+
+    try:
+        for _field, _value in _filtered.items():
+            setattr(_rule, _field, _value)
+        return _rule
+    except Exception:
+        pass
+
+    try:
+        for _field, _value in _filtered.items():
+            object.__setattr__(_rule, _field, _value)
+    except Exception:
+        pass
+
+    return _rule
+
+def _mm_override_order_rule(_key: str, **_changes):
+    _rule = ORDER_RULES.get(_key)
+
+    if _rule is None:
+        return False
+
+    ORDER_RULES[_key] = _mm_replace_order_rule(_rule, **_changes)
+    return True
+
+def _mm_override_order_rule_by_label(_label: str, **_changes):
+    _patched = 0
+
+    for _key, _rule in list(ORDER_RULES.items()):
+        if str(getattr(_rule, "label", "")) == str(_label):
+            ORDER_RULES[_key] = _mm_replace_order_rule(_rule, **_changes)
+            _patched += 1
+
+    return _patched
+
+def _mm_override_title_color_brave_carry():
+    _patched = 0
+
+    for _key, _rule in list(ORDER_RULES.items()):
+        _label = str(getattr(_rule, "label", ""))
+
+        if _key == "title_color_brave_carry" or ("炫彩勇敢者" in _label and "代做" in _label):
+            ORDER_RULES[_key] = _mm_replace_order_rule(_rule, max_quantity=3)
+            _patched += 1
+
+    return _patched
+
+def _mm_add_custom_order_rule():
+    try:
+        CATEGORY_LABELS["custom"] = "自訂單"
+    except Exception:
+        pass
+
+    try:
+        ORDER_CATEGORY_LABELS["custom"] = "自訂單"
+    except Exception:
+        pass
+
+    _template = (
+        ORDER_RULES.get("farm_department_task")
+        or ORDER_RULES.get("basic_entertain_single")
+        or next(iter(ORDER_RULES.values()))
+    )
+
+    _allowed_roles = tuple(
+        role for role in (
+            "top_protector",
+            "female_protector",
+            "male_protector",
+            "male_companion",
+            "female_companion",
+        )
+    )
+
+    _changes = {
+        "key": "custom_custom_order",
+        "category": "custom",
+        "label": "自訂單",
+        "pricing_type": "manual",
+        "quantity_unit": "單",
+        "min_quantity": 1,
+        "max_quantity": 24,
+        "allow_specify": True,
+        "max_specified_count": 24,
+        "allowed_roles": _allowed_roles,
+        "required_staff_count": 1,
+        "min_protector_count": 0,
+        "point_benefits_allowed": False,
+        "base_amount": 0,
+        "base_price": 0,
+        "price": 0,
+        "unit_price": 0,
+        "hourly_price": 0,
+        "specify_fee": 0,
+    }
+
+    ORDER_RULES["custom_custom_order"] = _mm_replace_order_rule(_template, **_changes)
+
+_mm_override_order_rule("farm_season_3x3_contract", max_quantity=4)
+
+# 炫彩勇敢者｜代做用 key + label 雙保險，避免 key 或 label 寫法不同。
+_mm_override_order_rule("title_color_brave_carry", max_quantity=3)
+_mm_override_order_rule_by_label("炫彩勇敢者｜代做", max_quantity=3)
+_mm_override_title_color_brave_carry()
+
+# 炫彩勇敢者｜陪做只能 1 單
+_mm_override_order_rule("title_color_brave_play", max_quantity=1)
+_mm_override_order_rule_by_label("炫彩勇敢者｜陪做", max_quantity=1)
+
+# 勇敢者｜陪做只能 1 單
+_mm_override_order_rule("title_brave_play", max_quantity=1)
+_mm_override_order_rule_by_label("勇敢者｜陪做", max_quantity=1)
+
+_mm_override_order_rule("basic_bet_1000", label="賭約單 800w")
+_mm_override_order_rule("basic_bet_1500", label="賭約單 1000w")
+_mm_override_order_rule("basic_bet_2500", label="賭約單 1200w")
+
+_mm_override_order_rule("basic_trial_500", label="體驗單 777w")
+_mm_override_order_rule("basic_trial_1000", label="體驗單 1688w")
+
+_mm_add_custom_order_rule()
+# ===== 魔丸 runtime rule overrides end =====

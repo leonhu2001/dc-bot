@@ -2471,16 +2471,31 @@ def _get_order_rule_by_item_label(item: str | None):
 
 
 def get_self_service_quantity_limit(item: str | None) -> int:
+    item_text = str(item or "").strip()
+
+    # 高難度稱號特殊數量限制，直接用顯示名稱保底，避免 fixed 類型被壓成 1。
+    if item_text == "炫彩勇敢者｜代做":
+        return 3
+
+    if item_text in {"炫彩勇敢者｜陪做", "勇敢者｜陪做"}:
+        return 1
+
     rule = _get_order_rule_by_item_label(item)
 
     if rule is None:
         return 1
 
-    if rule.pricing_type in {"hourly", "game"}:
-        return int(rule.max_quantity or 24)
+    category = str(getattr(rule, "category", "") or "").lower()
+    pricing_type = str(getattr(rule, "pricing_type", "") or "").lower()
 
-    if rule.pricing_type == "unit":
-        return int(rule.max_quantity or 99)
+    if category in {"title", "custom"}:
+        return max(1, int(getattr(rule, "max_quantity", None) or 1))
+
+    if pricing_type in {"hourly", "game"}:
+        return max(1, int(getattr(rule, "max_quantity", None) or 24))
+
+    if pricing_type == "unit":
+        return max(1, int(getattr(rule, "max_quantity", None) or 99))
 
     return 1
 
@@ -2531,7 +2546,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             ]
             disabled = True
             placeholder = "請先選擇訂單項目"
-        elif selected_item in QUANTITY_SELECT_ITEMS:
+        elif get_self_service_quantity_limit(selected_item) > 1 or selected_item in QUANTITY_SELECT_ITEMS:
             quantity_options = get_self_service_quantity_options(selected_item)
             quantity_unit = get_self_service_quantity_unit(selected_item)
 
@@ -2589,15 +2604,14 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             await interaction.response.send_message("數量選擇異常，請重新選擇。", ephemeral=True)
             return
 
-        if selected_item not in QUANTITY_SELECT_ITEMS:
-            quantity = 1
-        else:
-            max_quantity = get_self_service_quantity_limit(selected_item)
-            quantity_unit = get_self_service_quantity_unit(selected_item)
+        max_quantity = get_self_service_quantity_limit(selected_item)
+        quantity_unit = get_self_service_quantity_unit(selected_item)
 
-            if quantity < 1 or quantity > max_quantity:
-                await interaction.response.send_message(f"數量請選擇 1～{max_quantity} {quantity_unit}。", ephemeral=True)
-                return
+        if max_quantity <= 1:
+            quantity = 1
+        elif quantity < 1 or quantity > max_quantity:
+            await interaction.response.send_message(f"數量請選擇 1～{max_quantity} {quantity_unit}。", ephemeral=True)
+            return
 
         data["customer_id"] = self.customer_id
         data["quantity"] = quantity
@@ -5677,6 +5691,7 @@ async def create_waiting_acceptance_order_from_self_service(
             customer_member = None
 
     companion_preference = data.get("companion_preference") or "不指定陪玩/打手"
+    staff_order_note = str(data.get("staff_order_note") or data.get("staff_note") or "").strip()
 
     embed = build_self_service_order_embed(
         customer_mention=f"<@{customer_id}>",
@@ -5687,7 +5702,18 @@ async def create_waiting_acceptance_order_from_self_service(
         source_channel=interaction.channel,
         companion_preference=companion_preference,
         receiver_text="尚未接單",
+        staff_note=staff_order_note or None,
     )
+
+    if price_adjustment.get("manual_staff_amount") is not None:
+        embed.add_field(
+            name="客服報價",
+            value=(
+                f"{_format_plain_amount(price_adjustment['manual_staff_amount'])}"
+                + (f"\n備註：{price_adjustment.get('manual_staff_price_reason')}" if price_adjustment.get("manual_staff_price_reason") else "")
+            ),
+            inline=False,
+        )
 
     embed.add_field(name="顧客應付", value=_format_plain_amount(amount), inline=True)
     embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout_base_amount), inline=True)
@@ -5843,6 +5869,9 @@ async def create_waiting_acceptance_order_from_self_service(
     data["order_rule_key"] = rule.key
     data["quantity"] = quantity
     data["player_count"] = player_count
+    data["manual_price_missing"] = price_adjustment["manual_price_missing"]
+    data["manual_staff_amount"] = price_adjustment["manual_staff_amount"]
+    data["manual_staff_price_reason"] = price_adjustment["manual_staff_price_reason"]
     data["rule_original_amount"] = price_adjustment["rule_original_amount"]
     data["original_amount"] = price_adjustment["original_amount"]
     data["manual_discount_percent"] = price_adjustment["manual_discount_percent"]
@@ -6043,10 +6072,17 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
     else:
         adjustment = calculate_self_service_financials(rule, price, data)
 
-        lines.append(("顧客應付", _format_plain_amount(adjustment["customer_pay_amount"])))
+        if adjustment.get("manual_price_missing"):
+            lines.append(("顧客應付", "客服待填價"))
+        else:
+            lines.append(("顧客應付", _format_plain_amount(adjustment["customer_pay_amount"])))
 
         detail_parts = [
-            f"原價 {_format_plain_amount(adjustment['rule_original_amount'])}",
+            (
+                "客服待填價格"
+                if adjustment.get("manual_price_missing")
+                else f"原價 {_format_plain_amount(adjustment['rule_original_amount'])}"
+            ),
         ]
 
         if int(price.specify_fee or 0) > 0:
@@ -6513,8 +6549,14 @@ def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
 
 
 def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
-    rule_original_amount = max(0, int(getattr(price_result, "total_amount", 0) or 0))
-    specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
+    manual_staff_amount = get_self_service_staff_price(data)
+
+    if is_self_service_staff_price_required(rule):
+        rule_original_amount = max(0, int(manual_staff_amount or 0))
+        specify_fee = 0
+    else:
+        rule_original_amount = max(0, int(getattr(price_result, "total_amount", 0) or 0))
+        specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
 
     benefit = get_selected_order_point_benefit(data, rule)
     benefit_key = str(benefit.get("key")) if benefit else None
@@ -6615,6 +6657,9 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
         service_bonus_parts.append(f"點數折價 -{_format_plain_amount(point_discount_coupon_amount)}，店內吸收")
 
     return {
+        "manual_price_missing": bool(is_self_service_staff_price_required(rule) and manual_staff_amount is None),
+        "manual_staff_amount": manual_staff_amount,
+        "manual_staff_price_reason": str(data.get("manual_staff_price_reason") or "").strip(),
         "rule_original_amount": rule_original_amount,
         "original_amount": priced_amount,
         "priced_amount": priced_amount,
@@ -6912,6 +6957,106 @@ class SelfServiceSpecifiedStaffDropdownView(discord.ui.View):
             except discord.HTTPException:
                 pass
 
+def is_self_service_staff_price_required(rule) -> bool:
+    rule_key = str(getattr(rule, "key", "") or "")
+    pricing_type = str(getattr(rule, "pricing_type", "") or "").lower()
+
+    return (
+        rule_key in {"farm_department_task", "custom_custom_order"}
+        or pricing_type in {"manual", "staff", "custom"}
+    )
+
+
+def get_self_service_staff_price(data: dict) -> int | None:
+    amount = _to_int(data.get("manual_staff_amount"), None)
+
+    if amount is None:
+        return None
+
+    return max(0, int(amount))
+
+
+class SelfServiceStaffPriceModal(discord.ui.Modal, title="客服填寫訂單價格"):
+    amount = discord.ui.TextInput(
+        label="訂單價格",
+        placeholder="請輸入實收前原價，例如 3000",
+        required=True,
+        max_length=10,
+    )
+
+    reason = discord.ui.TextInput(
+        label="價格備註",
+        placeholder="例如 自訂單報價、部門任務報價",
+        required=False,
+        max_length=100,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
+        super().__init__()
+        self.customer_id = int(customer_id)
+        self.channel_id = int(channel_id)
+        self.panel_message_id = panel_message_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以填寫訂單價格。", ephemeral=True)
+            return
+
+        raw_amount = str(self.amount.value or "").strip().replace(",", "")
+
+        try:
+            amount = int(float(raw_amount))
+        except ValueError:
+            await interaction.response.send_message("價格請輸入數字，例如 3000。", ephemeral=True)
+            return
+
+        if amount < 0:
+            await interaction.response.send_message("價格不能小於 0。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data["manual_staff_amount"] = int(amount)
+        data["manual_staff_price_reason"] = str(self.reason.value or "").strip()
+        data["manual_staff_price_set_by"] = interaction.user.id
+        data["manual_staff_price_set_at"] = get_taipei_now_iso()
+        data.pop("payment_method", None)
+
+        remember_order_data(self.channel_id, data)
+
+        await interaction.response.defer(ephemeral=True)
+
+        edited_panel = False
+
+        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
+            try:
+                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
+                await panel_message.edit(
+                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                    view=SelfServiceOrderView(
+                        customer_id=self.customer_id,
+                        channel_id=self.channel_id,
+                        selected_category=data.get("category"),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+                edited_panel = True
+            except discord.HTTPException:
+                edited_panel = False
+
+        await interaction.followup.send(
+            f"已設定訂單價格：{_format_plain_amount(amount)}"
+            + (f"\n備註：{data['manual_staff_price_reason']}" if data.get("manual_staff_price_reason") else "")
+            + ("" if edited_panel else "\n\n提醒：面板沒有自動刷新，請重新選一次數量即可刷新試算。"),
+            ephemeral=True,
+        )
+
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "客服填寫訂單價格",
+            f"{_format_plain_amount(amount)}｜{data.get('manual_staff_price_reason') or '無備註'}",
+        )
+
 class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定折扣 / 折現券"):
     discount_percent = discord.ui.TextInput(
         label="客服折扣百分比",
@@ -7013,6 +7158,72 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
             "設定折扣 / 折現券",
             "｜".join(adjustment_note) if adjustment_note else "無折扣、無折現券",
         )
+
+class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"):
+    note = discord.ui.TextInput(
+        label="訂單備註",
+        placeholder="可填可不填，例如：老闆特殊需求、時間、注意事項",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=800,
+    )
+
+    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
+        super().__init__()
+        self.customer_id = int(customer_id)
+        self.channel_id = int(channel_id)
+        self.panel_message_id = panel_message_id
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+            await interaction.response.send_message("請聯繫客服送單。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        note_text = str(self.note.value or "").strip()
+
+        if note_text:
+            data["staff_order_note"] = note_text
+            data["staff_note"] = note_text
+        else:
+            data.pop("staff_order_note", None)
+            data.pop("staff_note", None)
+
+        data["staff_order_note_set_by"] = interaction.user.id
+        data["staff_order_note_set_at"] = get_taipei_now_iso()
+        remember_order_data(self.channel_id, data)
+
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            response_text = await create_waiting_acceptance_order_from_self_service(
+                interaction,
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+            )
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            print(f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 channel_id={self.channel_id}: {exc}")
+            await interaction.followup.send("送出等待接單失敗，請通知客服確認後台紀錄。", ephemeral=True)
+            return
+
+        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
+            try:
+                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
+                await panel_message.edit(view=None)
+            except discord.HTTPException:
+                pass
+
+        await log_self_service_proxy_action(
+            interaction,
+            self.customer_id,
+            "送出等待接單",
+            note_text or "無備註",
+        )
+
+        await interaction.followup.send(response_text, ephemeral=True)
 
 class SelfServiceOrderView(discord.ui.View):
     def __init__(self, customer_id: int, channel_id: int, selected_category: str | None = None):
@@ -7145,6 +7356,43 @@ class SelfServiceOrderView(discord.ui.View):
 
 
     @discord.ui.button(
+        label="客服填價格",
+        style=discord.ButtonStyle.secondary,
+        custom_id="self_service_order_staff_price_button",
+        row=4,
+    )
+    async def staff_price(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以填寫訂單價格。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+
+        if not data.get("item"):
+            await interaction.response.send_message("請先選擇訂單項目，再填寫價格。", ephemeral=True)
+            return
+
+        try:
+            rule = _get_rule_from_self_service_data(data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        if not is_self_service_staff_price_required(rule):
+            await interaction.response.send_message("這個項目會自動試算價格，不需要客服手動填價格。", ephemeral=True)
+            return
+
+        panel_message_id = interaction.message.id if interaction.message is not None else None
+        await interaction.response.send_modal(
+            SelfServiceStaffPriceModal(
+                customer_id=self.customer_id,
+                channel_id=self.channel_id,
+                panel_message_id=panel_message_id,
+            )
+        )
+
+
+    @discord.ui.button(
         label="客服設定折扣/折現券",
         style=discord.ButtonStyle.secondary,
         custom_id="self_service_order_staff_discount_coupon_button",
@@ -7178,8 +7426,8 @@ class SelfServiceOrderView(discord.ui.View):
         row=4
     )
     async def go_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以操作訂單。", ephemeral=True)
+        if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+            await interaction.response.send_message("請聯繫客服送單。", ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
@@ -7250,30 +7498,19 @@ class SelfServiceOrderView(discord.ui.View):
             )
             return
 
-        await interaction.response.defer(ephemeral=True)
+        if is_self_service_staff_price_required(rule) and get_self_service_staff_price(data) is None:
+            await interaction.response.send_message("這張單需要客服先按「客服填價格」填寫價格，才能送出等待接單。", ephemeral=True)
+            return
 
-        try:
-            response_text = await create_waiting_acceptance_order_from_self_service(
-                interaction,
+        panel_message_id = interaction.message.id if interaction.message is not None else None
+        await interaction.response.send_modal(
+            SelfServiceSubmitNoteModal(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
+                panel_message_id=panel_message_id,
             )
-        except ValueError as exc:
-            await interaction.followup.send(str(exc), ephemeral=True)
-            return
-        except Exception as exc:
-            print(f"[acceptance] 建立 waiting_acceptance 自助單失敗 channel_id={self.channel_id}: {exc}")
-            await interaction.followup.send("送出等待接單失敗，請通知客服確認後台紀錄。", ephemeral=True)
-            return
+        )
 
-        button.disabled = True
-        button.label = "已送出等待接單"
-        try:
-            await interaction.message.edit(view=self)
-        except discord.HTTPException:
-            pass
-
-        await interaction.followup.send(response_text, ephemeral=True)
 
 class StaffOrderOperationSelect(discord.ui.Select):
     def __init__(self):
