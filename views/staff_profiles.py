@@ -698,3 +698,88 @@ class StaffProfilePanelView(discord.ui.View):
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
         )
+
+
+def list_customer_favorites(customer_id: str, limit: int = 25) -> list[sqlite3.Row]:
+    ensure_staff_profile_tables()
+
+    conn = _connect()
+    try:
+        return conn.execute(
+            """
+            SELECT
+                f.staff_discord_id,
+                f.staff_display_name AS favorite_display_name,
+                f.created_at AS favorited_at,
+                p.display_name,
+                p.profile_type,
+                p.role_title,
+                p.main_games,
+                p.service_tags,
+                p.bio,
+                p.card_image_url,
+                p.panel_message_id,
+                p.forum_thread_id,
+                p.is_public
+            FROM staff_favorites f
+            LEFT JOIN staff_profiles p
+                   ON p.staff_discord_id = f.staff_discord_id
+            WHERE f.customer_discord_id = ?
+            ORDER BY f.created_at DESC, f.id DESC
+            LIMIT ?
+            """,
+            (str(customer_id), int(limit)),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def build_customer_favorites_embed(customer_id: str, favorites: list[sqlite3.Row]) -> discord.Embed:
+    embed = discord.Embed(
+        title="我的收藏成員",
+        description="你收藏過的成員會顯示在這裡。指定下單目前仍需從票口或客服協助建立。",
+        color=discord.Color.pink(),
+    )
+
+    if not favorites:
+        embed.description = "你目前還沒有收藏成員。可以到成員個人牆按「♡ 收藏」。"
+        return embed
+
+    for index, row in enumerate(favorites[:25], start=1):
+        staff_id = str(row["staff_discord_id"])
+        display_name = (
+            row["display_name"]
+            or row["favorite_display_name"]
+            or staff_id
+        )
+
+        profile_type = row["profile_type"] or "成員"
+        role_title = row["role_title"] or "未填職位"
+        games = row["main_games"] or "未填遊戲"
+        services = row["service_tags"] or "未填服務"
+        is_public = int(row["is_public"] or 0)
+
+        if row["panel_message_id"] and row["forum_thread_id"]:
+            wall_text = f"https://discord.com/channels/@me/{row['forum_thread_id']}/{row['panel_message_id']}"
+        elif row["forum_thread_id"]:
+            wall_text = f"<#{row['forum_thread_id']}>"
+        else:
+            wall_text = "尚未建立個人牆"
+
+        public_text = "公開" if is_public else "未公開"
+
+        embed.add_field(
+            name=f"{index}. {display_name}",
+            value=(
+                f"成員：<@{staff_id}>\n"
+                f"類型：{profile_type}｜{role_title}｜{public_text}\n"
+                f"遊戲：{games}\n"
+                f"服務：{services}\n"
+                f"個人牆：{wall_text}"
+            ),
+            inline=False,
+        )
+
+    embed.set_footer(text="指定下單第一版暫不直接開單，避免影響現有訂單流程。")
+    return embed
+
