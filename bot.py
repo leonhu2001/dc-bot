@@ -8602,6 +8602,136 @@ async def staff_profile_panel(
 
 
 
+
+
+async def _fetch_staff_profile_panel_target(guild: discord.Guild, profile: dict):
+    channel_id_text = str(
+        profile.get("forum_thread_id")
+        or profile.get("forum_channel_id")
+        or ""
+    ).strip()
+    message_id_text = str(profile.get("panel_message_id") or "").strip()
+
+    if not channel_id_text or not message_id_text:
+        return None, None, "這位成員還沒有記錄個人牆 panel 位置，請先在個人牆貼文內使用 /staff_profile_panel。"
+
+    try:
+        channel_id = int(channel_id_text)
+        message_id = int(message_id_text)
+    except (TypeError, ValueError):
+        return None, None, "個人牆 panel 位置資料格式錯誤，請重新使用 /staff_profile_panel 生成一次。"
+
+    channel = None
+
+    try:
+        get_thread = getattr(guild, "get_thread", None)
+        if callable(get_thread):
+            channel = get_thread(channel_id)
+
+        if channel is None:
+            channel = guild.get_channel(channel_id)
+
+        if channel is None:
+            channel = await guild.fetch_channel(channel_id)
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+        channel = None
+
+    if channel is None or not hasattr(channel, "fetch_message"):
+        return None, None, "找不到原本的個人牆頻道或貼文，請確認貼文是否還存在。"
+
+    try:
+        message = await channel.fetch_message(message_id)
+    except discord.NotFound:
+        return channel, None, "找不到原本的個人牆 panel 訊息，請重新使用 /staff_profile_panel 生成一次。"
+    except discord.Forbidden:
+        return channel, None, "Bot 沒有權限讀取或編輯原本的個人牆 panel。"
+    except discord.HTTPException as e:
+        return channel, None, f"讀取個人牆 panel 失敗：{e}"
+
+    return channel, message, None
+
+
+@bot.tree.command(
+    name="refresh_staff_profile_panel",
+    description="將後台個人牆資料同步到 Discord panel",
+    guild=discord.Object(id=GUILD_ID),
+)
+@app_commands.describe(
+    member="要同步個人牆 panel 的成員"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def refresh_staff_profile_panel(
+    interaction: discord.Interaction,
+    member: discord.Member,
+):
+    if not _require_customer_staff_or_manager(interaction):
+        await interaction.response.send_message("只有客服、店長或管理員可以同步個人牆 panel。", ephemeral=True)
+        return
+
+    if interaction.guild is None:
+        await interaction.response.send_message("這個指令只能在伺服器內使用。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    profile = get_staff_profile(member.id)
+
+    if profile is None:
+        await interaction.followup.send(
+            "找不到這位成員的個人牆資料，請先建立 /staff_profile_panel。",
+            ephemeral=True,
+        )
+        return
+
+    channel, panel_message, error_message = await _fetch_staff_profile_panel_target(
+        interaction.guild,
+        profile,
+    )
+
+    if error_message:
+        await interaction.followup.send(error_message, ephemeral=True)
+        return
+
+    view = StaffProfilePanelView(member.id)
+    embed = build_staff_profile_embed(profile)
+
+    try:
+        await panel_message.edit(
+            embed=embed,
+            view=view,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+    except discord.Forbidden:
+        await interaction.followup.send("Bot 沒有權限編輯這則個人牆 panel。", ephemeral=True)
+        return
+    except discord.HTTPException as e:
+        await interaction.followup.send(f"同步個人牆 panel 失敗：{e}", ephemeral=True)
+        return
+
+    parent_id = None
+    if isinstance(channel, discord.Thread):
+        parent_id = getattr(channel.parent, "id", None)
+
+    save_staff_profile_panel_message(
+        staff_id=member.id,
+        panel_message_id=panel_message.id,
+        forum_thread_id=getattr(channel, "id", None),
+        forum_channel_id=parent_id or getattr(channel, "id", None),
+    )
+
+    try:
+        bot.add_view(StaffProfilePanelView(member.id), message_id=panel_message.id)
+    except ValueError:
+        pass
+
+    await interaction.followup.send(
+        f"已同步 {member.mention} 的個人牆 panel。\n"
+        "後台資料已更新到 Discord 訊息；收藏、指定下單、查看評價按鈕也已重新掛上。",
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+    )
+
+
 # ========= 點數兌換面板 =========
 
 POINT_REDEEM_ITEMS = [
