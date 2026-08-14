@@ -170,6 +170,7 @@ from views.staff_profiles import (
     build_staff_profile_embed,
     list_customer_favorites,
     build_customer_favorites_embed,
+    CustomerFavoritesView,
     StaffProfilePanelView,
 )
 
@@ -8412,9 +8413,11 @@ async def on_ready():
     guild=discord.Object(id=GUILD_ID),
 )
 async def my_favorites(interaction: discord.Interaction):
-    favorites = list_customer_favorites(str(interaction.user.id), limit=25)
-    embed = build_customer_favorites_embed(str(interaction.user.id), favorites)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    customer_id = str(interaction.user.id)
+    favorites = list_customer_favorites(customer_id, limit=25)
+    embed = build_customer_favorites_embed(customer_id, favorites)
+    view = CustomerFavoritesView(customer_id, favorites) if favorites else None
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 

@@ -1048,3 +1048,278 @@ def build_customer_favorites_embed(customer_id: str, favorites: list[sqlite3.Row
     embed.set_footer(text="指定下單第一版暫不直接開單，避免影響現有訂單流程。")
     return embed
 
+
+def _favorite_row_get(row, key: str, default=None):
+    if row is None:
+        return default
+
+    if isinstance(row, dict):
+        return row.get(key, default)
+
+    try:
+        return row[key]
+    except Exception:
+        return default
+
+
+def _favorite_option_text(value, limit: int) -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = "未填"
+    return text[: max(1, int(limit))]
+
+
+def delete_customer_staff_favorite(customer_id: int | str, staff_id: int | str) -> bool:
+    ensure_staff_profile_tables()
+
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            """
+            DELETE FROM staff_favorites
+            WHERE customer_discord_id = ?
+              AND staff_discord_id = ?
+            """,
+            (str(customer_id), str(staff_id)),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def build_favorite_profile_summary_embed(customer_id: int | str, staff_id: int | str) -> discord.Embed:
+    profile = get_staff_profile(str(staff_id))
+
+    if profile is None:
+        embed = discord.Embed(
+            title="收藏成員",
+            description="這位成員目前沒有公開個人牆資料，可能尚未建立或已被隱藏。",
+            color=discord.Color.orange(),
+            timestamp=datetime.now(),
+        )
+        embed.add_field(
+            name="成員",
+            value=f"<@{staff_id}>",
+            inline=False,
+        )
+        embed.set_footer(text="你仍然可以取消收藏。")
+        return embed
+
+    embed = build_staff_profile_embed(profile)
+    embed.add_field(
+        name="收藏操作",
+        value=(
+            "你可以查看評價、產生指定下單請求卡片，或取消收藏。\n"
+            "這裡不會直接建立訂單。"
+        ),
+        inline=False,
+    )
+    return embed
+
+
+class CustomerFavoritesSelect(discord.ui.Select):
+    def __init__(self, customer_id: int | str, favorites: list):
+        self.customer_id = str(customer_id)
+        safe_favorites = list(favorites or [])[:25]
+
+        options = []
+
+        for row in safe_favorites:
+            staff_id = str(_favorite_row_get(row, "staff_discord_id", "") or "").strip()
+            if not staff_id:
+                continue
+
+            display_name = (
+                _favorite_row_get(row, "display_name")
+                or _favorite_row_get(row, "favorite_display_name")
+                or staff_id
+            )
+            role_title = _favorite_row_get(row, "role_title", "未填職位")
+            games = _favorite_row_get(row, "main_games", "未填遊戲")
+            services = _favorite_row_get(row, "service_tags", "未填服務")
+
+            description = f"{role_title}｜{games}｜{services}"
+
+            options.append(
+                discord.SelectOption(
+                    label=_favorite_option_text(display_name, 100),
+                    value=staff_id[:100],
+                    description=_favorite_option_text(description, 100),
+                )
+            )
+
+        if not options:
+            options.append(
+                discord.SelectOption(
+                    label="目前沒有收藏成員",
+                    value="__empty__",
+                    description="到成員個人牆按 ♡ 收藏 後會出現在這裡",
+                )
+            )
+
+        super().__init__(
+            placeholder="選擇收藏成員",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != self.customer_id:
+            await interaction.response.send_message("這不是你的收藏清單。", ephemeral=True)
+            return
+
+        staff_id = str(self.values[0] or "")
+
+        if staff_id == "__empty__":
+            await interaction.response.defer()
+            return
+
+        embed = build_favorite_profile_summary_embed(self.customer_id, staff_id)
+        await interaction.response.edit_message(
+            embed=embed,
+            view=CustomerFavoriteActionsView(self.customer_id, staff_id),
+        )
+
+
+class CustomerFavoritesView(discord.ui.View):
+    def __init__(self, customer_id: int | str, favorites: list):
+        super().__init__(timeout=300)
+        self.customer_id = str(customer_id)
+        self.add_item(CustomerFavoritesSelect(customer_id, favorites))
+
+
+class CustomerFavoriteActionsView(discord.ui.View):
+    def __init__(self, customer_id: int | str, staff_id: int | str):
+        super().__init__(timeout=300)
+        self.customer_id = str(customer_id)
+        self.staff_id = str(staff_id)
+
+        summary_button = discord.ui.Button(
+            label="個人牆摘要",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"favorite_summary:{self.staff_id}",
+            row=0,
+        )
+        summary_button.callback = self.summary_callback
+        self.add_item(summary_button)
+
+        reviews_button = discord.ui.Button(
+            label="查看評價",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"favorite_reviews:{self.staff_id}",
+            row=0,
+        )
+        reviews_button.callback = self.reviews_callback
+        self.add_item(reviews_button)
+
+        order_button = discord.ui.Button(
+            label="指定下單請求",
+            style=discord.ButtonStyle.primary,
+            custom_id=f"favorite_order_request:{self.staff_id}",
+            row=1,
+        )
+        order_button.callback = self.order_request_callback
+        self.add_item(order_button)
+
+        remove_button = discord.ui.Button(
+            label="取消收藏",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"favorite_remove:{self.staff_id}",
+            row=1,
+        )
+        remove_button.callback = self.remove_callback
+        self.add_item(remove_button)
+
+        back_button = discord.ui.Button(
+            label="返回收藏清單",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"favorite_back:{self.staff_id}",
+            row=2,
+        )
+        back_button.callback = self.back_callback
+        self.add_item(back_button)
+
+    async def _check_owner(self, interaction: discord.Interaction) -> bool:
+        if str(interaction.user.id) != self.customer_id:
+            await interaction.response.send_message("這不是你的收藏操作。", ephemeral=True)
+            return False
+        return True
+
+    async def summary_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        await interaction.response.edit_message(
+            embed=build_favorite_profile_summary_embed(self.customer_id, self.staff_id),
+            view=self,
+        )
+
+    async def reviews_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        profile = get_staff_profile(self.staff_id)
+        if profile is None:
+            await interaction.response.send_message("找不到這位成員的個人牆資料。", ephemeral=True)
+            return
+
+        view = StaffProfileReviewsPageView(self.staff_id, page=0, page_size=5)
+        await interaction.response.send_message(
+            embed=view.build_embed(),
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+
+    async def order_request_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        profile = get_staff_profile(self.staff_id)
+        if profile is None:
+            await interaction.response.send_message("找不到這位成員的個人牆資料。", ephemeral=True)
+            return
+
+        await interaction.response.send_message(
+            embed=build_staff_order_request_embed(profile, interaction.user.id),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+
+    async def remove_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        deleted = delete_customer_staff_favorite(self.customer_id, self.staff_id)
+        favorites = list_customer_favorites(self.customer_id, limit=25)
+        embed = build_customer_favorites_embed(self.customer_id, favorites)
+        view = CustomerFavoritesView(self.customer_id, favorites) if favorites else None
+
+        if deleted:
+            embed.add_field(
+                name="操作結果",
+                value=f"已取消收藏 <@{self.staff_id}>。",
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="操作結果",
+                value="這位成員已不在你的收藏清單中。",
+                inline=False,
+            )
+
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    async def back_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        favorites = list_customer_favorites(self.customer_id, limit=25)
+        embed = build_customer_favorites_embed(self.customer_id, favorites)
+        view = CustomerFavoritesView(self.customer_id, favorites) if favorites else None
+
+        await interaction.response.edit_message(embed=embed, view=view)
+
