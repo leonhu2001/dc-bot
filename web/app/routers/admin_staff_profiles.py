@@ -208,7 +208,8 @@ async def staff_profiles_index(request: Request):
             <td>{link_html}</td>
             <td class="bio">{bio}</td>
             <td>{updated_at}</td>
-            <td>
+            <td class="actions">
+                <a class="edit-link" href="/admin/staff_profiles/edit/{staff_id}">編輯</a>
                 <form method="post" action="/admin/staff_profiles/toggle_public">
                     <input type="hidden" name="staff_discord_id" value="{staff_id}">
                     <button type="submit">{toggle_label}</button>
@@ -279,6 +280,17 @@ async def staff_profiles_index(request: Request):
         }}
         button:hover {{ background: #1d4ed8; }}
         a {{ color: #93c5fd; }}
+        .actions {{ display: flex; flex-direction: column; gap: 8px; min-width: 88px; }}
+        .edit-link {{
+            display: inline-block;
+            background: #334155;
+            color: #e5e7eb;
+            text-decoration: none;
+            border-radius: 8px;
+            padding: 7px 10px;
+            text-align: center;
+        }}
+        .edit-link:hover {{ background: #475569; }}
         .empty {{ text-align: center; color: #94a3b8; padding: 32px; }}
     </style>
 </head>
@@ -310,6 +322,252 @@ async def staff_profiles_index(request: Request):
 </html>
 """
     return HTMLResponse(html_text)
+
+
+
+def _fetch_profile(staff_discord_id: str) -> sqlite3.Row | None:
+    _ensure_tables()
+
+    conn = _connect()
+    try:
+        return conn.execute(
+            """
+            SELECT *
+            FROM staff_profiles
+            WHERE staff_discord_id = ?
+            LIMIT 1
+            """,
+            (str(staff_discord_id),),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def _profile_edit_page_html(row: sqlite3.Row) -> str:
+    staff_id = _esc(row["staff_discord_id"])
+    display_name = _esc(row["display_name"] or "")
+    profile_type = _esc(row["profile_type"] or "")
+    role_title = _esc(row["role_title"] or "")
+    main_games = _esc(row["main_games"] or "")
+    service_tags = _esc(row["service_tags"] or "")
+    bio = _esc(row["bio"] or "")
+    card_image_url = _esc(row["card_image_url"] or "")
+    updated_at = _esc(row["updated_at"] or "")
+
+    preview = (
+        f'<img src="{card_image_url}" alt="名片預覽">'
+        if card_image_url
+        else '<div class="no-image">尚未設定名片圖片 URL</div>'
+    )
+
+    return f"""
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="utf-8">
+    <title>編輯成員個人牆</title>
+    <style>
+        body {{
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 24px;
+            background: #0f172a;
+            color: #e5e7eb;
+        }}
+        .wrap {{ max-width: 920px; }}
+        h1 {{ margin-bottom: 4px; }}
+        .sub {{ color: #94a3b8; margin-bottom: 20px; }}
+        .card {{
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 14px;
+            padding: 18px;
+        }}
+        label {{
+            display: block;
+            margin: 14px 0 6px;
+            color: #cbd5e1;
+            font-weight: 700;
+        }}
+        input, textarea {{
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            background: #020617;
+            color: #e5e7eb;
+            padding: 10px 12px;
+            font-size: 14px;
+        }}
+        textarea {{ min-height: 150px; resize: vertical; }}
+        .row {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }}
+        .actions {{
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 18px;
+        }}
+        button {{
+            background: #2563eb;
+            color: white;
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-weight: 700;
+        }}
+        button:hover {{ background: #1d4ed8; }}
+        a {{
+            color: #93c5fd;
+            text-decoration: none;
+        }}
+        .muted {{ color: #94a3b8; font-size: 13px; }}
+        .preview {{
+            margin-top: 14px;
+            background: #020617;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 12px;
+        }}
+        .preview img {{
+            max-width: 100%;
+            border-radius: 10px;
+            display: block;
+        }}
+        .no-image {{ color: #94a3b8; padding: 24px; text-align: center; }}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>編輯成員個人牆</h1>
+        <div class="sub">
+            成員 ID：{staff_id}｜最後更新：{updated_at}<br>
+            這裡只修改個人牆資料，不影響訂單、接單、分潤。
+        </div>
+
+        <form class="card" method="post" action="/admin/staff_profiles/edit/{staff_id}">
+            <div class="row">
+                <div>
+                    <label>顯示名稱</label>
+                    <input name="display_name" value="{display_name}" maxlength="80">
+                </div>
+                <div>
+                    <label>類型</label>
+                    <input name="profile_type" value="{profile_type}" maxlength="40" placeholder="打手 / 陪玩 / 主播">
+                </div>
+            </div>
+
+            <div class="row">
+                <div>
+                    <label>階級 / 職位</label>
+                    <input name="role_title" value="{role_title}" maxlength="80">
+                </div>
+                <div>
+                    <label>主要遊戲</label>
+                    <input name="main_games" value="{main_games}" maxlength="120">
+                </div>
+            </div>
+
+            <label>服務項目</label>
+            <input name="service_tags" value="{service_tags}" maxlength="200" placeholder="護航 / 技術陪 / 代做">
+
+            <label>個人特色</label>
+            <textarea name="bio" maxlength="1200">{bio}</textarea>
+
+            <label>名片圖片 URL</label>
+            <input name="card_image_url" value="{card_image_url}" maxlength="1000" placeholder="https://...">
+
+            <div class="preview">
+                <div class="muted">目前名片圖片預覽</div>
+                {preview}
+            </div>
+
+            <div class="actions">
+                <button type="submit">儲存變更</button>
+                <a href="/admin/staff_profiles/">返回列表</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+"""
+
+
+@router.get("/edit/{staff_discord_id}", response_class=HTMLResponse)
+async def edit_staff_profile_page(request: Request, staff_discord_id: str):
+    if not _is_admin(request):
+        return RedirectResponse(url="/login", status_code=303)
+
+    row = _fetch_profile(staff_discord_id)
+
+    if row is None:
+        return HTMLResponse(
+            "<h1>找不到成員個人牆</h1><p><a href='/admin/staff_profiles/'>返回列表</a></p>",
+            status_code=404,
+        )
+
+    return HTMLResponse(_profile_edit_page_html(row))
+
+
+@router.post("/edit/{staff_discord_id}")
+async def update_staff_profile_page(
+    request: Request,
+    staff_discord_id: str,
+    display_name: str = Form(""),
+    profile_type: str = Form(""),
+    role_title: str = Form(""),
+    main_games: str = Form(""),
+    service_tags: str = Form(""),
+    bio: str = Form(""),
+    card_image_url: str = Form(""),
+):
+    if not _is_admin(request):
+        return RedirectResponse(url="/login", status_code=303)
+
+    _ensure_tables()
+
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT staff_discord_id FROM staff_profiles WHERE staff_discord_id = ?",
+            (str(staff_discord_id),),
+        ).fetchone()
+
+        if row is None:
+            return RedirectResponse(url="/admin/staff_profiles/", status_code=303)
+
+        conn.execute(
+            """
+            UPDATE staff_profiles
+            SET display_name = ?,
+                profile_type = ?,
+                role_title = ?,
+                main_games = ?,
+                service_tags = ?,
+                bio = ?,
+                card_image_url = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE staff_discord_id = ?
+            """,
+            (
+                str(display_name or "").strip(),
+                str(profile_type or "").strip(),
+                str(role_title or "").strip(),
+                str(main_games or "").strip(),
+                str(service_tags or "").strip(),
+                str(bio or "").strip(),
+                str(card_image_url or "").strip(),
+                str(staff_discord_id),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return RedirectResponse(url="/admin/staff_profiles/", status_code=303)
 
 
 @router.post("/toggle_public")
