@@ -812,6 +812,66 @@ class StaffProfileReviewsPageView(discord.ui.View):
         self._refresh_button_state()
         await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
+
+def build_staff_order_request_embed(profile: dict, requester_id: int | str) -> discord.Embed:
+    staff_id = str(profile.get("staff_discord_id") or "")
+    display_name = str(profile.get("display_name") or staff_id or "成員")
+    profile_type = str(profile.get("profile_type") or "成員")
+    role_title = str(profile.get("role_title") or "未填")
+    games = str(profile.get("main_games") or "未填")
+    services = str(profile.get("service_tags") or "未填")
+
+    request_text = (
+        f"我要指定：{display_name}（{staff_id}）\n"
+        f"類型 / 階級：{profile_type} / {role_title}\n"
+        f"遊戲：{games}\n"
+        f"服務：{services}\n"
+        "訂單內容：\n"
+        "預計時間 / 場數：\n"
+        "付款方式：\n"
+        "備註："
+    )
+
+    embed = discord.Embed(
+        title="指定下單請求",
+        description=(
+            f"你選擇指定 **{display_name}**。\n"
+            "請把下方格式貼給客服，客服會確認內容、價格、成員是否可接。"
+        ),
+        color=discord.Color.blurple(),
+        timestamp=datetime.now(),
+    )
+
+    embed.add_field(
+        name="指定成員",
+        value=(
+            f"成員：<@{staff_id}>\n"
+            f"類型：{profile_type}\n"
+            f"階級：{role_title}\n"
+            f"遊戲：{games}\n"
+            f"服務：{services}"
+        ),
+        inline=False,
+    )
+
+    embed.add_field(
+        name="給客服的複製格式",
+        value=f"```txt\n{request_text[:1700]}\n```",
+        inline=False,
+    )
+
+    embed.add_field(
+        name="提醒",
+        value=(
+            "這個按鈕目前不會直接建立訂單，也不會鎖定成員。\n"
+            "是否可接單、價格與指定費，仍以下單當下客服確認為準。"
+        ),
+        inline=False,
+    )
+
+    embed.set_footer(text="第一版只做請求卡片，避免影響現有訂單流程。")
+    return embed
+
 class StaffProfilePanelView(discord.ui.View):
     def __init__(self, staff_id: int | str):
         super().__init__(timeout=None)
@@ -883,13 +943,8 @@ class StaffProfilePanelView(discord.ui.View):
             await interaction.response.send_message("找不到這位成員的個人牆資料。", ephemeral=True)
             return
 
-        display_name = str(profile.get("display_name") or self.staff_id)
         await interaction.response.send_message(
-            (
-                f"已選擇指定：**{display_name}**。\n\n"
-                "目前第一版不直接建立訂單，避免影響現有訂單流程。\n"
-                "請到下單票口告知客服要指定這位成員，客服會確認內容、價格與是否可接。"
-            ),
+            embed=build_staff_order_request_embed(profile, interaction.user.id),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
         )
