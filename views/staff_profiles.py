@@ -603,6 +603,215 @@ async def find_profile_card_image_url(channel) -> str | None:
     return None
 
 
+
+def count_public_reviews(staff_id: int | str) -> int:
+    ensure_staff_profile_tables()
+    conn = _connect()
+    try:
+        if not _has_table(conn, "order_reviews"):
+            return 0
+
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS c
+            FROM order_reviews
+            WHERE staff_discord_id = ?
+              AND COALESCE(is_public, 1) = 1
+              AND COALESCE(is_hidden, 0) = 0
+            """,
+            (str(staff_id),),
+        ).fetchone()
+
+        return int(row["c"] or 0) if row else 0
+    finally:
+        conn.close()
+
+
+def list_public_reviews_page(
+    staff_id: int | str,
+    *,
+    page: int = 0,
+    page_size: int = 5,
+) -> list[dict]:
+    ensure_staff_profile_tables()
+    safe_page = max(0, int(page or 0))
+    safe_page_size = max(1, min(10, int(page_size or 5)))
+    offset = safe_page * safe_page_size
+
+    conn = _connect()
+    try:
+        if not _has_table(conn, "order_reviews"):
+            return []
+
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM order_reviews
+            WHERE staff_discord_id = ?
+              AND COALESCE(is_public, 1) = 1
+              AND COALESCE(is_hidden, 0) = 0
+            ORDER BY id DESC
+            LIMIT ?
+            OFFSET ?
+            """,
+            (str(staff_id), safe_page_size, offset),
+        ).fetchall()
+
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def build_reviews_page_embed(
+    profile: dict,
+    reviews: list[dict],
+    *,
+    page: int,
+    page_size: int,
+    total_count: int,
+) -> discord.Embed:
+    display_name = str(profile.get("display_name") or profile.get("staff_discord_id") or "成員")
+    stats = get_profile_stats(profile["staff_discord_id"])
+    avg = stats["average_rating"]
+
+    total_pages = max(1, (int(total_count or 0) + int(page_size or 5) - 1) // int(page_size or 5))
+    current_page = min(max(0, int(page or 0)), total_pages - 1)
+
+    embed = discord.Embed(
+        title=f"{display_name}｜全部評價",
+        color=discord.Color.gold(),
+        timestamp=datetime.now(),
+    )
+
+    if avg is not None:
+        rating_line = f"⭐ 平均：{avg:.1f} / 5"
+    else:
+        rating_line = "⭐ 平均：尚無公開評價"
+
+    embed.description = (
+        f"{rating_line}\n"
+        f"📝 公開評價：{int(total_count or 0)} 則\n"
+        f"✅ 完成訂單：{stats['completed_orders']}\n"
+        f"📄 頁數：{current_page + 1} / {total_pages}"
+    )
+
+    if not reviews:
+        embed.add_field(
+            name="評價",
+            value="目前還沒有公開評價。",
+            inline=False,
+        )
+        return embed
+
+    for index, review in enumerate(reviews, start=current_page * int(page_size or 5) + 1):
+        rating = int(review.get("rating") or 0)
+        stars = "⭐" * max(1, min(5, rating))
+        service = "｜".join(
+            part
+            for part in [
+                str(review.get("service_category") or "").strip(),
+                str(review.get("service_item") or "").strip(),
+            ]
+            if part
+        ) or "未記錄服務"
+
+        created_at = str(review.get("created_at") or "")[:10] or "未記錄日期"
+        comment = str(review.get("comment") or "").strip() or "未填寫評語"
+
+        if len(comment) > 450:
+            comment = comment[:447] + "..."
+
+        embed.add_field(
+            name=f"{index}. {stars}｜{service}｜{created_at}",
+            value=comment,
+            inline=False,
+        )
+
+    embed.set_footer(text="只顯示公開且未被後台隱藏的評價。")
+    return embed
+
+
+class StaffProfileReviewsPageView(discord.ui.View):
+    def __init__(self, staff_id: int | str, *, page: int = 0, page_size: int = 5):
+        super().__init__(timeout=300)
+        self.staff_id = str(staff_id)
+        self.page = max(0, int(page or 0))
+        self.page_size = max(1, min(10, int(page_size or 5)))
+
+        prev_button = discord.ui.Button(
+            label="上一頁",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"staff_profile_reviews_prev:{self.staff_id}",
+            row=0,
+        )
+        prev_button.callback = self.previous_page
+        self.add_item(prev_button)
+
+        next_button = discord.ui.Button(
+            label="下一頁",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"staff_profile_reviews_next:{self.staff_id}",
+            row=0,
+        )
+        next_button.callback = self.next_page
+        self.add_item(next_button)
+
+        self._refresh_button_state()
+
+    def _total_count(self) -> int:
+        return count_public_reviews(self.staff_id)
+
+    def _max_page(self) -> int:
+        total = self._total_count()
+        return max(0, (total + self.page_size - 1) // self.page_size - 1)
+
+    def _refresh_button_state(self) -> None:
+        max_page = self._max_page()
+
+        for child in self.children:
+            if not isinstance(child, discord.ui.Button):
+                continue
+
+            if str(child.custom_id or "").startswith("staff_profile_reviews_prev:"):
+                child.disabled = self.page <= 0
+            elif str(child.custom_id or "").startswith("staff_profile_reviews_next:"):
+                child.disabled = self.page >= max_page
+
+    def build_embed(self) -> discord.Embed:
+        profile = get_staff_profile(self.staff_id)
+
+        if profile is None:
+            return discord.Embed(
+                title="找不到成員個人牆",
+                description="這位成員的個人牆資料不存在或已被移除。",
+                color=discord.Color.red(),
+            )
+
+        total = self._total_count()
+        reviews = list_public_reviews_page(
+            self.staff_id,
+            page=self.page,
+            page_size=self.page_size,
+        )
+
+        return build_reviews_page_embed(
+            profile,
+            reviews,
+            page=self.page,
+            page_size=self.page_size,
+            total_count=total,
+        )
+
+    async def previous_page(self, interaction: discord.Interaction):
+        self.page = max(0, self.page - 1)
+        self._refresh_button_state()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        self.page = min(self._max_page(), self.page + 1)
+        self._refresh_button_state()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
 class StaffProfilePanelView(discord.ui.View):
     def __init__(self, staff_id: int | str):
         super().__init__(timeout=None)
@@ -692,9 +901,10 @@ class StaffProfilePanelView(discord.ui.View):
             await interaction.response.send_message("找不到這位成員的個人牆資料。", ephemeral=True)
             return
 
-        reviews = list_public_reviews(self.staff_id, limit=5)
+        view = StaffProfileReviewsPageView(self.staff_id, page=0, page_size=5)
         await interaction.response.send_message(
-            embed=build_reviews_embed(profile, reviews),
+            embed=view.build_embed(),
+            view=view,
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
         )
