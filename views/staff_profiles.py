@@ -1323,3 +1323,522 @@ class CustomerFavoriteActionsView(discord.ui.View):
 
         await interaction.response.edit_message(embed=embed, view=view)
 
+
+
+def _public_profile_value(row, key: str, default=None):
+    if row is None:
+        return default
+
+    if isinstance(row, dict):
+        return row.get(key, default)
+
+    try:
+        return row[key]
+    except Exception:
+        return default
+
+
+def _public_profile_option_text(value, limit: int) -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = "未填"
+    return text[: max(1, int(limit))]
+
+
+def get_public_staff_profile(staff_id: int | str):
+    profile = get_staff_profile(str(staff_id))
+
+    if profile is None:
+        return None
+
+    try:
+        is_public = int(profile.get("is_public") or 0) == 1
+    except Exception:
+        is_public = False
+
+    if not is_public:
+        return None
+
+    return profile
+
+
+def _normalize_public_profile_keyword(keyword: str | None) -> str:
+    return str(keyword or "").strip()[:60]
+
+
+def count_public_staff_profiles(keyword: str | None = None) -> int:
+    ensure_staff_profile_tables()
+
+    keyword = _normalize_public_profile_keyword(keyword)
+
+    where = ["COALESCE(is_public, 1) = 1"]
+    params = []
+
+    if keyword:
+        like = f"%{keyword.lower()}%"
+        where.append(
+            """
+            (
+                LOWER(COALESCE(display_name, '')) LIKE ?
+                OR LOWER(COALESCE(profile_type, '')) LIKE ?
+                OR LOWER(COALESCE(role_title, '')) LIKE ?
+                OR LOWER(COALESCE(main_games, '')) LIKE ?
+                OR LOWER(COALESCE(service_tags, '')) LIKE ?
+                OR LOWER(COALESCE(bio, '')) LIKE ?
+                OR LOWER(COALESCE(staff_discord_id, '')) LIKE ?
+            )
+            """
+        )
+        params.extend([like, like, like, like, like, like, like])
+
+    sql = f"""
+        SELECT COUNT(*) AS total
+        FROM staff_profiles
+        WHERE {' AND '.join(where)}
+    """
+
+    conn = _connect()
+    try:
+        row = conn.execute(sql, params).fetchone()
+        return int(row["total"] or 0) if row is not None else 0
+    finally:
+        conn.close()
+
+
+def list_public_staff_profiles(
+    *,
+    page: int = 0,
+    page_size: int = 10,
+    keyword: str | None = None,
+) -> list[sqlite3.Row]:
+    ensure_staff_profile_tables()
+
+    page = max(0, int(page or 0))
+    page_size = max(1, min(25, int(page_size or 10)))
+    keyword = _normalize_public_profile_keyword(keyword)
+
+    where = ["COALESCE(is_public, 1) = 1"]
+    params = []
+
+    if keyword:
+        like = f"%{keyword.lower()}%"
+        where.append(
+            """
+            (
+                LOWER(COALESCE(display_name, '')) LIKE ?
+                OR LOWER(COALESCE(profile_type, '')) LIKE ?
+                OR LOWER(COALESCE(role_title, '')) LIKE ?
+                OR LOWER(COALESCE(main_games, '')) LIKE ?
+                OR LOWER(COALESCE(service_tags, '')) LIKE ?
+                OR LOWER(COALESCE(bio, '')) LIKE ?
+                OR LOWER(COALESCE(staff_discord_id, '')) LIKE ?
+            )
+            """
+        )
+        params.extend([like, like, like, like, like, like, like])
+
+    params.extend([page_size, page * page_size])
+
+    sql = f"""
+        SELECT *
+        FROM staff_profiles
+        WHERE {' AND '.join(where)}
+        ORDER BY updated_at DESC, created_at DESC, display_name ASC
+        LIMIT ?
+        OFFSET ?
+    """
+
+    conn = _connect()
+    try:
+        return conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+
+
+def build_public_staff_profiles_embed(
+    profiles: list,
+    *,
+    page: int = 0,
+    page_size: int = 10,
+    total_count: int = 0,
+    keyword: str | None = None,
+) -> discord.Embed:
+    page = max(0, int(page or 0))
+    page_size = max(1, min(25, int(page_size or 10)))
+    total_count = max(0, int(total_count or 0))
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    keyword = _normalize_public_profile_keyword(keyword)
+
+    description = (
+        "選擇下方成員可以查看個人牆摘要、公開評價，或產生指定下單請求卡片。\n"
+        "這裡只瀏覽公開個人牆，不會直接建立訂單。"
+    )
+
+    if keyword:
+        description += f"\n\n搜尋關鍵字：`{keyword}`"
+
+    embed = discord.Embed(
+        title="公開成員個人牆",
+        description=description,
+        color=discord.Color.teal(),
+        timestamp=datetime.now(),
+    )
+
+    embed.add_field(
+        name="頁面",
+        value=f"{page + 1} / {total_pages}｜共 {total_count} 位公開成員",
+        inline=False,
+    )
+
+    if not profiles:
+        embed.add_field(
+            name="沒有符合的成員",
+            value="目前沒有公開個人牆，或沒有符合搜尋條件的成員。",
+            inline=False,
+        )
+        return embed
+
+    for index, row in enumerate(profiles[:page_size], start=page * page_size + 1):
+        staff_id = str(_public_profile_value(row, "staff_discord_id", "") or "")
+        display_name = str(_public_profile_value(row, "display_name", "") or staff_id)
+        profile_type = str(_public_profile_value(row, "profile_type", "") or "成員")
+        role_title = str(_public_profile_value(row, "role_title", "") or "未填職位")
+        games = str(_public_profile_value(row, "main_games", "") or "未填遊戲")
+        services = str(_public_profile_value(row, "service_tags", "") or "未填服務")
+
+        embed.add_field(
+            name=f"{index}. {display_name}",
+            value=(
+                f"成員：<@{staff_id}>\n"
+                f"類型：{profile_type}｜{role_title}\n"
+                f"遊戲：{games}\n"
+                f"服務：{services}"
+            ),
+            inline=False,
+        )
+
+    embed.set_footer(text="可用 /browse_staff_profiles keyword:關鍵字 搜尋名稱、遊戲、服務或階級。")
+    return embed
+
+
+def build_public_staff_profile_summary_embed(staff_id: int | str) -> discord.Embed:
+    profile = get_public_staff_profile(staff_id)
+
+    if profile is None:
+        embed = discord.Embed(
+            title="找不到公開個人牆",
+            description="這位成員的個人牆不存在，或目前沒有公開。",
+            color=discord.Color.orange(),
+            timestamp=datetime.now(),
+        )
+        return embed
+
+    embed = build_staff_profile_embed(profile)
+    embed.add_field(
+        name="瀏覽操作",
+        value=(
+            "你可以查看公開評價，或產生指定下單請求卡片。\n"
+            "這裡不會直接建立訂單。"
+        ),
+        inline=False,
+    )
+    return embed
+
+
+class PublicStaffProfilesSelect(discord.ui.Select):
+    def __init__(
+        self,
+        viewer_id: int | str,
+        profiles: list,
+        *,
+        page: int = 0,
+        page_size: int = 10,
+        keyword: str | None = None,
+    ):
+        self.viewer_id = str(viewer_id)
+        self.page = max(0, int(page or 0))
+        self.page_size = max(1, min(25, int(page_size or 10)))
+        self.keyword = _normalize_public_profile_keyword(keyword)
+
+        options = []
+
+        for row in list(profiles or [])[:25]:
+            staff_id = str(_public_profile_value(row, "staff_discord_id", "") or "").strip()
+            if not staff_id:
+                continue
+
+            display_name = (
+                _public_profile_value(row, "display_name")
+                or staff_id
+            )
+            role_title = _public_profile_value(row, "role_title", "未填職位")
+            games = _public_profile_value(row, "main_games", "未填遊戲")
+            services = _public_profile_value(row, "service_tags", "未填服務")
+
+            description = f"{role_title}｜{games}｜{services}"
+
+            options.append(
+                discord.SelectOption(
+                    label=_public_profile_option_text(display_name, 100),
+                    value=staff_id[:100],
+                    description=_public_profile_option_text(description, 100),
+                )
+            )
+
+        if not options:
+            options.append(
+                discord.SelectOption(
+                    label="沒有可選擇的公開成員",
+                    value="__empty__",
+                    description="目前沒有公開個人牆",
+                )
+            )
+
+        super().__init__(
+            placeholder="選擇公開成員",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if str(interaction.user.id) != self.viewer_id:
+            await interaction.response.send_message("這不是你的瀏覽清單。", ephemeral=True)
+            return
+
+        staff_id = str(self.values[0] or "")
+
+        if staff_id == "__empty__":
+            await interaction.response.defer()
+            return
+
+        await interaction.response.edit_message(
+            embed=build_public_staff_profile_summary_embed(staff_id),
+            view=PublicStaffProfileActionsView(
+                self.viewer_id,
+                staff_id,
+                keyword=self.keyword,
+                page=self.page,
+                page_size=self.page_size,
+            ),
+        )
+
+
+class PublicStaffProfileBrowseView(discord.ui.View):
+    def __init__(
+        self,
+        viewer_id: int | str,
+        *,
+        keyword: str | None = None,
+        page: int = 0,
+        page_size: int = 10,
+    ):
+        super().__init__(timeout=300)
+        self.viewer_id = str(viewer_id)
+        self.keyword = _normalize_public_profile_keyword(keyword)
+        self.page = max(0, int(page or 0))
+        self.page_size = max(1, min(25, int(page_size or 10)))
+
+        self.total_count = count_public_staff_profiles(self.keyword)
+        self.profiles = list_public_staff_profiles(
+            page=self.page,
+            page_size=self.page_size,
+            keyword=self.keyword,
+        )
+
+        if self.profiles:
+            self.add_item(
+                PublicStaffProfilesSelect(
+                    self.viewer_id,
+                    self.profiles,
+                    page=self.page,
+                    page_size=self.page_size,
+                    keyword=self.keyword,
+                )
+            )
+
+        max_page = self._max_page()
+
+        if max_page > 0:
+            prev_button = discord.ui.Button(
+                label="上一頁",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"public_profiles_prev:{self.page}",
+                row=1,
+                disabled=self.page <= 0,
+            )
+            prev_button.callback = self.previous_page
+            self.add_item(prev_button)
+
+            next_button = discord.ui.Button(
+                label="下一頁",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"public_profiles_next:{self.page}",
+                row=1,
+                disabled=self.page >= max_page,
+            )
+            next_button.callback = self.next_page
+            self.add_item(next_button)
+
+    def _max_page(self) -> int:
+        return max(0, (self.total_count + self.page_size - 1) // self.page_size - 1)
+
+    def build_embed(self) -> discord.Embed:
+        return build_public_staff_profiles_embed(
+            self.profiles,
+            page=self.page,
+            page_size=self.page_size,
+            total_count=self.total_count,
+            keyword=self.keyword,
+        )
+
+    async def _check_owner(self, interaction: discord.Interaction) -> bool:
+        if str(interaction.user.id) != self.viewer_id:
+            await interaction.response.send_message("這不是你的瀏覽清單。", ephemeral=True)
+            return False
+        return True
+
+    async def previous_page(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        new_view = PublicStaffProfileBrowseView(
+            self.viewer_id,
+            keyword=self.keyword,
+            page=max(0, self.page - 1),
+            page_size=self.page_size,
+        )
+        await interaction.response.edit_message(embed=new_view.build_embed(), view=new_view if new_view.children else None)
+
+    async def next_page(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        new_view = PublicStaffProfileBrowseView(
+            self.viewer_id,
+            keyword=self.keyword,
+            page=min(self._max_page(), self.page + 1),
+            page_size=self.page_size,
+        )
+        await interaction.response.edit_message(embed=new_view.build_embed(), view=new_view if new_view.children else None)
+
+
+class PublicStaffProfileActionsView(discord.ui.View):
+    def __init__(
+        self,
+        viewer_id: int | str,
+        staff_id: int | str,
+        *,
+        keyword: str | None = None,
+        page: int = 0,
+        page_size: int = 10,
+    ):
+        super().__init__(timeout=300)
+        self.viewer_id = str(viewer_id)
+        self.staff_id = str(staff_id)
+        self.keyword = _normalize_public_profile_keyword(keyword)
+        self.page = max(0, int(page or 0))
+        self.page_size = max(1, min(25, int(page_size or 10)))
+
+        summary_button = discord.ui.Button(
+            label="個人牆摘要",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"public_profile_summary:{self.staff_id}",
+            row=0,
+        )
+        summary_button.callback = self.summary_callback
+        self.add_item(summary_button)
+
+        reviews_button = discord.ui.Button(
+            label="查看評價",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"public_profile_reviews:{self.staff_id}",
+            row=0,
+        )
+        reviews_button.callback = self.reviews_callback
+        self.add_item(reviews_button)
+
+        order_button = discord.ui.Button(
+            label="指定下單請求",
+            style=discord.ButtonStyle.primary,
+            custom_id=f"public_profile_order:{self.staff_id}",
+            row=1,
+        )
+        order_button.callback = self.order_request_callback
+        self.add_item(order_button)
+
+        back_button = discord.ui.Button(
+            label="返回瀏覽",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"public_profile_back:{self.staff_id}",
+            row=1,
+        )
+        back_button.callback = self.back_callback
+        self.add_item(back_button)
+
+    async def _check_owner(self, interaction: discord.Interaction) -> bool:
+        if str(interaction.user.id) != self.viewer_id:
+            await interaction.response.send_message("這不是你的瀏覽操作。", ephemeral=True)
+            return False
+        return True
+
+    async def summary_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        await interaction.response.edit_message(
+            embed=build_public_staff_profile_summary_embed(self.staff_id),
+            view=self,
+        )
+
+    async def reviews_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        profile = get_public_staff_profile(self.staff_id)
+
+        if profile is None:
+            await interaction.response.send_message("這位成員目前沒有公開個人牆。", ephemeral=True)
+            return
+
+        view = StaffProfileReviewsPageView(self.staff_id, page=0, page_size=5)
+        await interaction.response.send_message(
+            embed=view.build_embed(),
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+
+    async def order_request_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        profile = get_public_staff_profile(self.staff_id)
+
+        if profile is None:
+            await interaction.response.send_message("這位成員目前沒有公開個人牆。", ephemeral=True)
+            return
+
+        await interaction.response.send_message(
+            embed=build_staff_order_request_embed(profile, interaction.user.id),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+
+    async def back_callback(self, interaction: discord.Interaction):
+        if not await self._check_owner(interaction):
+            return
+
+        view = PublicStaffProfileBrowseView(
+            self.viewer_id,
+            keyword=self.keyword,
+            page=self.page,
+            page_size=self.page_size,
+        )
+
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view if view.children else None,
+        )
+

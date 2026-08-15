@@ -171,6 +171,7 @@ from views.staff_profiles import (
     list_customer_favorites,
     build_customer_favorites_embed,
     CustomerFavoritesView,
+    PublicStaffProfileBrowseView,
     StaffProfilePanelView,
 )
 
@@ -8416,9 +8417,55 @@ async def my_favorites(interaction: discord.Interaction):
     customer_id = str(interaction.user.id)
     favorites = list_customer_favorites(customer_id, limit=25)
     embed = build_customer_favorites_embed(customer_id, favorites)
-    view = CustomerFavoritesView(customer_id, favorites) if favorites else None
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    if favorites:
+        await interaction.response.send_message(
+            embed=embed,
+            view=CustomerFavoritesView(customer_id, favorites),
+            ephemeral=True,
+        )
+    else:
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True,
+        )
+
+
+
+
+@bot.tree.command(
+    name="browse_staff_profiles",
+    description="瀏覽公開成員個人牆",
+    guild=discord.Object(id=GUILD_ID),
+)
+@app_commands.describe(
+    keyword="可搜尋名稱、遊戲、服務或階級，可不填"
+)
+async def browse_staff_profiles(
+    interaction: discord.Interaction,
+    keyword: str | None = None,
+):
+    keyword_text = str(keyword or "").strip()[:60]
+    view = PublicStaffProfileBrowseView(
+        interaction.user.id,
+        keyword=keyword_text,
+        page=0,
+        page_size=10,
+    )
+
+    if view.children:
+        await interaction.response.send_message(
+            embed=view.build_embed(),
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+    else:
+        await interaction.response.send_message(
+            embed=view.build_embed(),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
 
 
 
