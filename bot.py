@@ -6319,6 +6319,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
         return []
 
     quantity = _to_int(data.get("quantity"), 1) or 1
+    companion_preference = str(data.get("companion_preference") or "不指定陪玩/打手").strip()
     player_count = _to_int(data.get("player_count"), 1) or 1
     specified_staff_ids = [str(item) for item in data.get("specified_staff_ids") or []]
 
@@ -6563,6 +6564,34 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
     entries.sort(key=lambda item: (item["role_order"], item["label"].casefold(), item["id"]))
     return entries
 
+
+
+async def _acknowledge_component_interaction(interaction: discord.Interaction) -> None:
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+    except discord.HTTPException:
+        pass
+
+
+async def _edit_component_message(
+    interaction: discord.Interaction,
+    *,
+    content: str | None = None,
+    view: discord.ui.View | None = None,
+) -> None:
+    try:
+        if interaction.response.is_done():
+            await interaction.edit_original_response(content=content, view=view)
+        else:
+            await interaction.response.edit_message(content=content, view=view)
+    except discord.NotFound:
+        pass
+    except discord.HTTPException as exc:
+        try:
+            await interaction.followup.send(f"更新指定人員選單失敗：{exc}", ephemeral=True)
+        except discord.HTTPException:
+            pass
 
 class SelfServiceSpecifiedStaffDropdown(discord.ui.Select):
     def __init__(self, parent_view: "SelfServiceSpecifiedStaffDropdownView"):
