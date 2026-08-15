@@ -366,9 +366,37 @@ def toggle_staff_favorite(
     return True, "已加入收藏。"
 
 
+
+def _has_column(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except sqlite3.Error:
+        return False
+
+    return any(str(row["name"]) == str(column_name) for row in rows)
+
+
+def _coalesce_datetime_expr(
+    conn: sqlite3.Connection,
+    table_name: str,
+    alias: str,
+    candidates: list[str],
+) -> str | None:
+    parts = []
+
+    for column_name in candidates:
+        if _has_column(conn, table_name, column_name):
+            parts.append(f"NULLIF({alias}.{column_name}, '')")
+
+    if not parts:
+        return None
+
+    return "COALESCE(" + ", ".join(parts) + ")"
+
 def get_profile_stats(staff_id: int | str) -> dict:
     ensure_staff_profile_tables()
     staff_id_text = str(staff_id)
+
     conn = _connect()
     try:
         favorite_count = conn.execute(
@@ -381,6 +409,8 @@ def get_profile_stats(staff_id: int | str) -> dict:
         ).fetchone()["c"]
 
         completed_orders = 0
+        recent_completed_orders = 0
+
         if _has_table(conn, "web_orders") and _has_table(conn, "order_assignments"):
             row = conn.execute(
                 """
@@ -396,13 +426,44 @@ def get_profile_stats(staff_id: int | str) -> dict:
             ).fetchone()
             completed_orders = int(row["c"] or 0)
 
+            completed_date_expr = _coalesce_datetime_expr(
+                conn,
+                "web_orders",
+                "wo",
+                ["closed_at", "updated_at", "created_at"],
+            )
+
+            if completed_date_expr:
+                row = conn.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT wo.id) AS c
+                    FROM web_orders wo
+                    JOIN order_assignments oa
+                      ON oa.order_id = wo.id
+                    WHERE oa.worker_discord_id = ?
+                      AND COALESCE(oa.is_active, 1) = 1
+                      AND wo.status = 'closed'
+                      AND datetime({completed_date_expr}) >= datetime('now', '-30 days')
+                    """,
+                    (staff_id_text,),
+                ).fetchone()
+                recent_completed_orders = int(row["c"] or 0)
+
         review_count = 0
+        recent_review_count = 0
         average_rating = None
+        latest_review_at = None
+
         if _has_table(conn, "order_reviews"):
+            has_created_at = _has_column(conn, "order_reviews", "created_at")
+
+            select_latest = ", MAX(created_at) AS latest_review_at" if has_created_at else ""
+
             row = conn.execute(
-                """
+                f"""
                 SELECT COUNT(*) AS c,
                        AVG(rating) AS avg_rating
+                       {select_latest}
                 FROM order_reviews
                 WHERE staff_discord_id = ?
                   AND COALESCE(is_public, 1) = 1
@@ -410,18 +471,37 @@ def get_profile_stats(staff_id: int | str) -> dict:
                 """,
                 (staff_id_text,),
             ).fetchone()
+
             review_count = int(row["c"] or 0)
             average_rating = row["avg_rating"]
+
+            if has_created_at:
+                latest_review_at = row["latest_review_at"]
+
+                row = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM order_reviews
+                    WHERE staff_discord_id = ?
+                      AND COALESCE(is_public, 1) = 1
+                      AND COALESCE(is_hidden, 0) = 0
+                      AND datetime(NULLIF(created_at, '')) >= datetime('now', '-30 days')
+                    """,
+                    (staff_id_text,),
+                ).fetchone()
+                recent_review_count = int(row["c"] or 0)
 
         return {
             "favorite_count": int(favorite_count or 0),
             "completed_orders": int(completed_orders or 0),
+            "recent_completed_orders": int(recent_completed_orders or 0),
             "review_count": int(review_count or 0),
+            "recent_review_count": int(recent_review_count or 0),
             "average_rating": float(average_rating) if average_rating is not None else None,
+            "latest_review_at": str(latest_review_at or "").strip() or None,
         }
     finally:
         conn.close()
-
 
 def list_public_reviews(staff_id: int | str, limit: int = 5) -> list[dict]:
     ensure_staff_profile_tables()
@@ -453,6 +533,15 @@ def _short_text(value: str | None, limit: int = 1024) -> str:
         return "未填寫"
     return text[:limit]
 
+
+
+def _date_text(value: str | None, empty_text: str = "尚無公開評價") -> str:
+    text = str(value or "").strip()
+
+    if not text:
+        return empty_text
+
+    return text[:10]
 
 def build_staff_profile_embed(profile: dict) -> discord.Embed:
     stats = get_profile_stats(profile["staff_discord_id"])
@@ -495,7 +584,10 @@ def build_staff_profile_embed(profile: dict) -> discord.Embed:
         value=(
             f"❤️ 收藏數：{stats['favorite_count']}\n"
             f"✅ 完成訂單：{stats['completed_orders']}\n"
-            f"⭐ 平均評價：{rating_text}"
+            f"⭐ 平均評價：{rating_text}\n"
+            f"📆 近 30 天完成：{stats['recent_completed_orders']}\n"
+            f"📝 近 30 天評價：{stats['recent_review_count']}\n"
+            f"🕒 最近評價：{_date_text(stats.get('latest_review_at'))}"
         ),
         inline=False,
     )
@@ -522,12 +614,18 @@ def build_reviews_embed(profile: dict, reviews: list[dict]) -> discord.Embed:
     embed.description = (
         f"⭐ 平均：{avg:.1f} / 5\n"
         f"📝 公開評價：{stats['review_count']} 則\n"
-        f"✅ 完成訂單：{stats['completed_orders']}"
+        f"✅ 完成訂單：{stats['completed_orders']}\n"
+        f"📆 近 30 天完成：{stats['recent_completed_orders']}\n"
+        f"📝 近 30 天評價：{stats['recent_review_count']}\n"
+        f"🕒 最近評價：{_date_text(stats.get('latest_review_at'))}"
         if avg is not None
         else (
             "⭐ 平均：尚無公開評價\n"
             f"📝 公開評價：{stats['review_count']} 則\n"
-            f"✅ 完成訂單：{stats['completed_orders']}"
+            f"✅ 完成訂單：{stats['completed_orders']}\n"
+            f"📆 近 30 天完成：{stats['recent_completed_orders']}\n"
+            f"📝 近 30 天評價：{stats['recent_review_count']}\n"
+            f"🕒 最近評價：{_date_text(stats.get('latest_review_at'))}"
         )
     )
 
