@@ -762,102 +762,6 @@ async def create_private_channel(
 # ========= 評價 Modal / 按鈕 =========
 # Review modal/button views moved to views/review.py
 
-# ========= 派單 Modal =========
-
-class DispatchModal(discord.ui.Modal, title="派單"):
-    order_name = discord.ui.TextInput(
-        label="單子名稱",
-        placeholder="請輸入單子名稱",
-        required=True,
-        max_length=100
-    )
-
-    receiver = discord.ui.TextInput(
-        label="接單打手/陪玩",
-        placeholder="請輸入接單打手/陪玩名稱",
-        required=True,
-        max_length=100
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
-
-        if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以派單。", ephemeral=True)
-            return
-
-        guild = interaction.guild
-
-        if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
-
-        if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "找不到派單頻道，請確認 DISPATCH_CHANNEL_ID 是否正確。",
-                ephemeral=True
-            )
-            return
-
-        source_channel = interaction.channel.mention if isinstance(interaction.channel, discord.TextChannel) else "未知頻道"
-
-        embed = discord.Embed(
-            title="新派單",
-            color=discord.Color.blue()
-        )
-
-        embed.add_field(
-            name="單子名稱",
-            value=self.order_name.value,
-            inline=False
-        )
-
-        embed.add_field(
-            name="接單打手/陪玩",
-            value=self.receiver.value,
-            inline=False
-        )
-
-        embed.add_field(
-            name="派單客服",
-            value=interaction.user.mention,
-            inline=False
-        )
-
-        embed.add_field(
-            name="來源頻道",
-            value=source_channel,
-            inline=False
-        )
-
-        await dispatch_channel.send(
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
-        )
-
-        await interaction.response.send_message(
-            f"已派單，派單資訊已送到 {dispatch_channel.mention}。",
-            ephemeral=True
-        )
-
-        if isinstance(interaction.channel, discord.TextChannel):
-            await interaction.channel.send(
-                f"此單已由 {interaction.user.mention} 派單。\n"
-                f"單子名稱：{self.order_name.value}\n"
-                f"接單打手/陪玩：{self.receiver.value}"
-            )
-
-
-
-
 def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) -> None:
     """DC bot 結單後，把網站訂單狀態同步成 closed。"""
     try:
@@ -2878,7 +2782,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         )
 
     dispatch_embed.add_field(
-        name="接單狀態",
+        name="狀態",
         value="人數已滿，等待顧客付款" if str(state.status) == ACCEPTED_PENDING_PAY else "等待接單中",
         inline=False,
     )
@@ -4121,7 +4025,7 @@ class DispatchClaimView(discord.ui.View):
 
         if status == "stored":
             new_embed.add_field(
-                name="接單狀態",
+                name="狀態",
                 value=(
                     "已存單，接單面板已鎖定\n"
                     f"存單原因：{claim_data.get('stored_reason') or '未填寫'}\n"
@@ -4131,7 +4035,7 @@ class DispatchClaimView(discord.ui.View):
             )
         elif claim_data.get("locked"):
             new_embed.add_field(
-                name="接單狀態",
+                name="狀態",
                 value="已結單，接單面板已鎖定",
                 inline=False
             )
@@ -4426,7 +4330,7 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             receiver_text=receiver_text
         )
         embed.add_field(
-            name="接單狀態",
+            name="狀態",
             value="已結單，接單面板已鎖定",
             inline=False
         )
@@ -4613,7 +4517,7 @@ async def store_dispatch_claim_panel(
         receiver_text=receiver_text
     )
     embed.add_field(
-        name="接單狀態",
+        name="狀態",
         value=(
             "已存單，接單面板已鎖定\n"
             f"存單原因：{reason}\n"
@@ -4781,7 +4685,7 @@ async def resume_stored_order(
         receiver_text=receiver_text
     )
     embed.add_field(
-        name="接單狀態",
+        name="狀態",
         value=f"已由 {staff_member.mention} 恢復訂單，接單面板已重新發到最新位置。",
         inline=False
     )
@@ -10471,7 +10375,7 @@ async def update_stored_order_note_and_panel(
         receiver_text="\n".join(receiver_lines) if receiver_lines else None,
     )
     embed.add_field(
-        name="接單狀態",
+        name="狀態",
         value=(
             "已存單，接單面板已鎖定\n"
             f"存單原因：{reason}\n"

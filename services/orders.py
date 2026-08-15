@@ -195,6 +195,7 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
 
     return "｜".join(parts), payment_method
 
+
 def build_self_service_order_embed(
     customer_mention: str,
     category_label: str,
@@ -206,68 +207,64 @@ def build_self_service_order_embed(
     receiver_text: str | None = None,
     staff_note: str | None = None,
 ) -> discord.Embed:
+    payment_text = str(payment_method or "未紀錄").strip() or "未紀錄"
+
+    if payment_text in {"待付款", "未付款", "等待付款"}:
+        status_text = "等待接單｜付款前"
+        color = discord.Color.gold()
+    elif payment_text in {"未紀錄", "待客服確認"}:
+        status_text = "狀態未紀錄"
+        color = discord.Color.blue()
+    else:
+        status_text = "已付款｜服務進行中"
+        color = discord.Color.green()
+
+    ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
+
     embed = discord.Embed(
-        title="新自助下單",
-        color=discord.Color.blue(),
+        title="魔丸娛樂｜接單面板",
+        description="所有派單、接單、存單、恢復與結單狀態皆以此面板為準。",
+        color=color,
     )
 
-    embed.add_field(name="下單用戶", value=customer_mention, inline=False)
-    embed.add_field(name="訂單類別", value=category_label, inline=True)
-    embed.add_field(name="訂單項目", value=item, inline=True)
+    embed.add_field(name="狀態", value=status_text, inline=False)
+    embed.add_field(name="顧客", value=str(customer_mention or "未紀錄"), inline=True)
+    embed.add_field(name="票口", value=str(ticket_text), inline=True)
+    embed.add_field(name="訂單", value=f"{category_label}｜{item}", inline=False)
     embed.add_field(name="數量", value=f"{quantity} 單", inline=True)
-    embed.add_field(name="付款方式", value=payment_method, inline=True)
+    embed.add_field(name="付款方式", value=payment_text, inline=True)
 
     if companion_preference is not None:
-        embed.add_field(name="指定選項", value=companion_preference, inline=False)
+        embed.add_field(name="指定", value=str(companion_preference), inline=True)
 
     if staff_note is None:
         source_channel_id = getattr(source_channel, "id", None)
+
         try:
             source_data = _ORDER_SELECTIONS.get(int(source_channel_id), {}) if source_channel_id is not None else {}
         except (TypeError, ValueError):
             source_data = {}
 
         if isinstance(source_data, dict):
-            staff_note = source_data.get("staff_note") or source_data.get("customer_service_note")
+            staff_note = source_data.get("staff_note") or source_data.get("customer_service_note") or source_data.get("staff_order_note")
 
     staff_note_text = str(staff_note or "").strip()
     if staff_note_text:
         embed.add_field(name="客服備註", value=staff_note_text[:1024], inline=False)
 
-    if receiver_text is not None:
-        normalized_receiver_text = str(receiver_text or "").strip()
+    normalized_receiver_text = str(receiver_text or "").strip()
 
-        if normalized_receiver_text.startswith("打手："):
-            normalized_receiver_text = normalized_receiver_text.removeprefix("打手：").strip()
-        elif normalized_receiver_text.startswith("打手:"):
-            normalized_receiver_text = normalized_receiver_text.removeprefix("打手:").strip()
-        elif normalized_receiver_text.startswith("陪玩："):
-            normalized_receiver_text = normalized_receiver_text.removeprefix("陪玩：").strip()
-        elif normalized_receiver_text.startswith("陪玩:"):
-            normalized_receiver_text = normalized_receiver_text.removeprefix("陪玩:").strip()
-        elif normalized_receiver_text in {"不指定陪玩/打手", "不指定打手/陪玩"}:
-            normalized_receiver_text = "尚未接單"
+    for prefix in ("打手：", "打手:", "陪玩：", "陪玩:"):
+        if normalized_receiver_text.startswith(prefix):
+            normalized_receiver_text = normalized_receiver_text[len(prefix):].strip()
+            break
 
-        for prefix in (
-            "打手接單：",
-            "打手接單:",
-            "陪玩接單：",
-            "陪玩接單:",
-            "打手：",
-            "打手:",
-            "陪玩：",
-            "陪玩:",
-            "接單人員：",
-            "接單人員:",
-        ):
-            if normalized_receiver_text.startswith(prefix):
-                normalized_receiver_text = normalized_receiver_text.removeprefix(prefix).strip()
-                break
+    if not normalized_receiver_text:
+        normalized_receiver_text = "尚未接單"
 
-        embed.add_field(name="接單人員", value=normalized_receiver_text or "尚未接單", inline=False)
+    embed.add_field(name="目前接單", value=normalized_receiver_text[:1024], inline=False)
 
-    embed.add_field(name="來源票口", value=source_channel.mention, inline=False)
-    embed.add_field(name="接單狀態", value="等待接單", inline=False)
+    embed.set_footer(text="魔丸娛樂｜接單系統")
     return embed
 
 def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
