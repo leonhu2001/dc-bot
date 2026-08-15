@@ -2325,21 +2325,23 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         else:
             data["companion_preference"] = "不指定陪玩/打手"
         remember_order_data(self.channel_id, data)
-        await log_self_service_proxy_action(
+
+        await _defer_and_refresh_self_service_panel(
             interaction,
-            self.customer_id,
-            "選擇訂單項目",
-            selected_item,
+            customer_id=self.customer_id,
+            channel_id=self.channel_id,
+            data=data,
         )
 
-        await interaction.response.edit_message(
-            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
-            view=SelfServiceOrderView(
-                customer_id=self.customer_id,
-                channel_id=self.channel_id,
-                selected_category=data.get("category")
+        try:
+            await log_self_service_proxy_action(
+                interaction,
+                self.customer_id,
+                "選擇訂單項目",
+                selected_item,
             )
-        )
+        except Exception as exc:
+            print(f"[self-service] log 選擇訂單項目失敗 channel_id={self.channel_id}: {exc}")
 
 
 class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
@@ -2379,51 +2381,46 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             ]
             disabled = False
             placeholder = "請選擇幣號狀態"
-        elif selected_item in SPECIAL_COMPANION_ITEMS:
-            if selected_item == "陪打":
-                options = [
-                    discord.SelectOption(
-                        label="不指定打手",
-                        value="不指定打手",
-                        description="由客服安排合適人選",
-                        default=selected_preference in {"不指定打手", "不指定陪玩/打手", None}
-                    ),
-                    discord.SelectOption(
-                        label="指定打手",
-                        value="指定打手",
-                        description="由下單用戶指定人選",
-                        default=selected_preference in {"指定打手", "指定陪玩/打手"}
-                    ),
-                ]
-                placeholder = "請選擇是否指定打手"
-            else:
-                options = [
-                    discord.SelectOption(
-                        label="不指定陪玩/打手",
-                        value="不指定陪玩/打手",
-                        description="由客服安排合適人選",
-                        default=selected_preference == "不指定陪玩/打手"
-                    ),
-                    discord.SelectOption(
-                        label="指定陪玩/打手",
-                        value="指定陪玩/打手",
-                        description="由下單用戶指定人選",
-                        default=selected_preference == "指定陪玩/打手"
-                    ),
-                ]
-                placeholder = "請選擇是否指定陪玩/打手"
-            disabled = False
         else:
-            options = [
-                discord.SelectOption(
-                    label="不指定陪玩/打手",
-                    value="不指定陪玩/打手",
-                    description="此項目不開放指定",
-                    default=True
-                )
-            ]
+            rule = _get_order_rule_by_item_label(selected_item)
+            allow_specify = bool(getattr(rule, "allow_specify", False)) if rule is not None else False
+            allowed_roles = set(getattr(rule, "allowed_roles", []) or []) if rule is not None else set()
+            companion_roles = {"male_companion", "female_companion"}
+            booster_only = bool(allowed_roles) and allowed_roles.isdisjoint(companion_roles)
+            use_booster_label = selected_item == "陪打" or booster_only
+
+            if allow_specify:
+                not_label = "不指定打手" if use_booster_label else "不指定陪玩/打手"
+                specify_label = "指定打手" if use_booster_label else "指定陪玩/打手"
+                placeholder = "請選擇是否指定打手" if use_booster_label else "請選擇是否指定陪玩/打手"
+
+                options = [
+                    discord.SelectOption(
+                        label=not_label,
+                        value=not_label,
+                        description="由客服安排合適人選",
+                        default=selected_preference in {not_label, "不指定陪玩/打手", None},
+                    ),
+                    discord.SelectOption(
+                        label=specify_label,
+                        value=specify_label,
+                        description="由下單用戶指定人選",
+                        default=selected_preference in {specify_label, "指定陪玩/打手", "指定打手"},
+                    ),
+                ]
+            else:
+                not_label = "不指定打手" if use_booster_label else "不指定陪玩/打手"
+                options = [
+                    discord.SelectOption(
+                        label=not_label,
+                        value=not_label,
+                        description="此項目不開放指定",
+                        default=True,
+                    )
+                ]
+                placeholder = not_label
+
             disabled = False
-            placeholder = "不指定陪玩/打手"
 
         super().__init__(
             placeholder=placeholder,
@@ -2451,21 +2448,23 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             data.pop("specified_staff_ids", None)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
-        await log_self_service_proxy_action(
+
+        await _defer_and_refresh_self_service_panel(
             interaction,
-            self.customer_id,
-            "選擇指定選項",
-            self.values[0],
+            customer_id=self.customer_id,
+            channel_id=self.channel_id,
+            data=data,
         )
 
-        await interaction.response.edit_message(
-            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
-            view=SelfServiceOrderView(
-                customer_id=self.customer_id,
-                channel_id=self.channel_id,
-                selected_category=data.get("category")
+        try:
+            await log_self_service_proxy_action(
+                interaction,
+                self.customer_id,
+                "選擇指定選項",
+                self.values[0],
             )
-        )
+        except Exception as exc:
+            print(f"[self-service] log 選擇指定選項失敗 channel_id={self.channel_id}: {exc}")
 
 def _get_order_rule_by_item_label(item: str | None):
     item_text = str(item or "")
@@ -5746,6 +5745,43 @@ async def _resolve_specified_roles_for_price(
     return specified_roles, resolved_mentions
 
 
+
+async def _defer_and_refresh_self_service_panel(
+    interaction: discord.Interaction,
+    *,
+    customer_id: int,
+    channel_id: int,
+    data: dict,
+):
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+    except discord.HTTPException:
+        pass
+
+    if interaction.message is None:
+        try:
+            await interaction.followup.send("已更新自助下單選項。", ephemeral=True)
+        except discord.HTTPException:
+            pass
+        return
+
+    try:
+        await interaction.message.edit(
+            embed=build_self_service_panel_embed(customer_id, data, interaction.guild),
+            view=SelfServiceOrderView(
+                customer_id=customer_id,
+                channel_id=channel_id,
+                selected_category=data.get("category"),
+            ),
+            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        )
+    except discord.HTTPException as exc:
+        try:
+            await interaction.followup.send(f"更新自助下單 panel 失敗：{exc}", ephemeral=True)
+        except discord.HTTPException:
+            pass
+
 class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
     player_count = discord.ui.TextInput(
         label="陪玩人數",
@@ -7503,14 +7539,6 @@ class SelfServiceOrderView(discord.ui.View):
         self.add_item(SelfServiceCompanionPreferenceSelect(customer_id, channel_id, selected_item, selected_preference))
         self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
 
-        for child in list(self.children):
-            if getattr(child, "custom_id", None) == "self_service_order_specified_staff_button":
-                if _is_specify_preference(selected_preference):
-                    child.label = "選擇指定成員"
-                else:
-                    self.remove_item(child)
-                break
-
     @discord.ui.button(
         label="選擇指定成員",
         style=discord.ButtonStyle.secondary,
@@ -7531,19 +7559,6 @@ class SelfServiceOrderView(discord.ui.View):
         if not _is_specify_preference(data.get("companion_preference")):
             data.pop("specified_staff_ids", None)
             remember_order_data(self.channel_id, data)
-
-            if interaction.message is not None:
-                try:
-                    await interaction.message.edit(
-                        embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
-                        view=SelfServiceOrderView(
-                            customer_id=self.customer_id,
-                            channel_id=self.channel_id,
-                            selected_category=data.get("category"),
-                        ),
-                    )
-                except discord.HTTPException:
-                    pass
 
             await interaction.response.send_message(
                 "目前選擇「不指定」，不需要選擇指定成員。請先在下拉選單改成「指定陪玩/打手」或「指定打手」。",
