@@ -6265,7 +6265,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 lines.append(("指定狀態", "已選擇指定"))
                 lines.append(("指定人員", "、".join(specified_mentions)))
             else:
-                lines.append(("指定狀態", f"已選擇指定，尚未選擇成員\\n可指定人數：最多 {max_spec} 位"))
+                lines.append(("指定狀態", f"已選擇指定，尚未選擇成員\n可指定人數：最多 {max_spec} 位"))
         else:
             lines.append(("指定狀態", "目前不指定"))
             lines.append(("可指定人數", f"此項目可指定，最多 {max_spec} 位"))
