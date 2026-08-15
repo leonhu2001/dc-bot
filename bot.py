@@ -2447,7 +2447,7 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         data["companion_preference"] = self.values[0]
-        if "指定" not in str(self.values[0] or ""):
+        if not _is_specify_preference(self.values[0]):
             data.pop("specified_staff_ids", None)
         data.pop("payment_method", None)
         remember_order_data(self.channel_id, data)
@@ -5683,7 +5683,8 @@ def _get_rule_from_self_service_data(data: dict):
 
 
 def _is_specify_preference(value: str | None) -> bool:
-    return "指定" in str(value or "")
+    text = str(value or "").strip()
+    return text in {"指定陪玩/打手", "指定打手"}
 
 
 def _role_key_for_member(rule, member: discord.Member):
@@ -5790,7 +5791,7 @@ class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
         )
 
 
-class SelfServiceSpecifiedStaffModal(discord.ui.Modal, title="填寫指定人員"):
+class SelfServiceSpecifiedStaffModal(discord.ui.Modal, title="客服手填指定人員"):
     staff_ids = discord.ui.TextInput(
         label="指定人員 ID 或提及",
         placeholder="可填 Discord ID 或直接貼 @提及；多位請用空格或換行分開",
@@ -6390,9 +6391,18 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
 
     if rule.allow_specify:
         max_spec = rule.max_specified_count or required_staff_count
-        lines.append(("指定人員", "、".join(specified_mentions) if specified_mentions else f"可指定，最多 {max_spec} 位"))
+
+        if _is_specify_preference(companion_preference):
+            if specified_mentions:
+                lines.append(("指定狀態", "已選擇指定"))
+                lines.append(("指定人員", "、".join(specified_mentions)))
+            else:
+                lines.append(("指定狀態", f"已選擇指定，尚未選擇成員\n可指定人數：最多 {max_spec} 位"))
+        else:
+            lines.append(("指定狀態", "目前不指定"))
+            lines.append(("可指定人數", f"此項目可指定，最多 {max_spec} 位"))
     else:
-        lines.append(("指定人員", "不可指定"))
+        lines.append(("指定狀態", "不可指定"))
 
     if not rule.point_benefits_allowed:
         lines.append(("點數福利", "此分類不可使用點數福利"))
@@ -7493,15 +7503,23 @@ class SelfServiceOrderView(discord.ui.View):
         self.add_item(SelfServiceCompanionPreferenceSelect(customer_id, channel_id, selected_item, selected_preference))
         self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
 
+        for child in list(self.children):
+            if getattr(child, "custom_id", None) == "self_service_order_specified_staff_button":
+                if _is_specify_preference(selected_preference):
+                    child.label = "選擇指定成員"
+                else:
+                    self.remove_item(child)
+                break
+
     @discord.ui.button(
-        label="填寫指定人員",
+        label="選擇指定成員",
         style=discord.ButtonStyle.secondary,
         custom_id="self_service_order_specified_staff_button",
         row=4,
     )
     async def specified_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以填寫指定人員。", ephemeral=True)
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇指定成員。", ephemeral=True)
             return
 
         if interaction.guild is None:
@@ -7510,8 +7528,31 @@ class SelfServiceOrderView(discord.ui.View):
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
 
+        if not _is_specify_preference(data.get("companion_preference")):
+            data.pop("specified_staff_ids", None)
+            remember_order_data(self.channel_id, data)
+
+            if interaction.message is not None:
+                try:
+                    await interaction.message.edit(
+                        embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                        view=SelfServiceOrderView(
+                            customer_id=self.customer_id,
+                            channel_id=self.channel_id,
+                            selected_category=data.get("category"),
+                        ),
+                    )
+                except discord.HTTPException:
+                    pass
+
+            await interaction.response.send_message(
+                "目前選擇「不指定」，不需要選擇指定成員。請先在下拉選單改成「指定陪玩/打手」或「指定打手」。",
+                ephemeral=True,
+            )
+            return
+
         if not data.get("item"):
-            await interaction.response.send_message("請先選擇訂單項目，再填寫指定人員。", ephemeral=True)
+            await interaction.response.send_message("請先選擇訂單項目，再選擇指定成員。", ephemeral=True)
             return
 
         try:
