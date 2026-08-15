@@ -269,6 +269,37 @@ def _fetch_profiles() -> list[sqlite3.Row]:
         conn.close()
 
 
+
+def _staff_profile_sync_command(staff_discord_id: str) -> str:
+    staff_id = str(staff_discord_id or "").strip()
+    return f"/refresh_staff_profile_panel member:<@{staff_id}>"
+
+
+def _panel_status_html(row: sqlite3.Row) -> str:
+    staff_id = str(row["staff_discord_id"] or "").strip()
+    thread_id = str(row["forum_thread_id"] or "").strip()
+    message_id = str(row["panel_message_id"] or "").strip()
+
+    has_panel = bool(thread_id and message_id)
+    badge_class = "ok" if has_panel else "off"
+    badge_text = "Panel 已建立" if has_panel else "Panel 未建立"
+
+    command = _esc(_staff_profile_sync_command(staff_id))
+
+    if has_panel:
+        location_text = f"Thread {thread_id}<br>Message {message_id}"
+    else:
+        location_text = "尚未記錄 Discord panel 位置"
+
+    return f"""
+        <div class="panel-box">
+            <span class="badge {badge_class}">{badge_text}</span>
+            <div class="panel-location">{_esc(location_text)}</div>
+            <div class="sync-label">同步指令</div>
+            <code>{command}</code>
+        </div>
+    """
+
 def _discord_link(row: sqlite3.Row) -> str:
     thread_id = row["forum_thread_id"]
     message_id = row["panel_message_id"]
@@ -314,6 +345,7 @@ async def staff_profiles_index(request: Request):
         latest_review_at = _esc(_date_text(profile_recent_stats.get("latest_review_at")))
         link = _discord_link(row)
         link_html = f'<a href="{_esc(link)}" target="_blank">打開</a>' if link else "尚未記錄"
+        panel_status_html = _panel_status_html(row)
 
         rows_html.append(f"""
         <tr>
@@ -334,7 +366,10 @@ async def staff_profiles_index(request: Request):
                 <span class="muted">最近評價 {latest_review_at}</span>
             </td>
             <td><span class="badge {'ok' if is_public else 'off'}">{public_badge}</span></td>
-            <td>{link_html}</td>
+            <td>
+                <div>{link_html}</div>
+                {panel_status_html}
+            </td>
             <td class="bio">{bio}</td>
             <td>{updated_at}</td>
             <td class="actions">
@@ -420,12 +455,43 @@ async def staff_profiles_index(request: Request):
             text-align: center;
         }}
         .edit-link:hover {{ background: #475569; }}
+        .panel-box {{
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            background: #020617;
+            min-width: 210px;
+        }}
+        .panel-location {{
+            color: #94a3b8;
+            font-size: 11px;
+            margin-top: 6px;
+            line-height: 1.4;
+        }}
+        .sync-label {{
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 8px;
+        }}
+        code {{
+            display: block;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 4px;
+            padding: 6px;
+            border-radius: 8px;
+            background: #111827;
+            color: #fde68a;
+            font-size: 12px;
+        }}
         .empty {{ text-align: center; color: #94a3b8; padding: 32px; }}
     </style>
 </head>
 <body>
     <h1>成員個人牆後台</h1>
-    <div class="sub">只管理個人牆顯示狀態，不影響訂單、接單、分潤。數據欄含總量與近 30 天資料。</div>
+    <div class="sub">只管理個人牆顯示狀態，不影響訂單、接單、分潤。數據欄含總量與近 30 天資料。後台改資料後，可用同步指令更新 Discord panel。</div>
 
     <table>
         <thead>
@@ -574,7 +640,7 @@ def _profile_edit_page_html(row: sqlite3.Row) -> str:
         <h1>編輯成員個人牆</h1>
         <div class="sub">
             成員 ID：{staff_id}｜最後更新：{updated_at}<br>
-            這裡只修改個人牆資料，不影響訂單、接單、分潤。
+            這裡只修改個人牆資料，不影響訂單、接單、分潤。儲存後請回列表查看同步指令，或到 Discord 使用 /refresh_staff_profile_panel。
         </div>
 
         <form class="card" method="post" action="/admin/staff_profiles/edit/{staff_id}">
