@@ -104,6 +104,127 @@ def _ensure_tables() -> None:
         conn.close()
 
 
+
+def _has_table(conn: sqlite3.Connection, table_name: str) -> bool:
+    try:
+        row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (str(table_name),),
+        ).fetchone()
+        return row is not None
+    except sqlite3.Error:
+        return False
+
+
+def _has_column(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    except sqlite3.Error:
+        return False
+
+    return any(str(row["name"]) == str(column_name) for row in rows)
+
+
+def _date_expr_for_table(
+    conn: sqlite3.Connection,
+    table_name: str,
+    alias: str,
+    candidates: list[str],
+) -> str | None:
+    parts = []
+
+    for column_name in candidates:
+        if _has_column(conn, table_name, column_name):
+            parts.append(f"NULLIF({alias}.{column_name}, '')")
+
+    if not parts:
+        return None
+
+    return "COALESCE(" + ", ".join(parts) + ")"
+
+
+def _fetch_recent_profile_stats() -> dict[str, dict]:
+    _ensure_tables()
+
+    stats: dict[str, dict] = {}
+
+    conn = _connect()
+    try:
+        if _has_table(conn, "web_orders") and _has_table(conn, "order_assignments"):
+            completed_date_expr = _date_expr_for_table(
+                conn,
+                "web_orders",
+                "wo",
+                ["closed_at", "updated_at", "created_at"],
+            )
+
+            if completed_date_expr:
+                rows = conn.execute(
+                    f"""
+                    SELECT
+                        oa.worker_discord_id AS staff_discord_id,
+                        COUNT(DISTINCT wo.id) AS recent_completed_count
+                    FROM order_assignments oa
+                    JOIN web_orders wo ON wo.id = oa.order_id
+                    WHERE wo.status = 'closed'
+                      AND COALESCE(oa.is_active, 1) = 1
+                      AND datetime({completed_date_expr}) >= datetime('now', '-30 days')
+                    GROUP BY oa.worker_discord_id
+                    """
+                ).fetchall()
+
+                for row in rows:
+                    staff_id = str(row["staff_discord_id"])
+                    stats.setdefault(staff_id, {})
+                    stats[staff_id]["recent_completed_count"] = int(row["recent_completed_count"] or 0)
+
+        if _has_table(conn, "order_reviews") and _has_column(conn, "order_reviews", "created_at"):
+            rows = conn.execute(
+                """
+                SELECT
+                    staff_discord_id,
+                    COUNT(*) AS recent_review_count
+                FROM order_reviews
+                WHERE COALESCE(is_public, 1) = 1
+                  AND COALESCE(is_hidden, 0) = 0
+                  AND datetime(NULLIF(created_at, '')) >= datetime('now', '-30 days')
+                GROUP BY staff_discord_id
+                """
+            ).fetchall()
+
+            for row in rows:
+                staff_id = str(row["staff_discord_id"])
+                stats.setdefault(staff_id, {})
+                stats[staff_id]["recent_review_count"] = int(row["recent_review_count"] or 0)
+
+            rows = conn.execute(
+                """
+                SELECT
+                    staff_discord_id,
+                    MAX(created_at) AS latest_review_at
+                FROM order_reviews
+                WHERE COALESCE(is_public, 1) = 1
+                  AND COALESCE(is_hidden, 0) = 0
+                GROUP BY staff_discord_id
+                """
+            ).fetchall()
+
+            for row in rows:
+                staff_id = str(row["staff_discord_id"])
+                stats.setdefault(staff_id, {})
+                stats[staff_id]["latest_review_at"] = str(row["latest_review_at"] or "").strip()
+
+        return stats
+    finally:
+        conn.close()
+
+
+def _date_text(value: str | None, empty_text: str = "無") -> str:
+    text = str(value or "").strip()
+    if not text:
+        return empty_text
+    return text[:10]
+
 def _fetch_profiles() -> list[sqlite3.Row]:
     _ensure_tables()
 
@@ -167,6 +288,7 @@ async def staff_profiles_index(request: Request):
         return RedirectResponse(url="/login", status_code=303)
 
     profiles = _fetch_profiles()
+    recent_stats = _fetch_recent_profile_stats()
 
     rows_html = []
 
@@ -186,6 +308,10 @@ async def staff_profiles_index(request: Request):
         review_count = int(row["review_count"] or 0)
         favorite_count = int(row["favorite_count"] or 0)
         completed_count = int(row["completed_count"] or 0)
+        profile_recent_stats = recent_stats.get(str(row["staff_discord_id"]), {})
+        recent_completed_count = int(profile_recent_stats.get("recent_completed_count") or 0)
+        recent_review_count = int(profile_recent_stats.get("recent_review_count") or 0)
+        latest_review_at = _esc(_date_text(profile_recent_stats.get("latest_review_at")))
         link = _discord_link(row)
         link_html = f'<a href="{_esc(link)}" target="_blank">打開</a>' if link else "尚未記錄"
 
@@ -202,7 +328,10 @@ async def staff_profiles_index(request: Request):
             <td>
                 收藏 {favorite_count}<br>
                 完成 {completed_count}<br>
-                評價 {avg_rating:.1f} / 5（{review_count}）
+                評價 {avg_rating:.1f} / 5（{review_count}）<br>
+                <span class="muted">近 30 天完成 {recent_completed_count}</span><br>
+                <span class="muted">近 30 天評價 {recent_review_count}</span><br>
+                <span class="muted">最近評價 {latest_review_at}</span>
             </td>
             <td><span class="badge {'ok' if is_public else 'off'}">{public_badge}</span></td>
             <td>{link_html}</td>
@@ -296,7 +425,7 @@ async def staff_profiles_index(request: Request):
 </head>
 <body>
     <h1>成員個人牆後台</h1>
-    <div class="sub">只管理個人牆顯示狀態，不影響訂單、接單、分潤。</div>
+    <div class="sub">只管理個人牆顯示狀態，不影響訂單、接單、分潤。數據欄含總量與近 30 天資料。</div>
 
     <table>
         <thead>
