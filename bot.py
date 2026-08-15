@@ -2381,46 +2381,52 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             ]
             disabled = False
             placeholder = "請選擇幣號狀態"
-        else:
-            rule = _get_order_rule_by_item_label(selected_item)
-            allow_specify = bool(getattr(rule, "allow_specify", False)) if rule is not None else False
-            allowed_roles = set(getattr(rule, "allowed_roles", []) or []) if rule is not None else set()
-            companion_roles = {"male_companion", "female_companion"}
-            booster_only = bool(allowed_roles) and allowed_roles.isdisjoint(companion_roles)
-            use_booster_label = selected_item == "陪打" or booster_only
-
-            if allow_specify:
-                not_label = "不指定打手" if use_booster_label else "不指定陪玩/打手"
-                specify_label = "指定打手" if use_booster_label else "指定陪玩/打手"
-                placeholder = "請選擇是否指定打手" if use_booster_label else "請選擇是否指定陪玩/打手"
-
+        elif selected_item in SPECIAL_COMPANION_ITEMS:
+            if selected_item == "陪打":
                 options = [
                     discord.SelectOption(
-                        label=not_label,
-                        value=not_label,
+                        label="不指定打手",
+                        value="不指定打手",
                         description="由客服安排合適人選",
-                        default=selected_preference in {not_label, "不指定陪玩/打手", None},
+                        default=selected_preference in {"不指定打手", "不指定陪玩/打手", None}
                     ),
                     discord.SelectOption(
-                        label=specify_label,
-                        value=specify_label,
+                        label="指定打手",
+                        value="指定打手",
                         description="由下單用戶指定人選",
-                        default=selected_preference in {specify_label, "指定陪玩/打手", "指定打手"},
+                        default=selected_preference in {"指定打手", "指定陪玩/打手"}
                     ),
                 ]
+                disabled = False
+                placeholder = "請選擇是否指定打手"
             else:
-                not_label = "不指定打手" if use_booster_label else "不指定陪玩/打手"
                 options = [
                     discord.SelectOption(
-                        label=not_label,
-                        value=not_label,
-                        description="此項目不開放指定",
-                        default=True,
-                    )
+                        label="不指定陪玩/打手",
+                        value="不指定陪玩/打手",
+                        description="由客服安排合適人選",
+                        default=selected_preference in {"不指定陪玩/打手", "不指定打手", None}
+                    ),
+                    discord.SelectOption(
+                        label="指定陪玩/打手",
+                        value="指定陪玩/打手",
+                        description="由下單用戶指定人選",
+                        default=selected_preference in {"指定陪玩/打手", "指定打手"}
+                    ),
                 ]
-                placeholder = not_label
-
+                disabled = False
+                placeholder = "請選擇是否指定陪玩/打手"
+        else:
+            options = [
+                discord.SelectOption(
+                    label="不指定陪玩/打手",
+                    value="不指定陪玩/打手",
+                    description="此項目不開放指定",
+                    default=True
+                )
+            ]
             disabled = False
+            placeholder = "不指定陪玩/打手"
 
         super().__init__(
             placeholder=placeholder,
@@ -5827,87 +5833,6 @@ class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
         )
 
 
-class SelfServiceSpecifiedStaffModal(discord.ui.Modal, title="客服手填指定人員"):
-    staff_ids = discord.ui.TextInput(
-        label="指定人員 ID 或提及",
-        placeholder="可填 Discord ID 或直接貼 @提及；多位請用空格或換行分開",
-        style=discord.TextStyle.paragraph,
-        required=True,
-        max_length=500,
-    )
-
-    def __init__(self, customer_id: int, channel_id: int, panel_message_id: int | None = None):
-        super().__init__()
-        self.customer_id = customer_id
-        self.channel_id = channel_id
-        self.panel_message_id = panel_message_id
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以操作訂單。", ephemeral=True)
-            return
-
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
-
-        try:
-            rule = _get_rule_from_self_service_data(data)
-            from services.order_rules import get_required_staff_count
-            player_count = _to_int(data.get("player_count"), 1) or 1
-            required_staff_count = get_required_staff_count(rule, player_count)
-        except Exception as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-            return
-
-        ids = _extract_discord_ids_from_text(str(self.staff_ids.value or ""))
-
-        if not ids:
-            await interaction.response.send_message("請至少填寫一位指定人員的 Discord ID 或提及。", ephemeral=True)
-            return
-
-        max_specified = rule.max_specified_count or required_staff_count
-
-        if len(ids) > int(max_specified):
-            await interaction.response.send_message(f"{rule.label} 最多只能指定 {max_specified} 位。", ephemeral=True)
-            return
-
-        if len(ids) > int(required_staff_count):
-            await interaction.response.send_message("指定人數不能超過需要接單人數。", ephemeral=True)
-            return
-
-        data["specified_staff_ids"] = ids
-        data["companion_preference"] = "指定陪玩/打手"
-        data.pop("payment_method", None)
-        remember_order_data(self.channel_id, data)
-
-        await interaction.response.defer(ephemeral=True)
-
-        edited_panel = False
-
-        if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
-            try:
-                panel_message = await interaction.channel.fetch_message(self.panel_message_id)
-                await panel_message.edit(
-                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
-                    view=SelfServiceOrderView(
-                        customer_id=self.customer_id,
-                        channel_id=self.channel_id,
-                        selected_category=data.get("category"),
-                    ),
-                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-                )
-                edited_panel = True
-            except discord.HTTPException:
-                edited_panel = False
-
-        await interaction.followup.send(
-            "已填寫指定人員：\n"
-            + "\n".join(f"- <@{staff_id}>" for staff_id in ids)
-            + ("\n\n面板已更新。" if edited_panel else "\n\n提醒：面板沒有自動刷新，請重新選一次數量即可刷新試算。"),
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-        )
-
-
 async def create_waiting_acceptance_order_from_self_service(
     interaction: discord.Interaction,
     *,
@@ -6426,7 +6351,9 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
     lines.append(("接單需求", f"{required_staff_count} 位"))
     lines.append(("可接職位", role_labels(rule.allowed_roles)))
 
-    if rule.allow_specify:
+    can_specify_item = bool(getattr(rule, "allow_specify", False)) and str(rule.label) in SPECIAL_COMPANION_ITEMS
+
+    if can_specify_item:
         max_spec = rule.max_specified_count or required_staff_count
 
         if _is_specify_preference(companion_preference):
@@ -6434,7 +6361,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 lines.append(("指定狀態", "已選擇指定"))
                 lines.append(("指定人員", "、".join(specified_mentions)))
             else:
-                lines.append(("指定狀態", f"已選擇指定，尚未選擇成員\n可指定人數：最多 {max_spec} 位"))
+                lines.append(("指定狀態", f"已選擇指定，尚未選擇成員\\n可指定人數：最多 {max_spec} 位"))
         else:
             lines.append(("指定狀態", "目前不指定"))
             lines.append(("可指定人數", f"此項目可指定，最多 {max_spec} 位"))
@@ -7585,16 +7512,6 @@ class SelfServiceOrderView(discord.ui.View):
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
 
-        if not _is_specify_preference(data.get("companion_preference")):
-            data.pop("specified_staff_ids", None)
-            remember_order_data(self.channel_id, data)
-
-            await interaction.response.send_message(
-                "目前選擇「不指定」，不需要選擇指定成員。請先在下拉選單改成「指定陪玩/打手」或「指定打手」。",
-                ephemeral=True,
-            )
-            return
-
         if not data.get("item"):
             await interaction.response.send_message("請先選擇訂單項目，再選擇指定成員。", ephemeral=True)
             return
@@ -7611,15 +7528,30 @@ class SelfServiceOrderView(discord.ui.View):
             await interaction.response.send_message(f"讀取指定規則失敗：{exc}", ephemeral=True)
             return
 
-        if not getattr(rule, "allow_specify", False):
+        can_specify_item = bool(getattr(rule, "allow_specify", False)) and str(rule.label) in SPECIAL_COMPANION_ITEMS
+
+        if not can_specify_item:
+            data.pop("specified_staff_ids", None)
+            remember_order_data(self.channel_id, data)
             await interaction.response.send_message("這個項目不開放指定人員。", ephemeral=True)
             return
+
+        if not _is_specify_preference(data.get("companion_preference")):
+            data.pop("specified_staff_ids", None)
+            remember_order_data(self.channel_id, data)
+            await interaction.response.send_message(
+                "目前選擇「不指定」，不需要選擇指定成員。請先在下拉選單改成「指定陪玩/打手」或「指定打手」。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
 
         max_specified_count = int(rule.max_specified_count or required_staff_count or 1)
         entries = get_specified_staff_entries_for_rule(interaction.guild, rule)
 
         if not entries:
-            await interaction.response.send_message("目前找不到符合這張單可指定職位的人員，請確認打手身分組。", ephemeral=True)
+            await interaction.followup.send("目前找不到符合這張單可指定職位的人員，請確認打手身分組。", ephemeral=True)
             return
 
         panel_message_id = interaction.message.id if interaction.message is not None else None
@@ -7634,7 +7566,7 @@ class SelfServiceOrderView(discord.ui.View):
             selected_ids=[str(item) for item in data.get("specified_staff_ids") or []],
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             content=view.build_message_content(),
             view=view,
             ephemeral=True,
@@ -7825,12 +7757,9 @@ class SelfServiceOrderView(discord.ui.View):
 
         if getattr(rule, "allow_specify", False) and _is_specify_preference(companion_preference) and not data.get("specified_staff_ids"):
             panel_message_id = interaction.message.id if interaction.message is not None else None
-            await interaction.response.send_modal(
-                SelfServiceSpecifiedStaffModal(
-                    self.customer_id,
-                    self.channel_id,
-                    panel_message_id=panel_message_id,
-                )
+            await interaction.response.send_message(
+                "老闆已選擇指定，但尚未完成指定成員選擇。請老闆先點「選擇指定成員」並按「完成」後，再送出等待接單。",
+                ephemeral=True,
             )
             return
 
