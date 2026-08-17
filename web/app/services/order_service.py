@@ -490,68 +490,10 @@ def claim_order_for_worker(
 
         return refreshed_order
 
-    if has_acceptance_meta(order_id):
-        ensure_not_unpaid_prepay_order_for_legacy_assignment(
-            db,
-            order,
-            action_label="接單",
-        )
+    if get_acceptance_meta_status_for_order(db, order_id) is not None:
+        raise ValueError("這張訂單已離開付款前接單階段，網站不能再新增接單。")
 
-        if str(order.status) not in {OrderStatus.ACTIVE.value, OrderStatus.CLOSED.value}:
-            raise ValueError("這張訂單目前不能接單。")
-
-    if order.status != OrderStatus.ACTIVE.value:
-        raise ValueError("這張訂單不是 active 狀態，不能接單。")
-
-    existing_same_order = db.scalar(
-        select(OrderAssignment)
-        .where(OrderAssignment.order_id == order_id)
-        .where(OrderAssignment.worker_discord_id == worker_discord_id)
-        .where(OrderAssignment.is_active.is_(True))
-        .limit(1)
-    )
-
-    if existing_same_order is not None:
-        raise ValueError("你已經接了這張單。")
-
-    assignment = OrderAssignment(
-        order_id=order_id,
-        worker_discord_id=worker_discord_id,
-        worker_display_name=worker_display_name,
-        role_type="booster",
-        is_active=True,
-        has_named_bonus=False,
-    )
-
-    db.add(assignment)
-    db.flush()
-
-    recalculate_order_payouts(db, order_id)
-
-    create_sync_event(
-        db,
-        event_type=SyncEventType.ORDER_CLAIMED,
-        order_id=order_id,
-        payload={
-            "order_id": order_id,
-            "worker_discord_id": worker_discord_id,
-            "worker_display_name": worker_display_name,
-        },
-    )
-
-    db.commit()
-
-    refreshed_order = db.scalar(
-        select(WebOrder)
-        .where(WebOrder.id == order_id)
-        .options(selectinload(WebOrder.assignments))
-        .options(selectinload(WebOrder.payouts))
-    )
-
-    if refreshed_order is None:
-        raise ValueError("接單成功，但重新讀取訂單失敗。")
-
-    return refreshed_order
+    raise ValueError("這張訂單不是付款前接單狀態，不能在網站接單。")
 
 def unclaim_order_for_worker(
     db: Session,
@@ -605,59 +547,7 @@ def unclaim_order_for_worker(
 
         return refreshed_order
 
-    if has_acceptance_meta(order_id):
-        ensure_not_unpaid_prepay_order_for_legacy_assignment(
-            db,
-            order,
-            action_label="取消接單",
-        )
+    if get_acceptance_meta_status_for_order(db, order_id) is not None:
+        raise ValueError("這張訂單已離開付款前接單階段，網站不能取消接單。")
 
-        if str(order.status) not in {OrderStatus.ACTIVE.value, OrderStatus.CLOSED.value}:
-            raise ValueError("這張訂單目前不能取消接單。")
-
-    if order.status != OrderStatus.ACTIVE.value:
-        raise ValueError("這張訂單不是 active 狀態，不能取消接單。")
-
-    assignment = db.scalar(
-        select(OrderAssignment)
-        .where(OrderAssignment.order_id == order_id)
-        .where(OrderAssignment.worker_discord_id == worker_discord_id)
-        .where(OrderAssignment.is_active.is_(True))
-        .limit(1)
-    )
-
-    if assignment is None:
-        raise ValueError("你目前沒有接這張單。")
-
-    assignment.is_active = False
-    assignment.removed_at = datetime.utcnow()
-    assignment.has_named_bonus = False
-
-    db.flush()
-
-    recalculate_order_payouts(db, order_id)
-
-    create_sync_event(
-        db,
-        event_type=SyncEventType.ORDER_UNCLAIMED,
-        order_id=order_id,
-        payload={
-            "order_id": order_id,
-            "worker_discord_id": worker_discord_id,
-            "worker_display_name": worker_display_name,
-        },
-    )
-
-    db.commit()
-
-    refreshed_order = db.scalar(
-        select(WebOrder)
-        .where(WebOrder.id == order_id)
-        .options(selectinload(WebOrder.assignments))
-        .options(selectinload(WebOrder.payouts))
-    )
-
-    if refreshed_order is None:
-        raise ValueError("取消接單成功，但重新讀取訂單失敗。")
-
-    return refreshed_order
+    raise ValueError("這張訂單不是付款前接單狀態，不能在網站取消接單。")

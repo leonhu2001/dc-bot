@@ -574,14 +574,26 @@
                             {% endif %}
 
                             <div class="dispatch-footer">
-                                {% if user_claimed_this_order %}
-                                    <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
-                                        <button class="dispatch-button danger" type="submit">取消接單</button>
-                                    </form>
+                                {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
+                                    {% if user_claimed_this_order %}
+                                        <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
+                                            <button class="button danger" type="submit">
+                                                取消接單
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
+                                            <button class="button" type="submit">
+                                                接單
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% elif order.status == "active" %}
+                                    <span>已付款成立，網站接單已鎖定。</span>
+                                {% elif order.status == "stored" %}
+                                    <span>這張訂單已存單，網站接單已鎖定。</span>
                                 {% else %}
-                                    <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
-                                        <button class="dispatch-button" type="submit">接單</button>
-                                    </form>
+                                    <span>此狀態不開放網站接單。</span>
                                 {% endif %}
                             </div>
                         </article>
