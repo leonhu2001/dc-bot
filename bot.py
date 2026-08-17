@@ -1581,6 +1581,19 @@ def get_dispatch_claim_view_from_data(message_id: int) -> "DispatchClaimView | N
     if not data:
         return None
 
+    if _is_final_dispatch_claim_status(data):
+        parsed_message_id = _to_int(message_id)
+
+        if parsed_message_id is not None:
+            ORDER_CLAIMS.pop(parsed_message_id, None)
+
+            try:
+                delete_claim_row_from_db(message_id=parsed_message_id)
+            except Exception as exc:
+                print(f"[claims] cleanup final dispatch claim on restore failed message_id={parsed_message_id}: {exc}")
+
+        return None
+
     required_values = [
         data.get("customer_id"),
         data.get("category_label"),
@@ -1714,6 +1727,35 @@ configure_data_access(
     get_effective_member_level_func=get_effective_member_level,
 )
 configure_reward_order_context(SELF_SERVICE_ORDER_SELECTIONS, save_bot_data)
+
+_raw_remember_claim_data = remember_claim_data
+
+
+def _is_final_dispatch_claim_status(data: dict | None) -> bool:
+    if not isinstance(data, dict):
+        return False
+
+    status = str(data.get("status") or "").lower().strip()
+
+    return bool(data.get("closed")) or status in {"closed", "cancelled", "canceled"}
+
+
+def remember_claim_data(message_id: int, data: dict) -> None:
+    """保存派單 claim；closed/cancelled 不再持久化，避免重啟恢復舊接單面板。"""
+    parsed_message_id = _to_int(message_id)
+
+    if _is_final_dispatch_claim_status(data):
+        if parsed_message_id is not None:
+            ORDER_CLAIMS.pop(parsed_message_id, None)
+            try:
+                delete_claim_row_from_db(message_id=parsed_message_id)
+            except Exception as exc:
+                print(f"[claims] delete final dispatch claim failed message_id={parsed_message_id}: {exc}")
+
+        return
+
+    _raw_remember_claim_data(message_id, data)
+
 
 
 async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: bool = False) -> tuple[int, list[str]]:
