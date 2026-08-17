@@ -49,6 +49,7 @@ def main() -> None:
         ROOT / "tools" / "audit_order_integrity.py",
         ROOT / "tools" / "audit_order_rules.py",
         ROOT / "tools" / "audit_templates.py",
+        ROOT / "tools" / "diff_order_rules_baseline.py",
     ]
 
     for target in compile_targets:
@@ -64,6 +65,12 @@ def main() -> None:
         "ORDER_RULES_AUDIT",
         [str(python_bin), str(ROOT / "tools" / "audit_order_rules.py")],
     )
+
+    run_step(
+        "ORDER_RULES_BASELINE_DIFF",
+        [str(python_bin), str(ROOT / "tools" / "diff_order_rules_baseline.py")],
+    )
+
 
     run_step(
         "TEMPLATE_AUDIT",

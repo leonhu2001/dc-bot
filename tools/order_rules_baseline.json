@@ -1,0 +1,1494 @@
+{
+  "categories": {
+    "basic": "基礎單",
+    "custom": "自訂單",
+    "farm": "代解代肝",
+    "fun": "趣味單",
+    "steam": "Steam 陪玩",
+    "title": "高難度稱號",
+    "valorant": "Valorant 陪玩"
+  },
+  "category_count": 7,
+  "role_ids": {
+    "female_companion": "1482080315798192210",
+    "female_protector": "1500234170943934544",
+    "male_companion": "1500751059239440575",
+    "male_protector": "1500751039060643990",
+    "top_protector": "1500234130871550004"
+  },
+  "rule_count": 41,
+  "rules": {
+    "basic_bet_1000": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_bet_1000",
+      "label": "賭約單 800w",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 1000,
+      "price_at_min_quantity": {
+        "base_amount": 1000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 1000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_bet_1500": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_bet_1500",
+      "label": "賭約單 1000w",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 1500,
+      "price_at_min_quantity": {
+        "base_amount": 1500,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 1500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_bet_2500": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_bet_2500",
+      "label": "賭約單 1200w",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 2500,
+      "price_at_min_quantity": {
+        "base_amount": 2500,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 2500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_entertain_double": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_entertain_double",
+      "label": "娛樂陪｜雙陪",
+      "max_quantity": 24,
+      "max_specified_count": 2,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 650,
+      "price_at_min_quantity": {
+        "base_amount": 650,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 650
+      },
+      "price_type": "hourly",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "H"
+    },
+    "basic_entertain_single": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_entertain_single",
+      "label": "娛樂陪｜單陪",
+      "max_quantity": 24,
+      "max_specified_count": 1,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 350,
+      "price_at_min_quantity": {
+        "base_amount": 350,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 350
+      },
+      "price_type": "hourly",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "basic_exbar_gamble_leiguan": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_exbar_gamble_leiguan",
+      "label": "絕巴四幻神賭單｜賭淚冠",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 16888,
+      "price_at_min_quantity": {
+        "base_amount": 16888,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 16888
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_exbar_gamble_rangefinder": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_exbar_gamble_rangefinder",
+      "label": "絕巴四幻神賭單｜賭測距儀",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 12888,
+      "price_at_min_quantity": {
+        "base_amount": 12888,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 12888
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_exbar_gamble_tianyuan": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_exbar_gamble_tianyuan",
+      "label": "絕巴四幻神賭單｜賭天圓地方",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 8888,
+      "price_at_min_quantity": {
+        "base_amount": 8888,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 8888
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_exbar_gamble_zongheng": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_exbar_gamble_zongheng",
+      "label": "絕巴四幻神賭單｜賭縱橫",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 16888,
+      "price_at_min_quantity": {
+        "base_amount": 16888,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 16888
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_exbar_tech": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_exbar_tech",
+      "label": "絕巴技術陪",
+      "max_quantity": 24,
+      "max_specified_count": 2,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 1200,
+      "price_at_min_quantity": {
+        "base_amount": 1200,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 1200
+      },
+      "price_type": "hourly",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "H"
+    },
+    "basic_oil_all": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_oil_all",
+      "label": "油鍋單｜全包",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 4500,
+      "price_at_min_quantity": {
+        "base_amount": 4500,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 4500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_oil_fuel": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_oil_fuel",
+      "label": "油鍋單｜火箭燃油",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 3000,
+      "price_at_min_quantity": {
+        "base_amount": 3000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 3000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_oil_satellite": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_oil_satellite",
+      "label": "油鍋單｜GTI衛星通訊天線",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 2000,
+      "price_at_min_quantity": {
+        "base_amount": 2000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 2000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_sweet_single": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_sweet_single",
+      "label": "甜蜜單｜單陪",
+      "max_quantity": 24,
+      "max_specified_count": 1,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 520,
+      "price_at_min_quantity": {
+        "base_amount": 520,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 520
+      },
+      "price_type": "hourly",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "basic_teaching_one": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_teaching_one",
+      "label": "教學單｜導師一名",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 3,
+      "point_benefits_allowed": true,
+      "price": 500,
+      "price_at_min_quantity": {
+        "base_amount": 1500,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 3,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 1500
+      },
+      "price_type": "hourly",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "basic_teaching_two": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_teaching_two",
+      "label": "教學單｜導師兩名",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 3,
+      "point_benefits_allowed": true,
+      "price": 900,
+      "price_at_min_quantity": {
+        "base_amount": 2700,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 3,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 2700
+      },
+      "price_type": "hourly",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "H"
+    },
+    "basic_tech_secret_double": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_tech_secret_double",
+      "label": "技術陪｜機密雙護",
+      "max_quantity": 24,
+      "max_specified_count": 2,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 800,
+      "price_at_min_quantity": {
+        "base_amount": 800,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 800
+      },
+      "price_type": "hourly",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "H"
+    },
+    "basic_tech_secret_single": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_tech_secret_single",
+      "label": "技術陪｜機密單護",
+      "max_quantity": 24,
+      "max_specified_count": 1,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 400,
+      "price_at_min_quantity": {
+        "base_amount": 400,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 400
+      },
+      "price_type": "hourly",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "basic_tech_topsecret_double": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_tech_topsecret_double",
+      "label": "技術陪｜絕密雙護",
+      "max_quantity": 24,
+      "max_specified_count": 2,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 900,
+      "price_at_min_quantity": {
+        "base_amount": 900,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 900
+      },
+      "price_type": "hourly",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "H"
+    },
+    "basic_tech_topsecret_single": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_tech_topsecret_single",
+      "label": "技術陪｜絕密單護",
+      "max_quantity": 24,
+      "max_specified_count": 1,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 450,
+      "price_at_min_quantity": {
+        "base_amount": 450,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 450
+      },
+      "price_type": "hourly",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "basic_trial_1000": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_trial_1000",
+      "label": "體驗單 1688w",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 1000,
+      "price_at_min_quantity": {
+        "base_amount": 1000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 1000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "basic_trial_500": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "basic",
+      "key": "basic_trial_500",
+      "label": "體驗單 777w",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 500,
+      "price_at_min_quantity": {
+        "base_amount": 500,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "custom_custom_order": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "custom",
+      "key": "custom_custom_order",
+      "label": "自訂單",
+      "max_quantity": 24,
+      "max_specified_count": 24,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": false,
+      "price": 0,
+      "price_at_min_quantity": {
+        "base_amount": 0,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 0
+      },
+      "price_type": "manual",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "farm_department_task": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_department_task",
+      "label": "代解部門任務",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 0,
+      "price_at_min_quantity": {
+        "base_amount": 0,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 0
+      },
+      "price_type": "manual",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "farm_halfcoin_120m": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_halfcoin_120m",
+      "label": "哈夫幣代洗｜120M",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 1250,
+      "price_at_min_quantity": {
+        "base_amount": 1250,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 1250
+      },
+      "price_type": "fixed",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "farm_halfcoin_360m": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_halfcoin_360m",
+      "label": "哈夫幣代洗｜360M",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 3400,
+      "price_at_min_quantity": {
+        "base_amount": 3400,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 3400
+      },
+      "price_type": "fixed",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "farm_halfcoin_600m": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_halfcoin_600m",
+      "label": "哈夫幣代洗｜600M",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 5300,
+      "price_at_min_quantity": {
+        "base_amount": 5300,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 5300
+      },
+      "price_type": "fixed",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "farm_season_3x3_contract": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_season_3x3_contract",
+      "label": "賽季3x3｜命運契約",
+      "max_quantity": 4,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 700,
+      "price_at_min_quantity": {
+        "base_amount": 700,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 700
+      },
+      "price_type": "unit",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "個"
+    },
+    "farm_season_3x3_normal": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_season_3x3_normal",
+      "label": "賽季3x3｜普通",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 5500,
+      "price_at_min_quantity": {
+        "base_amount": 5500,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 5500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "farm_season_3x3_skin": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "farm",
+      "key": "farm_season_3x3_skin",
+      "label": "賽季3x3｜造型",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 3000,
+      "price_at_min_quantity": {
+        "base_amount": 3000,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 3000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "1",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "單"
+    },
+    "fun_eat_yourself": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "fun",
+      "key": "fun_eat_yourself",
+      "label": "想吃自己打",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 3000,
+      "price_at_min_quantity": {
+        "base_amount": 3000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 3000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "fun_lovebirds": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "fun",
+      "key": "fun_lovebirds",
+      "label": "比翼雙飛",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 1,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 2000,
+      "price_at_min_quantity": {
+        "base_amount": 2000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 2000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "fun_read_no_reply": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "fun",
+      "key": "fun_read_no_reply",
+      "label": "已讀亂回",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 1,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 2000,
+      "price_at_min_quantity": {
+        "base_amount": 2000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 2000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "fun_rich_enough": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "fun",
+      "key": "fun_rich_enough",
+      "label": "豪到你了嗎",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 2000,
+      "price_at_min_quantity": {
+        "base_amount": 2000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 2000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "steam_play": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "steam",
+      "key": "steam_play",
+      "label": "Steam 陪玩",
+      "max_quantity": 24,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": false,
+      "price": 350,
+      "price_at_min_quantity": {
+        "base_amount": 350,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 350
+      },
+      "price_type": "hourly",
+      "required_staff_count": "player_count",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "title_brave_play": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "title",
+      "key": "title_brave_play",
+      "label": "勇敢者｜陪做",
+      "max_quantity": 1,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 4500,
+      "price_at_min_quantity": {
+        "base_amount": 4500,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 4500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "title_color_brave_carry": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "title",
+      "key": "title_color_brave_carry",
+      "label": "炫彩勇敢者｜代做",
+      "max_quantity": 3,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 6500,
+      "price_at_min_quantity": {
+        "base_amount": 6500,
+        "free_specify_fee": false,
+        "required_staff_count": 3,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 6500
+      },
+      "price_type": "fixed",
+      "required_staff_count": "3",
+      "resolved_required_staff_count_at_player_1": 3,
+      "unit_label": "單"
+    },
+    "title_color_brave_play": {
+      "allow_specify": false,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "title",
+      "key": "title_color_brave_play",
+      "label": "炫彩勇敢者｜陪做",
+      "max_quantity": 1,
+      "max_specified_count": null,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": true,
+      "price": 20000,
+      "price_at_min_quantity": {
+        "base_amount": 20000,
+        "free_specify_fee": false,
+        "required_staff_count": 2,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 20000
+      },
+      "price_type": "fixed",
+      "required_staff_count": "2",
+      "resolved_required_staff_count_at_player_1": 2,
+      "unit_label": "單"
+    },
+    "valorant_entertain": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1482080315798192210",
+        "1500234170943934544",
+        "1500751059239440575",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_companion",
+        "female_protector",
+        "male_companion",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "valorant",
+      "key": "valorant_entertain",
+      "label": "Valorant 陪玩｜娛樂陪",
+      "max_quantity": 24,
+      "max_specified_count": 4,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": false,
+      "price": 350,
+      "price_at_min_quantity": {
+        "base_amount": 350,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 350
+      },
+      "price_type": "hourly",
+      "required_staff_count": "player_count",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "H"
+    },
+    "valorant_tech": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234170943934544",
+        "1500751039060643990",
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "female_protector",
+        "male_protector",
+        "top_protector"
+      ],
+      "category": "valorant",
+      "key": "valorant_tech",
+      "label": "Valorant 陪玩｜技術陪",
+      "max_quantity": 24,
+      "max_specified_count": 4,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": false,
+      "price": 200,
+      "price_at_min_quantity": {
+        "base_amount": 200,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 200
+      },
+      "price_type": "game",
+      "required_staff_count": "player_count",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "局"
+    },
+    "valorant_top_tech": {
+      "allow_specify": true,
+      "allowed_role_ids": [
+        "1500234130871550004"
+      ],
+      "allowed_roles": [
+        "top_protector"
+      ],
+      "category": "valorant",
+      "key": "valorant_top_tech",
+      "label": "Valorant 陪玩｜頂級技術陪",
+      "max_quantity": 24,
+      "max_specified_count": 4,
+      "min_protector_count": 0,
+      "min_quantity": 1,
+      "point_benefits_allowed": false,
+      "price": 350,
+      "price_at_min_quantity": {
+        "base_amount": 350,
+        "free_specify_fee": false,
+        "required_staff_count": 1,
+        "service_quantity": 1,
+        "specify_fee": 0,
+        "staff_adjustment_amount": 0,
+        "total_amount": 350
+      },
+      "price_type": "game",
+      "required_staff_count": "player_count",
+      "resolved_required_staff_count_at_player_1": 1,
+      "unit_label": "局"
+    }
+  },
+  "schema_version": 1
+}
