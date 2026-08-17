@@ -403,6 +403,76 @@ select.input {
         justify-content: flex-start !important;
     }
 }
+
+.admin-rule-snapshot-section {
+    display: grid !important;
+    gap: 12px !important;
+}
+
+.rule-snapshot-grid,
+.history-rule-snapshot-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+}
+
+.rule-snapshot-card {
+    border: 1px solid rgba(245, 198, 107, .16) !important;
+    border-radius: 14px !important;
+    padding: 11px 12px !important;
+    background: rgba(245, 198, 107, .055) !important;
+    min-width: 0 !important;
+}
+
+.rule-snapshot-card span {
+    display: block !important;
+    color: var(--mw-muted, #a7a0b5) !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+}
+
+.rule-snapshot-card strong {
+    display: block !important;
+    margin-top: 6px !important;
+    color: #fff3cf !important;
+    font-size: 14px !important;
+    word-break: break-all !important;
+}
+
+.rule-snapshot-details {
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 14px !important;
+    padding: 10px 12px !important;
+    background: rgba(0,0,0,.18) !important;
+}
+
+.rule-snapshot-details summary {
+    cursor: pointer !important;
+    color: var(--mw-gold, #f5c66b) !important;
+    font-weight: 900 !important;
+}
+
+.rule-snapshot-raw {
+    margin: 10px 0 0 !important;
+    max-height: 260px !important;
+    overflow: auto !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+    background: rgba(0,0,0,.32) !important;
+    color: rgba(255,247,226,.9) !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+}
+
+@media (max-width: 980px) {
+    .rule-snapshot-grid,
+    .history-rule-snapshot-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 </style>
 
 
@@ -451,7 +521,7 @@ select.input {
         </div>
 
         <div class="panel">
-            <h2>魔丸♫客服分潤</h2>
+            <h2>魔丸♫魔丸♫客服分潤</h2>
             <p class="big-number">5%</p>
             <p>發給每單指定的魔丸♫客服。</p>
         </div>
@@ -511,6 +581,54 @@ select.input {
                                 <span>對接客服</span>
                                 <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong>
                             </div>
+                        </div>
+
+
+                        <div class="admin-section admin-rule-snapshot-section">
+                            {% set rule_snapshot_json = order.rule_snapshot_json | default("", true) %}
+                            {% set price_snapshot_json = order.price_snapshot_json | default("", true) %}
+
+                            <h4>規則快照 / 價格快照</h4>
+
+                            <div class="rule-snapshot-grid">
+                                <div class="rule-snapshot-card">
+                                    <span>規則 Key</span>
+                                    <strong>{{ order.order_rule_key | default("未保存", true) }}</strong>
+                                </div>
+
+                                <div class="rule-snapshot-card">
+                                    <span>規則版本</span>
+                                    <strong>{{ order.rule_version | default("未保存", true) }}</strong>
+                                </div>
+
+                                <div class="rule-snapshot-card">
+                                    <span>訂單金額</span>
+                                    <strong>{{ order.amount or 0 }}T</strong>
+                                </div>
+
+                                <div class="rule-snapshot-card">
+                                    <span>分潤基準</span>
+                                    <strong>{{ order.payout_base_amount | default(order.amount, true) or 0 }}T</strong>
+                                </div>
+                            </div>
+
+                            {% if rule_snapshot_json or price_snapshot_json %}
+                                {% if price_snapshot_json %}
+                                    <details class="rule-snapshot-details">
+                                        <summary>展開價格快照 JSON</summary>
+                                        <pre class="rule-snapshot-raw">{{ price_snapshot_json }}</pre>
+                                    </details>
+                                {% endif %}
+
+                                {% if rule_snapshot_json %}
+                                    <details class="rule-snapshot-details">
+                                        <summary>展開規則快照 JSON</summary>
+                                        <pre class="rule-snapshot-raw">{{ rule_snapshot_json }}</pre>
+                                    </details>
+                                {% endif %}
+                            {% else %}
+                                <p class="muted-text">這張訂單建立時尚未保存快照；之後的新自助單才會顯示完整規則與價格快照。</p>
+                            {% endif %}
                         </div>
 
                         <div class="admin-section admin-section-cs-assign">

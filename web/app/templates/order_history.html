@@ -709,6 +709,85 @@ document.addEventListener("click", function (event) {
         justify-content: flex-start;
     }
 }
+
+.admin-rule-snapshot-section {
+    display: grid !important;
+    gap: 12px !important;
+}
+
+.rule-snapshot-grid,
+.history-rule-snapshot-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+}
+
+.rule-snapshot-card {
+    border: 1px solid rgba(245, 198, 107, .16) !important;
+    border-radius: 14px !important;
+    padding: 11px 12px !important;
+    background: rgba(245, 198, 107, .055) !important;
+    min-width: 0 !important;
+}
+
+.rule-snapshot-card span {
+    display: block !important;
+    color: var(--mw-muted, #a7a0b5) !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+}
+
+.rule-snapshot-card strong {
+    display: block !important;
+    margin-top: 6px !important;
+    color: #fff3cf !important;
+    font-size: 14px !important;
+    word-break: break-all !important;
+}
+
+.rule-snapshot-details {
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 14px !important;
+    padding: 10px 12px !important;
+    background: rgba(0,0,0,.18) !important;
+}
+
+.rule-snapshot-details summary {
+    cursor: pointer !important;
+    color: var(--mw-gold, #f5c66b) !important;
+    font-weight: 900 !important;
+}
+
+.rule-snapshot-raw {
+    margin: 10px 0 0 !important;
+    max-height: 260px !important;
+    overflow: auto !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+    background: rgba(0,0,0,.32) !important;
+    color: rgba(255,247,226,.9) !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+}
+
+@media (max-width: 980px) {
+    .rule-snapshot-grid,
+    .history-rule-snapshot-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+.history-rule-snapshot-card {
+    display: grid !important;
+    gap: 12px !important;
+}
+
+.history-rule-snapshot-card .rule-snapshot-details {
+    margin-top: 0 !important;
+}
+
 </style>
 
 <div class="history-ledger-page">
@@ -977,7 +1056,60 @@ document.addEventListener("click", function (event) {
                                                       </div>
                                                   </section>
 
-                                                  <section class="history-dossier-card history-dossier-card-wide">
+                                                  
+                                                  <section class="history-dossier-card history-dossier-card-wide history-rule-snapshot-card">
+                                                      {% set rule_snapshot_json = order.rule_snapshot_json | default("", true) %}
+                                                      {% set price_snapshot_json = order.price_snapshot_json | default("", true) %}
+
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>規則快照 / 價格快照</h5>
+                                                              <p>保存下單當下的規則、金額、折扣與點數資訊，避免之後改價或改人數時混淆。</p>
+                                                          </div>
+                                                      </div>
+
+                                                      <div class="history-rule-snapshot-grid">
+                                                          <div class="rule-snapshot-card">
+                                                              <span>規則 Key</span>
+                                                              <strong>{{ order.order_rule_key | default("未保存", true) }}</strong>
+                                                          </div>
+
+                                                          <div class="rule-snapshot-card">
+                                                              <span>規則版本</span>
+                                                              <strong>{{ order.rule_version | default("未保存", true) }}</strong>
+                                                          </div>
+
+                                                          <div class="rule-snapshot-card">
+                                                              <span>訂單金額</span>
+                                                              <strong>{{ order.amount or 0 }}T</strong>
+                                                          </div>
+
+                                                          <div class="rule-snapshot-card">
+                                                              <span>分潤基準</span>
+                                                              <strong>{{ order.payout_base_amount | default(order.amount, true) or 0 }}T</strong>
+                                                          </div>
+                                                      </div>
+
+                                                      {% if rule_snapshot_json or price_snapshot_json %}
+                                                          {% if price_snapshot_json %}
+                                                              <details class="rule-snapshot-details">
+                                                                  <summary>展開價格快照 JSON</summary>
+                                                                  <pre class="rule-snapshot-raw">{{ price_snapshot_json }}</pre>
+                                                              </details>
+                                                          {% endif %}
+
+                                                          {% if rule_snapshot_json %}
+                                                              <details class="rule-snapshot-details">
+                                                                  <summary>展開規則快照 JSON</summary>
+                                                                  <pre class="rule-snapshot-raw">{{ rule_snapshot_json }}</pre>
+                                                              </details>
+                                                          {% endif %}
+                                                      {% else %}
+                                                          <div class="history-dossier-empty">這張訂單建立時尚未保存快照；之後的新自助單才會顯示完整規則與價格快照。</div>
+                                                      {% endif %}
+                                                  </section>
+
+<section class="history-dossier-card history-dossier-card-wide">
                                                       <div class="history-dossier-card-head">
                                                           <div>
                                                               <h5>分潤調整</h5>
