@@ -664,7 +664,8 @@ def find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id) -> int 
             FROM order_acceptance_meta m
             JOIN web_orders o ON o.id = m.order_id
             WHERE o.dispatch_message_id = :dispatch_message_id
-              AND o.status IN ('waiting_acceptance', 'accepted_pending_pay', 'stored')
+              AND o.status IN ('waiting_acceptance', 'accepted_pending_pay', 'active', 'stored')
+              AND m.status IN ('waiting_acceptance', 'accepted_pending_pay', 'active', 'stored')
             LIMIT 1
         """), {
             "dispatch_message_id": dispatch_message_id_text,

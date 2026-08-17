@@ -763,8 +763,10 @@ async def create_private_channel(
 # Review modal/button views moved to views/review.py
 
 def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) -> None:
-    """DC bot 結單後，把網站訂單狀態同步成 closed。"""
+    """DC bot 結單後，把網站訂單狀態同步成 closed，並同步付款前接單 lifecycle。"""
     try:
+        from datetime import datetime, timedelta
+
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
         ok = update_web_order_status_by_ticket_channel(
@@ -775,64 +777,83 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
         )
         print(f"[web-sync] close order ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} ok={ok}")
 
-        if ok:
+        if not ok:
+            return
+
+        order_id = None
+
+        try:
+            from shared.db import SessionLocal
+            from shared.models import WebOrder
+            from web.app.services.order_service import recalculate_order_payouts
+
+            db = SessionLocal()
+
             try:
-                from shared.db import SessionLocal
-                from shared.models import WebOrder
-                from web.app.services.order_service import recalculate_order_payouts
+                order = (
+                    db.query(WebOrder)
+                    .filter(WebOrder.ticket_channel_id == str(ticket_channel_id))
+                    .first()
+                )
 
-                db = SessionLocal()
-
-                try:
+                if order is None and ticket_channel_id is not None:
                     order = (
                         db.query(WebOrder)
-                        .filter(WebOrder.ticket_channel_id == str(ticket_channel_id))
+                        .filter(WebOrder.ticket_channel_id == ticket_channel_id)
                         .first()
                     )
 
-                    if order is None and ticket_channel_id is not None:
-                        order = (
-                            db.query(WebOrder)
-                            .filter(WebOrder.ticket_channel_id == ticket_channel_id)
-                            .first()
-                        )
+                if order is None and dispatch_message_id is not None:
+                    order = (
+                        db.query(WebOrder)
+                        .filter(WebOrder.dispatch_message_id == str(dispatch_message_id))
+                        .first()
+                    )
 
-                    if order is None and dispatch_message_id is not None:
-                        order = (
-                            db.query(WebOrder)
-                            .filter(WebOrder.dispatch_message_id == str(dispatch_message_id))
-                            .first()
-                        )
+                if order is None and dispatch_message_id is not None:
+                    order = (
+                        db.query(WebOrder)
+                        .filter(WebOrder.dispatch_message_id == dispatch_message_id)
+                        .first()
+                    )
 
-                    if order is None and dispatch_message_id is not None:
-                        order = (
-                            db.query(WebOrder)
-                            .filter(WebOrder.dispatch_message_id == dispatch_message_id)
-                            .first()
-                        )
+                if order is None:
+                    print(
+                        f"[web-sync] payout skipped: web order not found "
+                        f"ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id}"
+                    )
+                else:
+                    order_id = int(order.id)
+                    order.status = "closed"
 
-                    if order is None:
-                        print(
-                            f"[web-sync] payout skipped: web order not found "
-                            f"ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id}"
-                        )
-                    else:
-                        order.status = "closed"
-                        if not getattr(order, "closed_at", None):
-                            order.closed_at = __import__("datetime").datetime.utcnow() + __import__("datetime").timedelta(hours=8)
-                        recalculate_order_payouts(db, order.id)
-                        db.commit()
-                        print(
-                            f"[web-sync] payout recalculated WEB-{order.id} "
-                            f"ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} "
-                            f"closed_at={order.closed_at}"
-                        )
+                    if not getattr(order, "closed_at", None):
+                        order.closed_at = datetime.utcnow() + timedelta(hours=8)
 
-                finally:
-                    db.close()
+                    recalculate_order_payouts(db, order.id)
+                    db.commit()
 
+                    print(
+                        f"[web-sync] payout recalculated WEB-{order.id} "
+                        f"ticket_channel_id={ticket_channel_id} dispatch_message_id={dispatch_message_id} "
+                        f"closed_at={order.closed_at}"
+                    )
+
+            finally:
+                db.close()
+
+        except Exception as exc:
+            print(f"[web-sync] payout recalculate failed ticket_channel_id={ticket_channel_id}: {exc}")
+
+        if order_id is not None:
+            try:
+                from shared.order_acceptance import close_acceptance_order, has_acceptance_meta
+
+                if has_acceptance_meta(order_id):
+                    close_acceptance_order(order_id, source="discord_close")
+                    print(f"[acceptance] closed order_id={order_id} source=discord_close")
             except Exception as exc:
-                print(f"[web-sync] payout recalculate failed ticket_channel_id={ticket_channel_id}: {exc}")
+                print(f"[acceptance] 結單同步付款前接單狀態失敗 order_id={order_id}: {exc}")
+
     except Exception as exc:
         print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
 
@@ -8878,7 +8899,7 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
 
 
 def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
-    """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled。"""
+    """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled，並同步付款前接單 lifecycle。"""
     try:
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
@@ -8893,6 +8914,65 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
             f"ticket_channel_id={ticket_channel_id} "
             f"dispatch_message_id={dispatch_message_id} ok={ok}"
         )
+
+        if not ok:
+            return
+
+        order_id = None
+
+        try:
+            from shared.db import SessionLocal
+            from shared.models import WebOrder
+
+            db = SessionLocal()
+
+            try:
+                order = (
+                    db.query(WebOrder)
+                    .filter(WebOrder.ticket_channel_id == str(ticket_channel_id))
+                    .first()
+                )
+
+                if order is None and ticket_channel_id is not None:
+                    order = (
+                        db.query(WebOrder)
+                        .filter(WebOrder.ticket_channel_id == ticket_channel_id)
+                        .first()
+                    )
+
+                if order is None and dispatch_message_id is not None:
+                    order = (
+                        db.query(WebOrder)
+                        .filter(WebOrder.dispatch_message_id == str(dispatch_message_id))
+                        .first()
+                    )
+
+                if order is None and dispatch_message_id is not None:
+                    order = (
+                        db.query(WebOrder)
+                        .filter(WebOrder.dispatch_message_id == dispatch_message_id)
+                        .first()
+                    )
+
+                if order is not None:
+                    order_id = int(order.id)
+
+            finally:
+                db.close()
+
+        except Exception as exc:
+            print(f"[web-sync] cancel order lookup failed ticket_channel_id={ticket_channel_id}: {exc}")
+
+        if order_id is not None:
+            try:
+                from shared.order_acceptance import cancel_acceptance_order, has_acceptance_meta
+
+                if has_acceptance_meta(order_id):
+                    cancel_acceptance_order(order_id, source="discord_cancel")
+                    print(f"[acceptance] cancelled order_id={order_id} source=discord_cancel")
+            except Exception as exc:
+                print(f"[acceptance] 取消訂單同步付款前接單狀態失敗 order_id={order_id}: {exc}")
+
     except Exception as exc:
         print(
             f"[web-sync] 刪除/取消訂單同步網站失敗 "
