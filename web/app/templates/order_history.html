@@ -3,13 +3,12 @@
 {% block page_title %}歷史訂單
 <script>
 document.addEventListener("click", function (event) {
-    const button = event.target.closest(".history-dossier-toggle");
+    const button = event.target.closest("button.history-dossier-toggle[data-dossier-target]");
     if (!button) return;
 
     const targetId = button.getAttribute("data-dossier-target");
-    if (!targetId) return;
-
     const row = document.getElementById(targetId);
+
     if (!row) return;
 
     const isHidden = row.hasAttribute("hidden");
@@ -20,18 +19,18 @@ document.addEventListener("click", function (event) {
         }
     });
 
-    document.querySelectorAll(".history-dossier-toggle").forEach(function (item) {
+    document.querySelectorAll("button.history-dossier-toggle[data-dossier-target]").forEach(function (item) {
         if (item !== button) {
-            item.textContent = "查看明細";
+            item.textContent = "\u6aa2\u8996\u5377\u5b97";
         }
     });
 
     if (isHidden) {
         row.removeAttribute("hidden");
-        button.textContent = "收起明細";
+        button.textContent = "\u6536\u8d77\u5377\u5b97";
     } else {
         row.setAttribute("hidden", "");
-        button.textContent = "查看明細";
+        button.textContent = "\u6aa2\u8996\u5377\u5b97";
     }
 });
 </script>
@@ -434,7 +433,7 @@ document.addEventListener("click", function (event) {
     }
 }
 
-/* ===== 訂單編輯器：卡片式操作面板 ===== */
+/* ===== 卷宗編輯器：卡片式操作面板 ===== */
 .history-dossier-detail {
     padding: 20px !important;
     background:
@@ -813,7 +812,7 @@ document.addEventListener("click", function (event) {
 
 
             <label>
-                <span>搜尋訂單編號 / 內容 / 老闆</span>
+                <span>搜尋契約編號 / 內容 / 委託人</span>
                 <input class="input" type="search" name="keyword" value="{{ keyword }}" placeholder="輸入關鍵字">
             </label>
 
@@ -831,7 +830,7 @@ document.addEventListener("click", function (event) {
         <div class="history-ledger-stat">
             <span>已結單 ◆</span>
             <strong>{{ history_closed_count }}</strong>
-            <small>已完成訂單</small>
+            <small>已完成卷宗</small>
         </div>
         <div class="history-ledger-stat">
             <span>存單 ◆</span>
@@ -852,8 +851,8 @@ document.addEventListener("click", function (event) {
             <section class="history-ledger-panel">
                 <div class="history-ledger-head">
                     <div>
-                        <p class="order-no">ORDER HISTORY</p>
-                        <h3>歷史訂單 / 訂單紀錄</h3>
+                        <p class="order-no">DOSSIER LEDGER</p>
+                        <h3>卷宗庫 / 歷史訂單卷宗</h3>
                     </div>
                     <div class="muted-text">第 {{ page }} / {{ total_pages }} 頁，共 {{ total_orders }} 筆</div>
                 </div>
@@ -862,9 +861,9 @@ document.addEventListener("click", function (event) {
                     <table class="history-ledger-table">
                         <thead>
                             <tr>
-                                <th>訂單編號</th>
+                                <th>契約編號</th>
                                 <th>結單日期</th>
-                                <th>老闆</th>
+                                <th>委託人</th>
                                 <th>內容</th>
                                 <th>接單人員</th>
                                 <th>魔丸♫客服</th>
@@ -893,7 +892,7 @@ document.addEventListener("click", function (event) {
 
                                     <td>
                                         <div class="history-ledger-person">
-                                            <input class="input" type="text" name="customer_display_name_{{ order.id }}" value="{{ order.customer_display_name or '' }}" placeholder="老闆">
+                                            <input class="input" type="text" name="customer_display_name_{{ order.id }}" value="{{ order.customer_display_name or '' }}" placeholder="委託人">
                                             <input type="hidden" name="customer_discord_id_{{ order.id }}" value="{{ order.customer_discord_id or '' }}">
                                             {% if order.customer_discord_id %}
                                                 <small>ID：{{ order.customer_discord_id }}</small>
@@ -943,7 +942,7 @@ document.addEventListener("click", function (event) {
                                     </td>
 
                                     <td class="history-ledger-action">
-                                        <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">查看明細</button>
+                                        <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">檢視卷宗</button>
                                     </td>
                                 </tr>
                                   <tr class="history-dossier-detail-row" id="dossier-{{ order.id }}" hidden>
@@ -951,8 +950,8 @@ document.addEventListener("click", function (event) {
                                           <div class="history-dossier-detail">
                                               <div class="history-dossier-detail-head">
                                                   <div>
-                                                      <p class="order-no">ORDER DETAIL</p>
-                                                      <h4>{{ order.bot_order_no or ("WEB-" ~ order.id) }}｜訂單修改</h4>
+                                                      <p class="order-no">DOSSIER EDITOR</p>
+                                                      <h4>{{ order.bot_order_no or ("WEB-" ~ order.id) }}｜卷宗修改</h4>
                                                   </div>
 
                                                   <div class="history-dossier-summary">
@@ -964,7 +963,7 @@ document.addEventListener("click", function (event) {
 
                                               <div class="history-dossier-overview">
                                                   <div class="history-dossier-info-card">
-                                                      <span>老闆</span>
+                                                      <span>委託人</span>
                                                       <strong>{{ order.customer_display_name or "未記錄" }}</strong>
                                                   </div>
 
@@ -1186,10 +1185,10 @@ document.addEventListener("click", function (event) {
             </section>
 
             <div class="history-bulk-toolbar">
-                <p class="muted-text">已進行的變更將暫存在本頁，請按「儲存全部修改」套用至這 10 筆訂單。</p>
+                <p class="muted-text">已進行的變更將暫存在本頁，請按「儲存全部修改」套用至這 10 筆卷宗。</p>
                 <div class="history-bulk-actions">
-                    <button class="button secondary" type="reset">還原本頁</button>
-                    <button class="button" type="submit">儲存本頁修改</button>
+                    <button class="button secondary" type="reset">重設</button>
+                    <button class="button" type="submit">儲存全部修改</button>
                 </div>
             </div>
         {% else %}
