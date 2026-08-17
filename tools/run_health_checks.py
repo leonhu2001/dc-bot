@@ -49,6 +49,7 @@ def main() -> None:
         ROOT / "tools" / "audit_order_integrity.py",
         ROOT / "tools" / "audit_order_rules.py",
         ROOT / "tools" / "audit_templates.py",
+        ROOT / "tools" / "audit_services.py",
         ROOT / "tools" / "diff_order_rules_baseline.py",
     ]
 
@@ -81,6 +82,12 @@ def main() -> None:
         "ORDER_INTEGRITY_AUDIT",
         [str(python_bin), str(ROOT / "tools" / "audit_order_integrity.py")],
     )
+
+    run_step(
+        "SERVICE_AUDIT",
+        [str(python_bin), str(ROOT / "tools" / "audit_services.py")],
+    )
+
 
     title("HEALTH_CHECK_DONE")
     print("DC_BOT_HEALTH_CHECK_PASS")
