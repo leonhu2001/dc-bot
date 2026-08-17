@@ -28,7 +28,7 @@ document.addEventListener("click", function (event) {
 
     if (isHidden) {
         row.removeAttribute("hidden");
-        button.textContent = "收起訂單";
+        button.textContent = "收起明細";
     } else {
         row.setAttribute("hidden", "");
         button.textContent = "查看明細";
@@ -1188,8 +1188,8 @@ document.addEventListener("click", function (event) {
             <div class="history-bulk-toolbar">
                 <p class="muted-text">已進行的變更將暫存在本頁，請按「儲存全部修改」套用至這 10 筆訂單。</p>
                 <div class="history-bulk-actions">
-                    <button class="button secondary" type="reset">重設</button>
-                    <button class="button" type="submit">儲存全部修改</button>
+                    <button class="button secondary" type="reset">還原本頁</button>
+                    <button class="button" type="submit">儲存本頁修改</button>
                 </div>
             </div>
         {% else %}
