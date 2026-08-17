@@ -132,6 +132,12 @@ from services.orders import (
     ORDER_CATEGORY_LABELS,
     ORDER_ITEMS_BY_CATEGORY,
     ORDER_ITEM_TO_CATEGORY,
+    ORDER_ITEM_GROUPS_BY_CATEGORY,
+    get_order_item_details_for_group,
+    get_order_item_group_label,
+    get_order_item_detail_label,
+    get_order_item_detail_for_selection,
+    get_self_service_quantity_meta,
     SPECIAL_COMPANION_ITEMS,
     QUANTITY_SELECT_ITEMS,
     QUANTITY_OPTIONS,
@@ -2120,7 +2126,7 @@ class OrderControlSelect(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(
-                label="派單",
+                label="填寫自助下單",
                 value="dispatch",
                 description="開啟自助下單面板給開單用戶填寫"
             ),
@@ -2191,6 +2197,8 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         data["category"] = selected_category
+        data.pop("item_group", None)
+        data.pop("item_detail_value", None)
         data.pop("item", None)
         data.pop("order_rule_key", None)
         data.pop("quantity", None)
@@ -2215,6 +2223,7 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
             )
         )
 
+
 class SelfServiceOrderItemSelect(discord.ui.Select):
     def __init__(
         self,
@@ -2227,28 +2236,34 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         self.channel_id = channel_id
         self.selected_category = selected_category
 
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        selected_group = data.get("item_group") or (
+            get_order_item_group_label(selected_item) if selected_item else None
+        )
+
         if selected_category is None:
             options = [
                 discord.SelectOption(
                     label="請先選擇訂單類別",
                     value="need_category",
-                    description="選完上方類別後，這裡會自動更新項目"
+                    description="選完上方類別後，這裡會自動更新",
                 )
             ]
             disabled = True
             placeholder = "請先選擇訂單類別"
         else:
+            group_options = ORDER_ITEM_GROUPS_BY_CATEGORY.get(selected_category, [])
             options = [
                 discord.SelectOption(
-                    label=item,
-                    value=item,
-                    description=ORDER_CATEGORY_LABELS[selected_category],
-                    default=item == selected_item
+                    label=str(group_label)[:100],
+                    value=str(group_label)[:100],
+                    description=ORDER_CATEGORY_LABELS.get(selected_category, selected_category)[:100],
+                    default=str(group_label) == str(selected_group),
                 )
-                for item in ORDER_ITEMS_BY_CATEGORY[selected_category]
+                for group_label in group_options[:25]
             ]
-            disabled = False
-            placeholder = "請選擇訂單項目"
+            disabled = not bool(options)
+            placeholder = "請選擇訂單項目" if options else "此類別目前沒有可用品項"
 
         super().__init__(
             placeholder=placeholder,
@@ -2257,40 +2272,40 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
             options=options,
             custom_id="self_service_order_item_select",
             row=1,
-            disabled=disabled
+            disabled=disabled,
         )
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單項目。", ephemeral=True)
             return
 
-        selected_item = self.values[0]
-
+        selected_group = self.values[0]
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
-        data["item"] = selected_item
-
-        try:
-            from services.orders import ORDER_RULE_KEY_BY_LABEL
-            rule_key = ORDER_RULE_KEY_BY_LABEL.get(selected_item)
-        except Exception:
-            rule_key = None
-
-        if rule_key:
-            data["order_rule_key"] = rule_key
-        else:
-            data.pop("order_rule_key", None)
-
-        data["quantity"] = 1
+        data["item_group"] = selected_group
+        data.pop("item_detail_value", None)
+        data.pop("item", None)
+        data.pop("order_rule_key", None)
         data.pop("player_count", None)
         data.pop("specified_staff_ids", None)
         data.pop("payment_method", None)
+        data["companion_preference"] = "不指定陪玩/打手"
 
-        if selected_item in SPECIAL_COMPANION_ITEMS:
-            data.pop("companion_preference", None)
+        details = get_order_item_details_for_group(data.get("category"), selected_group)
+
+        # 只有一個規格時直接選好，但第三欄仍會顯示該規格。
+        if len(details) == 1:
+            detail = details[0]
+            data["item_detail_value"] = str(detail.get("value") or "")
+            data["item"] = detail["item"]
+            data["order_rule_key"] = detail["rule_key"]
+            if detail.get("player_count") is not None:
+                data["player_count"] = int(detail["player_count"])
+            data["quantity"] = int(detail.get("min_quantity") or 1)
         else:
-            data["companion_preference"] = "不指定陪玩/打手"
+            data["quantity"] = 1
+
         remember_order_data(self.channel_id, data)
 
         await _defer_and_refresh_self_service_panel(
@@ -2304,122 +2319,107 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
             await log_self_service_proxy_action(
                 interaction,
                 self.customer_id,
-                "選擇訂單項目",
-                selected_item,
+                "自助下單項目",
+                selected_group,
             )
         except Exception as exc:
-            print(f"[self-service] log 選擇訂單項目失敗 channel_id={self.channel_id}: {exc}")
+            print(f"[self-service] log 自助下單項目失敗 channel_id={self.channel_id}: {exc}")
 
 
-class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
+class SelfServiceOrderDetailSelect(discord.ui.Select):
     def __init__(
         self,
         customer_id: int,
         channel_id: int,
-        selected_item: str | None = None,
-        selected_preference: str | None = None,
     ):
         self.customer_id = customer_id
         self.channel_id = channel_id
-        self.selected_item = selected_item
 
-        if selected_item is None:
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        category = data.get("category")
+        selected_group = data.get("item_group")
+        selected_value = str(data.get("item_detail_value") or "")
+
+        if category is None or selected_group is None:
             options = [
                 discord.SelectOption(
                     label="請先選擇訂單項目",
                     value="need_item",
-                    description="選完上方項目後，這裡會自動更新"
+                    description="選完第二欄後，這裡會顯示規格",
                 )
             ]
             disabled = True
             placeholder = "請先選擇訂單項目"
-        elif selected_item == "幣號":
-            options = [
-                discord.SelectOption(
-                    label="已冷",
-                    value="已冷",
-                    default=selected_preference == "已冷"
-                ),
-                discord.SelectOption(
-                    label="未冷",
-                    value="未冷",
-                    default=selected_preference == "未冷"
-                ),
-            ]
-            disabled = False
-            placeholder = "請選擇幣號狀態"
-        elif selected_item in SPECIAL_COMPANION_ITEMS:
-            if selected_item == "陪打":
+        else:
+            details = get_order_item_details_for_group(category, selected_group)
+            if not details:
                 options = [
                     discord.SelectOption(
-                        label="不指定打手",
-                        value="不指定打手",
-                        description="由客服安排合適人選",
-                        default=selected_preference in {"不指定打手", "不指定陪玩/打手", None}
-                    ),
-                    discord.SelectOption(
-                        label="指定打手",
-                        value="指定打手",
-                        description="由下單用戶指定人選",
-                        default=selected_preference in {"指定打手", "指定陪玩/打手"}
-                    ),
+                        label="沒有可用規格",
+                        value="need_item",
+                        description="請重新選擇訂單項目",
+                    )
                 ]
-                disabled = False
-                placeholder = "請選擇是否指定打手"
+                disabled = True
+                placeholder = "沒有可用規格"
             else:
                 options = [
                     discord.SelectOption(
-                        label="不指定陪玩/打手",
-                        value="不指定陪玩/打手",
-                        description="由客服安排合適人選",
-                        default=selected_preference in {"不指定陪玩/打手", "不指定打手", None}
-                    ),
-                    discord.SelectOption(
-                        label="指定陪玩/打手",
-                        value="指定陪玩/打手",
-                        description="由下單用戶指定人選",
-                        default=selected_preference in {"指定陪玩/打手", "指定打手"}
-                    ),
+                        label=str(detail.get("label") or detail.get("item"))[:100],
+                        value=str(detail.get("value") or "")[:100],
+                        description=(
+                            f"{detail.get('quantity_unit', '單')}｜"
+                            f"{detail.get('min_quantity', 1)}～{detail.get('max_quantity', 1)}"
+                        )[:100],
+                        default=str(detail.get("value") or "") == selected_value,
+                    )
+                    for detail in details[:25]
                 ]
-                disabled = False
-                placeholder = "請選擇是否指定陪玩/打手"
-        else:
-            options = [
-                discord.SelectOption(
-                    label="不指定陪玩/打手",
-                    value="不指定陪玩/打手",
-                    description="此項目不開放指定",
-                    default=True
-                )
-            ]
-            disabled = False
-            placeholder = "不指定陪玩/打手"
+                disabled = len(details) == 1 and bool(selected_value)
+                placeholder = "請選擇具體規格"
 
         super().__init__(
             placeholder=placeholder,
             min_values=1,
             max_values=1,
             options=options,
-            custom_id="self_service_companion_preference_select",
+            custom_id="self_service_order_detail_select",
             row=2,
-            disabled=disabled
+            disabled=disabled,
         )
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單規格。", ephemeral=True)
             return
 
-        if self.values[0] == "need_item":
+        selected_value = self.values[0]
+        if selected_value == "need_item":
             await interaction.response.defer()
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
-        data["customer_id"] = self.customer_id
-        data["companion_preference"] = self.values[0]
-        if not _is_specify_preference(self.values[0]):
-            data.pop("specified_staff_ids", None)
+        category = data.get("category")
+        selected_group = data.get("item_group")
+        detail = get_order_item_detail_for_selection(category, selected_group, selected_value)
+
+        if detail is None:
+            await interaction.response.send_message("訂單規格選擇異常，請重新選擇。", ephemeral=True)
+            return
+
+        data["item_detail_value"] = str(detail.get("value") or "")
+        data["item"] = detail["item"]
+        data["order_rule_key"] = detail["rule_key"]
+
+        if detail.get("player_count") is not None:
+            data["player_count"] = int(detail["player_count"])
+        else:
+            data.pop("player_count", None)
+
+        data["quantity"] = int(detail.get("min_quantity") or 1)
+        data.pop("specified_staff_ids", None)
         data.pop("payment_method", None)
+        data["companion_preference"] = "不指定陪玩/打手"
         remember_order_data(self.channel_id, data)
 
         await _defer_and_refresh_self_service_panel(
@@ -2433,82 +2433,104 @@ class SelfServiceCompanionPreferenceSelect(discord.ui.Select):
             await log_self_service_proxy_action(
                 interaction,
                 self.customer_id,
-                "選擇指定選項",
-                self.values[0],
+                "自助下單規格",
+                str(detail.get("label") or detail.get("item")),
             )
         except Exception as exc:
-            print(f"[self-service] log 選擇指定選項失敗 channel_id={self.channel_id}: {exc}")
+            print(f"[self-service] log 自助下單規格失敗 channel_id={self.channel_id}: {exc}")
+
 
 def _get_order_rule_by_item_label(item: str | None):
-    item_text = str(item or "")
-
+    item_text = str(item or "").strip()
     if not item_text:
         return None
 
     try:
         from services.order_rules import ORDER_RULES
+        from services.orders import ORDER_RULE_KEY_BY_LABEL
     except Exception:
         return None
 
-    for rule in ORDER_RULES.values():
-        if rule.label == item_text:
-            return rule
+    rule_key = ORDER_RULE_KEY_BY_LABEL.get(item_text)
+    if rule_key and rule_key in ORDER_RULES:
+        return ORDER_RULES[rule_key]
 
+    for rule in ORDER_RULES.values():
+        if str(getattr(rule, "label", "")) == item_text:
+            return rule
     return None
 
 
-def get_self_service_quantity_limit(item: str | None) -> int:
-    item_text = str(item or "").strip()
+def normalize_self_service_staff_count(data: dict) -> None:
+    if not isinstance(data, dict):
+        return
 
-    # 高難度稱號特殊數量限制，直接用顯示名稱保底，避免 fixed 類型被壓成 1。
+    try:
+        rule = _get_rule_from_self_service_data(data)
+    except Exception:
+        return
+
+    if not bool(getattr(rule, "player_count_enabled", False)):
+        return
+
+    raw_value = data.get("player_count")
+    if raw_value is None or str(raw_value).strip() == "":
+        return
+
+    value = _to_int(raw_value)
+    if value is None:
+        data.pop("player_count", None)
+        return
+
+    minimum = max(1, int(getattr(rule, "min_player_count", 1) or 1))
+    maximum_raw = getattr(rule, "max_player_count", None)
+    maximum = int(maximum_raw) if maximum_raw is not None else None
+    value = max(minimum, value)
+    if maximum is not None:
+        value = min(maximum, value)
+    data["player_count"] = value
+
+
+def _self_service_quantity_meta(data: dict | None, item: str | None = None) -> dict:
+    data = data or {}
+    meta = get_self_service_quantity_meta(
+        data.get("category"),
+        data.get("item_group"),
+        data.get("item_detail_value"),
+    )
+    if meta:
+        return meta
+
+    # 舊訂單 / 舊 panel fallback。
+    rule = _get_order_rule_by_item_label(item or data.get("item"))
+    if rule is None:
+        return {"unit": "單", "min": 1, "max": 1}
+
+    item_text = str(item or data.get("item") or "")
     if item_text == "炫彩勇敢者｜代做":
-        return 3
-
+        return {"unit": "小時", "min": 1, "max": 3}
     if item_text in {"炫彩勇敢者｜陪做", "勇敢者｜陪做"}:
-        return 1
+        return {"unit": "小時", "min": 1, "max": 1}
 
-    rule = _get_order_rule_by_item_label(item)
-
-    if rule is None:
-        return 1
-
-    category = str(getattr(rule, "category", "") or "").lower()
     pricing_type = str(getattr(rule, "pricing_type", "") or "").lower()
-
-    if category in {"title", "custom"}:
-        return max(1, int(getattr(rule, "max_quantity", None) or 1))
-
-    if pricing_type in {"hourly", "game"}:
-        return max(1, int(getattr(rule, "max_quantity", None) or 24))
-
-    if pricing_type == "unit":
-        return max(1, int(getattr(rule, "max_quantity", None) or 99))
-
-    return 1
+    unit = "小時" if str(getattr(rule, "unit_label", "")) == "H" else str(getattr(rule, "unit_label", "單") or "單")
+    minimum = max(1, int(getattr(rule, "min_quantity", 1) or 1))
+    maximum = int(getattr(rule, "max_quantity", None) or (24 if pricing_type in {"hourly", "game"} else 1))
+    return {"unit": unit, "min": minimum, "max": max(minimum, maximum)}
 
 
-def get_self_service_quantity_unit(item: str | None) -> str:
-    rule = _get_order_rule_by_item_label(item)
-
-    if rule is None:
-        return "單"
-
-    if rule.unit_label == "H":
-        return "小時"
-
-    return str(rule.unit_label or "單")
+def get_self_service_quantity_limit(item: str | None, data: dict | None = None) -> int:
+    return int(_self_service_quantity_meta(data, item)["max"])
 
 
-def get_self_service_quantity_options(item: str | None) -> list[int]:
-    rule = _get_order_rule_by_item_label(item)
-    limit = get_self_service_quantity_limit(item)
+def get_self_service_quantity_unit(item: str | None, data: dict | None = None) -> str:
+    return str(_self_service_quantity_meta(data, item)["unit"])
 
-    if rule is not None and int(getattr(rule, "min_quantity", 1) or 1) > 1:
-        start = int(rule.min_quantity)
-    else:
-        start = 1
 
-    return list(range(start, limit + 1))
+def get_self_service_quantity_options(item: str | None, data: dict | None = None) -> list[int]:
+    meta = _self_service_quantity_meta(data, item)
+    return list(range(int(meta["min"]), int(meta["max"]) + 1))
+
 
 class SelfServiceOrderQuantitySelect(discord.ui.Select):
     def __init__(
@@ -2521,47 +2543,49 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         self.customer_id = customer_id
         self.channel_id = channel_id
         self.selected_item = selected_item
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
         quantity = selected_quantity or 1
 
         if selected_item is None:
             options = [
                 discord.SelectOption(
-                    label="請先選擇訂單項目",
+                    label="請先選擇具體規格",
                     value="need_item",
-                    description="選完上方項目後，這裡會自動更新"
+                    description="選完第三欄後，這裡會顯示單數",
                 )
             ]
             disabled = True
-            placeholder = "請先選擇訂單項目"
-        elif get_self_service_quantity_limit(selected_item) > 1 or selected_item in QUANTITY_SELECT_ITEMS:
-            quantity_options = get_self_service_quantity_options(selected_item)
-            quantity_unit = get_self_service_quantity_unit(selected_item)
+            placeholder = "請先選擇具體規格"
+        else:
+            quantity_options = get_self_service_quantity_options(selected_item, data)
+            quantity_unit = get_self_service_quantity_unit(selected_item, data)
 
             if quantity not in quantity_options:
                 quantity = quantity_options[0]
 
-            options = [
-                discord.SelectOption(
-                    label=f"{num} {quantity_unit}",
-                    value=str(num),
-                    description=f"{num} {quantity_unit}",
-                    default=quantity == num
-                )
-                for num in quantity_options
-            ]
-            disabled = False
-            placeholder = f"請選擇數量 1～{max(quantity_options)} {quantity_unit}"
-        else:
-            options = [
-                discord.SelectOption(
-                    label="1 單",
-                    value="1",
-                    description="此項目數量固定為 1 單",
-                    default=True
-                )
-            ]
-            disabled = False
-            placeholder = "數量固定為 1 單"
+            if len(quantity_options) == 1:
+                options = [
+                    discord.SelectOption(
+                        label=f"{quantity_options[0]} {quantity_unit}",
+                        value=str(quantity_options[0]),
+                        description=f"此項目固定 {quantity_options[0]} {quantity_unit}",
+                        default=True,
+                    )
+                ]
+                disabled = True
+                placeholder = f"固定 {quantity_options[0]} {quantity_unit}"
+            else:
+                options = [
+                    discord.SelectOption(
+                        label=f"{num} {quantity_unit}",
+                        value=str(num),
+                        description=f"{num} {quantity_unit}",
+                        default=quantity == num,
+                    )
+                    for num in quantity_options[:25]
+                ]
+                disabled = False
+                placeholder = f"請選擇 {min(quantity_options)}～{max(quantity_options)} {quantity_unit}"
 
         super().__init__(
             placeholder=placeholder,
@@ -2570,12 +2594,12 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             options=options,
             custom_id="self_service_order_quantity_select",
             row=3,
-            disabled=disabled
+            disabled=disabled,
         )
 
     async def callback(self, interaction: discord.Interaction):
         if not can_operate_self_service_order(interaction.user, self.customer_id):
-            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單數量。", ephemeral=True)
+            await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單單數。", ephemeral=True)
             return
 
         if self.values[0] == "need_item":
@@ -2588,16 +2612,19 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         try:
             quantity = int(self.values[0])
         except ValueError:
-            await interaction.response.send_message("數量選擇異常，請重新選擇。", ephemeral=True)
+            await interaction.response.send_message("單數選擇異常，請重新選擇。", ephemeral=True)
             return
 
-        max_quantity = get_self_service_quantity_limit(selected_item)
-        quantity_unit = get_self_service_quantity_unit(selected_item)
+        meta = _self_service_quantity_meta(data, selected_item)
+        minimum = int(meta["min"])
+        maximum = int(meta["max"])
+        quantity_unit = str(meta["unit"])
 
-        if max_quantity <= 1:
-            quantity = 1
-        elif quantity < 1 or quantity > max_quantity:
-            await interaction.response.send_message(f"數量請選擇 1～{max_quantity} {quantity_unit}。", ephemeral=True)
+        if quantity < minimum or quantity > maximum:
+            await interaction.response.send_message(
+                f"單數請選擇 {minimum}～{maximum} {quantity_unit}。",
+                ephemeral=True,
+            )
             return
 
         data["customer_id"] = self.customer_id
@@ -2608,8 +2635,8 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "選擇訂單數量",
-            f"{quantity} {get_self_service_quantity_unit(selected_item)}",
+            "選擇訂單單數",
+            f"{quantity} {quantity_unit}",
         )
 
         await interaction.response.edit_message(
@@ -2617,10 +2644,9 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             view=SelfServiceOrderView(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
-                selected_category=data.get("category")
-            )
+                selected_category=data.get("category"),
+            ),
         )
-
 
 async def log_self_service_proxy_action(
     interaction: discord.Interaction,
@@ -5015,6 +5041,7 @@ def _extract_discord_ids_from_text(text_value: str) -> list[str]:
 def _get_rule_from_self_service_data(data: dict):
     try:
         from services.order_rules import ORDER_RULES, get_rule
+        from services.orders import ORDER_RULE_KEY_BY_LABEL
     except Exception as exc:
         raise ValueError(f"讀取訂單規則失敗：{exc}") from exc
 
@@ -5025,14 +5052,22 @@ def _get_rule_from_self_service_data(data: dict):
         except Exception:
             pass
 
-    item_text = str(data.get("item") or "")
+    item_text = str(data.get("item") or "").strip()
+    alias_rule_key = ORDER_RULE_KEY_BY_LABEL.get(item_text)
+    if alias_rule_key:
+        try:
+            rule = get_rule(alias_rule_key)
+            data["order_rule_key"] = rule.key
+            return rule
+        except Exception:
+            pass
+
     for rule in ORDER_RULES.values():
-        if rule.label == item_text:
+        if str(rule.label) == item_text:
             data["order_rule_key"] = rule.key
             return rule
 
     raise ValueError("找不到這個訂單項目的規則，請重新選擇品項。")
-
 
 def _is_specify_preference(value: str | None) -> bool:
     text = str(value or "").strip()
@@ -5135,6 +5170,9 @@ async def _defer_and_refresh_self_service_panel(
         except discord.HTTPException:
             pass
 
+
+
+
 class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
     player_count = discord.ui.TextInput(
         label="陪玩人數",
@@ -5216,6 +5254,7 @@ async def create_waiting_acceptance_order_from_self_service(
     from shared.web_order_sync import upsert_web_order_from_dispatch
 
     quantity = _to_int(data.get("quantity"), 1) or 1
+    normalize_self_service_staff_count(data)
     player_count = _to_int(data.get("player_count"), 1) or 1
     specified_staff_ids = [str(item) for item in data.get("specified_staff_ids") or []]
 
@@ -5246,12 +5285,21 @@ async def create_waiting_acceptance_order_from_self_service(
         allowed_role_ids=allowed_role_ids_for_rule,
         specified_staff_ids=specified_staff_ids,
     )
+
+    rule_version = int(
+        rule_snapshot.get("version", 1) or 1
+    )
+
+    rule_snapshot_json = json.dumps(
+        rule_snapshot,
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
     price_snapshot = {
-        "version": int(rule_snapshot.get("version", 1) or 1),
+        "version": rule_version,
         "order_rule_key": rule.key,
         "rule_version": rule_version,
-        "rule_snapshot_json": rule_snapshot_json,
-        "price_snapshot_json": price_snapshot_json,
         "quantity": quantity,
         "player_count": player_count,
         "required_staff_count": required_staff_count,
@@ -5273,11 +5321,17 @@ async def create_waiting_acceptance_order_from_self_service(
         "store_absorbed_amount": price_adjustment.get("store_absorbed_amount"),
         "customer_pay_amount": price_adjustment.get("customer_pay_amount"),
         "service_bonus_text": price_adjustment.get("service_bonus_text"),
-        "specified_staff_ids": [str(item) for item in (specified_staff_ids or [])],
+        "specified_staff_ids": [
+            str(item)
+            for item in (specified_staff_ids or [])
+        ],
     }
-    rule_version = int(rule_snapshot.get("version", 1) or 1)
-    rule_snapshot_json = json.dumps(rule_snapshot, ensure_ascii=False, sort_keys=True)
-    price_snapshot_json = json.dumps(price_snapshot, ensure_ascii=False, sort_keys=True)
+
+    price_snapshot_json = json.dumps(
+        price_snapshot,
+        ensure_ascii=False,
+        sort_keys=True,
+    )
 
     dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
 
@@ -5753,7 +5807,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
             detail_parts.append(f"首小時免費 -{_format_plain_amount(adjustment['point_free_first_hour_amount'])}")
 
         if getattr(price, "free_specify_fee", False):
-            detail_parts.append("兩單以上免指定費")
+            detail_parts.append("2 小時以上免指定費")
 
         if adjustment["manual_discount_amount"] > 0:
             reason = adjustment["manual_discount_reason"] or "未填原因"
@@ -5786,7 +5840,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 point_text += f"｜{adjustment['service_bonus_text']}"
             lines.append(("點數福利", point_text))
 
-    unit = get_self_service_quantity_unit(rule.label)
+    unit = get_self_service_quantity_unit(rule.label, data)
     lines.append(("數量", f"{quantity} {unit}"))
 
     if getattr(rule, "player_count_enabled", False):
@@ -5795,7 +5849,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
     lines.append(("接單需求", f"{required_staff_count} 位"))
     lines.append(("可接職位", role_labels(rule.allowed_roles)))
 
-    can_specify_item = bool(getattr(rule, "allow_specify", False)) and str(rule.label) in SPECIAL_COMPANION_ITEMS
+    can_specify_item = bool(getattr(rule, "allow_specify", False))
 
     if can_specify_item:
         max_spec = rule.max_specified_count or required_staff_count
@@ -5848,35 +5902,54 @@ def build_self_service_panel_embed(
 ) -> discord.Embed:
     category = data.get("category")
     category_label = ORDER_CATEGORY_LABELS.get(category, "尚未選擇")
-    item = data.get("item") or "尚未選擇"
+    item_group = str(data.get("item_group") or "尚未選擇")
+
+    detail = get_order_item_detail_for_selection(
+        category,
+        data.get("item_group"),
+        data.get("item_detail_value"),
+    )
+    detail_label = str((detail or {}).get("label") or "尚未選擇")
+
     quantity = _to_int(data.get("quantity"), 1) or 1
-    companion_preference = data.get("companion_preference") or "尚未選擇"
+    quantity_unit = get_self_service_quantity_unit(data.get("item"), data) if data.get("item") else "單"
 
     embed = discord.Embed(
         title="自助下單",
         description=(
             f"下單用戶：<@{customer_id}>\n\n"
-            "請依序選擇訂單類別、訂單項目、指定選項與數量。\n"
-            "畫面會即時顯示試算金額、可接職位與接單需求。\n"
-            "送出後會先派單等待接單，人數滿後才會開放付款。"
+            "請依序選擇：類別 → 訂單項目 → 具體規格 → 單數。\n"
+            "可指定的品項才會開放指定成員；2 小時以上免指定費。\n"
+            "送出後先進入等待接單，人數滿後才開放付款。"
         ),
         color=discord.Color.purple(),
     )
 
-    embed.add_field(name="目前類別", value=str(category_label), inline=True)
-    embed.add_field(name="目前項目", value=str(item), inline=True)
+    embed.add_field(name="第一欄｜類別", value=str(category_label), inline=True)
+    embed.add_field(name="第二欄｜項目", value=item_group, inline=True)
+    embed.add_field(name="第三欄｜規格", value=detail_label, inline=True)
 
     if data.get("item"):
         embed.add_field(
-            name="目前數量",
-            value=f"{quantity} {get_self_service_quantity_unit(data.get('item'))}",
+            name="第四欄｜單數",
+            value=f"{quantity} {quantity_unit}",
             inline=True,
         )
 
-    embed.add_field(name="指定選項", value=str(companion_preference), inline=False)
+    try:
+        rule = _get_rule_from_self_service_data(data) if data.get("item") else None
+    except Exception:
+        rule = None
+
+    if rule is not None:
+        if getattr(rule, "allow_specify", False):
+            specified_ids = [str(item) for item in data.get("specified_staff_ids") or []]
+            specify_text = "未指定" if not specified_ids else f"已指定 {len(specified_ids)} 位"
+        else:
+            specify_text = "此品項不可指定"
+        embed.add_field(name="指定", value=specify_text, inline=True)
 
     return add_self_service_quote_preview(embed, data, guild)
-
 
 SPECIFIED_STAFF_SELECT_PAGE_SIZE = 25
 
@@ -6249,8 +6322,9 @@ def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
     manual_staff_amount = get_self_service_staff_price(data)
 
     if is_self_service_staff_price_required(rule):
-        rule_original_amount = max(0, int(manual_staff_amount or 0))
-        specify_fee = 0
+        # 手動價是客服填的服務原價；自訂單若有指定，指定費仍由系統自動加上。
+        specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
+        rule_original_amount = max(0, int(manual_staff_amount or 0)) + specify_fee
     else:
         rule_original_amount = max(0, int(getattr(price_result, "total_amount", 0) or 0))
         specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
@@ -6925,19 +6999,32 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
 class SelfServiceOrderView(discord.ui.View):
     def __init__(self, customer_id: int, channel_id: int, selected_category: str | None = None):
         super().__init__(timeout=86400)
+
         self.customer_id = customer_id
         self.channel_id = channel_id
 
         data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
         category = selected_category or data.get("category")
         selected_item = data.get("item")
-        selected_preference = data.get("companion_preference")
         selected_quantity = _to_int(data.get("quantity"), 1) or 1
 
         self.add_item(SelfServiceOrderCategorySelect(customer_id, channel_id, category))
         self.add_item(SelfServiceOrderItemSelect(customer_id, channel_id, category, selected_item))
-        self.add_item(SelfServiceCompanionPreferenceSelect(customer_id, channel_id, selected_item, selected_preference))
+        self.add_item(SelfServiceOrderDetailSelect(customer_id, channel_id))
         self.add_item(SelfServiceOrderQuantitySelect(customer_id, channel_id, selected_item, selected_quantity))
+
+        try:
+            current_rule = _get_rule_from_self_service_data(data) if selected_item else None
+        except Exception:
+            current_rule = None
+
+        for child in self.children:
+            custom_id = getattr(child, "custom_id", None)
+            if custom_id == "self_service_order_specified_staff_button":
+                child.disabled = not bool(current_rule and getattr(current_rule, "allow_specify", False))
+            elif custom_id == "self_service_order_staff_price_button":
+                child.disabled = not bool(current_rule and is_self_service_staff_price_required(current_rule))
+
 
     @discord.ui.button(
         label="選擇指定成員",
@@ -6972,7 +7059,7 @@ class SelfServiceOrderView(discord.ui.View):
             await interaction.response.send_message(f"讀取指定規則失敗：{exc}", ephemeral=True)
             return
 
-        can_specify_item = bool(getattr(rule, "allow_specify", False)) and str(rule.label) in SPECIAL_COMPANION_ITEMS
+        can_specify_item = bool(getattr(rule, "allow_specify", False))
 
         if not can_specify_item:
             data.pop("specified_staff_ids", None)
@@ -6981,13 +7068,9 @@ class SelfServiceOrderView(discord.ui.View):
             return
 
         if not _is_specify_preference(data.get("companion_preference")):
-            data.pop("specified_staff_ids", None)
+            data["companion_preference"] = "指定陪玩/打手"
             remember_order_data(self.channel_id, data)
-            await interaction.response.send_message(
-                "目前選擇「不指定」，不需要選擇指定成員。請先在下拉選單改成「指定陪玩/打手」或「指定打手」。",
-                ephemeral=True,
-            )
-            return
+
 
         await interaction.response.defer(ephemeral=True)
 
@@ -7157,33 +7240,35 @@ class SelfServiceOrderView(discord.ui.View):
             await interaction.response.send_message("請先選擇訂單類別與訂單項目，再取得訂單金額。", ephemeral=True)
             return
 
-        item_category = ORDER_ITEM_TO_CATEGORY.get(item)
+        try:
+            selected_rule = _get_rule_from_self_service_data(data)
+            item_category = str(getattr(selected_rule, "category", "") or "")
+        except ValueError:
+            item_category = ORDER_ITEM_TO_CATEGORY.get(item)
 
         if item_category != category:
             await interaction.response.send_message(
                 "你選擇的訂單類別與訂單項目不一致，請重新選擇。",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
-        if item in SPECIAL_COMPANION_ITEMS and companion_preference is None:
-            await interaction.response.send_message(
-                "這個項目請先選擇「不指定陪玩/打手」或「指定陪玩/打手」，再取得訂單金額。",
-                ephemeral=True
-            )
-            return
 
-        if item not in QUANTITY_SELECT_ITEMS:
-            quantity = 1
-            data["quantity"] = 1
+        quantity_meta = _self_service_quantity_meta(data, item)
+        min_quantity = int(quantity_meta["min"])
+        max_quantity = int(quantity_meta["max"])
+        quantity_unit = str(quantity_meta["unit"])
+
+        if min_quantity == max_quantity:
+            quantity = min_quantity
+            data["quantity"] = quantity
             remember_order_data(self.channel_id, data)
-        else:
-            max_quantity = get_self_service_quantity_limit(item)
-            quantity_unit = get_self_service_quantity_unit(item)
-
-            if quantity < 1 or quantity > max_quantity:
-                await interaction.response.send_message(f"數量請選擇 1～{max_quantity} {quantity_unit}。", ephemeral=True)
-                return
+        elif quantity < min_quantity or quantity > max_quantity:
+            await interaction.response.send_message(
+                f"單數請選擇 {min_quantity}～{max_quantity} {quantity_unit}。",
+                ephemeral=True,
+            )
+            return
 
         if companion_preference is None:
             companion_preference = "不指定陪玩/打手"
@@ -7195,6 +7280,8 @@ class SelfServiceOrderView(discord.ui.View):
         except ValueError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
+
+        normalize_self_service_staff_count(data)
 
         if getattr(rule, "player_count_enabled", False) and not _to_int(data.get("player_count")):
             await interaction.response.send_modal(SelfServicePlayerCountModal(self.customer_id, self.channel_id))

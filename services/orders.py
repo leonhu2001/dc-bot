@@ -10,6 +10,7 @@ from services.order_rules import (
     get_rules_by_category,
 )
 
+
 def _to_int(value, default: int | None = None) -> int | None:
     try:
         if value is None or value == "":
@@ -18,13 +19,142 @@ def _to_int(value, default: int | None = None) -> int | None:
     except (TypeError, ValueError):
         return default
 
+
 ORDER_CATEGORY_LABELS = dict(RULE_CATEGORY_LABELS)
 
+# 新自助下單固定商品表。
+# UI 不再靠 rule.label 內的分隔符猜「主品項 / 規格」，所有顯示與選項都在這裡明確定義。
+SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
+    "basic": [
+        {
+            "label": "絕巴四幻神賭單",
+            "details": [
+                {"label": "縱橫", "value": "zongheng", "rule_key": "basic_exbar_gamble_zongheng", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "萬金淚冠", "value": "leiguan", "rule_key": "basic_exbar_gamble_leiguan", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "測距儀", "value": "rangefinder", "rule_key": "basic_exbar_gamble_rangefinder", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "天圓地方", "value": "tianyuan", "rule_key": "basic_exbar_gamble_tianyuan", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {
+            "label": "絕巴技術陪",
+            "details": [
+                {"label": "絕巴技術陪", "value": "exbar_tech", "rule_key": "basic_exbar_tech", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "技術陪",
+            "details": [
+                {"label": "機密單陪", "value": "secret_single", "rule_key": "basic_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "機密雙陪", "value": "secret_double", "rule_key": "basic_tech_secret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "絕密單陪", "value": "topsecret_single", "rule_key": "basic_tech_topsecret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "絕密雙陪", "value": "topsecret_double", "rule_key": "basic_tech_topsecret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "娛樂陪",
+            "details": [
+                {"label": "單陪", "value": "single", "rule_key": "basic_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "雙陪", "value": "double", "rule_key": "basic_entertain_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "甜蜜陪",
+            "details": [
+                {"label": "單陪", "value": "single", "rule_key": "basic_sweet_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "體驗單",
+            "details": [
+                {"label": "777w", "value": "777w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "1688w", "value": "1688w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {
+            "label": "教學單",
+            "details": [
+                {"label": "導師1名", "value": "teacher_1", "rule_key": "basic_teaching_one", "quantity_unit": "小時", "min_quantity": 3, "max_quantity": 24},
+                {"label": "導師2名", "value": "teacher_2", "rule_key": "basic_teaching_two", "quantity_unit": "小時", "min_quantity": 3, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "賭約單",
+            "details": [
+                {"label": "800w", "value": "800w", "rule_key": "basic_bet_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "1000w", "value": "1000w", "rule_key": "basic_bet_1500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "1200w", "value": "1200w", "rule_key": "basic_bet_2500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {
+            "label": "油鍋單",
+            "details": [
+                {"label": "火箭燃油", "value": "fuel", "rule_key": "basic_oil_fuel", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "GTI衛星通訊天線", "value": "satellite", "rule_key": "basic_oil_satellite", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "全包", "value": "all", "rule_key": "basic_oil_all", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+    ],
+    "fun": [
+        {"label": "比翼雙飛", "details": [{"label": "比翼雙飛", "value": "lovebirds", "rule_key": "fun_lovebirds", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {"label": "已讀亂回", "details": [{"label": "已讀亂回", "value": "read_no_reply", "rule_key": "fun_read_no_reply", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {"label": "豪到你了嗎", "details": [{"label": "豪到你了嗎", "value": "rich_enough", "rule_key": "fun_rich_enough", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {"label": "想吃自己打", "details": [{"label": "想吃自己打", "value": "eat_yourself", "rule_key": "fun_eat_yourself", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+    ],
+    "farm": [
+        {"label": "賽季3x3", "details": [{"label": "賽季3x3", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {
+            "label": "哈夫幣代洗",
+            "details": [
+                {"label": "120M", "value": "120m", "rule_key": "farm_halfcoin_120m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "360M", "value": "360m", "rule_key": "farm_halfcoin_360m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "600M", "value": "600m", "rule_key": "farm_halfcoin_600m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+    ],
+    "title": [
+        {
+            "label": "炫彩勇敢者",
+            "details": [
+                {"label": "代做", "value": "carry", "rule_key": "title_color_brave_carry", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 3},
+                {"label": "陪做", "value": "play", "rule_key": "title_color_brave_play", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+        {"label": "勇敢者", "details": [{"label": "陪做", "value": "play", "rule_key": "title_brave_play", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 1}]},
+    ],
+    "steam": [
+        {
+            "label": "娛樂陪",
+            "details": [
+                {"label": f"陪玩{count}名", "value": f"players_{count}", "rule_key": "steam_play", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
+                for count in range(1, 5)
+            ],
+        },
+    ],
+    "valorant": [
+        {
+            "label": "娛樂陪",
+            "details": [
+                {"label": f"陪玩{count}名", "value": f"players_{count}", "rule_key": "valorant_entertain", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
+                for count in range(1, 5)
+            ],
+        },
+    ],
+    "custom": [
+        {
+            "label": "自訂",
+            "details": [
+                {"label": f"陪玩{count}名", "value": f"players_{count}", "rule_key": "custom_custom_order", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
+                for count in range(1, 5)
+            ],
+        },
+    ],
+}
+
+
+# 所有 rule label 仍保留，讓舊訂單 / 舊紀錄可繼續被辨識。
 ORDER_ITEMS_BY_CATEGORY = {
-    category: [
-        rule.label
-        for rule in get_rules_by_category(category)
-    ]
+    category: [rule.label for rule in get_rules_by_category(category)]
     for category in ORDER_CATEGORY_LABELS
 }
 
@@ -33,10 +163,130 @@ ORDER_RULE_KEY_BY_LABEL = {
     for rule in ORDER_RULES.values()
 }
 
+# 舊版顯示名稱別名，確保未結舊單即使沒有 order_rule_key 仍可被找回。
+ORDER_RULE_KEY_BY_LABEL.update({
+    "絕巴四幻神賭單｜賭縱橫": "basic_exbar_gamble_zongheng",
+    "絕巴四幻神賭單｜賭淚冠": "basic_exbar_gamble_leiguan",
+    "絕巴四幻神賭單｜賭測距儀": "basic_exbar_gamble_rangefinder",
+    "絕巴四幻神賭單｜賭天圓地方": "basic_exbar_gamble_tianyuan",
+    "技術陪｜機密單護": "basic_tech_secret_single",
+    "技術陪｜機密雙護": "basic_tech_secret_double",
+    "技術陪｜絕密單護": "basic_tech_topsecret_single",
+    "技術陪｜絕密雙護": "basic_tech_topsecret_double",
+    "甜蜜單｜單陪": "basic_sweet_single",
+    "教學單｜導師一名": "basic_teaching_one",
+    "教學單｜導師兩名": "basic_teaching_two",
+    "賭約單 1000": "basic_bet_1000",
+    "賭約單 1500": "basic_bet_1500",
+    "賭約單 2500": "basic_bet_2500",
+    "賭約單 800w": "basic_bet_1000",
+    "賭約單 1000w": "basic_bet_1500",
+    "賭約單 1200w": "basic_bet_2500",
+    "體驗單 500": "basic_trial_500",
+    "體驗單 1000": "basic_trial_1000",
+    "體驗單 777w": "basic_trial_500",
+    "體驗單 1688w": "basic_trial_1000",
+    "賽季3x3｜普通": "farm_season_3x3_normal",
+    "代解部門任務": "farm_department_task",
+    "Steam 陪玩": "steam_play",
+    "Valorant 陪玩｜娛樂陪": "valorant_entertain",
+    "自訂單": "custom_custom_order",
+})
+
 ORDER_ITEM_TO_CATEGORY = {
-    rule.label: rule.category
-    for rule in ORDER_RULES.values()
+    label: ORDER_RULES[rule_key].category
+    for label, rule_key in ORDER_RULE_KEY_BY_LABEL.items()
+    if rule_key in ORDER_RULES
 }
+
+ORDER_ITEM_GROUPS_BY_CATEGORY = {
+    category: [group["label"] for group in groups]
+    for category, groups in SELF_SERVICE_ORDER_CATALOG.items()
+}
+
+
+def get_order_item_group_label(item_label: str | None) -> str | None:
+    if item_label is None:
+        return None
+
+    key = ORDER_RULE_KEY_BY_LABEL.get(str(item_label))
+    if key is None:
+        return str(item_label)
+
+    for category, groups in SELF_SERVICE_ORDER_CATALOG.items():
+        for group in groups:
+            for detail in group.get("details", []):
+                if detail.get("rule_key") == key:
+                    return str(group["label"])
+
+    return str(item_label)
+
+
+def get_order_item_details_for_group(category: str | None, group_label: str | None) -> list[dict]:
+    if category is None or group_label is None:
+        return []
+
+    for group in SELF_SERVICE_ORDER_CATALOG.get(str(category), []):
+        if str(group.get("label")) != str(group_label):
+            continue
+
+        result: list[dict] = []
+        for detail in group.get("details", []):
+            item = dict(detail)
+            rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
+            item["item"] = str(getattr(rule, "label", "") or item.get("label") or "")
+            result.append(item)
+        return result
+
+    return []
+
+
+def get_order_item_detail_for_selection(
+    category: str | None,
+    group_label: str | None,
+    detail_value: str | None,
+) -> dict | None:
+    if detail_value is None:
+        return None
+
+    for detail in get_order_item_details_for_group(category, group_label):
+        if str(detail.get("value")) == str(detail_value):
+            return detail
+    return None
+
+
+def get_order_item_detail_label(item_label: str | None) -> str | None:
+    if item_label is None:
+        return None
+
+    rule_key = ORDER_RULE_KEY_BY_LABEL.get(str(item_label))
+    if rule_key is None:
+        return str(item_label)
+
+    for groups in SELF_SERVICE_ORDER_CATALOG.values():
+        for group in groups:
+            for detail in group.get("details", []):
+                if detail.get("rule_key") == rule_key:
+                    return str(detail.get("label") or item_label)
+
+    return str(item_label)
+
+
+def get_self_service_quantity_meta(
+    category: str | None,
+    group_label: str | None,
+    detail_value: str | None,
+) -> dict | None:
+    detail = get_order_item_detail_for_selection(category, group_label, detail_value)
+    if detail is None:
+        return None
+
+    return {
+        "unit": str(detail.get("quantity_unit") or "單"),
+        "min": max(1, int(detail.get("min_quantity") or 1)),
+        "max": max(1, int(detail.get("max_quantity") or 1)),
+    }
+
 
 SPECIAL_COMPANION_ITEMS = {
     rule.label
@@ -45,9 +295,11 @@ SPECIAL_COMPANION_ITEMS = {
 }
 
 QUANTITY_SELECT_ITEMS = {
-    rule.label
-    for rule in ORDER_RULES.values()
-    if rule.pricing_type in {"hourly", "game", "unit"}
+    detail["item"]
+    for category, groups in SELF_SERVICE_ORDER_CATALOG.items()
+    for group in groups
+    for detail in get_order_item_details_for_group(category, group["label"])
+    if int(detail.get("max_quantity") or 1) > 1
 }
 
 QUANTITY_OPTIONS = list(range(1, 25))

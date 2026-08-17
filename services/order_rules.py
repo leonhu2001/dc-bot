@@ -714,4 +714,145 @@ def build_order_rule_snapshot(
     }
 
     return _order_rule_snapshot_safe(snapshot)
+# ===== zYao self-service catalog v2 start =====
+# 新自助下單只使用明確 catalog；這裡只負責 rule 的價格、顯示名稱、數量、人數與指定規則。
+from dataclasses import replace as _zy_replace_order_rule
 
+CATEGORY_LABELS.update({
+    "basic": "基礎單",
+    "fun": "趣味單",
+    "farm": "代肝代解",
+    "title": "高難度稱號",
+    "steam": "Steam遊戲",
+    "valorant": "特戰英豪",
+    "custom": "自訂",
+})
+
+
+def _zy_patch_rule(_key: str, **_changes):
+    _rule = ORDER_RULES.get(_key)
+    if _rule is None:
+        raise RuntimeError(f"missing order rule for self-service catalog v2: {_key}")
+    ORDER_RULES[_key] = _zy_replace_order_rule(_rule, **_changes)
+
+
+# 基礎單：固定套餐只有 1 單；小時計價品項依實際小時數計算。
+_zy_patch_rule("basic_exbar_gamble_zongheng", label="絕巴四幻神賭單｜縱橫", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_exbar_gamble_leiguan", label="絕巴四幻神賭單｜萬金淚冠", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_exbar_gamble_rangefinder", label="絕巴四幻神賭單｜測距儀", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_exbar_gamble_tianyuan", label="絕巴四幻神賭單｜天圓地方", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+
+_zy_patch_rule("basic_exbar_tech", label="絕巴技術陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_secret_single", label="技術陪｜機密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_secret_double", label="技術陪｜機密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_topsecret_single", label="技術陪｜絕密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_topsecret_double", label="技術陪｜絕密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_entertain_single", label="娛樂陪｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_entertain_double", label="娛樂陪｜雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_sweet_single", label="甜蜜陪｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+
+_zy_patch_rule("basic_trial_500", label="體驗單｜777w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_trial_1000", label="體驗單｜1688w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_teaching_one", label="教學單｜導師1名", unit_label="H", min_quantity=3, max_quantity=24, allow_specify=False)
+_zy_patch_rule("basic_teaching_two", label="教學單｜導師2名", unit_label="H", min_quantity=3, max_quantity=24, allow_specify=False)
+_zy_patch_rule("basic_bet_1000", label="賭約單｜800w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_bet_1500", label="賭約單｜1000w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_bet_2500", label="賭約單｜1200w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_oil_fuel", label="油鍋單｜火箭燃油", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_oil_satellite", label="油鍋單｜GTI衛星通訊天線", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("basic_oil_all", label="油鍋單｜全包", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+
+# 趣味單：全部固定 1 單，不開放指定。
+for _zy_fun_key in ("fun_lovebirds", "fun_read_no_reply", "fun_rich_enough", "fun_eat_yourself"):
+    _zy_patch_rule(_zy_fun_key, unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+
+# 代肝代解：賽季 3x3 / 部門任務由客服手動填價；哈夫幣固定 1 單。
+_zy_patch_rule(
+    "farm_season_3x3_normal",
+    label="賽季3x3",
+    pricing_type="manual",
+    price=0,
+    unit_label="單",
+    min_quantity=1,
+    max_quantity=1,
+    allow_specify=False,
+    staff_adjustments={},
+    staff_adjustment_labels={},
+)
+_zy_patch_rule("farm_department_task", label="部門任務", pricing_type="manual", price=0, unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("farm_halfcoin_600m", label="哈夫幣代洗｜600M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+
+# 高難度稱號：單數視為小時，但不開放指定。
+_zy_patch_rule("title_color_brave_carry", label="炫彩勇敢者｜代做", unit_label="H", min_quantity=1, max_quantity=3, allow_specify=False)
+_zy_patch_rule("title_color_brave_play", label="炫彩勇敢者｜陪做", unit_label="H", min_quantity=1, max_quantity=1, allow_specify=False)
+_zy_patch_rule("title_brave_play", label="勇敢者｜陪做", unit_label="H", min_quantity=1, max_quantity=1, allow_specify=False)
+
+# Steam / 特戰英豪：350 / 小時 / 每位；1～4 位。指定費只看小時數，2 小時以上全免。
+_zy_patch_rule(
+    "steam_play",
+    label="Steam遊戲｜娛樂陪",
+    pricing_type="hourly",
+    price=350,
+    unit_label="H",
+    min_quantity=1,
+    max_quantity=24,
+    min_player_count=1,
+    max_player_count=4,
+    player_count_enabled=True,
+    required_staff_count="player_count",
+    price_multiply_player_count=True,
+    allow_specify=True,
+    max_specified_count=4,
+    specify_fee_by_role=_all_receiver_fee(150),
+    specify_fee_default=150,
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+    point_benefits_allowed=False,
+)
+_zy_patch_rule(
+    "valorant_entertain",
+    label="特戰英豪｜娛樂陪",
+    pricing_type="hourly",
+    price=350,
+    unit_label="H",
+    min_quantity=1,
+    max_quantity=24,
+    min_player_count=1,
+    max_player_count=4,
+    player_count_enabled=True,
+    required_staff_count="player_count",
+    price_multiply_player_count=True,
+    allow_specify=True,
+    max_specified_count=4,
+    specify_fee_by_role=_all_receiver_fee(150),
+    specify_fee_default=150,
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+    point_benefits_allowed=False,
+)
+
+# 自訂：1～4 位、1～24 小時，價格由客服手動填；仍可指定。
+_zy_patch_rule(
+    "custom_custom_order",
+    label="自訂｜自訂",
+    pricing_type="manual",
+    price=0,
+    unit_label="H",
+    min_quantity=1,
+    max_quantity=24,
+    min_player_count=1,
+    max_player_count=4,
+    player_count_enabled=True,
+    required_staff_count="player_count",
+    price_multiply_player_count=False,
+    allow_specify=True,
+    max_specified_count=4,
+    specify_fee_by_role=_all_receiver_fee(150),
+    specify_fee_default=150,
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+    point_benefits_allowed=False,
+)
+# ===== zYao self-service catalog v2 end =====
