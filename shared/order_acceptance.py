@@ -89,6 +89,9 @@ def ensure_acceptance_tables() -> None:
                 allowed_role_ids_json TEXT,
                 specified_staff_ids_json TEXT,
                 point_benefits_allowed INTEGER NOT NULL DEFAULT 1,
+                rule_version INTEGER,
+                rule_snapshot_json TEXT,
+                price_snapshot_json TEXT,
                 status TEXT NOT NULL DEFAULT 'waiting_acceptance',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -119,6 +122,21 @@ def ensure_acceptance_tables() -> None:
             CREATE INDEX IF NOT EXISTS idx_order_acceptance_claims_staff
             ON order_acceptance_claims(staff_discord_id)
         """))
+        for column_name, ddl in (
+            ("rule_version", "INTEGER"),
+            ("rule_snapshot_json", "TEXT"),
+            ("price_snapshot_json", "TEXT"),
+        ):
+            existing_columns = {
+                row[1]
+                for row in conn.exec_driver_sql("PRAGMA table_info(order_acceptance_meta)").fetchall()
+            }
+
+            if column_name not in existing_columns:
+                conn.exec_driver_sql(
+                    f"ALTER TABLE order_acceptance_meta ADD COLUMN {column_name} {ddl}"
+                )
+
 
 
 def create_or_update_acceptance_meta(

@@ -656,3 +656,58 @@ _mm_override_order_rule("basic_trial_1000", label="體驗單 1688w")
 
 _mm_add_custom_order_rule()
 # ===== 魔丸 runtime rule overrides end =====
+
+
+ORDER_RULE_SNAPSHOT_VERSION = 1
+
+
+def _order_rule_snapshot_safe(value):
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, dict):
+        return {
+            str(key): _order_rule_snapshot_safe(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, (list, tuple, set)):
+        return [_order_rule_snapshot_safe(item) for item in value]
+
+    return str(value)
+
+
+def build_order_rule_snapshot(
+    rule,
+    *,
+    quantity: int | None = None,
+    player_count: int | None = None,
+    required_staff_count: int | None = None,
+    allowed_role_ids: list[str] | tuple[str, ...] | set[str] | None = None,
+    specified_staff_ids: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> dict:
+    """保存建立訂單當下的規則快照，避免之後改價/改人數影響既有訂單。"""
+    from dataclasses import asdict, is_dataclass
+
+    if is_dataclass(rule):
+        raw_rule = asdict(rule)
+    else:
+        raw_rule = dict(getattr(rule, "__dict__", {}) or {})
+
+    snapshot = {
+        "version": ORDER_RULE_SNAPSHOT_VERSION,
+        "rule": _order_rule_snapshot_safe(raw_rule),
+        "resolved": {
+            "quantity": quantity,
+            "player_count": player_count,
+            "required_staff_count": required_staff_count,
+            "min_protector_count": getattr(rule, "min_protector_count", 0),
+            "allowed_role_keys": list(getattr(rule, "allowed_roles", []) or []),
+            "allowed_role_ids": [str(item) for item in (allowed_role_ids or [])],
+            "specified_staff_ids": [str(item) for item in (specified_staff_ids or [])],
+            "point_benefits_allowed": bool(getattr(rule, "point_benefits_allowed", True)),
+        },
+    }
+
+    return _order_rule_snapshot_safe(snapshot)
+

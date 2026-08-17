@@ -5209,6 +5209,7 @@ async def create_waiting_acceptance_order_from_self_service(
         ROLE_IDS,
         calculate_price,
         get_required_staff_count,
+        build_order_rule_snapshot,
         role_labels,
     )
     from shared.order_acceptance import WAITING_ACCEPTANCE, create_or_update_acceptance_meta
@@ -5235,6 +5236,48 @@ async def create_waiting_acceptance_order_from_self_service(
     price_adjustment = apply_self_service_financials_to_order_data(data, rule, price_result)
     amount = int(price_adjustment["customer_pay_amount"] or 0)
     payout_base_amount = int(price_adjustment["payout_base_amount"] or amount)
+    allowed_role_ids_for_rule = [str(ROLE_IDS[role_key]) for role_key in rule.allowed_roles]
+
+    rule_snapshot = build_order_rule_snapshot(
+        rule,
+        quantity=quantity,
+        player_count=player_count,
+        required_staff_count=required_staff_count,
+        allowed_role_ids=allowed_role_ids_for_rule,
+        specified_staff_ids=specified_staff_ids,
+    )
+    price_snapshot = {
+        "version": int(rule_snapshot.get("version", 1) or 1),
+        "order_rule_key": rule.key,
+        "rule_version": rule_version,
+        "rule_snapshot_json": rule_snapshot_json,
+        "price_snapshot_json": price_snapshot_json,
+        "quantity": quantity,
+        "player_count": player_count,
+        "required_staff_count": required_staff_count,
+        "manual_staff_amount": price_adjustment.get("manual_staff_amount"),
+        "rule_original_amount": price_adjustment.get("rule_original_amount"),
+        "original_amount": price_adjustment.get("original_amount"),
+        "manual_discount_percent": price_adjustment.get("manual_discount_percent"),
+        "manual_discount_amount": price_adjustment.get("manual_discount_amount"),
+        "payout_base_amount": price_adjustment.get("payout_base_amount"),
+        "cash_coupon_amount": price_adjustment.get("cash_coupon_amount"),
+        "point_benefit_key": price_adjustment.get("point_benefit_key"),
+        "point_benefit_name": price_adjustment.get("point_benefit_name"),
+        "point_benefit_cost": price_adjustment.get("point_benefit_cost"),
+        "point_discount_coupon_amount": price_adjustment.get("point_discount_coupon_amount"),
+        "point_waived_specify_fee": price_adjustment.get("point_waived_specify_fee"),
+        "point_free_first_hour_amount": price_adjustment.get("point_free_first_hour_amount"),
+        "point_extra_hours": price_adjustment.get("point_extra_hours"),
+        "point_extra_games": price_adjustment.get("point_extra_games"),
+        "store_absorbed_amount": price_adjustment.get("store_absorbed_amount"),
+        "customer_pay_amount": price_adjustment.get("customer_pay_amount"),
+        "service_bonus_text": price_adjustment.get("service_bonus_text"),
+        "specified_staff_ids": [str(item) for item in (specified_staff_ids or [])],
+    }
+    rule_version = int(rule_snapshot.get("version", 1) or 1)
+    rule_snapshot_json = json.dumps(rule_snapshot, ensure_ascii=False, sort_keys=True)
+    price_snapshot_json = json.dumps(price_snapshot, ensure_ascii=False, sort_keys=True)
 
     dispatch_channel = guild.get_channel(DISPATCH_CHANNEL_ID)
 
@@ -5387,6 +5430,32 @@ async def create_waiting_acceptance_order_from_self_service(
         ),
     )
 
+    try:
+        from shared.db import engine as _rule_snapshot_engine
+        from sqlalchemy import text as _rule_snapshot_sql_text
+
+        with _rule_snapshot_engine.begin() as _rule_snapshot_conn:
+            _rule_snapshot_conn.execute(
+                _rule_snapshot_sql_text("""
+                    UPDATE web_orders
+                    SET order_rule_key = :order_rule_key,
+                        rule_version = :rule_version,
+                        rule_snapshot_json = :rule_snapshot_json,
+                        price_snapshot_json = :price_snapshot_json,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :order_id
+                """),
+                {
+                    "order_id": int(web_order.id),
+                    "order_rule_key": str(rule.key),
+                    "rule_version": int(rule_version),
+                    "rule_snapshot_json": rule_snapshot_json,
+                    "price_snapshot_json": price_snapshot_json,
+                },
+            )
+    except Exception as exc:
+        print(f"[rule-snapshot] failed to persist web_order snapshot order_id={getattr(web_order, 'id', None)}: {type(exc).__name__}: {exc}")
+
     create_or_update_acceptance_meta(
         order_id=int(web_order.id),
         order_rule_key=rule.key,
@@ -5397,6 +5466,31 @@ async def create_waiting_acceptance_order_from_self_service(
         point_benefits_allowed=bool(rule.point_benefits_allowed),
         status=WAITING_ACCEPTANCE,
     )
+
+    try:
+        from shared.db import engine as _rule_snapshot_engine
+        from sqlalchemy import text as _rule_snapshot_sql_text
+
+        with _rule_snapshot_engine.begin() as _rule_snapshot_conn:
+            _rule_snapshot_conn.execute(
+                _rule_snapshot_sql_text("""
+                    UPDATE order_acceptance_meta
+                    SET rule_version = :rule_version,
+                        rule_snapshot_json = :rule_snapshot_json,
+                        price_snapshot_json = :price_snapshot_json,
+                        updated_at = :updated_at
+                    WHERE order_id = :order_id
+                """),
+                {
+                    "order_id": int(web_order.id),
+                    "rule_version": int(rule_version),
+                    "rule_snapshot_json": rule_snapshot_json,
+                    "price_snapshot_json": price_snapshot_json,
+                    "updated_at": get_taipei_now_iso(),
+                },
+            )
+    except Exception as exc:
+        print(f"[rule-snapshot] failed to persist acceptance_meta snapshot order_id={getattr(web_order, 'id', None)}: {type(exc).__name__}: {exc}")
 
     ORDER_CLAIMS[dispatch_message.id] = {
         "companion": set(),
@@ -5427,6 +5521,9 @@ async def create_waiting_acceptance_order_from_self_service(
     data["category_label"] = category_label
     data["item"] = rule.label
     data["order_rule_key"] = rule.key
+    data["rule_version"] = rule_version
+    data["rule_snapshot_json"] = rule_snapshot_json
+    data["price_snapshot_json"] = price_snapshot_json
     data["quantity"] = quantity
     data["player_count"] = player_count
     data["manual_price_missing"] = price_adjustment["manual_price_missing"]
