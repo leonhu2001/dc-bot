@@ -5232,7 +5232,7 @@ async def create_waiting_acceptance_order_from_self_service(
         specified_roles=specified_roles,
     )
 
-    required_staff_count = get_required_staff_count(rule, player_count)
+    required_staff_count = int(getattr(price_result, "required_staff_count", None) or get_required_staff_count(rule, player_count))
     price_adjustment = apply_self_service_financials_to_order_data(data, rule, price_result)
     amount = int(price_adjustment["customer_pay_amount"] or 0)
     payout_base_amount = int(price_adjustment["payout_base_amount"] or amount)
