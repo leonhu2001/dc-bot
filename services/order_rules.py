@@ -178,8 +178,6 @@ def calculate_price(
             base_amount *= players
 
     specified_roles = tuple(specified_roles or ())
-    if getattr(rule, "key", "") == "custom_custom_order" and specified_roles:
-        required_staff = max(required_staff, len(specified_roles))
     if specified_roles and not rule.allow_specify:
         raise ValueError(f"{rule.label} 不開放指定")
 
@@ -621,7 +619,11 @@ def _mm_add_custom_order_rule():
         "allow_specify": True,
         "max_specified_count": 4,
         "allowed_roles": _allowed_roles,
-        "required_staff_count": 1,
+        "required_staff_count": "player_count",
+        "price_multiply_player_count": False,
+        "max_player_count": 4,
+        "min_player_count": 1,
+        "player_count_enabled": True,
         "min_protector_count": 0,
         "point_benefits_allowed": False,
         "base_amount": 0,

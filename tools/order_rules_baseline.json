@@ -812,7 +812,7 @@
       "key": "custom_custom_order",
       "label": "自訂單",
       "max_quantity": 24,
-      "max_specified_count": 24,
+      "max_specified_count": 4,
       "min_protector_count": 0,
       "min_quantity": 1,
       "point_benefits_allowed": false,
@@ -827,7 +827,7 @@
         "total_amount": 0
       },
       "price_type": "manual",
-      "required_staff_count": "1",
+      "required_staff_count": "player_count",
       "resolved_required_staff_count_at_player_1": 1,
       "unit_label": "單"
     },

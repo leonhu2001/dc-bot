@@ -6992,6 +6992,7 @@ class SelfServiceOrderView(discord.ui.View):
         await interaction.response.defer(ephemeral=True)
 
         max_specified_count = int(rule.max_specified_count or required_staff_count or 1)
+        max_specified_count = min(max_specified_count, int(required_staff_count or 1))
         entries = get_specified_staff_entries_for_rule(interaction.guild, rule)
 
         if not entries:
