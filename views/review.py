@@ -13,12 +13,20 @@ from core.permissions import is_customer_staff
 
 
 _REVIEW_CHANNEL_ID: int | None = None
+_REORDER_TICKET_CREATOR = None
 
 
 def configure_review_views(*, review_channel_id: int) -> None:
     global _REVIEW_CHANNEL_ID
     _REVIEW_CHANNEL_ID = review_channel_id
     ensure_review_tables()
+
+
+def configure_reorder_ticket_creator(callback) -> None:
+    global _REORDER_TICKET_CREATOR
+    _REORDER_TICKET_CREATOR = callback
+
+
 
 
 def get_review_channel_id() -> int:
@@ -1106,49 +1114,120 @@ class ReviewButtonView(discord.ui.View):
         row=1,
     )
     async def reorder(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # reorder_v2_direct_self_service
         if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有這張票口的老闆可以送出再約需求。", ephemeral=True)
+            await interaction.response.send_message(
+                "只有這張票口的老闆可以使用再約。",
+                ephemeral=True,
+            )
             return
 
         channel = interaction.channel
+
         if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            await interaction.response.send_message(
+                "無法確認目前票口頻道。",
+                ephemeral=True,
+            )
             return
 
-        order, targets = get_review_targets(channel.id)
-        summary = build_reorder_summary(order, targets, self.order_content)
-
-        embed = discord.Embed(
-            title="🔁 老闆想再約",
-            description=(
-                f"{interaction.user.mention} 想依照這張已結單內容再約一次。\n\n"
-                "請客服確認時間、價格、指定成員是否可接，再重新開單。"
-            ),
-            color=discord.Color.blue(),
-            timestamp=datetime.now(),
-        )
-        embed.add_field(
-            name="再約參考資料",
-            value=summary[:1024],
-            inline=False,
+        order, targets = get_review_targets(
+            channel.id
         )
 
-        if targets:
-            embed.add_field(
-                name="指定建議",
-                value="、".join(_target_label(target) for target in targets)[:1024],
-                inline=False,
+        if order is None:
+            await interaction.response.send_message(
+                "找不到這張已結單訂單的網站資料，暫時無法自動建立再約單。",
+                ephemeral=True,
+            )
+            return
+
+        creator = _REORDER_TICKET_CREATOR
+
+        if creator is None:
+            await interaction.response.send_message(
+                "再約系統尚未完成初始化，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(
+            ephemeral=True,
+            thinking=True,
+        )
+
+        try:
+            result = await creator(
+                interaction=interaction,
+                order=order,
+                targets=targets,
+                order_content=self.order_content,
+            )
+        except Exception as exc:
+            print(
+                f"[reorder] create ticket failed "
+                f"customer_id={self.customer_id} "
+                f"ticket_channel_id={channel.id}: "
+                f"{type(exc).__name__}: {exc}"
             )
 
-        await channel.send(
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            await interaction.followup.send(
+                "建立再約票口失敗，請通知客服確認機器人紀錄。",
+                ephemeral=True,
+            )
+            return
+
+        if not isinstance(result, dict):
+            await interaction.followup.send(
+                "再約系統回傳資料異常，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        new_channel = result.get("channel")
+
+        if not isinstance(
+            new_channel,
+            discord.TextChannel,
+        ):
+            await interaction.followup.send(
+                "沒有成功建立再約票口，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        created = bool(
+            result.get("created", True)
         )
 
-        await interaction.response.send_message(
-            "已送出再約需求，客服會協助確認是否可接與重新開單。",
+        warning = str(
+            result.get("warning")
+            or ""
+        ).strip()
+
+        if created:
+            text = (
+                f"已建立再約票口：{new_channel.mention}\n"
+                "系統已先帶入上一張單的內容，你可以直接進去修改。\n"
+                "確認完成後由客服按「客服確認送出」。"
+            )
+        else:
+            text = (
+                f"你已經有一張這筆訂單的再約草稿：{new_channel.mention}\n"
+                "直接進去修改即可，不會重複建立票口。"
+            )
+
+        if warning:
+            text += (
+                "\n\n提醒："
+                + warning
+            )
+
+        await interaction.followup.send(
+            text,
             ephemeral=True,
         )
+
 
     @discord.ui.button(
         label="關閉票口",
