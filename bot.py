@@ -2787,9 +2787,142 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         customer_id = _to_int(order.customer_discord_id)
         category_label = str(order.category or "未紀錄")
         item = str(order.item or "未紀錄")
-        quantity = _to_int(order.quantity, 1) or 1
-        amount = _to_int(order.amount, 0) or 0
-        payment_method = str(order.payment_method or "待付款")
+        quantity = _to_int(
+            order.quantity,
+            1,
+        ) or 1
+
+        amount = _to_int(
+            getattr(
+                order,
+                "customer_pay_amount",
+                None,
+            ),
+            None,
+        )
+
+        if amount is None:
+            amount = _to_int(
+                order.amount,
+                0,
+            ) or 0
+
+        payment_method = str(
+            order.payment_method
+            or "待付款"
+        )
+
+        web_price_data = _price_snapshot(
+            getattr(
+                order,
+                "price_snapshot_json",
+                None,
+            )
+        )
+
+        web_price_data.setdefault(
+            "original_amount",
+            _to_int(
+                getattr(
+                    order,
+                    "original_amount",
+                    None,
+                ),
+                0,
+            )
+            or 0,
+        )
+
+        web_price_data.setdefault(
+            "service_original_amount",
+            web_price_data.get(
+                "original_amount",
+                0,
+            ),
+        )
+
+        web_price_data.setdefault(
+            "manual_discount_amount",
+            _to_int(
+                getattr(
+                    order,
+                    "manual_discount_amount",
+                    None,
+                ),
+                0,
+            )
+            or 0,
+        )
+
+        web_price_data.setdefault(
+            "cash_coupon_amount",
+            _to_int(
+                getattr(
+                    order,
+                    "cash_coupon_amount",
+                    None,
+                ),
+                0,
+            )
+            or 0,
+        )
+
+        web_price_data.setdefault(
+            "fixed_discount_amount",
+            web_price_data.get(
+                "cash_coupon_amount",
+                0,
+            ),
+        )
+
+        web_price_data.setdefault(
+            "payout_base_amount",
+            _to_int(
+                getattr(
+                    order,
+                    "payout_base_amount",
+                    None,
+                ),
+                amount,
+            )
+            or 0,
+        )
+
+        web_price_data.setdefault(
+            "customer_pay_amount",
+            amount,
+        )
+
+        absorbed = _to_int(
+            getattr(
+                order,
+                "store_absorbed_amount",
+                None,
+            ),
+            0,
+        ) or 0
+
+        web_price_data.setdefault(
+            "point_discount_coupon_amount",
+            max(
+                0,
+                absorbed
+                - _price_int(
+                    web_price_data,
+                    "cash_coupon_amount",
+                    default=0,
+                ),
+            ),
+        )
+
+        web_order_note = str(
+            getattr(
+                order,
+                "note",
+                None,
+            )
+            or ""
+        ).strip()
     finally:
         db.close()
 
@@ -2841,6 +2974,14 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
     data["amount"] = amount
     data["total_amount"] = amount
     data["amount_text"] = _format_plain_amount(amount) if "_format_plain_amount" in globals() else str(amount)
+
+    for key, value in web_price_data.items():
+        if value is not None:
+            data[key] = value
+
+    if web_order_note:
+        data["web_order_note"] = web_order_note
+
     data["dispatch_message_id"] = dispatch_message_id
     data["dispatch_channel_id"] = dispatch_channel_id
     data["web_order_id"] = int(order_id)
@@ -2860,8 +3001,16 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         receiver_text=receiver_text,
     )
 
-    dispatch_embed.add_field(name="訂單總價", value=_format_plain_amount(amount) if "_format_plain_amount" in globals() else str(amount), inline=True)
-    dispatch_embed.add_field(name="接單進度", value=f"{state.accepted_count}/{state.required_staff_count}", inline=True)
+    add_self_service_financial_breakdown_fields(
+        dispatch_embed,
+        web_price_data,
+    )
+
+    dispatch_embed.add_field(
+        name="接單進度",
+        value=f"{state.accepted_count}/{state.required_staff_count}",
+        inline=True,
+    )
 
     if int(getattr(state, "min_protector_count", 0) or 0) > 0:
         dispatch_embed.add_field(
@@ -3734,47 +3883,11 @@ async def finalize_accepted_pending_payment(
                     receiver_text=receiver_text,
                     staff_note=staff_note,
                 )
-                payout_base_amount = _to_int(data.get("payout_base_amount"), amount) or amount
-                dispatch_embed.add_field(name="顧客實付", value=_format_plain_amount(amount) if "_format_plain_amount" in globals() else format_t_amount(amount), inline=True)
-                dispatch_embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout_base_amount) if "_format_plain_amount" in globals() else format_t_amount(payout_base_amount), inline=True)
-
-                coupon_amount = _to_int(data.get("cash_coupon_amount"), 0) or 0
-                if coupon_amount > 0:
-                    dispatch_embed.add_field(
-                        name="折現券",
-                        value=f"-{_format_plain_amount(coupon_amount) if '_format_plain_amount' in globals() else format_t_amount(coupon_amount)}｜店內吸收，不扣打手分潤",
-                        inline=False,
-                    )
-
-                discount_amount = _to_int(data.get("manual_discount_amount"), 0) or 0
-                if discount_amount > 0:
-                    dispatch_embed.add_field(
-                        name="客服折扣",
-                        value=f"{_format_percent_value(data.get('manual_discount_percent'))}%｜-{_format_plain_amount(discount_amount) if '_format_plain_amount' in globals() else format_t_amount(discount_amount)}",
-                        inline=False,
-                    )
-
-                paid_point_benefit_name = str(data.get("point_benefit_name") or "")
-                if paid_point_benefit_name:
-                    point_value = f"{_to_int(data.get('point_benefit_cost'), 0) or 0} 點｜{paid_point_benefit_name}"
-
-                    service_bonus_text = str(data.get("service_bonus_text") or "").strip()
-                    if service_bonus_text:
-                        point_value += f"\n{service_bonus_text}"
-
-                    if data.get("point_benefit_redeemed"):
-                        point_value += (
-                            f"\n已扣點："
-                            f"{_to_int(data.get('point_benefit_before_points'), 0) or 0}"
-                            f" → "
-                            f"{_to_int(data.get('point_benefit_after_points'), 0) or 0}"
-                        )
-
-                    dispatch_embed.add_field(
-                        name="點數福利",
-                        value=point_value,
-                        inline=False,
-                    )
+                add_self_service_financial_breakdown_fields(
+                    dispatch_embed,
+                    data,
+                    final_label="顧客實付",
+                )
 
                 dispatch_embed.add_field(name="付款狀態", value="已付款，接單人員已確認", inline=False)
 
@@ -5218,6 +5331,363 @@ class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
         )
 
 
+
+def _price_int(
+    src: dict,
+    *keys,
+    default=0,
+):
+    for key in keys:
+        value = src.get(key)
+
+        if (
+            value is None
+            or str(value).strip() == ""
+        ):
+            continue
+
+        value = _to_int(
+            value,
+            None,
+        )
+
+        if value is not None:
+            return int(value)
+
+    return int(default)
+
+
+def _price_rate(
+    src: dict,
+) -> float:
+    try:
+        value = float(
+            src.get(
+                "discount_rate_percent",
+                src.get(
+                    "manual_discount_percent",
+                    100,
+                ),
+            )
+        )
+    except (TypeError, ValueError):
+        value = 100.0
+
+    value = max(
+        0.0,
+        min(
+            100.0,
+            value,
+        ),
+    )
+
+    mode = str(
+        src.get(
+            "manual_discount_mode"
+        )
+        or ""
+    ).strip().lower()
+
+    if (
+        mode == "pay_rate"
+        or _price_int(
+            src,
+            "price_formula_version",
+            default=0,
+        )
+        >= 2
+    ):
+        return value
+
+    return 100.0 - value
+
+
+def _price_snapshot(
+    value,
+) -> dict:
+    if isinstance(
+        value,
+        dict,
+    ):
+        return dict(value)
+
+    try:
+        parsed = json.loads(
+            str(
+                value
+                or ""
+            )
+        )
+    except Exception:
+        return {}
+
+    return (
+        parsed
+        if isinstance(
+            parsed,
+            dict,
+        )
+        else {}
+    )
+
+
+def add_self_service_financial_breakdown_fields(
+    embed: discord.Embed,
+    src: dict,
+    final_label="顧客應付",
+):
+    src = dict(
+        src
+        or {}
+    )
+
+    original = max(
+        0,
+        _price_int(
+            src,
+            "service_original_amount",
+            "original_amount",
+            default=0,
+        ),
+    )
+
+    percent_off = max(
+        0,
+        _price_int(
+            src,
+            "percent_discount_amount",
+            "manual_discount_amount",
+            default=0,
+        ),
+    )
+
+    fixed = max(
+        0,
+        _price_int(
+            src,
+            "fixed_discount_amount",
+            "cash_coupon_amount",
+            default=0,
+        ),
+    )
+
+    point_cash = max(
+        0,
+        _price_int(
+            src,
+            "point_discount_coupon_amount",
+            default=0,
+        ),
+    )
+
+    specify_before = max(
+        0,
+        _price_int(
+            src,
+            "specified_fee_before_waiver",
+            default=0,
+        ),
+    )
+
+    point_specify = max(
+        0,
+        _price_int(
+            src,
+            "point_waived_specify_fee",
+            default=0,
+        ),
+    )
+
+    specify_effective = src.get(
+        "effective_specify_fee"
+    )
+
+    if specify_effective is None:
+        specify_effective = max(
+            0,
+            specify_before
+            - point_specify,
+        )
+    else:
+        specify_effective = max(
+            0,
+            _to_int(
+                specify_effective,
+                0,
+            )
+            or 0,
+        )
+
+    final = max(
+        0,
+        _price_int(
+            src,
+            "customer_pay_amount",
+            "amount",
+            "total_amount",
+            default=0,
+        ),
+    )
+
+    payout = max(
+        0,
+        _price_int(
+            src,
+            "payout_base_amount",
+            default=0,
+        ),
+    )
+
+    rate = _price_rate(
+        src
+    )
+
+    embed.add_field(
+        name="商品原價",
+        value=_format_plain_amount(
+            original
+        ),
+        inline=True,
+    )
+
+    if (
+        rate < 100
+        or percent_off
+    ):
+        embed.add_field(
+            name="百分比折扣",
+            value=(
+                "折後 "
+                f"{_format_percent_value(rate)}%"
+                "\n"
+                f"-{_format_plain_amount(percent_off)}"
+            ),
+            inline=True,
+        )
+
+    if fixed:
+        reason = str(
+            src.get(
+                "cash_coupon_reason"
+            )
+            or ""
+        ).strip()
+
+        text = (
+            f"-{_format_plain_amount(fixed)}"
+        )
+
+        if reason:
+            text += (
+                f"\n{reason}"
+            )
+
+        text += (
+            "\n店內吸收，不扣打手分潤"
+        )
+
+        embed.add_field(
+            name="固定折扣",
+            value=text,
+            inline=True,
+        )
+
+    if point_cash:
+        embed.add_field(
+            name="點數折價",
+            value=(
+                f"-{_format_plain_amount(point_cash)}"
+                "\n店內吸收，不扣打手分潤"
+            ),
+            inline=True,
+        )
+
+    if specify_before:
+        if specify_effective == 0:
+            text = (
+                f"原 {_format_plain_amount(specify_before)}"
+                "\n已免除"
+            )
+
+        else:
+            text = (
+                "+"
+                f"{_format_plain_amount(specify_effective)}"
+            )
+
+        embed.add_field(
+            name="指定費",
+            value=text,
+            inline=True,
+        )
+
+    embed.add_field(
+        name=final_label,
+        value=_format_plain_amount(
+            final
+        ),
+        inline=True,
+    )
+
+    embed.add_field(
+        name="打手分潤基準",
+        value=_format_plain_amount(
+            payout
+        ),
+        inline=True,
+    )
+
+    benefit_name = str(
+        src.get(
+            "point_benefit_name"
+        )
+        or ""
+    ).strip()
+
+    bonus = str(
+        src.get(
+            "service_bonus_text"
+        )
+        or ""
+    ).strip()
+
+    if benefit_name:
+        lines = [
+            (
+                f"{_price_int(src, 'point_benefit_cost', default=0)} "
+                f"點｜{benefit_name}"
+            )
+        ]
+
+        if point_cash:
+            lines.append(
+                "已直接折抵價格："
+                f"-{_format_plain_amount(point_cash)}"
+            )
+
+        if bonus:
+            lines.append(
+                f"訂單備註：{bonus}"
+            )
+
+        embed.add_field(
+            name="點數福利",
+            value="\n".join(
+                lines
+            ),
+            inline=False,
+        )
+
+    elif bonus:
+        embed.add_field(
+            name="訂單福利備註",
+            value=bonus,
+            inline=False,
+        )
+
+    return embed
+
+
 async def create_waiting_acceptance_order_from_self_service(
     interaction: discord.Interaction,
     *,
@@ -5298,6 +5768,16 @@ async def create_waiting_acceptance_order_from_self_service(
 
     price_snapshot = {
         "version": rule_version,
+        "price_formula_version": price_adjustment.get("price_formula_version", 2),
+        "manual_discount_mode": price_adjustment.get("manual_discount_mode", "pay_rate"),
+        "service_original_amount": price_adjustment.get("service_original_amount"),
+        "discount_rate_percent": price_adjustment.get("discount_rate_percent"),
+        "percent_discount_amount": price_adjustment.get("percent_discount_amount"),
+        "fixed_discount_amount": price_adjustment.get("fixed_discount_amount"),
+        "manual_discount_reason": price_adjustment.get("manual_discount_reason"),
+        "cash_coupon_reason": price_adjustment.get("cash_coupon_reason"),
+        "specified_fee_before_waiver": price_adjustment.get("specified_fee_before_waiver"),
+        "effective_specify_fee": price_adjustment.get("effective_specify_fee"),
         "order_rule_key": rule.key,
         "rule_version": rule_version,
         "quantity": quantity,
@@ -5372,58 +5852,38 @@ async def create_waiting_acceptance_order_from_self_service(
             inline=False,
         )
 
-    embed.add_field(name="顧客應付", value=_format_plain_amount(amount), inline=True)
-    embed.add_field(name="打手分潤基準", value=_format_plain_amount(payout_base_amount), inline=True)
-    embed.add_field(name="接單需求", value=f"{required_staff_count} 位", inline=True)
-    embed.add_field(name="可接職位", value=role_labels(rule.allowed_roles), inline=False)
+    add_self_service_financial_breakdown_fields(
+        embed,
+        price_adjustment,
+    )
 
-    if price_adjustment["manual_discount_amount"] > 0:
-        embed.add_field(
-            name="客服折扣",
-            value=(
-                f"{_format_percent_value(price_adjustment['manual_discount_percent'])}%"
-                f"｜-{_format_plain_amount(price_adjustment['manual_discount_amount'])}\n"
-                f"原因：{price_adjustment['manual_discount_reason'] or '未填'}"
-            ),
-            inline=True,
-        )
+    embed.add_field(
+        name="接單需求",
+        value=f"{required_staff_count} 位",
+        inline=True,
+    )
 
-    if price_adjustment["cash_coupon_amount"] > 0:
-        embed.add_field(
-            name="折現券",
-            value=(
-                f"-{_format_plain_amount(price_adjustment['cash_coupon_amount'])}\n"
-                f"原因：{price_adjustment['cash_coupon_reason'] or '未填'}\n"
-                "店內吸收，不扣打手分潤"
-            ),
-            inline=True,
-        )
-
-    if price_adjustment.get("point_benefit_name"):
-        point_value = f"{price_adjustment['point_benefit_cost']} 點｜{price_adjustment['point_benefit_name']}"
-        if price_adjustment.get("service_bonus_text"):
-            point_value += f"\n{price_adjustment['service_bonus_text']}"
-        if price_adjustment.get("point_waived_specify_fee", 0) > 0:
-            point_value += "\n免指定費不列入顧客金額，也不列入打手分潤"
-        if price_adjustment.get("point_discount_coupon_amount", 0) > 0:
-            point_value += "\n點數折價由店內吸收，不扣打手分潤"
-        embed.add_field(
-            name="點數福利",
-            value=point_value,
-            inline=False,
-        )
-
+    embed.add_field(
+        name="可接職位",
+        value=role_labels(rule.allowed_roles),
+        inline=False,
+    )
 
     if rule.player_count_enabled:
-        embed.add_field(name="陪玩人數", value=f"{player_count} 位", inline=True)
+        embed.add_field(
+            name="陪玩人數",
+            value=f"{player_count} 位",
+            inline=True,
+        )
 
     if specified_mentions:
-        embed.add_field(name="指定人員", value="、".join(specified_mentions), inline=False)
-
-    if price_result.free_specify_fee:
-        embed.add_field(name="指定費", value="已達兩單以上，免指定費", inline=True)
-    elif price_result.specify_fee:
-        embed.add_field(name="指定費", value=_format_plain_amount(price_result.specify_fee), inline=True)
+        embed.add_field(
+            name="指定人員",
+            value="、".join(
+                specified_mentions
+            ),
+            inline=False,
+        )
 
     if not rule.point_benefits_allowed:
         embed.add_field(name="點數福利", value="此分類不可使用點數福利", inline=False)
@@ -5442,6 +5902,29 @@ async def create_waiting_acceptance_order_from_self_service(
             status=WAITING_ACCEPTANCE,
         ),
         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+    web_note_parts = []
+
+    if staff_order_note:
+        web_note_parts.append(
+            f"客服備註：{staff_order_note}"
+        )
+
+    if price_adjustment.get(
+        "service_bonus_text"
+    ):
+        web_note_parts.append(
+            "點數福利："
+            f"{price_adjustment['service_bonus_text']}"
+        )
+
+    web_order_note = (
+        "｜".join(
+            web_note_parts
+        )
+        if web_note_parts
+        else None
     )
 
     web_order = upsert_web_order_from_dispatch(
@@ -5465,23 +5948,7 @@ async def create_waiting_acceptance_order_from_self_service(
         customer_service_discord_id=getattr(interaction.user, "id", None) if isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user) else None,
         customer_service_display_name=getattr(interaction.user, "display_name", None) if isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user) else None,
         bot_order_no=data.get("order_no") or data.get("receipt_id"),
-        note=(
-            data.get("staff_note")
-            or data.get("customer_service_note")
-            or (
-                f"原價={price_adjustment['original_amount']}; "
-                f"客服折扣={_format_percent_value(price_adjustment['manual_discount_percent'])}%; "
-                f"折扣金額={price_adjustment['manual_discount_amount']}; "
-                f"分潤基準={price_adjustment['payout_base_amount']}; "
-                f"折現券={price_adjustment['cash_coupon_amount']}; "
-                f"點數福利={price_adjustment.get('point_benefit_name') or '無'}; "
-                f"點數折價={price_adjustment.get('point_discount_coupon_amount') or 0}; "
-                f"點數免指定費={price_adjustment.get('point_waived_specify_fee') or 0}; "
-                f"首小時免費={price_adjustment.get('point_free_first_hour_amount') or 0}; "
-                f"服務加成={price_adjustment.get('service_bonus_text') or '無'}; "
-                f"顧客應付={price_adjustment['customer_pay_amount']}"
-            )
-        ),
+        note=web_order_note,
     )
 
     try:
@@ -5659,17 +6126,21 @@ def _parse_discount_percent_text(value: str | None) -> float:
     raw = str(value or "").strip().replace("%", "")
 
     if not raw:
-        return 0.0
+        return 100.0
 
     try:
-        percent = float(raw)
+        value = float(raw)
     except ValueError as exc:
-        raise ValueError("折扣百分比請輸入數字，例如 10 代表 9 折。") from exc
+        raise ValueError(
+            "折後比例請輸入數字，例如 90 代表 9 折。"
+        ) from exc
 
-    if percent < 0 or percent > 100:
-        raise ValueError("折扣百分比只能輸入 0～100。")
+    if value < 0 or value > 100:
+        raise ValueError(
+            "折後比例只能輸入 0～100。"
+        )
 
-    return percent
+    return value
 
 
 def _parse_cash_amount_text(value: str | None) -> int:
@@ -5681,41 +6152,147 @@ def _parse_cash_amount_text(value: str | None) -> int:
     try:
         amount = int(float(raw))
     except ValueError as exc:
-        raise ValueError("折現券金額請輸入數字，例如 100。") from exc
+        raise ValueError(
+            "固定折扣金額請輸入數字，例如 100。"
+        ) from exc
 
     if amount < 0:
-        raise ValueError("折現券金額不能小於 0。")
+        raise ValueError(
+            "固定折扣金額不能小於 0。"
+        )
 
     return amount
 
 
-def calculate_manual_price_adjustment(base_amount: int, data: dict) -> dict:
-    original_amount = max(0, int(base_amount or 0))
+PRICE_FORMULA_VERSION = 2
+
+
+def _resolve_manual_discount_rate_percent(data: dict) -> float:
+    raw = data.get("manual_discount_percent")
+
+    if raw is None or str(raw).strip() == "":
+        return 100.0
 
     try:
-        discount_percent = float(data.get("manual_discount_percent") or 0)
+        value = float(raw)
     except (TypeError, ValueError):
-        discount_percent = 0.0
+        value = 0.0
 
-    discount_percent = max(0.0, min(100.0, discount_percent))
-    discount_amount = int(round(original_amount * discount_percent / 100))
-    payout_base_amount = max(0, original_amount - discount_amount)
+    value = max(
+        0.0,
+        min(100.0, value),
+    )
 
-    coupon_amount = _to_int(data.get("cash_coupon_amount"), 0) or 0
-    coupon_amount = max(0, min(int(coupon_amount), payout_base_amount))
+    if (
+        str(
+            data.get("manual_discount_mode")
+            or ""
+        ).strip().lower()
+        == "pay_rate"
+    ):
+        return value
 
-    customer_pay_amount = max(0, payout_base_amount - coupon_amount)
+    # legacy：
+    # 舊資料 10 = 折掉 10%
+    # 新制等同折後 90%
+    return 100.0 - value
+
+
+def calculate_manual_price_adjustment(
+    base_amount: int,
+    data: dict,
+) -> dict:
+    original = max(
+        0,
+        int(base_amount or 0),
+    )
+
+    rate = (
+        _resolve_manual_discount_rate_percent(
+            data
+        )
+    )
+
+    after_percent = max(
+        0,
+        min(
+            original,
+            int(
+                round(
+                    original
+                    * rate
+                    / 100
+                )
+            ),
+        ),
+    )
+
+    percent_off = (
+        original
+        - after_percent
+    )
+
+    raw_fixed = data.get(
+        "fixed_discount_amount"
+    )
+
+    if raw_fixed is None:
+        raw_fixed = data.get(
+            "cash_coupon_amount"
+        )
+
+    fixed = max(
+        0,
+        min(
+            after_percent,
+            _to_int(
+                raw_fixed,
+                0,
+            )
+            or 0,
+        ),
+    )
 
     return {
-        "original_amount": original_amount,
-        "manual_discount_percent": discount_percent,
-        "manual_discount_amount": discount_amount,
-        "payout_base_amount": payout_base_amount,
-        "cash_coupon_amount": coupon_amount,
-        "store_absorbed_amount": coupon_amount,
-        "customer_pay_amount": customer_pay_amount,
-        "manual_discount_reason": str(data.get("manual_discount_reason") or "").strip(),
-        "cash_coupon_reason": str(data.get("cash_coupon_reason") or "").strip(),
+        "price_formula_version": 2,
+        "manual_discount_mode": "pay_rate",
+
+        "service_original_amount": original,
+        "original_amount": original,
+
+        "manual_discount_percent": rate,
+        "discount_rate_percent": rate,
+
+        "manual_discount_amount": percent_off,
+        "percent_discount_amount": percent_off,
+
+        "payout_base_amount": after_percent,
+
+        # 舊 DB 欄位仍保留相容，
+        # 但畫面統一叫固定折扣。
+        "cash_coupon_amount": fixed,
+        "fixed_discount_amount": fixed,
+
+        "store_absorbed_amount": fixed,
+
+        "customer_pay_amount": max(
+            0,
+            after_percent - fixed,
+        ),
+
+        "manual_discount_reason": str(
+            data.get(
+                "manual_discount_reason"
+            )
+            or ""
+        ).strip(),
+
+        "cash_coupon_reason": str(
+            data.get(
+                "cash_coupon_reason"
+            )
+            or ""
+        ).strip(),
     }
 
 
@@ -5793,7 +6370,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
             (
                 "客服待填價格"
                 if adjustment.get("manual_price_missing")
-                else f"原價 {_format_plain_amount(adjustment['rule_original_amount'])}"
+                else f"商品原價 {_format_plain_amount(adjustment['service_original_amount'])}"
             ),
         ]
 
@@ -5812,7 +6389,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
         if adjustment["manual_discount_amount"] > 0:
             reason = adjustment["manual_discount_reason"] or "未填原因"
             detail_parts.append(
-                f"客服折扣 {_format_percent_value(adjustment['manual_discount_percent'])}%"
+                f"百分比折扣｜折後 {_format_percent_value(adjustment['manual_discount_percent'])}%"
                 f" -{_format_plain_amount(adjustment['manual_discount_amount'])}"
                 f"（{reason}）"
             )
@@ -5828,7 +6405,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
         if adjustment["cash_coupon_amount"] > 0:
             reason = adjustment["cash_coupon_reason"] or "未填原因"
             detail_parts.append(
-                f"折現券 -{_format_plain_amount(adjustment['cash_coupon_amount'])}"
+                f"固定折扣 -{_format_plain_amount(adjustment['cash_coupon_amount'])}"
                 f"（{reason}，店內吸收）"
             )
 
@@ -6278,8 +6855,18 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
     if kind == "free_specify_fee":
         if not getattr(rule, "allow_specify", False):
             return False, "此項目不開放指定，因此不能使用免指定費。"
+
         if not data.get("specified_staff_ids"):
             return False, "請先指定人員，再使用免指定費。"
+
+        if str(getattr(rule, "pricing_type", "") or "") == "hourly":
+            quantity = _to_int(
+                data.get("quantity"),
+                1,
+            ) or 1
+
+            if quantity >= 2:
+                return False, "2 小時以上本來就免指定費，不需要再花 25 點兌換。"
 
     if kind == "free_first_hour":
         if str(getattr(rule, "key", "")) not in FREE_PLAY_FIRST_HOUR_RULE_KEYS:
@@ -6318,140 +6905,447 @@ def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
     return merged
 
 
-def calculate_self_service_financials(rule, price_result, data: dict) -> dict:
-    manual_staff_amount = get_self_service_staff_price(data)
+def calculate_self_service_financials(
+    rule,
+    price_result,
+    data: dict,
+) -> dict:
+    manual_price = (
+        get_self_service_staff_price(
+            data
+        )
+    )
 
-    if is_self_service_staff_price_required(rule):
-        # 手動價是客服填的服務原價；自訂單若有指定，指定費仍由系統自動加上。
-        specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
-        rule_original_amount = max(0, int(manual_staff_amount or 0)) + specify_fee
+    specify_before = max(
+        0,
+        int(
+            getattr(
+                price_result,
+                "specify_fee",
+                0,
+            )
+            or 0
+        ),
+    )
+
+    staff_adjust = int(
+        getattr(
+            price_result,
+            "staff_adjustment_amount",
+            0,
+        )
+        or 0
+    )
+
+    if is_self_service_staff_price_required(
+        rule
+    ):
+        service_original = max(
+            0,
+            int(
+                manual_price
+                or 0
+            ),
+        )
+
     else:
-        rule_original_amount = max(0, int(getattr(price_result, "total_amount", 0) or 0))
-        specify_fee = max(0, int(getattr(price_result, "specify_fee", 0) or 0))
-
-    benefit = get_selected_order_point_benefit(data, rule)
-    benefit_key = str(benefit.get("key")) if benefit else None
-    benefit_name = str(benefit.get("name")) if benefit else ""
-    benefit_cost = int(benefit.get("cost") or 0) if benefit else 0
-    benefit_kind = str(benefit.get("kind")) if benefit else ""
-
-    point_waived_specify_fee = 0
-    point_discount_coupon_amount = 0
-    point_free_first_hour_amount = 0
-    point_extra_hours = 0.0
-    point_extra_games = 0
-
-    if benefit:
-        if benefit_kind == "free_specify_fee":
-            point_waived_specify_fee = specify_fee
-
-        elif benefit_kind == "cash_discount":
-            point_discount_coupon_amount = max(0, int(benefit.get("amount") or 0))
-
-        elif benefit_kind == "free_first_hour":
-            try:
-                from services.order_rules import calculate_price
-                player_count = _to_int(data.get("player_count"), 1) or 1
-                first_hour_price = calculate_price(
-                    rule,
-                    quantity=1,
-                    player_count=player_count,
-                    specified_roles=[],
+        service_original = max(
+            0,
+            int(
+                getattr(
+                    price_result,
+                    "base_amount",
+                    0,
                 )
-                point_free_first_hour_amount = max(0, int(getattr(first_hour_price, "base_amount", 0) or 0))
-            except Exception:
-                quantity = _to_int(data.get("quantity"), 1) or 1
-                quantity = max(1, int(quantity))
-                point_free_first_hour_amount = max(0, int(getattr(price_result, "base_amount", 0) or 0) // quantity)
+                or 0
+            )
+            + staff_adjust,
+        )
 
-        elif benefit_kind == "free_first_hour":
-            try:
-                from services.order_rules import calculate_price
-                player_count = _to_int(data.get("player_count"), 1) or 1
-                first_hour_price = calculate_price(
-                    rule,
-                    quantity=1,
-                    player_count=player_count,
-                    specified_roles=[],
+    benefit = (
+        get_selected_order_point_benefit(
+            data,
+            rule,
+        )
+    )
+
+    bkey = (
+        str(
+            benefit.get("key")
+        )
+        if benefit
+        else None
+    )
+
+    bname = (
+        str(
+            benefit.get("name")
+        )
+        if benefit
+        else ""
+    )
+
+    bcost = (
+        int(
+            benefit.get("cost")
+            or 0
+        )
+        if benefit
+        else 0
+    )
+
+    bkind = (
+        str(
+            benefit.get("kind")
+            or ""
+        )
+        if benefit
+        else ""
+    )
+
+    point_specify = 0
+    point_cash = 0
+
+    legacy_free_hour = 0
+
+    extra_hours = 0.0
+    extra_games = 0
+
+    if bkind == "free_specify_fee":
+        point_specify = (
+            specify_before
+        )
+
+    elif bkind == "cash_discount":
+        point_cash = max(
+            0,
+            int(
+                benefit.get(
+                    "amount"
                 )
-                point_free_first_hour_amount = max(0, int(getattr(first_hour_price, "base_amount", 0) or 0))
-            except Exception:
-                quantity = _to_int(data.get("quantity"), 1) or 1
-                quantity = max(1, int(quantity))
-                point_free_first_hour_amount = max(0, int(getattr(price_result, "base_amount", 0) or 0) // quantity)
+                or 0
+            ),
+        )
 
-        elif benefit_kind == "extra_hours":
-            point_extra_hours = max(0.0, float(benefit.get("hours") or 0))
+    elif bkind == "extra_hours":
+        extra_hours = max(
+            0.0,
+            float(
+                benefit.get(
+                    "hours"
+                )
+                or 0
+            ),
+        )
 
-        elif benefit_kind == "extra_game":
-            point_extra_games = max(0, int(benefit.get("games") or 0))
+    elif bkind == "extra_game":
+        extra_games = max(
+            0,
+            int(
+                benefit.get(
+                    "games"
+                )
+                or 0
+            ),
+        )
 
-    point_free_first_hour_amount = min(point_free_first_hour_amount, max(0, rule_original_amount - point_waived_specify_fee))
-    priced_amount = max(0, rule_original_amount - point_waived_specify_fee - point_free_first_hour_amount)
+    elif bkind == "free_first_hour":
+        # 80 點已從新清單下架。
+        # 只相容舊未結單。
+        try:
+            from services.order_rules import (
+                calculate_price
+            )
 
-    try:
-        discount_percent = float(data.get("manual_discount_percent") or 0)
-    except (TypeError, ValueError):
-        discount_percent = 0.0
+            pc = (
+                _to_int(
+                    data.get(
+                        "player_count"
+                    ),
+                    1,
+                )
+                or 1
+            )
 
-    discount_percent = max(0.0, min(100.0, discount_percent))
-    manual_discount_amount = int(round(priced_amount * discount_percent / 100))
-    payout_base_amount = max(0, priced_amount - manual_discount_amount)
+            first = calculate_price(
+                rule,
+                quantity=1,
+                player_count=pc,
+                specified_roles=[],
+            )
 
-    point_discount_coupon_amount = min(point_discount_coupon_amount, payout_base_amount)
+            legacy_free_hour = max(
+                0,
+                int(
+                    getattr(
+                        first,
+                        "base_amount",
+                        0,
+                    )
+                    or 0
+                ),
+            )
 
-    raw_cash_coupon = _to_int(data.get("cash_coupon_amount"), 0) or 0
-    raw_cash_coupon = max(0, int(raw_cash_coupon))
-    cash_coupon_amount = min(raw_cash_coupon, max(0, payout_base_amount - point_discount_coupon_amount))
+        except Exception:
+            qty = max(
+                1,
+                _to_int(
+                    data.get(
+                        "quantity"
+                    ),
+                    1,
+                )
+                or 1,
+            )
 
-    store_absorbed_amount = point_discount_coupon_amount + cash_coupon_amount
-    customer_pay_amount = max(0, payout_base_amount - store_absorbed_amount)
+            legacy_free_hour = max(
+                0,
+                int(
+                    getattr(
+                        price_result,
+                        "base_amount",
+                        0,
+                    )
+                    or 0
+                )
+                // qty,
+            )
 
-    service_bonus_parts = []
+    point_specify = min(
+        point_specify,
+        specify_before,
+    )
 
-    if point_free_first_hour_amount > 0:
-        service_bonus_parts.append(f"首小時免費 -{_format_plain_amount(point_free_first_hour_amount)}")
+    specify_effective = max(
+        0,
+        specify_before
+        - point_specify,
+    )
 
-    if point_free_first_hour_amount > 0:
-        service_bonus_parts.append(f"首小時免費 -{_format_plain_amount(point_free_first_hour_amount)}")
+    legacy_free_hour = min(
+        legacy_free_hour,
+        service_original,
+    )
 
-    if point_extra_hours > 0:
-        service_bonus_parts.append(f"服務時間 +{_format_point_hours(point_extra_hours)}")
+    discountable = max(
+        0,
+        service_original
+        - legacy_free_hour,
+    )
 
-    if point_extra_games > 0:
-        service_bonus_parts.append(f"加場 {point_extra_games} 場保撤")
+    rate = (
+        _resolve_manual_discount_rate_percent(
+            data
+        )
+    )
 
-    if point_waived_specify_fee > 0:
-        service_bonus_parts.append(f"免指定費 -{_format_plain_amount(point_waived_specify_fee)}")
+    after_percent = max(
+        0,
+        min(
+            discountable,
+            int(
+                round(
+                    discountable
+                    * rate
+                    / 100
+                )
+            ),
+        ),
+    )
 
-    if point_discount_coupon_amount > 0:
-        service_bonus_parts.append(f"點數折價 -{_format_plain_amount(point_discount_coupon_amount)}，店內吸收")
+    percent_off = max(
+        0,
+        discountable
+        - after_percent,
+    )
+
+    raw_fixed = data.get(
+        "fixed_discount_amount"
+    )
+
+    if raw_fixed is None:
+        raw_fixed = data.get(
+            "cash_coupon_amount"
+        )
+
+    fixed = max(
+        0,
+        min(
+            after_percent,
+            _to_int(
+                raw_fixed,
+                0,
+            )
+            or 0,
+        ),
+    )
+
+    after_fixed = max(
+        0,
+        after_percent
+        - fixed,
+    )
+
+    point_cash = max(
+        0,
+        min(
+            point_cash,
+            after_fixed,
+        ),
+    )
+
+    customer_service_amount = max(
+        0,
+        after_fixed
+        - point_cash,
+    )
+
+    # 固定折扣 / 點數折價由店內吸收，
+    # 所以不扣打手分潤。
+    payout_base = max(
+        0,
+        after_percent
+        + specify_effective,
+    )
+
+    customer_pay = max(
+        0,
+        customer_service_amount
+        + specify_effective,
+    )
+
+    notes = []
+
+    if legacy_free_hour:
+        notes.append(
+            "舊版福利：首小時免費 "
+            f"-{_format_plain_amount(legacy_free_hour)}"
+        )
+
+    if extra_hours:
+        notes.append(
+            "服務時間 +"
+            f"{_format_point_hours(extra_hours)}"
+        )
+
+    if extra_games:
+        notes.append(
+            f"加場 {extra_games} 場保撤"
+        )
+
+    if point_specify:
+        notes.append(
+            "免指定費 "
+            f"-{_format_plain_amount(point_specify)}"
+        )
 
     return {
-        "manual_price_missing": bool(is_self_service_staff_price_required(rule) and manual_staff_amount is None),
-        "manual_staff_amount": manual_staff_amount,
-        "manual_staff_price_reason": str(data.get("manual_staff_price_reason") or "").strip(),
-        "rule_original_amount": rule_original_amount,
-        "original_amount": priced_amount,
-        "priced_amount": priced_amount,
-        "manual_discount_percent": discount_percent,
-        "manual_discount_amount": manual_discount_amount,
-        "manual_discount_reason": str(data.get("manual_discount_reason") or "").strip(),
-        "payout_base_amount": payout_base_amount,
-        "cash_coupon_amount": cash_coupon_amount,
-        "cash_coupon_reason": str(data.get("cash_coupon_reason") or "").strip(),
-        "point_discount_coupon_amount": point_discount_coupon_amount,
-        "point_waived_specify_fee": point_waived_specify_fee,
-        "point_free_first_hour_amount": point_free_first_hour_amount,
-        "point_extra_hours": point_extra_hours,
-        "point_extra_games": point_extra_games,
-        "point_benefit_key": benefit_key,
-        "point_benefit_name": benefit_name,
-        "point_benefit_cost": benefit_cost,
-        "point_benefit_summary": str(benefit.get("summary") or "") if benefit else "",
-        "service_bonus_text": "｜".join(service_bonus_parts),
-        "store_absorbed_amount": store_absorbed_amount,
-        "customer_pay_amount": customer_pay_amount,
+        "price_formula_version": 2,
+        "manual_discount_mode": "pay_rate",
+
+        "manual_price_missing": bool(
+            is_self_service_staff_price_required(
+                rule
+            )
+            and manual_price is None
+        ),
+
+        "manual_staff_amount": manual_price,
+
+        "manual_staff_price_reason": str(
+            data.get(
+                "manual_staff_price_reason"
+            )
+            or ""
+        ).strip(),
+
+        "rule_original_amount": (
+            service_original
+            + specify_before
+        ),
+
+        "service_original_amount": service_original,
+        "original_amount": service_original,
+        "priced_amount": discountable,
+
+        "manual_discount_percent": rate,
+        "discount_rate_percent": rate,
+
+        "manual_discount_amount": percent_off,
+        "percent_discount_amount": percent_off,
+
+        "manual_discount_reason": str(
+            data.get(
+                "manual_discount_reason"
+            )
+            or ""
+        ).strip(),
+
+        "cash_coupon_amount": fixed,
+        "fixed_discount_amount": fixed,
+
+        "cash_coupon_reason": str(
+            data.get(
+                "cash_coupon_reason"
+            )
+            or ""
+        ).strip(),
+
+        "point_discount_coupon_amount": (
+            point_cash
+        ),
+
+        "specified_fee_before_waiver": (
+            specify_before
+        ),
+
+        "effective_specify_fee": (
+            specify_effective
+        ),
+
+        "point_waived_specify_fee": (
+            point_specify
+        ),
+
+        "point_free_first_hour_amount": (
+            legacy_free_hour
+        ),
+
+        "point_extra_hours": extra_hours,
+        "point_extra_games": extra_games,
+
+        "point_benefit_key": bkey,
+        "point_benefit_name": bname,
+        "point_benefit_cost": bcost,
+
+        "point_benefit_summary": (
+            str(
+                benefit.get(
+                    "summary"
+                )
+                or ""
+            )
+            if benefit
+            else ""
+        ),
+
+        # 非折價福利直接顯示在訂單備註。
+        "service_bonus_text": (
+            "｜".join(notes)
+        ),
+
+        "payout_base_amount": (
+            payout_base
+        ),
+
+        "store_absorbed_amount": (
+            fixed
+            + point_cash
+        ),
+
+        "customer_pay_amount": (
+            customer_pay
+        ),
     }
 
 
@@ -6828,10 +7722,10 @@ class SelfServiceStaffPriceModal(discord.ui.Modal, title="客服填寫訂單價�
             f"{_format_plain_amount(amount)}｜{data.get('manual_staff_price_reason') or '無備註'}",
         )
 
-class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定折扣 / 折現券"):
+class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定折扣"):
     discount_percent = discord.ui.TextInput(
-        label="客服折扣百分比",
-        placeholder="例如 10 = 9 折；不折扣可留空或填 0",
+        label="折後比例 %",
+        placeholder="例如 90 = 9 折；不折扣留空或填 100",
         required=False,
         max_length=10,
     )
@@ -6844,15 +7738,15 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
     )
 
     cash_coupon_amount = discord.ui.TextInput(
-        label="折現券金額",
-        placeholder="例如 100；沒有折現券可留空或填 0",
+        label="固定折扣金額",
+        placeholder="例如 100；沒有固定折扣可留空或填 0",
         required=False,
         max_length=10,
     )
 
     cash_coupon_reason = discord.ui.TextInput(
-        label="折現券原因 / 名稱",
-        placeholder="例如 VIP折現券、活動折現券、生日券",
+        label="固定折扣原因 / 名稱",
+        placeholder="例如 VIP優惠、活動優惠、生日優惠",
         required=False,
         max_length=100,
     )
@@ -6865,13 +7759,13 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
 
     async def on_submit(self, interaction: discord.Interaction):
         if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以設定折扣與折現券。", ephemeral=True)
+            await interaction.response.send_message("只有客服可以設定折扣。", ephemeral=True)
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
 
         if not data.get("item"):
-            await interaction.response.send_message("請先選擇訂單項目，再設定折扣或折現券。", ephemeral=True)
+            await interaction.response.send_message("請先選擇訂單項目，再設定折扣。", ephemeral=True)
             return
 
         try:
@@ -6881,9 +7775,11 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
+        data["manual_discount_mode"] = "pay_rate"
         data["manual_discount_percent"] = discount_percent
         data["manual_discount_reason"] = str(self.discount_reason.value or "").strip()
         data["cash_coupon_amount"] = coupon_amount
+        data["fixed_discount_amount"] = coupon_amount
         data["cash_coupon_reason"] = str(self.cash_coupon_reason.value or "").strip()
         data["manual_price_adjustment_set_by"] = interaction.user.id
         data["manual_price_adjustment_set_at"] = get_taipei_now_iso()
@@ -6911,14 +7807,14 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
                 edited_panel = False
 
         adjustment_note = []
-        if discount_percent > 0:
-            adjustment_note.append(f"客服折扣：{_format_percent_value(discount_percent)}%")
+        if discount_percent < 100:
+            adjustment_note.append(f"折後比例：{_format_percent_value(discount_percent)}%")
         if coupon_amount > 0:
-            adjustment_note.append(f"折現券：{_format_plain_amount(coupon_amount)}（店內吸收，不扣打手分潤）")
+            adjustment_note.append(f"固定折扣：-{_format_plain_amount(coupon_amount)}（店內吸收，不扣打手分潤）")
 
         await interaction.followup.send(
-            "已設定折扣 / 折現券。"
-            + ("\n" + "\n".join(adjustment_note) if adjustment_note else "\n目前無折扣、無折現券。")
+            "已設定折扣。"
+            + ("\n" + "\n".join(adjustment_note) if adjustment_note else "\n目前折後 100%，無固定折扣。")
             + ("" if edited_panel else "\n\n提醒：面板沒有自動刷新，請重新選一次數量即可刷新試算。"),
             ephemeral=True,
         )
@@ -6926,8 +7822,8 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
-            "設定折扣 / 折現券",
-            "｜".join(adjustment_note) if adjustment_note else "無折扣、無折現券",
+            "設定折扣",
+            "｜".join(adjustment_note) if adjustment_note else "折後100%，無固定折扣",
         )
 
 class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"):
@@ -7189,20 +8085,20 @@ class SelfServiceOrderView(discord.ui.View):
 
 
     @discord.ui.button(
-        label="客服設定折扣/折現券",
+        label="客服設定折扣",
         style=discord.ButtonStyle.secondary,
         custom_id="self_service_order_staff_discount_coupon_button",
         row=4,
     )
     async def staff_discount_coupon(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以設定折扣與折現券。", ephemeral=True)
+            await interaction.response.send_message("只有客服可以設定折扣。", ephemeral=True)
             return
 
         data = SELF_SERVICE_ORDER_SELECTIONS.get(self.channel_id, {})
 
         if not data.get("item"):
-            await interaction.response.send_message("請先選擇訂單項目，再設定折扣或折現券。", ephemeral=True)
+            await interaction.response.send_message("請先選擇訂單項目，再設定折扣。", ephemeral=True)
             return
 
         panel_message_id = interaction.message.id if interaction.message is not None else None
@@ -8335,13 +9231,21 @@ POINT_REDEEM_ITEMS = [
     {"key": "free_specify_fee", "cost": 25, "name": "免指定費 1 次"},
     {"key": "discount_100", "cost": 30, "name": "100 元折價券"},
     {"key": "extra_30", "cost": 40, "name": "加時一小時"},
-    {"key": "free_play_1h", "cost": 80, "name": "免費陪玩 1 小時"},
 ]
 
 POINT_REDEEM_ITEMS_BY_KEY = {
     item["key"]: item
     for item in POINT_REDEEM_ITEMS
 }
+
+POINT_REDEEM_ITEMS_BY_KEY.setdefault(
+    "free_play_1h",
+    dict(
+        key="free_play_1h",
+        cost=80,
+        name="免費陪玩 1 小時",
+    ),
+)
 
 _REWARD_REDEEM_SELECTIONS: dict[tuple[int, int], str] = {}
 
