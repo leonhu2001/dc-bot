@@ -970,6 +970,217 @@ def build_staff_order_request_embed(profile: dict, requester_id: int | str) -> d
     embed.set_footer(text="第一版只做請求卡片，避免影響現有訂單流程。")
     return embed
 
+
+
+async def refresh_staff_profile_panel_for_staff(
+    guild: discord.Guild | None,
+    staff_id: int | str,
+    *,
+    reason: str = "event",
+) -> bool:
+    """Refresh one saved Discord staff profile panel after a data-changing event."""
+    if guild is None:
+        return False
+
+    staff_id_text = str(staff_id or "").strip()
+    if not staff_id_text:
+        return False
+
+    profile = get_staff_profile(staff_id_text)
+    if profile is None:
+        return False
+
+    channel_id_text = str(
+        profile.get("forum_thread_id")
+        or profile.get("forum_channel_id")
+        or ""
+    ).strip()
+
+    message_id_text = str(
+        profile.get("panel_message_id")
+        or ""
+    ).strip()
+
+    if not channel_id_text or not message_id_text:
+        return False
+
+    try:
+        channel_id = int(channel_id_text)
+        message_id = int(message_id_text)
+    except (TypeError, ValueError):
+        return False
+
+    channel = None
+
+    get_thread = getattr(guild, "get_thread", None)
+    if callable(get_thread):
+        channel = get_thread(channel_id)
+
+    if channel is None:
+        channel = guild.get_channel(channel_id)
+
+    if channel is None:
+        try:
+            channel = await guild.fetch_channel(channel_id)
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException,
+        ):
+            return False
+
+    if not hasattr(channel, "fetch_message"):
+        return False
+
+    try:
+        panel_message = await channel.fetch_message(message_id)
+    except (
+        discord.NotFound,
+        discord.Forbidden,
+        discord.HTTPException,
+    ):
+        return False
+
+    latest_profile = get_staff_profile(staff_id_text)
+    if latest_profile is None:
+        return False
+
+    try:
+        await panel_message.edit(
+            embed=build_staff_profile_embed(latest_profile),
+            view=StaffProfilePanelView(staff_id_text),
+            allowed_mentions=discord.AllowedMentions(
+                users=False,
+                roles=False,
+                everyone=False,
+            ),
+        )
+    except discord.HTTPException as exc:
+        print(
+            f"[staff-profile] refresh failed "
+            f"staff_id={staff_id_text} "
+            f"reason={reason}: {exc}"
+        )
+        return False
+
+    print(
+        f"[staff-profile] refreshed "
+        f"staff_id={staff_id_text} "
+        f"reason={reason}"
+    )
+    return True
+
+
+def get_order_staff_ids_for_profile_refresh(
+    *,
+    ticket_channel_id: int | str | None = None,
+    dispatch_message_id: int | str | None = None,
+    order_id: int | str | None = None,
+) -> list[str]:
+    """Return active workers attached to one web order."""
+    ensure_staff_profile_tables()
+
+    conn = _connect()
+
+    try:
+        if (
+            not _has_table(conn, "web_orders")
+            or not _has_table(conn, "order_assignments")
+        ):
+            return []
+
+        where = []
+        params = []
+
+        if order_id is not None and str(order_id).strip():
+            where.append("id = ?")
+            params.append(str(order_id))
+
+        if ticket_channel_id is not None and str(ticket_channel_id).strip():
+            where.append("ticket_channel_id = ?")
+            params.append(str(ticket_channel_id))
+
+        if dispatch_message_id is not None and str(dispatch_message_id).strip():
+            where.append("dispatch_message_id = ?")
+            params.append(str(dispatch_message_id))
+
+        if not where:
+            return []
+
+        order_row = conn.execute(
+            f"""
+            SELECT id
+            FROM web_orders
+            WHERE {" OR ".join(where)}
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+
+        if order_row is None:
+            return []
+
+        rows = conn.execute(
+            """
+            SELECT DISTINCT worker_discord_id
+            FROM order_assignments
+            WHERE order_id = ?
+              AND COALESCE(is_active, 1) = 1
+              AND COALESCE(worker_discord_id, '') != ''
+            ORDER BY id ASC
+            """,
+            (order_row["id"],),
+        ).fetchall()
+
+        return [
+            str(row["worker_discord_id"])
+            for row in rows
+            if str(row["worker_discord_id"] or "").strip()
+        ]
+
+    finally:
+        conn.close()
+
+
+async def refresh_staff_profile_panels_for_order(
+    guild: discord.Guild | None,
+    *,
+    ticket_channel_id: int | str | None = None,
+    dispatch_message_id: int | str | None = None,
+    order_id: int | str | None = None,
+    reason: str = "order_event",
+) -> int:
+    """Refresh only the staff profile panels affected by one order."""
+    staff_ids = get_order_staff_ids_for_profile_refresh(
+        ticket_channel_id=ticket_channel_id,
+        dispatch_message_id=dispatch_message_id,
+        order_id=order_id,
+    )
+
+    refreshed = 0
+
+    for staff_id in dict.fromkeys(staff_ids):
+        try:
+            ok = await refresh_staff_profile_panel_for_staff(
+                guild,
+                staff_id,
+                reason=reason,
+            )
+        except Exception as exc:
+            print(
+                f"[staff-profile] event refresh error "
+                f"staff_id={staff_id} "
+                f"reason={reason}: {exc}"
+            )
+            continue
+
+        if ok:
+            refreshed += 1
+
+    return refreshed
+
+
 class StaffProfilePanelView(discord.ui.View):
     def __init__(self, staff_id: int | str):
         super().__init__(timeout=None)

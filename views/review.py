@@ -7,6 +7,8 @@ from pathlib import Path
 
 import discord
 
+from views.staff_profiles import refresh_staff_profile_panel_for_staff
+
 from core.permissions import is_customer_staff
 
 
@@ -702,6 +704,12 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
             await interaction.response.send_message(message, ephemeral=True)
             return
 
+        await refresh_staff_profile_panel_for_staff(
+            guild,
+            str(self.target.get("staff_id") or ""),
+            reason="review_submitted",
+        )
+
         await _send_review_channel_embed(
             guild=guild,
             customer_id=self.customer_id,
@@ -881,6 +889,15 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
             lines.append("沒有新增收藏。")
 
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
+
+        guild = interaction.guild
+        if guild is not None:
+            for staff_id in selected_ids:
+                await refresh_staff_profile_panel_for_staff(
+                    guild,
+                    staff_id,
+                    reason="post_close_favorite",
+                )
 
 
 class FavoriteCurrentMembersView(discord.ui.View):

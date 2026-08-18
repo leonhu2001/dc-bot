@@ -179,6 +179,7 @@ from views.staff_profiles import (
     CustomerFavoritesView,
     PublicStaffProfileBrowseView,
     StaffProfilePanelView,
+    refresh_staff_profile_panels_for_order,
 )
 
 from views.support import (
@@ -1102,6 +1103,12 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             dispatch_message_id=order_data.get("dispatch_message_id"),
         )
 
+        await refresh_staff_profile_panels_for_order(
+            guild,
+            ticket_channel_id=order_channel.id,
+            reason="order_closed",
+        )
+
         receipt_text = (
             "```text\n"
             "收據\n"
@@ -1313,6 +1320,12 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
     sync_web_order_closed_from_bot(
         ticket_channel_id=order_channel.id,
         dispatch_message_id=order_data.get("dispatch_message_id"),
+    )
+
+    await refresh_staff_profile_panels_for_order(
+        guild,
+        ticket_channel_id=order_channel.id,
+        reason="order_closed",
     )
 
     await lock_dispatch_claim_panel(guild, order_channel.id)
