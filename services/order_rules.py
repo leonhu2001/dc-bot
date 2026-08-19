@@ -341,7 +341,7 @@ _add(OrderRule("fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allo
 
 # 魔丸娛樂嘎拉給木
 # 固定 1 單 / 2 位 / 只允許女陪或女護
-# 不開放指定、不使用點數福利；客服人工折扣仍走通用折扣功能。
+# 可指定女陪 / 女護，指定費 0T；不使用點數福利，客服人工折扣仍走通用折扣功能。
 for key, label, price in [
     ("fun_mawan_galagame_basic", "魔丸娛樂嘎拉給木｜基礎", 1688),
     ("fun_mawan_galagame_standard", "魔丸娛樂嘎拉給木｜標準", 2688),
@@ -362,7 +362,13 @@ for key, label, price in [
         required_staff_count=2,
         min_quantity=1,
         max_quantity=1,
-        allow_specify=False,
+        allow_specify=True,
+        max_specified_count=2,
+        specify_fee_default=0,
+        specify_fee_by_role={
+            "female_companion": 0,
+            "female_protector": 0,
+        },
         point_benefits_allowed=False,
     ))
 
@@ -791,16 +797,12 @@ _zy_patch_rule("basic_oil_fuel", label="油鍋單｜火箭燃油", unit_label="�
 _zy_patch_rule("basic_oil_satellite", label="油鍋單｜GTI衛星通訊天線", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("basic_oil_all", label="油鍋單｜全包", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
-# 趣味單：全部固定 1 單，不開放指定。
+# 一般趣味單：固定 1 單，不開放指定。
 for _zy_fun_key in (
     "fun_lovebirds",
     "fun_read_no_reply",
     "fun_rich_enough",
     "fun_eat_yourself",
-    "fun_mawan_galagame_basic",
-    "fun_mawan_galagame_standard",
-    "fun_mawan_galagame_hard",
-    "fun_mawan_galagame_hell",
 ):
     _zy_patch_rule(
         _zy_fun_key,
@@ -808,6 +810,33 @@ for _zy_fun_key in (
         min_quantity=1,
         max_quantity=1,
         allow_specify=False,
+    )
+
+# 魔丸娛樂嘎拉給木：
+# 固定 1 單，可指定 1～2 位，但只限女陪 / 女護，指定費固定 0T。
+for _zy_galagame_key in (
+    "fun_mawan_galagame_basic",
+    "fun_mawan_galagame_standard",
+    "fun_mawan_galagame_hard",
+    "fun_mawan_galagame_hell",
+):
+    _zy_patch_rule(
+        _zy_galagame_key,
+        unit_label="單",
+        min_quantity=1,
+        max_quantity=1,
+        allow_specify=True,
+        max_specified_count=2,
+        allowed_roles=(
+            "female_companion",
+            "female_protector",
+        ),
+        specify_fee_default=0,
+        specify_fee_by_role={
+            "female_companion": 0,
+            "female_protector": 0,
+        },
+        point_benefits_allowed=False,
     )
 
 # 代肝代解：賽季 3x3 / 部門任務由客服手動填價；哈夫幣固定 1 單。
