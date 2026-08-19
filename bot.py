@@ -6463,6 +6463,23 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 point_text += f"｜{adjustment['service_bonus_text']}"
             lines.append(("點數福利", point_text))
 
+    # service_promotion_quote_preview_v2
+    if price is not None:
+        promotion_text = str(
+            adjustment.get(
+                "service_promotion_text"
+            )
+            or ""
+        ).strip()
+
+        if promotion_text:
+            lines.append(
+                (
+                    "活動加贈",
+                    promotion_text,
+                )
+            )
+
     unit = get_self_service_quantity_unit(rule.label, data)
     lines.append(("數量", f"{quantity} {unit}"))
 
@@ -6514,21 +6531,6 @@ def add_self_service_quote_preview(embed: discord.Embed, data: dict, guild: disc
         value=preview_text[:1024],
         inline=False,
     )
-
-    # service_promotion_quote_preview_v1
-    promotion_text = str(
-        adjustment.get(
-            "service_promotion_text"
-        )
-        or ""
-    ).strip()
-
-    if promotion_text:
-        embed.add_field(
-            name="活動加贈",
-            value=promotion_text,
-            inline=False,
-        )
 
     return embed
 
