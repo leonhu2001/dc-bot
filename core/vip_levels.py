@@ -17,6 +17,7 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "free_secret_space": "・每月一次免費「機密航天保底1000w」",
     "rebate_5": "・儲值返利5%",
     "discount_94": "・體驗單、趣味單及賽季限定單外全館94折",
+    "custom_order": "・可根據闆闆要求製作「自訂單」",
 }
 
 VIP_LEVELS: list[dict[str, Any]] = [
@@ -30,7 +31,12 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "name": "金級魔丸",
         "threshold": 6000,
         "role_id": 1516575036973256738,
-        "benefit_keys": ["vip_room", "priority_cs", "discount_98"],
+        "benefit_keys": [
+            "vip_room",
+            "priority_cs",
+            "discount_98",
+            "custom_order",
+        ],
     },
     {
         "name": "白金魔丸",
@@ -43,6 +49,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "rebate_2",
             "monthly_coupon_200",
             "priority_order",
+            "custom_order",
         ],
     },
     {
@@ -57,6 +64,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "familiar_worker",
             "rebate_3",
             "discount_96",
+            "custom_order",
         ],
     },
     {
@@ -72,6 +80,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "discount_96",
             "rebate_4",
             "monthly_coupon_500",
+            "custom_order",
         ],
     },
     {
@@ -88,6 +97,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "free_secret_space",
             "rebate_5",
             "discount_94",
+            "custom_order",
         ],
     },
 ]
