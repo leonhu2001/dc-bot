@@ -304,6 +304,8 @@ for key, label, price, staff_count in [
         specify_fee_by_role=_all_receiver_fee(150),
         specify_free_min_units=2,
         specify_free_basis="quantity",
+        service_bonus_buy=5,
+        service_bonus_gift=1,
     ))
 
 _add(OrderRule(

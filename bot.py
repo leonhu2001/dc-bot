@@ -1082,6 +1082,9 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             )
             return
 
+        # legacy_receipt_close_ack_v1
+        await interaction.response.defer()
+
         amount_text = str(order_data.get("amount_text") or format_t_amount(parsed_amount))
 
         existing_receipt_id = str(order_data.get("receipt_id") or order_data.get("order_no") or "").strip()
@@ -1186,7 +1189,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         close_receipt_text = "收據已於付款送出時產生，本次不重複送出。" if receipt_already_created else "收據已送出。"
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
             f"{reward_result}\n\n"
             f"可以選擇評價本次服務、不留評價，或關閉票口。",
@@ -1261,6 +1264,9 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
         )
         return
 
+    # close_interaction_ack_v1
+    await interaction.response.defer()
+
     order_content, detected_payment_method = get_order_summary_from_channel(order_channel.id)
     payment_method = str(
         order_data.get("payment_method")
@@ -1298,7 +1304,7 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
                 )
                 order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
             except ValueError as exc:
-                await interaction.response.send_message(str(exc), ephemeral=True)
+                await interaction.followup.send(str(exc), ephemeral=True)
                 return
         else:
             receipt_id = generate_order_receipt_id()
@@ -1355,7 +1361,7 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
 
     close_receipt_text = "收據已於付款送出時產生，本次不重複送出。" if receipt_already_created else "收據已自動產生或補登。"
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
         f"{reward_result}\n\n"
         f"可以選擇評價本次服務、不留評價，或關閉票口。",
@@ -5699,6 +5705,21 @@ def add_self_service_financial_breakdown_fields(
             inline=False,
         )
 
+    # service_promotion_financial_embed_v1
+    service_promotion_text = str(
+        src.get(
+            "service_promotion_text"
+        )
+        or ""
+    ).strip()
+
+    if service_promotion_text:
+        embed.add_field(
+            name="活動加贈",
+            value=service_promotion_text,
+            inline=False,
+        )
+
     return embed
 
 
@@ -5815,6 +5836,9 @@ async def create_waiting_acceptance_order_from_self_service(
         "store_absorbed_amount": price_adjustment.get("store_absorbed_amount"),
         "customer_pay_amount": price_adjustment.get("customer_pay_amount"),
         "service_bonus_text": price_adjustment.get("service_bonus_text"),
+        "service_quantity": price_adjustment.get("service_quantity"),
+        "service_bonus_quantity": price_adjustment.get("service_bonus_quantity"),
+        "service_promotion_text": price_adjustment.get("service_promotion_text"),
         "specified_staff_ids": [
             str(item)
             for item in (specified_staff_ids or [])
@@ -5931,6 +5955,14 @@ async def create_waiting_acceptance_order_from_self_service(
         web_note_parts.append(
             "點數福利："
             f"{price_adjustment['service_bonus_text']}"
+        )
+
+    # service_promotion_web_note_v1
+    if price_adjustment.get(
+        "service_promotion_text"
+    ):
+        web_order_note_parts.append(
+            price_adjustment["service_promotion_text"]
         )
 
     web_order_note = (
@@ -6482,6 +6514,21 @@ def add_self_service_quote_preview(embed: discord.Embed, data: dict, guild: disc
         value=preview_text[:1024],
         inline=False,
     )
+
+    # service_promotion_quote_preview_v1
+    promotion_text = str(
+        adjustment.get(
+            "service_promotion_text"
+        )
+        or ""
+    ).strip()
+
+    if promotion_text:
+        embed.add_field(
+            name="活動加贈",
+            value=promotion_text,
+            inline=False,
+        )
 
     return embed
 
@@ -7253,6 +7300,52 @@ def calculate_self_service_financials(
             f"-{_format_plain_amount(point_specify)}"
         )
 
+    # service_promotion_calc_v1
+    purchased_service_quantity = max(
+        1,
+        _to_int(
+            data.get("quantity"),
+            1,
+        )
+        or 1,
+    )
+
+    actual_service_quantity = max(
+        purchased_service_quantity,
+        int(
+            getattr(
+                price_result,
+                "service_quantity",
+                purchased_service_quantity,
+            )
+            or purchased_service_quantity
+        ),
+    )
+
+    automatic_service_bonus_quantity = max(
+        0,
+        actual_service_quantity
+        - purchased_service_quantity,
+    )
+
+    service_unit_text = str(
+        getattr(
+            rule,
+            "unit_label",
+            "單",
+        )
+        or "單"
+    ).strip()
+
+    service_promotion_text = ""
+
+    if automatic_service_bonus_quantity > 0:
+        service_promotion_text = (
+            f"活動加贈：購買 {purchased_service_quantity}{service_unit_text}，"
+            f"額外贈送 {automatic_service_bonus_quantity}{service_unit_text}"
+            f"｜活動後共 {actual_service_quantity}{service_unit_text}"
+        )
+
     return {
         "price_formula_version": 2,
         "manual_discount_mode": "pay_rate",
@@ -7347,6 +7440,16 @@ def calculate_self_service_financials(
         "service_bonus_text": (
             "｜".join(notes)
         ),
+
+        "service_quantity": (
+            actual_service_quantity
+        ),
+
+        "service_bonus_quantity": (
+            automatic_service_bonus_quantity
+        ),
+
+        "service_promotion_text": service_promotion_text,
 
         "payout_base_amount": (
             payout_base
