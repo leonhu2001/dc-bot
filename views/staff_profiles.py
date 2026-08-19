@@ -7,6 +7,70 @@ from pathlib import Path
 import discord
 
 
+# 個人牆指定下單：
+# 真正建立票口的邏輯由 bot.py 注入，
+# 避免 views.staff_profiles 直接 import bot.py 造成 circular import。
+_STAFF_PROFILE_ORDER_TICKET_CREATOR = None
+
+
+def configure_staff_profile_order_ticket_creator(creator) -> None:
+    global _STAFF_PROFILE_ORDER_TICKET_CREATOR
+    _STAFF_PROFILE_ORDER_TICKET_CREATOR = creator
+
+
+async def _open_staff_profile_order_ticket(
+    interaction: discord.Interaction,
+    staff_id: int | str,
+):
+    creator = _STAFF_PROFILE_ORDER_TICKET_CREATOR
+
+    if creator is None:
+        await interaction.response.send_message(
+            "指定下單功能尚未完成初始化，請通知客服。",
+            ephemeral=True,
+        )
+        return
+
+    try:
+        await creator(
+            interaction=interaction,
+            staff_id=str(staff_id),
+        )
+    except ValueError as exc:
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                str(exc),
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                str(exc),
+                ephemeral=True,
+            )
+    except Exception as exc:
+        print(
+            "[staff-profile-order] "
+            f"create ticket failed staff_id={staff_id}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        message = (
+            "建立指定下單票口失敗，"
+            "請稍後再試或通知客服。"
+        )
+
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                message,
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                message,
+                ephemeral=True,
+            )
+
+
 def _root_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -1249,13 +1313,15 @@ class StaffProfilePanelView(discord.ui.View):
         profile = get_staff_profile(self.staff_id)
 
         if profile is None:
-            await interaction.response.send_message("找不到這位成員的個人牆資料。", ephemeral=True)
+            await interaction.response.send_message(
+                "找不到這位成員的個人牆資料。",
+                ephemeral=True,
+            )
             return
 
-        await interaction.response.send_message(
-            embed=build_staff_order_request_embed(profile, interaction.user.id),
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+        await _open_staff_profile_order_ticket(
+            interaction,
+            self.staff_id,
         )
 
     async def reviews_callback(self, interaction: discord.Interaction):

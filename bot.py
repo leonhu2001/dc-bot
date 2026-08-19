@@ -181,6 +181,7 @@ from views.staff_profiles import (
     PublicStaffProfileBrowseView,
     StaffProfilePanelView,
     refresh_staff_profile_panels_for_order,
+    configure_staff_profile_order_ticket_creator,
 )
 
 from views.support import (
@@ -674,6 +675,9 @@ async def create_private_channel(
     intro_message: str,
     view: discord.ui.View | None = None,
     topic: str | None = None,
+    pre_message: str | None = None,
+    mention_roles_in_intro: bool = True,
+    order_log_status: str = "已確認詳閱規章內容",
 ):
     guild = interaction.guild
     member = interaction.user
@@ -735,16 +739,42 @@ async def create_private_channel(
         reason=f"{member} opened a private channel"
     )
 
-    role_mentions = " ".join(role.mention for role in allowed_roles if role is not None)
+    role_mentions = " ".join(
+        role.mention
+        for role in allowed_roles
+        if role is not None
+    )
+
+    # profile_direct_order_pre_message_v1
+    if pre_message:
+        await channel.send(
+            content=str(pre_message),
+            allowed_mentions=discord.AllowedMentions(
+                roles=True,
+                users=True,
+                everyone=False,
+            ),
+        )
+
+    intro_content = str(intro_message)
+
+    if (
+        mention_roles_in_intro
+        and role_mentions
+    ):
+        intro_content = (
+            f"{role_mentions}\n"
+            f"{intro_content}"
+        )
 
     await channel.send(
-        content=f"{role_mentions}\n{intro_message}",
+        content=intro_content,
         view=view,
         allowed_mentions=discord.AllowedMentions(
             roles=True,
             users=True,
-            everyone=False
-        )
+            everyone=False,
+        ),
     )
 
     if topic and "order_customer_id=" in topic:
@@ -754,7 +784,7 @@ async def create_private_channel(
             fields=[
                 ("開單人", member.mention, True),
                 ("票口", channel.mention, True),
-                ("狀態", "已確認詳閱規章內容", False),
+                ("狀態", str(order_log_status), False),
             ],
             color=discord.Color.purple(),
         )
@@ -9615,6 +9645,114 @@ class OrderControlView(discord.ui.View):
                 everyone=False
             )
         )
+
+# profile_direct_order_ticket_creator_v1
+async def create_staff_profile_order_ticket(
+    *,
+    interaction: discord.Interaction,
+    staff_id: str,
+):
+    guild = interaction.guild
+    member = interaction.user
+
+    if (
+        guild is None
+        or not isinstance(
+            member,
+            discord.Member,
+        )
+    ):
+        raise ValueError(
+            "這個功能只能在伺服器內使用。"
+        )
+
+    try:
+        target_id = int(
+            str(staff_id)
+        )
+    except (TypeError, ValueError):
+        raise ValueError(
+            "指定成員 ID 無效，請通知客服。"
+        )
+
+    target_member = guild.get_member(
+        target_id
+    )
+
+    if target_member is None:
+        try:
+            target_member = (
+                await guild.fetch_member(
+                    target_id
+                )
+            )
+        except Exception:
+            target_member = None
+
+    if target_member is None:
+        raise ValueError(
+            "目前找不到這位指定成員，"
+            "可能已離開伺服器或身分資料失效。"
+        )
+
+    customer_role = guild.get_role(
+        CUSTOMER_ROLE_ID
+    )
+
+    if customer_role is None:
+        raise ValueError(
+            "找不到客服身分組，"
+            "請通知管理員確認設定。"
+        )
+
+    # 只做「指定意向」通知，
+    # 不預先寫 specified_staff_ids。
+    # 真正指定仍由後面的訂單規則判斷，
+    # 避免選到不可指定品項造成衝突。
+    pre_message = (
+        f"{customer_role.mention} "
+        f"老闆想要指定 "
+        f"{target_member.mention}"
+    )
+
+    intro = (
+        f"這裡有闆闆開單。\n\n"
+        f"開單人：{member.mention}\n"
+        f"狀態：由個人牆指定下單建立"
+        f"{format_customer_notes_for_ticket(member.id)}"
+    )
+
+    topic = (
+        f"order_customer_id={member.id};"
+        f"profile_specified_staff_id={target_id}"
+    )
+
+    await create_private_channel(
+        interaction=interaction,
+        category_id=CUSTOMER_CATEGORY_ID,
+        channel_name=safe_channel_name(
+            "下單",
+            member,
+        ),
+        allowed_roles=[
+            customer_role,
+        ],
+        intro_message=intro,
+        view=OrderControlView(),
+        topic=topic,
+        pre_message=pre_message,
+        mention_roles_in_intro=False,
+        order_log_status=(
+            "個人牆指定下單｜"
+            f"指定 {target_member.display_name}"
+        ),
+    )
+
+
+configure_staff_profile_order_ticket_creator(
+    create_staff_profile_order_ticket
+)
+
 
 # ========= 主面板 / 下單入口 View 設定 =========
 
