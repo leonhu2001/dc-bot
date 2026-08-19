@@ -339,6 +339,33 @@ _add(OrderRule("fun", "fun_read_no_reply", "已讀亂回", "fixed", 2000, allowe
 _add(OrderRule("fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
 _add(OrderRule("fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
 
+# 魔丸娛樂嘎拉給木
+# 固定 1 單 / 2 位 / 只允許女陪或女護
+# 不開放指定、不使用點數福利；客服人工折扣仍走通用折扣功能。
+for key, label, price in [
+    ("fun_mawan_galagame_basic", "魔丸娛樂嘎拉給木｜基礎", 1688),
+    ("fun_mawan_galagame_standard", "魔丸娛樂嘎拉給木｜標準", 2688),
+    ("fun_mawan_galagame_hard", "魔丸娛樂嘎拉給木｜困難", 4688),
+    ("fun_mawan_galagame_hell", "魔丸娛樂嘎拉給木｜地獄", 6688),
+]:
+    _add(OrderRule(
+        "fun",
+        key,
+        label,
+        "fixed",
+        price,
+        "單",
+        allowed_roles=(
+            "female_companion",
+            "female_protector",
+        ),
+        required_staff_count=2,
+        min_quantity=1,
+        max_quantity=1,
+        allow_specify=False,
+        point_benefits_allowed=False,
+    ))
+
 
 # ========= 代解代肝 =========
 
@@ -765,8 +792,23 @@ _zy_patch_rule("basic_oil_satellite", label="油鍋單｜GTI衛星通訊天線",
 _zy_patch_rule("basic_oil_all", label="油鍋單｜全包", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
 # 趣味單：全部固定 1 單，不開放指定。
-for _zy_fun_key in ("fun_lovebirds", "fun_read_no_reply", "fun_rich_enough", "fun_eat_yourself"):
-    _zy_patch_rule(_zy_fun_key, unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
+for _zy_fun_key in (
+    "fun_lovebirds",
+    "fun_read_no_reply",
+    "fun_rich_enough",
+    "fun_eat_yourself",
+    "fun_mawan_galagame_basic",
+    "fun_mawan_galagame_standard",
+    "fun_mawan_galagame_hard",
+    "fun_mawan_galagame_hell",
+):
+    _zy_patch_rule(
+        _zy_fun_key,
+        unit_label="單",
+        min_quantity=1,
+        max_quantity=1,
+        allow_specify=False,
+    )
 
 # 代肝代解：賽季 3x3 / 部門任務由客服手動填價；哈夫幣固定 1 單。
 _zy_patch_rule(

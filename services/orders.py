@@ -99,6 +99,43 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {"label": "已讀亂回", "details": [{"label": "已讀亂回", "value": "read_no_reply", "rule_key": "fun_read_no_reply", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {"label": "豪到你了嗎", "details": [{"label": "豪到你了嗎", "value": "rich_enough", "rule_key": "fun_rich_enough", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {"label": "想吃自己打", "details": [{"label": "想吃自己打", "value": "eat_yourself", "rule_key": "fun_eat_yourself", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {
+            "label": "魔丸娛樂嘎拉給木",
+            "details": [
+                {
+                    "label": "基礎",
+                    "value": "basic",
+                    "rule_key": "fun_mawan_galagame_basic",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "標準",
+                    "value": "standard",
+                    "rule_key": "fun_mawan_galagame_standard",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "困難",
+                    "value": "hard",
+                    "rule_key": "fun_mawan_galagame_hard",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "地獄",
+                    "value": "hell",
+                    "rule_key": "fun_mawan_galagame_hell",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+            ],
+        },
     ],
     "farm": [
         {"label": "賽季3x3", "details": [{"label": "賽季3x3", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
