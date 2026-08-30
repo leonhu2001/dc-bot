@@ -32,6 +32,7 @@ DEFAULT_RECEIVER_ROLE_IDS: list[int] = [
 EMPLOYEE_FAMILY_ROLE_ID = 1507204925766242425
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS: list[int] = []
 VOICE_VIEW_ONLY_ROLE_IDS = []
+VOICE_MOVE_MEMBER_ROLE_IDS: list[int] = []
 TEMP_VOICE_CONTROL_PANELS: dict[int, dict] = {}
 
 
@@ -47,6 +48,7 @@ def configure_voice_helpers(
     vip_voice_lobby_role_ids: list[int] | None = None,
     play_voice_allowed_role_ids: list[int],
     voice_room_hidden_visible_role_ids: list[int],
+    voice_move_member_role_ids: list[int] | None = None,
     temp_voice_control_panels: dict[int, dict],
 ) -> None:
     global PLAY_VOICE_CATEGORY_ID
@@ -60,6 +62,7 @@ def configure_voice_helpers(
     global PLAY_VOICE_ALLOWED_ROLE_IDS
     global VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS
     global VOICE_VIEW_ONLY_ROLE_IDS
+    global VOICE_MOVE_MEMBER_ROLE_IDS
     global TEMP_VOICE_CONTROL_PANELS
 
     PLAY_VOICE_CATEGORY_ID = int(play_voice_category_id)
@@ -72,6 +75,14 @@ def configure_voice_helpers(
     VIP_VOICE_LOBBY_ROLE_IDS = [int(role_id) for role_id in (vip_voice_lobby_role_ids or [VIP_VOICE_LOBBY_ROLE_ID]) if int(role_id)]
     PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS)]
     VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [int(role_id) for role_id in (voice_room_hidden_visible_role_ids or [])]
+    VOICE_MOVE_MEMBER_ROLE_IDS = [
+        int(role_id)
+        for role_id in (
+            voice_move_member_role_ids
+            or DEFAULT_RECEIVER_ROLE_IDS
+        )
+        if int(role_id)
+    ]
     TEMP_VOICE_CONTROL_PANELS = temp_voice_control_panels
 
 
@@ -186,7 +197,18 @@ def build_full_temp_voice_overwrite(
 
 
 def is_receiver_voice_role(role: discord.Role | None) -> bool:
-    return role is not None and int(role.id) in {int(role_id) for role_id in DEFAULT_RECEIVER_ROLE_IDS}
+    if role is None:
+        return False
+
+    allowed_ids = {
+        int(role_id)
+        for role_id in (
+            VOICE_MOVE_MEMBER_ROLE_IDS
+            or DEFAULT_RECEIVER_ROLE_IDS
+        )
+    }
+
+    return int(role.id) in allowed_ids
 
 
 

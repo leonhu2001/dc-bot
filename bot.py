@@ -448,6 +448,11 @@ configure_voice_helpers(
     vip_voice_lobby_role_ids=VIP_VOICE_LOBBY_ROLE_IDS,
     play_voice_allowed_role_ids=PLAY_VOICE_ALLOWED_ROLE_IDS,
     voice_room_hidden_visible_role_ids=VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS,
+    voice_move_member_role_ids=[
+        *COMPANION_RECEIVER_ROLE_IDS,
+        *BOOSTER_RECEIVER_ROLE_IDS,
+        CUSTOMER_ROLE_ID,
+    ],
     temp_voice_control_panels=TEMP_VOICE_CONTROL_PANELS,
 )
 
@@ -4059,6 +4064,12 @@ async def maybe_handle_prepay_acceptance_claim(
         await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
         return True
 
+    # acceptance_claim_ack_v1
+    # Acknowledge Discord before synchronous DB validation/write.
+    await interaction.response.defer(
+        ephemeral=True
+    )
+
     try:
         state = claim_acceptance_order(
             order_id=acceptance_order_id,
@@ -4068,11 +4079,29 @@ async def maybe_handle_prepay_acceptance_claim(
             source="discord",
         )
     except ValueError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=True)
+        print(
+            "[acceptance] claim rejected "
+            f"order_id={acceptance_order_id} "
+            f"user_id={interaction.user.id} "
+            f"role_ids={_member_role_id_texts(interaction.user)} "
+            f"reason={exc}"
+        )
+        await interaction.followup.send(
+            str(exc),
+            ephemeral=True,
+        )
         return True
     except Exception as exc:
-        print(f"[acceptance] Discord 新流程接單失敗 order_id={acceptance_order_id}: {exc}")
-        await interaction.response.send_message("接單失敗，請稍後再試或通知客服。", ephemeral=True)
+        print(
+            "[acceptance] Discord new-flow claim failed "
+            f"order_id={acceptance_order_id} "
+            f"user_id={interaction.user.id}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        await interaction.followup.send(
+            "接單失敗，請稍後再試或通知客服。",
+            ephemeral=True,
+        )
         return True
 
     claim_data = view.get_claim_data(interaction.message.id)
@@ -4128,6 +4157,11 @@ async def maybe_handle_prepay_acceptance_unclaim(
         await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
         return True
 
+    # acceptance_unclaim_ack_v1
+    await interaction.response.defer(
+        ephemeral=True
+    )
+
     try:
         state = unclaim_acceptance_order(
             order_id=acceptance_order_id,
@@ -4135,11 +4169,22 @@ async def maybe_handle_prepay_acceptance_unclaim(
             source="discord",
         )
     except ValueError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=True)
+        await interaction.followup.send(
+            str(exc),
+            ephemeral=True,
+        )
         return True
     except Exception as exc:
-        print(f"[acceptance] Discord 新流程取消接單失敗 order_id={acceptance_order_id}: {exc}")
-        await interaction.response.send_message("取消接單失敗，請稍後再試或通知客服。", ephemeral=True)
+        print(
+            "[acceptance] Discord new-flow unclaim failed "
+            f"order_id={acceptance_order_id} "
+            f"user_id={interaction.user.id}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        await interaction.followup.send(
+            "取消接單失敗，請稍後再試或通知客服。",
+            ephemeral=True,
+        )
         return True
 
     claim_data = view.get_claim_data(interaction.message.id)
@@ -4239,18 +4284,31 @@ class DispatchClaimView(discord.ui.View):
     async def refresh_panel(self, interaction: discord.Interaction, locked: bool | None = None):
         guild = interaction.guild
 
+        # dispatch_refresh_after_defer_v1
+        async def send_ephemeral(message: str) -> None:
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    message,
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    message,
+                    ephemeral=True,
+                )
+
         if guild is None:
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+            await send_ephemeral("這個功能只能在伺服器內使用。")
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在派單文字頻道使用。", ephemeral=True)
+            await send_ephemeral("這個功能只能在派單文字頻道使用。")
             return
 
         source_channel = guild.get_channel(self.source_channel_id)
 
         if source_channel is None or not isinstance(source_channel, discord.TextChannel):
-            await interaction.response.send_message("找不到來源票口。", ephemeral=True)
+            await send_ephemeral("找不到來源票口。")
             return
 
         claim_data = self.get_claim_data(interaction.message.id)
@@ -4292,25 +4350,46 @@ class DispatchClaimView(discord.ui.View):
                 inline=False
             )
 
-        await interaction.response.edit_message(
-            embed=new_embed,
-            view=DispatchClaimView(
-                customer_id=self.customer_id,
-                category_label=self.category_label,
-                item=self.item,
-                quantity=_to_int(claim_data.get("quantity"), self.quantity) or 1,
-                payment_method=self.payment_method,
-                source_channel_id=self.source_channel_id,
-                companion_preference=self.companion_preference,
-                locked=bool(claim_data.get("locked")),
-                status=str(claim_data.get("status", "active"))
+        updated_view = DispatchClaimView(
+            customer_id=self.customer_id,
+            category_label=self.category_label,
+            item=self.item,
+            quantity=_to_int(
+                claim_data.get("quantity"),
+                self.quantity,
+            ) or 1,
+            payment_method=self.payment_method,
+            source_channel_id=self.source_channel_id,
+            companion_preference=self.companion_preference,
+            locked=bool(
+                claim_data.get("locked")
             ),
-            allowed_mentions=discord.AllowedMentions(
+            status=str(
+                claim_data.get(
+                    "status",
+                    "active",
+                )
+            ),
+        )
+
+        edit_kwargs = {
+            "embed": new_embed,
+            "view": updated_view,
+            "allowed_mentions": discord.AllowedMentions(
                 users=True,
                 roles=False,
-                everyone=False
+                everyone=False,
+            ),
+        }
+
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                **edit_kwargs
             )
-        )
+        else:
+            await interaction.response.edit_message(
+                **edit_kwargs
+            )
 
 
     async def claim_order(self, interaction: discord.Interaction, claim_type: str):
