@@ -8,6 +8,7 @@ import discord
 
 import services.rewards as rewards
 from core.time_utils import get_taipei_now_iso
+from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
 from services.topups import (
     calculate_topup_preview,
     get_pending_credit_topups,
@@ -220,6 +221,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
 
 def ensure_topup_credit_worker_started(bot: discord.Client) -> None:
     install_wallet_vip_guard()
+    install_legacy_wallet_add_bridge(bot)
     if getattr(bot, "_topup_credit_worker_started", False):
         return
     bot._topup_credit_worker_started = True
