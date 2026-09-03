@@ -588,6 +588,157 @@ body {
 
 <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
 
+<!-- BEGIN MAWAN_R13_3_WORKSPACE_LAYOUT -->
+<style>
+/*
+ * R13.3 ORDER WORKSPACE LAYOUT
+ * Portal 已經有自己的主內容寬度，因此取消舊 standalone page 的二次置中。
+ */
+body.mw-r5-admin
+.mw-r5-legacy-body
+> main.page {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 0 60px !important;
+}
+
+/*
+ * 舊 layout 原本預留左右兩欄，但目前只剩一個 section，
+ * 因此右側會形成空欄。外層改為單一完整內容區。
+ */
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .layout {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+/*
+ * 上半部重新排列：
+ * 1. 訂單資料：整行
+ * 2. Discord / 系統資訊：左下
+ * 3. 此客戶近期訂單：右下
+ */
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .layout
+> section {
+    display: grid !important;
+    grid-template-columns:
+        minmax(0, 1.15fr)
+        minmax(320px, .85fr) !important;
+    gap: 13px !important;
+    align-items: start !important;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .layout
+> section
+> .card {
+    margin-bottom: 0 !important;
+    min-width: 0 !important;
+}
+
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .layout
+> section
+> .card:nth-child(1) {
+    grid-column: 1 / -1 !important;
+}
+
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .layout
+> section
+> .card:nth-child(2) {
+    grid-column: 1 !important;
+}
+
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .layout
+> section
+> .card:nth-child(3) {
+    grid-column: 2 !important;
+}
+
+/* 上方副標題與操作按鈕也直接使用整個可用寬度 */
+body.mw-r5-admin
+.mw-r5-legacy-body
+.page
+> .top {
+    width: 100% !important;
+    max-width: none !important;
+    margin-top: 0 !important;
+    margin-bottom: 16px !important;
+}
+
+/* 編輯工作區與上半部對齊 */
+body.mw-r5-admin
+.mw-r5-legacy-body
+.mw-r8-workspace-editor {
+    width: 100% !important;
+    max-width: none !important;
+    margin-top: 16px !important;
+}
+
+/* 中型畫面開始改回單欄，避免系統資訊被擠太窄 */
+@media (max-width: 1180px) {
+    body.mw-r5-admin
+    .mw-r5-legacy-body
+    .page
+    > .layout
+    > section {
+        grid-template-columns:
+            minmax(0, 1fr) !important;
+    }
+
+    body.mw-r5-admin
+    .mw-r5-legacy-body
+    .page
+    > .layout
+    > section
+    > .card:nth-child(1),
+
+    body.mw-r5-admin
+    .mw-r5-legacy-body
+    .page
+    > .layout
+    > section
+    > .card:nth-child(2),
+
+    body.mw-r5-admin
+    .mw-r5-legacy-body
+    .page
+    > .layout
+    > section
+    > .card:nth-child(3) {
+        grid-column: 1 !important;
+    }
+}
+
+@media (max-width: 720px) {
+    body.mw-r5-admin
+    .mw-r5-legacy-body
+    > main.page {
+        padding-bottom: 40px !important;
+    }
+}
+</style>
+<!-- END MAWAN_R13_3_WORKSPACE_LAYOUT -->
+
 </head>
 
 <body class="mw-r5-admin">
@@ -1304,8 +1455,10 @@ body {
         <form method="post" action="/admin/order-workspace/{{ order.id }}/edit">
             <div class="mw-r8-edit-grid">
                 <label class="mw-r8-field">
-                    <span>結單日期</span>
+                    <span>結案日期</span>
                     <input type="date" name="closed_date" value="{{ order.closed_date or '' }}">
+                    <input type="hidden" name="closed_date_auto" value="">
+                    <input type="hidden" name="closed_date_touched" value="">
                 </label>
 
                 <label class="mw-r8-field">
@@ -1358,22 +1511,25 @@ body {
                 <label class="mw-r8-field">
                     <span>狀態</span>
                     <select name="status">
-                        {% set mw_r8_statuses = [
+                        {% set mw_r13_status_map = {
+                            'created': 'pending_cs_dispatch',
+                            'paid': 'active',
+                            'completed': 'closed',
+                            'done': 'closed',
+                            'canceled': 'cancelled'
+                        } %}
+                        {% set mw_r13_current_status = mw_r13_status_map.get(order.status, order.status) %}
+                        {% set mw_r13_statuses = [
                             ('pending_cs_dispatch', '待客服確認'),
                             ('waiting_acceptance', '等待接單'),
                             ('accepted_pending_pay', '等待付款'),
-                            ('created', '已建立'),
-                            ('paid', '已付款'),
                             ('active', '進行中'),
                             ('stored', '存單'),
-                            ('completed', '已完成'),
-                            ('done', '已完成（done）'),
                             ('closed', '已結單'),
-                            ('cancelled', '已取消'),
-                            ('canceled', '已取消（canceled）')
+                            ('cancelled', '已取消')
                         ] %}
-                        {% for value, label in mw_r8_statuses %}
-                            <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% for value, label in mw_r13_statuses %}
+                            <option value="{{ value }}" {% if mw_r13_current_status == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </label>
@@ -1385,6 +1541,34 @@ body {
 
             <div class="mw-r8-warning">
                 修改這裡會更新網站訂單資料；若該單已有正式接單人員，金額／客服調整會重新計算分潤並保留原本已發放狀態。已送出的 Discord 收據或舊訊息文字不會被這個表單改寫；實際結單／取消流程仍以 Discord 原流程為準。
+            </div>
+        </form>
+    </div>
+
+
+    <!-- MAWAN_R13_ATTENTION_AND_FINAL_DATE -->
+    <div class="mw-r8-editor-card">
+        <div class="mw-r8-editor-head">
+            <div>
+                <small>ATTENTION</small>
+                <h3>需注意訂單</h3>
+                <p>需要客服後續追蹤的訂單可在這裡標記，會同步回營運總覽的需注意區塊。</p>
+            </div>
+        </div>
+
+        <form method="post" action="/admin/order-workspace/{{ order.id }}/attention">
+            <label class="mw-r8-check">
+                <input type="checkbox" name="enabled" value="1" {% if order.needs_attention %}checked{% endif %}>
+                標記為需注意訂單
+            </label>
+
+            <label class="mw-r8-field" style="margin-top:12px;">
+                <span>注意原因</span>
+                <textarea name="attention_reason" maxlength="1000" placeholder="例如：等待客人回覆、付款異常、需客服後續確認">{{ order.attention_reason or '' }}</textarea>
+            </label>
+
+            <div class="mw-r8-actions">
+                <button class="mw-r8-btn primary" type="submit">儲存注意標記</button>
             </div>
         </form>
     </div>
@@ -1506,7 +1690,7 @@ body {
         </div>
     </div>
 </section>
-<!-- END MAWAN_R8_WORKSPACE_EDITOR -->
+<!-- END MAWAN_R8_WORKSPACE_EDITOR -->\n\n<script>\n// MAWAN_R13_FINAL_DATE_AUTOFILL\ndocument.addEventListener("DOMContentLoaded", function () {\n    const statusSelect = document.querySelector('select[name="status"]');\n    const dateInput = document.querySelector('input[name="closed_date"]');\n    const autoInput = document.querySelector('input[name="closed_date_auto"]');\n    const touchedInput = document.querySelector('input[name="closed_date_touched"]');\n\n    if (!statusSelect || !dateInput || !autoInput || !touchedInput) {\n        return;\n    }\n\n    function taipeiDate() {\n        const parts = new Intl.DateTimeFormat("en-US", {\n            timeZone: "Asia/Taipei",\n            year: "numeric",\n            month: "2-digit",\n            day: "2-digit"\n        }).formatToParts(new Date());\n        const values = {};\n        parts.forEach(function (part) {\n            values[part.type] = part.value;\n        });\n        return values.year + "-" + values.month + "-" + values.day;\n    }\n\n    function syncFinalDate() {\n        const isFinal = statusSelect.value === "closed" || statusSelect.value === "cancelled";\n        if (isFinal && !dateInput.value) {\n            dateInput.value = taipeiDate();\n            autoInput.value = "1";\n        } else if (!isFinal && autoInput.value === "1") {\n            dateInput.value = "";\n            autoInput.value = "";\n        }\n    }\n\n    statusSelect.addEventListener("change", syncFinalDate);\n    dateInput.addEventListener("input", function () {\n        autoInput.value = "";\n        touchedInput.value = "1";\n    });\n    syncFinalDate();\n});\n</script>\n
 
 </main>
 

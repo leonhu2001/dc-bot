@@ -2159,27 +2159,42 @@ def build_checkout_preview(
 
     if remaining > 0:
 
+        # 官網建立訂單時不選付款方式。
+        # 接單人數滿後才由 Discord PaymentMethodView 讓顧客選擇。
         if (
             payment_method
+            and payment_method
             not in PAYMENT_METHODS
         ):
 
             raise ValueError(
-                "請選擇付款方式。"
+                "付款方式格式錯誤。"
             )
 
 
-        payment_display = (
-            payment_method
-        )
+        if payment_method:
 
-
-        payment_info = (
-            get_payment_method_info(
+            payment_display = (
                 payment_method
             )
-            or ""
-        )
+
+
+            payment_info = (
+                get_payment_method_info(
+                    payment_method
+                )
+                or ""
+            )
+
+
+        else:
+
+            payment_display = (
+                "接單滿人後於 Discord 選擇"
+            )
+
+
+            payment_info = ""
 
 
     else:

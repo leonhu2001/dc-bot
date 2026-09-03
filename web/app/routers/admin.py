@@ -3070,6 +3070,7 @@ async def admin_order_workspace_r8(
                 """
                 SELECT
                     closed_at,
+                    updated_at,
                     amount,
                     customer_pay_amount,
                     original_amount,
@@ -3084,7 +3085,16 @@ async def admin_order_workspace_r8(
 
         financial = dict(financial) if financial is not None else {}
 
-        order["closed_date"] = str(financial.get("closed_at") or "")[:10]
+        finalized_at = financial.get("closed_at")
+        if (
+            not finalized_at
+            and str(order.get("status") or "").strip().lower()
+            in {"closed", "completed", "done", "cancelled", "canceled"}
+        ):
+            # Historical final orders may predate closed_at-on-cancel. Display the best existing
+            # timestamp without bulk-mutating old rows.
+            finalized_at = financial.get("updated_at")
+        order["closed_date"] = str(finalized_at or "")[:10]
         order["raw_amount"] = _mw4a2r6_safe_int(financial.get("amount"), 0)
         order["customer_pay_amount"] = _mw4a2r6_safe_int(
             financial.get("customer_pay_amount"),
@@ -3141,6 +3151,8 @@ async def admin_order_workspace_edit_r8(
     payment_method: str = Form(default=""),
     status: str = Form(default="active"),
     closed_date: str = Form(default=""),
+    closed_date_auto: str = Form(default=""),
+    closed_date_touched: str = Form(default=""),
     customer_service_discord_id: str = Form(default=""),
 ):
     user = require_admin_user(request)
@@ -3170,6 +3182,8 @@ async def admin_order_workspace_edit_r8(
     payment_method = str(payment_method or "").strip()
     status = str(status or "active").strip().lower()
     closed_date = str(closed_date or "").strip()
+    closed_date_auto = str(closed_date_auto or "").strip().lower()
+    closed_date_touched = str(closed_date_touched or "").strip().lower()
     customer_service_discord_id = str(customer_service_discord_id or "").strip()
 
     if quantity < 1:
@@ -3182,7 +3196,7 @@ async def admin_order_workspace_edit_r8(
         return _mw4a2r6_redirect(order_id, error="訂單狀態不在允許清單。")
 
     if closed_date and not _mw_r8_re.fullmatch(r"\d{4}-\d{2}-\d{2}", closed_date):
-        return _mw4a2r6_redirect(order_id, error="結單日期格式必須是 YYYY-MM-DD。")
+        return _mw4a2r6_redirect(order_id, error="結案日期格式必須是 YYYY-MM-DD。")
 
     db = SessionLocal()
 
@@ -3239,10 +3253,21 @@ async def admin_order_workspace_edit_r8(
                     payment_method = :payment_method,
                     status = :status,
                     closed_at = CASE
-                        WHEN :closed_date <> '' THEN :closed_date
-                        WHEN :status IN ('closed', 'completed', 'done')
+                        WHEN COALESCE(closed_at, '') <> ''
+                             AND :closed_date_touched NOT IN ('1', 'true', 'yes', 'on')
+                             AND substr(closed_at, 1, 10) = :closed_date
+                        THEN closed_at
+                        WHEN :closed_date_auto IN ('1', 'true', 'yes', 'on')
+                             AND :status IN ('closed', 'completed', 'done', 'cancelled', 'canceled')
                              AND COALESCE(closed_at, '') = ''
-                        THEN datetime('now')
+                        THEN datetime('now', '+8 hours')
+                        WHEN :closed_date_touched IN ('1', 'true', 'yes', 'on')
+                             AND :closed_date <> ''
+                        THEN :closed_date
+                        WHEN :status IN ('closed', 'completed', 'done', 'cancelled', 'canceled')
+                             AND COALESCE(closed_at, '') = ''
+                             AND :closed_date = ''
+                        THEN datetime('now', '+8 hours')
                         ELSE closed_at
                     END,
                     updated_at = datetime('now')
@@ -3261,6 +3286,8 @@ async def admin_order_workspace_edit_r8(
                 "payment_method": payment_method or None,
                 "status": status,
                 "closed_date": closed_date,
+                "closed_date_auto": closed_date_auto,
+                "closed_date_touched": closed_date_touched,
                 "order_id": int(order_id),
             },
         )

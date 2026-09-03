@@ -131,7 +131,7 @@ def upsert_web_order_from_dispatch(
         order.payment_method = payment_method or "未紀錄"
         next_status = str(status or "active")
         order.status = next_status
-        if next_status == "closed" and not getattr(order, "closed_at", None):
+        if next_status in {"closed", "cancelled", "canceled"} and not getattr(order, "closed_at", None):
             order.closed_at = _web_order_closed_at_now()
         order.customer_service_discord_id = _to_text_id(customer_service_discord_id)
         order.customer_service_display_name = customer_service_display_name
@@ -181,8 +181,7 @@ def update_web_order_status_by_ticket_channel(
 
         order.status = next_status
 
-        if next_status == "closed" and not getattr(order, "closed_at", None):
-
+        if next_status in {"closed", "cancelled", "canceled"} and not getattr(order, "closed_at", None):
             order.closed_at = _web_order_closed_at_now()
         dispatch_message_id_text = _to_text_id(dispatch_message_id)
         if dispatch_message_id_text:
