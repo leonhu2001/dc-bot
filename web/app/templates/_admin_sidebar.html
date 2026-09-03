@@ -17,8 +17,6 @@
             營運總覽
         </a>
 
-
-
         <a
             class="{% if _p.startswith('/admin/staff') %}active{% endif %}"
             href="/admin/staff"
@@ -31,6 +29,13 @@
             href="/admin/customers"
         >
             客戶管理
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/topups') %}active{% endif %}"
+            href="/admin/topups"
+        >
+            儲值審核
         </a>
 
         <a
