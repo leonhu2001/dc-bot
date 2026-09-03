@@ -80,6 +80,13 @@ class TopupOrderView(discord.ui.View):
 class TopupPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="網站錢包",
+                style=discord.ButtonStyle.link,
+                url="https://mowanentertainment.com/me/wallet",
+            )
+        )
 
     @discord.ui.button(
         label="我要儲值",
@@ -89,11 +96,3 @@ class TopupPanelView(discord.ui.View):
     )
     async def open_topup(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TopupAmountModal())
-
-    @discord.ui.button(
-        label="網站錢包",
-        style=discord.ButtonStyle.link,
-        url="https://mowanentertainment.com/me/wallet",
-    )
-    async def website_wallet(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass
