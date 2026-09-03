@@ -22,6 +22,10 @@ from services.topups import (
     mark_topup_processing,
     reset_topup_credit_error,
 )
+from services.vip_progress_repair import (
+    repair_all_legacy_vip_progress,
+    repair_vip_progress_data,
+)
 from services.wallet_service import adjust_wallet_balance, find_wallet_transaction, get_wallet_balance
 
 TOPUP_REVIEW_CHANNEL_ID = 1502040302649872394
@@ -33,8 +37,57 @@ TOPUP_REVIEW_URL = (
 )
 
 
+async def _sync_member_vip_benefits(
+    guild: discord.Guild | None,
+    customer_id: int,
+    data: dict,
+) -> None:
+    if guild is None:
+        return
+
+    member = await rewards.fetch_member_safely(guild, customer_id)
+    if member is not None:
+        await rewards.ensure_reward_member_benefits(guild, member, data)
+
+
+async def _repair_stuck_vip_members(bot: discord.Client) -> None:
+    repaired = repair_all_legacy_vip_progress()
+    if not repaired:
+        print("[vip-repair] no stuck VIP progress found", flush=True)
+        return
+
+    guilds = list(getattr(bot, "guilds", []) or [])
+    guild = guilds[0] if guilds else None
+
+    for item in repaired:
+        customer_id = int(item["user_id"])
+        data = rewards.get_customer_reward_data(customer_id)
+        try:
+            await _sync_member_vip_benefits(guild, customer_id, data)
+        except Exception:
+            print(
+                f"[vip-repair] role sync failed user={customer_id}\n"
+                f"{traceback.format_exc()}",
+                flush=True,
+            )
+
+    if rewards._SAVE_BOT_DATA is not None:
+        rewards._SAVE_BOT_DATA()
+
+    for item in repaired:
+        print(
+            "[vip-repair] repaired "
+            f"user={item['user_id']} "
+            f"{item['old_level']} -> {item['new_level']} "
+            f"total={item['total_spent']}",
+            flush=True,
+        )
+
+    print(f"[vip-repair] repaired members: {len(repaired)}", flush=True)
+
+
 def install_wallet_vip_guard() -> None:
-    """把 bot.py 已匯入的結單 VIP 函式包一層，防止錢包付款重複累積 VIP。"""
+    """包住結單會員紀錄：錢包付款不重複計 VIP，其他付款補做 VIP 自動升級。"""
     target_module = None
     for module in list(sys.modules.values()):
         if module is None:
@@ -59,7 +112,7 @@ def install_wallet_vip_guard() -> None:
         payment_method = str(order_data.get("payment_method") or "").strip()
 
         if payment_method != "我的錢包":
-            return await original(
+            result = await original(
                 guild,
                 order_channel_id,
                 customer_id,
@@ -67,10 +120,26 @@ def install_wallet_vip_guard() -> None:
                 notify_channel=notify_channel,
             )
 
+            data = rewards.get_customer_reward_data(customer_id)
+            changed, old_level, new_level = repair_vip_progress_data(data)
+            if changed:
+                await _sync_member_vip_benefits(guild, customer_id, data)
+                if rewards._SAVE_BOT_DATA is not None:
+                    rewards._SAVE_BOT_DATA()
+
+                if int(new_level.get("threshold", 0) or 0) > int(old_level.get("threshold", 0) or 0):
+                    result += f"\n🎉 VIP 已自動升級為「{new_level['name']}」。"
+
+            return result
+
         if order_data.get("reward_counted"):
             return "此訂單已處理會員紀錄，未重複累積。"
 
         data = rewards.get_customer_reward_data(customer_id)
+        vip_changed, _, _ = repair_vip_progress_data(data)
+        if vip_changed:
+            await _sync_member_vip_benefits(guild, customer_id, data)
+
         data["order_count"] = int(data.get("order_count", 0) or 0) + 1
         data["last_order_at"] = get_taipei_now_iso()
         data["points"] = rewards.get_current_reward_points(data)
@@ -185,6 +254,9 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
 
     try:
         data = rewards.get_customer_reward_data(customer_id)
+        repair_vip_progress_data(data)
+        old_level = rewards.get_effective_member_level(data)
+
         reward_key = f"topup:{topup_no}"
         reward_keys = data.setdefault("manual_purchase_keys", [])
         if not isinstance(reward_keys, list):
@@ -233,7 +305,6 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
                 )
 
         if reward_key not in reward_keys:
-            old_level = rewards.get_effective_member_level(data)
             points_before = rewards.get_current_reward_points(data)
 
             data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
@@ -245,22 +316,25 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
             data["point_adjustment"] = int(points_before) - int(base_points_after)
             data["points"] = int(points_before)
 
+            # 先沿用原本降級後重新累積的規則，再修復沒有降級紀錄卻卡階的舊資料。
             rewards.sync_vip_level_to_cumulative_if_higher(data)
+            repair_vip_progress_data(data)
 
-            guild = None
             guilds = list(getattr(bot, "guilds", []) or [])
-            if guilds:
-                guild = guilds[0]
-            if guild is not None:
-                member = await rewards.fetch_member_safely(guild, customer_id)
-                await rewards.ensure_reward_member_benefits(guild, member, data)
+            guild = guilds[0] if guilds else None
+            await _sync_member_vip_benefits(guild, customer_id, data)
 
             if rewards._SAVE_BOT_DATA is not None:
                 rewards._SAVE_BOT_DATA()
 
-            new_level = rewards.get_effective_member_level(data)
-            if new_level.get("threshold", 0) < old_level.get("threshold", 0):
-                raise RuntimeError("VIP 等級計算異常：儲值後等級不應下降。")
+        new_level = rewards.get_effective_member_level(data)
+        if new_level.get("threshold", 0) < old_level.get("threshold", 0):
+            raise RuntimeError("VIP 等級計算異常：儲值後等級不應下降。")
+
+        # 寫入儲值單的 VIP 顯示以真正完成後的會員等級為準。
+        preview = dict(preview)
+        preview["vip_level_after"] = str(new_level.get("name") or preview["vip_level_after"])
+        preview["vip_total_after"] = int(data.get("total_spent", preview["vip_total_after"]) or 0)
 
         mark_topup_completed(
             topup_id,
@@ -278,14 +352,17 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
         if user is not None:
             try:
                 balance = get_wallet_balance(customer_id)
+                upgraded = int(new_level.get("threshold", 0) or 0) > int(old_level.get("threshold", 0) or 0)
                 text = (
                     f"✅ 儲值完成｜`{topup_no}`\n"
                     f"儲值本金：**{amount:,}T**\n"
-                    f"VIP 等級：**{preview['vip_level_after']}**\n"
+                    f"VIP 等級：**{new_level['name']}**\n"
                     f"儲值回饋：**{preview['rebate_percent']}%（+{bonus_amount:,}T）**\n"
                     f"本次實得：**{int(preview['credited_amount']):,}T**\n"
                     f"目前錢包餘額：**{balance:,}T**"
                 )
+                if upgraded:
+                    text += f"\n\n🎉 恭喜升級為「**{new_level['name']}**」！"
                 await user.send(text)
             except Exception:
                 pass
@@ -297,6 +374,8 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
 
 async def topup_credit_worker(bot: discord.Client) -> None:
     await bot.wait_until_ready()
+    await _repair_stuck_vip_members(bot)
+
     while not bot.is_closed():
         try:
             await _notify_pending_reviews(bot)
