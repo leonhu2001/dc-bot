@@ -1,0 +1,52 @@
+{% extends "site_layout.html" %}
+{% block content %}
+<section class="site-section" style="max-width:900px;margin:0 auto;padding-top:48px">
+  <div class="section-heading">
+    <div><div class="section-eyebrow">TOPUP</div><h1>{{ topup.topup_no }}</h1></div>
+    <p>{{ status_label }}</p>
+  </div>
+
+  {% if error %}<div class="member-alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="member-alert">{{ ok }}</div>{% endif %}
+
+  <section class="member-panel member-panel-wide">
+    <div class="member-benefit-row">
+      <div><span>儲值本金</span><strong>{{ topup.amount_text }}</strong></div>
+      <div><span>完成後 VIP</span><strong>{{ preview.vip_level_after }}</strong></div>
+      <div><span>預計回饋</span><strong>{{ preview.rebate_percent }}% / +{{ "{:,}".format(preview.rebate_amount) }}T</strong></div>
+      <div><span>預計實得</span><strong>{{ "{:,}".format(preview.credited_amount) }}T</strong></div>
+    </div>
+  </section>
+
+  {% if topup.status == 'pending_payment' or topup.status == 'pending_review' %}
+  <section class="member-panel member-panel-wide" style="margin-top:18px">
+    <div class="member-panel-head"><div><small>PAYMENT</small><h3>銀行轉帳</h3></div></div>
+    <div style="display:grid;gap:10px;margin-bottom:18px">
+      <strong>國泰世華 013</strong>
+      <strong>帳號：135700021419</strong>
+      <span style="opacity:.72">請完成付款後填寫銀行帳號末五碼，客服確認後才會正式入帳。</span>
+    </div>
+    <form method="post" action="/me/wallet/topup/{{ topup.id }}/submit" style="display:grid;gap:12px">
+      <input name="bank_last5" inputmode="numeric" maxlength="5" required placeholder="銀行帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
+      <textarea name="payment_note" rows="3" placeholder="付款備註（選填）" style="padding:12px 14px;border-radius:12px"></textarea>
+      <button class="discord-login" type="submit" style="justify-content:center">我已完成付款</button>
+    </form>
+    <form method="post" action="/me/wallet/topup/{{ topup.id }}/cancel" style="margin-top:10px">
+      <button type="submit" class="discord-login" style="justify-content:center;opacity:.72">取消儲值單</button>
+    </form>
+  </section>
+  {% elif topup.status == 'completed' %}
+  <section class="member-panel member-panel-wide" style="margin-top:18px">
+    <div class="member-panel-head"><div><small>COMPLETED</small><h3>儲值完成</h3></div></div>
+    <div class="member-benefit-row">
+      <div><span>本金</span><strong>{{ topup.amount_text }}</strong></div>
+      <div><span>VIP 回饋</span><strong>+{{ topup.rebate_amount_text }}</strong></div>
+      <div><span>實際入帳</span><strong>{{ topup.credited_amount_text }}</strong></div>
+      <div><span>VIP 等級</span><strong>{{ topup.vip_level_after }}</strong></div>
+    </div>
+  </section>
+  {% endif %}
+
+  <div style="margin-top:18px"><a href="/me/wallet">← 返回我的錢包</a></div>
+</section>
+{% endblock %}
