@@ -43,6 +43,9 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
             )
             """
         )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference ON wallet_transactions(customer_discord_id, order_no, type)"
+        )
         conn.commit()
 
 
@@ -55,6 +58,28 @@ def get_wallet_balance(customer_id: str | int, db_file: str | Path | None = None
             (str(customer_id),),
         ).fetchone()
         return int(row[0] or 0) if row else 0
+
+
+def find_wallet_transaction(
+    *,
+    customer_id: str | int,
+    order_no: str,
+    tx_type: str,
+    db_file: str | Path | None = None,
+) -> dict[str, Any] | None:
+    ensure_wallet_tables(db_file)
+    path = _db_path(db_file)
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT * FROM wallet_transactions
+            WHERE customer_discord_id=? AND order_no=? AND type=?
+            ORDER BY id DESC LIMIT 1
+            """,
+            (str(customer_id), str(order_no), str(tx_type)),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def adjust_wallet_balance(
