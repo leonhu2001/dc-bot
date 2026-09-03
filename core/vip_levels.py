@@ -122,6 +122,22 @@ VIP_ROLE_TIERS: list[dict[str, int | str]] = [
 VIP_ROLE_IDS: list[int] = [int(level["role_id"]) for level in VIP_LEVELS]
 SILVER_MEMBER_ROLE_ID: int = int(VIP_LEVELS[0]["role_id"])
 
+# 儲值回饋依「本次儲值完成後」的有效 VIP 等級計算。
+# 銀級 / 金級尚未有儲值返利，因此為 0%。
+VIP_TOPUP_REBATE_PERCENT: dict[str, int] = {
+    "普通魔丸": 0,
+    "銀級魔丸": 0,
+    "金級魔丸": 0,
+    "白金魔丸": 2,
+    "鑽石魔丸": 3,
+    "白鑽魔丸": 4,
+    "黑鑽魔丸": 5,
+}
+
+
+def get_topup_rebate_percent(level_name: str | None) -> int:
+    return int(VIP_TOPUP_REBATE_PERCENT.get(str(level_name or "普通魔丸"), 0))
+
 
 def build_vip_level_benefits() -> dict[str, str]:
     benefits: dict[str, str] = {"普通魔丸": "尚未解鎖 VIP 福利。"}
