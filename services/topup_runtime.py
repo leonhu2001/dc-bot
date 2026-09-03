@@ -9,6 +9,11 @@ import discord
 import services.rewards as rewards
 from core.time_utils import get_taipei_now_iso
 from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
+from services.topup_notifications import (
+    ensure_topup_notification_columns,
+    list_unnotified_pending_reviews,
+    mark_review_notified,
+)
 from services.topups import (
     calculate_topup_preview,
     ensure_topup_tables,
@@ -18,6 +23,14 @@ from services.topups import (
     reset_topup_credit_error,
 )
 from services.wallet_service import adjust_wallet_balance, find_wallet_transaction, get_wallet_balance
+
+TOPUP_REVIEW_CHANNEL_ID = 1502040302649872394
+CUSTOMER_SERVICE_ROLE_ID = 1482084782031638548
+TOPUP_REVIEW_URL = (
+    "https://mowanentertainment.com/admin/topups?ok="
+    "%E5%B7%B2%E6%A0%B8%E5%87%86%EF%BC%8CBot%20%E5%B0%87%E8%87%AA%E5%8B%95%E5%AE%8C%E6%88%90"
+    "%E9%8C%A2%E5%8C%85%E8%88%87%20VIP%20%E5%85%A5%E5%B8%B3"
+)
 
 
 def install_wallet_vip_guard() -> None:
@@ -83,6 +96,80 @@ def install_wallet_vip_guard() -> None:
     setattr(target_module, "add_customer_reward_from_order", guarded_add_customer_reward_from_order)
     target_module._wallet_vip_guard_installed = True
     print("[topup] wallet VIP double-count guard installed", flush=True)
+
+
+async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
+    channel = bot.get_channel(TOPUP_REVIEW_CHANNEL_ID)
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(TOPUP_REVIEW_CHANNEL_ID)
+        except Exception:
+            channel = None
+
+    if channel is None or not hasattr(channel, "send"):
+        raise RuntimeError(f"找不到儲值審核通知頻道 {TOPUP_REVIEW_CHANNEL_ID}")
+
+    customer_id = str(row.get("customer_discord_id") or "").strip()
+    customer_name = str(row.get("customer_display_name") or "").strip() or customer_id or "未知"
+    topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
+    amount = int(row.get("amount") or 0)
+    bank_last5 = str(row.get("bank_last5") or "—")
+    source = str(row.get("source") or "").strip()
+    source_label = {
+        "web": "網站",
+        "discord": "Discord",
+        "discord_staff": "客服指令",
+    }.get(source, source or "未知")
+
+    embed = discord.Embed(
+        title="💰 新儲值待審核",
+        description="老闆已送出付款資料，請客服確認款項後前往後台審核。",
+        color=discord.Color.gold(),
+    )
+    embed.add_field(name="儲值單", value=f"`{topup_no}`", inline=False)
+    embed.add_field(name="老闆", value=f"{customer_name}\n`{customer_id}`", inline=True)
+    embed.add_field(name="儲值金額", value=f"{amount:,}T", inline=True)
+    embed.add_field(name="銀行末五碼", value=bank_last5, inline=True)
+    embed.add_field(name="來源", value=source_label, inline=True)
+
+    note = str(row.get("payment_note") or "").strip()
+    if note:
+        embed.add_field(name="付款備註", value=note[:1000], inline=False)
+
+    view = discord.ui.View(timeout=None)
+    view.add_item(
+        discord.ui.Button(
+            label="前往審核",
+            style=discord.ButtonStyle.link,
+            url=TOPUP_REVIEW_URL,
+        )
+    )
+
+    message = await channel.send(
+        content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> 有新的儲值付款待審核。",
+        embed=embed,
+        view=view,
+        allowed_mentions=discord.AllowedMentions(
+            everyone=False,
+            users=False,
+            roles=True,
+        ),
+    )
+    mark_review_notified(int(row["id"]), message.id)
+    print(f"[topup] review notification sent: {topup_no}", flush=True)
+
+
+async def _notify_pending_reviews(bot: discord.Client) -> None:
+    rows = list_unnotified_pending_reviews(limit=20)
+    for row in rows:
+        try:
+            await _notify_one_pending_review(bot, row)
+        except Exception:
+            print(
+                f"[topup] review notification failed id={row.get('id')}\n"
+                f"{traceback.format_exc()}",
+                flush=True,
+            )
 
 
 async def _process_one_topup(bot: discord.Client, row: dict) -> None:
@@ -212,6 +299,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
     await bot.wait_until_ready()
     while not bot.is_closed():
         try:
+            await _notify_pending_reviews(bot)
             rows = get_pending_credit_topups(limit=20)
             for row in rows:
                 await _process_one_topup(bot, row)
@@ -222,6 +310,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
 
 def ensure_topup_credit_worker_started(bot: discord.Client) -> None:
     ensure_topup_tables()
+    ensure_topup_notification_columns()
     install_wallet_vip_guard()
     install_legacy_wallet_add_bridge(bot)
     if getattr(bot, "_topup_credit_worker_started", False):
