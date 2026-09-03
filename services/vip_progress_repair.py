@@ -12,6 +12,11 @@ def _to_int(value: Any, default: int | None = None) -> int | None:
         return default
 
 
+def _max_member_level_index() -> int:
+    # 以既有公開函式取得最高階級 index，避免依賴 rewards 私有常數。
+    return rewards.get_member_level_index_by_total_spent(10**18)
+
+
 def has_active_downgrade_reset(data: dict) -> bool:
     """只有真正有降級紀錄的會員，才套用降級後重新累積規則。"""
     base_total = _to_int(data.get("vip_progress_base_total_spent"))
@@ -39,7 +44,7 @@ def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
         old_level = rewards.get_member_level_by_index(stored_index)
         return True, old_level, old_level
 
-    stored_index = max(0, min(stored_index, len(rewards._MEMBER_LEVELS) - 1))
+    stored_index = max(0, min(stored_index, _max_member_level_index()))
     old_level = rewards.get_member_level_by_index(stored_index)
 
     if has_active_downgrade_reset(data):
