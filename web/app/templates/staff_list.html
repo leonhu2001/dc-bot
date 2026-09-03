@@ -1,0 +1,192 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="crew-page-hero">
+
+    <div class="crew-page-heading">
+
+        <div class="section-eyebrow">
+            MEET THE CREW
+        </div>
+
+        <h1>
+            今晚想跟誰玩？
+        </h1>
+
+        <p>
+            看個人介紹、完成單數與真實評價，
+            找到適合今晚氣氛的人。
+        </p>
+
+    </div>
+
+</section>
+
+
+<section class="site-section crew-directory">
+
+    <div class="crew-filters">
+
+        <a
+            href="/staff?role=all"
+            class="{% if role_filter == 'all' %}is-active{% endif %}"
+        >
+            全部
+        </a>
+
+        <a
+            href="/staff?role=female_companion"
+            class="{% if role_filter == 'female_companion' %}is-active{% endif %}"
+        >
+            女陪
+        </a>
+
+        <a
+            href="/staff?role=male_companion"
+            class="{% if role_filter == 'male_companion' %}is-active{% endif %}"
+        >
+            男陪
+        </a>
+
+        <a
+            href="/staff?role=protector"
+            class="{% if role_filter == 'protector' %}is-active{% endif %}"
+        >
+            護航
+        </a>
+
+    </div>
+
+
+    {% if profiles %}
+
+        <div class="public-crew-grid">
+
+            {% for profile in profiles %}
+
+                <article class="public-crew-card">
+
+                    <a
+                        class="public-crew-photo"
+                        href="/staff/{{ profile.staff_id }}"
+                    >
+                        <img
+                            src="{{ profile.avatar_url }}"
+                            alt="{{ profile.display_name }}"
+                            loading="lazy"
+                            decoding="async"
+                            onerror="this.onerror=null;this.src='/static/img/server_logo.gif';this.classList.add('avatar-fallback');"
+                        >
+
+                        <span class="public-crew-role">
+                            {{ profile.role_title }}
+                        </span>
+                    </a>
+
+
+                    <div class="public-crew-content">
+
+                        <div class="public-crew-name-row">
+
+                            <div>
+                                <small>
+                                    {{ profile.profile_type }}
+                                </small>
+
+                                <h2>
+                                    {{ profile.display_name }}
+                                </h2>
+                            </div>
+
+                            {% if profile.is_favorite %}
+                                <span
+                                    class="favorite-mark"
+                                    title="已收藏"
+                                >
+                                    ♥
+                                </span>
+                            {% endif %}
+
+                        </div>
+
+
+                        {% if profile.main_games %}
+                            <p class="public-crew-games">
+                                {{ profile.main_games }}
+                            </p>
+                        {% endif %}
+
+
+                        <div class="public-crew-stats">
+
+                            <div>
+                                <strong>
+                                    {{ profile.average_rating_text }}
+                                </strong>
+
+                                <span>
+                                    評分
+                                </span>
+                            </div>
+
+                            <div>
+                                <strong>
+                                    {{ profile.completed_count }}
+                                </strong>
+
+                                <span>
+                                    完成
+                                </span>
+                            </div>
+
+                            <div>
+                                <strong>
+                                    {{ profile.favorite_count }}
+                                </strong>
+
+                                <span>
+                                    收藏
+                                </span>
+                            </div>
+
+                        </div>
+
+
+                        <a
+                            class="public-crew-more"
+                            href="/staff/{{ profile.staff_id }}"
+                        >
+                            查看個人牆
+                            <span>→</span>
+                        </a>
+
+                    </div>
+
+                </article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="crew-empty-state">
+
+            <div>◇</div>
+
+            <h2>
+                目前這個分類還沒有公開個人牆
+            </h2>
+
+            <p>
+                可以切換其他分類看看。
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

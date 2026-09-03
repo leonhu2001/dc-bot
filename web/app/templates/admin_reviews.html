@@ -1,0 +1,280 @@
+{% extends "layout.html" %}
+
+{% block page_title %}
+評價管理
+{% endblock %}
+
+
+{% block content %}
+
+<form
+    class="mw-review-toolbar"
+    method="get"
+    action="/admin/reviews/"
+>
+
+    <label>
+
+        <span>
+            成員 Discord ID
+        </span>
+
+        <input
+            name="staff_id"
+            value="{{ staff_id }}"
+            placeholder="搜尋成員 Discord ID"
+        >
+
+    </label>
+
+
+    <label>
+
+        <span>
+            公開狀態
+        </span>
+
+        <select name="public">
+
+            <option
+                value=""
+                {% if public not in ["0", "1"] %}
+                    selected
+                {% endif %}
+            >
+                全部
+            </option>
+
+            <option
+                value="1"
+                {% if public == "1" %}
+                    selected
+                {% endif %}
+            >
+                公開
+            </option>
+
+            <option
+                value="0"
+                {% if public == "0" %}
+                    selected
+                {% endif %}
+            >
+                不公開
+            </option>
+
+        </select>
+
+    </label>
+
+
+    <button type="submit">
+        篩選
+    </button>
+
+</form>
+
+
+<div class="mw-review-summary">
+
+    目前顯示最多 300 筆評價。
+    不留評價紀錄：
+    <strong>
+        {{ skip_count }}
+    </strong>
+    筆。
+
+</div>
+
+
+<section class="mw-review-panel">
+
+    <div class="mw-review-scroll">
+
+        <table class="mw-review-table">
+
+            <thead>
+
+                <tr>
+
+                    <th>ID</th>
+                    <th>訂單</th>
+                    <th>人員</th>
+                    <th>客戶</th>
+                    <th>評分</th>
+                    <th>服務</th>
+                    <th>評語</th>
+                    <th>狀態</th>
+                    <th>時間</th>
+                    <th>操作</th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+            {% if rows %}
+
+                {% for row in rows %}
+
+                    <tr>
+
+                        <td>
+                            {{ row.id }}
+                        </td>
+
+                        <td>
+                            WEB-{{ row.order_id or "" }}
+                        </td>
+
+                        <td>
+
+                            <strong>
+                                {{
+                                    row.staff_display_name
+                                    or "未記錄"
+                                }}
+                            </strong>
+
+                            <br>
+
+                            <small>
+                                {{
+                                    row.staff_discord_id
+                                }}
+                            </small>
+
+                        </td>
+
+                        <td>
+                            {{
+                                row.customer_discord_id
+                                or "—"
+                            }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ row.rating }}/5
+                            </strong>
+                        </td>
+
+                        <td>
+
+                            {{
+                                row.service_category
+                                or "—"
+                            }}
+
+                            {% if row.service_item %}
+
+                                <br>
+                                {{ row.service_item }}
+
+                            {% endif %}
+
+                        </td>
+
+                        <td class="mw-review-comment">
+
+                            {{
+                                row.comment
+                                or "沒有文字評語"
+                            }}
+
+                        </td>
+
+                        <td>
+
+                            {% if row.is_public %}
+
+                                公開
+
+                            {% else %}
+
+                                不公開
+
+                            {% endif %}
+
+                            <br>
+
+                            {% if row.is_hidden %}
+
+                                已隱藏
+
+                            {% else %}
+
+                                顯示中
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            {{ row.created_at }}
+                        </td>
+
+                        <td>
+
+                            <div class="mw-review-actions">
+
+                                <form
+                                    method="post"
+                                    action="/admin/reviews/{{ row.id }}/toggle-hidden"
+                                >
+
+                                    <button type="submit">
+                                        切換隱藏
+                                    </button>
+
+                                </form>
+
+
+                                <form
+                                    method="post"
+                                    action="/admin/reviews/{{ row.id }}/toggle-public"
+                                >
+
+                                    <button type="submit">
+                                        切換公開
+                                    </button>
+
+                                </form>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+            {% else %}
+
+                <tr>
+
+                    <td
+                        colspan="10"
+                        style="
+                            padding:34px;
+                            text-align:center;
+                        "
+                    >
+                        目前沒有符合條件的評價。
+                    </td>
+
+                </tr>
+
+            {% endif %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+{% endblock %}

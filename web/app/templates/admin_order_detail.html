@@ -1,0 +1,1590 @@
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+    {{ title }}
+</title>
+
+<!-- MAWAN_PHASE_4A2R6_DETAIL -->
+
+<style>
+
+* {
+    box-sizing:border-box;
+}
+
+:root {
+    --bg:#080807;
+    --panel:#11110f;
+    --line:rgba(255,255,255,.085);
+    --gold-line:rgba(223,183,92,.24);
+    --gold:#dfb75c;
+    --gold2:#f2d68d;
+    --text:#f4f2eb;
+    --muted:#8e8b83;
+    --red:#e47474;
+    --green:#7bd59b;
+}
+
+html,
+body {
+    margin:0;
+    min-height:100%;
+    color:var(--text);
+    background:
+        radial-gradient(
+            circle at 75% -10%,
+            rgba(220,172,67,.07),
+            transparent 28%
+        ),
+        var(--bg);
+    font-family:
+        Inter,
+        "Noto Sans TC",
+        "Microsoft JhengHei",
+        system-ui,
+        sans-serif;
+}
+
+a {
+    color:inherit;
+    text-decoration:none;
+}
+
+button,
+input,
+select,
+textarea {
+    font:inherit;
+}
+
+.page {
+    width:
+        min(
+            1380px,
+            calc(100% - 34px)
+        );
+    margin:0 auto;
+    padding:30px 0 60px;
+}
+
+.top {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:18px;
+    margin-bottom:20px;
+}
+
+.eyebrow {
+    color:var(--gold);
+    font-size:9px;
+    font-weight:950;
+    letter-spacing:.18em;
+}
+
+h1 {
+    margin:6px 0 0;
+    font-size:
+        clamp(29px,4vw,45px);
+}
+
+.subtitle {
+    margin-top:7px;
+    color:var(--muted);
+    font-size:12px;
+}
+
+.actions {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.button {
+    min-height:39px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 13px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    color:#c8c4ba;
+    background:
+        rgba(255,255,255,.025);
+    cursor:pointer;
+    font-size:11px;
+    font-weight:900;
+}
+
+.button.gold {
+    color:var(--gold2);
+    border-color:var(--gold-line);
+    background:
+        rgba(223,183,92,.06);
+}
+
+.notice {
+    margin-bottom:13px;
+    padding:12px 14px;
+    border-radius:10px;
+    font-size:12px;
+    font-weight:850;
+}
+
+.notice.success {
+    color:#a8e1bb;
+    border:
+        1px solid
+        rgba(123,213,155,.25);
+    background:
+        rgba(123,213,155,.06);
+}
+
+.notice.error {
+    color:#efa0a0;
+    border:
+        1px solid
+        rgba(228,116,116,.25);
+    background:
+        rgba(228,116,116,.06);
+}
+
+.layout {
+    display:grid;
+    grid-template-columns:
+        minmax(0,1.6fr)
+        minmax(310px,.72fr);
+    gap:13px;
+}
+
+.card {
+    overflow:hidden;
+    margin-bottom:13px;
+    border:1px solid var(--line);
+    border-radius:13px;
+    background:var(--panel);
+}
+
+.card-head {
+    min-height:52px;
+    display:flex;
+    align-items:center;
+    padding:0 15px;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+    font-weight:950;
+}
+
+.grid {
+    display:grid;
+    grid-template-columns:
+        repeat(3,minmax(0,1fr));
+    gap:1px;
+    background:var(--line);
+}
+
+.cell {
+    min-height:82px;
+    padding:13px;
+    background:#0d0d0c;
+}
+
+.cell.wide {
+    grid-column:span 2;
+}
+
+.cell.full {
+    grid-column:1 / -1;
+}
+
+.label {
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+}
+
+.value {
+    margin-top:7px;
+    font-size:11px;
+    line-height:1.65;
+    word-break:break-word;
+}
+
+.pill {
+    display:inline-flex;
+    margin:2px 4px 2px 0;
+    padding:5px 8px;
+    border:1px solid var(--line);
+    border-radius:999px;
+    font-size:9px;
+}
+
+.form {
+    padding:15px;
+}
+
+.field {
+    display:grid;
+    gap:6px;
+    margin-bottom:12px;
+}
+
+.field label {
+    color:var(--muted);
+    font-size:9px;
+    font-weight:900;
+}
+
+.input,
+.select,
+.textarea {
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:8px;
+    outline:0;
+    color:var(--text);
+    background:#0b0b0a;
+    font-size:11px;
+}
+
+.input,
+.select {
+    min-height:39px;
+    padding:0 10px;
+}
+
+.textarea {
+    min-height:125px;
+    padding:10px;
+    resize:vertical;
+    line-height:1.6;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+    border-color:
+        rgba(223,183,92,.45);
+}
+
+.history {
+    display:grid;
+}
+
+.history a {
+    display:grid;
+    grid-template-columns:
+        105px
+        minmax(0,1fr)
+        auto;
+    gap:10px;
+    padding:11px 13px;
+    border-bottom:1px solid var(--line);
+}
+
+.history a:last-child {
+    border-bottom:0;
+}
+
+.history strong {
+    color:var(--gold2);
+    font-size:9px;
+}
+
+.history span {
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+    font-size:10px;
+}
+
+.history small {
+    color:var(--muted);
+    font-size:9px;
+}
+
+.empty {
+    padding:28px 15px;
+    color:var(--muted);
+    text-align:center;
+    font-size:11px;
+}
+
+.meta {
+    margin-top:8px;
+    color:var(--muted);
+    font-size:9px;
+}
+
+@media (max-width:900px) {
+
+    .layout {
+        grid-template-columns:1fr;
+    }
+
+}
+
+@media (max-width:620px) {
+
+    .page {
+        width:
+            calc(100% - 22px);
+        padding-top:20px;
+    }
+
+    .top {
+        display:block;
+    }
+
+    .actions {
+        margin-top:13px;
+    }
+
+    .grid {
+        grid-template-columns:1fr;
+    }
+
+    .cell.wide,
+    .cell.full {
+        grid-column:auto;
+    }
+
+}
+
+
+
+/* MAWAN_PHASE_4B1_FONT_SCALE_V1 */
+
+/*
+ * 客服後台共用字級提升。
+ * 不改原本 layout 結構，只提高可讀性。
+ */
+
+body {
+    font-size:
+        14px;
+}
+
+
+/* ==========================================================
+   ADMIN DASHBOARD
+   ========================================================== */
+
+.sidebar .brand small {
+    font-size:
+        11px;
+}
+
+.sidebar .brand strong {
+    font-size:
+        24px;
+}
+
+.nav a {
+    font-size:
+        13px;
+}
+
+.eyebrow {
+    font-size:
+        11px;
+}
+
+.subtitle {
+    font-size:
+        13px;
+}
+
+.button {
+    min-height:
+        40px;
+    font-size:
+        12px;
+}
+
+.notice {
+    font-size:
+        13px;
+}
+
+.stat span {
+    font-size:
+        11px;
+}
+
+.stat strong {
+    font-size:
+        32px;
+}
+
+.panel-head strong {
+    font-size:
+        15px;
+}
+
+.count {
+    min-width:
+        28px;
+    height:
+        24px;
+    font-size:
+        11px;
+}
+
+.queue-no {
+    font-size:
+        12px;
+}
+
+.queue-main strong {
+    font-size:
+        13px;
+}
+
+.queue-main small {
+    font-size:
+        11px;
+}
+
+.badge {
+    padding:
+        6px 9px;
+    font-size:
+        11px;
+}
+
+.orders-top h2 {
+    font-size:
+        17px;
+}
+
+.orders-top small {
+    font-size:
+        11px;
+}
+
+.input,
+.select {
+    min-height:
+        39px;
+    font-size:
+        12px;
+}
+
+.order-head {
+    min-height:
+        46px;
+    font-size:
+        10px;
+}
+
+.order-row {
+    min-height:
+        72px;
+}
+
+.order-no {
+    font-size:
+        12px;
+}
+
+.primary {
+    font-size:
+        13px;
+}
+
+.secondary {
+    font-size:
+        11px;
+}
+
+.money {
+    font-size:
+        13px;
+}
+
+.pagination span {
+    font-size:
+        12px;
+}
+
+
+/* ==========================================================
+   ORDER WORKSPACE
+   ========================================================== */
+
+.card-head {
+    font-size:
+        15px;
+}
+
+.label {
+    font-size:
+        11px;
+}
+
+.value {
+    font-size:
+        13px;
+}
+
+.pill {
+    padding:
+        6px 9px;
+    font-size:
+        11px;
+}
+
+.field label {
+    font-size:
+        11px;
+}
+
+.textarea,
+.input,
+.select {
+    font-size:
+        13px;
+}
+
+.history strong {
+    font-size:
+        11px;
+}
+
+.history span {
+    font-size:
+        12px;
+}
+
+.history small {
+    font-size:
+        11px;
+}
+
+.empty {
+    font-size:
+        12px;
+}
+
+.meta {
+    font-size:
+        10px;
+}
+
+</style>
+
+
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+
+</head>
+
+<body class="mw-r5-admin">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_admin_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                ORDER WORKSPACE
+            </div>
+
+            <h1>
+                訂單工作區
+            </h1>
+
+            <p>
+                查看訂單內容、客服處理狀態與相關紀錄。
+            </p>
+
+        </header>
+
+        <div class="mw-r5-legacy-body">
+
+
+
+<main class="page">
+
+<header class="top">
+
+    <div>
+
+        <div class="eyebrow">
+            ORDER WORKSPACE
+        </div>
+
+
+
+        <div class="subtitle">
+            {{ order.customer_name }}
+            ·
+            {{ order.item }}
+        </div>
+
+    </div>
+
+
+    <div class="actions">
+
+        <a
+            class="button"
+            href="/admin"
+        >
+            ← 返回客服後台
+        </a>
+
+
+        {% if order.ticket_channel_id %}
+
+            <button
+                class="button gold"
+                type="button"
+                data-copy="{{ order.ticket_channel_id }}"
+            >
+                複製票口 ID
+            </button>
+
+        {% endif %}
+
+    </div>
+
+</header>
+
+
+{% if message %}
+
+    <div class="notice success">
+        {{ message }}
+    </div>
+
+{% endif %}
+
+
+{% if error %}
+
+    <div class="notice error">
+        {{ error }}
+    </div>
+
+{% endif %}
+
+
+{% if order.needs_attention %}
+
+    <div class="notice error">
+
+        此訂單已標記為需注意
+
+        {% if order.attention_reason %}
+
+            · {{ order.attention_reason }}
+
+        {% endif %}
+
+    </div>
+
+{% endif %}
+
+
+<div class="layout">
+
+<section>
+
+    <div class="card">
+
+        <div class="card-head">
+            訂單資料
+        </div>
+
+
+        <div class="grid">
+
+            <div class="cell">
+
+                <div class="label">
+                    狀態
+                </div>
+
+                <div class="value">
+                    {{ order.status_label }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    顧客應付
+                </div>
+
+                <div class="value">
+                    {{ order.amount }}T
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    數量
+                </div>
+
+                <div class="value">
+                    {{ order.quantity }}
+                </div>
+
+            </div>
+
+
+            <div class="cell wide">
+
+                <div class="label">
+                    服務項目
+                </div>
+
+                <div class="value">
+                    {{ order.category }}
+                    ｜
+                    {{ order.item }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    付款
+                </div>
+
+                <div class="value">
+                    {{ order.payment_method }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    客戶
+                </div>
+
+                <div class="value">
+                    {{ order.customer_name }}
+                </div>
+
+            </div>
+
+
+            <div class="cell wide">
+
+                <div class="label">
+                    Discord ID
+                </div>
+
+                <div class="value">
+                    {{ order.customer_id or "—" }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    對接客服
+                </div>
+
+                <div class="value">
+                    {{
+                        order.customer_service
+                        or
+                        "尚未指派"
+                    }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    建立時間
+                </div>
+
+                <div class="value">
+                    {{ order.created_display }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    計價規則
+                </div>
+
+                <div class="value">
+                    {{ order.rule_key or "—" }}
+                </div>
+
+            </div>
+
+
+            <div class="cell full">
+
+                <div class="label">
+                    指定人員
+                </div>
+
+                <div class="value">
+
+                    {% if order.specified_staff %}
+
+                        {% for staff in order.specified_staff %}
+
+                            <span class="pill">
+                                {{ staff.name }}
+                            </span>
+
+                        {% endfor %}
+
+                    {% else %}
+
+                        未指定
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+
+            <div class="cell full">
+
+                <div class="label">
+                    附加需求
+                </div>
+
+                <div class="value">
+                    {{
+                        order.extra_requirements
+                        or
+                        "無"
+                    }}
+                </div>
+
+            </div>
+
+
+            <div class="cell full">
+
+                <div class="label">
+                    原訂單備註
+                </div>
+
+                <div class="value">
+                    {{ order.note or "無" }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <div class="card-head">
+            Discord / 系統資訊
+        </div>
+
+
+        <div class="grid">
+
+            <div class="cell">
+
+                <div class="label">
+                    票口 Channel ID
+                </div>
+
+                <div class="value">
+                    {{
+                        order.ticket_channel_id
+                        or
+                        "尚未建立"
+                    }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    派單 Channel ID
+                </div>
+
+                <div class="value">
+                    {{
+                        order.dispatch_channel_id
+                        or
+                        "尚未派單"
+                    }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    派單 Message ID
+                </div>
+
+                <div class="value">
+                    {{
+                        order.dispatch_message_id
+                        or
+                        "尚未派單"
+                    }}
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    規章版本
+                </div>
+
+                <div class="value">
+                    {{ order.terms_version or "—" }}
+                </div>
+
+            </div>
+
+
+            <div class="cell wide">
+
+                <div class="label">
+                    最近更新
+                </div>
+
+                <div class="value">
+                    {{ order.updated_display }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <div class="card-head">
+            此客戶近期訂單
+        </div>
+
+
+        {% if customer_history %}
+
+            <div class="history">
+
+                {% for history in customer_history %}
+
+                    <a
+                        href="/admin/order-workspace/{{ history.id }}"
+                    >
+
+                        <strong>
+                            {{ history.order_no }}
+                        </strong>
+
+                        <span>
+                            {{ history.item }}
+                            ·
+                            {{ history.amount }}T
+                        </span>
+
+                        <small>
+                            {{ history.status_label }}
+                        </small>
+
+                    </a>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="empty">
+                沒有其他訂單紀錄
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</section>
+
+
+</div>
+
+<!-- BEGIN MAWAN_R8_WORKSPACE_EDITOR -->
+<style>
+.mw-r8-workspace-editor {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.mw-r8-editor-card {
+    border: 1px solid rgba(223, 183, 92, .22);
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(23, 21, 17, .96), rgba(12, 12, 11, .98));
+    padding: 22px;
+}
+
+.mw-r8-editor-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.mw-r8-editor-head small {
+    display: block;
+    margin-bottom: 6px;
+    color: #dfb75c;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .14em;
+}
+
+.mw-r8-editor-head h2,
+.mw-r8-editor-head h3 {
+    margin: 0;
+    color: #f4f2eb;
+}
+
+.mw-r8-editor-head p {
+    margin: 7px 0 0;
+    color: #918e85;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.mw-r8-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.mw-r8-field {
+    display: grid;
+    gap: 7px;
+}
+
+.mw-r8-field.span-2 {
+    grid-column: span 2;
+}
+
+.mw-r8-field.span-4 {
+    grid-column: 1 / -1;
+}
+
+.mw-r8-field > span {
+    color: #9e9a90;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.mw-r8-field input,
+.mw-r8-field select,
+.mw-r8-field textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 10px;
+    background: #0b0b0a;
+    color: #f4f2eb;
+    padding: 10px 12px;
+    font: inherit;
+    box-sizing: border-box;
+}
+
+.mw-r8-field textarea {
+    min-height: 92px;
+    resize: vertical;
+}
+
+.mw-r8-field input:focus,
+.mw-r8-field select:focus,
+.mw-r8-field textarea:focus {
+    outline: none;
+    border-color: rgba(223, 183, 92, .52);
+    box-shadow: 0 0 0 3px rgba(223, 183, 92, .07);
+}
+
+.mw-r8-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 9px;
+    margin-top: 16px;
+}
+
+.mw-r8-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    border: 1px solid rgba(223, 183, 92, .28);
+    border-radius: 10px;
+    background: rgba(223, 183, 92, .10);
+    color: #f1d38b;
+    padding: 9px 14px;
+    text-decoration: none;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.mw-r8-btn.primary {
+    background: linear-gradient(180deg, #e1bd68, #bd9340);
+    border-color: #d8ad55;
+    color: #17130a;
+}
+
+.mw-r8-btn.danger {
+    border-color: rgba(229, 113, 113, .32);
+    background: rgba(229, 113, 113, .09);
+    color: #ec9d9d;
+}
+
+.mw-r8-btn:hover {
+    filter: brightness(1.08);
+}
+
+.mw-r8-worker-list,
+.mw-r8-cs-list {
+    display: grid;
+    gap: 10px;
+}
+
+.mw-r8-person-row {
+    display: grid;
+    grid-template-columns: minmax(190px, 1.2fr) minmax(120px, .7fr) minmax(130px, .8fr) minmax(240px, 1.5fr);
+    gap: 12px;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    background: rgba(255,255,255,.018);
+}
+
+.mw-r8-person-name strong {
+    display: block;
+    color: #f4f2eb;
+}
+
+.mw-r8-person-name small,
+.mw-r8-meta {
+    color: #77746d;
+    font-size: 11px;
+}
+
+.mw-r8-person-money strong {
+    color: #dfb75c;
+    font-size: 17px;
+}
+
+.mw-r8-inline-form {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.mw-r8-inline-form input[type="number"],
+.mw-r8-inline-form input[type="text"] {
+    min-width: 0;
+    flex: 1 1 110px;
+    min-height: 38px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 9px;
+    background: #090908;
+    color: #f4f2eb;
+    padding: 8px 10px;
+}
+
+.mw-r8-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #bcb7ab;
+    font-size: 12px;
+}
+
+.mw-r8-warning {
+    margin-top: 14px;
+    padding: 11px 13px;
+    border-left: 3px solid #dfb75c;
+    background: rgba(223, 183, 92, .055);
+    color: #aaa69c;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+@media (max-width: 1120px) {
+    .mw-r8-edit-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mw-r8-field.span-4 {
+        grid-column: 1 / -1;
+    }
+
+    .mw-r8-person-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 720px) {
+    .mw-r8-edit-grid,
+    .mw-r8-person-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .mw-r8-field.span-2,
+    .mw-r8-field.span-4 {
+        grid-column: auto;
+    }
+}
+</style>
+
+<section class="mw-r8-workspace-editor">
+    <div class="mw-r8-editor-card">
+        <div class="mw-r8-editor-head">
+            <div>
+                <small>ORDER DATA</small>
+                <h2>訂單資料編輯</h2>
+                <p>營運總覽進來後直接在這裡修改，不再需要另外開訂單管理頁。</p>
+            </div>
+            <a class="mw-r8-btn" href="/admin">返回營運總覽</a>
+        </div>
+
+        <form method="post" action="/admin/order-workspace/{{ order.id }}/edit">
+            <div class="mw-r8-edit-grid">
+                <label class="mw-r8-field">
+                    <span>結單日期</span>
+                    <input type="date" name="closed_date" value="{{ order.closed_date or '' }}">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>委託人名稱</span>
+                    <input type="text" name="customer_display_name" value="{{ order.customer_name or '' }}" maxlength="120">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>委託人 Discord ID</span>
+                    <input type="text" name="customer_discord_id" value="{{ order.customer_id or '' }}" maxlength="32">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>客服</span>
+                    <select name="customer_service_discord_id">
+                        <option value="">未指定</option>
+                        {% for staff in customer_service_members %}
+                            <option value="{{ staff.discord_id }}" {% if order.customer_service_id == staff.discord_id %}selected{% endif %}>
+                                {{ staff.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="mw-r8-field span-2">
+                    <span>類別</span>
+                    <input type="text" name="category" value="{{ order.category or '' }}" maxlength="80">
+                </label>
+
+                <label class="mw-r8-field span-2">
+                    <span>訂單內容</span>
+                    <input type="text" name="item" value="{{ order.item or '' }}" maxlength="120">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>數量</span>
+                    <input type="number" name="quantity" min="1" step="1" value="{{ order.quantity or 1 }}">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>金額</span>
+                    <input type="number" name="amount" min="0" step="1" value="{{ order.amount or 0 }}">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>付款方式</span>
+                    <input type="text" name="payment_method" value="{{ order.payment_method or '' }}" maxlength="40">
+                </label>
+
+                <label class="mw-r8-field">
+                    <span>狀態</span>
+                    <select name="status">
+                        {% set mw_r8_statuses = [
+                            ('pending_cs_dispatch', '待客服確認'),
+                            ('waiting_acceptance', '等待接單'),
+                            ('accepted_pending_pay', '等待付款'),
+                            ('created', '已建立'),
+                            ('paid', '已付款'),
+                            ('active', '進行中'),
+                            ('stored', '存單'),
+                            ('completed', '已完成'),
+                            ('done', '已完成（done）'),
+                            ('closed', '已結單'),
+                            ('cancelled', '已取消'),
+                            ('canceled', '已取消（canceled）')
+                        ] %}
+                        {% for value, label in mw_r8_statuses %}
+                            <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+
+            <div class="mw-r8-actions">
+                <button class="mw-r8-btn primary" type="submit">儲存訂單資料</button>
+            </div>
+
+            <div class="mw-r8-warning">
+                修改這裡會更新網站訂單資料；若該單已有正式接單人員，金額／客服調整會重新計算分潤並保留原本已發放狀態。已送出的 Discord 收據或舊訊息文字不會被這個表單改寫；實際結單／取消流程仍以 Discord 原流程為準。
+            </div>
+        </form>
+    </div>
+
+    <div class="mw-r8-editor-card">
+        <div class="mw-r8-editor-head">
+            <div>
+                <small>ASSIGNMENTS & PAYOUTS</small>
+                <h3>接單人員與分潤</h3>
+                <p>新增、移除、掛名、手動分潤與發放狀態都集中在這裡。</p>
+            </div>
+        </div>
+
+        <div class="mw-r8-worker-list">
+            {% for row in workspace_assignments %}
+                <div class="mw-r8-person-row">
+                    <div class="mw-r8-person-name">
+                        <strong>{{ row.worker_display_name or row.worker_discord_id }}</strong>
+                        <small>{{ row.worker_discord_id }}</small>
+                    </div>
+
+                    <div class="mw-r8-person-money">
+                        <span class="mw-r8-meta">目前實拿</span>
+                        <strong>{{ row.final_payout or 0 }}T</strong>
+                    </div>
+
+                    <div>
+                        <span class="mw-r8-meta">發放狀態</span><br>
+                        <strong>{{ '已發放' if row.payout_status == paid_status else '未發放' }}</strong>
+                    </div>
+
+                    <div class="mw-r8-actions" style="margin-top:0;">
+                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/named-bonus">
+                            <label class="mw-r8-check">
+                                <input type="checkbox" name="enabled" value="on" {% if row.has_named_bonus %}checked{% endif %}>
+                                掛名 +5%
+                            </label>
+                            <button class="mw-r8-btn" type="submit">套用</button>
+                        </form>
+
+                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/manual-payout">
+                            <input type="hidden" name="worker_discord_id" value="{{ row.worker_discord_id }}">
+                            <input type="hidden" name="worker_display_name" value="{{ row.worker_display_name or row.worker_discord_id }}">
+                            <input type="number" name="manual_final_payout" min="0" step="1" value="{{ row.final_payout or 0 }}" required>
+                            <input type="text" name="reason" placeholder="分潤原因（可空白）">
+                            <button class="mw-r8-btn" type="submit">改分潤</button>
+                        </form>
+
+                        {% if row.payout_id %}
+                            <form method="post" action="/admin/order-workspace/{{ order.id }}/worker-payouts/{{ row.payout_id }}/status">
+                                <input type="hidden" name="status" value="{{ unpaid_status if row.payout_status == paid_status else paid_status }}">
+                                <button class="mw-r8-btn" type="submit">
+                                    {{ '改未發放' if row.payout_status == paid_status else '標記已發放' }}
+                                </button>
+                            </form>
+                        {% endif %}
+
+                        <form method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/remove" onsubmit="return confirm('確定移除這位接單人員？');">
+                            <input type="hidden" name="reason" value="客服後台訂單工作區移除">
+                            <button class="mw-r8-btn danger" type="submit">移除</button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="mw-r8-meta">目前沒有正式接單人員。</div>
+            {% endfor %}
+        </div>
+
+        <form method="post" action="/admin/order-workspace/{{ order.id }}/add-worker" class="mw-r8-actions">
+            <select name="worker_discord_id" required style="min-width:260px;min-height:40px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:#090908;color:#f4f2eb;padding:8px 10px;">
+                <option value="">新增接單人員</option>
+                {% for staff in worker_members %}
+                    <option value="{{ staff.discord_id }}">
+                        {{ staff.display_name or staff.global_name or staff.username or staff.discord_id }}
+                    </option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="reason" value="客服後台訂單工作區新增">
+            <button class="mw-r8-btn primary" type="submit">新增人員</button>
+        </form>
+    </div>
+
+    <div class="mw-r8-editor-card">
+        <div class="mw-r8-editor-head">
+            <div>
+                <small>CUSTOMER SERVICE PAYOUT</small>
+                <h3>客服分潤</h3>
+                <p>同一個工作區直接查看與切換客服分潤發放狀態。</p>
+            </div>
+        </div>
+
+        <div class="mw-r8-cs-list">
+            {% for row in workspace_cs_payouts %}
+                <div class="mw-r8-person-row">
+                    <div class="mw-r8-person-name">
+                        <strong>{{ row.customer_service_display_name or row.customer_service_discord_id }}</strong>
+                        <small>{{ row.customer_service_discord_id }}</small>
+                    </div>
+                    <div class="mw-r8-person-money">
+                        <span class="mw-r8-meta">客服分潤</span>
+                        <strong>{{ row.payout_amount or 0 }}T</strong>
+                    </div>
+                    <div>
+                        <span class="mw-r8-meta">發放狀態</span><br>
+                        <strong>{{ '已發放' if row.payout_status == paid_status else '未發放' }}</strong>
+                    </div>
+                    <div>
+                        <form method="post" action="/admin/order-workspace/{{ order.id }}/customer-service-payouts/{{ row.id }}/status">
+                            <input type="hidden" name="status" value="{{ unpaid_status if row.payout_status == paid_status else paid_status }}">
+                            <button class="mw-r8-btn" type="submit">
+                                {{ '改未發放' if row.payout_status == paid_status else '標記已發放' }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% else %}
+                <div class="mw-r8-meta">目前沒有客服分潤紀錄。</div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+<!-- END MAWAN_R8_WORKSPACE_EDITOR -->
+
+</main>
+
+
+<script>
+
+document.addEventListener(
+    "click",
+    function (event) {
+
+        const button =
+            event.target.closest(
+                "[data-copy]"
+            );
+
+
+        if (!button) {
+
+            return;
+        }
+
+
+        const value =
+            button.getAttribute(
+                "data-copy"
+            );
+
+
+        if (
+            !value
+            ||
+            !navigator.clipboard
+        ) {
+
+            return;
+        }
+
+
+        navigator.clipboard
+            .writeText(
+                value
+            )
+            .then(
+                function () {
+
+                    const oldText =
+                        button.textContent;
+
+
+                    button.textContent =
+                        "已複製";
+
+
+                    setTimeout(
+                        function () {
+
+                            button.textContent =
+                                oldText;
+
+                        },
+                        1200
+                    );
+
+                }
+            );
+
+    }
+);
+
+</script>
+
+
+
+
+        </div>
+
+    </section>
+
+</div>
+</body>
+</html>

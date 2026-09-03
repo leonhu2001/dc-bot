@@ -5,18 +5,18 @@ from typing import Any
 VIP_BENEFIT_ITEMS: dict[str, str] = {
     "vip_room": "・專屬 VIP 身分組，可使用VIP專屬包廂",
     "priority_cs": "・優先客服回覆",
-    "discount_98": "・體驗單、趣味單及賽季限定單外全館98折",
+    "discount_98": "・體驗單、趣味單及高難度稱號單外全館98折",
     "rebate_2": "・儲值返利2%",
     "monthly_coupon_200": "・每月一張折現券200T",
     "priority_order": "・優先排單",
     "familiar_worker": "・優先安排熟悉打手",
     "rebate_3": "・儲值返利3%",
-    "discount_96": "・體驗單、趣味單及賽季限定單外全館96折",
+    "discount_96": "・體驗單、趣味單及高難度稱號單外全館96折",
     "rebate_4": "・儲值返利4%",
     "monthly_coupon_500": "・每月額外一張折現券500T",
     "free_secret_space": "・每月一次免費「機密航天保底1000w」",
     "rebate_5": "・儲值返利5%",
-    "discount_94": "・體驗單、趣味單及賽季限定單外全館94折",
+    "discount_94": "・體驗單、趣味單及高難度稱號單外全館94折",
     "custom_order": "・可根據闆闆要求製作「自訂單」",
 }
 

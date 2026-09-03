@@ -1,0 +1,53 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="placeholder-hero">
+    <div class="placeholder-orb"></div>
+
+    <div class="placeholder-content">
+        <div class="section-eyebrow">
+            {{ eyebrow }}
+        </div>
+
+        <h1>
+            {{ heading }}
+        </h1>
+
+        <p>
+            {{ description }}
+        </p>
+
+        <div class="placeholder-status">
+            <span></span>
+            {{ next_label }}
+        </div>
+
+        <div class="hero-actions">
+            <a
+                class="button button-secondary"
+                href="/"
+            >
+                回首頁
+            </a>
+
+            {% if user %}
+                <a
+                    class="button button-primary"
+                    href="/me"
+                >
+                    個人中心
+                </a>
+            {% else %}
+                <a
+                    class="button button-primary"
+                    href="/auth/discord/login"
+                >
+                    Discord 登入
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% endblock %}

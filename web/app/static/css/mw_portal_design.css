@@ -1,0 +1,1561 @@
+
+/* MAWAN_PORTAL_DESIGN_SYSTEM_R3 */
+
+:root {
+
+    --mw-bg:
+        #080807;
+
+    --mw-panel:
+        #11110f;
+
+    --mw-panel-soft:
+        #0d0d0c;
+
+    --mw-panel-hover:
+        #151410;
+
+    --mw-line:
+        rgba(
+            255,
+            255,
+            255,
+            .085
+        );
+
+    --mw-line-gold:
+        rgba(
+            223,
+            183,
+            92,
+            .28
+        );
+
+    --mw-gold:
+        #dfb75c;
+
+    --mw-gold-soft:
+        #f0d28b;
+
+    --mw-text:
+        #f3f0e8;
+
+    --mw-muted:
+        #969188;
+
+    --mw-muted2:
+        #6f6b64;
+
+    --mw-danger:
+        #d96868;
+
+    --mw-success:
+        #71ce91;
+
+    --mw-sidebar:
+        176px;
+
+
+    /*
+     * Typography
+     *
+     * 14 / 500   content
+     * 13 / 700   table emphasis / buttons / navigation
+     * 12 / 500   secondary
+     * 15 / 800   card title
+     * 34 / 800   page title
+     */
+
+    --mw-font:
+        Inter,
+        "Noto Sans TC",
+        "Microsoft JhengHei",
+        system-ui,
+        sans-serif;
+}
+
+
+/* ==========================================================
+   RESET
+   ========================================================== */
+
+html {
+    background:
+        var(--mw-bg);
+}
+
+body.mw-portal {
+
+    margin:
+        0 !important;
+
+    min-height:
+        100vh;
+
+    color:
+        var(--mw-text) !important;
+
+    background:
+        radial-gradient(
+            circle at 78% -10%,
+            rgba(
+                223,
+                183,
+                92,
+                .055
+            ),
+            transparent 30%
+        ),
+        var(--mw-bg) !important;
+
+    font-family:
+        var(--mw-font) !important;
+
+    font-size:
+        14px !important;
+
+    font-weight:
+        500 !important;
+
+    line-height:
+        1.55 !important;
+}
+
+
+body.mw-portal *,
+body.mw-portal button,
+body.mw-portal input,
+body.mw-portal textarea,
+body.mw-portal select {
+
+    box-sizing:
+        border-box;
+
+    font-family:
+        var(--mw-font) !important;
+}
+
+
+body.mw-portal a {
+    text-decoration:
+        none;
+}
+
+
+/* ==========================================================
+   SHELL
+   ========================================================== */
+
+body.mw-portal .mw-portal-shell {
+
+    width:
+        100%;
+
+    min-height:
+        100vh;
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        var(--mw-sidebar)
+        minmax(
+            0,
+            1fr
+        ) !important;
+
+    background:
+        transparent !important;
+}
+
+
+/* ==========================================================
+   SIDEBAR
+   ========================================================== */
+
+.mw-portal-sidebar {
+
+    position:
+        sticky;
+
+    top:
+        0;
+
+    z-index:
+        100;
+
+    width:
+        var(--mw-sidebar);
+
+    height:
+        100vh;
+
+    padding:
+        20px 12px;
+
+    border-right:
+        1px solid
+        var(--mw-line);
+
+    background:
+        rgba(
+            6,
+            6,
+            5,
+            .985
+        );
+}
+
+
+.mw-portal-brand {
+
+    padding:
+        0 9px 24px;
+}
+
+
+.mw-portal-brand small {
+
+    display:
+        block;
+
+    color:
+        var(--mw-gold);
+
+    font-size:
+        9px;
+
+    font-weight:
+        800;
+
+    line-height:
+        1.2;
+
+    letter-spacing:
+        .16em;
+}
+
+
+.mw-portal-brand strong {
+
+    display:
+        block;
+
+    margin-top:
+        7px;
+
+    color:
+        var(--mw-text);
+
+    font-size:
+        19px;
+
+    font-weight:
+        800;
+
+    line-height:
+        1.2;
+}
+
+
+.mw-portal-navigation {
+
+    display:
+        grid;
+
+    gap:
+        5px;
+}
+
+
+.mw-portal-navigation a {
+
+    min-height:
+        38px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    padding:
+        0 10px;
+
+    border:
+        1px solid
+        transparent;
+
+    border-radius:
+        8px;
+
+    color:
+        var(--mw-muted) !important;
+
+    background:
+        transparent !important;
+
+    font-size:
+        13px !important;
+
+    font-weight:
+        700 !important;
+
+    transition:
+        color .15s ease,
+        border-color .15s ease,
+        background .15s ease;
+}
+
+
+.mw-portal-navigation a:hover,
+.mw-portal-navigation a:focus-visible {
+
+    color:
+        var(--mw-gold-soft) !important;
+
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .18
+        );
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .045
+        ) !important;
+}
+
+
+.mw-portal-navigation a.active {
+
+    color:
+        var(--mw-gold-soft) !important;
+
+    border-color:
+        var(--mw-line-gold);
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .075
+        ) !important;
+}
+
+
+/* ==========================================================
+   MAIN
+   ========================================================== */
+
+body.mw-portal .mw-portal-main {
+
+    min-width:
+        0;
+
+    width:
+        100%;
+
+    max-width:
+        none !important;
+
+    margin:
+        0 !important;
+
+    padding:
+        28px 30px 48px !important;
+
+    color:
+        var(--mw-text) !important;
+
+    background:
+        transparent !important;
+
+    font-size:
+        14px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+/* ==========================================================
+   STANDARD HEADER
+   ========================================================== */
+
+.mw-standard-header {
+
+    width:
+        100%;
+
+    min-height:
+        92px;
+
+    display:
+        flex;
+
+    justify-content:
+        space-between;
+
+    align-items:
+        flex-start;
+
+    gap:
+        20px;
+
+    margin:
+        0 0 20px;
+
+    padding:
+        0;
+}
+
+
+.mw-standard-kicker {
+
+    margin:
+        0;
+
+    color:
+        var(--mw-gold);
+
+    font-size:
+        10px;
+
+    font-weight:
+        800;
+
+    line-height:
+        1.3;
+
+    letter-spacing:
+        .16em;
+}
+
+
+.mw-standard-title {
+
+    margin:
+        8px 0 0 !important;
+
+    color:
+        var(--mw-text) !important;
+
+    font-size:
+        34px !important;
+
+    font-weight:
+        800 !important;
+
+    line-height:
+        1.08 !important;
+
+    letter-spacing:
+        .01em !important;
+}
+
+
+.mw-standard-description {
+
+    max-width:
+        780px;
+
+    margin:
+        9px 0 0;
+
+    color:
+        var(--mw-muted);
+
+    font-size:
+        12px;
+
+    font-weight:
+        500;
+
+    line-height:
+        1.65;
+}
+
+
+.mw-standard-actions {
+
+    display:
+        flex;
+
+    gap:
+        8px;
+
+    flex-wrap:
+        wrap;
+
+    justify-content:
+        flex-end;
+}
+
+
+/* ==========================================================
+   TYPOGRAPHY INSIDE CONTENT
+   ========================================================== */
+
+body.mw-portal .mw-portal-main h2 {
+
+    color:
+        var(--mw-text) !important;
+
+    font-size:
+        18px !important;
+
+    font-weight:
+        800 !important;
+
+    line-height:
+        1.3 !important;
+}
+
+
+body.mw-portal .mw-portal-main h3 {
+
+    color:
+        var(--mw-text) !important;
+
+    font-size:
+        15px !important;
+
+    font-weight:
+        800 !important;
+
+    line-height:
+        1.35 !important;
+}
+
+
+body.mw-portal .mw-portal-main h4 {
+
+    color:
+        var(--mw-text) !important;
+
+    font-size:
+        14px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+body.mw-portal .mw-portal-main p,
+body.mw-portal .mw-portal-main li,
+body.mw-portal .mw-portal-main td {
+
+    font-size:
+        13px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+body.mw-portal .mw-portal-main small {
+
+    color:
+        var(--mw-muted) !important;
+
+    font-size:
+        12px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+/* ==========================================================
+   CARDS
+   ========================================================== */
+
+body.mw-portal
+:is(
+    .card,
+    .panel,
+    .metric,
+    .stat,
+    .summary-card,
+    .admin-order-card,
+    .history-ledger-panel,
+    .history-ledger-filter,
+    .history-ledger-stat,
+    .staff-summary-filter,
+    .staff-summary-ledger-panel,
+    .staff-summary-total-card,
+    .my-payout-card,
+    .my-payout-total-card,
+    .summary-person-card,
+    .payout-summary-list-section,
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .dispatch-empty,
+    .dispatch-stat,
+    .member
+) {
+
+    border:
+        1px solid
+        var(--mw-line) !important;
+
+    border-radius:
+        12px !important;
+
+    color:
+        var(--mw-text) !important;
+
+    background:
+        var(--mw-panel) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+/* ==========================================================
+   BUTTON
+   ========================================================== */
+
+body.mw-portal
+:is(
+    button,
+    .button,
+    .btn,
+    .dispatch-button
+) {
+
+    min-height:
+        38px;
+
+    padding:
+        0 13px !important;
+
+    border:
+        1px solid
+        var(--mw-line-gold) !important;
+
+    border-radius:
+        8px !important;
+
+    color:
+        var(--mw-gold-soft) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .065
+        ) !important;
+
+    font-size:
+        13px !important;
+
+    font-weight:
+        700 !important;
+
+    line-height:
+        1 !important;
+
+    cursor:
+        pointer;
+}
+
+
+body.mw-portal
+:is(
+    button,
+    .button,
+    .btn,
+    .dispatch-button
+):hover {
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .12
+        ) !important;
+}
+
+
+/* ==========================================================
+   FORMS
+   ========================================================== */
+
+body.mw-portal
+:is(
+    input,
+    select,
+    textarea
+) {
+
+    border:
+        1px solid
+        var(--mw-line) !important;
+
+    border-radius:
+        8px !important;
+
+    color:
+        var(--mw-text) !important;
+
+    background:
+        #090908 !important;
+
+    font-size:
+        13px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+body.mw-portal
+:is(
+    input,
+    select
+) {
+
+    min-height:
+        38px;
+}
+
+
+body.mw-portal textarea {
+
+    padding:
+        10px 11px !important;
+}
+
+
+/* ==========================================================
+   TABLE
+   ========================================================== */
+
+body.mw-portal table {
+
+    width:
+        100%;
+
+    border-collapse:
+        collapse;
+
+    color:
+        var(--mw-text) !important;
+
+    background:
+        transparent !important;
+}
+
+
+body.mw-portal th {
+
+    padding:
+        11px 12px !important;
+
+    border-color:
+        var(--mw-line) !important;
+
+    color:
+        var(--mw-muted) !important;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .012
+        ) !important;
+
+    font-size:
+        12px !important;
+
+    font-weight:
+        700 !important;
+
+    line-height:
+        1.3 !important;
+}
+
+
+body.mw-portal td {
+
+    padding:
+        12px !important;
+
+    border-color:
+        var(--mw-line) !important;
+
+    font-size:
+        13px !important;
+
+    font-weight:
+        500 !important;
+
+    line-height:
+        1.5 !important;
+}
+
+
+body.mw-portal td strong {
+
+    font-weight:
+        700 !important;
+}
+
+
+/* ==========================================================
+   OLD PAGE HEADINGS
+   ========================================================== */
+
+body.mw-portal .mw-old-page-heading {
+
+    display:
+        none !important;
+}
+
+
+body.mw-portal .mw-old-page-header {
+
+    margin-top:
+        0 !important;
+
+    padding-top:
+        0 !important;
+}
+
+
+/* ==========================================================
+   METRIC GRID
+   ========================================================== */
+
+body.mw-portal
+:is(
+    .metrics,
+    .stats,
+    .history-ledger-stats,
+    .staff-summary-total-grid,
+    .my-payout-total-grid,
+    .dispatch-stats
+) {
+
+    gap:
+        12px !important;
+}
+
+
+body.mw-portal
+:is(
+    .metric,
+    .stat,
+    .history-ledger-stat,
+    .staff-summary-total-card,
+    .my-payout-total-card,
+    .dispatch-stat
+) {
+
+    min-height:
+        98px !important;
+
+    padding:
+        15px !important;
+}
+
+
+body.mw-portal
+:is(
+    .metric,
+    .stat,
+    .history-ledger-stat,
+    .staff-summary-total-card,
+    .my-payout-total-card,
+    .dispatch-stat
+)
+:is(
+    span,
+    small
+) {
+
+    font-size:
+        12px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+body.mw-portal
+:is(
+    .metric,
+    .stat,
+    .history-ledger-stat,
+    .staff-summary-total-card,
+    .my-payout-total-card,
+    .dispatch-stat
+)
+strong {
+
+    color:
+        var(--mw-gold-soft) !important;
+
+    font-size:
+        30px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+/* ==========================================================
+   EMPLOYEE LAUNCHPAD
+   ========================================================== */
+
+.mw-employee-launchpad {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        14px;
+
+    margin:
+        0 0 20px;
+}
+
+
+.mw-launch-card {
+
+    min-height:
+        136px;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    justify-content:
+        space-between;
+
+    padding:
+        18px;
+
+    border:
+        1px solid
+        var(--mw-line);
+
+    border-radius:
+        12px;
+
+    color:
+        var(--mw-text) !important;
+
+    background:
+        var(--mw-panel);
+
+    transition:
+        transform .15s ease,
+        border-color .15s ease,
+        background .15s ease;
+}
+
+
+.mw-launch-card:hover {
+
+    transform:
+        translateY(
+            -2px
+        );
+
+    border-color:
+        var(--mw-line-gold);
+
+    background:
+        var(--mw-panel-hover);
+}
+
+
+.mw-launch-card small {
+
+    color:
+        var(--mw-gold) !important;
+
+    font-size:
+        10px !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        .14em;
+}
+
+
+.mw-launch-card strong {
+
+    display:
+        block;
+
+    margin-top:
+        8px;
+
+    font-size:
+        20px;
+
+    font-weight:
+        800;
+}
+
+
+.mw-launch-card p {
+
+    margin:
+        7px 0 0;
+
+    color:
+        var(--mw-muted);
+
+    font-size:
+        12px !important;
+}
+
+
+.mw-launch-arrow {
+
+    color:
+        var(--mw-gold-soft);
+
+    font-size:
+        18px;
+
+    font-weight:
+        800;
+}
+
+
+/* ==========================================================
+   DISPATCH LAYOUT
+   ========================================================== */
+
+body.mw-portal-dispatch .dispatch-shell {
+
+    display:
+        grid !important;
+
+    gap:
+        14px !important;
+}
+
+
+body.mw-portal-dispatch .dispatch-board {
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        minmax(
+            0,
+            1.55fr
+        )
+        minmax(
+            300px,
+            .72fr
+        ) !important;
+
+    gap:
+        14px !important;
+
+    align-items:
+        start;
+}
+
+
+body.mw-portal-dispatch .dispatch-column {
+
+    min-width:
+        0;
+
+    padding:
+        15px !important;
+
+    border:
+        1px solid
+        var(--mw-line) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(--mw-panel) !important;
+}
+
+
+body.mw-portal-dispatch
+.dispatch-column:nth-child(2) {
+
+    position:
+        sticky;
+
+    top:
+        20px;
+}
+
+
+body.mw-portal-dispatch .dispatch-column-head {
+
+    margin:
+        0 0 12px !important;
+
+    padding:
+        0 0 12px !important;
+
+    border-bottom:
+        1px solid
+        var(--mw-line) !important;
+}
+
+
+body.mw-portal-dispatch .dispatch-order-card {
+
+    margin-bottom:
+        10px !important;
+
+    padding:
+        15px !important;
+}
+
+
+body.mw-portal-dispatch
+:is(
+    .dispatch-tag,
+    .dispatch-pill,
+    .dispatch-chip
+) {
+
+    border-color:
+        var(--mw-line-gold) !important;
+
+    color:
+        var(--mw-gold-soft) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .055
+        ) !important;
+}
+
+
+body.mw-portal-dispatch .dispatch-payout {
+
+    border:
+        1px solid
+        var(--mw-line-gold) !important;
+
+    border-radius:
+        9px !important;
+
+    color:
+        var(--mw-gold-soft) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .045
+        ) !important;
+}
+
+
+/* ==========================================================
+   PAYOUT
+   ========================================================== */
+
+body.mw-portal-payout .my-payout-page,
+body.mw-portal-payout .my-payout-command {
+
+    display:
+        grid !important;
+
+    gap:
+        14px !important;
+}
+
+
+body.mw-portal-payout .my-payout-intro {
+
+    border:
+        1px solid
+        var(--mw-line) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(--mw-panel) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+body.mw-portal-payout .my-payout-filter-card {
+
+    padding:
+        15px !important;
+
+    border:
+        1px solid
+        var(--mw-line) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(--mw-panel) !important;
+}
+
+
+/* ==========================================================
+   HISTORY / ADMIN PAYOUT / AUDIT
+   ========================================================== */
+
+body.mw-portal
+.history-ledger-page,
+body.mw-portal
+.staff-summary-page {
+
+    display:
+        grid !important;
+
+    gap:
+        14px !important;
+}
+
+
+body.mw-portal
+.history-ledger-hero {
+
+    border:
+        1px solid
+        var(--mw-line) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(--mw-panel) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+body.mw-portal
+.history-ledger-filter,
+body.mw-portal
+.staff-summary-filter {
+
+    padding:
+        14px !important;
+}
+
+
+/* ==========================================================
+   REVIEW MANAGEMENT
+   ========================================================== */
+
+.mw-review-toolbar {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        minmax(
+            260px,
+            1fr
+        )
+        180px
+        auto;
+
+    gap:
+        10px;
+
+    align-items:
+        end;
+
+    padding:
+        14px;
+
+    border:
+        1px solid
+        var(--mw-line);
+
+    border-radius:
+        12px;
+
+    background:
+        var(--mw-panel);
+}
+
+
+.mw-review-toolbar label {
+
+    display:
+        grid;
+
+    gap:
+        6px;
+
+    color:
+        var(--mw-muted);
+
+    font-size:
+        12px;
+
+    font-weight:
+        700;
+}
+
+
+.mw-review-summary {
+
+    margin-top:
+        14px;
+
+    padding:
+        12px 14px;
+
+    border:
+        1px solid
+        var(--mw-line);
+
+    border-radius:
+        10px;
+
+    color:
+        var(--mw-muted);
+
+    background:
+        var(--mw-panel);
+}
+
+
+.mw-review-panel {
+
+    margin-top:
+        14px;
+
+    overflow:
+        hidden;
+
+    border:
+        1px solid
+        var(--mw-line);
+
+    border-radius:
+        12px;
+
+    background:
+        var(--mw-panel);
+}
+
+
+.mw-review-scroll {
+
+    overflow-x:
+        auto;
+}
+
+
+.mw-review-table {
+
+    min-width:
+        1100px;
+}
+
+
+.mw-review-comment {
+
+    max-width:
+        340px;
+
+    white-space:
+        pre-wrap;
+}
+
+
+.mw-review-actions {
+
+    display:
+        flex;
+
+    gap:
+        6px;
+
+    flex-wrap:
+        wrap;
+}
+
+
+.mw-review-actions form {
+
+    margin:
+        0;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (
+    max-width: 900px
+) {
+
+    .mw-employee-launchpad {
+
+        grid-template-columns:
+            1fr;
+    }
+
+
+    body.mw-portal-dispatch
+    .dispatch-board {
+
+        grid-template-columns:
+            1fr !important;
+    }
+
+
+    body.mw-portal-dispatch
+    .dispatch-column:nth-child(2) {
+
+        position:
+            static;
+    }
+
+}
+
+
+@media (
+    max-width: 760px
+) {
+
+    body.mw-portal .mw-portal-shell {
+
+        display:
+            block !important;
+    }
+
+
+    .mw-portal-sidebar {
+
+        position:
+            static;
+
+        width:
+            100%;
+
+        height:
+            auto;
+
+        padding:
+            14px;
+
+        border-right:
+            0;
+
+        border-bottom:
+            1px solid
+            var(--mw-line);
+    }
+
+
+    .mw-portal-brand {
+
+        padding-bottom:
+            14px;
+    }
+
+
+    .mw-portal-navigation {
+
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+
+
+    body.mw-portal .mw-portal-main {
+
+        padding:
+            22px 14px 40px !important;
+    }
+
+
+    .mw-standard-header {
+
+        min-height:
+            0;
+
+        display:
+            block;
+
+        margin-bottom:
+            18px;
+    }
+
+
+    .mw-standard-title {
+
+        font-size:
+            30px !important;
+    }
+
+
+    .mw-standard-actions {
+
+        justify-content:
+            flex-start;
+
+        margin-top:
+            14px;
+    }
+
+
+    .mw-review-toolbar {
+
+        grid-template-columns:
+            1fr;
+    }
+
+}

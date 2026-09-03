@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="utf-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="theme-color"
+        content="#09090b"
+    >
+
+    <title>
+        {{ title or "魔丸娛樂" }}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/mw_site.css?v=1"
+    >
+
+    {% block head %}{% endblock %}
+
+
+<style>
+
+/* MAWAN_PHASE_4B2V4_SOCIAL_STYLE */
+
+html {
+    scroll-behavior:
+        smooth;
+}
+
+.mw-footer-link,
+.mw-order-notice-link {
+    color:
+        inherit !important;
+    text-decoration:
+        none !important;
+    cursor:
+        pointer;
+    transition:
+        color .16s ease,
+        opacity .16s ease;
+}
+
+.mw-footer-link:hover,
+.mw-footer-link:focus-visible,
+.mw-order-notice-link:hover,
+.mw-order-notice-link:focus-visible {
+    color:
+        #dfb75c !important;
+    opacity:
+        1 !important;
+}
+
+
+/* ==========================================================
+   HOME SOCIAL HUB
+   ========================================================== */
+
+.mw-social-hub {
+    width:
+        min(
+            1180px,
+            calc(
+                100% - 32px
+            )
+        );
+    position:
+        relative;
+    overflow:
+        hidden;
+    margin:
+        82px auto;
+    padding:
+        clamp(
+            30px,
+            5vw,
+            56px
+        );
+    border:
+        1px solid
+        rgba(
+            223,
+            183,
+            92,
+            .22
+        );
+    border-radius:
+        28px;
+    background:
+        radial-gradient(
+            circle at 84% 0%,
+            rgba(
+                223,
+                183,
+                92,
+                .18
+            ),
+            transparent 35%
+        ),
+        linear-gradient(
+            145deg,
+            rgba(
+                22,
+                21,
+                18,
+                .99
+            ),
+            rgba(
+                8,
+                8,
+                7,
+                .99
+            )
+        );
+    scroll-margin-top:
+        100px;
+}
+
+.mw-social-kicker {
+    color:
+        #dfb75c;
+    font-size:
+        11px;
+    font-weight:
+        950;
+    letter-spacing:
+        .19em;
+}
+
+.mw-social-title {
+    margin:
+        8px 0 0;
+    color:
+        #f6f2e8;
+    font-size:
+        clamp(
+            34px,
+            5vw,
+            54px
+        );
+    line-height:
+        1.08;
+}
+
+.mw-social-copy {
+    max-width:
+        720px;
+    margin:
+        14px 0 0;
+    color:
+        rgba(
+            235,
+            232,
+            222,
+            .65
+        );
+    font-size:
+        14px;
+    line-height:
+        1.85;
+}
+
+.mw-social-grid {
+    display:
+        grid;
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(
+                0,
+                1fr
+            )
+        );
+    gap:
+        12px;
+    margin-top:
+        30px;
+}
+
+.mw-social-card {
+    min-height:
+        138px;
+    display:
+        flex;
+    flex-direction:
+        column;
+    justify-content:
+        space-between;
+    gap:
+        18px;
+    padding:
+        20px;
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .09
+        );
+    border-radius:
+        17px;
+    color:
+        #f5f1e8;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .025
+        );
+    text-decoration:
+        none;
+    transition:
+        transform .16s ease,
+        border-color .16s ease,
+        background .16s ease;
+}
+
+.mw-social-card:hover,
+.mw-social-card:focus-visible {
+    transform:
+        translateY(
+            -3px
+        );
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .48
+        );
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .09
+        );
+}
+
+.mw-social-card strong {
+    font-size:
+        19px;
+}
+
+.mw-social-card span {
+    color:
+        rgba(
+            235,
+            232,
+            222,
+            .62
+        );
+    font-size:
+        12px;
+}
+
+.mw-social-arrow {
+    color:
+        #dfb75c;
+    font-size:
+        20px;
+    font-weight:
+        900;
+}
+
+@media (
+    max-width: 900px
+) {
+
+    .mw-social-grid {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+
+}
+
+@media (
+    max-width: 540px
+) {
+
+    .mw-social-hub {
+        margin:
+            54px auto;
+        padding:
+            24px 18px;
+        border-radius:
+            20px;
+    }
+
+    .mw-social-grid {
+        grid-template-columns:
+            1fr;
+    }
+
+}
+
+</style>
+
+<style>/* MAWAN_FINAL_FOOTER_MUTED_V1 */
+.site-footer .mw-footer-link{color:rgba(235,232,222,.50)!important}
+.site-footer .mw-footer-link:hover,.site-footer .mw-footer-link:focus-visible{color:#dfb75c!important}
+</style>
+
+<link rel="stylesheet" href="/static/css/mw_public_r5.css?v=r9_20260903_181715">
+</head>
+
+<!-- MAWAN_R5R1_VISUAL_FINAL PUBLIC -->
+<body
+    class="site-body mw-public-r5"
+    data-page="{{ page_name or '' }}"
+>
+    {% set current_path = request.url.path %}
+
+    <header class="site-header">
+        <div class="site-nav-shell">
+
+            <a
+                class="site-brand"
+                href="/"
+                aria-label="魔丸娛樂首頁"
+            >
+                <span class="site-brand-logo">
+                    <img
+                        src="/static/img/server_logo.gif"
+                        alt="魔丸娛樂"
+                    >
+                </span>
+
+                <span class="site-brand-copy">
+                    <strong>魔丸娛樂</strong>
+                    <small>MAWAN ENTERTAINMENT</small>
+                </span>
+            </a>
+
+            <nav
+                class="site-desktop-nav"
+                aria-label="主要導覽"
+            >
+                <a
+                    href="/"
+                    class="{% if current_path == '/' %}is-active{% endif %}"
+                >
+                    首頁
+                </a>
+
+                <a
+                    href="/order"
+                    class="{% if current_path.startswith('/order') %}is-active{% endif %}"
+                >
+                    點單
+                </a>
+
+                <a
+                    href="/staff"
+                    class="{% if current_path.startswith('/staff') %}is-active{% endif %}"
+                >
+                    陪玩陣容
+                </a>
+
+                <a
+                    href="/vip"
+                    class="{% if current_path.startswith('/vip') %}is-active{% endif %}"
+                >
+                    VIP
+                </a>
+
+                <a href="/#about">
+                    關於我們
+                </a>
+            </nav>
+
+            <div class="site-account">
+
+                {% if user %}
+                    <details class="account-menu">
+                        <summary>
+                            <span class="account-avatar">
+                                {% if user.avatar %}
+                                    <img
+                                        src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=128"
+                                        alt=""
+                                    >
+                                {% else %}
+                                    <span>
+                                        {{ (user.display_name or user.global_name or user.username or 'M')[:1] }}
+                                    </span>
+                                {% endif %}
+                            </span>
+
+                            <span class="account-name">
+                                {{ user.display_name or user.global_name or user.username }}
+                            </span>
+
+                            <span class="account-chevron">
+                                ▾
+                            </span>
+                        </summary>
+
+                        <div class="account-dropdown">
+                            <div class="account-dropdown-head">
+                                <strong>
+                                    {{ user.display_name or user.global_name or user.username }}
+                                </strong>
+
+                                <small>
+                                    Discord ID · {{ user.id }}
+                                </small>
+                            </div>
+
+                            <a href="/me">
+                                個人中心
+                            </a>
+
+                            <a href="/me#orders">
+                                我的訂單
+                            </a>
+
+                            <a href="/me#favorites">
+                                我的收藏
+                            </a>
+
+                            <a href="/me#vip">
+                                點數 / VIP
+                            </a>
+
+                            {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
+                                <div class="account-divider"></div>
+
+                                <a
+                                    href="/employee"
+                                    class="account-special"
+                                >
+                                    員工中心
+                                </a>
+                            {% endif %}
+
+                            {% if user.is_customer_service %}
+                                <a
+                                    href="/service"
+                                    class="account-special"
+                                >
+                                    客服後台
+                                </a>
+                            {% endif %}
+
+                            <div class="account-divider"></div>
+
+                            <a
+                                href="/auth/logout"
+                                class="account-logout"
+                            >
+                                登出
+                            </a>
+                        </div>
+                    </details>
+                {% else %}
+                    <a
+                        class="discord-login"
+                        href="/auth/discord/login"
+                    >
+                        <span class="discord-dot"></span>
+                        Discord 登入
+                    </a>
+                {% endif %}
+
+                <button
+                    class="mobile-nav-button"
+                    type="button"
+                    aria-label="開啟選單"
+                    aria-expanded="false"
+                    data-mobile-nav-button
+                >
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+
+        <nav
+            class="site-mobile-nav"
+            data-mobile-nav
+        >
+            <a href="/">首頁</a>
+            <a href="/order">點單</a>
+            <a href="/staff">陪玩陣容</a>
+            <a href="/vip">VIP</a>
+            <a href="/#about">關於我們</a>
+
+            {% if user %}
+                <a href="/me">個人中心</a>
+
+                {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
+                    <a href="/employee">員工中心</a>
+                {% endif %}
+
+                {% if user.is_customer_service %}
+                    <a href="/service">客服後台</a>
+                {% endif %}
+            {% endif %}
+        </nav>
+    </header>
+
+
+    <main class="site-main">
+        {% block content %}{% endblock %}
+    </main>
+
+
+    <footer class="site-footer">
+        <div class="footer-grid">
+
+            <div class="footer-brand">
+                <a
+                    class="site-brand"
+                    href="/"
+                >
+                    <span class="site-brand-logo">
+                        <img
+                            src="/static/img/server_logo.gif"
+                            alt="魔丸娛樂"
+                        >
+                    </span>
+
+                    <span class="site-brand-copy">
+                        <strong>魔丸娛樂</strong>
+                        <small>MAWAN ENTERTAINMENT</small>
+                    </span>
+                </a>
+
+                <p>
+                    陪你玩，也陪你把今晚玩得有意思。
+                </p>
+            </div>
+
+            <div>
+                <strong class="footer-title">
+                    服務
+                </strong>
+
+                <a href="/order">點單</a>
+                <a href="/staff">陪玩陣容</a>
+                <a href="/vip">VIP</a>
+            </div>
+
+            <div>
+                <strong class="footer-title">
+                    會員
+                </strong>
+
+                {% if user %}
+                    <a href="/me">個人中心</a>
+                {% else %}
+                    <a href="/auth/discord/login">
+                        Discord 登入
+                    </a>
+                {% endif %}
+
+                {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}
+                    <a href="/employee">
+                        員工中心
+                    </a>
+                {% endif %}
+            </div>
+
+            <div>
+                <strong class="footer-title">
+                    魔丸
+                </strong>
+
+                <a href="/#about">關於我們</a>
+                <a class="mw-footer-link" href="/#social">社群網址</a>
+                <span><!-- MAWAN_PHASE_FOOTER_ORDER_NOTICE_V1 --><a class="mw-footer-link" href="/service-rules">下單須知</a></span>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <span>
+                © 魔丸娛樂 MAWAN ENTERTAINMENT
+            </span>
+
+            <span>
+                Discord OAuth 安全登入
+            </span>
+        </div>
+
+<!-- MW SOCIAL LINKS -->
+<div class="mw-social-links">
+
+
+
+
+
+
+
+</div>
+<!-- /MW SOCIAL LINKS -->
+
+</footer>
+
+
+    <script
+        src="/static/js/mw_site.js?v=1"
+        defer
+    ></script>
+
+    {% block scripts %}{% endblock %}
+
+<!-- BEGIN MAWAN_R72_CREW_RUNTIME -->
+<script>
+(function(){
+"use strict";
+if(location.pathname!=="/")return;
+const norm=v=>String(v||"").replace(/\s+/g,"").trim();
+const targets=[
+ {label:"女陪",url:"/staff?role=female_companion"},
+ {label:"男陪",url:"/staff?role=male_companion"},
+ {label:"護航",url:"/staff?role=protector"}
+];
+function figure(label){
+ for(const card of document.querySelectorAll(".crew-type-card")){
+  const h=card.querySelector("h3");
+  if(h&&norm(h.textContent)===norm(label))return card.querySelector(".crew-figure");
+ }
+ return null;
+}
+async function load(t){
+ const box=figure(t.label); if(!box)return;
+ try{
+  const r=await fetch(t.url,{credentials:"same-origin",cache:"no-store"}); if(!r.ok)return;
+  const d=new DOMParser().parseFromString(await r.text(),"text/html");
+  const seen=new Set(), items=[];
+  d.querySelectorAll(".public-crew-card .public-crew-photo img[src]").forEach(n=>{
+   const src=String(n.getAttribute("src")||"").trim();
+   if(src&&!seen.has(src)&&items.length<6){seen.add(src);items.push([src,n.getAttribute("alt")||t.label]);}
+  });
+  if(!items.length)return;
+  const grid=document.createElement("div"); grid.className="mw-r72-crew-avatars";
+  for(const [src,alt] of items){
+   const f=document.createElement("div"); f.className="mw-r72-crew-avatar";
+   const img=document.createElement("img"); img.src=src; img.alt=alt; img.loading="lazy"; img.decoding="async";
+   f.appendChild(img); grid.appendChild(f);
+  }
+  box.replaceChildren(grid); box.classList.add("mw-r72-crew-figure-ready");
+ }catch(e){console.warn("[MAWAN R7.2] crew avatars skipped",t.label,e);}
+}
+targets.forEach(load);
+})();
+</script>
+<!-- END MAWAN_R72_CREW_RUNTIME -->
+</body>
+</html>

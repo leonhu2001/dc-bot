@@ -1,6 +1,7 @@
+{# MAWAN_PORTAL_UNIFIED_20260903_V1 DISPATCH #}
 {% extends "layout.html" %}
 
-{% block page_title %}派單中心{% endblock %}
+{% block page_title %}接單大廳{% endblock %}
 
 {% block content %}
 <style>
@@ -380,15 +381,15 @@
     <section class="dispatch-hero">
         <div class="dispatch-panel dispatch-hero-main">
             <p class="dispatch-eyebrow">MISSION DISPATCH</p>
-            <h1 class="dispatch-title">任務派單中心</h1>
+            <h1 class="dispatch-title">接單說明</h1>
             <p class="dispatch-desc">
                 查看目前可接任務、已接任務與預估分潤。接單後系統會同步紀錄，客服與五個新接單身分組皆沿用原本派單頁權限。
             </p>
 
             <div class="dispatch-tags">
                 <span class="dispatch-tag">魔丸♫客服</span>
-                <span class="dispatch-tag">護級接單</span>
-                <span class="dispatch-tag">陪級接單</span>
+                <span class="dispatch-tag">護航接單</span>
+                <span class="dispatch-tag">陪玩接單</span>
                 <span class="dispatch-tag">即時提醒</span>
             </div>
         </div>
@@ -594,7 +595,7 @@
                                             付款前接單進度：
                                             {{ order.prepay_claim_count or 0 }}/{{ order.prepay_required_count or "?" }}
                                             {% if order.prepay_min_protector_count %}
-                                                ｜護級 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}
+                                                ｜護航 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}
                                             {% endif %}
                                         </p>
                                     {% endif %}

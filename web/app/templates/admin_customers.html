@@ -1,0 +1,572 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title>
+<style>*{box-sizing:border-box}:root{--bg:#080807;--p:#11110f;--l:#24231f;--g:#dfb75c;--g2:#f2d68d;--t:#f4f2eb;--m:#969289}body{margin:0;background:var(--bg);color:var(--t);font:14px Inter,"Noto Sans TC","Microsoft JhengHei",sans-serif}a{color:inherit;text-decoration:none}.sh{min-height:100vh;display:grid;grid-template-columns:244px 1fr}.sb{padding:24px 16px;border-right:1px solid var(--l)}.brand{font-size:24px;font-weight:900}.brand small{display:block;color:var(--g);font-size:10px;letter-spacing:.18em}.nav{display:grid;gap:5px;margin-top:25px}.nav a{padding:13px;border-radius:9px;color:var(--m);font-weight:800}.nav a:hover,.nav .on{background:#16140e;color:var(--g2)}main{padding:30px}.k{color:var(--g);font-size:11px;font-weight:900;letter-spacing:.18em}h1{font-size:42px;margin:6px 0}.sub{color:var(--m)}form{display:flex;gap:8px;margin:20px 0}input{flex:1;padding:13px;border:1px solid var(--l);border-radius:9px;background:#0b0b0a;color:var(--t)}button{padding:0 17px;border:1px solid #4b3e1d;border-radius:9px;background:#17140c;color:var(--g2)}.card{border:1px solid var(--l);border-radius:13px;overflow:hidden}.row{display:grid;grid-template-columns:minmax(180px,1.4fr) 90px 90px 110px 110px 35px;gap:10px;align-items:center;padding:13px 15px;border-bottom:1px solid var(--l)}.row:hover{background:#10100e}.head{color:var(--m);font-size:11px}.name strong,.name span{display:block}.name span{color:var(--m);font-size:11px;margin-top:3px}.gold{color:var(--g2);font-weight:900}.empty{padding:40px;text-align:center;color:var(--m)}@media(max-width:850px){.sh{display:block}.sb{border-right:0}.nav{grid-template-columns:repeat(2,1fr)}main{padding:18px 12px}.row{grid-template-columns:1fr 65px 90px 30px}.hide{display:none}}</style>
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+</head><body class="mw-r5-admin">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_admin_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                CUSTOMER MANAGEMENT
+            </div>
+
+            <h1>
+                客戶管理
+            </h1>
+
+            <p>
+                訂單、收藏、評價與錢包資料集中管理。
+            </p>
+
+        </header>
+
+        <div class="mw-r5-legacy-body mw-r5-customers-page">
+
+
+<div class="sh"><main><div class="k">CUSTOMER MANAGEMENT</div><div class="sub">訂單、收藏、評價與錢包入口集中查看。</div>
+<form method="get"><input name="q" value="{{ q }}" placeholder="搜尋客戶名稱或 Discord ID"><button>搜尋</button></form><section class="card">
+<div class="row head"><div>客戶</div><div>訂單</div><div class="hide">完成</div><div>消費</div><div class="hide">收藏 / 評價</div><div></div></div>
+{% for c in customers %}<a class="row" href="/admin/customers/{{ c.customer_discord_id }}"><div class="name"><strong>{{ c.customer_display_name }}</strong><span>{{ c.customer_discord_id }}</span></div><div class="gold">{{ c.order_count }}</div><div class="hide">{{ c.completed_count }}</div><div>{{ c.total_spend }}T</div><div class="hide">{{ c.favorite_count }} / {{ c.review_count }}</div><div class="gold">→</div></a>{% else %}<div class="empty">沒有符合條件的客戶。</div>{% endfor %}
+</section></main></div>
+
+
+        </div>
+
+    </section>
+
+</div>
+
+<!-- BEGIN MAWAN_R5R6_TARGETED_FIX_V2_CUSTOMER_RUNTIME -->
+<script>
+(function () {
+    "use strict";
+
+    const path =
+        window.location.pathname;
+
+    if (
+        path !== "/admin/customers"
+        &&
+        !path.startsWith(
+            "/admin/customers/"
+        )
+    ) {
+        return;
+    }
+
+    const normalize = (value) =>
+        String(value || "")
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .replace(/[／/|｜·・:：()（）【】[\]「」『』]/g, "");
+
+    const legacy =
+        document.querySelector(
+            ".mw-r5-legacy-body"
+        )
+        ||
+        document.querySelector(
+            "main"
+        )
+        ||
+        document.body;
+
+    const main =
+        legacy.closest(
+            "main"
+        )
+        ||
+        document.querySelector(
+            "main"
+        );
+
+    document.body.classList.add(
+        "mw-r56-customer-page"
+    );
+
+    legacy.classList.add(
+        "mw-r56-customer-legacy"
+    );
+
+    if (main) {
+        main.classList.add(
+            "mw-r56-customer-main"
+        );
+    }
+
+
+    /*
+     * ======================================================
+     * 隱藏重複標題
+     * ======================================================
+     */
+
+    const hideDuplicateHeader = (
+        englishText
+    ) => {
+        const wanted =
+            normalize(
+                englishText
+            );
+
+        const candidates =
+            Array.from(
+                legacy.querySelectorAll(
+                    "header,section,div"
+                )
+            ).filter(
+                (node) => {
+                    const text =
+                        normalize(
+                            node.innerText
+                            ||
+                            ""
+                        );
+
+                    return (
+                        text.includes(
+                            wanted
+                        )
+                        &&
+                        text.length < 260
+                        &&
+                        node.querySelectorAll(
+                            "input,table,form"
+                        ).length
+                        === 0
+                    );
+                }
+            );
+
+        candidates
+            .sort(
+                (
+                    a,
+                    b
+                ) =>
+                    (
+                        a.innerText
+                        ||
+                        ""
+                    ).length
+                    -
+                    (
+                        b.innerText
+                        ||
+                        ""
+                    ).length
+            )
+            .slice(
+                0,
+                1
+            )
+            .forEach(
+                (node) =>
+                    node.classList.add(
+                        "mw-r56-duplicate-header"
+                    )
+            );
+    };
+
+
+    const commonAncestor = (
+        a,
+        b
+    ) => {
+        if (!a) {
+            return b;
+        }
+
+        if (!b) {
+            return a;
+        }
+
+        let node =
+            a;
+
+        while (
+            node
+            &&
+            node !== document.body
+        ) {
+            if (
+                node.contains(b)
+            ) {
+                return node;
+            }
+
+            node = node.parentElement;
+        }
+
+        return null;
+    };
+
+
+    /*
+     * ======================================================
+     * 把工作區一路往外撐滿
+     * ======================================================
+     */
+
+    const widenChain = (
+        node
+    ) => {
+        let current =
+            node;
+
+        const stop =
+            main
+            ?
+            main.parentElement
+            :
+            document.body;
+
+        while (
+            current
+            &&
+            current !== stop
+            &&
+            current !== document.body
+        ) {
+            current.classList.add(
+                "mw-r56-customer-expand"
+            );
+
+            current = current.parentElement;
+        }
+
+        if (main) {
+            main.classList.add(
+                "mw-r56-customer-expand"
+            );
+        }
+    };
+
+
+    const markWideStructuralChildren = (
+        root
+    ) => {
+        if (!root) {
+            return;
+        }
+
+        Array.from(
+            root.children
+        ).forEach(
+            (child) => {
+                const text =
+                    normalize(
+                        child.innerText
+                        ||
+                        ""
+                    );
+
+                const useful =
+                    child.querySelector(
+                        "table, form, input, select"
+                    )
+                    ||
+                    text.includes(
+                        "近期服務訂單"
+                    )
+                    ||
+                    text.includes(
+                        "近期訂單"
+                    )
+                    ||
+                    text.includes(
+                        "評價紀錄"
+                    )
+                    ||
+                    text.includes(
+                        "staffworkspace"
+                    );
+
+                if (useful) {
+                    child.classList.add(
+                        "mw-r56-customer-wide-block"
+                    );
+                }
+            }
+        );
+    };
+
+
+    /*
+     * ======================================================
+     * 客戶管理列表
+     * ======================================================
+     */
+
+    const setupList = () => {
+        hideDuplicateHeader(
+            "CUSTOMER MANAGEMENT"
+        );
+
+        const search =
+            Array.from(
+                legacy.querySelectorAll(
+                    "input"
+                )
+            ).find(
+                (input) => {
+                    const text =
+                        normalize(
+                            (
+                                input.getAttribute(
+                                    "placeholder"
+                                )
+                                ||
+                                ""
+                            )
+                            +
+                            " "
+                            +
+                            (
+                                input.getAttribute(
+                                    "name"
+                                )
+                                ||
+                                ""
+                            )
+                        );
+
+                    return (
+                        text.includes(
+                            "客戶"
+                        )
+                        ||
+                        text.includes(
+                            "discord"
+                        )
+                    );
+                }
+            );
+
+        const customerLink =
+            legacy.querySelector(
+                'a[href*="/admin/customers/"]'
+            );
+
+        const table =
+            legacy.querySelector(
+                "table"
+            );
+
+        const root =
+            commonAncestor(
+                search || table,
+                customerLink || table
+            )
+            ||
+            legacy;
+
+        root.classList.add(
+            "mw-r56-customer-list-root"
+        );
+
+        widenChain(
+            root
+        );
+
+        markWideStructuralChildren(
+            root
+        );
+
+        if (search) {
+            const form =
+                search.closest(
+                    "form"
+                );
+
+            if (form) {
+                form.classList.add(
+                    "mw-r56-customer-search"
+                );
+            }
+        }
+
+        if (table) {
+            table.classList.add(
+                "mw-r56-customer-table"
+            );
+        }
+    };
+
+
+    /*
+     * ======================================================
+     * 人員工作區
+     * ======================================================
+     */
+
+    const setupDetail = () => {
+        hideDuplicateHeader(
+            "CUSTOMER WORKSPACE"
+        );
+
+        legacy.classList.add(
+            "mw-r56-customer-detail-root"
+        );
+
+        widenChain(
+            legacy
+        );
+
+        markWideStructuralChildren(
+            legacy
+        );
+
+        const headings =
+            Array.from(
+                legacy.querySelectorAll(
+                    "h2,h3,h4,strong"
+                )
+            );
+
+        headings.forEach(
+            (heading) => {
+                const text =
+                    normalize(
+                        heading.textContent
+                    );
+
+                if (
+                    text.includes(
+                        "近期訂單"
+                    )
+                    ||
+                    text.includes(
+                        "近期服務訂單"
+                    )
+                    ||
+                    text.includes(
+                        "評價紀錄"
+                    )
+                ) {
+                    const panel =
+                        heading.closest(
+                            '[class*="panel"], [class*="card"], section, article, div'
+                        );
+
+                    if (panel) {
+                        panel.classList.add(
+                            "mw-r56-customer-wide-panel"
+                        );
+
+                        widenChain(
+                            panel
+                        );
+                    }
+                }
+            }
+        );
+
+        const labels = [
+            "訂單",
+            "完成",
+            "取消",
+            "進行中",
+            "累計消費",
+            "收藏",
+            "評價",
+        ];
+
+        const metricCards =
+            [];
+
+        labels.forEach(
+            (label) => {
+                const node =
+                    Array.from(
+                        legacy.querySelectorAll(
+                            "*"
+                        )
+                    ).find(
+                        (element) =>
+                            element.children.length
+                            === 0
+                            &&
+                            normalize(
+                                element.textContent
+                            )
+                            ===
+                            normalize(label)
+                    );
+
+                if (!node) {
+                    return;
+                }
+
+                const card =
+                    node.closest(
+                        '[class*="card"], [class*="metric"], [class*="stat"], div'
+                    );
+
+                if (
+                    card
+                    &&
+                    !metricCards.includes(
+                        card
+                    )
+                ) {
+                    metricCards.push(
+                        card
+                    );
+
+                    card.classList.add(
+                        "mw-r56-customer-metric"
+                    );
+                }
+            }
+        );
+
+        if (
+            metricCards.length >= 2
+        ) {
+            const grid =
+                metricCards[0]
+                    .parentElement;
+
+            if (
+                grid
+                &&
+                metricCards.every(
+                    (card) =>
+                        grid.contains(
+                            card
+                        )
+                )
+            ) {
+                grid.classList.add(
+                    "mw-r56-customer-metric-grid"
+                );
+
+                widenChain(
+                    grid
+                );
+            }
+        }
+    };
+
+
+    if (
+        path === "/admin/customers"
+    ) {
+        setupList();
+
+    } else {
+        setupDetail();
+    }
+
+})();
+</script>
+<!-- END MAWAN_R5R6_TARGETED_FIX_V2_CUSTOMER_RUNTIME -->
+</body></html>

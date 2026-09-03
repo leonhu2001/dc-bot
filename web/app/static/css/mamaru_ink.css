@@ -4004,7 +4004,7 @@ body:has(form#historyBulkForm) .history-bulk-actions .button {
 
 /* =========================================================
    Mamaru Ink Dashboard - Admin Command Center
-   總控後台作戰台外觀
+   客服後台作戰台外觀
 ========================================================= */
 
 /* 總控頁辨識：有同步 Discord 成員表單 */
@@ -6850,4 +6850,118 @@ html body .staff-stat-card:hover {
         0 0 0 1px rgba(226, 200, 134, 0.14) !important;
 }
 /* === GLOBAL NO-FILL WIREFRAME END === */
+
+
+/* === MAMARU FONT SYSTEM START === */
+/* 字體規則：
+   大標題用毛筆字；其他內容用標楷體。
+   注意：不嵌入字型檔，依照使用者電腦/手機可用字體 fallback。
+*/
+
+:root {
+    --mw-brush-font:
+        "Yuji Syuku",
+        "Yuji Mai",
+        "Hanyi Senty Brush",
+        "DFKai-SB",
+        "BiauKai",
+        "KaiTi",
+        "標楷體",
+        serif;
+
+    --mw-kai-font:
+        "DFKai-SB",
+        "BiauKai",
+        "KaiTi",
+        "標楷體",
+        "Noto Serif TC",
+        serif;
+}
+
+/* 全站基礎文字：標楷體 */
+html body,
+html body p,
+html body span,
+html body div,
+html body label,
+html body input,
+html body select,
+html body textarea,
+html body button,
+html body .button,
+html body table,
+html body th,
+html body td,
+html body .muted-text,
+html body .chip,
+html body .badge,
+html body .mw-sidebar-link {
+    font-family: var(--mw-kai-font) !important;
+}
+
+/* 大標題：毛筆字 */
+html body h1,
+html body h2,
+html body .page-title,
+html body .mw-page-title,
+html body .mw-brand-title,
+html body .mw-logo-title,
+html body .dispatch-v2-hero-main h2,
+html body .dispatch-v2-column-head h2,
+html body .admin-hero h1,
+html body .admin-hero h2,
+html body .history-hero h1,
+html body .history-hero h2,
+html body .summary-hero h1,
+html body .summary-hero h2,
+html body .staff-hero h1,
+html body .staff-hero h2,
+html body .login-title,
+html body .no-access-title {
+    font-family: var(--mw-brush-font) !important;
+    letter-spacing: 0.08em;
+}
+
+/* 卡片標題：可以稍微偏毛筆，但不要太誇張 */
+html body h3,
+html body .card-title,
+html body .panel-title,
+html body .dispatch-v2-mission-top h3,
+html body .dispatch-v2-my-card h3,
+html body .summary-person-name,
+html body .staff-card-name {
+    font-family: var(--mw-brush-font) !important;
+    letter-spacing: 0.04em;
+}
+
+/* 按鈕、表單、表格維持標楷體，避免可讀性掉太多 */
+html body .button,
+html body button,
+html body input,
+html body select,
+html body textarea,
+html body th,
+html body td,
+html body .dispatch-v2-mission-footer .button,
+html body .history-bulk-actions .button,
+html body .filter-form .button {
+    font-family: var(--mw-kai-font) !important;
+    letter-spacing: 0.04em;
+}
+
+/* 數字維持較穩，不要被毛筆字拉歪 */
+html body .big-number,
+html body .dispatch-v2-stat-card strong,
+html body .summary-total-card strong,
+html body .staff-stat-card strong,
+html body .money,
+html body .amount {
+    font-family:
+        "Times New Roman",
+        "DFKai-SB",
+        "BiauKai",
+        serif !important;
+    letter-spacing: 0.02em;
+}
+/* === MAMARU FONT SYSTEM END === */
 

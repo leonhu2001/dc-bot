@@ -309,7 +309,7 @@ def history_db_path() -> str:
 
 
 def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
-    """抓歷史訂單的打手/客服分潤，給歷史頁批量修改用。"""
+    """抓歷史訂單的護航 / 陪玩 / 魔丸♫客服分潤，給歷史頁批量修改用。"""
     if not order_ids:
         return {}
 
@@ -341,7 +341,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
             result.setdefault(order_id, []).append(
                 {
                     "kind": "worker",
-                    "label": "護級 / 陪級",
+                    "label": "護航 / 陪玩",
                     "id": int(row["id"]),
                     "person_id": row["person_id"],
                     "person_name": row["person_name"] or row["person_id"],
@@ -473,7 +473,7 @@ def history_parse_worker_option(value: str) -> tuple[str, str]:
 def history_staff_options() -> dict:
     """歷史訂單頁可選人員。
 
-    workers：只要是打手或陪玩就顯示，同一人只顯示一次。
+    workers：只要是護航或陪玩就顯示，同一人只顯示一次。
     customer_services：客服獨立顯示。
     """
     workers = {}
@@ -624,7 +624,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
             result.setdefault(order_id, []).append(
                 {
                     "kind": "worker",
-                    "label": "護級 / 陪級",
+                    "label": "護航 / 陪玩",
                     "person_id": person_id,
                     "person_name": row["person_name"] or person_id,
                     "amount": int(row["amount"] or 0),
@@ -1074,7 +1074,7 @@ def apply_manual_payout_edits(form, order_ids: list[int]) -> None:
 
     # 回復已發放狀態。
     
-    # 客服選「無」或測試客服時，不計客服分潤
+    # 客服選「無」或測試客服時，不計魔丸♫客服分潤
     conn = sqlite3.connect(history_db_path())
     try:
         for order_id in order_ids:
@@ -1212,7 +1212,7 @@ async def admin_order_history(
             name="no_access.html",
             context={
                 "title": "沒有權限",
-                "message": "你沒有總控後台權限。",
+                "message": "你沒有客服後台權限。",
                 "user": user,
             },
             status_code=403,
@@ -1342,7 +1342,7 @@ async def history_set_customer_service(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1381,7 +1381,7 @@ async def history_add_worker(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1407,7 +1407,7 @@ async def history_add_worker(
     finally:
         db.close()
 
-    return redirect_to_history(message="已新增歷史訂單打手/陪玩，分潤已重新計算。")
+    return redirect_to_history(message="已新增歷史訂單護航 / 陪玩，分潤已重新計算。")
 
 
 @router.post("/admin/orders/history/assignments/{assignment_id}/named-bonus")
@@ -1419,7 +1419,7 @@ async def history_update_named_bonus(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1448,7 +1448,7 @@ async def history_remove_worker(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1465,7 +1465,7 @@ async def history_remove_worker(
     finally:
         db.close()
 
-    return redirect_to_history(message="已移除歷史訂單打手/陪玩，分潤已重新計算。")
+    return redirect_to_history(message="已移除歷史訂單護航 / 陪玩，分潤已重新計算。")
 
 
 @router.post("/admin/orders/history/{order_id}/manual-payout")
@@ -1480,7 +1480,7 @@ async def history_manual_payout(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1512,7 +1512,7 @@ async def history_set_worker_payout_status(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1524,7 +1524,7 @@ async def history_set_worker_payout_status(
     finally:
         db.close()
 
-    return redirect_to_history(message="打手/陪玩分潤狀態已更新。")
+    return redirect_to_history(message="護航 / 陪玩分潤狀態已更新。")
 
 
 @router.post("/admin/orders/history/customer-service-payouts/{payout_id}/status")
@@ -1536,7 +1536,7 @@ async def history_set_customer_service_payout_status(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1553,7 +1553,7 @@ async def history_set_customer_service_payout_status(
     finally:
         db.close()
 
-    return redirect_to_history(message="客服分潤狀態已更新。")
+    return redirect_to_history(message="魔丸♫魔丸♫客服分潤狀態已更新。")
 
 
 @router.post("/admin/orders/history/bulk-update")

@@ -1,83 +1,465 @@
 <!doctype html>
 <html lang="zh-Hant">
+
 <head>
+
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ title or "魔丸打手系統" }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
-    <link rel="stylesheet" href="/static/css/mamaru_ink.css">
-    <link rel="stylesheet" href="/static/css/mw_redesign.css?v=1">
+
+    <meta
+        name="viewport"
+        content="width=device-width,initial-scale=1"
+    >
+
+    <title>
+        {{ title or "魔丸娛樂" }}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/app.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/mamaru_ink.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/mw_redesign.css?v=1"
+    >
+
+    <!-- MAWAN_PORTAL_UNIFIED_20260903_V1 -->
+
+
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
 </head>
-<body>
-    <div class="mw-layout">
-        {% set current_path = request.url.path %}
-        {% if user %}
-            <aside class="mw-sidebar">
-                <div class="mw-sidebar-brand">
-                    <div class="mw-sidebar-logo mw-sidebar-logo-image">
-                        <img src="/static/img/server_logo.gif" alt="魔丸" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
-                        <span>魔丸</span>
-                    </div>
-                    <div class="mw-sidebar-subtitle">魔丸娛樂後台</div>
-                </div>
 
-                <nav class="mw-sidebar-nav">
-                    {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
-                        <div class="mw-sidebar-group">
-                            <span class="mw-sidebar-label">打手 / 陪玩 / 客服</span>
-                            <a class="mw-sidebar-link {% if current_path == '/dispatch' %}is-active{% endif %}" data-icon="◈" href="/dispatch">派單頁</a>
-                            <a class="mw-sidebar-link {% if current_path == '/my/payouts' %}is-active{% endif %}" data-icon="◉" href="/my/payouts">我的分潤</a>
-                        </div>
-                    {% endif %}
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+<body class="mw-r5-layout">
 
-                    {% if user.is_admin %}
-                        <div class="mw-sidebar-group">
-                            <span class="mw-sidebar-label">客服</span>
-                            <a class="mw-sidebar-link {% if current_path == '/admin' %}is-active{% endif %}" data-icon="✦" href="/admin">總控</a>
-                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/orders/history') %}is-active{% endif %}" data-icon="☷" href="/admin/orders/history">歷史訂單</a>
-                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/wallets') %}is-active{% endif %}" data-icon="◈" href="/admin/wallets">顧客錢包</a>
-                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/payouts/summary') %}is-active{% endif %}" data-icon="◎" href="/admin/payouts/summary">人員總表</a>
-                            <a class="mw-sidebar-link {% if current_path.startswith('/admin/staff') %}is-active{% endif %}" data-icon="◇" href="/admin/staff">人員名單</a>
-                        </div>
-                    {% endif %}
-      </nav>
+{% set current_path = request.url.path %}
+{% set mw_admin_area = current_path.startswith('/admin') %}
 
-                <div class="mw-sidebar-footer">
-                    <a class="mw-sidebar-link mw-sidebar-logout" data-icon="↯" href="/auth/logout">登出</a>
-                </div>
-            </aside>
-        {% endif %}
+<div class="mw-r5-shell">
 
-        <main class="page mw-main">
-            <section class="card wide mw-page-card">
-                <div class="topbar compact-topbar mw-page-topbar">
-                    <div>
-                        <p class="eyebrow">MW 魔丸娛樂中控</p>
-                        <h1>{% block page_title %}魔丸打手系統{% endblock %}</h1>
-                        {% if user %}
-                            <p class="muted compact-user">
-                                {{ user.global_name or user.username or user.id }}
-                            </p>
-                        {% endif %}
-                    </div>
-                </div>
+    {% if mw_admin_area %}
 
-                {% block content %}{% endblock %}
-            </section>
-        </main>
-    </div>
+        {% include "_admin_sidebar.html" %}
+
+    {% else %}
+
+        {% include "_employee_sidebar.html" %}
+
+    {% endif %}
+
+
+    <main class="mw-r5-main-host">
+
+
+{% set _p = request.url.path %}
+
+<header class="mw-r5-page-header">
+
+    {% if _p.startswith('/admin/orders/history') %}
+
+        <div class="mw-r5-kicker">
+            ORDER MANAGEMENT
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            訂單管理
+        </h1>
+
+        <p>
+            搜尋、篩選與查看完整訂單紀錄。
+        </p>
+
+
+    {% elif _p.startswith('/admin/payout') %}
+
+        <div class="mw-r5-kicker">
+            PAYOUT MANAGEMENT
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            薪資結算
+        </h1>
+
+        <p>
+            查看人員薪資、結算狀態與歷史紀錄。
+        </p>
+
+
+    {% elif _p.startswith('/admin/reviews') %}
+
+        <div class="mw-r5-kicker">
+            REVIEW MANAGEMENT
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            評價管理
+        </h1>
+
+        <p>
+            查看、篩選與管理客戶留下的服務評價。
+        </p>
+
+
+    {% elif _p.startswith('/admin/audit') %}
+
+        <div class="mw-r5-kicker">
+            AUDIT LOG
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            操作紀錄
+        </h1>
+
+        <p>
+            查看客服後台的重要操作與系統紀錄。
+        </p>
+
+
+    {% elif _p.startswith('/dispatch') %}
+
+        <div class="mw-r5-kicker">
+            ORDER DISPATCH
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            接單大廳
+        </h1>
+
+        <p>
+            查看目前可接訂單，以及自己正在進行的訂單。
+        </p>
+
+
+    {% elif _p.startswith('/my/payouts') %}
+
+        <div class="mw-r5-kicker">
+            PAYOUT CENTER
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            完整薪資
+        </h1>
+
+        <p>
+            依月份查看服務薪資、結算狀態與完整明細。
+        </p>
+
+
+    {% else %}
+
+        <div class="mw-r5-kicker">
+
+            {% if mw_admin_area %}
+                CUSTOMER SERVICE BACKOFFICE
+            {% else %}
+                EMPLOYEE WORKSPACE
+            {% endif %}
+
+        </div>
+
+        <h1 class="mw-r5-page-title">
+            {% block page_title %}
+                魔丸娛樂
+            {% endblock %}
+        </h1>
+
+    {% endif %}
+
+</header>
+
+
+
+        <section class="mw-r5-content">
+
+            {% block content %}
+            {% endblock %}
+
+        </section>
+
+    </main>
+
+</div>
+
+
 <script src="/static/js/ui_tweaks.js?v=1"></script>
+
 <script src="/static/js/payout_status_i18n.js?v=1"></script>
 
-<script>
-if (window.location.pathname === "/dispatch") {
-  const script = document.createElement("script");
-  script.src = "/static/js/dispatch_alerts.js?v=53";
-  script.defer = true;
-  document.body.appendChild(script);
-}
-</script>
-
 <script src="/static/js/month_select.js?v=1"></script>
+
+{% if current_path == "/dispatch" %}
+
+<script src="/static/js/dispatch_alerts.js?v=53"></script>
+
+{% endif %}
+
+
+
+<!-- BEGIN MAWAN_R5R6_TARGETED_FIX_V2_PORTAL_RUNTIME -->
+<script>
+(function () {
+    "use strict";
+
+    const path =
+        window.location.pathname;
+
+    const normalize = (value) =>
+        String(value || "")
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .replace(/[／/|｜·・:：()（）【】[\]「」『』]/g, "");
+
+    const leafTextNodes = (
+        root
+    ) =>
+        Array.from(
+            root.querySelectorAll(
+                "span,strong,b,small,div,p"
+            )
+        ).filter(
+            (node) =>
+                node.children.length
+                === 0
+        );
+
+
+    /*
+     * ======================================================
+     * 薪資結算
+     * ======================================================
+     */
+
+    const markPayoutMetrics = () => {
+        if (
+            !path.startsWith(
+                "/admin/payout"
+            )
+        ) {
+            return;
+        }
+
+        const labels = [
+            "未發放總額",
+            "已發放總額",
+            "未發放筆數",
+            "已發放筆數",
+        ];
+
+        labels.forEach(
+            (label) => {
+                const labelNode =
+                    Array.from(
+                        document.querySelectorAll(
+                            "*"
+                        )
+                    ).find(
+                        (node) =>
+                            node.children.length
+                            === 0
+                            &&
+                            normalize(
+                                node.textContent
+                            )
+                            ===
+                            normalize(label)
+                    );
+
+                if (!labelNode) {
+                    return;
+                }
+
+                const card =
+                    labelNode.closest(
+                        '[class*="card"], [class*="stat"], [class*="total"], article, section, div'
+                    );
+
+                if (!card) {
+                    return;
+                }
+
+                card.classList.add(
+                    "mw-r56-payout-metric"
+                );
+
+                leafTextNodes(
+                    card
+                ).forEach(
+                    (node) => {
+                        const text =
+                            String(
+                                node.textContent
+                                ||
+                                ""
+                            ).trim();
+
+                        if (
+                            /^\d+(?:\.\d+)?(?:T)?$/i
+                                .test(text)
+                        ) {
+                            node.classList.add(
+                                "mw-r56-payout-value"
+                            );
+                        }
+                    }
+                );
+            }
+        );
+    };
+
+
+    /*
+     * ======================================================
+     * 訂單管理狀態
+     * ======================================================
+     *
+     * 重點：
+     * - 不再留橢圓膠囊
+     * - select 撐滿整個狀態欄
+     * - hover 是整個矩形格子變化
+     */
+
+    const markOrderStatus = () => {
+        if (
+            !path.startsWith(
+                "/admin/orders/history"
+            )
+        ) {
+            return;
+        }
+
+        document.querySelectorAll(
+            ".history-status-select, .history-ledger-table select"
+        ).forEach(
+            (select) => {
+                const optionText =
+                    normalize(
+                        Array.from(
+                            select.options
+                            ||
+                            []
+                        )
+                            .map(
+                                (option) =>
+                                    option.textContent
+                            )
+                            .join(" ")
+                    );
+
+                if (
+                    !optionText.includes(
+                        "已結"
+                    )
+                    &&
+                    !optionText.includes(
+                        "取消"
+                    )
+                    &&
+                    !optionText.includes(
+                        "等待"
+                    )
+                    &&
+                    !optionText.includes(
+                        "付款"
+                    )
+                ) {
+                    return;
+                }
+
+                select.classList.add(
+                    "mw-r56-order-status-select"
+                );
+
+                const cell =
+                    select.closest(
+                        "td"
+                    );
+
+                if (cell) {
+                    cell.classList.add(
+                        "mw-r56-order-status-cell"
+                    );
+                }
+
+                const form =
+                    select.closest(
+                        "form"
+                    );
+
+                if (form) {
+                    form.classList.add(
+                        "mw-r56-order-status-form"
+                    );
+                }
+
+                let wrapper =
+                    select.parentElement;
+
+                while (
+                    wrapper
+                    &&
+                    wrapper !== cell
+                    &&
+                    wrapper !== document.body
+                ) {
+                    wrapper.classList.add(
+                        "mw-r56-order-status-wrapper"
+                    );
+
+                    wrapper = wrapper.parentElement;
+                }
+            }
+        );
+    };
+
+
+    const centerButtons = () => {
+        document.querySelectorAll(
+            'button, input[type="submit"], .button, .btn, .seal-button'
+        ).forEach(
+            (element) => {
+                element.classList.add(
+                    "mw-r56-center-action"
+                );
+            }
+        );
+    };
+
+
+    const boot = () => {
+        markPayoutMetrics();
+
+        markOrderStatus();
+
+        centerButtons();
+    };
+
+
+    if (
+        document.readyState
+        === "loading"
+    ) {
+        document.addEventListener(
+            "DOMContentLoaded",
+            boot,
+            {
+                once:
+                    true
+            }
+        );
+
+    } else {
+        boot();
+    }
+
+})();
+</script>
+<!-- END MAWAN_R5R6_TARGETED_FIX_V2_PORTAL_RUNTIME -->
 </body>
 </html>

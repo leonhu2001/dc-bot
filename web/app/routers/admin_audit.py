@@ -54,7 +54,7 @@ async def admin_audit_logs(request: Request, action: str | None = None, admin_id
             name="no_access.html",
             context={
                 "title": "沒有權限",
-                "message": "你沒有總控後台權限。",
+                "message": "你沒有客服後台權限。",
                 "user": user,
             },
             status_code=403,

@@ -2840,7 +2840,8 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         dispatch_channel_id = _to_int(order.dispatch_channel_id, DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
         ticket_channel_id = _to_int(order.ticket_channel_id)
         customer_id = _to_int(order.customer_discord_id)
-        category_label = str(order.category or "未紀錄")
+        category_raw = str(order.category or "未紀錄")
+        category_label = ORDER_CATEGORY_LABELS.get(category_raw, category_raw)
         item = str(order.item or "未紀錄")
         quantity = _to_int(
             order.quantity,
@@ -2996,6 +2997,22 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         raise ValueError(f"找不到票口頻道：{ticket_channel_id}")
 
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
+
+    # zYao 3C3B website order refresh safety v1
+    if data.get("website_finance_settled"):
+        website_selected_method = str(
+            data.get("website_payment_method")
+            or payment_method
+            or ""
+        ).strip()
+
+        if website_selected_method:
+            data["website_payment_method"] = website_selected_method
+
+        # 網站只是預選付款方式。
+        # 正式付款仍由原本 Discord PaymentMethodView 決定。
+        payment_method = "待付款"
+
     claim_data = ORDER_CLAIMS.setdefault(
         dispatch_message_id,
         {
@@ -3034,6 +3051,26 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         if value is not None:
             data[key] = value
 
+
+    if data.get("website_finance_settled"):
+        for unsafe_key in (
+            "point_benefit_key",
+            "selected_point_benefit_key",
+            "point_benefit_name",
+            "point_benefit_cost",
+            "point_discount_coupon_amount",
+            "point_waived_specify_fee",
+            "point_free_first_hour_amount",
+            "point_extra_hours",
+            "point_extra_games",
+            "point_benefit_redeemed",
+            "point_benefit_redeemed_at",
+            "point_benefit_before_points",
+            "point_benefit_after_points",
+            "point_benefit_redeemed_by",
+        ):
+            data.pop(unsafe_key, None)
+
     if web_order_note:
         data["web_order_note"] = web_order_note
 
@@ -3054,11 +3091,58 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         source_channel=ticket_channel,
         companion_preference=companion_preference,
         receiver_text=receiver_text,
+        staff_note=str(data.get("extra_requirements") or data.get("staff_note") or "").strip() or None,
     )
 
     add_self_service_financial_breakdown_fields(
         dispatch_embed,
         web_price_data,
+    )
+
+
+    website_info_lines = [
+        f"網站訂單：WEB-{order_id}"
+    ]
+
+    # 官網不選付款方式。
+    website_payment_method = ""
+
+    service_terms_version = str(
+        data.get("service_terms_version")
+        or ""
+    ).strip()
+
+    if service_terms_version:
+        website_info_lines.append(
+            f"服務規章：已同意｜{service_terms_version}"
+        )
+
+    specified_staff_ids = [
+        str(value).strip()
+        for value
+        in (
+            data.get("specified_staff_ids")
+            or []
+        )
+        if str(value).strip()
+    ]
+
+    if specified_staff_ids:
+        website_info_lines.append(
+            "指定人員："
+            + "、".join(
+                f"<@{staff_id}>"
+                for staff_id
+                in specified_staff_ids
+            )
+        )
+
+    dispatch_embed.add_field(
+        name="網站下單資訊",
+        value="\n".join(
+            website_info_lines
+        )[:1024],
+        inline=False,
     )
 
     dispatch_embed.add_field(
@@ -3069,7 +3153,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
     if int(getattr(state, "min_protector_count", 0) or 0) > 0:
         dispatch_embed.add_field(
-            name="護級需求",
+            name="護航需求",
             value=f"{state.protector_count}/{state.min_protector_count}",
             inline=True,
         )
@@ -3078,6 +3162,11 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         name="狀態",
         value="人數已滿，等待顧客付款" if str(state.status) == ACCEPTED_PENDING_PAY else "等待接單中",
         inline=False,
+    )
+
+
+    dispatch_embed.set_footer(
+        text=f"WEB-{order_id}｜網站訂單"
     )
 
     try:
@@ -3181,6 +3270,8 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
     remember_order_data(ticket_channel_id, data)
     save_bot_data()
+
+
 
 
 async def process_acceptance_sync_events_once() -> None:
@@ -3574,6 +3665,10 @@ def _build_receiver_text_from_claim_data(claim_data: dict) -> str | None:
 
 
 def _get_pending_order_point_benefit_info(data: dict) -> dict | None:
+    # zYao 3C3B website finance point safety v1
+    if data.get("website_finance_settled"):
+        return None
+
     benefit_key = str(
         data.get("point_benefit_key")
         or data.get("selected_point_benefit_key")
@@ -10119,6 +10214,30 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_ready():
+    # zYao 3C3B2R persistent CS review view v1
+    # zYao 3C3B2R3 persistent CS view v1
+    if not getattr(
+        bot,
+        "_website_cs_view_v3_registered",
+        False,
+    ):
+
+        bot.add_view(
+            WebsiteOrderCsConfirmView()
+        )
+
+        bot._website_cs_view_v3_registered = True
+    if not getattr(
+        bot,
+        "_website_cs_review_registered",
+        False,
+    ):
+
+        bot.add_view(
+            WebsiteOrderCsConfirmView()
+        )
+
+        bot._website_cs_review_registered = True
     if not getattr(bot, '_acceptance_sync_worker_started', False):
         bot._acceptance_sync_worker_started = True
         bot.loop.create_task(acceptance_sync_event_worker())
@@ -12173,7 +12292,3544 @@ def _web_sync_embed_without_receiver_fields(embed):
     return embed
 
 
-async def process_one_web_sync_event(event: dict) -> None:
+
+# zYao 3C3B web order created bridge v1
+
+def _web_order_created_json(value, default=None):
+    if default is None:
+        default = {}
+
+    if isinstance(value, dict):
+        return dict(value)
+
+    if not value:
+        return dict(default)
+
+    try:
+        parsed = json.loads(str(value))
+    except Exception:
+        return dict(default)
+
+    if not isinstance(parsed, dict):
+        return dict(default)
+
+    return parsed
+
+
+def _web_order_created_json_list(value):
+    if isinstance(value, (list, tuple, set)):
+        return [
+            str(item).strip()
+            for item in value
+            if str(item).strip()
+        ]
+
+    if not value:
+        return []
+
+    try:
+        parsed = json.loads(str(value))
+    except Exception:
+        return []
+
+    if not isinstance(parsed, list):
+        return []
+
+    return [
+        str(item).strip()
+        for item in parsed
+        if str(item).strip()
+    ]
+
+
+def _web_order_created_table_exists(conn, table_name: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name = ?
+        LIMIT 1
+        """,
+        (str(table_name),),
+    ).fetchone()
+
+    return row is not None
+
+
+def _web_order_created_load_bundle(order_id: int) -> dict:
+    import sqlite3
+
+    conn = sqlite3.connect(
+        _web_dashboard_db_path_for_bot(),
+        timeout=15,
+    )
+    conn.row_factory = sqlite3.Row
+
+    try:
+        order_row = conn.execute(
+            """
+            SELECT *
+            FROM web_orders
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(order_id),),
+        ).fetchone()
+
+        if order_row is None:
+            raise RuntimeError(
+                f"找不到網站訂單 WEB-{order_id}"
+            )
+
+        acceptance_row = None
+
+        if _web_order_created_table_exists(
+            conn,
+            "order_acceptance_meta",
+        ):
+            acceptance_row = conn.execute(
+                """
+                SELECT *
+                FROM order_acceptance_meta
+                WHERE order_id = ?
+                LIMIT 1
+                """,
+                (int(order_id),),
+            ).fetchone()
+
+        submission_row = None
+
+        if _web_order_created_table_exists(
+            conn,
+            "web_order_submission_meta",
+        ):
+            submission_row = conn.execute(
+                """
+                SELECT *
+                FROM web_order_submission_meta
+                WHERE order_id = ?
+                LIMIT 1
+                """,
+                (int(order_id),),
+            ).fetchone()
+
+        return {
+            "order": (
+                dict(order_row)
+                if order_row is not None
+                else {}
+            ),
+            "acceptance": (
+                dict(acceptance_row)
+                if acceptance_row is not None
+                else {}
+            ),
+            "submission": (
+                dict(submission_row)
+                if submission_row is not None
+                else {}
+            ),
+        }
+
+    finally:
+        conn.close()
+
+
+def _web_order_created_details(bundle: dict) -> dict:
+    order = bundle.get("order") or {}
+    acceptance = bundle.get("acceptance") or {}
+    submission = bundle.get("submission") or {}
+
+    rule_snapshot = _web_order_created_json(
+        order.get("rule_snapshot_json")
+    )
+
+    price_snapshot = _web_order_created_json(
+        order.get("price_snapshot_json")
+    )
+
+    submission_payload = _web_order_created_json(
+        submission.get(
+            "submission_payload_json"
+        )
+    )
+
+    specified_staff_ids = (
+        _web_order_created_json_list(
+            acceptance.get(
+                "specified_staff_ids_json"
+            )
+        )
+    )
+
+    if not specified_staff_ids:
+        specified_staff_ids = (
+            _web_order_created_json_list(
+                price_snapshot.get(
+                    "specified_staff_ids"
+                )
+            )
+        )
+
+    if not specified_staff_ids:
+        for candidate_key in (
+            "specified_staff_ids",
+            "selected_staff_ids",
+            "staff_ids",
+        ):
+            specified_staff_ids = (
+                _web_order_created_json_list(
+                    submission_payload.get(
+                        candidate_key
+                    )
+                )
+            )
+
+            if specified_staff_ids:
+                break
+
+    category_key = str(
+        rule_snapshot.get("category")
+        or price_snapshot.get("category")
+        or order.get("category")
+        or ""
+    ).strip()
+
+    raw_category = str(
+        order.get("category")
+        or category_key
+        or "未紀錄"
+    ).strip()
+
+    category_label = (
+        ORDER_CATEGORY_LABELS.get(
+            category_key,
+            raw_category,
+        )
+    )
+
+    amount_value = order.get(
+        "customer_pay_amount"
+    )
+
+    if amount_value is None:
+        amount_value = (
+            price_snapshot.get(
+                "customer_pay_amount"
+            )
+        )
+
+    if amount_value is None:
+        amount_value = order.get(
+            "amount"
+        )
+
+    amount = _to_int(
+        amount_value,
+        0,
+    )
+
+    if amount is None:
+        amount = 0
+
+    player_count = _to_int(
+        price_snapshot.get(
+            "player_count"
+        ),
+        None,
+    )
+
+    if player_count is None:
+        player_count = _to_int(
+            rule_snapshot.get(
+                "player_count"
+            ),
+            1,
+        )
+
+    player_count = max(
+        1,
+        int(player_count or 1),
+    )
+
+    website_payment_method = str(
+        submission_payload.get(
+            "payment_method"
+        )
+        or submission_payload.get(
+            "payment_method_key"
+        )
+        or order.get(
+            "payment_method"
+        )
+        or ""
+    ).strip()
+
+    service_terms_version = str(
+        submission.get(
+            "terms_version"
+        )
+        or submission_payload.get(
+            "terms_version"
+        )
+        or ""
+    ).strip()
+
+    terms_accepted_at = str(
+        submission.get(
+            "terms_accepted_at"
+        )
+        or ""
+    ).strip()
+
+    extra_requirements = str(
+        submission.get(
+            "extra_requirements"
+        )
+        or submission_payload.get(
+            "extra_requirements"
+        )
+        or ""
+    ).strip()
+
+    request_key = str(
+        submission.get(
+            "request_key"
+        )
+        or submission_payload.get(
+            "request_key"
+        )
+        or ""
+    ).strip()
+
+    required_staff_count = _to_int(
+        acceptance.get(
+            "required_staff_count"
+        ),
+        1,
+    )
+
+    return {
+        "rule_snapshot": rule_snapshot,
+        "price_snapshot": price_snapshot,
+        "submission_payload": submission_payload,
+        "category_key": category_key,
+        "category_label": category_label,
+        "item": str(
+            order.get("item")
+            or "未紀錄"
+        ),
+        "quantity": max(
+            1,
+            int(
+                _to_int(
+                    order.get("quantity"),
+                    1,
+                )
+                or 1
+            ),
+        ),
+        "player_count": player_count,
+        "amount": int(amount),
+        "website_payment_method": website_payment_method,
+        "service_terms_version": service_terms_version,
+        "terms_accepted_at": terms_accepted_at,
+        "extra_requirements": extra_requirements[:500],
+        "request_key": request_key,
+        "specified_staff_ids": specified_staff_ids,
+        "required_staff_count": max(
+            1,
+            int(
+                required_staff_count
+                or 1
+            ),
+        ),
+    }
+
+
+def _web_order_created_update_links(
+    order_id: int,
+    *,
+    ticket_channel_id=None,
+    dispatch_channel_id=None,
+    dispatch_message_id=None,
+) -> None:
+    import sqlite3
+
+    updates = []
+    values = []
+
+    if ticket_channel_id is not None:
+        updates.append(
+            "ticket_channel_id = ?"
+        )
+        values.append(
+            str(ticket_channel_id)
+        )
+
+    if dispatch_channel_id is not None:
+        updates.append(
+            "dispatch_channel_id = ?"
+        )
+        values.append(
+            str(dispatch_channel_id)
+        )
+
+    if dispatch_message_id is not None:
+        updates.append(
+            "dispatch_message_id = ?"
+        )
+        values.append(
+            str(dispatch_message_id)
+        )
+
+    if not updates:
+        return
+
+    values.append(
+        int(order_id)
+    )
+
+    conn = sqlite3.connect(
+        _web_dashboard_db_path_for_bot(),
+        timeout=15,
+    )
+
+    try:
+        conn.execute(
+            "UPDATE web_orders SET "
+            + ", ".join(updates)
+            + " WHERE id = ?",
+            tuple(values),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _web_order_created_mark_processing(
+    event_id: int,
+) -> None:
+    import sqlite3
+
+    conn = sqlite3.connect(
+        _web_dashboard_db_path_for_bot(),
+        timeout=15,
+    )
+
+    try:
+        conn.execute(
+            """
+            UPDATE sync_events
+            SET status = 'processing',
+                error_message = NULL
+            WHERE id = ?
+              AND event_type = 'order_created'
+              AND status IN (
+                  'pending',
+                  'failed',
+                  'processing'
+              )
+            """,
+            (int(event_id),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _web_order_created_fetch_retry_events(
+    limit: int = 10,
+) -> list[dict]:
+    import sqlite3
+
+    conn = sqlite3.connect(
+        _web_dashboard_db_path_for_bot(),
+        timeout=15,
+    )
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                e.id AS event_id,
+                e.order_id,
+                e.event_type,
+                e.retry_count,
+                w.id AS web_order_id,
+                w.ticket_channel_id,
+                w.dispatch_channel_id,
+                w.dispatch_message_id,
+                w.category,
+                w.item,
+                w.quantity,
+                w.amount,
+                w.customer_discord_id,
+                w.customer_display_name
+            FROM sync_events e
+            JOIN web_orders w
+              ON w.id = e.order_id
+            WHERE e.event_type = 'order_created'
+              AND e.status IN (
+                  'failed',
+                  'processing'
+              )
+              AND COALESCE(
+                  e.retry_count,
+                  0
+              ) < 20
+            ORDER BY e.id ASC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+        conn.close()
+
+
+async def _web_order_created_get_member(
+    guild: discord.Guild,
+    customer_id: int,
+):
+    member = guild.get_member(
+        int(customer_id)
+    )
+
+    if member is not None:
+        return member
+
+    try:
+        return await guild.fetch_member(
+            int(customer_id)
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"找不到網站下單顧客 Discord 成員：{customer_id}"
+        ) from exc
+
+
+async def _web_order_created_get_channel(
+    guild: discord.Guild,
+    channel_id,
+):
+    parsed_id = _to_int(
+        channel_id,
+        None,
+    )
+
+    if parsed_id is None:
+        return None
+
+    channel = guild.get_channel(
+        parsed_id
+    )
+
+    if channel is not None:
+        return channel
+
+    try:
+        return await guild.fetch_channel(
+            parsed_id
+        )
+    except Exception:
+        return None
+
+
+async def _web_order_created_find_ticket(
+    guild: discord.Guild,
+    order_id: int,
+    stored_channel_id,
+):
+    channel = await _web_order_created_get_channel(
+        guild,
+        stored_channel_id,
+    )
+
+    if isinstance(
+        channel,
+        discord.TextChannel,
+    ):
+        return channel
+
+    marker = (
+        f"web_order_id={order_id}"
+    )
+
+    for candidate in guild.text_channels:
+        topic = str(
+            candidate.topic
+            or ""
+        )
+
+        if marker in topic:
+            return candidate
+
+    return None
+
+
+async def _web_order_created_has_footer(
+    channel: discord.TextChannel,
+    footer_text: str,
+    *,
+    limit: int = 25,
+) -> bool:
+    try:
+        async for message in channel.history(
+            limit=int(limit),
+        ):
+            for embed in message.embeds:
+                footer = getattr(
+                    embed,
+                    "footer",
+                    None,
+                )
+
+                text = str(
+                    getattr(
+                        footer,
+                        "text",
+                        "",
+                    )
+                    or ""
+                )
+
+                if footer_text in text:
+                    return True
+
+    except discord.HTTPException:
+        return False
+
+    return False
+
+
+async def _web_order_created_ensure_ticket(
+    guild: discord.Guild,
+    event_id: int,
+    order_id: int,
+    bundle: dict,
+):
+    order = bundle["order"]
+    details = _web_order_created_details(
+        bundle
+    )
+
+    details["website_payment_method"] = ""
+
+    customer_id = _to_int(
+        order.get(
+            "customer_discord_id"
+        ),
+        None,
+    )
+
+    if customer_id is None:
+        raise RuntimeError(
+            f"WEB-{order_id} 缺少 customer_discord_id"
+        )
+
+    member = await _web_order_created_get_member(
+        guild,
+        customer_id,
+    )
+
+    ticket_channel = (
+        await _web_order_created_find_ticket(
+            guild,
+            order_id,
+            order.get(
+                "ticket_channel_id"
+            ),
+        )
+    )
+
+    created = False
+
+    if ticket_channel is None:
+        category = (
+            await _web_order_created_get_channel(
+                guild,
+                CUSTOMER_CATEGORY_ID,
+            )
+        )
+
+        if not isinstance(
+            category,
+            discord.CategoryChannel,
+        ):
+            raise RuntimeError(
+                "找不到網站訂單票口類別。"
+            )
+
+        support_role = guild.get_role(
+            CUSTOMER_ROLE_ID
+        )
+
+        bot_member = guild.me
+
+        if (
+            bot_member is None
+            and bot.user is not None
+        ):
+            bot_member = guild.get_member(
+                bot.user.id
+            )
+
+        if bot_member is None:
+            raise RuntimeError(
+                "無法取得 Bot guild member。"
+            )
+
+        overwrites = {
+            guild.default_role:
+                discord.PermissionOverwrite(
+                    view_channel=False,
+                    send_messages=False,
+                    read_message_history=False,
+                ),
+            member:
+                discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                ),
+            bot_member:
+                discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    manage_channels=True,
+                    read_message_history=True,
+                    attach_files=True,
+                ),
+        }
+
+        if support_role is not None:
+            overwrites[
+                support_role
+            ] = (
+                discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    attach_files=True,
+                )
+            )
+
+        topic = (
+            f"order_customer_id={customer_id};"
+            f"web_order_id={order_id};"
+            f"web_order_event_id={event_id}"
+        )
+
+        channel_name = (
+            build_ticket_channel_name(
+                "下單",
+                member,
+                display_name=(
+                    order.get(
+                        "customer_display_name"
+                    )
+                    or getattr(
+                        member,
+                        "display_name",
+                        None,
+                    )
+                ),
+            )
+        )
+
+        ticket_channel = (
+            await guild.create_text_channel(
+                name=channel_name,
+                category=category,
+                overwrites=overwrites,
+                topic=topic,
+                reason=(
+                    f"WEB-{order_id} "
+                    "website order"
+                ),
+            )
+        )
+
+        created = True
+
+    _web_order_created_update_links(
+        order_id,
+        ticket_channel_id=(
+            ticket_channel.id
+        ),
+    )
+
+    intro_footer = (
+        f"WEB-{order_id}｜網站訂單票口"
+    )
+
+    has_intro = (
+        await _web_order_created_has_footer(
+            ticket_channel,
+            intro_footer,
+            limit=25,
+        )
+    )
+
+    if not has_intro:
+        amount_text = (
+            _format_plain_amount(
+                details["amount"]
+            )
+            if "_format_plain_amount"
+            in globals()
+            else format_t_amount(
+                details["amount"]
+            )
+        )
+
+        embed = discord.Embed(
+            title="網站訂單已建立｜等待客服確認",
+            description=(
+                "此訂單已由官網正式送出，"
+                "目前等待客服確認送單。\n"
+                "客服確認後才會派單，之後沿用原本"
+                " Discord 接單與付款流程。"
+            ),
+            color=discord.Color.gold(),
+        )
+
+        embed.add_field(
+            name="訂單",
+            value=(
+                f"WEB-{order_id}\n"
+                f"{details['category_label']}｜"
+                f"{details['item']}"
+            ),
+            inline=False,
+        )
+
+        embed.add_field(
+            name="顧客",
+            value=f"<@{customer_id}>",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="數量",
+            value=str(
+                details["quantity"]
+            ),
+            inline=True,
+        )
+
+        embed.add_field(
+            name="顧客應付",
+            value=amount_text,
+            inline=True,
+        )
+
+        if details[
+            "website_payment_method"
+        ]:
+            embed.add_field(
+                name="網站預選付款方式",
+                value=details[
+                    "website_payment_method"
+                ][:1024],
+                inline=False,
+            )
+
+        if details[
+            "service_terms_version"
+        ]:
+            terms_value = (
+                "已同意"
+                f"｜{details['service_terms_version']}"
+            )
+
+            if details[
+                "terms_accepted_at"
+            ]:
+                terms_value += (
+                    "\n"
+                    + details[
+                        "terms_accepted_at"
+                    ]
+                )
+
+            embed.add_field(
+                name="服務規章",
+                value=terms_value[:1024],
+                inline=False,
+            )
+
+        if details[
+            "specified_staff_ids"
+        ]:
+            embed.add_field(
+                name="指定人員",
+                value="、".join(
+                    f"<@{staff_id}>"
+                    for staff_id
+                    in details[
+                        "specified_staff_ids"
+                    ]
+                )[:1024],
+                inline=False,
+            )
+
+        if details[
+            "extra_requirements"
+        ]:
+            embed.add_field(
+                name="附加需求",
+                value=details[
+                    "extra_requirements"
+                ][:1024],
+                inline=False,
+            )
+
+        embed.set_footer(
+            text=intro_footer
+        )
+
+        await ticket_channel.send(
+            content=(
+                f"<@{customer_id}> "
+                "您的網站訂單已建立。"
+            ),
+            embed=embed,
+            allowed_mentions=(
+                discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False,
+                )
+            ),
+        )
+
+    if created:
+        try:
+            await send_order_log(
+                guild,
+                title="網站新票口已建立",
+                fields=[
+                    (
+                        "顧客",
+                        f"<@{customer_id}>",
+                        True,
+                    ),
+                    (
+                        "網站訂單",
+                        f"WEB-{order_id}",
+                        True,
+                    ),
+                    (
+                        "票口",
+                        ticket_channel.mention,
+                        False,
+                    ),
+                ],
+                color=discord.Color.purple(),
+            )
+        except Exception as exc:
+            print(
+                "[web-order-create] "
+                "ticket log failed "
+                f"WEB-{order_id}: {exc}"
+            )
+
+    return ticket_channel
+
+
+
+
+async def _web_order_created_find_dispatch_message(
+    guild: discord.Guild,
+    order_id: int,
+    order: dict,
+):
+    dispatch_channel_id = _to_int(
+        order.get(
+            "dispatch_channel_id"
+        ),
+        DISPATCH_CHANNEL_ID,
+    ) or DISPATCH_CHANNEL_ID
+
+    dispatch_channel = (
+        await _web_order_created_get_channel(
+            guild,
+            dispatch_channel_id,
+        )
+    )
+
+    if not isinstance(
+        dispatch_channel,
+        discord.TextChannel,
+    ):
+        dispatch_channel = (
+            await _web_order_created_get_channel(
+                guild,
+                DISPATCH_CHANNEL_ID,
+            )
+        )
+
+    if not isinstance(
+        dispatch_channel,
+        discord.TextChannel,
+    ):
+        raise RuntimeError(
+            "找不到派單頻道。"
+        )
+
+    stored_message_id = _to_int(
+        order.get(
+            "dispatch_message_id"
+        ),
+        None,
+    )
+
+    if stored_message_id is not None:
+        try:
+            existing = (
+                await dispatch_channel.fetch_message(
+                    stored_message_id
+                )
+            )
+
+            return (
+                dispatch_channel,
+                existing,
+            )
+
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException,
+        ):
+            pass
+
+    marker = (
+        f"WEB-{order_id}｜網站訂單"
+    )
+
+    try:
+        async for message in dispatch_channel.history(
+            limit=100,
+        ):
+            for embed in message.embeds:
+                footer = getattr(
+                    embed,
+                    "footer",
+                    None,
+                )
+
+                footer_text = str(
+                    getattr(
+                        footer,
+                        "text",
+                        "",
+                    )
+                    or ""
+                )
+
+                if marker in footer_text:
+                    return (
+                        dispatch_channel,
+                        message,
+                    )
+
+    except discord.HTTPException:
+        pass
+
+    return (
+        dispatch_channel,
+        None,
+    )
+
+
+async def _web_order_created_ensure_dispatch(
+    guild: discord.Guild,
+    order_id: int,
+    bundle: dict,
+    ticket_channel: discord.TextChannel,
+):
+    order = bundle["order"]
+    details = _web_order_created_details(
+        bundle
+    )
+
+    (
+        dispatch_channel,
+        dispatch_message,
+    ) = (
+        await _web_order_created_find_dispatch_message(
+            guild,
+            order_id,
+            order,
+        )
+    )
+
+    if dispatch_message is None:
+        customer_id = _to_int(
+            order.get(
+                "customer_discord_id"
+            ),
+            None,
+        )
+
+        placeholder = discord.Embed(
+            title="網站訂單｜等待接單",
+            description=(
+                f"網站訂單：WEB-{order_id}\n"
+                f"顧客：<@{customer_id}>\n"
+                f"項目：{details['category_label']}｜"
+                f"{details['item']}\n"
+                "正在建立正式接單面板。"
+            ),
+            color=discord.Color.gold(),
+        )
+
+        placeholder.set_footer(
+            text=(
+                f"WEB-{order_id}｜網站訂單"
+            )
+        )
+
+        dispatch_message = (
+            await dispatch_channel.send(
+                embed=placeholder,
+                allowed_mentions=(
+                    discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    )
+                ),
+            )
+        )
+
+    _web_order_created_update_links(
+        order_id,
+        ticket_channel_id=(
+            ticket_channel.id
+        ),
+        dispatch_channel_id=(
+            dispatch_channel.id
+        ),
+        dispatch_message_id=(
+            dispatch_message.id
+        ),
+    )
+
+    return (
+        dispatch_channel,
+        dispatch_message,
+    )
+
+
+def _web_order_created_seed_state(
+    order_id: int,
+    bundle: dict,
+    ticket_channel: discord.TextChannel,
+    dispatch_channel: discord.TextChannel,
+    dispatch_message: discord.Message,
+):
+    order = bundle["order"]
+    acceptance = (
+        bundle.get("acceptance")
+        or {}
+    )
+
+    if not acceptance:
+        raise RuntimeError(
+            f"WEB-{order_id} 缺少付款前接單 meta"
+        )
+
+    details = (
+        _web_order_created_details(
+            bundle
+        )
+    )
+
+    customer_id = _to_int(
+        order.get(
+            "customer_discord_id"
+        ),
+        None,
+    )
+
+    if customer_id is None:
+        raise RuntimeError(
+            f"WEB-{order_id} 缺少顧客 ID"
+        )
+
+    data = (
+        SELF_SERVICE_ORDER_SELECTIONS
+        .setdefault(
+            ticket_channel.id,
+            {},
+        )
+    )
+
+    data["customer_id"] = (
+        customer_id
+    )
+
+    data["category"] = (
+        details["category_key"]
+        or order.get("category")
+    )
+
+    data["category_label"] = (
+        details["category_label"]
+    )
+
+    data["item"] = (
+        details["item"]
+    )
+
+    data["quantity"] = (
+        details["quantity"]
+    )
+
+    data["player_count"] = (
+        details["player_count"]
+    )
+
+    data["order_rule_key"] = (
+        order.get(
+            "order_rule_key"
+        )
+    )
+
+    data["rule_version"] = (
+        order.get(
+            "rule_version"
+        )
+    )
+
+    data["rule_snapshot_json"] = (
+        order.get(
+            "rule_snapshot_json"
+        )
+    )
+
+    data["price_snapshot_json"] = (
+        order.get(
+            "price_snapshot_json"
+        )
+    )
+
+    amount = int(
+        details["amount"]
+    )
+
+    data["amount"] = amount
+    data["total_amount"] = amount
+
+    data["amount_text"] = (
+        _format_plain_amount(
+            amount
+        )
+        if "_format_plain_amount"
+        in globals()
+        else format_t_amount(
+            amount
+        )
+    )
+
+    for key in (
+        "original_amount",
+        "payout_base_amount",
+        "customer_pay_amount",
+        "manual_discount_amount",
+        "cash_coupon_amount",
+        "store_absorbed_amount",
+    ):
+        value = order.get(key)
+
+        if value is not None:
+            data[key] = value
+
+    data[
+        "website_payment_method"
+    ] = details[
+        "website_payment_method"
+    ] or None
+
+    # 網站預選不代表 Discord 已正式付款。
+    data.pop(
+        "payment_method",
+        None,
+    )
+
+    data[
+        "specified_staff_ids"
+    ] = list(
+        details[
+            "specified_staff_ids"
+        ]
+    )
+
+    data[
+        "companion_preference"
+    ] = (
+        "指定陪玩/打手"
+        if details[
+            "specified_staff_ids"
+        ]
+        else "不指定陪玩/打手"
+    )
+
+    extra_requirements = (
+        details[
+            "extra_requirements"
+        ]
+    )
+
+    data[
+        "extra_requirements"
+    ] = (
+        extra_requirements
+        or None
+    )
+
+    if extra_requirements:
+        data["staff_note"] = (
+            extra_requirements
+        )
+        data[
+            "staff_order_note"
+        ] = extra_requirements
+
+    data[
+        "service_terms_version"
+    ] = (
+        details[
+            "service_terms_version"
+        ]
+        or None
+    )
+
+    data[
+        "website_terms_accepted_at"
+    ] = (
+        details[
+            "terms_accepted_at"
+        ]
+        or None
+    )
+
+    data[
+        "web_submission_request_key"
+    ] = (
+        details[
+            "request_key"
+        ]
+        or None
+    )
+
+    data["web_order_note"] = (
+        order.get("note")
+    )
+
+    data[
+        "website_finance_settled"
+    ] = True
+
+    data[
+        "web_order_source"
+    ] = "website"
+
+    data[
+        "web_order_id"
+    ] = int(order_id)
+
+    data[
+        "dispatch_channel_id"
+    ] = dispatch_channel.id
+
+    data[
+        "dispatch_message_id"
+    ] = dispatch_message.id
+
+    data[
+        "closed"
+    ] = False
+
+    data[
+        "status"
+    ] = str(
+        acceptance.get(
+            "status"
+        )
+        or order.get(
+            "status"
+        )
+        or "waiting_acceptance"
+    )
+
+    data[
+        "waiting_acceptance_created_at"
+    ] = (
+        data.get(
+            "waiting_acceptance_created_at"
+        )
+        or get_taipei_now_iso()
+    )
+
+    # 防止網站已扣的點數福利，
+    # 又被 Bot 付款流程視為尚未扣除。
+    for unsafe_key in (
+        "point_benefit_key",
+        "selected_point_benefit_key",
+        "point_benefit_name",
+        "point_benefit_cost",
+        "point_discount_coupon_amount",
+        "point_waived_specify_fee",
+        "point_free_first_hour_amount",
+        "point_extra_hours",
+        "point_extra_games",
+        "point_benefit_redeemed",
+        "point_benefit_redeemed_at",
+        "point_benefit_before_points",
+        "point_benefit_after_points",
+        "point_benefit_redeemed_by",
+    ):
+        data.pop(
+            unsafe_key,
+            None,
+        )
+
+    from shared.order_acceptance import (
+        get_acceptance_state,
+    )
+
+    state = get_acceptance_state(
+        int(order_id)
+    )
+
+    claim_data = (
+        ORDER_CLAIMS.setdefault(
+            dispatch_message.id,
+            {
+                "companion": set(),
+                "booster": set(),
+                "locked": False,
+            },
+        )
+    )
+
+    _apply_acceptance_state_to_claim_data(
+        claim_data,
+        state,
+    )
+
+    claim_data[
+        "locked"
+    ] = False
+
+    claim_data[
+        "customer_id"
+    ] = customer_id
+
+    claim_data[
+        "category_label"
+    ] = details[
+        "category_label"
+    ]
+
+    claim_data[
+        "item"
+    ] = details[
+        "item"
+    ]
+
+    claim_data[
+        "quantity"
+    ] = details[
+        "quantity"
+    ]
+
+    claim_data[
+        "payment_method"
+    ] = "待付款"
+
+    claim_data[
+        "amount"
+    ] = amount
+
+    claim_data[
+        "total_amount"
+    ] = amount
+
+    claim_data[
+        "source_channel_id"
+    ] = ticket_channel.id
+
+    claim_data[
+        "dispatch_channel_id"
+    ] = dispatch_channel.id
+
+    claim_data[
+        "companion_preference"
+    ] = data[
+        "companion_preference"
+    ]
+
+    claim_data[
+        "specified_staff_ids"
+    ] = list(
+        details[
+            "specified_staff_ids"
+        ]
+    )
+
+    claim_data[
+        "website_order"
+    ] = True
+
+    ORDER_CLAIMS[
+        dispatch_message.id
+    ] = claim_data
+
+    remember_order_data(
+        ticket_channel.id,
+        data,
+    )
+
+    remember_claim_data(
+        dispatch_message.id,
+        claim_data,
+    )
+
+    save_bot_data()
+
+
+
+# zYao 3C3B2R CS review gate v1
+
+WEB_ORDER_PENDING_CS_DISPATCH = (
+    "pending_cs_dispatch"
+)
+
+
+def _web_order_created_set_cs_status(
+
+    order_id: int,
+
+    status: str,
+
+    *,
+
+    cs_user=None,
+
+) -> None:
+
+    import sqlite3
+
+
+    conn = sqlite3.connect(
+
+        _web_dashboard_db_path_for_bot(),
+
+        timeout=15,
+
+    )
+
+
+    try:
+
+        conn.execute(
+            "BEGIN IMMEDIATE"
+        )
+
+
+        if cs_user is None:
+
+            conn.execute(
+
+                """
+                UPDATE web_orders
+
+                SET status = ?
+
+                WHERE id = ?
+                """,
+
+                (
+                    str(status),
+                    int(order_id),
+                ),
+
+            )
+
+
+        else:
+
+            conn.execute(
+
+                """
+                UPDATE web_orders
+
+                SET status = ?,
+
+                    customer_service_discord_id = ?,
+
+                    customer_service_display_name = ?
+
+                WHERE id = ?
+                """,
+
+                (
+                    str(status),
+
+                    str(
+                        cs_user.id
+                    ),
+
+                    str(
+                        getattr(
+                            cs_user,
+                            "display_name",
+                            None,
+                        )
+                        or getattr(
+                            cs_user,
+                            "name",
+                            None,
+                        )
+                        or cs_user.id
+                    ),
+
+                    int(order_id),
+                ),
+
+            )
+
+
+        conn.execute(
+
+            """
+            UPDATE order_acceptance_meta
+
+            SET status = ?,
+
+                updated_at =
+                    CURRENT_TIMESTAMP
+
+            WHERE order_id = ?
+            """,
+
+            (
+                str(status),
+                int(order_id),
+            ),
+
+        )
+
+
+        conn.commit()
+
+
+    except Exception:
+
+        conn.rollback()
+
+        raise
+
+
+    finally:
+
+        conn.close()
+
+
+def _web_order_created_seed_cs_review(
+
+    order_id: int,
+
+    bundle: dict,
+
+    ticket_channel:
+        discord.TextChannel,
+
+):
+
+    order = (
+        bundle.get(
+            "order"
+        )
+        or {}
+    )
+
+
+    details = (
+        _web_order_created_details(
+            bundle
+        )
+    )
+
+
+    customer_id = _to_int(
+
+        order.get(
+            "customer_discord_id"
+        ),
+
+        None,
+
+    )
+
+
+    if customer_id is None:
+
+        raise RuntimeError(
+            f"WEB-{order_id} "
+            "缺少顧客 Discord ID"
+        )
+
+
+    data = (
+        SELF_SERVICE_ORDER_SELECTIONS
+        .setdefault(
+            ticket_channel.id,
+            {},
+        )
+    )
+
+
+    data[
+        "customer_id"
+    ] = customer_id
+
+
+    data[
+        "category"
+    ] = (
+
+        details.get(
+            "category_key"
+        )
+
+        or order.get(
+            "category"
+        )
+
+    )
+
+
+    data[
+        "category_label"
+    ] = details.get(
+        "category_label"
+    )
+
+
+    data[
+        "item"
+    ] = details.get(
+        "item"
+    )
+
+
+    data[
+        "quantity"
+    ] = int(
+        details.get(
+            "quantity"
+        )
+        or 1
+    )
+
+
+    data[
+        "player_count"
+    ] = int(
+        details.get(
+            "player_count"
+        )
+        or 1
+    )
+
+
+    data[
+        "order_rule_key"
+    ] = order.get(
+        "order_rule_key"
+    )
+
+
+    data[
+        "rule_version"
+    ] = order.get(
+        "rule_version"
+    )
+
+
+    data[
+        "rule_snapshot_json"
+    ] = order.get(
+        "rule_snapshot_json"
+    )
+
+
+    data[
+        "price_snapshot_json"
+    ] = order.get(
+        "price_snapshot_json"
+    )
+
+
+    amount = _to_int(
+
+        order.get(
+            "customer_pay_amount"
+        ),
+
+        None,
+
+    )
+
+
+    if amount is None:
+
+        amount = _to_int(
+
+            details.get(
+                "amount"
+            ),
+
+            0,
+
+        )
+
+
+    amount = int(
+        amount
+        or 0
+    )
+
+
+    data[
+        "amount"
+    ] = amount
+
+
+    data[
+        "total_amount"
+    ] = amount
+
+
+    data[
+        "customer_pay_amount"
+    ] = amount
+
+
+    data[
+        "amount_text"
+    ] = (
+
+        _format_plain_amount(
+            amount
+        )
+
+        if "_format_plain_amount"
+        in globals()
+
+        else format_t_amount(
+            amount
+        )
+
+    )
+
+
+    for key in (
+
+        "original_amount",
+
+        "payout_base_amount",
+
+        "manual_discount_amount",
+
+        "cash_coupon_amount",
+
+        "store_absorbed_amount",
+
+    ):
+
+        if order.get(
+            key
+        ) is not None:
+
+            data[key] = (
+                order.get(
+                    key
+                )
+            )
+
+
+    specified_staff_ids = [
+
+        str(value).strip()
+
+        for value
+        in (
+            details.get(
+                "specified_staff_ids"
+            )
+            or []
+        )
+
+        if str(
+            value
+        ).strip()
+
+    ]
+
+
+    data[
+        "specified_staff_ids"
+    ] = specified_staff_ids
+
+
+    data[
+        "companion_preference"
+    ] = (
+
+        "指定陪玩/打手"
+
+        if specified_staff_ids
+
+        else "不指定陪玩/打手"
+
+    )
+
+
+    extra_requirements = str(
+
+        details.get(
+            "extra_requirements"
+        )
+
+        or ""
+
+    ).strip()
+
+
+    data[
+        "extra_requirements"
+    ] = (
+
+        extra_requirements
+        or None
+
+    )
+
+
+    if extra_requirements:
+
+        data[
+            "staff_note"
+        ] = (
+            extra_requirements
+        )
+
+
+        data[
+            "staff_order_note"
+        ] = (
+            extra_requirements
+        )
+
+
+    data[
+        "service_terms_version"
+    ] = (
+
+        details.get(
+            "service_terms_version"
+        )
+
+        or None
+
+    )
+
+
+    data[
+        "website_terms_accepted_at"
+    ] = (
+
+        details.get(
+            "terms_accepted_at"
+        )
+
+        or None
+
+    )
+
+
+    # 官網不決定付款方式。
+    data.pop(
+        "payment_method",
+        None,
+    )
+
+
+    data.pop(
+        "website_payment_method",
+        None,
+    )
+
+
+    # 但點數福利若已在官網正式建單時結算，
+    # 仍要標記，避免付款階段重複扣點。
+    data[
+        "website_finance_settled"
+    ] = True
+
+
+    data[
+        "web_order_source"
+    ] = "website"
+
+
+    data[
+        "web_order_id"
+    ] = int(
+        order_id
+    )
+
+
+    data[
+        "status"
+    ] = (
+        WEB_ORDER_PENDING_CS_DISPATCH
+    )
+
+
+    data[
+        "closed"
+    ] = False
+
+
+    for key in (
+
+        "dispatch_channel_id",
+
+        "dispatch_message_id",
+
+        "payment_channel_id",
+
+        "payment_message_id",
+
+        "payment_finalizing",
+
+        "dispatch_submitting",
+
+    ):
+
+        data.pop(
+            key,
+            None,
+        )
+
+
+    remember_order_data(
+        ticket_channel.id,
+        data,
+    )
+
+
+    save_bot_data()
+
+
+    return data
+
+
+async def _web_order_created_ensure_cs_review_panel(
+
+    order_id: int,
+
+    bundle: dict,
+
+    ticket_channel:
+        discord.TextChannel,
+
+    data: dict,
+
+):
+
+    footer_text = (
+        f"WEB-{order_id}"
+        "｜客服送單前"
+    )
+
+
+    if (
+        await _web_order_created_has_footer(
+
+            ticket_channel,
+
+            footer_text,
+
+            limit=40,
+
+        )
+    ):
+
+        return None
+
+
+    customer_id = _to_int(
+
+        data.get(
+            "customer_id"
+        ),
+
+        None,
+
+    )
+
+
+    embed = discord.Embed(
+
+        title=(
+            "網站訂單｜"
+            "等待客服確認"
+        ),
+
+        description=(
+
+            "官網訂單已成功建立。\n\n"
+
+            "目前尚未派單，"
+            "也沒有開放陪玩／護航接單。\n"
+
+            "請客服確認訂單內容後，"
+            "再按「客服確認送單」。"
+
+        ),
+
+        color=discord.Color.gold(),
+
+    )
+
+
+    embed.add_field(
+
+        name="網站訂單",
+
+        value=f"WEB-{order_id}",
+
+        inline=True,
+
+    )
+
+
+    embed.add_field(
+
+        name="顧客",
+
+        value=(
+
+            f"<@{customer_id}>"
+
+            if customer_id
+            else "未紀錄"
+
+        ),
+
+        inline=True,
+
+    )
+
+
+    embed.add_field(
+
+        name="項目",
+
+        value=(
+
+            f"{data.get('category_label') or '未紀錄'}"
+            f"｜"
+            f"{data.get('item') or '未紀錄'}"
+
+        ),
+
+        inline=False,
+
+    )
+
+
+    embed.add_field(
+
+        name="數量",
+
+        value=str(
+            data.get(
+                "quantity"
+            )
+            or 1
+        ),
+
+        inline=True,
+
+    )
+
+
+    embed.add_field(
+
+        name="顧客應付",
+
+        value=(
+
+            _format_plain_amount(
+                data.get(
+                    "customer_pay_amount"
+                )
+                or 0
+            )
+
+            if "_format_plain_amount"
+            in globals()
+
+            else format_t_amount(
+                data.get(
+                    "customer_pay_amount"
+                )
+                or 0
+            )
+
+        ),
+
+        inline=True,
+
+    )
+
+
+    embed.add_field(
+
+        name="付款方式",
+
+        value=(
+            "尚未選擇｜"
+            "接單完成後於 Discord 選擇"
+        ),
+
+        inline=False,
+
+    )
+
+
+    specified_staff_ids = (
+
+        data.get(
+            "specified_staff_ids"
+        )
+
+        or []
+
+    )
+
+
+    if specified_staff_ids:
+
+        embed.add_field(
+
+            name="指定人員",
+
+            value=(
+
+                "、".join(
+
+                    f"<@{staff_id}>"
+
+                    for staff_id
+                    in specified_staff_ids
+
+                )[:1024]
+
+            ),
+
+            inline=False,
+
+        )
+
+
+    extra_requirements = str(
+
+        data.get(
+            "extra_requirements"
+        )
+
+        or ""
+
+    ).strip()
+
+
+    if extra_requirements:
+
+        embed.add_field(
+
+            name="附加需求",
+
+            value=(
+                extra_requirements[
+                    :1024
+                ]
+            ),
+
+            inline=False,
+
+        )
+
+
+    terms = str(
+
+        data.get(
+            "service_terms_version"
+        )
+
+        or ""
+
+    ).strip()
+
+
+    if terms:
+
+        embed.add_field(
+
+            name="服務規章",
+
+            value=(
+                f"已同意｜{terms}"
+            ),
+
+            inline=False,
+
+        )
+
+
+    embed.set_footer(
+        text=footer_text
+    )
+
+
+    message = (
+        await ticket_channel.send(
+
+            embed=embed,
+
+            view=(
+                WebsiteOrderCsConfirmView()
+            ),
+
+            allowed_mentions=(
+                discord.AllowedMentions(
+
+                    users=True,
+
+                    roles=False,
+
+                    everyone=False,
+
+                )
+            ),
+
+        )
+    )
+
+
+    data[
+        "website_cs_review_message_id"
+    ] = message.id
+
+
+    remember_order_data(
+        ticket_channel.id,
+        data,
+    )
+
+
+    save_bot_data()
+
+
+    return message
+
+
+class WebsiteOrderCsConfirmView(
+    discord.ui.View
+):
+
+    def __init__(
+        self,
+    ):
+
+        super().__init__(
+            timeout=None
+        )
+
+
+    @discord.ui.button(
+
+        label="客服確認送單",
+
+        style=(
+            discord.ButtonStyle.success
+        ),
+
+        custom_id=(
+            "website_order_"
+            "cs_confirm_dispatch_v2"
+        ),
+
+    )
+
+    async def confirm_dispatch(
+
+        self,
+
+        interaction:
+            discord.Interaction,
+
+        button:
+            discord.ui.Button,
+
+    ):
+
+        if (
+
+            not isinstance(
+                interaction.user,
+                discord.Member,
+            )
+
+            or not is_customer_staff(
+                interaction.user
+            )
+
+        ):
+
+            await (
+                interaction.response
+                .send_message(
+
+                    "只有客服可以確認送單。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+            return
+
+
+        if not isinstance(
+
+            interaction.channel,
+
+            discord.TextChannel,
+
+        ):
+
+            await (
+                interaction.response
+                .send_message(
+
+                    "目前不是有效的訂單票口。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+            return
+
+
+        channel_id = (
+            interaction.channel.id
+        )
+
+
+        data = (
+            SELF_SERVICE_ORDER_SELECTIONS
+            .get(
+                channel_id,
+                {},
+            )
+        )
+
+
+        order_id = _to_int(
+
+            data.get(
+                "web_order_id"
+            ),
+
+            None,
+
+        )
+
+
+        if order_id is None:
+
+            await (
+                interaction.response
+                .send_message(
+
+                    "找不到網站訂單編號，"
+                    "請通知管理員確認。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+            return
+
+
+        if data.get(
+            "dispatch_message_id"
+        ):
+
+            await (
+                interaction.response
+                .send_message(
+
+                    "這張訂單已經送出派單。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+            return
+
+
+        status = str(
+
+            data.get(
+                "status"
+            )
+
+            or ""
+
+        ).lower()
+
+
+        if (
+            status
+            != WEB_ORDER_PENDING_CS_DISPATCH
+        ):
+
+            await (
+                interaction.response
+                .send_message(
+
+                    "這張訂單目前不是"
+                    "等待客服確認狀態。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+            return
+
+
+        await (
+            interaction.response
+            .defer(
+                ephemeral=True
+            )
+        )
+
+
+        try:
+
+            # 先正式放行 DB 狀態。
+            _web_order_created_set_cs_status(
+
+                order_id,
+
+                "waiting_acceptance",
+
+                cs_user=
+                    interaction.user,
+
+            )
+
+
+            bundle = (
+                _web_order_created_load_bundle(
+                    order_id
+                )
+            )
+
+
+            guild = interaction.guild
+
+
+            if guild is None:
+
+                raise RuntimeError(
+                    "找不到 Discord guild"
+                )
+
+
+            (
+                dispatch_channel,
+                dispatch_message,
+            ) = (
+                await _web_order_created_ensure_dispatch(
+
+                    guild,
+
+                    order_id,
+
+                    bundle,
+
+                    interaction.channel,
+
+                )
+            )
+
+
+            # 使用原本 3C-3B 已完成的資料 seed。
+            _web_order_created_seed_state(
+
+                order_id,
+
+                bundle,
+
+                interaction.channel,
+
+                dispatch_channel,
+
+                dispatch_message,
+
+            )
+
+
+            # 這裡才真正建立正常等待接單 panel。
+            await refresh_acceptance_dispatch_from_web_order(
+
+                guild,
+
+                order_id,
+
+            )
+
+
+            updated = (
+                SELF_SERVICE_ORDER_SELECTIONS
+                .setdefault(
+                    channel_id,
+                    {},
+                )
+            )
+
+
+            updated[
+                "cs_dispatch_confirmed_by"
+            ] = interaction.user.id
+
+
+            updated[
+                "cs_dispatch_confirmed_at"
+            ] = get_taipei_now_iso()
+
+
+            remember_order_data(
+                channel_id,
+                updated,
+            )
+
+
+            save_bot_data()
+
+
+            if (
+                interaction.message
+                is not None
+            ):
+
+                old_embed = (
+
+                    interaction
+                    .message
+                    .embeds[0]
+                    .copy()
+
+                    if interaction
+                    .message
+                    .embeds
+
+                    else discord.Embed()
+
+                )
+
+
+                old_embed.title = (
+                    "網站訂單｜"
+                    "客服已確認送單"
+                )
+
+
+                old_embed.description = (
+
+                    f"已由 "
+                    f"{interaction.user.mention} "
+                    "確認並送出等待接單。"
+
+                )
+
+
+                try:
+
+                    await (
+                        interaction.message
+                        .edit(
+
+                            embed=old_embed,
+
+                            view=None,
+
+                        )
+                    )
+
+
+                except discord.HTTPException:
+
+                    pass
+
+
+            await (
+                interaction.followup
+                .send(
+
+                    "已確認訂單並送出等待接單。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+
+        except Exception as exc:
+
+            print(
+
+                "[web-order-create] "
+                "CS dispatch failed "
+                f"WEB-{order_id}: "
+                f"{type(exc).__name__}: "
+                f"{exc}",
+
+                flush=True,
+
+            )
+
+
+            await (
+                interaction.followup
+                .send(
+
+                    "客服送單失敗，"
+                    "請通知管理員查看 Bot 紀錄。",
+
+                    ephemeral=True,
+
+                )
+            )
+
+
+
+# zYao 3C3B2R3 CS review gate v1
+
+WEB_ORDER_PENDING_CS_DISPATCH = (
+    "pending_cs_dispatch"
+)
+
+
+def _web_cs_order_id_from_channel(
+    channel,
+):
+
+    topic = str(
+        getattr(
+            channel,
+            "topic",
+            "",
+        )
+        or ""
+    )
+
+
+    match = re.search(
+        r"(?:^|;)"
+        r"web_order_id="
+        r"(\d+)"
+        r"(?:;|$)",
+        topic,
+    )
+
+
+    if not match:
+
+        return None
+
+
+    return int(
+        match.group(1)
+    )
+
+
+def _web_cs_set_status(
+    order_id: int,
+    status: str,
+):
+
+    import sqlite3
+
+
+    conn = sqlite3.connect(
+        _web_dashboard_db_path_for_bot(),
+        timeout=15,
+    )
+
+
+    try:
+
+        conn.execute(
+            "BEGIN IMMEDIATE"
+        )
+
+
+        conn.execute(
+            """
+            UPDATE web_orders
+
+            SET status = ?
+
+            WHERE id = ?
+            """,
+            (
+                str(status),
+                int(order_id),
+            ),
+        )
+
+
+        conn.execute(
+            """
+            UPDATE order_acceptance_meta
+
+            SET status = ?,
+                updated_at =
+                    CURRENT_TIMESTAMP
+
+            WHERE order_id = ?
+            """,
+            (
+                str(status),
+                int(order_id),
+            ),
+        )
+
+
+        conn.commit()
+
+
+    except Exception:
+
+        conn.rollback()
+
+        raise
+
+
+    finally:
+
+        conn.close()
+
+
+async def _web_cs_ensure_review_panel(
+    order_id: int,
+    bundle: dict,
+    ticket_channel:
+        discord.TextChannel,
+):
+
+    footer_text = (
+        f"WEB-{order_id}"
+        "｜客服送單前"
+    )
+
+
+    if await _web_order_created_has_footer(
+        ticket_channel,
+        footer_text,
+        limit=40,
+    ):
+
+        return
+
+
+    order = (
+        bundle.get(
+            "order"
+        )
+        or {}
+    )
+
+
+    details = (
+        _web_order_created_details(
+            bundle
+        )
+    )
+
+
+    customer_id = _to_int(
+        order.get(
+            "customer_discord_id"
+        ),
+        None,
+    )
+
+
+    amount = _to_int(
+        order.get(
+            "customer_pay_amount"
+        ),
+        details.get(
+            "amount"
+        )
+        or 0,
+    )
+
+
+    amount = int(
+        amount
+        or 0
+    )
+
+
+    embed = discord.Embed(
+        title=(
+            "網站訂單｜"
+            "等待客服確認"
+        ),
+        description=(
+            "官網訂單已建立完成。\n\n"
+            "目前尚未送到派單頻道，"
+            "也尚未開放任何人接單。\n"
+            "請客服確認內容後再送單。"
+        ),
+        color=discord.Color.gold(),
+    )
+
+
+    embed.add_field(
+        name="網站訂單",
+        value=f"WEB-{order_id}",
+        inline=True,
+    )
+
+
+    embed.add_field(
+        name="顧客",
+        value=(
+            f"<@{customer_id}>"
+            if customer_id
+            else "未紀錄"
+        ),
+        inline=True,
+    )
+
+
+    embed.add_field(
+        name="項目",
+        value=(
+            f"{details.get('category_label') or '未紀錄'}"
+            f"｜"
+            f"{details.get('item') or '未紀錄'}"
+        ),
+        inline=False,
+    )
+
+
+    embed.add_field(
+        name="數量",
+        value=str(
+            details.get(
+                "quantity"
+            )
+            or 1
+        ),
+        inline=True,
+    )
+
+
+    amount_text = (
+        _format_plain_amount(
+            amount
+        )
+        if "_format_plain_amount"
+        in globals()
+        else format_t_amount(
+            amount
+        )
+    )
+
+
+    embed.add_field(
+        name="顧客應付",
+        value=amount_text,
+        inline=True,
+    )
+
+
+    embed.add_field(
+        name="付款方式",
+        value=(
+            "尚未選擇\n"
+            "人員接滿後於 Discord 選擇"
+        ),
+        inline=False,
+    )
+
+
+    specified = (
+        details.get(
+            "specified_staff_ids"
+        )
+        or []
+    )
+
+
+    if specified:
+
+        embed.add_field(
+            name="指定人員",
+            value="、".join(
+                f"<@{staff_id}>"
+                for staff_id
+                in specified
+            )[:1024],
+            inline=False,
+        )
+
+
+    extra = str(
+        details.get(
+            "extra_requirements"
+        )
+        or ""
+    ).strip()
+
+
+    if extra:
+
+        embed.add_field(
+            name="附加需求",
+            value=extra[:1024],
+            inline=False,
+        )
+
+
+    terms = str(
+        details.get(
+            "service_terms_version"
+        )
+        or ""
+    ).strip()
+
+
+    if terms:
+
+        embed.add_field(
+            name="服務規章",
+            value=(
+                f"已同意｜{terms}"
+            ),
+            inline=False,
+        )
+
+
+    embed.set_footer(
+        text=footer_text
+    )
+
+
+    await ticket_channel.send(
+        embed=embed,
+        view=WebsiteOrderCsConfirmView(),
+        allowed_mentions=(
+            discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            )
+        ),
+    )
+
+
+class WebsiteOrderCsConfirmView(
+    discord.ui.View
+):
+
+    def __init__(
+        self,
+    ):
+
+        super().__init__(
+            timeout=None
+        )
+
+
+    @discord.ui.button(
+        label="客服確認送單",
+        style=(
+            discord.ButtonStyle.success
+        ),
+        custom_id=(
+            "website_order_"
+            "cs_confirm_dispatch_v3"
+        ),
+    )
+    async def confirm(
+        self,
+        interaction:
+            discord.Interaction,
+        button:
+            discord.ui.Button,
+    ):
+
+        if (
+            not isinstance(
+                interaction.user,
+                discord.Member,
+            )
+            or not is_customer_staff(
+                interaction.user
+            )
+        ):
+
+            await interaction.response.send_message(
+                "只有客服可以確認送單。",
+                ephemeral=True,
+            )
+
+            return
+
+
+        if not isinstance(
+            interaction.channel,
+            discord.TextChannel,
+        ):
+
+            await interaction.response.send_message(
+                "目前不是有效訂單票口。",
+                ephemeral=True,
+            )
+
+            return
+
+
+        order_id = (
+            _web_cs_order_id_from_channel(
+                interaction.channel
+            )
+        )
+
+
+        if order_id is None:
+
+            await interaction.response.send_message(
+                "找不到網站訂單編號。",
+                ephemeral=True,
+            )
+
+            return
+
+
+        bundle = (
+            _web_order_created_load_bundle(
+                order_id
+            )
+        )
+
+
+        order = (
+            bundle.get(
+                "order"
+            )
+            or {}
+        )
+
+
+        current_status = str(
+            order.get(
+                "status"
+            )
+            or ""
+        ).lower()
+
+
+        if (
+            current_status
+            != WEB_ORDER_PENDING_CS_DISPATCH
+        ):
+
+            await interaction.response.send_message(
+                (
+                    "這張訂單目前不是"
+                    "等待客服確認狀態。"
+                ),
+                ephemeral=True,
+            )
+
+            return
+
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
+
+
+        try:
+
+            # 先放行為正式等待接單。
+            _web_cs_set_status(
+                order_id,
+                "waiting_acceptance",
+            )
+
+
+            bundle = (
+                _web_order_created_load_bundle(
+                    order_id
+                )
+            )
+
+
+            guild = interaction.guild
+
+
+            if guild is None:
+
+                raise RuntimeError(
+                    "找不到 Discord guild"
+                )
+
+
+            (
+                dispatch_channel,
+                dispatch_message,
+            ) = (
+                await _web_order_created_ensure_dispatch(
+                    guild,
+                    order_id,
+                    bundle,
+                    interaction.channel,
+                )
+            )
+
+
+            # 接回原本 3C-3B seed。
+            _web_order_created_seed_state(
+                order_id,
+                bundle,
+                interaction.channel,
+                dispatch_channel,
+                dispatch_message,
+            )
+
+
+            # 官網沒有付款方式。
+            data = (
+                SELF_SERVICE_ORDER_SELECTIONS
+                .setdefault(
+                    interaction.channel.id,
+                    {},
+                )
+            )
+
+
+            data.pop(
+                "payment_method",
+                None,
+            )
+
+
+            data.pop(
+                "website_payment_method",
+                None,
+            )
+
+
+            data[
+                "web_order_no_payment_selection"
+            ] = True
+
+
+            remember_order_data(
+                interaction.channel.id,
+                data,
+            )
+
+
+            save_bot_data()
+
+
+            await (
+                refresh_acceptance_dispatch_from_web_order(
+                    guild,
+                    order_id,
+                )
+            )
+
+
+            await interaction.channel.send(
+                (
+                    "✅ "
+                    f"{interaction.user.mention} "
+                    "已確認訂單並送出等待接單。"
+                ),
+                allowed_mentions=(
+                    discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    )
+                ),
+            )
+
+
+            if interaction.message:
+
+                try:
+
+                    await interaction.message.edit(
+                        view=None
+                    )
+
+                except discord.HTTPException:
+
+                    pass
+
+
+            await interaction.followup.send(
+                "已確認並送出等待接單。",
+                ephemeral=True,
+            )
+
+
+        except Exception as exc:
+
+            # 派單失敗就恢復客服確認狀態，
+            # 讓客服可以重試。
+            try:
+
+                _web_cs_set_status(
+                    order_id,
+                    WEB_ORDER_PENDING_CS_DISPATCH,
+                )
+
+            except Exception:
+
+                pass
+
+
+            print(
+                "[web-order-create] "
+                f"CS dispatch failed "
+                f"WEB-{order_id}: "
+                f"{type(exc).__name__}: "
+                f"{exc}",
+                flush=True,
+            )
+
+
+            await interaction.followup.send(
+                (
+                    "送單失敗，"
+                    "訂單已恢復等待客服確認。"
+                ),
+                ephemeral=True,
+            )
+
+
+async def _process_web_order_created_event(
+    event: dict,
+) -> None:
+
+    event_id = int(
+        event["event_id"]
+    )
+
+
+    order_id = int(
+        event.get(
+            "order_id"
+        )
+        or event.get(
+            "web_order_id"
+        )
+    )
+
+
+    retry_count = int(
+        event.get(
+            "retry_count"
+        )
+        or 0
+    )
+
+
+    _web_order_created_mark_processing(
+        event_id
+    )
+
+
+    try:
+
+        bundle = (
+            _web_order_created_load_bundle(
+                order_id
+            )
+        )
+
+
+        order = (
+            bundle.get(
+                "order"
+            )
+            or {}
+        )
+
+
+        status = str(
+            order.get(
+                "status"
+            )
+            or ""
+        ).lower()
+
+
+        if (
+            status
+            != WEB_ORDER_PENDING_CS_DISPATCH
+        ):
+
+            _web_sync_mark_event_done(
+                event_id
+            )
+
+
+            print(
+                "[web-order-create] "
+                f"skip WEB-{order_id} "
+                f"status={status}",
+                flush=True,
+            )
+
+
+            return
+
+
+        guild = bot.get_guild(
+            GUILD_ID
+        )
+
+
+        if guild is None:
+
+            raise RuntimeError(
+                "Discord guild 尚未 ready"
+            )
+
+
+        ticket_channel = (
+            await _web_order_created_ensure_ticket(
+                guild,
+                event_id,
+                order_id,
+                bundle,
+            )
+        )
+
+
+        await _web_cs_ensure_review_panel(
+            order_id,
+            bundle,
+            ticket_channel,
+        )
+
+
+        _web_sync_mark_event_done(
+            event_id
+        )
+
+
+        print(
+            "[web-order-create] "
+            f"WEB-{order_id} "
+            f"ticket={ticket_channel.id} "
+            "waiting_for_cs",
+            flush=True,
+        )
+
+
+    except Exception as exc:
+
+        _web_sync_mark_event_failed(
+            event_id,
+            (
+                f"{type(exc).__name__}: "
+                f"{exc}"
+            ),
+            retry_count,
+        )
+
+
+        print(
+            "[web-order-create] "
+            f"WEB-{order_id} failed: "
+            f"{type(exc).__name__}: "
+            f"{exc}",
+            flush=True,
+        )
+
+
+
+
+async def process_one_web_sync_event(
+    event: dict,
+) -> None:
+    event_type = str(
+        event.get("event_type")
+        or ""
+    ).strip().lower()
+
+    if event_type == "order_created":
+        await _process_web_order_created_event(
+            event
+        )
+        return
+
+    await _process_existing_web_sync_event(
+        event
+    )
+
+async def _process_existing_web_sync_event(event: dict) -> None:
     event_id = int(event["event_id"])
     retry_count = int(event.get("retry_count") or 0)
 
@@ -12248,20 +15904,80 @@ async def process_one_web_sync_event(event: dict) -> None:
         print(f"處理網站同步事件失敗 event_id={event_id}：{exc}")
 
 
+
+
 async def web_sync_event_worker() -> None:
     await bot.wait_until_ready()
 
+    print(
+        "[web-sync] worker loop running",
+        flush=True,
+    )
+
     while not bot.is_closed():
         try:
-            events = _web_sync_fetch_pending_events(limit=10)
+            events = (
+                _web_sync_fetch_pending_events(
+                    limit=10
+                )
+            )
+
+            seen_event_ids = set()
 
             for event in events:
-                await process_one_web_sync_event(event)
+                event_id = int(
+                    event.get(
+                        "event_id"
+                    )
+                    or 0
+                )
+
+                if event_id:
+                    seen_event_ids.add(
+                        event_id
+                    )
+
+                await process_one_web_sync_event(
+                    event
+                )
+
+            # 3C-3A 測試期間可能已有
+            # ORDER_CREATED 被舊 worker 標成 failed。
+            # 只恢復 created event，不動其他 failed event。
+            retry_events = (
+                _web_order_created_fetch_retry_events(
+                    limit=10
+                )
+            )
+
+            for event in retry_events:
+                event_id = int(
+                    event.get(
+                        "event_id"
+                    )
+                    or 0
+                )
+
+                if (
+                    event_id
+                    and event_id
+                    in seen_event_ids
+                ):
+                    continue
+
+                await process_one_web_sync_event(
+                    event
+                )
 
         except Exception as exc:
-            print(f"[web-sync] 背景處理器失敗：{exc}")
+            print(
+                "[web-sync] 背景處理器失敗："
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         await asyncio.sleep(5)
+
 
 
 def ensure_web_sync_event_worker_started() -> None:

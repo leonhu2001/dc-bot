@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block page_title %}歷史訂單
+{% block page_title %}訂單管理
 <script>
 document.addEventListener("click", function (event) {
     const button = event.target.closest("button.history-dossier-toggle[data-dossier-target]");
@@ -34,6 +34,56 @@ document.addEventListener("click", function (event) {
     }
 });
 </script>
+
+<script>
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        if (
+            params.get("open")
+            !== "1"
+        ) {
+            return;
+        }
+
+        const button =
+            document.querySelector(
+                "button.history-dossier-toggle[data-dossier-target]"
+            );
+
+        if (!button) {
+            return;
+        }
+
+        window.setTimeout(
+            function () {
+
+                button.click();
+
+                button.scrollIntoView(
+                    {
+                        block:
+                            "center",
+
+                        behavior:
+                            "smooth"
+                    }
+                );
+
+            },
+            80
+        );
+    }
+);
+</script>
+<!-- MAWAN_R5R3_AUTO_OPEN_ORDER -->
+
 
 
 
@@ -812,7 +862,7 @@ document.addEventListener("click", function (event) {
 
 
             <label>
-                <span>搜尋契約編號 / 內容 / 委託人</span>
+                <span>搜尋訂單編號 / 內容 / 委託人</span>
                 <input class="input" type="search" name="keyword" value="{{ keyword }}" placeholder="輸入關鍵字">
             </label>
 
@@ -823,7 +873,7 @@ document.addEventListener("click", function (event) {
 
     <section class="history-ledger-stats">
         <div class="history-ledger-stat">
-            <span>歷史總筆數 ◆</span>
+            <span>訂單總數 ◆</span>
             <strong>{{ total_orders }}</strong>
             <small>每頁顯示 {{ per_page }} 筆</small>
         </div>
@@ -851,8 +901,8 @@ document.addEventListener("click", function (event) {
             <section class="history-ledger-panel">
                 <div class="history-ledger-head">
                     <div>
-                        <p class="order-no">DOSSIER LEDGER</p>
-                        <h3>卷宗庫 / 歷史訂單卷宗</h3>
+                        <p class="order-no">ORDER LIST</p>
+                        <h3>卷宗庫 / 訂單管理卷宗</h3>
                     </div>
                     <div class="muted-text">第 {{ page }} / {{ total_pages }} 頁，共 {{ total_orders }} 筆</div>
                 </div>
@@ -861,7 +911,7 @@ document.addEventListener("click", function (event) {
                     <table class="history-ledger-table">
                         <thead>
                             <tr>
-                                <th>契約編號</th>
+                                <th>訂單編號</th>
                                 <th>結單日期</th>
                                 <th>委託人</th>
                                 <th>內容</th>
@@ -942,7 +992,7 @@ document.addEventListener("click", function (event) {
                                     </td>
 
                                     <td class="history-ledger-action">
-                                        <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">檢視卷宗</button>
+                                        <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">查看詳情</button>
                                     </td>
                                 </tr>
                                   <tr class="history-dossier-detail-row" id="dossier-{{ order.id }}" hidden>
@@ -1028,7 +1078,7 @@ document.addEventListener("click", function (event) {
                                                   <section class="history-dossier-card">
                                                       <div class="history-dossier-card-head">
                                                           <div>
-                                                              <h5>新增護級 / 陪級</h5>
+                                                              <h5>新增護航 / 陪玩</h5>
                                                               <p>最多先提供 3 個新增欄位，儲存後重新計算分潤。</p>
                                                           </div>
                                                       </div>
@@ -1193,7 +1243,7 @@ document.addEventListener("click", function (event) {
             </div>
         {% else %}
             <section class="panel">
-                <div class="empty-state">目前沒有歷史訂單。</div>
+                <div class="empty-state">目前沒有訂單管理。</div>
             </section>
         {% endif %}
     </form>

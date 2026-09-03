@@ -310,11 +310,14 @@ for key, label, price, staff_count in [
 
 _add(OrderRule(
     "basic", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
-    allowed_roles=ALL_RECEIVER_ROLES,
+    allowed_roles=("female_protector", "female_companion"),
     required_staff_count=1,
     allow_specify=True,
     max_specified_count=1,
-    specify_fee_by_role=_all_receiver_fee(150),
+    specify_fee_by_role={
+        "female_protector": 150,
+        "female_companion": 150,
+    },
     specify_free_min_units=2,
     specify_free_basis="quantity",
 ))

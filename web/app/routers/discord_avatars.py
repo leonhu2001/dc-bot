@@ -51,63 +51,203 @@ def ensure_avatar_url_column(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE web_staff_members ADD COLUMN avatar_url TEXT")
 
 
-def avatar_from_staff_db(discord_id: str, size: int = 128) -> str:
-    path = db_path()
-    discord_id = str(discord_id or "").strip()
+def _normalize_cached_discord_avatar_url(
+    url: str,
+    size: int,
+) -> str:
+    url = str(
+        url or ""
+    ).strip()
 
-    if not path.exists() or not discord_id:
+    if not url:
+        return ""
+
+    trusted_parts = (
+        "cdn.discordapp.com/avatars/",
+        "cdn.discordapp.com/guilds/",
+        "cdn.discordapp.com/embed/avatars/",
+    )
+
+    if not any(
+        part in url
+        for part in trusted_parts
+    ):
+        return ""
+
+    if (
+        "cdn.discordapp.com/avatars/"
+        in url
+        or "cdn.discordapp.com/guilds/"
+        in url
+    ):
+        base = url.split(
+            "?",
+            1,
+        )[0]
+
+        return (
+            f"{base}"
+            f"?size={int(size or 512)}"
+        )
+
+    return url
+
+
+def avatar_from_staff_db(
+    discord_id: str,
+    size: int = 128,
+) -> str:
+    path = db_path()
+
+    discord_id = str(
+        discord_id or ""
+    ).strip()
+
+    if (
+        not path.exists()
+        or not discord_id
+    ):
         return ""
 
     try:
-        with sqlite3.connect(path) as conn:
-            conn.row_factory = sqlite3.Row
-            cols = table_columns(conn, "web_staff_members")
+        with sqlite3.connect(
+            path
+        ) as conn:
 
-            if not cols or "discord_id" not in cols:
+            conn.row_factory = (
+                sqlite3.Row
+            )
+
+            cols = table_columns(
+                conn,
+                "web_staff_members",
+            )
+
+            if (
+                not cols
+                or "discord_id"
+                not in cols
+            ):
                 return ""
 
-            select_cols = ["discord_id"]
+            select_cols = [
+                "discord_id",
+            ]
+
             if "avatar_url" in cols:
-                select_cols.append("avatar_url")
+                select_cols.append(
+                    "avatar_url"
+                )
+
             if "avatar" in cols:
-                select_cols.append("avatar")
+                select_cols.append(
+                    "avatar"
+                )
 
             row = conn.execute(
                 f"""
-                SELECT {", ".join(select_cols)}
+                SELECT
+                    {", ".join(select_cols)}
                 FROM web_staff_members
-                WHERE CAST(discord_id AS TEXT) = ?
+                WHERE CAST(
+                    discord_id
+                    AS TEXT
+                ) = ?
                 LIMIT 1
                 """,
-                (discord_id,),
+                (
+                    discord_id,
+                ),
             ).fetchone()
 
             if not row:
                 return ""
 
-            if "avatar_url" in row.keys():
-                avatar_url = str(row["avatar_url"] or "").strip()
-                if avatar_url:
-                    return avatar_url
+            cached_url = ""
 
-            if "avatar" in row.keys():
-                avatar_hash = str(row["avatar"] or "").strip()
-                url = avatar_cdn_url(discord_id, avatar_hash, size=size)
+            if (
+                "avatar_url"
+                in row.keys()
+            ):
+                cached_url = str(
+                    row["avatar_url"]
+                    or ""
+                ).strip()
+
+            # Server-specific Discord avatar should take
+            # priority over the normal/global avatar.
+            if (
+                cached_url
+                and "cdn.discordapp.com/guilds/"
+                in cached_url
+            ):
+                return (
+                    _normalize_cached_discord_avatar_url(
+                        cached_url,
+                        size,
+                    )
+                )
+
+            avatar_hash = ""
+
+            if (
+                "avatar"
+                in row.keys()
+            ):
+                avatar_hash = str(
+                    row["avatar"]
+                    or ""
+                ).strip()
+
+            if avatar_hash:
+
+                url = avatar_cdn_url(
+                    discord_id,
+                    avatar_hash,
+                    size=size,
+                )
+
                 if url:
+
                     try:
-                        ensure_avatar_url_column(conn)
+                        ensure_avatar_url_column(
+                            conn
+                        )
+
                         conn.execute(
                             """
                             UPDATE web_staff_members
                             SET avatar_url = ?
-                            WHERE CAST(discord_id AS TEXT) = ?
+                            WHERE CAST(
+                                discord_id
+                                AS TEXT
+                            ) = ?
                             """,
-                            (url, discord_id),
+                            (
+                                url,
+                                discord_id,
+                            ),
                         )
+
                         conn.commit()
+
                     except Exception:
                         pass
+
                     return url
+
+            # Only trust Discord CDN cached URLs.
+            # Old/external/broken URLs will fall through
+            # to live Discord lookup.
+            trusted_cached = (
+                _normalize_cached_discord_avatar_url(
+                    cached_url,
+                    size,
+                )
+            )
+
+            if trusted_cached:
+                return trusted_cached
 
     except Exception:
         return ""
@@ -154,50 +294,205 @@ def get_setting(*names: str) -> str:
     return ""
 
 
-def fetch_live_discord_avatar(discord_id: str, size: int = 128) -> str:
-    discord_id = str(discord_id or "").strip()
+def guild_avatar_cdn_url(
+    guild_id: str,
+    discord_id: str,
+    avatar_hash: str,
+    size: int = 128,
+) -> str:
+    guild_id = str(
+        guild_id or ""
+    ).strip()
 
-    token = get_setting("DISCORD_BOT_TOKEN", "DISCORD_TOKEN", "BOT_TOKEN", "TOKEN")
-    guild_id = get_setting("GUILD_ID", "DISCORD_GUILD_ID", "DISCORD_SERVER_ID", "SERVER_ID")
+    discord_id = str(
+        discord_id or ""
+    ).strip()
 
-    if not discord_id or not token or not guild_id:
+    avatar_hash = str(
+        avatar_hash or ""
+    ).strip()
+
+    if (
+        not guild_id
+        or not discord_id
+        or not avatar_hash
+    ):
+        return ""
+
+    ext = (
+        "gif"
+        if avatar_hash.startswith(
+            "a_"
+        )
+        else "png"
+    )
+
+    return (
+        "https://cdn.discordapp.com/"
+        f"guilds/{guild_id}/users/"
+        f"{discord_id}/avatars/"
+        f"{avatar_hash}.{ext}"
+        f"?size={int(size or 128)}"
+    )
+
+
+def fetch_live_discord_avatar(
+    discord_id: str,
+    size: int = 128,
+) -> str:
+    discord_id = str(
+        discord_id or ""
+    ).strip()
+
+    token = get_setting(
+        "DISCORD_BOT_TOKEN",
+        "DISCORD_TOKEN",
+        "BOT_TOKEN",
+        "TOKEN",
+    )
+
+    guild_id = get_setting(
+        "GUILD_ID",
+        "DISCORD_GUILD_ID",
+        "DISCORD_SERVER_ID",
+        "SERVER_ID",
+    )
+
+    if (
+        not discord_id
+        or not token
+        or not guild_id
+    ):
         return ""
 
     try:
         req = urllib.request.Request(
-            f"https://discord.com/api/v10/guilds/{guild_id}/members/{discord_id}",
+            (
+                "https://discord.com/api/v10/"
+                f"guilds/{guild_id}/members/"
+                f"{discord_id}"
+            ),
             headers={
-                "Authorization": f"Bot {token}",
-                "User-Agent": "Mozilla/5.0",
+                "Authorization":
+                    f"Bot {token}",
+
+                "User-Agent":
+                    "MawanWeb/1.0",
             },
         )
 
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        with urllib.request.urlopen(
+            req,
+            timeout=8,
+        ) as resp:
 
-        user = data.get("user") or {}
-        avatar_hash = str(user.get("avatar") or "").strip()
+            data = json.loads(
+                resp.read().decode(
+                    "utf-8"
+                )
+            )
 
-        if not avatar_hash:
+        user = (
+            data.get("user")
+            or {}
+        )
+
+        guild_avatar_hash = str(
+            data.get(
+                "avatar"
+            )
+            or ""
+        ).strip()
+
+        user_avatar_hash = str(
+            user.get(
+                "avatar"
+            )
+            or ""
+        ).strip()
+
+        url = ""
+
+        if guild_avatar_hash:
+
+            url = guild_avatar_cdn_url(
+                guild_id,
+                discord_id,
+                guild_avatar_hash,
+                size=size,
+            )
+
+        elif user_avatar_hash:
+
+            url = avatar_cdn_url(
+                discord_id,
+                user_avatar_hash,
+                size=size,
+            )
+
+        if not url:
             return ""
 
-        url = avatar_cdn_url(discord_id, avatar_hash, size=size)
-
         try:
-            with sqlite3.connect(db_path()) as conn:
-                cols = table_columns(conn, "web_staff_members")
-                if cols and "discord_id" in cols:
-                    ensure_avatar_url_column(conn)
-                    conn.execute(
-                        """
-                        UPDATE web_staff_members
-                        SET avatar = COALESCE(NULLIF(avatar, ''), ?),
-                            avatar_url = ?
-                        WHERE CAST(discord_id AS TEXT) = ?
-                        """,
-                        (avatar_hash, url, discord_id),
+            with sqlite3.connect(
+                db_path()
+            ) as conn:
+
+                cols = table_columns(
+                    conn,
+                    "web_staff_members",
+                )
+
+                if (
+                    cols
+                    and "discord_id"
+                    in cols
+                ):
+
+                    ensure_avatar_url_column(
+                        conn
                     )
+
+                    if (
+                        user_avatar_hash
+                        and "avatar"
+                        in cols
+                    ):
+                        conn.execute(
+                            """
+                            UPDATE web_staff_members
+                            SET avatar = ?,
+                                avatar_url = ?
+                            WHERE CAST(
+                                discord_id
+                                AS TEXT
+                            ) = ?
+                            """,
+                            (
+                                user_avatar_hash,
+                                url,
+                                discord_id,
+                            ),
+                        )
+
+                    else:
+                        conn.execute(
+                            """
+                            UPDATE web_staff_members
+                            SET avatar_url = ?
+                            WHERE CAST(
+                                discord_id
+                                AS TEXT
+                            ) = ?
+                            """,
+                            (
+                                url,
+                                discord_id,
+                            ),
+                        )
+
                     conn.commit()
+
         except Exception:
             pass
 

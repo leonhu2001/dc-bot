@@ -862,7 +862,7 @@
                 <span>角色身分</span>
                 <select class="input" name="role">
                     <option value="all" {% if role == "all" %}selected{% endif %}>全部身分</option>
-                    <option value="worker" {% if role == "worker" %}selected{% endif %}>護級 / 陪級</option>
+                    <option value="worker" {% if role == "worker" %}selected{% endif %}>護航 / 陪玩</option>
                     <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
                 </select>
             </label>
@@ -1070,4 +1070,13 @@ document.addEventListener("click", function (event) {
     }
 });
 </script>
+<!-- BEGIN MAWAN_R72_PAYOUT_CONTRAST -->
+<style>
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card{background:#15130f!important;background-image:none!important;border-color:rgba(223,183,92,.34)!important;color:#f4f2eb!important;box-shadow:none!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card span{color:#f2e4c3!important;-webkit-text-fill-color:#f2e4c3!important;opacity:1!important;text-shadow:none!important;filter:none!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card strong{color:#f6d98f!important;-webkit-text-fill-color:#f6d98f!important;opacity:1!important;text-shadow:none!important;filter:none!important;-webkit-text-stroke:0!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card small{color:rgba(244,242,235,.76)!important;-webkit-text-fill-color:rgba(244,242,235,.76)!important;opacity:1!important;text-shadow:none!important;filter:none!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card::after{color:rgba(246,217,143,.52)!important;border-color:rgba(246,217,143,.34)!important;text-shadow:none!important}
+</style>
+<!-- END MAWAN_R72_PAYOUT_CONTRAST -->
 {% endblock %}

@@ -36,28 +36,100 @@
             margin-top: 20px;
         }
     </style>
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
 </head>
-<body>
+<body class="mw-r5-employee">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_employee_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                STAFF CENTER
+            </div>
+
+            <h1>
+                員工中心
+            </h1>
+
+            <p>
+                快速進入接單、完整薪資與個人中心。
+            </p>
+
+        </header>
+
+        <div class="mw-r5-legacy-body">
+
+
+<section class="mw-r5-employee-links">
+
+    <a
+        class="mw-r5-employee-link"
+        href="/dispatch"
+    >
+
+        <div>
+            <small>ORDER DISPATCH</small>
+            <strong>接單大廳</strong>
+            <p>
+                查看目前可接訂單，以及自己正在進行的訂單。
+            </p>
+        </div>
+
+        <span>→</span>
+
+    </a>
+
+
+    <a
+        class="mw-r5-employee-link"
+        href="/my/payouts"
+    >
+
+        <div>
+            <small>PAYOUT CENTER</small>
+            <strong>完整薪資</strong>
+            <p>
+                查看本月薪資、結算狀態與歷史明細。
+            </p>
+        </div>
+
+        <span>→</span>
+
+    </a>
+
+</section>
+
+
+
+
+
     <main class="shell">
         <div class="top-actions">
             <a class="button" href="/auth/logout">登出</a>
         </div>
 
         <section class="mw-hero">
-            <h1 class="mw-title">魔丸娛樂中控</h1>
+
             <div class="mw-subtitle">選擇你要前往的管理分頁</div>
         </section>
 
         <section class="grid-wrap mw-grid">
             {% if is_admin %}
                 <a class="mw-action-card" href="/admin">
-                    <strong>總控後台</strong>
+                    <strong>客服後台</strong>
                     <span>訂單、分潤、營運總覽</span>
                 </a>
 
                 <a class="mw-action-card" href="/admin/staff">
                     <strong>人員名單</strong>
-                    <span>客服、護級、陪級同步與篩選</span>
+                    <span>客服、護航、陪玩同步與篩選</span>
                 </a>
 
                 <a class="mw-action-card" href="/order-history">
@@ -88,5 +160,12 @@
             {% endif %}
         </section>
     </main>
+
+
+        </div>
+
+    </section>
+
+</div>
 </body>
 </html>

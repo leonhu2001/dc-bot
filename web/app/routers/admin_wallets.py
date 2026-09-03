@@ -300,6 +300,8 @@ async def admin_wallets(
     request: Request,
     q: str | None = Query(default=None, description="搜尋 Discord ID、訂單、備註、操作人"),
 ):
+    if not _mwfinal_wallet_admin_user(request):
+        return _mwfinal_wallet_redirect(url="/admin",status_code=303)
     wallets = fetch_wallets(q)
     total_balance = sum(int(w.get("balance") or 0) for w in wallets)
 
@@ -325,6 +327,8 @@ async def admin_wallet_detail(
     customer_discord_id: str,
     limit: int = Query(default=100, ge=1, le=300),
 ):
+    if not _mwfinal_wallet_admin_user(request):
+        return _mwfinal_wallet_redirect(url="/admin",status_code=303)
     wallet, transactions = fetch_wallet_detail(customer_discord_id, limit=limit)
 
     return templates.TemplateResponse(
@@ -338,3 +342,7 @@ async def admin_wallet_detail(
             "limit": limit,
         },
     )
+
+# MAWAN_FINAL_WALLET_ADMIN_GUARD_V1
+from web.app.routers.admin_staff import _mw4b2_admin_user as _mwfinal_wallet_admin_user
+from fastapi.responses import RedirectResponse as _mwfinal_wallet_redirect

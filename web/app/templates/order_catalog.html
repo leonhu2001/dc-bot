@@ -1,0 +1,923 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="order3-hero">
+
+    <div class="order3-hero-copy">
+
+        <div class="section-eyebrow">
+            ORDER
+        </div>
+
+        <h1>
+            選一種玩法，
+            <br>
+            再決定細節。
+        </h1>
+
+        <p>
+            相同性質的服務已整理成同一張主商品。
+            點進去後再選難度、人數、數量與附加需求。
+        </p>
+
+    </div>
+
+</section>
+
+
+<section class="site-section order3-store">
+
+    {% if selected_staff %}
+
+        <div class="order3-specified">
+
+            <img
+                src="{{ selected_staff.avatar_url }}"
+                alt=""
+                onerror="this.onerror=null;this.src='/static/img/server_logo.gif';"
+            >
+
+            <div>
+                <small>
+                    SPECIFIED CREW
+                </small>
+
+                <strong>
+                    已從個人牆選擇
+                    {{ selected_staff.display_name }}
+                </strong>
+
+                <span>
+                    {{ selected_staff.role_title }}
+                </span>
+            </div>
+
+            <a
+                href="/staff/{{ selected_staff.staff_id }}"
+            >
+                查看個人牆 →
+            </a>
+
+        </div>
+
+    {% endif %}
+
+
+    <div class="order3-filter">
+
+        {% for item in categories %}
+
+            <a
+                href="/order?category={{ item.key }}{% if selected_staff %}&staff={{ selected_staff.staff_id }}{% endif %}"
+                class="{% if category_filter == item.key %}is-active{% endif %}"
+            >
+                {{ item.label }}
+            </a>
+
+        {% endfor %}
+
+    </div>
+
+
+    {% if groups %}
+
+        <div class="order3-grid">
+
+            {% for group in groups %}
+
+                <article
+                    class="order3-card"
+                    data-order-group-card="{{ group.key }}"
+                >
+                    <!-- MW ORDER CARD IMAGE SLOT -->
+                    <div
+                        class="order3-media"
+                        data-order-image-slot="{{ group.key }}"
+                    >
+                        <div class="order3-media-placeholder">
+                            <span>MAWAN</span>
+                            <small>ORDER VISUAL</small>
+                        </div>
+                    </div>
+                    <!-- /MW ORDER CARD IMAGE SLOT -->
+
+
+                    <div class="order3-card-head">
+
+                        <span>
+                            {{ group.category_label }}
+                        </span>
+
+                        <small>
+                            {{ "%02d"|format(loop.index) }}
+                        </small>
+
+                    </div>
+
+
+                    <h2>
+                        {{ group.label }}
+                    </h2>
+
+
+                    <p>
+                        {{ group.description }}
+                    </p>
+
+
+                    <div class="order3-card-meta">
+
+                        <div>
+                            <small>
+                                PRICE
+                            </small>
+
+                            <strong>
+                                {{ group.starting_price_text }}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <small>
+                                OPTIONS
+                            </small>
+
+                            <strong>
+                                {{ group.variants|length }}
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        class="order3-open"
+                        data-order-group="{{ group.key }}"
+                    >
+                        開始設定
+                        <span>→</span>
+                    </button>
+
+                </article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="crew-empty-state">
+
+            <div>◇</div>
+
+            <h2>
+                目前沒有這個分類的方案
+            </h2>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+<dialog
+    class="order3-dialog"
+    id="mw-order-dialog"
+>
+
+    <div class="order3-dialog-shell">
+
+        <div class="order3-dialog-head">
+
+            <div>
+                <small id="mw-dialog-category">
+                    ORDER
+                </small>
+
+                <h2 id="mw-dialog-title">
+                    商品設定
+                </h2>
+            </div>
+
+            <button
+                type="button"
+                class="order3-dialog-close"
+                id="mw-dialog-close"
+                aria-label="關閉"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+
+        <!-- MW ORDER DIALOG IMAGE SLOT -->
+        <div
+            class="order3-dialog-media"
+            id="mw-dialog-media"
+        >
+            <div class="order3-media-placeholder">
+                <span>MAWAN</span>
+                <small>ORDER VISUAL</small>
+            </div>
+        </div>
+        <!-- /MW ORDER DIALOG IMAGE SLOT -->
+
+        <p
+            class="order3-dialog-description"
+            id="mw-dialog-description"
+        ></p>
+
+
+        <div class="order3-fields">
+
+            <label
+                class="order3-field"
+                id="mw-variant-field"
+            >
+
+                <span id="mw-variant-label">
+                    方案
+                </span>
+
+                <select id="mw-variant"></select>
+
+            </label>
+
+
+            <div
+                class="order3-field"
+                id="mw-quantity-field"
+                hidden
+            >
+
+                <span id="mw-quantity-label">
+                    數量
+                </span>
+
+                <div class="order3-stepper">
+
+                    <button
+                        type="button"
+                        id="mw-quantity-minus"
+                    >
+                        −
+                    </button>
+
+                    <strong id="mw-quantity">
+                        1
+                    </strong>
+
+                    <button
+                        type="button"
+                        id="mw-quantity-plus"
+                    >
+                        ＋
+                    </button>
+
+                </div>
+
+                <small id="mw-quantity-help"></small>
+
+            </div>
+
+
+            <div
+                class="order3-field"
+                id="mw-player-field"
+                hidden
+            >
+
+                <span>
+                    陪玩人數
+                </span>
+
+                <div class="order3-stepper">
+
+                    <button
+                        type="button"
+                        id="mw-player-minus"
+                    >
+                        −
+                    </button>
+
+                    <strong id="mw-player-count">
+                        1
+                    </strong>
+
+                    <button
+                        type="button"
+                        id="mw-player-plus"
+                    >
+                        ＋
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="order3-field order3-adjustments"
+                id="mw-adjustments-field"
+                hidden
+            >
+
+                <span>
+                    附加需求
+                </span>
+
+                <div id="mw-adjustments"></div>
+
+            </div>
+
+        </div>
+
+
+        <div class="order3-info">
+
+            <div>
+                <span>
+                    可接人員
+                </span>
+
+                <strong id="mw-roles">
+                    —
+                </strong>
+            </div>
+
+            <div>
+                <span>
+                    需要人員
+                </span>
+
+                <strong id="mw-required-staff">
+                    —
+                </strong>
+            </div>
+
+            <div>
+                <span>
+                    指定
+                </span>
+
+                <strong id="mw-specify">
+                    —
+                </strong>
+            </div>
+
+        </div>
+
+
+        <div
+            class="order3-service-bonus"
+            id="mw-service-bonus"
+            hidden
+        ></div>
+
+
+        <div class="order3-quote">
+
+            <div>
+
+                <small>
+                    CURRENT TOTAL
+                </small>
+
+                <strong id="mw-total">
+                    0T
+                </strong>
+
+                <span id="mw-total-detail">
+                    選擇方案後即時計算
+                </span>
+
+            </div>
+
+
+            {% if user %}
+
+                <button
+                    type="button"
+                    class="button button-primary order3-next"
+                    id="mw-next-step"
+                >
+                    取得價格
+                    <span>→</span>
+                </button>
+
+            {% else %}
+
+                <a
+                    class="button button-primary"
+                    href="/auth/discord/login"
+                >
+                    Discord 登入後繼續
+                    <span>→</span>
+                </a>
+
+            {% endif %}
+
+        </div>
+
+
+        <div
+            class="order3-next-notice mw-old-next-notice"
+            id="mw-next-notice"
+            hidden
+        >
+            商品設定已完成。
+            下一階段會把這份設定送進指定、
+            VIP／點數、付款與 Discord 票口建立流程。
+        </div>
+
+
+
+        <!-- MW SERVER QUOTE -->
+        <div
+            class="order3-server-result"
+            id="mw-server-result"
+            hidden
+        >
+
+            <div class="order3-server-title">
+
+                <div>
+                    <small>SERVER VERIFIED</small>
+
+                    <h3>
+                        價格明細
+                    </h3>
+                </div>
+
+                <span class="order3-verified-badge">
+                    VERIFIED
+                </span>
+
+            </div>
+
+
+            <div class="order3-server-money">
+
+                <div>
+                    <span>商品金額</span>
+                    <strong id="mw-server-base">—</strong>
+                </div>
+
+                <div>
+                    <span>附加需求</span>
+                    <strong id="mw-server-extra">—</strong>
+                </div>
+
+                <div>
+                    <span>驗價總額</span>
+                    <strong id="mw-server-total">—</strong>
+                </div>
+
+            </div>
+
+
+            <div
+                class="order3-server-detail"
+                id="mw-server-detail"
+            ></div>
+
+            <button
+                type="button"
+                class="button button-primary order-price-next"
+                id="mw-open-checkout"
+                hidden
+            >
+                下一步：指定與確認
+                <span>→</span>
+            </button>
+
+
+        </div>
+        <!-- /MW SERVER QUOTE -->
+
+
+<!-- MAWAN_3C3B2R_NO_WEB_PAYMENT -->
+<!-- MAWAN_3C3B2R3_SIMPLE_CHECKOUT -->
+<!-- MW PHASE3B2 CHECKOUT -->
+        <section
+            class="order-checkout"
+            id="mw-checkout-panel"
+            hidden
+        >
+
+            <div class="order-checkout-head">
+
+                <div>
+
+                    <small>
+                        CHECKOUT
+                    </small>
+
+                    <h3>
+                        指定與確認
+                    </h3>
+
+                    <p>
+                        確認指定人員、點數福利與附加需求後，
+                        即可建立正式訂單。
+                    </p>
+
+                </div>
+
+                <span class="order-checkout-preview-badge">
+                    FINAL CHECK
+                </span>
+
+            </div>
+
+
+            <div class="order-checkout-account">
+
+                <div>
+                    <span>
+                        會員等級
+                    </span>
+
+                    <strong id="mw-checkout-vip">
+                        —
+                    </strong>
+
+                    <small id="mw-checkout-vip-note">
+                        —
+                    </small>
+                </div>
+
+
+                <div>
+                    <span>
+                        目前點數
+                    </span>
+
+                    <strong id="mw-checkout-points">
+                        —
+                    </strong>
+
+                    <small>
+                        正式送單前才會扣除
+                    </small>
+                </div>
+
+
+                <div>
+                    <span>
+                        錢包餘額
+                    </span>
+
+                    <strong id="mw-checkout-wallet-balance">
+                        —
+                    </strong>
+
+                    <small>
+                        正式送單前才會扣款
+                    </small>
+                </div>
+
+            </div>
+
+
+            <div
+                class="order-checkout-section"
+                id="mw-checkout-staff-section"
+            >
+
+                <div class="order-checkout-section-head">
+
+                    <div>
+                        <span>
+                            指定人員
+                        </span>
+
+                        <small id="mw-checkout-staff-help">
+                            載入中…
+                        </small>
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="order-checkout-staff-grid"
+                    id="mw-checkout-staff-grid"
+                ></div>
+
+            </div>
+
+
+            <div class="order-checkout-controls">
+
+                <label class="order-checkout-control">
+
+                    <span>
+                        點數福利
+                    </span>
+
+                    <select
+                        id="mw-checkout-point"
+                    >
+                        <option value="">
+                            不使用點數
+                        </option>
+                    </select>
+
+                    <small id="mw-checkout-point-note">
+                        選擇後由伺服器重新驗證資格
+                    </small>
+
+                </label>
+
+
+                <label class="order-checkout-control" hidden aria-hidden="true" data-web-payment-hidden="1" style="display:none !important;" aria-hidden="true">
+
+                    <span>
+                        錢包
+                    </span>
+
+                    <div class="order-checkout-toggle-row">
+
+                        <input
+                            type="checkbox"
+                            id="mw-checkout-use-wallet"
+                        >
+
+                        <strong>
+                            優先使用錢包餘額
+                        </strong>
+
+                    </div>
+
+                    <small>
+                        不足額時再補轉帳或街口
+                    </small>
+
+                </label>
+
+
+                <label class="order-checkout-control" hidden aria-hidden="true" data-web-payment-hidden="1" style="display:none !important;" aria-hidden="true">
+
+                    <span>
+                        付款方式
+                    </span>
+
+                    <select
+                        id="mw-checkout-payment"
+                    >
+                        <option value="轉帳">
+                            銀行轉帳
+                        </option>
+
+                        <option value="街口">
+                            街口支付
+                        </option>
+                    </select>
+
+                    <small>
+                        錢包足額時不需額外付款
+                    </small>
+
+                </label>
+
+            </div>
+
+
+            <div
+                class="order-checkout-payment-info"
+                id="mw-checkout-payment-info"
+                hidden
+            ></div>
+
+
+            <div
+                class="order-checkout-error"
+                id="mw-checkout-error"
+                hidden
+            ></div>
+
+
+            <div
+                class="order-checkout-summary"
+                id="mw-checkout-summary"
+                hidden
+            >
+
+                <div class="order-checkout-summary-grid">
+
+                    <div>
+                        <span>
+                            商品服務
+                        </span>
+
+                        <strong id="mw-co-service">
+                            —
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            VIP 折扣
+                        </span>
+
+                        <strong id="mw-co-vip-discount">
+                            —
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            指定費
+                        </span>
+
+                        <strong id="mw-co-specify">
+                            —
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            點數折抵
+                        </span>
+
+                        <strong id="mw-co-point">
+                            —
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            錢包支付
+                        </span>
+
+                        <strong id="mw-co-wallet">
+                            —
+                        </strong>
+                    </div>
+
+
+                    <div class="is-total">
+                        <span>
+                            尚需支付
+                        </span>
+
+                        <strong id="mw-co-total">
+                            —
+                        </strong>
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="order-checkout-notes"
+                    id="mw-co-notes"
+                ></div>
+
+
+
+                <!-- MW PHASE3C3A FINAL SUBMIT -->
+
+                <div
+                    class="order-checkout-terms"
+                    id="mw-checkout-terms-box"
+                >
+                    <label class="order-checkout-toggle-row">
+
+                        <input
+                            type="checkbox"
+                            id="mw-checkout-terms"
+                            data-terms-version="2026-09-02-v1"
+                        >
+
+                        <strong>
+                            我已閱讀並同意
+                            <a
+                                href="/service-rules"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                《<!-- MAWAN_PHASE_4B2V4_CATALOG_NOTICE --><a class="mw-order-notice-link" href="/service-rules">下單須知</a>》
+                            </a>
+                        </strong>
+
+                    </label>
+
+                    <small>
+                        完成下單即代表同意目前版本：
+                        2026-09-02-v1
+                    </small>
+                </div>
+
+
+                <button
+                    type="button"
+                    class="button button-primary"
+                    id="mw-checkout-final"
+                    disabled
+                >
+                    確認建立正式訂單
+                    <span>→</span>
+                </button>
+
+
+                <p
+                    class="order-checkout-final-note"
+                    id="mw-checkout-final-note"
+                >
+                    送出時伺服器會再次驗證價格、
+                    指定資格、點數、錢包與付款資料。
+                </p>
+
+
+                <div
+                    class="order-checkout-success"
+                    id="mw-checkout-success"
+                    hidden
+                ></div>
+
+                <!-- /MW PHASE3C3A FINAL SUBMIT -->
+
+
+            </div>
+
+        </section>
+        <!-- /MW PHASE3B2 CHECKOUT -->
+
+
+
+
+        <div
+            class="order3-error"
+            id="mw-order-error"
+            hidden
+        ></div>
+
+        <div class="order3-debug">
+
+            <span>
+                Rule
+            </span>
+
+            <code id="mw-rule-key">
+                —
+            </code>
+
+        </div>
+
+    </div>
+
+</dialog>
+
+
+<script
+    id="mw-order-groups-data"
+    type="application/json"
+>
+{{ groups|tojson }}
+</script>
+
+
+<script
+    id="mw-order-context-data"
+    type="application/json"
+>
+{
+    "logged_in": {{ "true" if user else "false" }},
+    "specified_staff_id": {{ ('"' ~ selected_staff.staff_id ~ '"') if selected_staff else "null" }}
+}
+</script>
+
+
+<script
+    src="/static/js/mw_order.js?v=3a"
+    defer
+></script>
+
+
+<script
+    src="/static/js/mw_order_quote.js?v=3c3b2r3-simple-checkout"
+    defer
+></script>
+
+
+<script
+    src="/static/js/mw_order_guard.js?v=3b211r-lean-guard"
+    defer
+></script>
+
+<script
+    src="/static/js/mw_order_form_fix.js?v=3b211r-clean-modal"
+    defer
+></script>
+{% endblock %}

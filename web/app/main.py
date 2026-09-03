@@ -14,6 +14,7 @@ from web.app.routers.admin_payouts import router as admin_payouts_router
 from web.app.routers.admin_payout_summary import router as admin_payout_summary_router
 from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
 from web.app.routers.auth import router as auth_router
+from web.app.routers.site import router as site_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
 from web.app.routers.order_history import router as order_history_router
@@ -38,6 +39,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
+app.include_router(site_router)
 app.include_router(admin_staff_profiles.router)
 app.include_router(admin_router)
 app.include_router(admin_staff_router)
@@ -58,18 +60,6 @@ async def startup_event():
 
 def get_current_user(request: Request) -> dict | None:
     return request.session.get("user")
-
-
-@app.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={
-            "title": "魔丸打手系統",
-            "user": get_current_user(request),
-        },
-    )
 
 
 @app.get("/no-access")

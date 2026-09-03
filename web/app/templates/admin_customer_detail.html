@@ -1,0 +1,572 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title>
+<style>*{box-sizing:border-box}:root{--b:#080807;--p:#11110f;--l:#26251f;--g:#f2d68d;--t:#f4f2eb;--m:#969289}body{margin:0;background:var(--b);color:var(--t);font:14px Inter,"Noto Sans TC","Microsoft JhengHei",sans-serif}a{color:inherit;text-decoration:none}main{max-width:1500px;margin:auto;padding:30px}.top{display:flex;justify-content:space-between;gap:15px}.k{color:#dfb75c;font-size:11px;font-weight:900;letter-spacing:.18em}h1{font-size:42px;margin:6px 0}.m{color:var(--m)}.btn{display:inline-flex;padding:12px 14px;border:1px solid var(--l);border-radius:9px;margin-left:7px}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin:20px 0}.stat,.card{border:1px solid var(--l);border-radius:12px;background:var(--p)}.stat{padding:14px}.stat span{color:var(--m);font-size:11px}.stat strong{display:block;color:var(--g);font-size:24px;margin-top:7px}.grid{display:grid;grid-template-columns:1.35fr .65fr;gap:12px}.card{overflow:hidden;margin-bottom:12px}.card h2{font-size:15px;margin:0;padding:15px;border-bottom:1px solid var(--l)}.row{display:grid;grid-template-columns:125px 1fr 80px 90px;gap:9px;padding:12px;border-bottom:1px solid var(--l);font-size:12px}.item{padding:12px;border-bottom:1px solid var(--l);font-size:12px;line-height:1.65}.g{color:var(--g)}.empty{padding:25px;text-align:center;color:var(--m)}@media(max-width:950px){.stats{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}}@media(max-width:600px){main{padding:18px 12px}.top{display:block}.stats{grid-template-columns:repeat(2,1fr)}.row{grid-template-columns:95px 1fr 70px}.row>:last-child{display:none}}</style>
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+</head><body class="mw-r5-admin">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_admin_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                CUSTOMER WORKSPACE
+            </div>
+
+            <h1>
+                客戶工作區
+            </h1>
+
+            <p>
+                查看客戶訂單、收藏、評價與錢包資訊。
+            </p>
+
+        </header>
+
+        <div class="mw-r5-legacy-body">
+
+<main>
+<div class="top"><div><div class="k">CUSTOMER WORKSPACE</div><div class="m">{{ customer_id }}</div></div><div><a class="btn" href="/admin/customers">← 返回</a><a class="btn" href="/admin/wallets/{{ customer_id }}">完整錢包</a></div></div>
+<div class="stats">{% for label,value in [("訂單",stats.orders),("完成",stats.completed),("取消",stats.cancelled),("累計消費",stats.total_spend ~ "T"),("收藏",stats.favorites),("評價",stats.reviews)] %}<div class="stat"><span>{{ label }}</span><strong>{{ value }}</strong></div>{% endfor %}</div>
+<div class="grid"><section><div class="card"><h2>近期訂單</h2>{% for o in orders %}<a class="row" href="/admin/order-workspace/{{ o.id }}"><span class="g">{{ o.bot_order_no or ("WEB-" ~ o.id) }}</span><span>{{ o.item or "未紀錄" }}</span><span>{{ o.customer_pay_amount or o.amount or 0 }}T</span><span class="m">{{ o.status }}</span></a>{% else %}<div class="empty">沒有訂單</div>{% endfor %}</div>
+<div class="card"><h2>評價紀錄</h2>{% for r in reviews %}<div class="item"><span class="g">{{ r.rating or "—" }} / 5</span> · {{ r.staff_display_name or r.staff_discord_id }}<br><span class="m">{{ r.comment or "沒有文字內容" }}</span></div>{% else %}<div class="empty">沒有評價</div>{% endfor %}</div></section>
+</div></main>
+
+
+        </div>
+
+    </section>
+
+</div>
+
+<!-- BEGIN MAWAN_R5R6_TARGETED_FIX_V2_CUSTOMER_RUNTIME -->
+<script>
+(function () {
+    "use strict";
+
+    const path =
+        window.location.pathname;
+
+    if (
+        path !== "/admin/customers"
+        &&
+        !path.startsWith(
+            "/admin/customers/"
+        )
+    ) {
+        return;
+    }
+
+    const normalize = (value) =>
+        String(value || "")
+            .toLowerCase()
+            .replace(/\s+/g, "")
+            .replace(/[／/|｜·・:：()（）【】[\]「」『』]/g, "");
+
+    const legacy =
+        document.querySelector(
+            ".mw-r5-legacy-body"
+        )
+        ||
+        document.querySelector(
+            "main"
+        )
+        ||
+        document.body;
+
+    const main =
+        legacy.closest(
+            "main"
+        )
+        ||
+        document.querySelector(
+            "main"
+        );
+
+    document.body.classList.add(
+        "mw-r56-customer-page"
+    );
+
+    legacy.classList.add(
+        "mw-r56-customer-legacy"
+    );
+
+    if (main) {
+        main.classList.add(
+            "mw-r56-customer-main"
+        );
+    }
+
+
+    /*
+     * ======================================================
+     * 隱藏重複標題
+     * ======================================================
+     */
+
+    const hideDuplicateHeader = (
+        englishText
+    ) => {
+        const wanted =
+            normalize(
+                englishText
+            );
+
+        const candidates =
+            Array.from(
+                legacy.querySelectorAll(
+                    "header,section,div"
+                )
+            ).filter(
+                (node) => {
+                    const text =
+                        normalize(
+                            node.innerText
+                            ||
+                            ""
+                        );
+
+                    return (
+                        text.includes(
+                            wanted
+                        )
+                        &&
+                        text.length < 260
+                        &&
+                        node.querySelectorAll(
+                            "input,table,form"
+                        ).length
+                        === 0
+                    );
+                }
+            );
+
+        candidates
+            .sort(
+                (
+                    a,
+                    b
+                ) =>
+                    (
+                        a.innerText
+                        ||
+                        ""
+                    ).length
+                    -
+                    (
+                        b.innerText
+                        ||
+                        ""
+                    ).length
+            )
+            .slice(
+                0,
+                1
+            )
+            .forEach(
+                (node) =>
+                    node.classList.add(
+                        "mw-r56-duplicate-header"
+                    )
+            );
+    };
+
+
+    const commonAncestor = (
+        a,
+        b
+    ) => {
+        if (!a) {
+            return b;
+        }
+
+        if (!b) {
+            return a;
+        }
+
+        let node =
+            a;
+
+        while (
+            node
+            &&
+            node !== document.body
+        ) {
+            if (
+                node.contains(b)
+            ) {
+                return node;
+            }
+
+            node = node.parentElement;
+        }
+
+        return null;
+    };
+
+
+    /*
+     * ======================================================
+     * 把工作區一路往外撐滿
+     * ======================================================
+     */
+
+    const widenChain = (
+        node
+    ) => {
+        let current =
+            node;
+
+        const stop =
+            main
+            ?
+            main.parentElement
+            :
+            document.body;
+
+        while (
+            current
+            &&
+            current !== stop
+            &&
+            current !== document.body
+        ) {
+            current.classList.add(
+                "mw-r56-customer-expand"
+            );
+
+            current = current.parentElement;
+        }
+
+        if (main) {
+            main.classList.add(
+                "mw-r56-customer-expand"
+            );
+        }
+    };
+
+
+    const markWideStructuralChildren = (
+        root
+    ) => {
+        if (!root) {
+            return;
+        }
+
+        Array.from(
+            root.children
+        ).forEach(
+            (child) => {
+                const text =
+                    normalize(
+                        child.innerText
+                        ||
+                        ""
+                    );
+
+                const useful =
+                    child.querySelector(
+                        "table, form, input, select"
+                    )
+                    ||
+                    text.includes(
+                        "近期服務訂單"
+                    )
+                    ||
+                    text.includes(
+                        "近期訂單"
+                    )
+                    ||
+                    text.includes(
+                        "評價紀錄"
+                    )
+                    ||
+                    text.includes(
+                        "staffworkspace"
+                    );
+
+                if (useful) {
+                    child.classList.add(
+                        "mw-r56-customer-wide-block"
+                    );
+                }
+            }
+        );
+    };
+
+
+    /*
+     * ======================================================
+     * 客戶管理列表
+     * ======================================================
+     */
+
+    const setupList = () => {
+        hideDuplicateHeader(
+            "CUSTOMER MANAGEMENT"
+        );
+
+        const search =
+            Array.from(
+                legacy.querySelectorAll(
+                    "input"
+                )
+            ).find(
+                (input) => {
+                    const text =
+                        normalize(
+                            (
+                                input.getAttribute(
+                                    "placeholder"
+                                )
+                                ||
+                                ""
+                            )
+                            +
+                            " "
+                            +
+                            (
+                                input.getAttribute(
+                                    "name"
+                                )
+                                ||
+                                ""
+                            )
+                        );
+
+                    return (
+                        text.includes(
+                            "客戶"
+                        )
+                        ||
+                        text.includes(
+                            "discord"
+                        )
+                    );
+                }
+            );
+
+        const customerLink =
+            legacy.querySelector(
+                'a[href*="/admin/customers/"]'
+            );
+
+        const table =
+            legacy.querySelector(
+                "table"
+            );
+
+        const root =
+            commonAncestor(
+                search || table,
+                customerLink || table
+            )
+            ||
+            legacy;
+
+        root.classList.add(
+            "mw-r56-customer-list-root"
+        );
+
+        widenChain(
+            root
+        );
+
+        markWideStructuralChildren(
+            root
+        );
+
+        if (search) {
+            const form =
+                search.closest(
+                    "form"
+                );
+
+            if (form) {
+                form.classList.add(
+                    "mw-r56-customer-search"
+                );
+            }
+        }
+
+        if (table) {
+            table.classList.add(
+                "mw-r56-customer-table"
+            );
+        }
+    };
+
+
+    /*
+     * ======================================================
+     * 人員工作區
+     * ======================================================
+     */
+
+    const setupDetail = () => {
+        hideDuplicateHeader(
+            "CUSTOMER WORKSPACE"
+        );
+
+        legacy.classList.add(
+            "mw-r56-customer-detail-root"
+        );
+
+        widenChain(
+            legacy
+        );
+
+        markWideStructuralChildren(
+            legacy
+        );
+
+        const headings =
+            Array.from(
+                legacy.querySelectorAll(
+                    "h2,h3,h4,strong"
+                )
+            );
+
+        headings.forEach(
+            (heading) => {
+                const text =
+                    normalize(
+                        heading.textContent
+                    );
+
+                if (
+                    text.includes(
+                        "近期訂單"
+                    )
+                    ||
+                    text.includes(
+                        "近期服務訂單"
+                    )
+                    ||
+                    text.includes(
+                        "評價紀錄"
+                    )
+                ) {
+                    const panel =
+                        heading.closest(
+                            '[class*="panel"], [class*="card"], section, article, div'
+                        );
+
+                    if (panel) {
+                        panel.classList.add(
+                            "mw-r56-customer-wide-panel"
+                        );
+
+                        widenChain(
+                            panel
+                        );
+                    }
+                }
+            }
+        );
+
+        const labels = [
+            "訂單",
+            "完成",
+            "取消",
+            "進行中",
+            "累計消費",
+            "收藏",
+            "評價",
+        ];
+
+        const metricCards =
+            [];
+
+        labels.forEach(
+            (label) => {
+                const node =
+                    Array.from(
+                        legacy.querySelectorAll(
+                            "*"
+                        )
+                    ).find(
+                        (element) =>
+                            element.children.length
+                            === 0
+                            &&
+                            normalize(
+                                element.textContent
+                            )
+                            ===
+                            normalize(label)
+                    );
+
+                if (!node) {
+                    return;
+                }
+
+                const card =
+                    node.closest(
+                        '[class*="card"], [class*="metric"], [class*="stat"], div'
+                    );
+
+                if (
+                    card
+                    &&
+                    !metricCards.includes(
+                        card
+                    )
+                ) {
+                    metricCards.push(
+                        card
+                    );
+
+                    card.classList.add(
+                        "mw-r56-customer-metric"
+                    );
+                }
+            }
+        );
+
+        if (
+            metricCards.length >= 2
+        ) {
+            const grid =
+                metricCards[0]
+                    .parentElement;
+
+            if (
+                grid
+                &&
+                metricCards.every(
+                    (card) =>
+                        grid.contains(
+                            card
+                        )
+                )
+            ) {
+                grid.classList.add(
+                    "mw-r56-customer-metric-grid"
+                );
+
+                widenChain(
+                    grid
+                );
+            }
+        }
+    };
+
+
+    if (
+        path === "/admin/customers"
+    ) {
+        setupList();
+
+    } else {
+        setupDetail();
+    }
+
+})();
+</script>
+<!-- END MAWAN_R5R6_TARGETED_FIX_V2_CUSTOMER_RUNTIME -->
+</body></html>

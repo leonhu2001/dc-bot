@@ -1,0 +1,728 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="hero">
+    <div class="hero-glow hero-glow-a"></div>
+    <div class="hero-glow hero-glow-b"></div>
+
+    <div class="hero-grid">
+
+        <div class="hero-copy">
+            <div class="hero-eyebrow">
+                MAWAN ENTERTAINMENT
+            </div>
+
+            <h1>
+                今晚，
+                <span>想怎麼玩？</span>
+            </h1>
+
+            <p class="hero-lead">
+                不只有上分。
+                聊天、娛樂、開黑、趣味玩法，
+                找到今天最適合陪你玩的那個人。
+            </p>
+
+            <div class="hero-actions">
+                <a
+                    class="button button-primary"
+                    href="/order"
+                >
+                    立即點單
+                    <span>→</span>
+                </a>
+
+                <a
+                    class="button button-secondary"
+                    href="/staff"
+                >
+                    挑選陪玩
+                </a>
+            </div>
+
+            <div class="hero-notes">
+                <span>
+                    <i></i>
+                    Discord 安全登入
+                </span>
+
+                <span>
+                    <i></i>
+                    訂單系統即時同步
+                </span>
+
+                <span>
+                    <i></i>
+                    真人客服
+                </span>
+            </div>
+        </div>
+
+
+        <div
+            class="hero-visual"
+            aria-label="魔丸主視覺預留區"
+        >
+            <div class="hero-art-frame">
+                <div class="hero-art-orbit orbit-one"></div>
+                <div class="hero-art-orbit orbit-two"></div>
+
+                <div class="hero-art-logo">
+                    <img
+                        src="/static/img/server_logo.gif"
+                        alt="魔丸娛樂"
+                    >
+                </div>
+
+                <div class="hero-art-copy">
+                    <small>
+                        ARTWORK AREA
+                    </small>
+
+                    <strong>
+                        美編主視覺
+                        <br>
+                        預留位置
+                    </strong>
+
+                    <span>
+                        之後直接替換圖片，不需要重做版面
+                    </span>
+                </div>
+
+                <div class="art-corner art-corner-a"></div>
+                <div class="art-corner art-corner-b"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<section class="trust-strip">
+    <div>
+        <small>ORDER</small>
+        <strong>一站式點單</strong>
+        <span>網站與 Discord 流程整合</span>
+    </div>
+
+    <div>
+        <small>CREW</small>
+        <strong>陪玩陣容</strong>
+        <span>評價、收藏、指定下單</span>
+    </div>
+
+    <div>
+        <small>MEMBER</small>
+        <strong>個人中心</strong>
+        <span>訂單、點數、VIP 集中管理</span>
+    </div>
+
+    <div>
+        <small>STAFF</small>
+        <strong>員工系統</strong>
+        <span>依 Discord 身分自動開放</span>
+    </div>
+</section>
+
+
+<section class="site-section experience-section">
+    <div class="section-heading">
+        <div>
+            <div class="section-eyebrow">
+                CHOOSE YOUR NIGHT
+            </div>
+
+            <h2>
+                今天想怎麼玩？
+            </h2>
+        </div>
+
+        <p>
+            不需要先搞懂所有階級。
+            先告訴我們今晚想要什麼體驗。
+        </p>
+    </div>
+
+
+    <div class="experience-grid">
+
+        <a
+            class="experience-card"
+            href="/order?mood=chat"
+        >
+            <span class="experience-no">
+                01
+            </span>
+
+            <div class="experience-icon">
+                ✦
+            </div>
+
+            <h3>
+                歡樂聊天
+            </h3>
+
+            <p>
+                不拼輸贏，
+                今天就是想有人陪。
+            </p>
+
+            <span class="card-link">
+                找陪玩 →
+            </span>
+        </a>
+
+
+        <a
+            class="experience-card"
+            href="/order?mood=fun"
+        >
+            <span class="experience-no">
+                02
+            </span>
+
+            <div class="experience-icon">
+                ◈
+            </div>
+
+            <h3>
+                娛樂開黑
+            </h3>
+
+            <p>
+                一起玩、一起鬧，
+                輕鬆享受遊戲。
+            </p>
+
+            <span class="card-link">
+                看方案 →
+            </span>
+        </a>
+
+
+        <a
+            class="experience-card"
+            href="/order?mood=rank"
+        >
+            <span class="experience-no">
+                03
+            </span>
+
+            <div class="experience-icon">
+                ♛
+            </div>
+
+            <h3>
+                技術上分
+            </h3>
+
+            <p>
+                想認真打，
+                幫你配適合的技術人員。
+            </p>
+
+            <span class="card-link">
+                看方案 →
+            </span>
+        </a>
+
+
+        <a
+            class="experience-card"
+            href="/order?mood=special"
+        >
+            <span class="experience-no">
+                04
+            </span>
+
+            <div class="experience-icon">
+                ◇
+            </div>
+
+            <h3>
+                趣味玩法
+            </h3>
+
+            <p>
+                嘎拉給木與店內限定企劃，
+                今晚來點不一樣的。
+            </p>
+
+            <span class="card-link">
+                看玩法 →
+            </span>
+        </a>
+
+
+        <a
+            class="experience-card"
+            href="/staff"
+        >
+            <span class="experience-no">
+                05
+            </span>
+
+            <div class="experience-icon">
+                ♡
+            </div>
+
+            <h3>
+                指定陪玩
+            </h3>
+
+            <p>
+                已經有喜歡的人？
+                直接從個人牆找他。
+            </p>
+
+            <span class="card-link">
+                挑選陪玩 →
+            </span>
+        </a>
+
+    </div>
+</section>
+
+
+<section class="site-section service-section">
+    <div class="section-heading">
+        <div>
+            <div class="section-eyebrow">
+                POPULAR SERVICES
+            </div>
+
+            <h2>
+                熱門點單
+            </h2>
+        </div>
+
+        <a
+            class="section-more"
+            href="/order"
+        >
+            查看全部方案 →
+        </a>
+    </div>
+
+
+    <div class="service-grid">
+
+        <a
+            class="service-card service-featured"
+            href="/order?view=technical"
+        >
+            <div class="service-tag">
+                POPULAR
+            </div>
+
+            <div class="service-art art-delta">
+                <span>
+                    DELTA
+                </span>
+            </div>
+
+            <div class="service-content">
+                <small>
+                    三角洲行動
+                </small>
+
+                <h3>
+                    陪玩 / 護航
+                </h3>
+
+                <p>
+                    從輕鬆娛樂到技術需求，
+                    依你的玩法安排合適人員。
+                </p>
+
+                <span class="card-link">
+                    查看方案 →
+                </span>
+            </div>
+        </a>
+
+
+        <a
+            class="service-card"
+            href="/order?view=entertainment"
+        >
+            <div class="service-art art-fun">
+                <span>
+                    FUN
+                </span>
+            </div>
+
+            <div class="service-content">
+                <small>
+                    娛樂開黑
+                </small>
+
+                <h3>
+                    娛樂陪玩
+                </h3>
+
+                <p>
+                    不追求硬實力，
+                    重點是聊天、互動和氣氛。
+                </p>
+
+                <span class="card-link">
+                    查看方案 →
+                </span>
+            </div>
+        </a>
+
+
+        <a
+            class="service-card"
+            href="/order?category=fun"
+        >
+            <div class="service-art art-special">
+                <span>
+                    SPECIAL
+                </span>
+            </div>
+
+            <div class="service-content">
+                <small>
+                    魔丸限定
+                </small>
+
+                <h3>
+                    趣味單
+                </h3>
+
+                <p>
+                    嘎拉給木與不定期特色玩法，
+                    每次點單都能有不同體驗。
+                </p>
+
+                <span class="card-link">
+                    查看玩法 →
+                </span>
+            </div>
+        </a>
+
+    </div>
+</section>
+
+
+<section class="site-section crew-preview">
+    <div class="section-heading">
+        <div>
+            <div class="section-eyebrow">
+                MEET THE CREW
+            </div>
+
+            <h2>
+                今晚想跟誰玩？
+            </h2>
+        </div>
+
+        <a
+            class="section-more"
+            href="/staff"
+        >
+            查看陪玩陣容 →
+        </a>
+    </div>
+
+
+    <div class="crew-grid">
+
+        <div class="crew-type-card">
+            <div class="crew-figure">
+                <span>女陪</span>
+            </div>
+
+            <div>
+                <small>
+                    COMPANION
+                </small>
+
+                <h3>
+                    女陪
+                </h3>
+
+                <p>
+                    聊天、娛樂、氣氛互動
+                </p>
+            </div>
+        </div>
+
+
+        <div class="crew-type-card">
+            <div class="crew-figure">
+                <span>男陪</span>
+            </div>
+
+            <div>
+                <small>
+                    COMPANION
+                </small>
+
+                <h3>
+                    男陪
+                </h3>
+
+                <p>
+                    輕鬆開黑、聊天娛樂
+                </p>
+            </div>
+        </div>
+
+
+        <div class="crew-type-card">
+            <div class="crew-figure">
+                <span>護航</span>
+            </div>
+
+            <div>
+                <small>
+                    PROTECTOR
+                </small>
+
+                <h3>
+                    護航
+                </h3>
+
+                <p>
+                    有技術需求時的進階選擇
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <p class="crew-art-note">
+        人物圖目前不沿用舊素材。
+        第二階段串接正式個人牆資料後，
+        再交給美編依卡片比例製作新圖。
+    </p>
+</section>
+
+
+<section
+    class="site-section special-banner"
+    id="about"
+>
+    <div class="special-banner-art">
+        <span>
+            MW
+        </span>
+    </div>
+
+    <div class="special-banner-copy">
+        <div class="section-eyebrow">
+            ONLY AT MAWAN
+        </div>
+
+        <h2>
+            不只是陪玩，
+            <br>
+            今晚來點不一樣的。
+        </h2>
+
+        <p>
+            魔丸想做的不是把每個人都塞進同一套服務。
+            從娛樂陪玩、技術需求到店內限定趣味單，
+            讓不同客人都能找到適合自己的玩法。
+        </p>
+
+        <a
+            class="button button-primary"
+            href="/order"
+        >
+            探索魔丸玩法
+            <span>→</span>
+        </a>
+    </div>
+</section>
+
+
+<!-- MAWAN_PHASE_4B2V4_SOCIAL_HUB -->
+
+<section
+    id="social"
+    class="mw-social-hub"
+>
+
+    <div class="mw-social-kicker">
+        OFFICIAL SOCIALS
+    </div>
+
+    <h2 class="mw-social-title">
+        社群網址
+    </h2>
+
+    <p class="mw-social-copy">
+        加入魔丸娛樂的官方社群。
+        最新活動、店內公告、陪玩與護航資訊、
+        精華內容都會集中在這裡。
+    </p>
+
+    <div class="mw-social-grid">
+
+
+        <a
+            class="mw-social-card"
+            href="https://discord.gg/EdxRfJ2MfX"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+
+            <strong>
+                Discord
+            </strong>
+
+            <span>
+                加入官方 Discord 社群
+            </span>
+
+            <div class="mw-social-arrow">
+                ↗
+            </div>
+
+        </a>
+
+        <a
+            class="mw-social-card"
+            href="https://www.instagram.com/mowanentertainment?igsi=MTRwNDE0MGhxNWhydA%3D%3D&amp;utm_source=qr"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+
+            <strong>
+                Instagram
+            </strong>
+
+            <span>
+                追蹤活動與最新動態
+            </span>
+
+            <div class="mw-social-arrow">
+                ↗
+            </div>
+
+        </a>
+
+        <a
+            class="mw-social-card"
+            href="https://www.threads.com/@mowanentertainment?igshid=NTc4MTIwNjQ2YQ=="
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+
+            <strong>
+                Threads
+            </strong>
+
+            <span>
+                查看魔丸日常更新
+            </span>
+
+            <div class="mw-social-arrow">
+                ↗
+            </div>
+
+        </a>
+
+        <a
+            class="mw-social-card"
+            href="https://www.tiktok.com/@mowanentertainment?_r=1&amp;_t=ZS-99Mj1gK7VGm"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+
+            <strong>
+                TikTok
+            </strong>
+
+            <span>
+                觀看精華與短影音
+            </span>
+
+            <div class="mw-social-arrow">
+                ↗
+            </div>
+
+        </a>
+
+    </div>
+
+</section>
+
+
+
+<section class="site-section vip-preview">
+    <div class="vip-card">
+        <div>
+            <div class="section-eyebrow">
+                MAWAN VIP
+            </div>
+
+            <h2>
+                玩得越久，
+                <br>
+                權益越完整。
+            </h2>
+
+            <p>
+                專屬折扣、會員活動、點數與升級進度，
+                之後全部集中在個人中心查看。
+            </p>
+
+            <a
+                class="button button-secondary"
+                href="/vip"
+            >
+                查看 VIP
+            </a>
+        </div>
+
+        <div class="vip-emblem">
+            <span>VIP</span>
+            <small>MAWAN</small>
+        </div>
+    </div>
+</section>
+
+
+<section class="site-section final-cta">
+    <div>
+        <div class="section-eyebrow">
+            READY TO PLAY?
+        </div>
+
+        <h2>
+            今晚別自己排。
+        </h2>
+
+        <p>
+            登入 Discord，
+            之後你的訂單、收藏、點數與 VIP
+            都會集中在同一個個人中心。
+        </p>
+    </div>
+
+    {% if user %}
+        <a
+            class="button button-primary"
+            href="/me"
+        >
+            前往個人中心
+            <span>→</span>
+        </a>
+    {% else %}
+        <a
+            class="button button-discord"
+            href="/auth/discord/login"
+        >
+            Discord 登入
+            <span>→</span>
+        </a>
+    {% endif %}
+</section>
+
+{% endblock %}

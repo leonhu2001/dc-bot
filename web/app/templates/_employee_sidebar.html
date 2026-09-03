@@ -1,0 +1,40 @@
+
+{% set _p = request.url.path %}
+
+<aside class="mw-r5-sidebar">
+
+    <div class="mw-r5-brand">
+        <small>MAWAN STAFF</small>
+        <strong>魔丸娛樂</strong>
+    </div>
+
+    <nav class="mw-r5-nav">
+
+        <a
+            class="{% if _p == '/employee' %}active{% endif %}"
+            href="/employee"
+        >
+            員工中心
+        </a>
+
+        <a
+            class="{% if _p.startswith('/dispatch') %}active{% endif %}"
+            href="/dispatch"
+        >
+            接單大廳
+        </a>
+
+        <a
+            class="{% if _p.startswith('/my/payouts') %}active{% endif %}"
+            href="/my/payouts"
+        >
+            完整薪資
+        </a>
+
+        <a href="/">
+            返回官網
+        </a>
+
+    </nav>
+
+</aside>
