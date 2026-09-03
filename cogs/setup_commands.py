@@ -4,7 +4,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from services.topup_runtime import ensure_topup_credit_worker_started
 from views.panels import MainPanelView
+from views.topups import TopupPanelView
 from views.voice import (
     get_or_create_play_voice_lobby,
     get_or_create_vip_voice_lobby,
@@ -17,6 +19,10 @@ class SetupCommands(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        ensure_topup_credit_worker_started(bot)
+        if not getattr(bot, "_topup_panel_view_registered", False):
+            bot.add_view(TopupPanelView())
+            bot._topup_panel_view_registered = True
 
     @setup.command(
         name="panel",
@@ -42,6 +48,31 @@ class SetupCommands(commands.Cog):
         await interaction.response.send_message("客服面板已建立。", ephemeral=True)
 
     @setup.command(
+        name="topup_panel",
+        description="建立魔丸娛樂儲值中心面板",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
+    async def setup_topup_panel(self, interaction: discord.Interaction):
+        if not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("請在文字頻道使用這個指令。", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="💰 魔丸娛樂｜儲值中心",
+            description=(
+                "可於此處進行魔丸錢包儲值。\n"
+                "付款完成並經客服確認後，系統會自動入帳並同步 VIP 進度。\n\n"
+                "**VIP 儲值回饋**\n"
+                "白金魔丸 2%｜鑽石魔丸 3%｜白鑽魔丸 4%｜黑鑽魔丸 5%\n"
+                "本次儲值若達成新 VIP 等級，當筆即套用新等級返利。"
+            ),
+            color=discord.Color.gold(),
+        )
+        await interaction.channel.send(embed=embed, view=TopupPanelView())
+        await interaction.response.send_message("儲值中心面板已建立。", ephemeral=True)
+
+    @setup.command(
         name="complaint_panel",
         description="建立客訴表單面板",
     )
@@ -52,7 +83,6 @@ class SetupCommands(commands.Cog):
             "客訴功能已整合到「/setup panel」建立的客服中心主面板，不需要另外建立客訴面板。",
             ephemeral=True,
         )
-
 
     @setup.command(
         name="feedback_panel",
@@ -65,7 +95,6 @@ class SetupCommands(commands.Cog):
             "顧客意見功能已整合到「/setup panel」建立的客服中心主面板，不需要另外建立顧客意見箱面板。",
             ephemeral=True,
         )
-
 
     @setup.command(
         name="play_voice",
