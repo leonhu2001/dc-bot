@@ -18,6 +18,7 @@ from web.app.routers.site import router as site_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
 from web.app.routers.order_history import router as order_history_router
+from web.app.routers.topups import router as topups_router
 from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_payouts_grouped
 
@@ -40,6 +41,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
 app.include_router(site_router)
+app.include_router(topups_router)
 app.include_router(admin_staff_profiles.router)
 app.include_router(admin_router)
 app.include_router(admin_staff_router)
