@@ -19,7 +19,7 @@ from services.topups import (
     submit_topup_payment,
     topup_status_label,
 )
-from web.app.routers.admin_staff import _mw4b2_admin_user as _admin_user
+from web.app.routers.admin_staff import require_admin
 from web.app.services.site_data import get_member_summary
 
 router = APIRouter(tags=["topups"])
@@ -192,7 +192,8 @@ async def member_wallet_topup_cancel(request: Request, topup_id: int):
 
 @router.get("/admin/topups", response_class=HTMLResponse)
 async def admin_topups(request: Request, status: str | None = None):
-    if not _admin_user(request):
+    admin_user = require_admin(request)
+    if not admin_user:
         return RedirectResponse("/admin", status_code=303)
     rows = [_decorate(row) for row in list_topups_for_admin(status=status, limit=200)]
     return templates.TemplateResponse(
@@ -200,7 +201,7 @@ async def admin_topups(request: Request, status: str | None = None):
         name="admin_topups.html",
         context={
             "title": "儲值審核",
-            "user": _user(request),
+            "user": admin_user,
             "topups": rows,
             "status_filter": status or "",
             "error": request.query_params.get("error"),
@@ -211,8 +212,8 @@ async def admin_topups(request: Request, status: str | None = None):
 
 @router.post("/admin/topups/{topup_id}/approve")
 async def admin_topup_approve(request: Request, topup_id: int):
-    user = _user(request)
-    if not _admin_user(request) or not user:
+    user = require_admin(request)
+    if not user:
         return RedirectResponse("/admin", status_code=303)
     try:
         approve_topup_order(
@@ -235,8 +236,8 @@ async def admin_topup_reject(
     topup_id: int,
     reason: str = Form(default=""),
 ):
-    user = _user(request)
-    if not _admin_user(request) or not user:
+    user = require_admin(request)
+    if not user:
         return RedirectResponse("/admin", status_code=303)
     try:
         reject_topup_order(
