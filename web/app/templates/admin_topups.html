@@ -1,46 +1,51 @@
 {% extends "layout.html" %}
 {% block page_title %}儲值審核{% endblock %}
 {% block content %}
-<section class="wallet-page">
-  <section class="wallet-card wallet-intro" style="padding:22px">
-    <p class="order-no">TOPUP REVIEW</p>
+<style>
+.topup-page{display:grid;gap:18px}.topup-card,.topup-panel{border:1px solid rgba(245,198,107,.18);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),rgba(8,11,19,.94);box-shadow:0 24px 68px rgba(0,0,0,.28)}.topup-card{padding:22px}.topup-kicker{margin:0;color:var(--mw-gold,#f5c66b);font-weight:950;letter-spacing:.16em}.topup-card h2{margin:6px 0 8px;font-size:30px}.topup-card>p:last-child{margin:0;color:var(--mw-muted,#a7a0b5);line-height:1.8}.topup-alert{padding:13px 16px;border:1px solid rgba(245,198,107,.22);border-radius:14px;background:rgba(245,198,107,.08)}.topup-panel{overflow:hidden}.topup-head{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08)}.topup-head h3{margin:4px 0 0;font-size:24px}.topup-filter{display:flex;gap:8px;flex-wrap:wrap}.topup-link,.topup-action{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(245,198,107,.28);border-radius:999px;background:rgba(245,198,107,.08);color:#ffe3a3;padding:8px 12px;font-weight:950;text-decoration:none;cursor:pointer}.topup-action.reject{border-color:rgba(255,120,120,.22);background:rgba(255,120,120,.07);color:#ffc2c2}.topup-table-wrap{overflow-x:auto}.topup-table{width:100%;min-width:980px;border-collapse:separate;border-spacing:0}.topup-table th,.topup-table td{padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.075);text-align:left;vertical-align:middle}.topup-table th{color:var(--mw-gold,#f5c66b);font-weight:950;letter-spacing:.06em;background:rgba(255,255,255,.025);white-space:nowrap}.topup-table tbody tr:hover td{background:rgba(245,198,107,.045)}.topup-name{font-weight:950}.topup-muted{margin-top:4px;color:rgba(255,255,255,.48);font-size:12px;word-break:break-all}.topup-amount{color:var(--mw-gold,#f5c66b);font-weight:950}.topup-actions{display:flex;gap:7px;flex-wrap:wrap}.topup-empty{text-align:center;padding:34px!important;color:var(--mw-muted,#a7a0b5)}@media(max-width:720px){.topup-head{align-items:flex-start;flex-direction:column}}
+</style>
+<section class="topup-page">
+  <section class="topup-card">
+    <p class="topup-kicker">TOPUP REVIEW</p>
     <h2>儲值審核</h2>
-    <p>客服確認付款後核准，Bot 會統一完成錢包入帳、VIP 累積與當筆返利。</p>
+    <p>客服確認款項後按「確認入帳」，Bot 會統一處理錢包、VIP 累積與當筆返利。</p>
   </section>
 
-  {% if error %}<div class="member-alert">{{ error }}</div>{% endif %}
-  {% if ok %}<div class="member-alert">{{ ok }}</div>{% endif %}
+  {% if error %}<div class="topup-alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="topup-alert">{{ ok }}</div>{% endif %}
 
-  <section class="wallet-panel">
-    <div class="wallet-panel-head">
-      <div><p class="order-no">TOPUPS</p><h3>儲值單</h3></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a class="wallet-link" href="/admin/topups">全部</a>
-        <a class="wallet-link" href="/admin/topups?status=pending_review">待審核</a>
-        <a class="wallet-link" href="/admin/topups?status=completed">已完成</a>
+  <section class="topup-panel">
+    <div class="topup-head">
+      <div><p class="topup-kicker">TOPUPS</p><h3>儲值單</h3></div>
+      <div class="topup-filter">
+        <a class="topup-link" href="/admin/topups">全部</a>
+        <a class="topup-link" href="/admin/topups?status=pending_review">待審核</a>
+        <a class="topup-link" href="/admin/topups?status=completed">已完成</a>
       </div>
     </div>
-    <div class="wallet-table-wrap">
-      <table class="wallet-table">
+    <div class="topup-table-wrap">
+      <table class="topup-table">
         <thead><tr><th>儲值單</th><th>老闆</th><th>金額</th><th>末五碼</th><th>來源</th><th>狀態</th><th>操作</th></tr></thead>
         <tbody>
         {% for topup in topups %}
           <tr>
-            <td><strong>{{ topup.topup_no }}</strong><div class="wallet-code">{{ topup.created_at }}</div></td>
-            <td><div class="wallet-boss-name">{{ topup.customer_display_name or '—' }}</div><div class="wallet-boss-id">{{ topup.customer_discord_id }}</div></td>
-            <td class="wallet-amount">{{ topup.amount_text }}</td>
+            <td><strong>{{ topup.topup_no }}</strong><div class="topup-muted">{{ topup.created_at }}</div></td>
+            <td><div class="topup-name">{{ topup.customer_display_name or '—' }}</div><div class="topup-muted">{{ topup.customer_discord_id }}</div></td>
+            <td class="topup-amount">{{ topup.amount_text }}</td>
             <td>{{ topup.bank_last5 or '—' }}</td>
             <td>{{ '網站' if topup.source == 'web' else 'Discord' }}</td>
             <td>{{ topup.status_label }}</td>
             <td>
               {% if topup.status == 'pending_review' %}
-              <form method="post" action="/admin/topups/{{ topup.id }}/approve" style="display:inline"><button class="wallet-link" type="submit">確認入帳</button></form>
-              <form method="post" action="/admin/topups/{{ topup.id }}/reject" style="display:inline"><input type="hidden" name="reason" value="客服駁回"><button class="wallet-link" type="submit">駁回</button></form>
+              <div class="topup-actions">
+                <form method="post" action="/admin/topups/{{ topup.id }}/approve"><button class="topup-action" type="submit">確認入帳</button></form>
+                <form method="post" action="/admin/topups/{{ topup.id }}/reject"><input type="hidden" name="reason" value="客服駁回"><button class="topup-action reject" type="submit">駁回</button></form>
+              </div>
               {% else %}—{% endif %}
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="7" class="wallet-empty">目前沒有儲值單。</td></tr>
+          <tr><td colspan="7" class="topup-empty">目前沒有儲值單。</td></tr>
         {% endfor %}
         </tbody>
       </table>
