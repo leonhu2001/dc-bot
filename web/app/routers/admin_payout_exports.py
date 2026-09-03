@@ -103,8 +103,8 @@ def export_worker_rows(db: Session, *, month: str | None, status: str | None) ->
         "類型",
         "訂單",
         "訂單ID",
-        "打手ID",
-        "打手名稱",
+        "護航 / 陪玩ID",
+        "護航 / 陪玩名稱",
         "分攤金額",
         "基本分潤",
         "掛名加成",
@@ -117,7 +117,7 @@ def export_worker_rows(db: Session, *, month: str | None, status: str | None) ->
 
     for payout, order in db.execute(statement).all():
         rows.append([
-            "打手",
+            "護航 / 陪玩",
             order_label(order, payout.order_id),
             str(payout.order_id),
             payout.worker_discord_id,

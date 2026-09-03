@@ -107,7 +107,7 @@ def add_person(people: dict[str, dict], *, discord_id, display_name, role, amoun
         "item": item or "",
         "customer_name": customer_name,
         "closed_date": closed_date,
-        "role": "打手" if role == "worker" else "客服",
+        "role": "護航 / 陪玩" if role == "worker" else "客服",
         "amount": amount,
         "payout_status": payout_status,
         "status_label": "已支付" if payout_status == "paid" else "未支付",
@@ -123,7 +123,7 @@ def finalize_people(people: dict[str, dict], q: str | None, status: str | None =
         roles = person.pop("roles", set())
 
         if roles == {"worker"}:
-            person["role_label"] = "打手"
+            person["role_label"] = "護航 / 陪玩"
             person["role"] = "worker"
         elif roles == {"customer_service"}:
             person["role_label"] = "客服"
@@ -376,8 +376,8 @@ def update_summary_payout_status(month: str | None, role: str | None, target_sta
             order_filter += " AND substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
             params.append(month)
 
-        # 打手
-        if role in {"all", "", "worker", "打手"}:
+        # 護航 / 陪玩
+        if role in {"all", "", "worker", "護航 / 陪玩"}:
             conn.execute(
                 f"""
                 UPDATE worker_payouts
@@ -417,32 +417,73 @@ def update_summary_payout_status(month: str | None, role: str | None, target_sta
 
 
 
-def update_summary_person_payout_status(month: str | None, person_role: str | None, person_id: str | None, target_status: str) -> None:
-    """只更新人員總表中某一個人的分潤狀態。"""
-    month = str(month or "").strip()
-    person_role = str(person_role or "").strip()
-    person_id = str(person_id or "").strip()
-    target_status = "paid" if target_status == "paid" else "unpaid"
+def update_summary_person_payout_status(month: str, person_role: str, person_id: str, target_status: str):
+    """更新單一人員分潤狀態。
 
+    混合身分要同時更新護航 / 陪玩分潤與魔丸♫客服分潤。
+    """
+    person_id = str(person_id or "").strip()
     if not person_id:
         return
 
-    paid_at_sql = "datetime('now')" if target_status == "paid" else "NULL"
+    target_status = "paid" if str(target_status or "").strip() == "paid" else "unpaid"
+    paid_at_sql = "datetime('now', '+8 hours')" if target_status == "paid" else "NULL"
 
-    conn = sqlite3.connect(summary_db_path() if "summary_db_path" in globals() else str(__import__("pathlib").Path.cwd() / "web_dashboard.db"))
+    role_text = str(person_role or "").strip().lower()
+
+    update_worker = role_text in {
+        "worker",
+        "護航 / 陪玩",
+        "worker_payout",
+        "護航 / 陪玩分潤",
+        "mixed",
+        "mix",
+        "both",
+        "hybrid",
+        "混合",
+        "混合身分",
+        "客服 / 護航",
+        "護航 / 客服",
+        "總控 / 客服 / 護航",
+    }
+
+    update_customer_service = role_text in {
+        "customer_service",
+        "customer-service",
+        "cs",
+        "客服",
+        "魔丸♫客服分潤",
+        "mixed",
+        "mix",
+        "both",
+        "hybrid",
+        "混合",
+        "混合身分",
+        "客服 / 護航",
+        "護航 / 客服",
+        "總控 / 客服 / 護航",
+    }
+
+    # 有些舊資料 role_label 可能只寫「混合」或畫面顯示「混合」，
+    # 保底：只要不是明確客服或明確護航 / 陪玩，就兩邊都嘗試更新。
+    if not update_worker and not update_customer_service:
+        update_worker = True
+        update_customer_service = True
+
+    conn = sqlite3.connect(db_path())
+    conn.row_factory = sqlite3.Row
 
     try:
         order_filter = "w.status = 'closed'"
-        params = []
+        params_worker = [target_status, person_id]
+        params_cs = [target_status, person_id]
 
         if month:
             order_filter += " AND substr(COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
-            params.append(month)
+            params_worker.append(month)
+            params_cs.append(month)
 
-        is_worker = person_role in {"worker", "打手", "worker_payout", "打手分潤"}
-        is_cs = person_role in {"customer_service", "客服", "cs", "customer_service_payout", "客服分潤"}
-
-        if is_worker:
+        if update_worker:
             conn.execute(
                 f"""
                 UPDATE worker_payouts
@@ -450,36 +491,162 @@ def update_summary_person_payout_status(month: str | None, person_role: str | No
                     paid_at = {paid_at_sql}
                 WHERE worker_discord_id = ?
                   AND order_id IN (
-                    SELECT w.id
-                    FROM web_orders w
-                    WHERE {order_filter}
+                      SELECT w.id
+                      FROM web_orders w
+                      WHERE {order_filter}
                   )
                 """,
-                [target_status, person_id, *params],
+                params_worker,
             )
 
-        if is_cs:
+        if update_customer_service:
             conn.execute(
                 f"""
                 UPDATE customer_service_payouts
                 SET payout_status = ?,
                     paid_at = {paid_at_sql}
                 WHERE customer_service_discord_id = ?
-                  AND COALESCE(customer_service_discord_id, '') <> ''
-                  AND COALESCE(customer_service_discord_id, '') <> 'demo_customer_service'
-                  AND COALESCE(customer_service_display_name, '') <> '測試客服'
                   AND order_id IN (
-                    SELECT w.id
-                    FROM web_orders w
-                    WHERE {order_filter}
+                      SELECT w.id
+                      FROM web_orders w
+                      WHERE {order_filter}
                   )
                 """,
-                [target_status, person_id, *params],
+                params_cs,
             )
 
         conn.commit()
+
     finally:
         conn.close()
+
+def build_combined_summary_rows(unpaid_rows: list[dict], paid_rows: list[dict]) -> list[dict]:
+    """人員總表用：把未發放與已發放同一人合併成一列。"""
+    combined: dict[tuple[str, str], dict] = {}
+
+    def as_number(value) -> float:
+        try:
+            return float(value or 0)
+        except Exception:
+            return 0
+
+    def as_int(value) -> int:
+        try:
+            return int(value or 0)
+        except Exception:
+            return 0
+
+    def get_value(row, key, default=None):
+        if isinstance(row, dict):
+            return row.get(key, default)
+        return getattr(row, key, default)
+
+    def ensure_row(row) -> dict:
+        role = str(get_value(row, "role", "") or "")
+        discord_id = str(get_value(row, "discord_id", "") or "")
+        key = (role, discord_id)
+
+        if key not in combined:
+            combined[key] = {
+                "role": role,
+                "role_label": get_value(row, "role_label", role or "人員"),
+                "discord_id": discord_id,
+                "display_name": get_value(row, "display_name", discord_id or "未知人員"),
+                "unpaid_total": 0,
+                "paid_total": 0,
+                "unpaid_count": 0,
+                "paid_count": 0,
+                "items": [],
+            }
+
+        return combined[key]
+
+    for row in unpaid_rows or []:
+        target = ensure_row(row)
+        target["unpaid_total"] += as_number(
+            get_value(row, "display_total", get_value(row, "unpaid_total", 0))
+        )
+        target["unpaid_count"] += as_int(get_value(row, "unpaid_count", 0))
+        target["items"].extend(list(get_value(row, "items", []) or []))
+
+    for row in paid_rows or []:
+        target = ensure_row(row)
+        target["paid_total"] += as_number(get_value(row, "paid_total", 0))
+        target["paid_count"] += as_int(get_value(row, "paid_count", 0))
+        target["items"].extend(list(get_value(row, "items", []) or []))
+
+    rows = list(combined.values())
+
+    for row in rows:
+        row["total_count"] = int(row["unpaid_count"] or 0) + int(row["paid_count"] or 0)
+
+        if row["unpaid_count"] and row["paid_count"]:
+            row["summary_status"] = "部分待審"
+            row["summary_status_class"] = "partial"
+        elif row["unpaid_count"]:
+            row["summary_status"] = "待發放"
+            row["summary_status_class"] = "unpaid"
+        else:
+            row["summary_status"] = "正常"
+            row["summary_status_class"] = "paid"
+
+    rows.sort(
+        key=lambda row: (
+            int(row.get("unpaid_count") or 0) <= 0,
+            -float(row.get("unpaid_total") or 0),
+            str(row.get("display_name") or ""),
+        )
+    )
+
+    return rows
+
+
+
+def attach_staff_avatars_to_summary_rows(rows: list[dict]) -> list[dict]:
+    """把 web_staff_members.avatar 接到人員總表 row。"""
+    discord_ids = []
+    for row in rows or []:
+        discord_id = str(row.get("discord_id") or "").strip()
+        if discord_id:
+            discord_ids.append(discord_id)
+
+    if not discord_ids:
+        return rows
+
+    conn = sqlite3.connect(summary_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        placeholders = ",".join("?" for _ in discord_ids)
+        avatar_rows = conn.execute(
+            f"""
+            SELECT discord_id, avatar
+            FROM web_staff_members
+            WHERE discord_id IN ({placeholders})
+            """,
+            discord_ids,
+        ).fetchall()
+
+        avatar_map = {
+            str(item["discord_id"]): str(item["avatar"] or "")
+            for item in avatar_rows
+        }
+    finally:
+        conn.close()
+
+    for row in rows:
+        discord_id = str(row.get("discord_id") or "").strip()
+        avatar = avatar_map.get(discord_id, "")
+        row["avatar"] = avatar
+
+        if avatar:
+            ext = "gif" if avatar.startswith("a_") else "png"
+            row["avatar_url"] = f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar}.{ext}?size=128"
+        else:
+            row["avatar_url"] = ""
+
+    return rows
+
 
 @router.get("/admin/payouts/summary")
 async def admin_payout_summary(request: Request, month: str | None = "", role: str | None = "all", q: str | None = ""):
@@ -491,7 +658,7 @@ async def admin_payout_summary(request: Request, month: str | None = "", role: s
             name="no_access.html",
             context={
                 "title": "沒有權限",
-                "message": "你沒有總控後台權限。",
+                "message": "你沒有客服後台權限。",
                 "user": current_user(request),
             },
             status_code=403,
@@ -506,6 +673,7 @@ async def admin_payout_summary(request: Request, month: str | None = "", role: s
     rows, totals = fetch_rows(month, role, q, status)
     unpaid_rows, unpaid_totals = fetch_rows(month, role, q, "unpaid")
     paid_rows, paid_totals = fetch_rows(month, role, q, "paid")
+    summary_rows = attach_staff_avatars_to_summary_rows(build_combined_summary_rows(unpaid_rows, paid_rows))
 
     return templates.TemplateResponse(
         request=request,
@@ -519,6 +687,7 @@ async def admin_payout_summary(request: Request, month: str | None = "", role: s
             "unpaid_totals": unpaid_totals,
             "paid_totals": paid_totals,
             "totals": totals,
+            "summary_rows": summary_rows,
             "month": month or "",
             "month_options": get_summary_month_options(),
             "role": role,

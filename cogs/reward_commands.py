@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
+import sqlite3
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -18,6 +21,66 @@ from services.rewards import (
     get_current_reward_points,
     ensure_reward_member_benefits,
 )
+
+
+# ========= 錢包查詢：整合到會員資料 Embed =========
+
+def _wallet_db_file() -> Path:
+    return Path(__file__).resolve().parents[1] / "bot.db"
+
+
+def ensure_wallet_tables_for_rewards() -> None:
+    conn = sqlite3.connect(_wallet_db_file())
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS customer_wallets (
+                customer_discord_id TEXT PRIMARY KEY,
+                balance INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS wallet_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_discord_id TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                balance_before INTEGER NOT NULL,
+                balance_after INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                order_channel_id TEXT,
+                order_no TEXT,
+                operator_discord_id TEXT,
+                operator_display_name TEXT,
+                note TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_wallet_balance_for_rewards(customer_id) -> int:
+    ensure_wallet_tables_for_rewards()
+    conn = sqlite3.connect(_wallet_db_file())
+    try:
+        row = conn.execute(
+            "SELECT balance FROM customer_wallets WHERE customer_discord_id = ?",
+            (str(customer_id),),
+        ).fetchone()
+        return int(row[0] or 0) if row else 0
+    finally:
+        conn.close()
+
+
+def add_wallet_field_to_member_embed(embed: discord.Embed, customer_id) -> discord.Embed:
+    embed.add_field(
+        name="錢包餘額",
+        value=format_t_amount(get_wallet_balance_for_rewards(customer_id)),
+        inline=True,
+    )
+    return embed
+
 
 
 class RewardCommands(commands.Cog):
@@ -40,6 +103,7 @@ class RewardCommands(commands.Cog):
     async def my_points(self, interaction: discord.Interaction):
         data = get_customer_reward_data(interaction.user.id)
         embed = build_member_info_embed(interaction.user, data, show_points=True)
+        add_wallet_field_to_member_embed(embed, interaction.user.id)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @reward.command(
@@ -60,6 +124,7 @@ class RewardCommands(commands.Cog):
         data = get_customer_reward_data(customer.id)
         embed = build_member_info_embed(customer, data, show_points=True)
         embed.title = "顧客會員資料"
+        add_wallet_field_to_member_embed(embed, customer.id)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @reward.command(

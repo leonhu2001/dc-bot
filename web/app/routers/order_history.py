@@ -1,11 +1,12 @@
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
 from shared.db import SessionLocal
@@ -102,13 +103,38 @@ def redirect_to_history(**params) -> RedirectResponse:
     finally:
         conn.close()
 
-    return RedirectResponse(url="/admin/orders/history", status_code=303)
+    return RedirectResponse(
+        url=f"/admin/orders/history?page={form.get('page') or 1}",
+        status_code=303,
+    )
+
+
+
+def parse_history_month_filter(month_filter: str | None):
+    """把 2026-06 轉成當月起訖 datetime。"""
+    month_text = str(month_filter or "").strip()
+
+    if not month_text:
+        return None
+
+    try:
+        start = datetime.strptime(month_text, "%Y-%m")
+    except ValueError:
+        return None
+
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
+    else:
+        end = start.replace(month=start.month + 1)
+
+    return start, end
 
 
 def list_history_orders(
     *,
     status_filter: str = "all",
     keyword: str | None = None,
+    month_filter: str | None = None,
 ) -> list[WebOrder]:
     db = SessionLocal()
 
@@ -118,7 +144,7 @@ def list_history_orders(
             .where(WebOrder.status != OrderStatus.ACTIVE.value)
             .options(selectinload(WebOrder.assignments))
             .options(selectinload(WebOrder.payouts))
-            .order_by(WebOrder.updated_at.desc(), WebOrder.created_at.desc())
+            .order_by(WebOrder.updated_at.desc(), WebOrder.created_at.desc(), WebOrder.id.desc())
         )
 
         if status_filter and status_filter != "all":
@@ -134,11 +160,104 @@ def list_history_orders(
                 | WebOrder.item.like(like_keyword)
             )
 
+        month_range = parse_history_month_filter(month_filter)
+        if month_range is not None:
+            month_start, month_end = month_range
+            statement = statement.where(
+                or_(
+                    (WebOrder.closed_at >= month_start) & (WebOrder.closed_at < month_end),
+                    (
+                        WebOrder.closed_at.is_(None)
+                        & (WebOrder.updated_at >= month_start)
+                        & (WebOrder.updated_at < month_end)
+                    ),
+                    (
+                        WebOrder.closed_at.is_(None)
+                        & WebOrder.updated_at.is_(None)
+                        & (WebOrder.created_at >= month_start)
+                        & (WebOrder.created_at < month_end)
+                    ),
+                )
+            )
+
         return list(db.scalars(statement).all())
     finally:
         db.close()
 
 
+
+
+
+def history_order_month_value(order) -> str:
+    """歷史訂單月份：優先 closed_at，沒有才用 updated_at / created_at。"""
+    for attr in ("closed_at", "updated_at", "created_at"):
+        value = getattr(order, attr, None)
+
+        if value is None:
+            continue
+
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m")
+
+        value_text = str(value).strip()
+
+        if len(value_text) >= 7:
+            return value_text[:7]
+
+    return ""
+
+
+def filter_history_orders_by_month(orders, month_filter: str | None):
+    month_text = str(month_filter or "").strip()
+
+    if not month_text:
+        return orders
+
+    return [
+        order for order in orders
+        if history_order_month_value(order) == month_text
+    ]
+
+
+
+def list_history_month_options() -> list[dict[str, str]]:
+    """月份選單只顯示歷史訂單實際存在的月份。"""
+    db = SessionLocal()
+
+    try:
+        statement = (
+            select(WebOrder)
+            .where(WebOrder.status != OrderStatus.ACTIVE.value)
+            .order_by(WebOrder.updated_at.desc(), WebOrder.created_at.desc(), WebOrder.id.desc())
+        )
+        orders = db.scalars(statement).all()
+    finally:
+        db.close()
+
+    month_values = sorted(
+        {
+            month_value
+            for order in orders
+            if (month_value := history_order_month_value(order))
+        },
+        reverse=True,
+    )
+
+    options: list[dict[str, str]] = []
+
+    for month_value in month_values:
+        try:
+            year_text, month_text = month_value.split("-", 1)
+            label = f"{int(year_text)} 年 {int(month_text)} 月"
+        except Exception:
+            label = month_value
+
+        options.append({
+            "value": month_value,
+            "label": label,
+        })
+
+    return options
 
 
 def history_to_int(value, default: int = 0) -> int:
@@ -148,11 +267,38 @@ def history_to_int(value, default: int = 0) -> int:
         return default
 
 
-def history_safe_status(value: str | None) -> str:
-    value = str(value or "").strip()
+def history_safe_status(value) -> str:
+    """歷史訂單狀態正規化。取消代表已退款，不進分潤。"""
+    status = str(value or "").strip().lower()
 
-    if value in {"active", "stored", "closed"}:
-        return value
+    aliases = {
+        "active": "active",
+        "ongoing": "active",
+        "進行中": "active",
+
+        "stored": "stored",
+        "saved": "stored",
+        "存單": "stored",
+        "審核中": "stored",
+
+        "closed": "closed",
+        "done": "closed",
+        "已結單": "closed",
+        "結單": "closed",
+
+        "cancelled": "cancelled",
+        "canceled": "cancelled",
+        "cancel": "cancelled",
+        "取消": "cancelled",
+        "已取消": "cancelled",
+        "退款": "cancelled",
+        "已退款": "cancelled",
+    }
+
+    status = aliases.get(status, status)
+
+    if status in {"active", "stored", "closed", "cancelled"}:
+        return status
 
     return "closed"
 
@@ -163,7 +309,7 @@ def history_db_path() -> str:
 
 
 def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
-    """抓歷史訂單的打手/客服分潤，給歷史頁批量修改用。"""
+    """抓歷史訂單的護航 / 陪玩 / 魔丸♫客服分潤，給歷史頁批量修改用。"""
     if not order_ids:
         return {}
 
@@ -195,7 +341,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
             result.setdefault(order_id, []).append(
                 {
                     "kind": "worker",
-                    "label": "打手",
+                    "label": "護航 / 陪玩",
                     "id": int(row["id"]),
                     "person_id": row["person_id"],
                     "person_name": row["person_name"] or row["person_id"],
@@ -251,7 +397,7 @@ def history_to_int(value, default: int = 0) -> int:
 
 def history_safe_status(value: str | None) -> str:
     value = str(value or "").strip()
-    return value if value in {"active", "stored", "closed"} else "closed"
+    return value if value in {"active", "stored", "closed", "cancelled"} else "closed"
 
 
 def history_effective_closed_date(order) -> str:
@@ -264,6 +410,21 @@ def history_effective_closed_date(order) -> str:
     )
     return str(value)[:10] if str(value or "").strip() else ""
 
+
+
+def history_closed_date_input_value(order) -> str:
+    """給歷史訂單編輯欄位使用：只使用真正 closed_at，不用 updated_at / created_at fallback。"""
+    return history_normalize_date(getattr(order, "closed_at", None))
+
+
+def history_should_update_closed_at(current_closed_at, submitted_closed_at: str) -> bool:
+    """只有使用者真的提交了結單日期，且和目前 closed_at 不同時，才更新 closed_at。"""
+    submitted = history_normalize_date(submitted_closed_at)
+    if not submitted:
+        return False
+
+    current = history_normalize_date(current_closed_at)
+    return submitted != current
 
 def history_normalize_date(value: str | None) -> str:
     """把 input type=date 的 YYYY-MM-DD 轉成可存進 SQLite 的 datetime 字串。"""
@@ -292,65 +453,82 @@ def history_normalize_date(value: str | None) -> str:
 def history_db_path() -> str:
     return str(Path.cwd() / "web_dashboard.db")
 
+def history_parse_worker_option(value: str) -> tuple[str, str]:
+    raw = str(value or "").strip()
+
+    if "|" in raw:
+        discord_id, role_type = raw.split("|", 1)
+        discord_id = discord_id.strip()
+        role_type = role_type.strip().lower()
+
+        if role_type not in {"worker", "companion"}:
+            role_type = "worker"
+
+        return discord_id, role_type
+
+    return raw, "worker"
+
+
 
 def history_staff_options() -> dict:
-    """從 Discord 同步成員表建立歷史訂單的人員下拉選項。"""
-    conn = sqlite3.connect(history_db_path())
-    conn.row_factory = sqlite3.Row
+    """歷史訂單頁可選人員。
 
+    workers：只要是護航或陪玩就顯示，同一人只顯示一次。
+    customer_services：客服獨立顯示。
+    """
     workers = {}
     customer_services = {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
 
     try:
         rows = conn.execute(
             """
             SELECT
                 discord_id,
-                username,
                 display_name,
-                global_name,
-                is_customer_service,
+                username,
                 is_worker,
                 is_companion,
+                is_customer_service,
                 is_active
             FROM web_staff_members
-            WHERE is_active = 1
-            ORDER BY display_name, global_name, username, discord_id
+            WHERE COALESCE(is_active, 1) = 1
+            ORDER BY display_name, username, discord_id
             """
         ).fetchall()
 
         for row in rows:
             discord_id = str(row["discord_id"] or "").strip()
-
             if not discord_id:
                 continue
 
-            display_name = (
+            name = (
                 str(row["display_name"] or "").strip()
-                or str(row["global_name"] or "").strip()
                 or str(row["username"] or "").strip()
                 or discord_id
             )
 
-            if discord_id == "demo_customer_service":
-                continue
+            is_customer_service = int(row["is_customer_service"] or 0) == 1
+            is_worker = int(row["is_worker"] or 0) == 1
+            is_companion = int(row["is_companion"] or 0) == 1
 
-            if display_name in {"測試客服", "demo_customer_service", "無"}:
-                continue
-
-            if int(row["is_customer_service"] or 0) == 1:
+            if is_customer_service:
                 customer_services[discord_id] = {
                     "id": discord_id,
-                    "name": display_name,
+                    "value": discord_id,
+                    "name": name,
+                    "role_type": "customer_service",
                 }
 
-            if int(row["is_worker"] or 0) == 1 or int(row["is_companion"] or 0) == 1:
-                role_type = "worker" if int(row["is_worker"] or 0) == 1 else "companion"
-
+            if is_worker or is_companion:
                 workers[discord_id] = {
                     "id": discord_id,
-                    "name": display_name,
-                    "role_type": role_type,
+                    "value": discord_id,
+                    "name": name,
+                    # 後端仍需要 role_type 時給 worker 當預設，不影響派單 embed 顯示。
+                    "role_type": "worker",
                 }
 
     finally:
@@ -446,7 +624,7 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
             result.setdefault(order_id, []).append(
                 {
                     "kind": "worker",
-                    "label": "打手",
+                    "label": "護航 / 陪玩",
                     "person_id": person_id,
                     "person_name": row["person_name"] or person_id,
                     "amount": int(row["amount"] or 0),
@@ -507,6 +685,54 @@ def fetch_history_payouts(order_ids: list[int]) -> dict[int, list[dict]]:
 
 
 
+
+
+
+def fetch_history_closed_dates(order_ids: list[int]) -> dict[int, str]:
+    """從 SQLite 直接抓 web_orders.closed_at；有值就回傳 YYYY-MM-DD。"""
+    clean_ids = []
+    for order_id in order_ids:
+        try:
+            order_id = int(order_id)
+        except Exception:
+            continue
+        if order_id > 0:
+            clean_ids.append(order_id)
+
+    if not clean_ids:
+        return {}
+
+    conn = sqlite3.connect(history_db_path())
+    conn.row_factory = sqlite3.Row
+
+    try:
+        columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(web_orders)").fetchall()
+        }
+
+        if "closed_at" not in columns:
+            return {}
+
+        placeholders = ",".join("?" for _ in clean_ids)
+        rows = conn.execute(
+            f"""
+            SELECT id, closed_at
+            FROM web_orders
+            WHERE id IN ({placeholders})
+            """,
+            clean_ids,
+        ).fetchall()
+
+        result = {}
+        for row in rows:
+            value = str(row["closed_at"] or "").strip()
+            if value:
+                result[int(row["id"])] = value[:10]
+
+        return result
+    finally:
+        conn.close()
 
 
 def build_customer_options_from_db():
@@ -848,7 +1074,7 @@ def apply_manual_payout_edits(form, order_ids: list[int]) -> None:
 
     # 回復已發放狀態。
     
-    # 客服選「無」或測試客服時，不計客服分潤
+    # 客服選「無」或測試客服時，不計魔丸♫客服分潤
     conn = sqlite3.connect(history_db_path())
     try:
         for order_id in order_ids:
@@ -963,7 +1189,9 @@ async def admin_order_history(
     message: str | None = None,
     error: str | None = None,
     customer: str | None = "",
+    page: int = 1,
 ):
+    month_filter = str(request.query_params.get("month") or "").strip()
     user = get_current_user(request)
 
     if not user:
@@ -984,7 +1212,7 @@ async def admin_order_history(
             name="no_access.html",
             context={
                 "title": "沒有權限",
-                "message": "你沒有總控後台權限。",
+                "message": "你沒有客服後台權限。",
                 "user": user,
             },
             status_code=403,
@@ -993,12 +1221,48 @@ async def admin_order_history(
     db = SessionLocal()
 
     try:
-        orders = list_history_orders(status_filter=status, keyword=keyword)
-        customer = request.query_params.get("customer", customer or "")
-        customer_options = build_customer_options_from_db()
-        orders = filter_orders_by_customer(orders, customer)
+        all_orders = list_history_orders(status_filter=status, keyword=keyword)
+        closed_dates_by_order_id = fetch_history_closed_dates([int(order.id) for order in all_orders])
+
+        if month_filter:
+            all_orders = [
+                order for order in all_orders
+                if str(closed_dates_by_order_id.get(int(order.id), "")).replace("/", "-").startswith(month_filter)
+            ]
+            closed_dates_by_order_id = {
+                int(order.id): closed_dates_by_order_id.get(int(order.id), "")
+                for order in all_orders
+            }
+
+        # 有結單日期就優先照結單日期新到舊；沒有才用 updated_at / created_at / id。
+        all_orders.sort(
+            key=lambda order: (
+                closed_dates_by_order_id.get(int(order.id), ""),
+                str(getattr(order, "updated_at", "") or ""),
+                str(getattr(order, "created_at", "") or ""),
+                int(getattr(order, "id", 0) or 0),
+            ),
+            reverse=True,
+        )
+
+        # 歷史訂單改成卷宗列表，不再依老闆分組。
+        per_page = 10
+        page = max(1, int(page or 1))
+        total_orders = len(all_orders)
+        total_pages = max(1, (total_orders + per_page - 1) // per_page)
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+        orders = all_orders[offset:offset + per_page]
+
+        customer = ""
+        customer_options = []
         customer_service_members = list_customer_service_members(db)
         worker_members = list_worker_members(db)
+
+        history_closed_count = sum(1 for order in all_orders if str(order.status) == OrderStatus.CLOSED.value)
+        history_stored_count = sum(1 for order in all_orders if str(order.status) == OrderStatus.STORED.value)
+        history_active_count = sum(1 for order in all_orders if str(order.status) == OrderStatus.ACTIVE.value)
+        history_total_amount = sum(int(getattr(order, "amount", 0) or 0) for order in all_orders)
 
         order_ids = [order.id for order in orders]
         customer_service_payouts_by_order: dict[int, list[CustomerServicePayout]] = {}
@@ -1024,16 +1288,32 @@ async def admin_order_history(
             "title": "歷史訂單",
             "user": user,
             "orders": orders,
-            "customer_groups": build_customer_groups(orders),
+            "customer_groups": [],
             "customer_options": customer_options,
             "customer": customer or "",
+            "page": page,
+            "per_page": per_page,
+            "total_orders": total_orders,
+            "total_pages": total_pages,
+            "history_closed_count": history_closed_count,
+            "history_stored_count": history_stored_count,
+            "history_active_count": history_active_count,
+            "history_total_amount": history_total_amount,
+            "closed_dates_by_order_id": closed_dates_by_order_id,
+            "has_prev_page": page > 1,
+            "has_next_page": page < total_pages,
+            "prev_page": max(1, page - 1),
+            "next_page": min(total_pages, page + 1),
             "history_staff_options": history_staff_options(),
             "history_effective_closed_date": history_effective_closed_date,
+            "history_closed_date_input_value": history_closed_date_input_value,
             "assignments_by_order_id": history_assignments_by_order([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "manual_payout_overrides": history_manual_payout_overrides([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "current_status": status,
+            "month_filter": month_filter,
+            "month_options": list_history_month_options(),
             "keyword": keyword or "",
             "message": message,
             "error": error,
@@ -1062,7 +1342,7 @@ async def history_set_customer_service(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1101,7 +1381,7 @@ async def history_add_worker(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1127,7 +1407,7 @@ async def history_add_worker(
     finally:
         db.close()
 
-    return redirect_to_history(message="已新增歷史訂單打手/陪玩，分潤已重新計算。")
+    return redirect_to_history(message="已新增歷史訂單護航 / 陪玩，分潤已重新計算。")
 
 
 @router.post("/admin/orders/history/assignments/{assignment_id}/named-bonus")
@@ -1139,7 +1419,7 @@ async def history_update_named_bonus(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1168,7 +1448,7 @@ async def history_remove_worker(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1185,7 +1465,7 @@ async def history_remove_worker(
     finally:
         db.close()
 
-    return redirect_to_history(message="已移除歷史訂單打手/陪玩，分潤已重新計算。")
+    return redirect_to_history(message="已移除歷史訂單護航 / 陪玩，分潤已重新計算。")
 
 
 @router.post("/admin/orders/history/{order_id}/manual-payout")
@@ -1200,7 +1480,7 @@ async def history_manual_payout(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1232,7 +1512,7 @@ async def history_set_worker_payout_status(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1244,7 +1524,7 @@ async def history_set_worker_payout_status(
     finally:
         db.close()
 
-    return redirect_to_history(message="打手/陪玩分潤狀態已更新。")
+    return redirect_to_history(message="護航 / 陪玩分潤狀態已更新。")
 
 
 @router.post("/admin/orders/history/customer-service-payouts/{payout_id}/status")
@@ -1256,7 +1536,7 @@ async def history_set_customer_service_payout_status(
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_history(error="你沒有總控後台權限，或登入狀態已過期。")
+        return redirect_to_history(error="你沒有客服後台權限，或登入狀態已過期。")
 
     db = SessionLocal()
 
@@ -1273,7 +1553,7 @@ async def history_set_customer_service_payout_status(
     finally:
         db.close()
 
-    return redirect_to_history(message="客服分潤狀態已更新。")
+    return redirect_to_history(message="魔丸♫魔丸♫客服分潤狀態已更新。")
 
 
 @router.post("/admin/orders/history/bulk-update")
@@ -1296,8 +1576,8 @@ async def bulk_update_order_history(request: Request):
     payout_status_snapshot = snapshot_payout_status(order_ids)
 
     staff_options = history_staff_options()
-    worker_name_map = {item["id"]: item["name"] for item in staff_options["workers"]}
-    worker_role_map = {item["id"]: item.get("role_type") or "worker" for item in staff_options["workers"]}
+    worker_name_map = {item.get("value") or item["id"]: item["name"] for item in staff_options["workers"]}
+    worker_role_map = {item.get("value") or item["id"]: item.get("role_type") or "worker" for item in staff_options["workers"]}
     cs_name_map = {item["id"]: item["name"] for item in staff_options["customer_services"]}
 
     conn = sqlite3.connect(history_db_path())
@@ -1310,7 +1590,17 @@ async def bulk_update_order_history(request: Request):
             item = str(form.get(f"item_{order_id}") or "").strip()
             amount = history_to_int(form.get(f"amount_{order_id}"), 0)
             status = history_safe_status(form.get(f"status_{order_id}"))
-            closed_at = history_normalize_date(form.get(f"closed_date_{order_id}"))
+            submitted_closed_at = history_normalize_date(form.get(f"closed_date_{order_id}"))
+
+            original_row = conn.execute(
+                "SELECT closed_at FROM web_orders WHERE id = ?",
+                (order_id,),
+            ).fetchone()
+
+            original_closed_at = history_normalize_date(original_row[0]) if original_row else ""
+            should_update_closed_at = bool(
+                submitted_closed_at and submitted_closed_at != original_closed_at
+            )
 
             cs_id = str(form.get(f"customer_service_{order_id}") or "").strip()
             cs_name = cs_name_map.get(cs_id, "") if cs_id else ""
@@ -1327,7 +1617,7 @@ async def bulk_update_order_history(request: Request):
                     item = ?,
                     amount = ?,
                     status = ?,
-                    closed_at = COALESCE(NULLIF(?, ''), closed_at),
+                    closed_at = CASE WHEN ? THEN ? ELSE closed_at END,
                     updated_at = datetime('now')
                 WHERE id = ?
                 """,
@@ -1340,7 +1630,8 @@ async def bulk_update_order_history(request: Request):
                     item,
                     amount,
                     status,
-                    closed_at,
+                    1 if should_update_closed_at else 0,
+                    submitted_closed_at,
                     order_id,
                 ),
             )
@@ -1349,6 +1640,8 @@ async def bulk_update_order_history(request: Request):
             for assignment_id_text in form.getlist(f"assignment_id_{order_id}"):
                 assignment_id = history_to_int(assignment_id_text)
                 selected_worker_id = str(form.get(f"assignment_worker_{assignment_id}") or "").strip()
+
+                selected_worker_id, parsed_role_type = history_parse_worker_option(selected_worker_id)
                 delete_flag = str(form.get(f"delete_assignment_{assignment_id}") or "").strip() == "1"
                 named_bonus = 1 if str(form.get(f"assignment_named_bonus_{assignment_id}") or "").strip() == "1" else 0
 
@@ -1399,12 +1692,25 @@ async def bulk_update_order_history(request: Request):
                 ).fetchall()
             }
 
-            for index in range(1, 4):
-                new_worker_id = str(form.get(f"new_worker_{order_id}_{index}") or "").strip()
+            for index in range(0, 3):
+                raw_new_worker_id = str(form.get(f"new_worker_{order_id}_{index}") or "").strip()
+                new_worker_id, parsed_role_type = history_parse_worker_option(raw_new_worker_id)
                 new_named_bonus = 1 if str(form.get(f"new_worker_named_bonus_{order_id}_{index}") or "").strip() == "1" else 0
 
                 if not new_worker_id or new_worker_id in existing_active:
                     continue
+
+                worker_display_name = (
+                    worker_name_map.get(raw_new_worker_id)
+                    or worker_name_map.get(new_worker_id)
+                    or new_worker_id
+                )
+                worker_role_type = (
+                    parsed_role_type
+                    or worker_role_map.get(raw_new_worker_id)
+                    or worker_role_map.get(new_worker_id)
+                    or "worker"
+                )
 
                 conn.execute(
                     """
@@ -1422,8 +1728,8 @@ async def bulk_update_order_history(request: Request):
                     (
                         order_id,
                         new_worker_id,
-                        worker_name_map.get(new_worker_id, new_worker_id),
-                        worker_role_map.get(new_worker_id, "worker"),
+                        worker_display_name,
+                        worker_role_type,
                         new_named_bonus,
                     ),
                 )

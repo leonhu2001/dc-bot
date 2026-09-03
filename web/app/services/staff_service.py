@@ -5,13 +5,36 @@ import requests
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from shared.db import SessionLocal
 from shared.staff_models import WebStaffMember
 from web.app.config import config
+from web.app.services.role_catalog import (
+    CUSTOMER_SERVICE_ROLE_ID,
+    COMPANION_ROLE_IDS,
+    PROTECTOR_ROLE_IDS,
+    RECEIVER_ROLE_IDS,
+    is_companion as catalog_is_companion,
+    is_customer_service as catalog_is_customer_service,
+    is_protector,
+    normalize_role_ids,
+)
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
 
-WORKER_ROLE_ID = "1503701170504339458"
-COMPANION_ROLE_ID = "1503706721883783218"
+WORKER_ROLE_IDS = {
+    "1500234130871550004",
+    "1500234170943934544",
+    "1500751039060643990",
+}
+COMPANION_ROLE_IDS = {
+    "1500751059239440575",
+    "1482080315798192210",
+}
+
+# 舊變數保留相容用，實際分類使用上面的 set。
+WORKER_ROLE_ID = next(iter(WORKER_ROLE_IDS))
+COMPANION_ROLE_ID = next(iter(COMPANION_ROLE_IDS))
+
 
 
 def get_staff_display_name(member: WebStaffMember) -> str:
@@ -65,19 +88,15 @@ def list_companion_members(db: Session) -> list[WebStaffMember]:
 
 
 def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
-    role_set = {str(role_id) for role_id in role_ids}
+    role_set = normalize_role_ids(role_ids)
 
-    customer_service_role_ids = {
-        str(role_id)
-        for role_id in (
-            getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
-            or getattr(config, "ADMIN_ROLE_IDS", set())
-        )
-    }
+    customer_service_role_ids = normalize_role_ids(
+        getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
+    )
 
-    is_customer_service = bool(role_set & customer_service_role_ids)
-    is_worker = WORKER_ROLE_ID in role_set
-    is_companion = COMPANION_ROLE_ID in role_set
+    is_customer_service = catalog_is_customer_service(role_set, customer_service_role_ids)
+    is_worker = is_protector(role_set) or catalog_is_companion(role_set)
+    is_companion = catalog_is_companion(role_set)
 
     return is_customer_service, is_worker, is_companion
 
@@ -119,98 +138,137 @@ def upsert_staff_member(
     return member
 
 
-def sync_staff_members_from_discord(db: Session) -> dict:
-    if not config.DISCORD_BOT_TOKEN:
-        raise RuntimeError("DISCORD_BOT_TOKEN is not configured")
+def sync_staff_members_from_discord(db=None) -> dict:
+    owns_session = db is None
 
-    if not config.DISCORD_GUILD_ID:
-        raise RuntimeError("DISCORD_GUILD_ID is not configured")
+    if owns_session:
+        db = SessionLocal()
 
-    customer_service_role_ids = {
-        str(role_id)
-        for role_id in (
-            getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
-            or getattr(config, "ADMIN_ROLE_IDS", set())
-        )
-    }
-    all_target_role_ids = customer_service_role_ids | {WORKER_ROLE_ID, COMPANION_ROLE_ID}
+    guild_id = getattr(config, "DISCORD_GUILD_ID", None) or getattr(config, "GUILD_ID", None)
+    bot_token = getattr(config, "DISCORD_BOT_TOKEN", None)
 
-    synced_at = datetime.utcnow()
+    if not guild_id:
+        raise RuntimeError("DISCORD_GUILD_ID / GUILD_ID 未設定")
+
+    if not bot_token:
+        raise RuntimeError("DISCORD_BOT_TOKEN 未設定")
+
+    customer_service_role_ids = normalize_role_ids(
+        getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
+    )
+
+    if not customer_service_role_ids:
+        customer_service_role_ids = {CUSTOMER_SERVICE_ROLE_ID}
+
+    headers = {"Authorization": f"Bot {bot_token}"}
+
+    members = []
     after = "0"
-    total_seen = 0
-    synced_count = 0
-    synced_ids: set[str] = set()
 
     while True:
         response = requests.get(
-            f"{DISCORD_API_BASE}/guilds/{config.DISCORD_GUILD_ID}/members",
-            headers={"Authorization": f"Bot {config.DISCORD_BOT_TOKEN}"},
+            f"https://discord.com/api/v10/guilds/{guild_id}/members",
+            headers=headers,
             params={"limit": 1000, "after": after},
             timeout=30,
         )
 
         if response.status_code != 200:
-            raise RuntimeError(f"Discord member sync failed: {response.status_code} {response.text}")
+            raise RuntimeError(f"Discord API 抓成員失敗：{response.status_code} {response.text[:500]}")
 
-        members = response.json()
+        batch = response.json()
 
-        if not members:
+        if not batch:
             break
 
-        for member_data in members:
-            total_seen += 1
-            user_data = member_data.get("user") or {}
-            discord_id = str(user_data.get("id") or "")
+        members.extend(batch)
+        after = str(batch[-1]["user"]["id"])
 
-            if not discord_id:
-                continue
+        if len(batch) < 1000:
+            break
 
-            role_ids = [str(role_id) for role_id in member_data.get("roles", [])]
-            role_set = set(role_ids)
+    now = datetime.now()
+    scanned = len(members)
+    written = 0
+    active_ids = set()
 
-            if not (role_set & all_target_role_ids):
-                continue
+    existing_members = {
+        str(member.discord_id): member
+        for member in db.scalars(select(WebStaffMember)).all()
+    }
 
-            display_name = (
-                member_data.get("nick")
-                or user_data.get("global_name")
-                or user_data.get("username")
-                or discord_id
-            )
+    for guild_member in members:
+        user = guild_member.get("user") or {}
+        discord_id = str(user.get("id") or "").strip()
 
-            upsert_staff_member(
-                db,
+        if not discord_id:
+            continue
+
+        role_ids = normalize_role_ids(guild_member.get("roles", []))
+
+        is_customer_service = bool(role_ids & customer_service_role_ids)
+        is_receiver = bool(role_ids & RECEIVER_ROLE_IDS)
+        is_companion = bool(role_ids & COMPANION_ROLE_IDS)
+
+        # 網頁只收客服與五個新接單身分組。
+        if not (is_customer_service or is_receiver or is_companion):
+            continue
+
+        active_ids.add(discord_id)
+
+        member = existing_members.get(discord_id)
+
+        if member is None:
+            member = WebStaffMember(
                 discord_id=discord_id,
-                username=user_data.get("username"),
-                display_name=display_name,
-                global_name=user_data.get("global_name"),
-                avatar=user_data.get("avatar"),
-                role_ids=role_ids,
-                synced_at=synced_at,
+                created_at=now,
             )
+            db.add(member)
+            existing_members[discord_id] = member
 
-            synced_ids.add(discord_id)
-            synced_count += 1
+        member.username = user.get("username")
+        member.display_name = guild_member.get("nick") or user.get("global_name") or user.get("username")
+        member.global_name = user.get("global_name")
+        member.avatar = user.get("avatar")
+        member.roles_json = json.dumps(sorted(role_ids), ensure_ascii=False)
+        member.is_customer_service = is_customer_service
+        member.is_worker = is_receiver
+        member.is_companion = is_companion
+        member.is_active = True
+        member.last_synced_at = now
 
-        after = str((members[-1].get("user") or {}).get("id") or after)
+        written += 1
 
-        if len(members) < 1000:
-            break
+    # 只有原本就在名單、但現在已經沒有客服或五個新接單身分組的人，才停用。
+    for discord_id, member in existing_members.items():
+        if discord_id in active_ids:
+            continue
 
-    existing_members = list(db.scalars(select(WebStaffMember)).all())
-    disabled_count = 0
+        try:
+            role_ids = normalize_role_ids(json.loads(member.roles_json or "[]"))
+        except Exception:
+            role_ids = set()
 
-    for member in existing_members:
-        if member.discord_id not in synced_ids:
-            if member.is_active:
-                disabled_count += 1
+        still_allowed = bool(
+            role_ids & customer_service_role_ids
+            or role_ids & RECEIVER_ROLE_IDS
+            or role_ids & COMPANION_ROLE_IDS
+        )
+
+        if not still_allowed:
+            member.is_customer_service = False
+            member.is_worker = False
+            member.is_companion = False
             member.is_active = False
-            member.last_synced_at = synced_at
 
-    db.commit()
+    if owns_session:
+        db.commit()
+        db.close()
 
     return {
-        "total_seen": total_seen,
-        "synced_count": synced_count,
-        "disabled_count": disabled_count,
+        "scanned": scanned,
+        "written": written,
+        "total_seen": scanned,
+        "synced_count": written,
+        "message": f"成員同步完成：掃描 {scanned} 人，寫入 {written} 人。",
     }

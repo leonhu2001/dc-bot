@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
@@ -273,7 +273,7 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
                 customer_name=row["customer_name"],
                 category=row["category"],
                 item=row["item"],
-                role_label="打手",
+                role_label="護航 / 陪玩",
                 payout_status=row["payout_status"],
                 amount=row["amount"],
             )
@@ -330,11 +330,11 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
     roles = person.pop("roles", set())
 
     if roles == {"worker"}:
-        person["role_label"] = "打手"
+        person["role_label"] = "護航 / 陪玩"
     elif roles == {"customer_service"}:
         person["role_label"] = "客服"
     elif roles:
-        person["role_label"] = "總控 / 客服 打手"
+        person["role_label"] = "總控 / 客服 / 護航"
 
     person["items"].sort(key=lambda item: str(item.get("closed_date") or ""), reverse=True)
 

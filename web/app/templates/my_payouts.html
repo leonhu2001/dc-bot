@@ -1,14 +1,91 @@
-﻿{% extends "layout.html" %}
+{# MAWAN_PORTAL_UNIFIED_20260903_V1 PAYOUTS #}
+{% extends "layout.html" %}
+{% from "_discord_avatar.html" import discord_avatar %}
 
-{% block page_title %}我的分潤{% endblock %}
+{% block page_title %}完整薪資{% endblock %}
 
 {% block content %}
 <style>
+.my-payout-page {
+    display: grid;
+    gap: 18px;
+}
+
+.my-payout-command {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(420px, .9fr);
+    gap: 16px;
+    align-items: stretch;
+}
+
+.my-payout-card {
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
+}
+
+.my-payout-intro {
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+}
+
+.my-payout-intro::after {
+    content: "PAYOUT";
+    position: absolute;
+    right: 18px;
+    bottom: 10px;
+    color: rgba(255,255,255,.045);
+    font-size: 76px;
+    font-weight: 950;
+    letter-spacing: .16em;
+    pointer-events: none;
+}
+
+.my-payout-intro .order-no {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .16em;
+}
+
+.my-payout-intro h2 {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 8px;
+    font-size: 30px;
+    letter-spacing: .08em;
+}
+
+.my-payout-intro p {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: var(--mw-muted, #a7a0b5);
+    line-height: 1.8;
+}
+
+.my-payout-filter-card {
+    padding: 18px;
+}
+
 .my-payout-filter {
     display: grid;
-    grid-template-columns: 180px 180px auto auto;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
-    align-items: end;
+}
+
+.my-payout-filter .button,
+.my-payout-filter .input,
+.my-payout-filter select {
+    min-height: 42px;
+}
+
+.my-payout-filter .button {
+    width: 100%;
+    justify-content: center;
 }
 
 .my-payout-total-grid {
@@ -18,29 +95,87 @@
 }
 
 .my-payout-total-card {
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 14px;
-    background: rgba(2, 6, 23, 0.32);
-    padding: 14px;
+    position: relative;
+    overflow: hidden;
+    min-height: 118px;
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 22px;
+    background:
+        radial-gradient(circle at 92% 15%, rgba(245,198,107,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+    padding: 18px;
+}
+
+.my-payout-total-card.due {
+    border-color: rgba(255, 107, 138, .22);
+    background:
+        radial-gradient(circle at 92% 15%, rgba(255,107,138,.18), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
+}
+
+.my-payout-total-card.paid {
+    border-color: rgba(117, 232, 255, .22);
+    background:
+        radial-gradient(circle at 92% 15%, rgba(117,232,255,.16), transparent 32%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94);
 }
 
 .my-payout-total-card span {
     display: block;
-    color: #9ca3af;
+    color: var(--mw-muted, #a7a0b5);
     font-size: 13px;
-    margin-bottom: 6px;
+    font-weight: 900;
+    margin-bottom: 10px;
 }
 
 .my-payout-total-card strong {
     display: block;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 34px;
+    line-height: 1;
+    font-weight: 950;
+}
+
+.payout-summary-list-section {
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 24px !important;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(8, 11, 19, .94) !important;
+    box-shadow: 0 24px 68px rgba(0,0,0,.28) !important;
+}
+
+.summary-list-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.summary-list-title {
+    margin: 0;
     font-size: 24px;
-    line-height: 1.1;
+    letter-spacing: .08em;
+}
+
+.summary-list-badge {
+    border: 1px solid rgba(245,198,107,.24);
+    border-radius: 999px;
+    background: rgba(245,198,107,.08);
+    color: #ffe3a3;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 950;
 }
 
 .summary-person-card {
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 16px;
-    background: rgba(15, 23, 42, 0.66);
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 22px;
+    background: rgba(255,255,255,.028);
     padding: 16px;
     margin-top: 14px;
 }
@@ -50,34 +185,42 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 16px;
     align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
 .summary-person-title {
     display: flex;
     align-items: center;
     gap: 14px;
+    min-width: 0;
 }
 
 .summary-avatar {
-    width: 42px;
-    height: 42px;
+    width: 46px;
+    height: 46px;
     border-radius: 999px;
     display: grid;
     place-items: center;
-    border: 1px solid rgba(99, 102, 241, 0.75);
-    background: rgba(99, 102, 241, 0.28);
-    color: #ffffff;
-    font-weight: 800;
+    border: 1px solid rgba(245,198,107,.36);
+    background: rgba(245,198,107,.12);
+    color: #ffe3a3;
+    font-weight: 950;
+    flex: 0 0 auto;
 }
 
 .summary-name {
     margin: 0;
+    font-size: 20px;
+    line-height: 1.35;
+    word-break: break-word;
 }
 
 .summary-id {
-    color: #9ca3af;
+    color: var(--mw-muted, #a7a0b5);
     margin: 4px 0 0;
     font-size: 13px;
+    word-break: break-all;
 }
 
 .summary-person-meta {
@@ -88,75 +231,103 @@
 }
 
 .summary-pill {
-    min-width: 90px;
-    border-radius: 12px;
-    background: rgba(2, 6, 23, 0.42);
-    padding: 10px 12px;
+    min-width: 110px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.04);
+    padding: 11px 13px;
     text-align: right;
 }
 
 .summary-pill span {
     display: block;
-    color: #9ca3af;
+    color: var(--mw-muted, #a7a0b5);
     font-size: 12px;
+    font-weight: 800;
 }
 
 .summary-pill strong {
     display: block;
-    font-size: 20px;
+    margin-top: 4px;
+    font-size: 22px;
+    color: var(--mw-gold, #f5c66b);
 }
 
 .summary-items {
-    margin-top: 16px;
+    margin-top: 14px;
     overflow-x: auto;
 }
 
 .summary-table {
     width: 100%;
-    border-collapse: collapse;
+    min-width: 900px;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 14px;
 }
 
 .summary-table th,
 .summary-table td {
-    padding: 10px 8px;
-    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    padding: 11px 10px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
     text-align: left;
     white-space: nowrap;
 }
 
 .summary-table th {
-    color: #93c5fd;
+    color: var(--mw-gold, #f5c66b);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 950;
+    letter-spacing: .08em;
+    background: rgba(255,255,255,.025);
+}
+
+.summary-table tbody tr:hover td {
+    background: rgba(245,198,107,.045);
+}
+
+.summary-status-paid,
+.summary-status-unpaid {
+    display: inline-flex;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 12px;
+    font-weight: 950;
 }
 
 .summary-status-paid {
-    color: #34d399;
-    font-weight: 800;
+    border: 1px solid rgba(114, 242, 166, .32);
+    background: rgba(114, 242, 166, .1);
+    color: #d9ffe8;
 }
 
 .summary-status-unpaid {
-    color: #22d3ee;
-    font-weight: 800;
+    border: 1px solid rgba(117, 232, 255, .32);
+    background: rgba(117, 232, 255, .09);
+    color: #c9f8ff;
 }
 
 .summary-empty {
-    border: 1px dashed rgba(148, 163, 184, 0.28);
-    border-radius: 14px;
-    padding: 18px;
-    color: #9ca3af;
+    border: 1px dashed rgba(255,255,255,.16);
+    border-radius: 18px;
+    padding: 20px;
+    color: var(--mw-muted, #a7a0b5);
+    background: rgba(255,255,255,.025);
 }
 
-@media (max-width: 900px) {
-    .my-payout-filter {
+@media (max-width: 1100px) {
+    .my-payout-command {
         grid-template-columns: 1fr;
     }
 
     .my-payout-total-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+}
 
+@media (max-width: 720px) {
+    .my-payout-filter,
+    .my-payout-total-grid,
     .summary-person-head {
         grid-template-columns: 1fr;
     }
@@ -169,144 +340,162 @@
         text-align: left;
     }
 }
+
+.summary-avatar {
+    overflow: hidden;
+}
+
+.summary-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
 </style>
 
-<section class="panel">
-    <div class="section-title-row">
-        <div>
+<div class="my-payout-page">
+    <section class="my-payout-command">
+        <div class="my-payout-card my-payout-intro">
             <p class="order-no">MY PAYOUTS</p>
-            <h2>我的分潤</h2>
-            <p class="muted-text">依未發放 / 已發放分類顯示，排列方式與人員總表一致。</p>
+            <h2>完整薪資明細</h2>
+            <p>依月份與發放狀態查看個人分潤，未發放與已發放分開整理，方便對帳。</p>
         </div>
-    </div>
-</section>
 
-<section class="panel">
-    <form method="get" action="/my/payouts" class="filter-form my-payout-filter">
-        <select class="input" name="month">
-            <option value="" {% if not month %}selected{% endif %}>全部月份</option>
-            {% for option in month_options %}
-                <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
-            {% endfor %}
-        </select>
+        <div class="my-payout-card my-payout-filter-card">
+            <form method="get" action="/my/payouts" class="filter-form my-payout-filter">
+                <select class="input" name="month">
+                    <option value="" {% if not month %}selected{% endif %}>全部月份</option>
+                    {% for option in month_options %}
+                        <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
 
-        <select class="input" name="status">
-            <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
-            <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>未發放</option>
-            <option value="paid" {% if status == "paid" %}selected{% endif %}>已發放</option>
-        </select>
+                <select class="input" name="status">
+                    <option value="all" {% if status == "all" %}selected{% endif %}>全部狀態</option>
+                    <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>未發放</option>
+                    <option value="paid" {% if status == "paid" %}selected{% endif %}>已發放</option>
+                </select>
 
-        <button class="button" type="submit">套用篩選</button>
-        <a class="button secondary" href="/my/payouts">清除</a>
-    </form>
-</section>
+                <button class="button" type="submit">套用篩選</button>
+                <a class="button secondary" href="/my/payouts">清除</a>
+            </form>
+        </div>
+    </section>
 
-<section class="panel">
-    <div class="my-payout-total-grid">
-        <div class="my-payout-total-card">
+    <section class="my-payout-total-grid">
+        <div class="my-payout-total-card due">
             <span>未發放總額</span>
             <strong>{{ summary.unpaid_total|round(0, 'common')|int }}T</strong>
         </div>
-        <div class="my-payout-total-card">
+        <div class="my-payout-total-card due">
             <span>未發放筆數</span>
             <strong>{{ summary.unpaid_count }}</strong>
         </div>
-        <div class="my-payout-total-card">
+        <div class="my-payout-total-card paid">
             <span>已發放總額</span>
             <strong>{{ summary.paid_total|round(0, 'common')|int }}T</strong>
         </div>
-        <div class="my-payout-total-card">
+        <div class="my-payout-total-card paid">
             <span>已發放筆數</span>
             <strong>{{ summary.paid_count }}</strong>
         </div>
-    </div>
-</section>
+    </section>
 
-{% macro person_card(row, list_status) %}
-<article class="summary-person-card">
-    <div class="summary-person-head">
-        <div class="summary-person-title">
-            <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
-            <div>
-                <p class="order-no">{{ row.role_label }}</p>
-                <h3 class="summary-name">{{ row.display_name }}</h3>
-                <p class="summary-id">ID：{{ row.discord_id }}</p>
+    {% macro person_card(row, list_status) %}
+    <article class="summary-person-card">
+        <div class="summary-person-head">
+            <div class="summary-person-title">
+                <div class="summary-avatar">{{ discord_avatar(row.discord_id, row.display_name, 128, "summary-avatar-img") }}</div>
+                <div>
+                    <p class="order-no">{{ row.role_label }}</p>
+                    <h3 class="summary-name">{{ row.display_name }}</h3>
+                    <p class="summary-id">ID：{{ row.discord_id }}</p>
+                </div>
+            </div>
+
+            <div class="summary-person-meta">
+                <div class="summary-pill">
+                    <span>{% if list_status == "paid" %}已發放{% else %}未發放{% endif %}</span>
+                    <strong>{% if list_status == "paid" %}{{ row.paid_total|round(0, 'common')|int }}{% else %}{{ row.unpaid_total|round(0, 'common')|int }}{% endif %}T</strong>
+                </div>
+                <div class="summary-pill">
+                    <span>筆數</span>
+                    <strong>{% if list_status == "paid" %}{{ row.paid_count }}{% else %}{{ row.unpaid_count }}{% endif %}</strong>
+                </div>
             </div>
         </div>
-        <div class="summary-person-meta">
-            <div class="summary-pill">
-                <span>{% if list_status == "paid" %}已發放{% else %}未發放{% endif %}</span>
-                <strong>{% if list_status == "paid" %}{{ row.paid_total|round(0, 'common')|int }}{% else %}{{ row.unpaid_total|round(0, 'common')|int }}{% endif %}T</strong>
-            </div>
-            <div class="summary-pill">
-                <span>筆數</span>
-                <strong>{% if list_status == "paid" %}{{ row.paid_count }}{% else %}{{ row.unpaid_count }}{% endif %}</strong>
-            </div>
+
+        <div class="summary-items">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>訂單</th>
+                        <th>結單日期</th>
+                        <th>老闆名稱</th>
+                        <th>項目</th>
+                        <th>身分</th>
+                        <th>狀態</th>
+                        <th>金額</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in row["items"] %}
+                        {% if item.payout_status == list_status %}
+                            <tr>
+                                <td>{{ item.order_no }}</td>
+                                <td>{{ item.closed_date }}</td>
+                                <td>{{ item.customer_name }}</td>
+                                <td>{{ item.category }}｜{{ item.item }}</td>
+                                <td>{{ item.role }}</td>
+                                <td>
+                                    {% if item.payout_status == "paid" %}
+                                        <span class="summary-status-paid">已發放</span>
+                                    {% else %}
+                                        <span class="summary-status-unpaid">未發放</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.amount|round(0, 'common')|int }}T</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
+    </article>
+    {% endmacro %}
 
-    <div class="summary-items">
-        <table class="summary-table">
-            <thead>
-                <tr>
-                    <th>訂單</th>
-                    <th>結單日期</th>
-                    <th>老闆名稱</th>
-                    <th>項目</th>
-                    <th>身份</th>
-                    <th>狀態</th>
-                    <th>金額</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in row["items"] %}
-                    {% if item.payout_status == list_status %}
-                        <tr>
-                            <td>{{ item.order_no }}</td>
-                            <td>{{ item.closed_date }}</td>
-                            <td>{{ item.customer_name }}</td>
-                            <td>{{ item.category }}｜{{ item.item }}</td>
-                            <td>{{ item.role }}</td>
-                            <td>
-                                {% if item.payout_status == "paid" %}
-                                    <span class="summary-status-paid">已發放</span>
-                                {% else %}
-                                    <span class="summary-status-unpaid">未發放</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ item.amount|round(0, 'common')|int }}T</td>
-                        </tr>
-                    {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</article>
-{% endmacro %}
+    {% if status in ["all", "unpaid"] %}
+    <section class="panel payout-summary-list-section">
+        <div class="summary-list-head">
+            <h2 class="summary-list-title">未發放明細</h2>
+            <span class="summary-list-badge">{{ summary.unpaid_count }} 筆</span>
+        </div>
 
-{% if status in ["all", "unpaid"] %}
-<section class="panel payout-summary-list-section">
-    <h2 class="summary-list-title">未發放明細</h2>
-    {% if summary_unpaid_rows %}
-        {% for row in summary_unpaid_rows %}
-            {{ person_card(row, "unpaid") }}
-        {% endfor %}
-    {% else %}
-        <div class="summary-empty">目前沒有未發放分潤。</div>
+        {% if summary_unpaid_rows %}
+            {% for row in summary_unpaid_rows %}
+                {{ person_card(row, "unpaid") }}
+            {% endfor %}
+        {% else %}
+            <div class="summary-empty">目前沒有未發放分潤。</div>
+        {% endif %}
+    </section>
     {% endif %}
-</section>
-{% endif %}
 
-{% if status in ["all", "paid"] %}
-<section class="panel payout-summary-list-section">
-    <h2 class="summary-list-title">已發放明細</h2>
-    {% if summary_paid_rows %}
-        {% for row in summary_paid_rows %}
-            {{ person_card(row, "paid") }}
-        {% endfor %}
-    {% else %}
-        <div class="summary-empty">目前沒有已發放分潤。</div>
+    {% if status in ["all", "paid"] %}
+    <section class="panel payout-summary-list-section">
+        <div class="summary-list-head">
+            <h2 class="summary-list-title">已發放明細</h2>
+            <span class="summary-list-badge">{{ summary.paid_count }} 筆</span>
+        </div>
+
+        {% if summary_paid_rows %}
+            {% for row in summary_paid_rows %}
+                {{ person_card(row, "paid") }}
+            {% endfor %}
+        {% else %}
+            <div class="summary-empty">目前沒有已發放分潤。</div>
+        {% endif %}
+    </section>
     {% endif %}
-</section>
-{% endif %}
+</div>
 {% endblock %}

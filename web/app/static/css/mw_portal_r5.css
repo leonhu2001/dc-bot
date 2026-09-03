@@ -1,0 +1,3394 @@
+
+/* MAWAN_R5R1_VISUAL_FINAL */
+
+:root {
+
+    --r5-bg:
+        #080807;
+
+    --r5-panel:
+        #11110f;
+
+    --r5-line:
+        rgba(
+            255,
+            255,
+            255,
+            .09
+        );
+
+    --r5-gold:
+        #dfb75c;
+
+    --r5-gold-soft:
+        #f0d28b;
+
+    --r5-text:
+        #f2efe8;
+
+    --r5-muted:
+        #a09b91;
+
+    --r5-side:
+        184px;
+
+    --r5-font:
+        Inter,
+        "Noto Sans TC",
+        "Microsoft JhengHei",
+        system-ui,
+        sans-serif;
+}
+
+
+/* ==========================================================
+   BASE
+   ========================================================== */
+
+body.mw-r5-layout,
+body.mw-r5-admin,
+body.mw-r5-employee {
+
+    margin:
+        0 !important;
+
+    min-height:
+        100vh;
+
+    color:
+        var(
+            --r5-text
+        ) !important;
+
+    background:
+        radial-gradient(
+            circle at 80% -12%,
+            rgba(
+                223,
+                183,
+                92,
+                .06
+            ),
+            transparent 32%
+        ),
+        var(
+            --r5-bg
+        ) !important;
+
+    font-family:
+        var(
+            --r5-font
+        ) !important;
+
+    font-size:
+        14px !important;
+
+    font-weight:
+        500 !important;
+
+    line-height:
+        1.55 !important;
+}
+
+
+body.mw-r5-layout *,
+body.mw-r5-admin *,
+body.mw-r5-employee * {
+
+    box-sizing:
+        border-box;
+
+    font-family:
+        var(
+            --r5-font
+        ) !important;
+}
+
+
+/* ==========================================================
+   SHELL
+   ========================================================== */
+
+.mw-r5-shell {
+
+    width:
+        100%;
+
+    min-height:
+        100vh;
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        var(
+            --r5-side
+        )
+        minmax(
+            0,
+            1fr
+        ) !important;
+
+    background:
+        transparent !important;
+}
+
+
+/* ==========================================================
+   SIDEBAR
+   ========================================================== */
+
+.mw-r5-sidebar {
+
+    position:
+        sticky;
+
+    top:
+        0;
+
+    z-index:
+        50;
+
+    height:
+        100vh;
+
+    padding:
+        20px 12px;
+
+    border-right:
+        1px solid
+        var(
+            --r5-line
+        );
+
+    background:
+        #070706;
+}
+
+
+.mw-r5-brand {
+
+    padding:
+        0 10px 24px;
+}
+
+
+.mw-r5-brand small {
+
+    display:
+        block;
+
+    color:
+        var(
+            --r5-gold
+        );
+
+    font-size:
+        10px !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        .14em;
+}
+
+
+.mw-r5-brand strong {
+
+    display:
+        block;
+
+    margin-top:
+        7px;
+
+    color:
+        var(
+            --r5-text
+        );
+
+    font-size:
+        20px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+.mw-r5-nav {
+
+    display:
+        grid;
+
+    gap:
+        5px;
+}
+
+
+.mw-r5-nav a {
+
+    min-height:
+        40px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    padding:
+        0 11px;
+
+    border:
+        1px solid
+        transparent;
+
+    border-radius:
+        9px;
+
+    color:
+        #9d988e !important;
+
+    background:
+        transparent !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        700 !important;
+
+    text-decoration:
+        none !important;
+}
+
+
+.mw-r5-nav a:hover,
+.mw-r5-nav a.active {
+
+    color:
+        var(
+            --r5-gold-soft
+        ) !important;
+
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .25
+        );
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .07
+        ) !important;
+}
+
+
+/* ==========================================================
+   MAIN / HEADER
+   ========================================================== */
+
+.mw-r5-main-host {
+
+    min-width:
+        0;
+
+    width:
+        100%;
+
+    padding:
+        30px 32px 52px !important;
+
+    background:
+        transparent !important;
+}
+
+
+.mw-r5-page-header {
+
+    min-height:
+        98px;
+
+    margin:
+        0 0 20px !important;
+
+    padding:
+        0 !important;
+
+    display:
+        block !important;
+
+    background:
+        transparent !important;
+
+    border:
+        0 !important;
+}
+
+
+.mw-r5-kicker,
+.mw-r5-page-header .eyebrow {
+
+    margin:
+        0 !important;
+
+    color:
+        var(
+            --r5-gold
+        ) !important;
+
+    font-size:
+        10px !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        .15em !important;
+}
+
+
+.mw-r5-page-header h1,
+.mw-r5-page-title {
+
+    margin:
+        8px 0 0 !important;
+
+    color:
+        var(
+            --r5-text
+        ) !important;
+
+    font-size:
+        36px !important;
+
+    font-weight:
+        800 !important;
+
+    line-height:
+        1.08 !important;
+}
+
+
+.mw-r5-page-header p,
+.mw-r5-current-user {
+
+    max-width:
+        820px;
+
+    margin:
+        9px 0 0 !important;
+
+    color:
+        var(
+            --r5-muted
+        ) !important;
+
+    font-size:
+        13px !important;
+}
+
+
+.mw-r5-content {
+
+    display:
+        grid;
+
+    gap:
+        14px;
+
+    min-width:
+        0;
+}
+
+
+/* ==========================================================
+   LEGACY STANDALONE CONTENT
+   ========================================================== */
+
+.mw-r5-legacy-body {
+
+    min-width:
+        0;
+}
+
+
+.mw-r5-legacy-body > .shell {
+
+    display:
+        block !important;
+
+    min-height:
+        0 !important;
+
+    width:
+        100% !important;
+
+    grid-template-columns:
+        1fr !important;
+
+    background:
+        transparent !important;
+}
+
+
+.mw-r5-legacy-body .sidebar {
+
+    display:
+        none !important;
+}
+
+
+.mw-r5-legacy-body .main {
+
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+
+    margin:
+        0 !important;
+
+    padding:
+        0 !important;
+
+    background:
+        transparent !important;
+}
+
+
+/* ==========================================================
+   TYPOGRAPHY
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    p,
+    li,
+    td,
+    label
+),
+body.mw-r5-admin
+:is(
+    p,
+    li,
+    td,
+    label
+),
+body.mw-r5-employee
+:is(
+    p,
+    li,
+    td,
+    label
+) {
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+body.mw-r5-layout small,
+body.mw-r5-admin small,
+body.mw-r5-employee small {
+
+    font-size:
+        12.5px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+body.mw-r5-layout
+:is(
+    h2,
+    .section-title
+),
+body.mw-r5-admin
+:is(
+    h2,
+    .section-title
+),
+body.mw-r5-employee
+:is(
+    h2,
+    .section-title
+) {
+
+    font-size:
+        19px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+body.mw-r5-layout h3,
+body.mw-r5-admin h3,
+body.mw-r5-employee h3 {
+
+    font-size:
+        16px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+/* ==========================================================
+   FORM / TABLE
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    button,
+    .button,
+    .btn
+),
+body.mw-r5-admin
+:is(
+    button,
+    .button,
+    .btn
+),
+body.mw-r5-employee
+:is(
+    button,
+    .button,
+    .btn
+) {
+
+    min-height:
+        39px;
+
+    padding:
+        0 13px !important;
+
+    border-radius:
+        8px !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+body.mw-r5-layout
+:is(
+    input,
+    select,
+    textarea
+),
+body.mw-r5-admin
+:is(
+    input,
+    select,
+    textarea
+),
+body.mw-r5-employee
+:is(
+    input,
+    select,
+    textarea
+) {
+
+    min-height:
+        39px;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+body.mw-r5-layout th,
+body.mw-r5-admin th,
+body.mw-r5-employee th {
+
+    padding:
+        11px 12px !important;
+
+    color:
+        var(
+            --r5-muted
+        ) !important;
+
+    font-size:
+        12.5px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+body.mw-r5-layout td,
+body.mw-r5-admin td,
+body.mw-r5-employee td {
+
+    padding:
+        12px !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+/* ==========================================================
+   PANELS
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    .panel,
+    .card,
+    .metric,
+    .stat,
+    .member,
+    .admin-order-card,
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .my-payout-card,
+    .my-payout-total-card,
+    .history-ledger-panel,
+    .history-ledger-filter,
+    .history-ledger-stat,
+    .staff-summary-filter,
+    .staff-summary-ledger-panel,
+    .staff-summary-total-card
+),
+body.mw-r5-admin
+:is(
+    .panel,
+    .card,
+    .metric,
+    .stat,
+    .member,
+    .admin-order-card
+),
+body.mw-r5-employee
+:is(
+    .panel,
+    .card,
+    .metric,
+    .stat,
+    .member
+) {
+
+    border-color:
+        var(
+            --r5-line
+        ) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(
+            --r5-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+/* ==========================================================
+   DISPATCH
+   ========================================================== */
+
+body.mw-r5-layout
+.dispatch-board {
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        minmax(
+            0,
+            1.55fr
+        )
+        minmax(
+            300px,
+            .72fr
+        ) !important;
+
+    gap:
+        14px !important;
+
+    align-items:
+        start !important;
+}
+
+
+body.mw-r5-layout
+.dispatch-column {
+
+    padding:
+        15px !important;
+
+    border:
+        1px solid
+        var(
+            --r5-line
+        ) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(
+            --r5-panel
+        ) !important;
+}
+
+
+body.mw-r5-layout
+.dispatch-column:nth-child(2) {
+
+    position:
+        sticky;
+
+    top:
+        20px;
+}
+
+
+body.mw-r5-layout
+.dispatch-order-card {
+
+    margin-bottom:
+        10px !important;
+
+    padding:
+        15px !important;
+}
+
+
+body.mw-r5-layout
+.dispatch-payout {
+
+    color:
+        var(
+            --r5-gold-soft
+        ) !important;
+
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .28
+        ) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .05
+        ) !important;
+}
+
+
+/* ==========================================================
+   EMPLOYEE HOME
+   ========================================================== */
+
+body.mw-r5-employee
+.mw-r5-employee-links {
+
+    display:
+        grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        14px;
+
+    margin:
+        0 0 18px;
+}
+
+
+body.mw-r5-employee
+.mw-r5-employee-link {
+
+    min-height:
+        130px;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    justify-content:
+        space-between;
+
+    padding:
+        18px;
+
+    border:
+        1px solid
+        var(
+            --r5-line
+        );
+
+    border-radius:
+        12px;
+
+    color:
+        var(
+            --r5-text
+        ) !important;
+
+    background:
+        var(
+            --r5-panel
+        );
+
+    text-decoration:
+        none !important;
+}
+
+
+body.mw-r5-employee
+.mw-r5-employee-link:hover {
+
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .28
+        );
+
+    background:
+        #151410;
+}
+
+
+body.mw-r5-employee
+.mw-r5-employee-link small {
+
+    color:
+        var(
+            --r5-gold
+        ) !important;
+
+    font-size:
+        10.5px !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        .12em;
+}
+
+
+body.mw-r5-employee
+.mw-r5-employee-link strong {
+
+    display:
+        block;
+
+    margin-top:
+        8px;
+
+    font-size:
+        20px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+body.mw-r5-employee
+.mw-r5-employee-link p {
+
+    margin:
+        6px 0 0 !important;
+
+    color:
+        var(
+            --r5-muted
+        ) !important;
+
+    font-size:
+        13px !important;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (
+    max-width: 900px
+) {
+
+    body.mw-r5-layout
+    .dispatch-board {
+
+        grid-template-columns:
+            1fr !important;
+    }
+
+
+    body.mw-r5-layout
+    .dispatch-column:nth-child(2) {
+
+        position:
+            static;
+    }
+
+
+    body.mw-r5-employee
+    .mw-r5-employee-links {
+
+        grid-template-columns:
+            1fr;
+    }
+
+}
+
+
+@media (
+    max-width: 760px
+) {
+
+    .mw-r5-shell {
+
+        display:
+            block !important;
+    }
+
+
+    .mw-r5-sidebar {
+
+        position:
+            static;
+
+        width:
+            100%;
+
+        height:
+            auto;
+
+        border-right:
+            0;
+
+        border-bottom:
+            1px solid
+            var(
+                --r5-line
+            );
+    }
+
+
+    .mw-r5-nav {
+
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+
+
+    .mw-r5-main-host {
+
+        padding:
+            22px 14px 40px !important;
+    }
+
+
+    .mw-r5-page-header h1,
+    .mw-r5-page-title {
+
+        font-size:
+            31px !important;
+    }
+
+}
+
+/* BEGIN MAWAN_R5R2_UI_CLEANUP */
+
+/* ==========================================================
+   MAWAN_R5R2_UI_CLEANUP
+   營運總覽 = Portal 唯一標準格式
+   ========================================================== */
+
+.mw-r5-main-host {
+    max-width: none !important;
+}
+
+
+.mw-r5-page-header {
+
+    min-height:
+        104px !important;
+
+    margin-bottom:
+        18px !important;
+}
+
+
+.mw-r5-page-header h1,
+.mw-r5-page-title {
+
+    font-size:
+        36px !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        0 !important;
+}
+
+
+.mw-r5-page-header p {
+
+    margin-top:
+        8px !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        500 !important;
+
+    line-height:
+        1.6 !important;
+}
+
+
+.mw-r5-current-user {
+    display: none !important;
+}
+
+
+/* ==========================================================
+   移除 standalone 裡留下來的第二套 Sidebar
+   ========================================================== */
+
+.mw-r5-legacy-body > .shell {
+
+    display:
+        block !important;
+
+    width:
+        100% !important;
+
+    min-height:
+        0 !important;
+
+    grid-template-columns:
+        1fr !important;
+}
+
+
+.mw-r5-legacy-body > .shell > .sidebar,
+.mw-r5-legacy-body > .shell > .side,
+.mw-r5-legacy-body > .shell > aside,
+.mw-r5-legacy-body > .shell > nav,
+.mw-r5-legacy-body > .shell > .brand,
+.mw-r5-legacy-body > .shell > .navigation,
+.mw-r5-legacy-body > .shell > .nav-column {
+
+    display:
+        none !important;
+}
+
+
+.mw-r5-legacy-body > .shell > .main,
+.mw-r5-legacy-body > .shell > main,
+.mw-r5-legacy-body .main {
+
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+
+    margin:
+        0 !important;
+
+    padding:
+        0 !important;
+}
+
+
+/* ==========================================================
+   移除 standalone 內第二組舊 Header
+   ========================================================== */
+
+.mw-r5-legacy-body > .top:first-child,
+.mw-r5-legacy-body > header:first-child,
+.mw-r5-legacy-body > .page-header:first-child,
+.mw-r5-legacy-body > .page-head:first-child,
+
+.mw-r5-legacy-body
+> .shell
+> .main
+> .top:first-child,
+
+.mw-r5-legacy-body
+> .shell
+> .main
+> header:first-child,
+
+.mw-r5-legacy-body
+> .shell
+> .main
+> .page-header:first-child,
+
+.mw-r5-legacy-body
+> .shell
+> .main
+> .page-head:first-child {
+
+    display:
+        none !important;
+}
+
+
+/* ==========================================================
+   所有 Portal 主內容統一寬度
+   ========================================================== */
+
+.mw-r5-content,
+.mw-r5-legacy-body,
+.history-ledger-page,
+.staff-summary-page,
+.my-payout-page,
+.dispatch-shell,
+.mw-review-toolbar,
+.mw-review-summary,
+.mw-review-panel,
+.admin-order-list,
+.compact-list,
+.panel,
+.compact-panel {
+
+    width:
+        100% !important;
+
+    max-width:
+        none !important;
+}
+
+
+/* 歷史訂單舊 Hero 不再當另一套 Header */
+
+.history-ledger-hero {
+    display: none !important;
+}
+
+
+/* ==========================================================
+   卡片統一成營運總覽
+   ========================================================== */
+
+.history-ledger-filter,
+.history-ledger-panel,
+.history-ledger-stat,
+
+.staff-summary-filter,
+.staff-summary-ledger-panel,
+.staff-summary-total-card,
+
+.my-payout-card,
+.my-payout-total-card,
+
+.dispatch-column,
+.dispatch-panel,
+
+.mw-review-toolbar,
+.mw-review-panel,
+
+.panel,
+.compact-panel,
+.admin-order-card {
+
+    border:
+        1px solid
+        var(--r5-line) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(--r5-panel) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+.history-ledger-filter,
+.staff-summary-filter,
+.mw-review-toolbar,
+.panel,
+.compact-panel {
+
+    padding:
+        14px !important;
+}
+
+
+.history-ledger-stat,
+.staff-summary-total-card,
+.my-payout-total-card {
+
+    min-height:
+        92px !important;
+
+    padding:
+        14px 15px !important;
+}
+
+
+.history-ledger-stat::after,
+.staff-summary-total-card::after,
+.history-ledger-hero::after {
+
+    display:
+        none !important;
+}
+
+
+.history-ledger-stat strong,
+.staff-summary-total-card strong,
+.my-payout-total-card strong,
+.dispatch-stat strong {
+
+    color:
+        var(--r5-gold-soft) !important;
+
+    font-size:
+        30px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+/* ==========================================================
+   Section title
+   ========================================================== */
+
+.history-ledger-head,
+.staff-summary-ledger-head,
+.order-card-header {
+
+    background:
+        transparent !important;
+
+    border-color:
+        var(--r5-line) !important;
+}
+
+
+.history-ledger-head h3,
+.staff-summary-ledger-head h2,
+.compact-panel > h2 {
+
+    font-size:
+        17px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+/* ==========================================================
+   Tables
+   ========================================================== */
+
+.history-ledger-table th,
+.staff-summary-table th,
+.mw-review-table th {
+
+    color:
+        var(--r5-muted) !important;
+
+    background:
+        #15130f !important;
+
+    font-size:
+        12.5px !important;
+
+    font-weight:
+        700 !important;
+
+    letter-spacing:
+        0 !important;
+}
+
+
+.history-ledger-table td,
+.staff-summary-table td,
+.mw-review-table td {
+
+    color:
+        var(--r5-text) !important;
+
+    background:
+        transparent !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+.history-ledger-table
+tbody
+tr:hover
+td,
+
+.staff-summary-table
+tbody
+tr:hover
+td,
+
+.mw-review-table
+tbody
+tr:hover
+td {
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .035
+        ) !important;
+}
+
+
+/* ==========================================================
+   操作紀錄：移除舊藍色資料格
+   ========================================================== */
+
+.order-meta.compact-meta > div,
+.audit-json-grid pre {
+
+    border:
+        1px solid
+        var(--r5-line) !important;
+
+    border-radius:
+        8px !important;
+
+    color:
+        var(--r5-text) !important;
+
+    background:
+        #0b0b0a !important;
+}
+
+
+.order-meta.compact-meta > div {
+
+    padding:
+        10px 11px !important;
+}
+
+
+.order-meta.compact-meta span {
+
+    color:
+        var(--r5-muted) !important;
+
+    font-size:
+        12px !important;
+
+    font-weight:
+        600 !important;
+}
+
+
+.order-meta.compact-meta strong {
+
+    color:
+        var(--r5-text) !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+.audit-details summary,
+.order-no {
+
+    color:
+        var(--r5-gold-soft) !important;
+}
+
+
+/* ==========================================================
+   舊頁按鈕改成營運總覽黑金風格
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    button,
+    .button,
+    .btn,
+    .seal-button
+),
+
+body.mw-r5-admin
+:is(
+    button,
+    .button,
+    .btn,
+    .seal-button
+),
+
+body.mw-r5-employee
+:is(
+    button,
+    .button,
+    .btn,
+    .seal-button
+) {
+
+    border:
+        1px solid
+        rgba(
+            223,
+            183,
+            92,
+            .28
+        ) !important;
+
+    color:
+        var(--r5-gold-soft) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .065
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+body.mw-r5-layout
+:is(
+    button,
+    .button,
+    .btn,
+    .seal-button
+):hover,
+
+body.mw-r5-admin
+:is(
+    button,
+    .button,
+    .btn,
+    .seal-button
+):hover,
+
+body.mw-r5-employee
+:is(
+    button,
+    .button,
+    .btn,
+    .seal-button
+):hover {
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .12
+        ) !important;
+}
+
+
+body.mw-r5-layout
+:is(
+    .danger,
+    .destructive
+),
+
+body.mw-r5-admin
+:is(
+    .danger,
+    .destructive
+),
+
+body.mw-r5-employee
+:is(
+    .danger,
+    .destructive
+) {
+
+    border-color:
+        rgba(
+            217,
+            88,
+            88,
+            .42
+        ) !important;
+
+    color:
+        #f0b0b0 !important;
+
+    background:
+        rgba(
+            150,
+            35,
+            35,
+            .18
+        ) !important;
+}
+
+
+/* ==========================================================
+   評價管理
+   ========================================================== */
+
+.mw-review-table thead,
+.mw-review-table thead tr,
+.mw-review-table thead th {
+
+    background:
+        #15130f !important;
+}
+
+
+.mw-review-table td:first-child {
+
+    color:
+        var(--r5-gold-soft) !important;
+}
+
+
+/* ==========================================================
+   接單大廳
+   ========================================================== */
+
+.dispatch-hero-main .dispatch-title {
+
+    font-size:
+        20px !important;
+
+    font-weight:
+        800 !important;
+}
+
+
+.dispatch-board {
+
+    width:
+        100% !important;
+
+    max-width:
+        none !important;
+}
+
+
+/* ==========================================================
+   員工中心
+   ========================================================== */
+
+.mw-r5-employee-links {
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        ) !important;
+}
+
+
+/* ==========================================================
+   Sidebar 字級
+   ========================================================== */
+
+.mw-r5-nav a {
+
+    min-height:
+        42px !important;
+
+    font-size:
+        14px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+.mw-r5-brand small {
+
+    font-size:
+        10px !important;
+}
+
+
+.mw-r5-brand strong {
+
+    font-size:
+        20px !important;
+}
+
+
+@media (
+    max-width: 900px
+) {
+
+    .mw-r5-employee-links {
+
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+/* END MAWAN_R5R2_UI_CLEANUP */
+
+/* BEGIN MAWAN_R5R3_CANONICAL_PORTAL */
+/* ==========================================================
+   營運總覽 = 唯一 Portal 設計標準
+   ========================================================== */
+
+.mw-r5-main-host {
+
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+
+    padding:
+        26px 24px 48px !important;
+}
+
+
+.mw-r5-main-host > *,
+.mw-r5-content,
+.mw-r5-content > *,
+.mw-r5-legacy-body,
+.mw-r5-legacy-body > * {
+
+    max-width:
+        none !important;
+}
+
+
+.mw-r5-content,
+.mw-r5-legacy-body {
+
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+}
+
+
+/* ==========================================================
+   所有主要頁面使用全部可用寬度
+   ========================================================== */
+
+body.mw-r5-layout
+.mw-r5-main-host
+:is(
+    .history-ledger-page,
+    .staff-summary-page,
+    .my-payout-page,
+    .dispatch-shell,
+    .mw-review-page,
+    .review-page,
+    .audit-page,
+    .admin-dashboard-shell,
+    .customer-management-page,
+    .customer-detail-page,
+    .staff-management-page,
+    .staff-detail-page,
+    .page-content,
+    .content,
+    .content-wrap,
+    .workspace,
+    .workspace-main
+),
+
+body.mw-r5-admin
+.mw-r5-main-host
+:is(
+    .history-ledger-page,
+    .staff-summary-page,
+    .mw-review-page,
+    .review-page,
+    .audit-page,
+    .admin-dashboard-shell,
+    .customer-management-page,
+    .customer-detail-page,
+    .staff-management-page,
+    .staff-detail-page,
+    .page-content,
+    .content,
+    .content-wrap,
+    .workspace,
+    .workspace-main
+),
+
+body.mw-r5-employee
+.mw-r5-main-host
+:is(
+    .my-payout-page,
+    .dispatch-shell,
+    .page-content,
+    .content,
+    .content-wrap,
+    .workspace,
+    .workspace-main
+) {
+
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+
+    margin-left:
+        0 !important;
+
+    margin-right:
+        0 !important;
+}
+
+
+/* ==========================================================
+   徹底停用 standalone 裡殘留的第二套 Sidebar
+   ========================================================== */
+
+.mw-r5-legacy-body
+:is(
+    aside,
+    .sidebar,
+    [class*="sidebar"],
+    [class*="side-nav"],
+    [class*="sidenav"]
+) {
+
+    display:
+        none !important;
+}
+
+
+.mw-r5-legacy-body
+:is(
+    .shell,
+    [class*="-shell"],
+    [class*="_shell"]
+) {
+
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+
+    margin:
+        0 !important;
+
+    padding-left:
+        0 !important;
+
+    padding-right:
+        0 !important;
+
+    grid-template-columns:
+        minmax(
+            0,
+            1fr
+        ) !important;
+}
+
+
+/* ==========================================================
+   standalone 裡的舊頁首也不要再顯示
+   ========================================================== */
+
+body.mw-r5-admin
+.mw-r5-legacy-body
+:is(
+    header,
+    .top,
+    .page-head,
+    .page-header,
+    .hero
+):has(h1) {
+
+    display:
+        none !important;
+}
+
+
+/* ==========================================================
+   Header 全站一致
+   ========================================================== */
+
+.mw-r5-page-header {
+
+    min-height:
+        92px !important;
+
+    margin:
+        0 0 16px !important;
+}
+
+
+.mw-r5-page-header h1,
+.mw-r5-page-title {
+
+    margin-top:
+        7px !important;
+
+    font-size:
+        36px !important;
+
+    line-height:
+        1.08 !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        0 !important;
+}
+
+
+.mw-r5-page-header p {
+
+    margin-top:
+        7px !important;
+
+    font-size:
+        13.5px !important;
+
+    line-height:
+        1.55 !important;
+}
+
+
+/* ==========================================================
+   卡片：只剩營運總覽的黑金設計
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    .panel,
+    .compact-panel,
+    .card,
+    .history-ledger-filter,
+    .history-ledger-stat,
+    .history-ledger-panel,
+    .staff-summary-filter,
+    .staff-summary-total-card,
+    .staff-summary-ledger-panel,
+    .my-payout-hero,
+    .my-payout-card,
+    .my-payout-total-card,
+    .dispatch-panel,
+    .dispatch-column,
+    .dispatch-order-card,
+    .mw-review-toolbar,
+    .mw-review-panel,
+    .admin-order-card
+),
+
+body.mw-r5-admin
+:is(
+    .panel,
+    .compact-panel,
+    .card,
+    .history-ledger-filter,
+    .history-ledger-stat,
+    .history-ledger-panel,
+    .staff-summary-filter,
+    .staff-summary-total-card,
+    .staff-summary-ledger-panel,
+    .mw-review-toolbar,
+    .mw-review-panel,
+    .admin-order-card
+),
+
+body.mw-r5-employee
+:is(
+    .panel,
+    .compact-panel,
+    .card,
+    .my-payout-hero,
+    .my-payout-card,
+    .my-payout-total-card,
+    .dispatch-panel,
+    .dispatch-column,
+    .dispatch-order-card
+) {
+
+    border:
+        1px solid
+        var(
+            --r5-line
+        ) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(
+            --r5-panel
+        ) !important;
+
+    background-image:
+        none !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+/* ==========================================================
+   不再只使用左半邊
+   ========================================================== */
+
+.history-ledger-filter,
+.history-ledger-stats,
+.history-ledger-panel,
+.history-ledger-table-wrap,
+
+.staff-summary-filter,
+.staff-summary-totals,
+.staff-summary-ledger-panel,
+
+.my-payout-page,
+.my-payout-header-grid,
+.my-payout-summary-grid,
+.my-payout-section,
+
+.dispatch-shell,
+.dispatch-board,
+
+.mw-review-toolbar,
+.mw-review-panel,
+.mw-review-table-wrap,
+
+.audit-page,
+.compact-panel {
+
+    width:
+        100% !important;
+
+    max-width:
+        none !important;
+}
+
+
+.history-ledger-stats,
+.staff-summary-totals,
+.my-payout-summary-grid {
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(
+                0,
+                1fr
+            )
+        ) !important;
+}
+
+
+/* ==========================================================
+   全部舊紅色 Table Header 清掉
+   ========================================================== */
+
+body.mw-r5-layout
+table thead,
+
+body.mw-r5-layout
+table thead tr,
+
+body.mw-r5-layout
+table thead th,
+
+body.mw-r5-admin
+table thead,
+
+body.mw-r5-admin
+table thead tr,
+
+body.mw-r5-admin
+table thead th,
+
+body.mw-r5-employee
+table thead,
+
+body.mw-r5-employee
+table thead tr,
+
+body.mw-r5-employee
+table thead th {
+
+    color:
+        var(
+            --r5-muted
+        ) !important;
+
+    background:
+        #15140f !important;
+
+    background-image:
+        none !important;
+
+    border-color:
+        var(
+            --r5-line
+        ) !important;
+}
+
+
+/* ==========================================================
+   其他舊紅／藍背景
+   ========================================================== */
+
+.history-bulk-toolbar,
+.history-dossier-detail,
+
+.my-payout-hero,
+.my-payout-section,
+
+.audit-json-grid pre,
+
+.order-meta.compact-meta > div {
+
+    background:
+        var(
+            --r5-panel
+        ) !important;
+
+    background-image:
+        none !important;
+
+    border-color:
+        var(
+            --r5-line
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+.my-payout-hero::after,
+.history-ledger-stat::after,
+.staff-summary-total-card::after,
+.history-ledger-hero::after {
+
+    display:
+        none !important;
+}
+
+
+/* ==========================================================
+   所有按鈕統一黑金
+   不再殘留舊版大紅按鈕
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    button,
+    input[type="submit"],
+    .button,
+    .btn,
+    .seal-button,
+    .admin-order-cancel-button,
+    .danger,
+    .destructive
+),
+
+body.mw-r5-admin
+:is(
+    button,
+    input[type="submit"],
+    .button,
+    .btn,
+    .seal-button,
+    .admin-order-cancel-button,
+    .danger,
+    .destructive
+),
+
+body.mw-r5-employee
+:is(
+    button,
+    input[type="submit"],
+    .button,
+    .btn,
+    .seal-button,
+    .danger,
+    .destructive
+) {
+
+    min-height:
+        39px !important;
+
+    padding:
+        8px 13px !important;
+
+    border:
+        1px solid
+        rgba(
+            223,
+            183,
+            92,
+            .30
+        ) !important;
+
+    border-radius:
+        8px !important;
+
+    color:
+        var(
+            --r5-gold-soft
+        ) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .065
+        ) !important;
+
+    background-image:
+        none !important;
+
+    box-shadow:
+        none !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+body.mw-r5-layout
+:is(
+    button,
+    input[type="submit"],
+    .button,
+    .btn,
+    .seal-button
+):hover,
+
+body.mw-r5-admin
+:is(
+    button,
+    input[type="submit"],
+    .button,
+    .btn,
+    .seal-button
+):hover,
+
+body.mw-r5-employee
+:is(
+    button,
+    input[type="submit"],
+    .button,
+    .btn,
+    .seal-button
+):hover {
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .13
+        ) !important;
+}
+
+
+/* ==========================================================
+   Input
+   ========================================================== */
+
+body.mw-r5-layout
+:is(
+    input,
+    select,
+    textarea
+),
+
+body.mw-r5-admin
+:is(
+    input,
+    select,
+    textarea
+),
+
+body.mw-r5-employee
+:is(
+    input,
+    select,
+    textarea
+) {
+
+    min-height:
+        39px !important;
+
+    border-radius:
+        8px !important;
+
+    font-size:
+        13.5px !important;
+}
+
+
+/* ==========================================================
+   Table 字型一致
+   ========================================================== */
+
+body.mw-r5-layout th,
+body.mw-r5-admin th,
+body.mw-r5-employee th {
+
+    padding:
+        10px 11px !important;
+
+    font-size:
+        12.5px !important;
+
+    font-weight:
+        700 !important;
+}
+
+
+body.mw-r5-layout td,
+body.mw-r5-admin td,
+body.mw-r5-employee td {
+
+    padding:
+        11px !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        500 !important;
+}
+
+
+/* ==========================================================
+   訂單管理＝列表＋展開詳情
+   ========================================================== */
+
+.history-ledger-hero {
+
+    display:
+        none !important;
+}
+
+
+.history-ledger-head h3 {
+
+    font-size:
+        17px !important;
+
+    font-weight:
+        800 !important;
+
+    letter-spacing:
+        0 !important;
+}
+
+
+.history-dossier-detail-head h4 {
+
+    font-size:
+        17px !important;
+
+    letter-spacing:
+        0 !important;
+}
+
+
+.history-ledger-table {
+
+    width:
+        100% !important;
+
+    min-width:
+        1120px !important;
+}
+
+
+.history-dossier-detail {
+
+    padding:
+        16px !important;
+
+    border-radius:
+        0 !important;
+}
+
+
+/* ==========================================================
+   評價 / 操作紀錄
+   ========================================================== */
+
+.mw-review-table td:first-child,
+.order-no,
+.audit-details summary {
+
+    color:
+        var(
+            --r5-gold-soft
+        ) !important;
+}
+
+
+.order-meta.compact-meta > div {
+
+    border-radius:
+        8px !important;
+}
+
+
+/* ==========================================================
+   員工頁面同樣吃滿
+   ========================================================== */
+
+.dispatch-board {
+
+    grid-template-columns:
+        minmax(
+            0,
+            1.5fr
+        )
+        minmax(
+            320px,
+            .75fr
+        ) !important;
+}
+
+
+.my-payout-header-grid {
+
+    grid-template-columns:
+        minmax(
+            0,
+            1.25fr
+        )
+        minmax(
+            420px,
+            .9fr
+        ) !important;
+}
+
+
+/* ==========================================================
+   Responsive
+   ========================================================== */
+
+@media (
+    max-width: 1100px
+) {
+
+    .history-ledger-stats,
+    .staff-summary-totals,
+    .my-payout-summary-grid {
+
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            ) !important;
+    }
+
+
+    .dispatch-board,
+    .my-payout-header-grid {
+
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+
+@media (
+    max-width: 720px
+) {
+
+    .mw-r5-main-host {
+
+        padding:
+            20px 14px 36px !important;
+    }
+
+
+    .history-ledger-stats,
+    .staff-summary-totals,
+    .my-payout-summary-grid {
+
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+/* END MAWAN_R5R3_CANONICAL_PORTAL */
+
+/* BEGIN MAWAN_R5R4_UI_POLISH */
+/* ==========================================================
+   客戶管理
+   ========================================================== */
+
+.mw-r5-customers-page,
+.mw-r5-customers-page .mw-r5-legacy-body {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+.mw-r5-customers-page :is(
+    [class*="shell"],
+    [class*="layout"],
+    [class*="workspace"],
+    [class*="container"],
+    [class*="main"],
+    [class*="content"],
+    [class*="page"]
+) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.mw-r5-customers-page :is(
+    [class*="shell"],
+    [class*="layout"]
+) {
+    grid-template-columns:
+        minmax(0, 1fr) !important;
+}
+
+/* 把客戶管理裡殘留的第二組舊 Header 隱藏 */
+.mw-r5-customers-page
+.mw-r5-legacy-body
+> :is(
+    header,
+    .top,
+    .page-head,
+    .page-header,
+    .hero,
+    [class*="hero"],
+    [class*="page-head"]
+) {
+    display: none !important;
+}
+
+.mw-r5-customers-page :is(
+    table,
+    .table-wrap,
+    [class*="table"],
+    form
+) {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.mw-r5-customers-page
+form:first-of-type {
+    display: grid !important;
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto !important;
+
+    gap: 10px !important;
+    align-items: end !important;
+}
+
+
+/* ==========================================================
+   薪資結算統計數字
+   ========================================================== */
+
+.staff-summary-total-card {
+    color:
+        var(--r5-text) !important;
+
+    background:
+        var(--r5-panel) !important;
+
+    background-image:
+        none !important;
+}
+
+.staff-summary-total-card::after {
+    display: none !important;
+    content: none !important;
+}
+
+.staff-summary-total-card,
+.staff-summary-total-card * {
+    opacity: 1 !important;
+}
+
+.staff-summary-total-card > span {
+    color:
+        var(--r5-muted) !important;
+
+    font-size:
+        13px !important;
+
+    font-weight:
+        700 !important;
+
+    letter-spacing:
+        0 !important;
+}
+
+.staff-summary-total-card > strong {
+    margin-top:
+        8px !important;
+
+    color:
+        var(--r5-gold-soft) !important;
+
+    font-size:
+        30px !important;
+
+    font-weight:
+        800 !important;
+
+    line-height:
+        1.05 !important;
+}
+
+.staff-summary-total-card > small {
+    color:
+        var(--r5-muted) !important;
+
+    font-size:
+        12.5px !important;
+}
+
+
+/* ==========================================================
+   Portal 所有按鈕文字置中
+   ========================================================== */
+
+body.mw-r5-layout :is(
+    button,
+    .button,
+    .btn,
+    .seal-button,
+    a.button
+),
+
+body.mw-r5-admin :is(
+    button,
+    .button,
+    .btn,
+    .seal-button,
+    a.button
+),
+
+body.mw-r5-employee :is(
+    button,
+    .button,
+    .btn,
+    .seal-button,
+    a.button
+) {
+    display:
+        inline-flex !important;
+
+    align-items:
+        center !important;
+
+    justify-content:
+        center !important;
+
+    text-align:
+        center !important;
+
+    line-height:
+        1.2 !important;
+
+    vertical-align:
+        middle !important;
+}
+
+body.mw-r5-layout
+input[type="submit"],
+
+body.mw-r5-admin
+input[type="submit"],
+
+body.mw-r5-employee
+input[type="submit"] {
+    text-align:
+        center !important;
+}
+
+
+/* ==========================================================
+   完整薪資按鈕
+   ========================================================== */
+
+.my-payout-page :is(
+    button,
+    .button,
+    a.button
+),
+
+.my-payout-header-grid :is(
+    button,
+    .button,
+    a.button
+) {
+    min-height:
+        40px !important;
+
+    display:
+        inline-flex !important;
+
+    align-items:
+        center !important;
+
+    justify-content:
+        center !important;
+
+    text-align:
+        center !important;
+}
+
+
+/* ==========================================================
+   接單大廳：移除暫無委託浮水印
+   ========================================================== */
+
+.dispatch-shell :is(
+    .dispatch-empty,
+    .dispatch-list,
+    .dispatch-column,
+    .dispatch-board,
+    .dispatch-panel
+)::before,
+
+.dispatch-shell :is(
+    .dispatch-empty,
+    .dispatch-list,
+    .dispatch-column,
+    .dispatch-board,
+    .dispatch-panel
+)::after {
+    content:
+        none !important;
+
+    display:
+        none !important;
+}
+
+.dispatch-empty {
+    overflow:
+        hidden !important;
+}
+
+
+/* ==========================================================
+   訂單管理狀態欄
+   ========================================================== */
+
+.history-status-cell {
+    padding:
+        11px !important;
+}
+
+.history-status-select {
+    width:
+        100% !important;
+
+    min-width:
+        96px !important;
+
+    min-height:
+        39px !important;
+
+    height:
+        39px !important;
+
+    padding:
+        0 10px !important;
+
+    border:
+        1px solid
+        var(--r5-line) !important;
+
+    border-radius:
+        8px !important;
+
+    color:
+        var(--r5-text) !important;
+
+    background:
+        #0b0b0a !important;
+
+    background-image:
+        none !important;
+
+    box-shadow:
+        none !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        600 !important;
+}
+
+
+/* ==========================================================
+   薪資／完整薪資金額提高辨識度
+   ========================================================== */
+
+.staff-money,
+.staff-count-main,
+
+.my-payout-page :is(
+    .money,
+    .amount,
+    [class*="money"],
+    [class*="amount"]
+) {
+    color:
+        var(--r5-gold-soft) !important;
+
+    font-weight:
+        800 !important;
+}
+/* END MAWAN_R5R4_UI_POLISH */
+
+/* BEGIN MAWAN_R5R6_TARGETED_FIX_V2_PORTAL_CSS */
+/* ==========================================================
+   客戶管理 / 人員工作區
+   解除舊版超窄寬度
+   ========================================================== */
+
+.mw-r56-duplicate-header {
+    display:
+        none !important;
+}
+
+
+body.mw-r56-customer-page
+.mw-r56-customer-main,
+
+body.mw-r56-customer-page
+.mw-r56-customer-legacy,
+
+body.mw-r56-customer-page
+.mw-r56-customer-expand,
+
+body.mw-r56-customer-page
+.mw-r56-customer-list-root,
+
+body.mw-r56-customer-page
+.mw-r56-customer-detail-root,
+
+body.mw-r56-customer-page
+.mw-r56-customer-wide-block,
+
+body.mw-r56-customer-page
+.mw-r56-customer-wide-panel {
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+
+    margin-right:
+        0 !important;
+
+    box-sizing:
+        border-box !important;
+
+    justify-self:
+        stretch !important;
+}
+
+
+body.mw-r56-customer-page
+.mw-r56-customer-main,
+
+body.mw-r56-customer-page
+.mw-r56-customer-expand {
+    flex:
+        1 1 auto !important;
+
+    grid-column:
+        1 / -1 !important;
+}
+
+
+body.mw-r56-customer-page
+.mw-r5-legacy-body {
+    width:
+        100% !important;
+
+    max-width:
+        none !important;
+
+    min-width:
+        0 !important;
+}
+
+
+body.mw-r56-customer-page
+.mw-r56-customer-detail-root
+> *,
+
+body.mw-r56-customer-page
+.mw-r56-customer-list-root
+> * {
+    max-width:
+        none !important;
+}
+
+
+.mw-r56-customer-search {
+    width:
+        100% !important;
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        minmax(
+            0,
+            1fr
+        )
+        auto !important;
+
+    gap:
+        10px !important;
+
+    align-items:
+        center !important;
+}
+
+
+.mw-r56-customer-search input {
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+}
+
+
+.mw-r56-customer-table,
+.mw-r56-customer-list {
+    width:
+        100% !important;
+
+    max-width:
+        none !important;
+}
+
+
+.mw-r56-customer-metric-grid {
+    width:
+        100% !important;
+
+    max-width:
+        none !important;
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(
+                0,
+                1fr
+            )
+        ) !important;
+
+    gap:
+        10px !important;
+}
+
+
+.mw-r56-customer-metric {
+    width:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    max-width:
+        none !important;
+}
+
+
+/* ==========================================================
+   薪資結算統計
+   ========================================================== */
+
+.mw-r56-payout-metric {
+    opacity:
+        1 !important;
+
+    color:
+        var(
+            --r5-text
+        ) !important;
+
+    background:
+        var(
+            --r5-panel
+        ) !important;
+
+    background-image:
+        none !important;
+}
+
+
+.mw-r56-payout-metric::before,
+.mw-r56-payout-metric::after {
+    opacity:
+        .08 !important;
+}
+
+
+.mw-r56-payout-metric
+.mw-r56-payout-value {
+    display:
+        block !important;
+
+    margin-top:
+        7px !important;
+
+    color:
+        #f0d28b !important;
+
+    -webkit-text-fill-color:
+        #f0d28b !important;
+
+    opacity:
+        1 !important;
+
+    font-size:
+        31px !important;
+
+    font-weight:
+        900 !important;
+
+    line-height:
+        1.05 !important;
+
+    text-shadow:
+        0 0 18px
+        rgba(
+            223,
+            183,
+            92,
+            .09
+        ) !important;
+}
+
+
+/* ==========================================================
+   訂單管理狀態
+   整個欄位是矩形填滿
+   不再有內縮橢圓 / 膠囊
+   ========================================================== */
+
+.history-ledger-table
+td.mw-r56-order-status-cell,
+
+.mw-r56-order-status-cell {
+    padding:
+        0 !important;
+
+    border-radius:
+        0 !important;
+
+    overflow:
+        hidden !important;
+
+    background:
+        transparent !important;
+
+    background-image:
+        none !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+.mw-r56-order-status-form,
+.mw-r56-order-status-wrapper {
+    display:
+        block !important;
+
+    width:
+        100% !important;
+
+    height:
+        100% !important;
+
+    min-width:
+        0 !important;
+
+    margin:
+        0 !important;
+
+    padding:
+        0 !important;
+
+    border:
+        0 !important;
+
+    border-radius:
+        0 !important;
+
+    background:
+        transparent !important;
+
+    background-image:
+        none !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+.history-ledger-table
+td.mw-r56-order-status-cell
+select.mw-r56-order-status-select,
+
+select.mw-r56-order-status-select {
+    appearance:
+        none !important;
+
+    -webkit-appearance:
+        none !important;
+
+    display:
+        block !important;
+
+    width:
+        100% !important;
+
+    min-width:
+        100% !important;
+
+    height:
+        100% !important;
+
+    min-height:
+        44px !important;
+
+    margin:
+        0 !important;
+
+    padding:
+        0 30px
+        0 12px !important;
+
+    border:
+        0 !important;
+
+    border-radius:
+        0 !important;
+
+    outline:
+        0 !important;
+
+    color:
+        var(
+            --r5-text
+        ) !important;
+
+    background-color:
+        rgba(
+            255,
+            255,
+            255,
+            .018
+        ) !important;
+
+    background-image:
+        linear-gradient(
+            45deg,
+            transparent 50%,
+            #d9b85f 50%
+        ),
+        linear-gradient(
+            135deg,
+            #d9b85f 50%,
+            transparent 50%
+        ) !important;
+
+    background-position:
+        calc(
+            100% - 15px
+        )
+        50%,
+
+        calc(
+            100% - 10px
+        )
+        50% !important;
+
+    background-size:
+        5px 5px,
+        5px 5px !important;
+
+    background-repeat:
+        no-repeat !important;
+
+    box-shadow:
+        none !important;
+
+    font-size:
+        13.5px !important;
+
+    font-weight:
+        700 !important;
+
+    line-height:
+        normal !important;
+
+    cursor:
+        pointer !important;
+}
+
+
+.history-ledger-table
+td.mw-r56-order-status-cell:hover,
+
+.history-ledger-table
+td.mw-r56-order-status-cell:focus-within,
+
+.mw-r56-order-status-cell:hover,
+
+.mw-r56-order-status-cell:focus-within {
+    border-radius:
+        0 !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .055
+        ) !important;
+
+    box-shadow:
+        inset
+        0 0 0 1px
+        rgba(
+            223,
+            183,
+            92,
+            .12
+        ) !important;
+}
+
+
+.history-ledger-table
+td.mw-r56-order-status-cell:hover
+select.mw-r56-order-status-select,
+
+.history-ledger-table
+td.mw-r56-order-status-cell:focus-within
+select.mw-r56-order-status-select,
+
+select.mw-r56-order-status-select:hover,
+
+select.mw-r56-order-status-select:focus {
+    border:
+        0 !important;
+
+    border-radius:
+        0 !important;
+
+    outline:
+        0 !important;
+
+    background-color:
+        transparent !important;
+
+    box-shadow:
+        none !important;
+}
+
+
+/* ==========================================================
+   Portal 按鈕文字置中
+   ========================================================== */
+
+.mw-r56-center-action {
+    align-items:
+        center !important;
+
+    justify-content:
+        center !important;
+
+    text-align:
+        center !important;
+}
+
+
+button.mw-r56-center-action,
+a.mw-r56-center-action,
+.button.mw-r56-center-action,
+.btn.mw-r56-center-action {
+    display:
+        inline-flex !important;
+}
+
+
+input[type="submit"]
+.mw-r56-center-action {
+    text-align:
+        center !important;
+}
+
+
+@media (
+    max-width: 1100px
+) {
+    .mw-r56-customer-metric-grid {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(
+                    0,
+                    1fr
+                )
+            ) !important;
+    }
+}
+
+
+@media (
+    max-width: 720px
+) {
+    .mw-r56-customer-metric-grid {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            ) !important;
+    }
+}
+/* END MAWAN_R5R6_TARGETED_FIX_V2_PORTAL_CSS */
+
+/* BEGIN MAWAN_R9_SIDEBAR_GOLD */
+html body.mw-r5-layout .mw-r5-sidebar .mw-r5-brand > small,
+html body.mw-r5-admin .mw-r5-sidebar .mw-r5-brand > small,
+html body.mw-r5-employee .mw-r5-sidebar .mw-r5-brand > small {
+    color: #dfb75c !important;
+    -webkit-text-fill-color: #dfb75c !important;
+    opacity: 1 !important;
+    font-size: 10px !important;
+    font-weight: 900 !important;
+    letter-spacing: .14em !important;
+}
+
+html body.mw-r5-layout .mw-r5-page-header .mw-r5-kicker,
+html body.mw-r5-admin .mw-r5-page-header .mw-r5-kicker,
+html body.mw-r5-employee .mw-r5-page-header .mw-r5-kicker {
+    color: #dfb75c !important;
+    -webkit-text-fill-color: #dfb75c !important;
+    opacity: 1 !important;
+}
+/* END MAWAN_R9_SIDEBAR_GOLD */

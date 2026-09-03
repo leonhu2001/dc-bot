@@ -1,176 +1,1720 @@
-{% extends "layout.html" %}
+<!doctype html>
+<html lang="zh-Hant">
 
-{% block page_title %}人員名單{% endblock %}
+<head>
 
-{% block content %}
+<meta charset="utf-8">
+
+<meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+>
+
+<title>
+    {{ title }}
+</title>
+
+<!-- MAWAN_PHASE_4B1_STAFF_V1 -->
+
 <style>
-    .staff-page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-        flex-wrap: wrap;
+
+* {
+    box-sizing:
+        border-box;
+}
+
+:root {
+    --bg:
+        #080807;
+
+    --panel:
+        #11110f;
+
+    --panel2:
+        #161511;
+
+    --line:
+        rgba(
+            255,
+            255,
+            255,
+            .085
+        );
+
+    --gold-line:
+        rgba(
+            223,
+            183,
+            92,
+            .24
+        );
+
+    --gold:
+        #dfb75c;
+
+    --gold2:
+        #f2d68d;
+
+    --text:
+        #f4f2eb;
+
+    --muted:
+        #969289;
+
+    --muted2:
+        #6f6b63;
+
+    --green:
+        #7bd59b;
+
+    --blue:
+        #7db5da;
+
+    --red:
+        #e47474;
+
+    --sidebar:
+        244px;
+}
+
+html,
+body {
+    margin:
+        0;
+    min-height:
+        100%;
+    color:
+        var(--text);
+    background:
+        radial-gradient(
+            circle at 75% -10%,
+            rgba(
+                220,
+                172,
+                67,
+                .07
+            ),
+            transparent 28%
+        ),
+        var(--bg);
+    font-family:
+        Inter,
+        "Noto Sans TC",
+        "Microsoft JhengHei",
+        system-ui,
+        sans-serif;
+    font-size:
+        14px;
+}
+
+a {
+    color:
+        inherit;
+    text-decoration:
+        none;
+}
+
+button,
+input,
+select {
+    font:
+        inherit;
+}
+
+.shell {
+    min-height:
+        100vh;
+    display:
+        grid;
+    grid-template-columns:
+        var(--sidebar)
+        minmax(
+            0,
+            1fr
+        );
+}
+
+.sidebar {
+    position:
+        sticky;
+    top:
+        0;
+    height:
+        100vh;
+    padding:
+        24px 16px;
+    border-right:
+        1px solid
+        var(--line);
+    background:
+        rgba(
+            7,
+            7,
+            6,
+            .96
+        );
+}
+
+.brand {
+    padding:
+        4px 10px 24px;
+}
+
+.brand small {
+    display:
+        block;
+    color:
+        var(--gold);
+    font-size:
+        11px;
+    font-weight:
+        950;
+    letter-spacing:
+        .18em;
+}
+
+.brand strong {
+    display:
+        block;
+    margin-top:
+        7px;
+    font-size:
+        24px;
+}
+
+.nav {
+    display:
+        grid;
+    gap:
+        5px;
+}
+
+.nav a {
+    min-height:
+        43px;
+    display:
+        flex;
+    align-items:
+        center;
+    padding:
+        0 12px;
+    border:
+        1px solid
+        transparent;
+    border-radius:
+        9px;
+    color:
+        #9c998f;
+    font-size:
+        13px;
+    font-weight:
+        850;
+}
+
+.nav a:hover,
+.nav a.active {
+    color:
+        var(--gold2);
+    border-color:
+        var(--gold-line);
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .055
+        );
+}
+
+.main {
+    min-width:
+        0;
+    padding:
+        30px;
+}
+
+.top {
+    display:
+        flex;
+    align-items:
+        flex-start;
+    justify-content:
+        space-between;
+    gap:
+        18px;
+    margin-bottom:
+        22px;
+}
+
+.eyebrow {
+    color:
+        var(--gold);
+    font-size:
+        11px;
+    font-weight:
+        950;
+    letter-spacing:
+        .18em;
+}
+
+h1 {
+    margin:
+        6px 0 0;
+    font-size:
+        clamp(
+            31px,
+            4vw,
+            48px
+        );
+}
+
+.subtitle {
+    margin-top:
+        8px;
+    max-width:
+        760px;
+    color:
+        var(--muted);
+    font-size:
+        13px;
+    line-height:
+        1.7;
+}
+
+.actions {
+    display:
+        flex;
+    gap:
+        8px;
+    flex-wrap:
+        wrap;
+}
+
+.button {
+    min-height:
+        40px;
+    display:
+        inline-flex;
+    align-items:
+        center;
+    justify-content:
+        center;
+    padding:
+        0 14px;
+    border:
+        1px solid
+        var(--line);
+    border-radius:
+        9px;
+    color:
+        #c8c4ba;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .025
+        );
+    cursor:
+        pointer;
+    font-size:
+        12px;
+    font-weight:
+        900;
+}
+
+.button:hover {
+    color:
+        var(--gold2);
+    border-color:
+        var(--gold-line);
+}
+
+.button.gold {
+    color:
+        var(--gold2);
+    border-color:
+        var(--gold-line);
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .07
+        );
+}
+
+.notice {
+    margin-bottom:
+        14px;
+    padding:
+        13px 15px;
+    border-radius:
+        10px;
+    font-size:
+        13px;
+    font-weight:
+        850;
+}
+
+.notice.success {
+    color:
+        #a6e4bb;
+    border:
+        1px solid
+        rgba(
+            123,
+            213,
+            155,
+            .25
+        );
+    background:
+        rgba(
+            123,
+            213,
+            155,
+            .06
+        );
+}
+
+.notice.error {
+    color:
+        #efa0a0;
+    border:
+        1px solid
+        rgba(
+            228,
+            116,
+            116,
+            .25
+        );
+    background:
+        rgba(
+            228,
+            116,
+            116,
+            .06
+        );
+}
+
+.stats {
+    display:
+        grid;
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(
+                0,
+                1fr
+            )
+        );
+    gap:
+        10px;
+    margin-bottom:
+        16px;
+}
+
+.stat {
+    min-height:
+        104px;
+    padding:
+        15px;
+    border:
+        1px solid
+        var(--line);
+    border-radius:
+        12px;
+    background:
+        var(--panel);
+}
+
+.stat span {
+    color:
+        var(--muted);
+    font-size:
+        11px;
+    font-weight:
+        900;
+}
+
+.stat strong {
+    display:
+        block;
+    margin-top:
+        10px;
+    color:
+        var(--gold2);
+    font-size:
+        31px;
+    line-height:
+        1;
+}
+
+.toolbar {
+    display:
+        grid;
+    grid-template-columns:
+        minmax(
+            0,
+            1fr
+        )
+        auto;
+    gap:
+        12px;
+    align-items:
+        end;
+    margin-bottom:
+        16px;
+    padding:
+        15px;
+    border:
+        1px solid
+        var(--line);
+    border-radius:
+        13px;
+    background:
+        var(--panel);
+}
+
+.filters {
+    display:
+        grid;
+    grid-template-columns:
+        220px
+        180px
+        minmax(
+            220px,
+            1fr
+        )
+        auto;
+    gap:
+        10px;
+    align-items:
+        end;
+}
+
+.field {
+    display:
+        grid;
+    gap:
+        6px;
+}
+
+.field label {
+    color:
+        var(--muted);
+    font-size:
+        11px;
+    font-weight:
+        900;
+}
+
+.input,
+.select {
+    width:
+        100%;
+    min-height:
+        42px;
+    border:
+        1px solid
+        var(--line);
+    border-radius:
+        9px;
+    outline:
+        0;
+    padding:
+        0 11px;
+    color:
+        var(--text);
+    background:
+        #0b0b0a;
+    font-size:
+        13px;
+}
+
+.input:focus,
+.select:focus {
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .45
+        );
+}
+
+.toolbar-actions {
+    display:
+        flex;
+    gap:
+        8px;
+    flex-wrap:
+        wrap;
+}
+
+.panel {
+    overflow:
+        hidden;
+    border:
+        1px solid
+        var(--line);
+    border-radius:
+        13px;
+    background:
+        var(--panel);
+}
+
+.panel-head {
+    min-height:
+        62px;
+    display:
+        flex;
+    align-items:
+        center;
+    justify-content:
+        space-between;
+    gap:
+        14px;
+    padding:
+        12px 16px;
+    border-bottom:
+        1px solid
+        var(--line);
+}
+
+.panel-head h2 {
+    margin:
+        0;
+    font-size:
+        17px;
+}
+
+.panel-head small {
+    display:
+        block;
+    margin-top:
+        5px;
+    color:
+        var(--muted);
+    font-size:
+        11px;
+}
+
+.member-grid {
+    display:
+        grid;
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(
+                315px,
+                1fr
+            )
+        );
+    gap:
+        12px;
+    padding:
+        14px;
+}
+
+.member {
+    min-width:
+        0;
+    display:
+        grid;
+    gap:
+        14px;
+    padding:
+        16px;
+    border:
+        1px solid
+        var(--line);
+    border-radius:
+        12px;
+    background:
+        #0d0d0c;
+    transition:
+        border-color .15s ease,
+        background .15s ease,
+        transform .15s ease;
+}
+
+.member:hover {
+    transform:
+        translateY(
+            -1px
+        );
+    border-color:
+        var(--gold-line);
+    background:
+        #10100e;
+}
+
+.member.inactive {
+    opacity:
+        .62;
+}
+
+.member-top {
+    min-width:
+        0;
+    display:
+        flex;
+    align-items:
+        center;
+    gap:
+        13px;
+}
+
+.avatar {
+    width:
+        60px;
+    height:
+        60px;
+    flex:
+        0 0
+        60px;
+    overflow:
+        hidden;
+    border:
+        2px solid
+        var(--gold-line);
+    border-radius:
+        50%;
+    background:
+        var(--panel2);
+}
+
+.avatar img {
+    width:
+        100%;
+    height:
+        100%;
+    display:
+        block;
+    object-fit:
+        cover;
+}
+
+.member-copy {
+    min-width:
+        0;
+}
+
+.member-name {
+    margin:
+        0;
+    overflow:
+        hidden;
+    text-overflow:
+        ellipsis;
+    white-space:
+        nowrap;
+    font-size:
+        17px;
+    font-weight:
+        950;
+}
+
+.member-id {
+    margin-top:
+        6px;
+    overflow:
+        hidden;
+    text-overflow:
+        ellipsis;
+    color:
+        var(--muted);
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Consolas,
+        monospace;
+    font-size:
+        11px;
+}
+
+.tags {
+    min-height:
+        31px;
+    display:
+        flex;
+    align-items:
+        flex-start;
+    flex-wrap:
+        wrap;
+    gap:
+        6px;
+}
+
+.tag {
+    display:
+        inline-flex;
+    align-items:
+        center;
+    justify-content:
+        center;
+    padding:
+        6px 9px;
+    border:
+        1px solid
+        var(--gold-line);
+    border-radius:
+        999px;
+    color:
+        var(--gold2);
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .055
+        );
+    font-size:
+        11px;
+    font-weight:
+        900;
+}
+
+.tag.cs {
+    color:
+        #9dd9f5;
+    border-color:
+        rgba(
+            125,
+            181,
+            218,
+            .28
+        );
+    background:
+        rgba(
+            125,
+            181,
+            218,
+            .06
+        );
+}
+
+.tag.play {
+    color:
+        #b8dbca;
+    border-color:
+        rgba(
+            123,
+            213,
+            155,
+            .24
+        );
+    background:
+        rgba(
+            123,
+            213,
+            155,
+            .05
+        );
+}
+
+.tag.inactive {
+    color:
+        #e59494;
+    border-color:
+        rgba(
+            228,
+            116,
+            116,
+            .25
+        );
+    background:
+        rgba(
+            228,
+            116,
+            116,
+            .055
+        );
+}
+
+.member-bottom {
+    display:
+        grid;
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+    gap:
+        8px;
+}
+
+.member-info {
+    min-width:
+        0;
+    padding:
+        10px;
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            .06
+        );
+    border-radius:
+        9px;
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .018
+        );
+}
+
+.member-info span {
+    display:
+        block;
+    color:
+        var(--muted2);
+    font-size:
+        10px;
+    font-weight:
+        900;
+}
+
+.member-info strong {
+    display:
+        block;
+    margin-top:
+        5px;
+    overflow:
+        hidden;
+    text-overflow:
+        ellipsis;
+    white-space:
+        nowrap;
+    font-size:
+        12px;
+}
+
+.empty {
+    padding:
+        46px 20px;
+    color:
+        var(--muted);
+    text-align:
+        center;
+    font-size:
+        13px;
+}
+
+@media (
+    max-width: 1180px
+) {
+
+    .stats {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
     }
 
-    .staff-stats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
-        margin: 14px 0;
+    .filters {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
     }
 
-    .staff-stat-card {
-        min-width: 0;
+}
+
+@media (
+    max-width: 760px
+) {
+
+    .shell {
+        display:
+            block;
     }
 
-    .staff-stat-card h2 {
-        margin-bottom: 8px;
+    .sidebar {
+        position:
+            static;
+        width:
+            100%;
+        height:
+            auto;
+        border-right:
+            0;
+        border-bottom:
+            1px solid
+            var(--line);
     }
 
-    .staff-filter-form {
-        display: grid;
-        grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr) auto;
-        gap: 12px;
-        align-items: end;
+    .nav {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
     }
 
-    .staff-role-chips {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
+    .main {
+        padding:
+            20px 12px 40px;
     }
 
-    @media (max-width: 980px) {
-        .staff-stats-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .staff-filter-form {
-            grid-template-columns: 1fr;
-        }
+    .top {
+        display:
+            block;
     }
 
-    @media (max-width: 560px) {
-        .staff-stats-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .staff-page-header {
-            display: block;
-        }
-
-        .staff-page-header form {
-            margin-top: 12px;
-        }
+    .actions {
+        margin-top:
+            14px;
     }
+
+    .stats {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+
+    .toolbar {
+        display:
+            block;
+    }
+
+    .filters {
+        grid-template-columns:
+            1fr;
+    }
+
+    .toolbar-actions {
+        margin-top:
+            10px;
+    }
+
+    .member-grid {
+        grid-template-columns:
+            1fr;
+    }
+
+}
+
+
+/* MAWAN_PHASE_4B2V4_STAFF_ACTION */
+
+.member-actions {
+    display:
+        flex;
+    padding-top:
+        2px;
+}
+
+.member-manage {
+    width:
+        100%;
+    min-height:
+        42px;
+    display:
+        flex;
+    align-items:
+        center;
+    justify-content:
+        space-between;
+    padding:
+        0 13px;
+    border:
+        1px solid
+        rgba(
+            223,
+            183,
+            92,
+            .25
+        );
+    border-radius:
+        9px;
+    color:
+        var(
+            --gold2,
+            #f2d68d
+        );
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .055
+        );
+    font-size:
+        13px;
+    font-weight:
+        900;
+}
+
+.member-manage:hover {
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .5
+        );
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .11
+        );
+}
+
 </style>
 
-    {% if message %}
-        <div class="notice success-box">{{ message }}</div>
-    {% endif %}
 
-    {% if error %}
-        <div class="notice error-box">{{ error }}</div>
-    {% endif %}
 
-    <div class="panel">
-        <div class="staff-page-header">
-            <div>
-                <h2>人員名單</h2>
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+</head>
+
+<body class="mw-r5-admin">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_admin_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                STAFF MANAGEMENT
             </div>
-            <form method="post" action="/admin/staff/sync">
-                <button class="button" type="submit">立即同步 Discord 成員</button>
-            </form>
+
+            <h1>
+                人員管理
+            </h1>
+
+            <p>
+                管理店內人員、身分、個人牆與服務紀錄。
+            </p>
+
+        </header>
+
+        <div class="mw-r5-legacy-body">
+
+
+
+{% from "_discord_avatar.html" import discord_avatar %}
+
+
+<div class="shell">
+
+
+
+
+<main class="main">
+
+<header class="top">
+
+    <div>
+
+        <div class="eyebrow">
+            STAFF MANAGEMENT
         </div>
+
+        
+
+        <div class="subtitle">
+            查看目前 Discord 同步的人員、身分與啟用狀態。
+            人員資格仍以 Discord 身分組為準，
+            此頁負責快速搜尋與管理檢視。
+        </div>
+
     </div>
 
-    <div class="staff-stats-grid">
-        <div class="panel staff-stat-card">
-            <h2>可接單人員</h2>
-            <p class="big-number">{{ stats.active }}</p>
-            <p>目前可接單的同步人員。</p>
-        </div>
 
-        <div class="panel staff-stat-card">
-            <h2>客服</h2>
-            <p class="big-number">{{ stats.customer_service }}</p>
-            <p>有客服身分組。</p>
-        </div>
+    <div class="actions">
 
-        <div class="panel staff-stat-card">
-            <h2>打手</h2>
-            <p class="big-number">{{ stats.worker }}</p>
-            <p>有打手身分組。</p>
-        </div>
+        <form
+            method="post"
+            action="/admin/staff/sync"
+        >
 
-        <div class="panel staff-stat-card">
-            <h2>陪玩</h2>
-            <p class="big-number">{{ stats.companion }}</p>
-            <p>有陪玩身分組。</p>
-        </div>
+            <button
+                class="
+                    button
+                    gold
+                "
+                type="submit"
+            >
+                同步 Discord 成員
+            </button>
+
+        </form>
+
+
+        <a
+            class="button"
+            href="/admin"
+        >
+            返回總覽
+        </a>
+
     </div>
 
-    <div class="panel">
-        <h2>篩選</h2>
+</header>
 
-        <form class="staff-filter-form" method="get" action="/admin/staff">
-            <select class="input" name="role">
-                <option value="all" {% if role == "all" %}selected{% endif %}>全部</option>
-                <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
-                <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
-                <option value="companion" {% if role == "companion" %}selected{% endif %}>陪玩</option>
+
+{% if message %}
+
+    <div class="notice success">
+        {{ message }}
+    </div>
+
+{% endif %}
+
+
+{% if error %}
+
+    <div class="notice error">
+        {{ error }}
+    </div>
+
+{% endif %}
+
+
+<section class="stats">
+
+    <div class="stat">
+
+        <span>
+            全部人員
+        </span>
+
+        <strong>
+            {{ stats.total }}
+        </strong>
+
+    </div>
+
+
+    <div class="stat">
+
+        <span>
+            啟用中
+        </span>
+
+        <strong>
+            {{ stats.active }}
+        </strong>
+
+    </div>
+
+
+    <div class="stat">
+
+        <span>
+            已停用
+        </span>
+
+        <strong>
+            {{ stats.inactive }}
+        </strong>
+
+    </div>
+
+
+    <div class="stat">
+
+        <span>
+            客服
+        </span>
+
+        <strong>
+            {{ stats.customer_service }}
+        </strong>
+
+    </div>
+
+
+    <div class="stat">
+
+        <span>
+            護航
+        </span>
+
+        <strong>
+            {{ stats.worker }}
+        </strong>
+
+    </div>
+
+
+    <div class="stat">
+
+        <span>
+            陪玩
+        </span>
+
+        <strong>
+            {{ stats.companion }}
+        </strong>
+
+    </div>
+
+</section>
+
+
+<section class="toolbar">
+
+    <form
+        class="filters"
+        method="get"
+        action="/admin/staff"
+    >
+
+        <div class="field">
+
+            <label>
+                身分
+            </label>
+
+            <select
+                class="select"
+                name="role"
+            >
+
+                <option
+                    value="all"
+                    {% if role == "all" %}
+                        selected
+                    {% endif %}
+                >
+                    全部身分
+                </option>
+
+
+                {% for option in role_filter_options %}
+
+                    {% if option.value %}
+
+                        <option
+                            value="{{ option.value }}"
+                            {% if role == option.value %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ option.label }}
+                        </option>
+
+                    {% endif %}
+
+                {% endfor %}
+
             </select>
 
-            <input class="input" type="text" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
+        </div>
 
-            <button class="button" type="submit">套用篩選</button>
-        </form>
+
+        <div class="field">
+
+            <label>
+                狀態
+            </label>
+
+            <select
+                class="select"
+                name="status"
+            >
+
+                <option
+                    value="active"
+                    {% if status == "active" %}
+                        selected
+                    {% endif %}
+                >
+                    啟用中
+                </option>
+
+                <option
+                    value="inactive"
+                    {% if status == "inactive" %}
+                        selected
+                    {% endif %}
+                >
+                    已停用
+                </option>
+
+                <option
+                    value="all"
+                    {% if status == "all" %}
+                        selected
+                    {% endif %}
+                >
+                    全部
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="field">
+
+            <label>
+                搜尋
+            </label>
+
+            <input
+                class="input"
+                type="search"
+                name="q"
+                value="{{ q }}"
+                placeholder="名稱、Discord ID..."
+            >
+
+        </div>
+
+
+        <div class="toolbar-actions">
+
+            <button
+                class="button gold"
+                type="submit"
+            >
+                套用
+            </button>
+
+            {% if
+                q
+                or role != "all"
+                or status != "active"
+            %}
+
+                <a
+                    class="button"
+                    href="/admin/staff"
+                >
+                    清除
+                </a>
+
+            {% endif %}
+
+        </div>
+
+    </form>
+
+
+    <div>
+
+        <span
+            style="
+                color:var(--muted);
+                font-size:12px;
+            "
+        >
+            目前顯示
+            <strong
+                style="
+                    color:var(--gold2);
+                "
+            >
+                {{ members | length }}
+            </strong>
+            人
+        </span>
+
     </div>
 
-    <div class="panel">
-        <h2>名單</h2>
+</section>
 
-        {% if members %}
-            <div class="admin-order-list compact-list">
-                {% for member in members %}
-                    <article class="admin-worker-card compact-card">
-                        <div class="order-card-header compact-header">
-                            {% set member_name = member.display_name or member.global_name or member.username or member.discord_id %}
-                            {% set avatar_ext = "gif" if member.avatar and member.avatar[:2] == "a_" else "png" %}
-                            {% set avatar_url = "https://cdn.discordapp.com/avatars/" ~ member.discord_id ~ "/" ~ member.avatar ~ "." ~ avatar_ext ~ "?size=128" if member.avatar else "" %}
 
-                            <div class="staff-person-block">
-                                <div class="staff-avatar">
-                                    {% if avatar_url %}
-                                        <img src="{{ avatar_url }}" alt="{{ member_name }}">
-                                    {% else %}
-                                        <span>{{ member_name[:1] }}</span>
-                                    {% endif %}
-                                </div>
+<section class="panel">
 
-                                <div class="staff-person-meta">
-                                    <strong>{{ member_name }}</strong>
-                                    <p class="muted-text">ID：{{ member.discord_id }}</p>
-                                </div>
-                            </div>
+    <div class="panel-head">
 
-                            <div class="staff-role-chips">
-                                {% if member.is_customer_service %}<span class="chip">客服</span>{% endif %}
-                                {% if member.is_worker %}<span class="chip">打手</span>{% endif %}
-                                {% if member.is_companion %}<span class="chip">陪玩</span>{% endif %}
-                            </div>
+        <div>
+
+            <h2>
+                成員列表
+            </h2>
+
+            <small>
+
+                {% if status == "active" %}
+
+                    顯示目前啟用中的人員
+
+                {% elif status == "inactive" %}
+
+                    顯示目前已停用的人員
+
+                {% else %}
+
+                    顯示全部同步人員
+
+                {% endif %}
+
+            </small>
+
+        </div>
+
+    </div>
+
+
+    {% if members %}
+
+        <div class="member-grid">
+
+            {% for member in members %}
+
+                {% set display_name =
+                    member.display_name
+                    or member.global_name
+                    or member.username
+                    or member.discord_id
+                %}
+
+
+                <article
+                    class="
+                        member
+                        {% if not member.is_active %}
+                            inactive
+                        {% endif %}
+                    "
+                >
+
+                    <div class="member-top">
+
+                        <div class="avatar">
+
+                            {{
+                                discord_avatar(
+                                    member.discord_id,
+                                    display_name,
+                                    128,
+                                    ""
+                                )
+                            }}
+
                         </div>
 
-                        <p class="muted-text">
-                            Discord：{{ member.username or "未記錄" }}
-                            ｜最後同步：{{ member.last_synced_at or "未記錄" }}
-                        </p>
-                    </article>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state">沒有符合條件的人員。</div>
-        {% endif %}
-    </div>
-{% endblock %}
+
+                        <div class="member-copy">
+
+                            <h3 class="member-name">
+                                {{ display_name }}
+                            </h3>
+
+                            <div class="member-id">
+                                {{ member.discord_id }}
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="tags">
+
+                        {% if not member.is_active %}
+
+                            <span
+                                class="
+                                    tag
+                                    inactive
+                                "
+                            >
+                                已停用
+                            </span>
+
+                        {% endif %}
+
+
+                        {% if member.is_customer_service %}
+
+                            <span
+                                class="
+                                    tag
+                                    cs
+                                "
+                            >
+                                {{
+                                    customer_service_label
+                                    or "客服"
+                                }}
+                            </span>
+
+                        {% endif %}
+
+
+                        {% if
+                            member.receiver_role_labels
+                            is defined
+                            and
+                            member.receiver_role_labels
+                        %}
+
+                            {% for role_label in member.receiver_role_labels %}
+
+                                <span class="tag">
+                                    {{ role_label }}
+                                </span>
+
+                            {% endfor %}
+
+                        {% else %}
+
+                            {% if member.is_worker %}
+
+                                <span class="tag">
+                                    護航
+                                </span>
+
+                            {% endif %}
+
+
+                            {% if member.is_companion %}
+
+                                <span
+                                    class="
+                                        tag
+                                        play
+                                    "
+                                >
+                                    陪玩
+                                </span>
+
+                            {% endif %}
+
+                        {% endif %}
+
+
+                        {% if
+                            not member.is_customer_service
+                            and not member.is_worker
+                            and not member.is_companion
+                        %}
+
+                            <span class="tag">
+                                其他人員
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <div class="member-bottom">
+
+                        <div class="member-info">
+
+                            <span>
+                                Discord 名稱
+                            </span>
+
+                            <strong>
+                                {{
+                                    member.username
+                                    or
+                                    member.global_name
+                                    or
+                                    "—"
+                                }}
+                            </strong>
+
+                        </div>
+
+
+                        <div class="member-info">
+
+                            <span>
+                                狀態
+                            </span>
+
+                            <strong>
+
+                                {% if member.is_active %}
+                                    啟用中
+                                {% else %}
+                                    已停用
+                                {% endif %}
+
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                
+
+                    <div class="member-actions">
+
+                        <a
+                            class="member-manage"
+                            href="/admin/staff/{{ member.discord_id }}"
+                        >
+
+                            <span>
+                                管理工作區
+                            </span>
+
+                            <span>
+                                →
+                            </span>
+
+                        </a>
+
+                    </div>
+
+<!-- MAWAN_PHASE_4B2V4_STAFF_ACTION -->
+</article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="empty">
+            目前沒有符合條件的人員
+        </div>
+
+    {% endif %}
+
+</section>
+
+</main>
+
+</div>
+
+
+
+
+        </div>
+
+    </section>
+
+</div>
+</body>
+</html>

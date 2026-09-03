@@ -1,42 +1,93 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="/static/css/app.css">
+    <meta charset="utf-8">
+    <title>魔丸娛樂中控｜登入</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/mw_redesign.css?v=1">
+    <style>
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            font-family: "Microsoft JhengHei", system-ui, sans-serif;
+        }
+
+        .login-shell {
+            width: min(920px, calc(100% - 32px));
+        }
+
+        .login-panel {
+            margin-top: 20px;
+            border-radius: 28px;
+            border: 1px solid var(--mw-line);
+            background:
+                linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.03)),
+                rgba(10, 13, 22, .92);
+            padding: 28px;
+            box-shadow: 0 30px 90px rgba(0,0,0,.38);
+        }
+
+        .login-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .button {
+            display: inline-flex;
+            padding: 12px 18px;
+            text-decoration: none;
+        }
+
+        .danger {
+            border-color: rgba(255, 91, 118, .45);
+            background: rgba(255, 91, 118, .14);
+        }
+
+        .role-note {
+            color: var(--mw-muted);
+            line-height: 1.8;
+        }
+    </style>
 </head>
 <body>
-    <main class="page">
-        <section class="card">
-            <p class="eyebrow">MW Dashboard</p>
-            <h1>魔丸打手系統</h1>
-            <p>使用 Discord 登入後，可依身分組進入總控、派單頁面與分潤查詢。</p>
+    <main class="login-shell">
+        <section class="mw-hero">
+            <h1 class="mw-title">魔丸娛樂中控</h1>
+            <div class="mw-subtitle">客服、護航、陪玩、派單與歷史訂單管理入口</div>
+        </section>
 
+        <section class="login-panel">
             {% if user %}
-                <div class="panel compact">
-                    <h2>已登入</h2>
-                    <p>目前登入：{{ user.global_name or user.username }}</p>
+                <h2>已登入</h2>
+                <p class="role-note">目前登入：{{ user.global_name or user.username }}</p>
 
-                    <div class="actions">
-                        {% if user.is_admin %}
-                            <a class="button" href="/admin">進入總控後台</a>
-                        {% endif %}
+                <div class="login-actions">
+                    {% if user.is_admin %}
+                        <a class="button" href="/admin">進入客服後台</a>
+                        <a class="button" href="/admin/staff">人員名單</a>
+                    {% endif %}
 
-                        {% if user.is_worker or user.is_admin %}
-                            <a class="button secondary" href="/dispatch">進入派單頁面</a>
-                        {% endif %}
+                    {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}
+                        <a class="button" href="/dispatch">進入派單頁面</a>
+                        <a class="button" href="/my/payouts">我的分潤</a>
+                    {% endif %}
 
-                        <a class="button danger" href="/auth/logout">登出</a>
-                    </div>
+                    <a class="button danger" href="/auth/logout">登出</a>
                 </div>
             {% else %}
-                <a class="button" href="/auth/discord/login">
-                    Discord 登入
-                </a>
-
-                <p class="hint">
-                    登入後會自動檢查你的 Discord 身分組。
+                <h2>登入網站</h2>
+                <p class="role-note">
+                    使用 Discord 登入後，系統會依照你的 Discord 身分組開放可使用的分頁。
+                    魔丸♫客服、魔丸♛頂護、魔丸♝女護、魔丸♜男護、魔丸♞男陪、魔丸♟女陪皆可進入原本接單相關頁面。
                 </p>
+
+                <div class="login-actions">
+                    <a class="button" href="/auth/discord/login">使用 Discord 登入</a>
+                </div>
             {% endif %}
         </section>
     </main>

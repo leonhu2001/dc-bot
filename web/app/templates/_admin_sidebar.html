@@ -1,0 +1,63 @@
+
+{% set _p = request.url.path %}
+
+<aside class="mw-r5-sidebar">
+
+    <div class="mw-r5-brand">
+        <small>MOWAN OPERATIONS</small>
+        <strong>魔丸娛樂</strong>
+    </div>
+
+    <nav class="mw-r5-nav">
+
+        <a
+            class="{% if _p == '/admin' %}active{% endif %}"
+            href="/admin"
+        >
+            營運總覽
+        </a>
+
+        
+
+        <a
+            class="{% if _p.startswith('/admin/staff') %}active{% endif %}"
+            href="/admin/staff"
+        >
+            人員管理
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') %}active{% endif %}"
+            href="/admin/customers"
+        >
+            客戶管理
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/payout') %}active{% endif %}"
+            href="/admin/payouts/summary"
+        >
+            薪資結算
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/reviews') %}active{% endif %}"
+            href="/admin/reviews/"
+        >
+            評價管理
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/audit') %}active{% endif %}"
+            href="/admin/audit"
+        >
+            操作紀錄
+        </a>
+
+        <a href="/">
+            返回官網
+        </a>
+
+    </nav>
+
+</aside>

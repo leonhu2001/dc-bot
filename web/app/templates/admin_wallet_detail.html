@@ -1,0 +1,324 @@
+{% extends "layout.html" %}
+
+{% block page_title %}錢包流水{% endblock %}
+
+{% block content %}
+<style>
+.wallet-detail-page {
+    display: grid;
+    gap: 18px;
+}
+
+.wallet-detail-command {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.wallet-detail-identity,
+.wallet-detail-actions,
+.wallet-detail-panel,
+.wallet-detail-stat {
+    border: 1px solid rgba(245, 198, 107, .18);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.28);
+}
+
+.wallet-detail-identity {
+    position: relative;
+    overflow: hidden;
+    padding: 22px;
+}
+
+.wallet-detail-identity::after {
+    content: "LOG";
+    position: absolute;
+    right: 18px;
+    bottom: 8px;
+    color: rgba(255,255,255,.045);
+    font-size: 82px;
+    font-weight: 950;
+    letter-spacing: .18em;
+    pointer-events: none;
+}
+
+.wallet-detail-identity .order-no {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .16em;
+}
+
+.wallet-detail-identity h2 {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 8px;
+    font-size: 30px;
+    letter-spacing: .08em;
+    word-break: break-word;
+}
+
+.wallet-detail-identity p {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: var(--mw-muted, #a7a0b5);
+    line-height: 1.8;
+}
+
+.wallet-code {
+    color: rgba(255,255,255,.58);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    word-break: break-all;
+}
+
+.wallet-detail-actions {
+    padding: 18px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: flex-end;
+}
+
+.wallet-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.wallet-detail-stat {
+    min-height: 118px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.wallet-detail-stat span {
+    display: block;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 13px;
+    font-weight: 900;
+    margin-bottom: 10px;
+}
+
+.wallet-detail-stat strong {
+    display: block;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 950;
+}
+
+.wallet-detail-panel {
+    overflow: hidden;
+}
+
+.wallet-detail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
+}
+
+.wallet-detail-head h3 {
+    margin: 4px 0 0;
+    font-size: 24px;
+    letter-spacing: .08em;
+}
+
+.wallet-limit-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.wallet-limit-form input {
+    width: 90px;
+    min-height: 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.3);
+    color: var(--mw-text, #f4f0e8);
+    padding: 8px 10px;
+}
+
+.wallet-table-wrap {
+    overflow-x: auto;
+}
+
+.wallet-table {
+    width: 100%;
+    min-width: 1120px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.wallet-table th,
+.wallet-table td {
+    padding: 13px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.wallet-table th {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .08em;
+    background: rgba(255,255,255,.025);
+    white-space: nowrap;
+}
+
+.wallet-table tbody tr:hover td {
+    background: rgba(245,198,107,.045);
+}
+
+.wallet-amount {
+    font-weight: 950 !important;
+}
+
+.wallet-plus {
+    color: #d9ffe8 !important;
+}
+
+.wallet-minus {
+    color: #ffd7df !important;
+}
+
+.wallet-pill {
+    display: inline-flex;
+    border: 1px solid rgba(245,198,107,.25);
+    background: rgba(245,198,107,.08);
+    border-radius: 999px;
+    padding: 5px 10px;
+    color: #ffe3a3;
+    font-weight: 950;
+}
+
+.wallet-note {
+    max-width: 380px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--mw-muted, #a7a0b5);
+}
+
+.wallet-empty {
+    text-align: center !important;
+    padding: 34px !important;
+    color: var(--mw-muted, #a7a0b5) !important;
+}
+
+@media (max-width: 920px) {
+    .wallet-detail-command,
+    .wallet-detail-stats,
+    .wallet-detail-head {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+    }
+
+    .wallet-detail-actions {
+        justify-content: flex-start;
+    }
+}
+</style>
+
+<section class="wallet-detail-page">
+    <section class="wallet-detail-command">
+        <div class="wallet-detail-identity">
+            <p class="order-no">CUSTOMER WALLET</p>
+            <h2>{{ wallet.customer_display_name }}</h2>
+            <p>Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span></p>
+        </div>
+
+        <div class="wallet-detail-actions">
+            <a class="button" href="/admin/wallets">返回錢包總覽</a>
+            <a class="button secondary" href="/admin">返回後台</a>
+        </div>
+    </section>
+
+    <section class="wallet-detail-stats">
+        <article class="wallet-detail-stat">
+            <span>目前餘額</span>
+            <strong>{{ wallet.balance_text }}</strong>
+        </article>
+
+        <article class="wallet-detail-stat">
+            <span>最後更新</span>
+            <strong>{{ wallet.updated_at_text or "—" }}</strong>
+        </article>
+    </section>
+
+    <section class="wallet-detail-panel">
+        <div class="wallet-detail-head">
+            <div>
+                <p class="order-no">TRANSACTION LOG</p>
+                <h3>錢包異動流水</h3>
+            </div>
+
+            <form class="wallet-limit-form" method="get" action="/admin/wallets/{{ wallet.customer_discord_id }}">
+                <input type="number" name="limit" min="1" max="300" value="{{ limit }}">
+                <button class="button" type="submit">筆數</button>
+            </form>
+        </div>
+
+        <div class="wallet-table-wrap">
+            <table class="wallet-table">
+                <thead>
+                    <tr>
+                        <th>時間</th>
+                        <th>類型</th>
+                        <th>異動</th>
+                        <th>異動前</th>
+                        <th>異動後</th>
+                        <th>訂單</th>
+                        <th>操作人</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.created_at_text or "—" }}</td>
+                        <td><span class="wallet-pill">{{ tx.type_label }}</span></td>
+                        <td class="wallet-amount {% if tx.amount > 0 %}wallet-plus{% else %}wallet-minus{% endif %}">
+                            {{ tx.amount_text }}
+                        </td>
+                        <td>{{ tx.balance_before_text }}</td>
+                        <td>{{ tx.balance_after_text }}</td>
+                        <td>
+                            {% if tx.order_no %}
+                                <span class="wallet-code">{{ tx.order_no }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if tx.operator_display_name %}
+                                {{ tx.operator_display_name }}
+                            {% elif tx.operator_discord_id %}
+                                <span class="wallet-code">{{ tx.operator_discord_id }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="wallet-note">{{ tx.note or "—" }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="wallet-empty">目前沒有錢包流水。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+{% endblock %}

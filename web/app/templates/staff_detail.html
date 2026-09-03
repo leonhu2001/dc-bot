@@ -1,0 +1,257 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="staff-detail-hero">
+
+    <div class="staff-detail-shell">
+
+        <div class="staff-detail-photo">
+
+            <img
+                class="staff-detail-main-image"
+                src="{{ profile.avatar_url }}"
+                alt="{{ profile.display_name }}"
+                decoding="async"
+                onerror="this.onerror=null;this.src='/static/img/server_logo.gif';this.classList.add('avatar-fallback');"
+            >
+
+            <span>
+                {{ profile.role_title }}
+            </span>
+
+        </div>
+
+
+        <div class="staff-detail-copy">
+
+            <a
+                class="staff-back"
+                href="/staff"
+            >
+                ← 回陪玩陣容
+            </a>
+
+            <div class="section-eyebrow">
+                MOWAN CREW
+            </div>
+
+            <h1>
+                {{ profile.display_name }}
+            </h1>
+
+            {% if profile.main_games %}
+                <p class="staff-games">
+                    {{ profile.main_games }}
+                </p>
+            {% endif %}
+
+
+            <div class="staff-detail-stats">
+
+                <div>
+                    <strong>
+                        {{ profile.average_rating_text }}
+                    </strong>
+
+                    <span>
+                        平均評分
+                    </span>
+                </div>
+
+                <div>
+                    <strong>
+                        {{ profile.review_count }}
+                    </strong>
+
+                    <span>
+                        公開評價
+                    </span>
+                </div>
+
+                <div>
+                    <strong>
+                        {{ profile.completed_count }}
+                    </strong>
+
+                    <span>
+                        完成訂單
+                    </span>
+                </div>
+
+                <div>
+                    <strong>
+                        {{ profile.favorite_count }}
+                    </strong>
+
+                    <span>
+                        收藏
+                    </span>
+                </div>
+
+            </div>
+
+
+            {% if profile.service_tags %}
+                <div class="staff-service-tags">
+
+                    {% for tag in profile.service_tags.split(',') %}
+                        {% if tag.strip() %}
+                            <span>
+                                {{ tag.strip() }}
+                            </span>
+                        {% endif %}
+                    {% endfor %}
+
+                </div>
+            {% endif %}
+
+
+            <div class="staff-detail-actions">
+
+                {% if user %}
+
+                    <form
+                        method="post"
+                        action="/staff/{{ profile.staff_id }}/favorite"
+                    >
+                        <button
+                            class="button button-secondary"
+                            type="submit"
+                        >
+                            {% if profile.is_favorite %}
+                                ♥ 已收藏
+                            {% else %}
+                                ♡ 收藏
+                            {% endif %}
+                        </button>
+                    </form>
+
+                {% else %}
+
+                    <a
+                        class="button button-secondary"
+                        href="/auth/discord/login"
+                    >
+                        ♡ 登入後收藏
+                    </a>
+
+                {% endif %}
+
+
+                <a
+                    class="button button-primary"
+                    href="/order?staff={{ profile.staff_id }}"
+                >
+                    指定下單
+                    <span>→</span>
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<section class="site-section staff-detail-body">
+
+    <div class="staff-bio-card">
+
+        <div class="section-eyebrow">
+            ABOUT
+        </div>
+
+        <h2>
+            關於 {{ profile.display_name }}
+        </h2>
+
+        {% if profile.bio %}
+            <p>
+                {{ profile.bio }}
+            </p>
+        {% else %}
+            <p class="muted-public">
+                這位成員目前還沒有填寫自我介紹。
+            </p>
+        {% endif %}
+
+    </div>
+
+
+    <div class="staff-reviews-card">
+
+        <div class="staff-review-head">
+
+            <div>
+                <div class="section-eyebrow">
+                    REVIEWS
+                </div>
+
+                <h2>
+                    老闆怎麼說
+                </h2>
+            </div>
+
+            <span>
+                {{ profile.review_count }} 則公開評價
+            </span>
+
+        </div>
+
+
+        {% if profile.reviews %}
+
+            <div class="public-review-list">
+
+                {% for review in profile.reviews %}
+
+                    <article class="public-review">
+
+                        <div class="review-stars">
+                            {% for i in range(review.rating) %}
+                                ★
+                            {% endfor %}
+                        </div>
+
+                        <p>
+                            {{ review.comment }}
+                        </p>
+
+                        <div>
+                            <span>
+                                {{ review.service_item or "魔丸訂單" }}
+                            </span>
+
+                            <small>
+                                {{ review.created_at }}
+                            </small>
+                        </div>
+
+                    </article>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <div class="crew-empty-state crew-empty-small">
+
+                <div>☆</div>
+
+                <h3>
+                    目前還沒有公開評價
+                </h3>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</section>
+
+{% endblock %}

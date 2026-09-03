@@ -1,45 +1,171 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <title>魔丸打手系統</title>
-    <link rel="stylesheet" href="/static/css/app.css">
+    <meta charset="utf-8">
+    <title>魔丸娛樂中控</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/mw_redesign.css?v=1">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Microsoft JhengHei", system-ui, sans-serif;
+        }
+
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 34px 0 56px;
+        }
+
+        .top-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .button {
+            display: inline-flex;
+            padding: 12px 18px;
+            text-decoration: none;
+        }
+
+        .grid-wrap {
+            margin-top: 20px;
+        }
+    </style>
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
 </head>
-<body>
-    <main class="page">
-        <section class="card dashboard-card">
-            <h1>魔丸打手系統</h1>
+<body class="mw-r5-employee">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_employee_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                STAFF CENTER
+            </div>
+
+            <h1>
+                員工中心
+            </h1>
 
             <p>
-                歡迎，<strong>{{ global_name or username }}</strong>
+                快速進入接單、完整薪資與個人中心。
             </p>
 
-            <p class="hint">
-                Discord ID：{{ discord_id }}
+        </header>
+
+        <div class="mw-r5-legacy-body">
+
+
+<section class="mw-r5-employee-links">
+
+    <a
+        class="mw-r5-employee-link"
+        href="/dispatch"
+    >
+
+        <div>
+            <small>ORDER DISPATCH</small>
+            <strong>接單大廳</strong>
+            <p>
+                查看目前可接訂單，以及自己正在進行的訂單。
             </p>
+        </div>
 
-            <div class="panel-list">
-                {% if is_admin %}
-                    <a class="panel-link" href="/admin">
-                        總控後台
-                        <span>管理訂單、打手、分潤與後台資料</span>
-                    </a>
-                {% endif %}
+        <span>→</span>
 
-                {% if is_worker %}
-                    <a class="panel-link" href="/dispatch">
-                        派單頁面
-                        <span>查看可接訂單與我的接單狀態</span>
-                    </a>
-                {% endif %}
+    </a>
 
-                {% if not is_admin and not is_worker %}
-                    <div class="no-access">
-                        你目前沒有網站權限，請確認 Discord 身分組。
-                    </div>
-                {% endif %}
-            </div>
+
+    <a
+        class="mw-r5-employee-link"
+        href="/my/payouts"
+    >
+
+        <div>
+            <small>PAYOUT CENTER</small>
+            <strong>完整薪資</strong>
+            <p>
+                查看本月薪資、結算狀態與歷史明細。
+            </p>
+        </div>
+
+        <span>→</span>
+
+    </a>
+
+</section>
+
+
+
+
+
+    <main class="shell">
+        <div class="top-actions">
+            <a class="button" href="/auth/logout">登出</a>
+        </div>
+
+        <section class="mw-hero">
+            
+            <div class="mw-subtitle">選擇你要前往的管理分頁</div>
+        </section>
+
+        <section class="grid-wrap mw-grid">
+            {% if is_admin %}
+                <a class="mw-action-card" href="/admin">
+                    <strong>客服後台</strong>
+                    <span>訂單、分潤、營運總覽</span>
+                </a>
+
+                <a class="mw-action-card" href="/admin/staff">
+                    <strong>人員名單</strong>
+                    <span>客服、護航、陪玩同步與篩選</span>
+                </a>
+
+                <a class="mw-action-card" href="/order-history">
+                    <strong>歷史訂單</strong>
+                    <span>保留既有訂單資料，只更新外觀</span>
+                </a>
+            {% endif %}
+
+            {% if is_worker or is_companion or is_admin %}
+                <a class="mw-action-card" href="/dispatch">
+                    <strong>派單頁</strong>
+                    <span>查看與承接可接訂單</span>
+                </a>
+            {% endif %}
+
+            {% if is_worker or is_companion or is_customer_service or is_admin %}
+                <a class="mw-action-card" href="/my/payouts">
+                    <strong>我的分潤</strong>
+                    <span>查看個人分潤紀錄</span>
+                </a>
+            {% endif %}
+
+            {% if not is_admin and not is_worker and not is_companion and not is_customer_service %}
+                <div class="mw-action-card">
+                    <strong>沒有可使用分頁</strong>
+                    <span>請確認 Discord 身分組是否正確。</span>
+                </div>
+            {% endif %}
         </section>
     </main>
+
+
+        </div>
+
+    </section>
+
+</div>
 </body>
 </html>

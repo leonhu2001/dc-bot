@@ -6,6 +6,12 @@ from shared.db import SessionLocal
 from shared.models import WebOrder
 
 
+
+def _web_order_closed_at_now():
+    """網站訂單結單時間：使用台北時間。"""
+    from datetime import datetime, timedelta
+    return datetime.utcnow() + timedelta(hours=8)
+
 def _to_text_id(value) -> str | None:
     if value is None:
         return None
@@ -35,6 +41,12 @@ def upsert_web_order_from_dispatch(
     quantity,
     amount,
     payment_method: str | None,
+    original_amount=None,
+    payout_base_amount=None,
+    customer_pay_amount=None,
+    manual_discount_amount=None,
+    cash_coupon_amount=None,
+    store_absorbed_amount=None,
     status: str = "active",
     customer_service_discord_id=None,
     customer_service_display_name: str | None = None,
@@ -91,14 +103,43 @@ def upsert_web_order_from_dispatch(
         order.item = str(item or "未紀錄")
         order.quantity = _to_int(quantity, 1) or 1
         order.amount = _to_int(amount, 0)
-        order.payment_method = payment_method or "未紀錄"
-        order.status = str(status or "active")
 
+        if original_amount is not None:
+            order.original_amount = _to_int(original_amount, order.amount)
+        elif getattr(order, "original_amount", None) is None:
+            order.original_amount = order.amount
+
+        if payout_base_amount is not None:
+            order.payout_base_amount = _to_int(payout_base_amount, order.amount)
+        elif getattr(order, "payout_base_amount", None) is None:
+            order.payout_base_amount = order.amount
+
+        if customer_pay_amount is not None:
+            order.customer_pay_amount = _to_int(customer_pay_amount, order.amount)
+        elif getattr(order, "customer_pay_amount", None) is None:
+            order.customer_pay_amount = order.amount
+
+        if manual_discount_amount is not None:
+            order.manual_discount_amount = _to_int(manual_discount_amount, 0)
+
+        if cash_coupon_amount is not None:
+            order.cash_coupon_amount = _to_int(cash_coupon_amount, 0)
+
+        if store_absorbed_amount is not None:
+            order.store_absorbed_amount = _to_int(store_absorbed_amount, 0)
+
+        order.payment_method = payment_method or "未紀錄"
+        next_status = str(status or "active")
+        order.status = next_status
+        if next_status in {"closed", "cancelled", "canceled"} and not getattr(order, "closed_at", None):
+            order.closed_at = _web_order_closed_at_now()
         order.customer_service_discord_id = _to_text_id(customer_service_discord_id)
         order.customer_service_display_name = customer_service_display_name
 
         if note:
-            order.note = note
+            note_text = str(note).strip()
+            if note_text and not note_text.startswith("由 DC bot"):
+                order.note = note_text
 
         db.commit()
         db.refresh(order)
@@ -136,14 +177,20 @@ def update_web_order_status_by_ticket_channel(
         if order is None:
             return False
 
-        order.status = str(status or "active")
+        next_status = str(status or "active")
 
+        order.status = next_status
+
+        if next_status in {"closed", "cancelled", "canceled"} and not getattr(order, "closed_at", None):
+            order.closed_at = _web_order_closed_at_now()
         dispatch_message_id_text = _to_text_id(dispatch_message_id)
         if dispatch_message_id_text:
             order.dispatch_message_id = dispatch_message_id_text
 
         if note:
-            order.note = note
+            note_text = str(note).strip()
+            if note_text and not note_text.startswith("由 DC bot"):
+                order.note = note_text
 
         db.commit()
         return True
@@ -208,7 +255,11 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
     ]
 
     payout_result = calculate_order_payout(
-        total_amount=int(order.amount or 0),
+        total_amount=int(
+            getattr(order, "payout_base_amount", None)
+            or order.amount
+            or 0
+        ),
         worker_discord_ids=worker_ids,
         named_bonus_worker_ids=named_bonus_worker_ids,
     )
@@ -383,7 +434,7 @@ def sync_dispatch_claims_to_web(
     desired = {}
 
     for user_id in companion_ids:
-        desired[user_id] = "companion"
+        desired[user_id] = "booster"
 
     for user_id in booster_ids:
         desired[user_id] = "booster"

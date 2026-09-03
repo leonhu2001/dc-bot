@@ -242,7 +242,7 @@ def add_worker_to_order(
     worker_display_name = str(worker_display_name or worker_discord_id).strip()
 
     if not worker_discord_id:
-        raise ValueError("請輸入打手 Discord ID。")
+        raise ValueError("請輸入護航 / 陪玩 Discord ID。")
 
     existing_active = db.scalar(
         select(OrderAssignment)
@@ -253,7 +253,7 @@ def add_worker_to_order(
     )
 
     if existing_active is not None:
-        raise ValueError("這位打手已經在這張單裡。")
+        raise ValueError("這位護航 / 陪玩已經在這張單裡。")
 
     assignment = OrderAssignment(
         order_id=order_id,
@@ -391,7 +391,7 @@ def set_worker_payout_status(
     payout = db.get(WorkerPayout, payout_id)
 
     if payout is None:
-        raise ValueError("找不到這筆打手分潤。")
+        raise ValueError("找不到這筆護航 / 陪玩分潤。")
 
     if status not in {PayoutStatus.UNPAID.value, PayoutStatus.PAID.value}:
         raise ValueError("分潤狀態不正確。")
@@ -434,7 +434,7 @@ def set_customer_service_payout_status(
     payout = db.get(CustomerServicePayout, payout_id)
 
     if payout is None:
-        raise ValueError("找不到這筆客服分潤。")
+        raise ValueError("找不到這筆魔丸♫客服分潤。")
 
     if status not in {PayoutStatus.UNPAID.value, PayoutStatus.PAID.value}:
         raise ValueError("分潤狀態不正確。")

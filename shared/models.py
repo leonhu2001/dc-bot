@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
@@ -69,6 +69,16 @@ class WebOrder(Base):
     item: Mapped[str] = mapped_column(String(120))
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     amount: Mapped[int] = mapped_column(Integer, default=0)
+    original_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payout_base_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_pay_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_rule_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    rule_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rule_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manual_discount_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cash_coupon_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    store_absorbed_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     payment_method: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     status: Mapped[str] = mapped_column(String(30), default=OrderStatus.ACTIVE.value)

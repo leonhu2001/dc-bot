@@ -1,441 +1,1082 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
+{% from "_discord_avatar.html" import discord_avatar %}
 
 {% block page_title %}人員總表{% endblock %}
 
 {% block content %}
 <style>
-.payout-ledger-note {
-    color: rgba(169, 159, 145, 0.9);
-    margin-top: 6px;
+.staff-summary-page {
+    display: grid;
+    gap: 20px;
+    background: transparent !important;
 }
 
-.payout-summary-filter {
+.staff-summary-page .panel,
+.staff-summary-page > section,
+.staff-summary-ledger-panel,
+.staff-summary-ledger-head,
+.staff-summary-table-wrap,
+.staff-summary-table,
+.staff-summary-table thead,
+.staff-summary-table tbody,
+.staff-summary-table tr,
+.staff-summary-table th,
+.staff-summary-table td,
+.staff-summary-detail-row,
+.staff-summary-detail-row td,
+.staff-summary-detail {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+.staff-summary-filter {
     display: grid;
-    grid-template-columns: 180px 180px minmax(260px, 1fr) auto auto;
+    grid-template-columns: minmax(180px, 220px) minmax(180px, 220px) minmax(260px, 1fr) auto auto;
     gap: 12px;
     align-items: end;
+    border: 1px solid rgba(190, 151, 86, 0.42);
+    border-radius: 18px;
+    padding: 16px;
 }
 
-.payout-summary-filter .button {
-    min-height: 40px;
-    white-space: nowrap;
+.staff-summary-filter label {
+    display: grid;
+    gap: 7px;
 }
 
-.summary-total-grid {
+.staff-summary-filter label span {
+    font-size: 15px;
+    font-weight: 900;
+    color: rgba(255, 244, 214, 0.9);
+}
+
+.staff-summary-filter .input {
+    font-size: 15px;
+    background: rgba(0, 0, 0, 0.18) !important;
+    border: 1px solid rgba(190, 151, 86, 0.36) !important;
+}
+
+.staff-summary-total-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
 }
 
-.summary-total-card {
-    border: 1px solid rgba(201, 164, 95, 0.22);
-    border-radius: 16px;
-    background:
-        radial-gradient(circle at 86% 24%, rgba(225, 75, 67, 0.16), transparent 34%),
-        linear-gradient(145deg, rgba(12, 13, 18, 0.92), rgba(5, 6, 8, 0.88));
-    padding: 18px;
+.staff-summary-total-card {
     min-height: 112px;
-}
-
-.summary-total-card span {
-    display: block;
-    color: rgba(226, 200, 134, 0.84);
-    font-size: 13px;
-    font-weight: 800;
-    margin-bottom: 8px;
-}
-
-.summary-total-card strong {
-    display: block;
-    font-size: 32px;
-    line-height: 1.1;
-    color: #fff7e8;
-}
-
-.summary-list {
-    display: grid;
-    gap: 16px;
-}
-
-.summary-list-title {
-    margin: 0 0 14px;
-    font-size: 22px;
-    font-weight: 900;
-}
-
-.summary-person-card {
-    border: 1px solid rgba(201, 164, 95, 0.22);
-    border-radius: 20px;
+    padding: 18px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(116, 78, 42, 0.46);
     background:
-        radial-gradient(circle at 100% 0%, rgba(179, 49, 45, 0.12), transparent 34%),
-        linear-gradient(145deg, rgba(15, 17, 23, 0.92), rgba(5, 6, 8, 0.92));
+        linear-gradient(135deg, rgba(238, 218, 178, 0.94), rgba(203, 180, 137, 0.86)),
+        radial-gradient(circle at 78% 30%, rgba(70, 42, 22, 0.16), transparent 42%) !important;
+    color: #130f0c;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.20);
+    position: relative;
     overflow: hidden;
-    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
 }
 
-.summary-person-head {
-    padding: 18px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 16px;
-    align-items: center;
-    border-bottom: 1px solid rgba(201, 164, 95, 0.12);
-}
-
-.summary-person-title {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    min-width: 0;
-}
-
-.summary-avatar {
-    width: 46px;
-    height: 46px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    background:
-        radial-gradient(circle at 35% 25%, rgba(225, 75, 67, 0.42), transparent 34%),
-        linear-gradient(145deg, rgba(48, 14, 16, 0.96), rgba(17, 18, 24, 0.96));
-    border: 1px solid rgba(201, 164, 95, 0.42);
+.staff-summary-total-card::after {
+    content: "魔丸";
+    position: absolute;
+    right: 16px;
+    bottom: 12px;
+    color: rgba(128, 24, 18, 0.72);
+    border: 2px solid rgba(128, 24, 18, 0.48);
+    padding: 4px;
     font-weight: 900;
-    color: #fff7e8;
-    box-shadow: 0 0 24px rgba(179, 49, 45, 0.20);
+    font-size: 15px;
+    transform: rotate(-3deg);
 }
 
-.summary-name {
-    margin: 0;
-    font-size: 19px;
-    color: #fff7e8;
-}
-
-.summary-id {
-    margin: 4px 0 0;
-    color: rgba(169, 159, 145, 0.86);
-    font-size: 13px;
-    word-break: break-all;
-}
-
-.summary-person-meta {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.summary-pill {
-    border-radius: 14px;
-    background:
-        linear-gradient(145deg, rgba(10, 11, 15, 0.94), rgba(25, 27, 35, 0.86));
-    border: 1px solid rgba(201, 164, 95, 0.18);
-    padding: 10px 13px;
-    min-width: 96px;
-    text-align: right;
-}
-
-.summary-pill span {
+.staff-summary-total-card span {
     display: block;
-    color: rgba(226, 200, 134, 0.80);
-    font-size: 12px;
+    color: #5b1714;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
+
+.staff-summary-total-card strong {
+    display: block;
+    margin-top: 10px;
+    color: #130f0c;
+    font-size: 36px;
+    line-height: 1;
+}
+
+.staff-summary-total-card small {
+    display: block;
+    margin-top: 10px;
+    color: rgba(23, 18, 14, 0.72);
+    font-size: 14px;
     font-weight: 800;
 }
 
-.summary-pill strong {
-    display: block;
-    margin-top: 4px;
-    font-size: 22px;
-    color: #fff7e8;
+.staff-summary-ledger-panel {
+    border: 1px solid rgba(190, 151, 86, 0.42);
+    border-radius: 18px;
+    overflow: hidden;
 }
 
-.summary-person-actions {
+.staff-summary-ledger-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(190, 151, 86, 0.26);
+}
+
+.staff-summary-ledger-head h2 {
+    margin: 0;
+    color: #fff1cc;
+    font-size: 30px;
+    letter-spacing: 0.08em;
+}
+
+.staff-summary-head-actions {
     display: flex;
     gap: 10px;
-    flex-wrap: wrap;
-    padding: 14px 18px 0;
+    align-items: center;
 }
 
-.summary-person-actions form {
-    margin: 0;
-}
-
-.summary-person-actions .button {
-    min-height: 36px;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 800;
-}
-
-.summary-items {
-    padding: 16px 18px 18px;
+.staff-summary-table-wrap {
     overflow-x: auto;
 }
 
-.summary-table {
+.staff-summary-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    min-width: 760px;
-    border: 1px solid rgba(201, 164, 95, 0.16);
-    border-radius: 14px;
-    overflow: hidden;
+    min-width: 1080px;
+    border-collapse: collapse;
 }
 
-.summary-table th,
-.summary-table td {
-    padding: 11px 9px;
-    border-top: 1px solid rgba(201, 164, 95, 0.10);
+.staff-summary-table th,
+.staff-summary-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(190, 151, 86, 0.22);
+    border-right: 1px solid rgba(190, 151, 86, 0.18);
+    vertical-align: middle;
+}
+
+.staff-summary-table th {
+    color: #e9cf8f;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+.staff-summary-table td {
+    color: rgba(255, 247, 226, 0.93);
+    font-size: 15px;
+}
+
+.staff-person {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 220px;
+}
+
+.staff-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(190, 151, 86, 0.44);
+    background: rgba(0, 0, 0, 0.22);
+    color: #f6dfaa;
+    font-weight: 900;
+}
+
+.staff-person-name {
+    display: block;
+    font-size: 16px;
+    font-weight: 900;
+    color: #fff1cc;
+}
+
+.staff-person-id {
+    display: block;
+    margin-top: 3px;
+    font-size: 13px;
+    color: rgba(255, 247, 226, 0.58);
+}
+
+.staff-role-badge,
+.staff-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    border-radius: 8px;
+    padding: 6px 10px;
+    border: 1px solid rgba(190, 151, 86, 0.36);
+    background: rgba(0, 0, 0, 0.18);
+    color: #f2dfb0;
+    font-weight: 900;
+}
+
+.staff-status-badge.paid {
+    border-color: rgba(86, 155, 92, 0.52);
+    color: #bce3b3;
+}
+
+.staff-status-badge.unpaid {
+    border-color: rgba(198, 73, 56, 0.52);
+    color: #ffad9d;
+}
+
+.staff-status-badge.partial {
+    border-color: rgba(204, 155, 64, 0.56);
+    color: #f2cf8a;
+}
+
+.staff-money {
+    font-size: 17px;
+    font-weight: 900;
+    color: #fff1cc;
+    white-space: nowrap;
+}
+
+.staff-count-main {
+    font-size: 17px;
+    font-weight: 900;
+}
+
+.staff-count-sub {
+    display: block;
+    margin-top: 3px;
+    color: rgba(255, 247, 226, 0.56);
+    font-size: 13px;
+}
+
+.staff-summary-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    white-space: nowrap;
+}
+
+.staff-summary-actions form {
+    display: inline;
+}
+
+.staff-summary-button {
+    border: 1px solid rgba(190, 151, 86, 0.42);
+    border-radius: 8px;
+    padding: 7px 10px;
+    background: rgba(0, 0, 0, 0.18);
+    color: #f2dfb0;
+    font-size: 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.staff-summary-button.primary {
+    border-color: rgba(211, 70, 54, 0.58);
+    background: rgba(125, 25, 20, 0.66);
+    color: #fff1cc;
+}
+
+.staff-summary-detail-row[hidden] {
+    display: none !important;
+}
+
+.staff-summary-detail {
+    padding: 16px 18px;
+    border-top: 1px solid rgba(190, 151, 86, 0.22);
+}
+
+.staff-summary-detail h3 {
+    margin: 0 0 12px;
+    color: #fff1cc;
+    font-size: 22px;
+}
+
+.staff-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.staff-detail-table th,
+.staff-detail-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(190, 151, 86, 0.16);
+    font-size: 14px;
+}
+
+.staff-detail-table th {
+    color: #e9cf8f;
     text-align: left;
 }
 
-.summary-table thead tr {
-    background:
-        linear-gradient(90deg, rgba(80, 19, 18, 0.72), rgba(17, 18, 24, 0.9), rgba(72, 57, 31, 0.42));
-}
-
-.summary-table th {
-    color: rgba(226, 200, 134, 0.94);
-    font-size: 13px;
+.staff-ledger-stamp {
+    display: inline-block;
+    border-radius: 7px;
+    padding: 4px 8px;
     font-weight: 900;
 }
 
-.summary-table td:last-child,
-.summary-table th:last-child {
-    text-align: right;
+.staff-ledger-stamp.paid {
+    background: rgba(56, 107, 60, 0.36);
+    color: #bce3b3;
 }
 
-.summary-status-paid {
-    color: #8ff0be;
-    font-weight: 900;
+.staff-ledger-stamp.unpaid {
+    background: rgba(120, 28, 22, 0.36);
+    color: #ffad9d;
 }
 
-.summary-status-unpaid {
-    color: #70e5ef;
-    font-weight: 900;
+.staff-summary-empty {
+    padding: 24px;
+    color: rgba(255, 247, 226, 0.72);
+    text-align: center;
 }
 
-.summary-empty {
-    border: 1px dashed rgba(201, 164, 95, 0.28);
-    border-radius: 14px;
-    padding: 18px;
-    color: rgba(169, 159, 145, 0.88);
-    background:
-        linear-gradient(145deg, rgba(10, 11, 15, 0.68), rgba(20, 22, 28, 0.5));
+@media (max-width: 1100px) {
+    .staff-summary-filter,
+    .staff-summary-total-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
-@media (max-width: 900px) {
-    .payout-summary-filter {
+@media (max-width: 720px) {
+    .staff-summary-filter,
+    .staff-summary-total-grid {
         grid-template-columns: 1fr;
     }
+}
 
-    .summary-total-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+/* === STAFF SUMMARY TABLE LAYOUT TUNE START === */
+
+/* 表格整體：更像總表，不要每列太高 */
+.staff-summary-table {
+    table-layout: fixed !important;
+    min-width: 1080px !important;
+}
+
+.staff-summary-table th,
+.staff-summary-table td {
+    padding: 10px 12px !important;
+}
+
+/* 欄位寬度重新分配 */
+.staff-summary-table th:nth-child(1),
+.staff-summary-table td:nth-child(1) {
+    width: 29% !important;
+}
+
+.staff-summary-table th:nth-child(2),
+.staff-summary-table td:nth-child(2) {
+    width: 10% !important;
+    text-align: center !important;
+}
+
+.staff-summary-table th:nth-child(3),
+.staff-summary-table td:nth-child(3),
+.staff-summary-table th:nth-child(4),
+.staff-summary-table td:nth-child(4) {
+    width: 10% !important;
+    text-align: right !important;
+}
+
+.staff-summary-table th:nth-child(5),
+.staff-summary-table td:nth-child(5) {
+    width: 12% !important;
+    text-align: center !important;
+}
+
+.staff-summary-table th:nth-child(6),
+.staff-summary-table td:nth-child(6) {
+    width: 11% !important;
+    text-align: center !important;
+}
+
+.staff-summary-table th:nth-child(7),
+.staff-summary-table td:nth-child(7) {
+    width: 18% !important;
+}
+
+/* 人員欄：不要太鬆，ID 稍微淡一點 */
+.staff-person {
+    min-width: 0 !important;
+    gap: 10px !important;
+}
+
+.staff-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    font-size: 15px !important;
+}
+
+.staff-person-name {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+}
+
+.staff-person-id {
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    color: rgba(255, 247, 226, 0.52) !important;
+    word-break: break-all !important;
+}
+
+/* 身分徽章縮小 */
+.staff-role-badge {
+    min-width: 58px !important;
+    padding: 5px 9px !important;
+    font-size: 14px !important;
+}
+
+/* 金額欄位統一靠右 */
+.staff-money {
+    display: block !important;
+    font-size: 16px !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+}
+
+/* 筆數欄 */
+.staff-count-main {
+    display: block !important;
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+}
+
+.staff-count-sub {
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+}
+
+/* 狀態徽章縮小一點 */
+.staff-status-badge {
+    min-width: 68px !important;
+    padding: 5px 9px !important;
+    font-size: 14px !important;
+}
+
+/* 操作欄改成 3 顆緊湊按鈕，不要擠滿整列 */
+.staff-summary-actions {
+    justify-content: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+}
+
+.staff-summary-actions form {
+    display: inline-flex !important;
+}
+
+.staff-summary-button {
+    min-width: 54px !important;
+    height: 34px !important;
+    padding: 0 10px !important;
+    border-radius: 9px !important;
+    font-size: 13px !important;
+    line-height: 34px !important;
+    white-space: nowrap !important;
+}
+
+.staff-summary-button.primary {
+    min-width: 62px !important;
+}
+
+/* 明細展開列內容也整理一下 */
+.staff-summary-detail {
+    padding: 14px 18px !important;
+}
+
+.staff-detail-table {
+    table-layout: fixed !important;
+}
+
+.staff-detail-table th,
+.staff-detail-table td {
+    padding: 9px 10px !important;
+    font-size: 14px !important;
+}
+
+.staff-detail-table th:nth-child(1),
+.staff-detail-table td:nth-child(1) {
+    width: 15% !important;
+}
+
+.staff-detail-table th:nth-child(2),
+.staff-detail-table td:nth-child(2) {
+    width: 14% !important;
+}
+
+.staff-detail-table th:nth-child(3),
+.staff-detail-table td:nth-child(3) {
+    width: 28% !important;
+}
+
+.staff-detail-table th:nth-child(4),
+.staff-detail-table td:nth-child(4) {
+    width: 13% !important;
+}
+
+.staff-detail-table th:nth-child(5),
+.staff-detail-table td:nth-child(5),
+.staff-detail-table th:nth-child(6),
+.staff-detail-table td:nth-child(6),
+.staff-detail-table th:nth-child(7),
+.staff-detail-table td:nth-child(7) {
+    width: 10% !important;
+    text-align: center !important;
+}
+
+/* === STAFF SUMMARY TABLE LAYOUT TUNE END === */
+
+
+/* === STAFF SUMMARY AVATAR IMAGE START === */
+
+.staff-avatar {
+    overflow: hidden !important;
+}
+
+.staff-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+    object-fit: cover !important;
+    border-radius: 50% !important;
+}
+
+/* === STAFF SUMMARY AVATAR IMAGE END === */
+
+
+/* === STAFF SUMMARY ALIGN WITH HISTORY START === */
+
+/* 整頁節奏對齊歷史訂單 */
+.staff-summary-page {
+    gap: 20px !important;
+}
+
+/* 篩選列：高度、內距、欄位比例對齊歷史訂單 */
+.staff-summary-filter {
+    grid-template-columns: 240px 240px minmax(360px, 1fr) auto auto !important;
+    gap: 12px !important;
+    align-items: end !important;
+
+    padding: 16px 18px !important;
+    margin: 0 !important;
+
+    border-radius: 18px !important;
+    border: 1px solid rgba(190, 151, 86, 0.42) !important;
+}
+
+.staff-summary-filter label {
+    gap: 7px !important;
+}
+
+.staff-summary-filter label span {
+    font-size: 15px !important;
+    line-height: 1.2 !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.06em !important;
+}
+
+.staff-summary-filter .input,
+.staff-summary-filter input,
+.staff-summary-filter select {
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 14px !important;
+    font-size: 15px !important;
+    border-radius: 10px !important;
+}
+
+.staff-summary-filter .button {
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0 18px !important;
+    font-size: 15px !important;
+    border-radius: 10px !important;
+    align-self: end !important;
+}
+
+/* 統計卡區：與歷史訂單卡片高度、間距一致 */
+.staff-summary-total-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    margin-top: 4px !important;
+}
+
+/* 卡片尺寸與文字位置對齊歷史訂單 */
+.staff-summary-total-card {
+    min-height: 112px !important;
+    height: 112px !important;
+    padding: 18px 20px !important;
+    border-radius: 8px !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+}
+
+.staff-summary-total-card span {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.08em !important;
+}
+
+.staff-summary-total-card strong {
+    margin-top: 10px !important;
+    font-size: 36px !important;
+    line-height: 1 !important;
+    letter-spacing: 0.02em !important;
+}
+
+.staff-summary-total-card small {
+    margin-top: 10px !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    font-weight: 800 !important;
+}
+
+/* 印章位置也對齊歷史訂單 */
+.staff-summary-total-card::after {
+    right: 16px !important;
+    bottom: 12px !important;
+    font-size: 15px !important;
+}
+
+/* 表格上方間距對齊歷史訂單 */
+.staff-summary-ledger-panel {
+    margin-top: 0 !important;
+}
+
+.staff-summary-ledger-head {
+    padding: 16px 18px !important;
+}
+
+.staff-summary-ledger-head h2 {
+    font-size: 30px !important;
+    line-height: 1.1 !important;
+}
+
+/* RWD 不要爆版 */
+@media (max-width: 1200px) {
+    .staff-summary-filter {
+        grid-template-columns: 1fr 1fr !important;
     }
 
-    .summary-person-head {
-        grid-template-columns: 1fr;
+    .staff-summary-filter label:nth-child(3) {
+        grid-column: 1 / -1;
     }
 
-    .summary-person-meta {
-        justify-content: flex-start;
-    }
-
-    .summary-pill {
-        text-align: left;
+    .staff-summary-total-grid {
+        grid-template-columns: 1fr 1fr !important;
     }
 }
 
-@media (max-width: 520px) {
-    .summary-total-grid {
-        grid-template-columns: 1fr;
+@media (max-width: 720px) {
+    .staff-summary-filter,
+    .staff-summary-total-grid {
+        grid-template-columns: 1fr !important;
     }
+
+    .staff-summary-filter label:nth-child(3) {
+        grid-column: auto;
+    }
+}
+
+/* === STAFF SUMMARY ALIGN WITH HISTORY END === */
+
+
+/* === STAFF SUMMARY MATCH HISTORY CARDS START === */
+
+/* 人員總表統計卡對齊歷史訂單：不要陰影字 */
+.staff-summary-total-card,
+.staff-summary-total-card span,
+.staff-summary-total-card strong,
+.staff-summary-total-card small {
+    text-shadow: none !important;
+}
+
+/* 統計卡數字不要黑色立體陰影 */
+.staff-summary-total-card strong {
+    color: #130f0c !important;
+    text-shadow: none !important;
+    filter: none !important;
+    -webkit-text-stroke: 0 !important;
+
+    margin-top: 8px !important;
+    font-size: 36px !important;
+    line-height: 1 !important;
+    letter-spacing: 0.02em !important;
+}
+
+/* 卡片內距與歷史訂單一致 */
+.staff-summary-total-card {
+    min-height: 112px !important;
+    height: 112px !important;
+    padding: 18px 20px !important;
+    justify-content: flex-start !important;
+}
+
+/* 小標與說明位置統一 */
+.staff-summary-total-card span {
+    margin: 0 !important;
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+    color: #5b1714 !important;
+}
+
+.staff-summary-total-card small {
+    margin-top: 9px !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    color: rgba(23, 18, 14, 0.72) !important;
+}
+
+/* 印章位置跟歷史訂單一致 */
+.staff-summary-total-card::after {
+    right: 16px !important;
+    bottom: 12px !important;
+    text-shadow: none !important;
+}
+
+/* 表格標題區高度與歷史訂單更接近 */
+.staff-summary-ledger-head {
+    padding: 16px 18px !important;
+}
+
+.staff-summary-ledger-head h2 {
+    margin: 0 !important;
+    font-size: 30px !important;
+    line-height: 1.12 !important;
+}
+
+/* 表格列距稍微放鬆，避免比歷史訂單更擠 */
+.staff-summary-table th,
+.staff-summary-table td {
+    padding-top: 11px !important;
+    padding-bottom: 11px !important;
+}
+
+/* 金額與筆數也不要任何陰影 */
+.staff-money,
+.staff-count-main,
+.staff-count-sub {
+    text-shadow: none !important;
+    filter: none !important;
+}
+
+/* === STAFF SUMMARY MATCH HISTORY CARDS END === */
+
+
+/* === STAFF SUMMARY FILTER BUTTON LAYOUT FIX START === */
+
+/* 修正人員總表篩選列：避免「重設條件」跑位 */
+.staff-summary-filter {
+    grid-template-columns: 220px 220px minmax(360px, 1fr) 110px 110px !important;
+    column-gap: 12px !important;
+    row-gap: 12px !important;
+    align-items: end !important;
+}
+
+.staff-summary-filter form {
+    display: contents !important;
+}
+
+.staff-summary-filter label {
+    min-width: 0 !important;
+}
+
+.staff-summary-filter .input,
+.staff-summary-filter input,
+.staff-summary-filter select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.staff-summary-filter .button {
+    width: 110px !important;
+    min-width: 110px !important;
+    max-width: 110px !important;
+    height: 42px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+}
+
+@media (max-width: 1250px) {
+    .staff-summary-filter {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    .staff-summary-filter label:nth-child(3) {
+        grid-column: 1 / -1 !important;
+    }
+
+    .staff-summary-filter .button {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+    }
+}
+
+/* === STAFF SUMMARY FILTER BUTTON LAYOUT FIX END === */
+
+
+.staff-avatar {
+    overflow: hidden;
+}
+
+.staff-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 999px;
 }
 </style>
 
-<section class="panel">
-    <div class="section-title-row">
-        <div>
-            <p class="order-no">PAYOUT SUMMARY</p>
-            <h2>人員總表</h2>
-            <p class="payout-ledger-note">
-                依未發放 / 已發放分類顯示，只統計已結單訂單。同一 Discord ID 會合併成一張卡。
-            </p>
-        </div>
-    </div>
-</section>
+<div class="staff-summary-page">
+    <section class="staff-summary-filter">
+        <form method="get" action="/admin/payouts/summary" style="display: contents;">
+            <label>
+                <span>統計期間</span>
+                <select class="input" name="month">
+                    <option value="" {% if not month %}selected{% endif %}>全部月份</option>
+                    {% for option in month_options %}
+                        <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
 
-<section class="panel">
-    <form method="get" action="/admin/payouts/summary" class="filter-form payout-summary-filter">
-        <select class="input" name="month">
-            <option value="" {% if not month %}selected{% endif %}>全部月份</option>
-            {% for option in month_options %}
-                <option value="{{ option.value }}" {% if month == option.value %}selected{% endif %}>{{ option.label }}</option>
-            {% endfor %}
-        </select>
+            <label>
+                <span>角色身分</span>
+                <select class="input" name="role">
+                    <option value="all" {% if role == "all" %}selected{% endif %}>全部身分</option>
+                    <option value="worker" {% if role == "worker" %}selected{% endif %}>護航 / 陪玩</option>
+                    <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
+                </select>
+            </label>
 
-        <select class="input" name="role">
-            <option value="all" {% if role == "all" %}selected{% endif %}>全部身份</option>
-            <option value="worker" {% if role == "worker" %}selected{% endif %}>打手</option>
-            <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
-        </select>
+            <label>
+                <span>搜尋人員姓名 / 編號</span>
+                <input class="input" type="text" name="q" placeholder="搜尋名稱或 Discord ID" value="{{ q or '' }}">
+            </label>
 
-        <input class="input" type="text" name="q" placeholder="搜尋名稱或 Discord ID" value="{{ q or '' }}">
+            <button class="button" type="submit">套用篩選</button>
+            <a class="button secondary" href="/admin/payouts/summary">重設條件</a>
+        </form>
+    </section>
 
-        <button class="button" type="submit">套用篩選</button>
-        <a class="button secondary" href="/admin/payouts/summary">清除</a>
-    </form>
-</section>
-
-<section class="panel">
-    <div class="summary-total-grid">
-        <div class="summary-total-card">
-            <span>未發放總額</span>
-            <strong>{{ unpaid_totals.display_total|default(unpaid_totals.unpaid_total)|round(0, 'common')|int }}T</strong>
+    <section class="staff-summary-total-grid">
+        <div class="staff-summary-total-card">
+            <span>未發放總額 ◆</span>
+            <strong>{{ unpaid_totals.display_total|default(unpaid_totals.unpaid_total)|round(0, 'common')|int }}</strong>
+            <small>待審核 {{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }} 筆</small>
         </div>
 
-        <div class="summary-total-card">
-            <span>未發放筆數</span>
+        <div class="staff-summary-total-card">
+            <span>已發放總額 ◆</span>
+            <strong>{{ paid_totals.paid_total|round(0, 'common')|int }}</strong>
+            <small>本期已發放 {{ paid_totals.paid_count }} 筆</small>
+        </div>
+
+        <div class="staff-summary-total-card">
+            <span>未發放筆數 ◆</span>
             <strong>{{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }}</strong>
+            <small>待審核中</small>
         </div>
 
-        <div class="summary-total-card">
-            <span>已發放總額</span>
-            <strong>{{ paid_totals.paid_total|round(0, 'common')|int }}T</strong>
-        </div>
-
-        <div class="summary-total-card">
-            <span>已發放筆數</span>
+        <div class="staff-summary-total-card">
+            <span>已發放筆數 ◆</span>
             <strong>{{ paid_totals.paid_count }}</strong>
+            <small>結算完成</small>
         </div>
-    </div>
-</section>
+    </section>
 
-{% macro person_card(row, list_status) %}
-<article class="summary-person-card">
-    <div class="summary-person-head">
-        <div class="summary-person-title">
-            <div class="summary-avatar">{{ (row.display_name or '?')[:1] }}</div>
+    <section class="staff-summary-ledger-panel">
+        <div class="staff-summary-ledger-head">
             <div>
-                <p class="order-no">{{ row.role_label }}</p>
-                <h3 class="summary-name">{{ row.display_name }}</h3>
-                <p class="summary-id">ID：{{ row.discord_id }}</p>
+                <p class="order-no">PAYOUT LEDGER</p>
+                <h2>人員分潤紀錄</h2>
+            </div>
+
+            <div class="staff-summary-head-actions">
+                <a class="button secondary" href="/admin/payouts/summary.csv?month={{ month }}&role={{ role }}&q={{ q }}">匯出報表</a>
             </div>
         </div>
 
-        <div class="summary-person-meta">
-            <div class="summary-pill">
-                <span>{% if list_status == "paid" %}已發放{% else %}未發放{% endif %}</span>
-                <strong>
-                    {% if list_status == "paid" %}
-                        {{ row.paid_total|round(0, 'common')|int }}T
-                    {% else %}
-                        {{ row.display_total|default(row.unpaid_total)|round(0, 'common')|int }}T
-                    {% endif %}
-                </strong>
+        {% if summary_rows %}
+            <div class="staff-summary-table-wrap">
+                <table class="staff-summary-table">
+                    <thead>
+                        <tr>
+                            <th>人員</th>
+                            <th>身分</th>
+                            <th>未發放</th>
+                            <th>已發放</th>
+                            <th>總筆數</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in summary_rows %}
+                            <tr>
+                                <td>
+                                    <div class="staff-person">
+                                        <div class="staff-avatar">
+                                            {% if row.avatar_url %}
+                                                <img src="{{ row.avatar_url }}" alt="{{ row.display_name }}">
+                                            {% else %}
+                                                {{ (row.display_name or '?')[:1] }}
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <span class="staff-person-name">{{ row.display_name }}</span>
+                                            <span class="staff-person-id">{{ row.discord_id }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="staff-role-badge">{{ row.role_label }}</span>
+                                </td>
+
+                                <td>
+                                    <span class="staff-money">{{ row.unpaid_total|round(0, 'common')|int }}T</span>
+                                </td>
+
+                                <td>
+                                    <span class="staff-money">{{ row.paid_total|round(0, 'common')|int }}T</span>
+                                </td>
+
+                                <td>
+                                    <span class="staff-count-main">{{ row.total_count }} 筆</span>
+                                    <span class="staff-count-sub">未 {{ row.unpaid_count }} / 已 {{ row.paid_count }}</span>
+                                </td>
+
+                                <td>
+                                    <span class="staff-status-badge {{ row.summary_status_class }}">{{ row.summary_status }}</span>
+                                </td>
+
+                                <td>
+                                    <div class="staff-summary-actions">
+                                        <button class="staff-summary-button" type="button" data-summary-target="staff-summary-detail-{{ loop.index }}">明細</button>
+
+                                        <form method="post" action="/admin/payouts/summary/person-status">
+                                            <input type="hidden" name="month" value="{{ month }}">
+                                            <input type="hidden" name="current_role" value="{{ role }}">
+                                            <input type="hidden" name="person_role" value="{{ row.role }}">
+                                            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
+                                            <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">已發放</button>
+                                        </form>
+
+                                        <form method="post" action="/admin/payouts/summary/person-status">
+                                            <input type="hidden" name="month" value="{{ month }}">
+                                            <input type="hidden" name="current_role" value="{{ role }}">
+                                            <input type="hidden" name="person_role" value="{{ row.role }}">
+                                            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
+                                            <button class="staff-summary-button" type="submit" name="target_status" value="unpaid">未發放</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr class="staff-summary-detail-row" id="staff-summary-detail-{{ loop.index }}" hidden>
+                                <td colspan="7">
+                                    <div class="staff-summary-detail">
+                                        <h3>{{ row.display_name }}｜分潤明細</h3>
+
+                                        <table class="staff-detail-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>契約編號</th>
+                                                    <th>委託人</th>
+                                                    <th>內容</th>
+                                                    <th>結單日期</th>
+                                                    <th>身份</th>
+                                                    <th>狀態</th>
+                                                    <th>賞金</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in row["items"] %}
+                                                    <tr>
+                                                        <td>{{ item.order_no }}</td>
+                                                        <td>{{ item.customer_name }}</td>
+                                                        <td>{{ item.category }}｜{{ item.item }}</td>
+                                                        <td>{{ item.closed_date }}</td>
+                                                        <td>{{ item.role }}</td>
+                                                        <td>
+                                                            {% if item.payout_status == "paid" %}
+                                                                <span class="staff-ledger-stamp paid">已發放</span>
+                                                            {% else %}
+                                                                <span class="staff-ledger-stamp unpaid">未發放</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ item.amount|round(0, 'common')|int }}T</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+        {% else %}
+            <div class="staff-summary-empty">目前沒有符合條件的人員分潤紀錄。</div>
+        {% endif %}
+    </section>
+</div>
 
-            <div class="summary-pill">
-                <span>筆數</span>
-                <strong>{% if list_status == "paid" %}{{ row.paid_count }}{% else %}{{ row.unpaid_count }}{% endif %}</strong>
-            </div>
-        </div>
-    </div>
+<script>
+document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-summary-target]");
+    if (!button) return;
 
-    <div class="summary-person-actions">
-        <form method="post" action="/admin/payouts/summary/person-status">
-            <input type="hidden" name="month" value="{{ month }}">
-            <input type="hidden" name="current_role" value="{{ role }}">
-            <input type="hidden" name="person_role" value="{{ row.role }}">
-            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
-            <button class="button" type="submit" name="target_status" value="paid">標記此人已發放</button>
-        </form>
+    const targetId = button.getAttribute("data-summary-target");
+    const row = document.getElementById(targetId);
+    if (!row) return;
 
-        <form method="post" action="/admin/payouts/summary/person-status">
-            <input type="hidden" name="month" value="{{ month }}">
-            <input type="hidden" name="current_role" value="{{ role }}">
-            <input type="hidden" name="person_role" value="{{ row.role }}">
-            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
-            <button class="button secondary" type="submit" name="target_status" value="unpaid">改回此人未發放</button>
-        </form>
-    </div>
+    const isHidden = row.hasAttribute("hidden");
 
-    <div class="ledger-items">
-        {% for item in row["items"] %}
-            {% if item.payout_status == list_status %}
-                <article class="ledger-entry">
-                    <div class="ledger-entry-main">
-                        <div class="ledger-order">
-                            <span class="ledger-label">契約編號</span>
-                            <strong>{{ item.order_no }}</strong>
-                        </div>
+    document.querySelectorAll(".staff-summary-detail-row").forEach(function (item) {
+        if (item !== row) item.setAttribute("hidden", "");
+    });
 
-                        <div class="ledger-client">
-                            <span class="ledger-label">委託人</span>
-                            <strong>{{ item.customer_name }}</strong>
-                        </div>
+    document.querySelectorAll("[data-summary-target]").forEach(function (item) {
+        if (item !== button) item.textContent = "明細";
+    });
 
-                        <div class="ledger-task">
-                            <span class="ledger-label">內容</span>
-                            <strong>{{ item.category }}｜{{ item.item }}</strong>
-                        </div>
-                    </div>
-
-                    <div class="ledger-entry-meta">
-                        <div>
-                            <span class="ledger-label">結單日期</span>
-                            <strong>{{ item.closed_date }}</strong>
-                        </div>
-
-                        <div>
-                            <span class="ledger-label">身份</span>
-                            <strong>{{ item.role }}</strong>
-                        </div>
-
-                        <div>
-                            <span class="ledger-label">狀態</span>
-                            {% if item.payout_status == "paid" %}
-                                <strong class="ledger-stamp paid">已發放</strong>
-                            {% else %}
-                                <strong class="ledger-stamp unpaid">未發放</strong>
-                            {% endif %}
-                        </div>
-
-                        <div class="ledger-amount">
-                            <span class="ledger-label">賞金</span>
-                            <strong>{{ item.amount|round(0, 'common')|int }}T</strong>
-                        </div>
-                    </div>
-                </article>
-            {% endif %}
-        {% endfor %}
-    </div>
-</article>
-{% endmacro %}
-
-<section class="panel payout-summary-list-section">
-    <h2 class="summary-list-title">未發放名單</h2>
-    {% if unpaid_rows %}
-        <div class="summary-list">
-            {% for row in unpaid_rows %}
-                {{ person_card(row, "unpaid") }}
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="summary-empty">目前沒有未發放分潤紀錄。</div>
-    {% endif %}
-</section>
-
-<section class="panel payout-summary-list-section">
-    <h2 class="summary-list-title">已發放名單</h2>
-    {% if paid_rows %}
-        <div class="summary-list">
-            {% for row in paid_rows %}
-                {{ person_card(row, "paid") }}
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="summary-empty">目前沒有已發放分潤紀錄。</div>
-    {% endif %}
-</section>
+    if (isHidden) {
+        row.removeAttribute("hidden");
+        button.textContent = "收起";
+    } else {
+        row.setAttribute("hidden", "");
+        button.textContent = "明細";
+    }
+});
+</script>
+<!-- BEGIN MAWAN_R72_PAYOUT_CONTRAST -->
+<style>
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card{background:#15130f!important;background-image:none!important;border-color:rgba(223,183,92,.34)!important;color:#f4f2eb!important;box-shadow:none!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card span{color:#f2e4c3!important;-webkit-text-fill-color:#f2e4c3!important;opacity:1!important;text-shadow:none!important;filter:none!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card strong{color:#f6d98f!important;-webkit-text-fill-color:#f6d98f!important;opacity:1!important;text-shadow:none!important;filter:none!important;-webkit-text-stroke:0!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card small{color:rgba(244,242,235,.76)!important;-webkit-text-fill-color:rgba(244,242,235,.76)!important;opacity:1!important;text-shadow:none!important;filter:none!important}
+.staff-summary-page .staff-summary-total-grid .staff-summary-total-card::after{color:rgba(246,217,143,.52)!important;border-color:rgba(246,217,143,.34)!important;text-shadow:none!important}
+</style>
+<!-- END MAWAN_R72_PAYOUT_CONTRAST -->
 {% endblock %}

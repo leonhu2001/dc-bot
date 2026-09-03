@@ -34,15 +34,15 @@ def is_customer_staff(member: discord.Member) -> bool:
 
 
 def is_exam_staff(member: discord.Member) -> bool:
-    return has_role(member, EXAMINER_ROLE_ID) or has_role(member, MANAGER_ROLE_ID)
+    return has_role(member, CUSTOMER_ROLE_ID)
 
 
 def is_complaint_staff(member: discord.Member) -> bool:
-    return has_role(member, CUSTOMER_ROLE_ID) or has_role(member, MANAGER_ROLE_ID)
+    return has_role(member, CUSTOMER_ROLE_ID)
 
 
 def is_manager_or_admin(member: discord.Member) -> bool:
-    return has_role(member, MANAGER_ROLE_ID) or member.guild_permissions.administrator
+    return has_role(member, CUSTOMER_ROLE_ID) or member.guild_permissions.administrator
 
 
 def can_operate_self_service_order(user, customer_id: int) -> bool:

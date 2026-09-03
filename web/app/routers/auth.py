@@ -100,17 +100,47 @@ async def discord_callback(
     if not discord_id:
         raise HTTPException(status_code=400, detail="Missing Discord user id")
 
-    role_ids = get_member_role_ids(discord_id)
+    # General customers may log in even when they do not
+    # have an employee role in the Mawan Discord server.
+    #
+    # If the user is not currently in the guild, treat them as
+    # a normal member with no staff permissions.
+    try:
+        role_ids = get_member_role_ids(discord_id)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            role_ids = []
+        else:
+            raise
+
     access = get_dashboard_access(role_ids)
 
-    if not access.get("can_access"):
-        request.session["discord_user"] = {
-            "id": discord_id,
-            "username": username,
-            "global_name": global_name,
-            "avatar": avatar,
-        }
-        return RedirectResponse(url="/no-access")
+    is_customer_service = bool(
+        access.get(
+            "is_customer_service",
+            False,
+        )
+    )
+
+    is_worker = bool(
+        access.get(
+            "is_worker",
+            False,
+        )
+    )
+
+    is_companion = bool(
+        access.get(
+            "is_companion",
+            False,
+        )
+    )
+
+    is_employee = bool(
+        is_customer_service
+        or is_worker
+        or is_companion
+    )
 
     request.session["user"] = {
         "id": discord_id,
@@ -119,10 +149,17 @@ async def discord_callback(
         "display_name": global_name or username,
         "avatar": avatar,
         "role_ids": role_ids,
-        "is_admin": access.get("is_admin", False),
-        "is_customer_service": access.get("is_customer_service", False),
-        "is_worker": access.get("is_worker", False),
-        "is_companion": access.get("is_companion", False),
+
+        # Customer service is the highest web permission.
+        #
+        # Keep is_admin for compatibility with existing
+        # /admin routers until the old backend is renamed.
+        "is_admin": is_customer_service,
+        "is_customer_service": is_customer_service,
+
+        "is_worker": is_worker,
+        "is_companion": is_companion,
+        "is_employee": is_employee,
     }
 
     return RedirectResponse(url="/")
@@ -131,3 +168,8 @@ async def discord_callback(
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/")
+
+
+@router.get("/discord")
+async def discord_login_alias():
+    return RedirectResponse(url="/auth/discord/login", status_code=303)

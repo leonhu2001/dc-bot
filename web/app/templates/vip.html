@@ -1,0 +1,201 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="vip-page-hero">
+
+    <div class="vip-page-orbit"></div>
+
+    <div class="vip-page-heading">
+
+        <div class="section-eyebrow">
+            MOWAN VIP
+        </div>
+
+        <h1>
+            魔丸會員制度
+        </h1>
+
+        <p>
+            累積有效消費解鎖會員等級。
+            高等級會員同時享有所有低等級福利。
+        </p>
+
+
+        {% if member %}
+
+            <div class="vip-current-member">
+
+                <span>
+                    目前等級
+                </span>
+
+                <strong>
+                    {{ member.vip_name }}
+                </strong>
+
+                <small>
+                    累積有效消費
+                    {{ member.total_spent_text }}
+                </small>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</section>
+
+
+<section class="site-section vip-level-section">
+
+    <div class="vip-level-grid">
+
+        {% for level in vip_levels %}
+
+            <article
+                class="vip-level-card vip-{{ level.key }}"
+            >
+
+                <div class="vip-level-top">
+
+                    <span class="vip-level-number">
+                        0{{ loop.index }}
+                    </span>
+
+                    <small>
+                        VIP LEVEL
+                    </small>
+
+                </div>
+
+                <h2>
+                    {{ level.name }}
+                </h2>
+
+                <div class="vip-threshold">
+                    累積消費
+                    <strong>
+                        {{ "{:,}".format(level.threshold) }}T
+                    </strong>
+                    ↑
+                </div>
+
+                <ul>
+                    {% for benefit in level.benefits %}
+                        <li>
+                            {{ benefit }}
+                        </li>
+                    {% endfor %}
+                </ul>
+
+            </article>
+
+        {% endfor %}
+
+    </div>
+
+</section>
+
+
+<section class="site-section vip-rule-section">
+
+    <div class="vip-rule-grid">
+
+        <article class="vip-rule-card">
+
+            <div class="section-eyebrow">
+                CUSTOM ORDER
+            </div>
+
+            <h2>
+                自訂單
+            </h2>
+
+            <ul>
+                {% for rule in custom_order_rules %}
+                    <li>
+                        {{ rule }}
+                    </li>
+                {% endfor %}
+            </ul>
+
+        </article>
+
+
+        <article class="vip-rule-card">
+
+            <div class="section-eyebrow">
+                TOP-UP REBATE
+            </div>
+
+            <h2>
+                儲值返利
+            </h2>
+
+            <ul>
+                {% for rule in rebate_rules %}
+                    <li>
+                        {{ rule }}
+                    </li>
+                {% endfor %}
+            </ul>
+
+        </article>
+
+
+        <article class="vip-rule-card vip-rule-wide">
+
+            <div class="section-eyebrow">
+                PRIVATE CHANNEL
+            </div>
+
+            <h2>
+                VIP 專屬私人文字頻道
+            </h2>
+
+            <ul>
+                {% for rule in private_channel_rules %}
+                    <li>
+                        {{ rule }}
+                    </li>
+                {% endfor %}
+            </ul>
+
+        </article>
+
+    </div>
+
+</section>
+
+
+<section class="site-section vip-general-section">
+
+    <div class="vip-general-card">
+
+        <div>
+
+            <div class="section-eyebrow">
+                VIP POLICY
+            </div>
+
+            <h2>
+                VIP 規則
+            </h2>
+
+        </div>
+
+        <ol>
+            {% for rule in vip_rules %}
+                <li>
+                    {{ rule }}
+                </li>
+            {% endfor %}
+        </ol>
+
+    </div>
+
+</section>
+
+{% endblock %}

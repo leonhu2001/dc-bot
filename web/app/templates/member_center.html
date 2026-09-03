@@ -1,0 +1,455 @@
+{% extends "site_layout.html" %}
+
+{% block content %}
+
+<section class="member-hero">
+    <div class="member-shell">
+
+        <div class="member-profile-card">
+
+            <div class="member-avatar-large">
+                {% if user.avatar %}
+                    <img
+                        src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=256"
+                        alt=""
+                    >
+                {% else %}
+                    <span>
+                        {{ (user.display_name or user.global_name or user.username or 'M')[:1] }}
+                    </span>
+                {% endif %}
+            </div>
+
+            <div class="member-profile-copy">
+
+                <div class="section-eyebrow">
+                    MEMBER CENTER
+                </div>
+
+                <h1>
+                    {{ user.display_name or user.global_name or user.username }}
+                </h1>
+
+                <p>
+                    Discord ID · {{ user.id }}
+                </p>
+
+                <div class="member-role-row">
+
+                    <span class="role-chip">
+                        {{ member.vip_name }}
+                    </span>
+
+                    {% if user.is_worker or user.is_companion %}
+                        <span class="role-chip role-chip-staff">
+                            員工
+                        </span>
+                    {% endif %}
+
+                    {% if user.is_customer_service %}
+                        <span class="role-chip role-chip-service">
+                            客服
+                        </span>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </div>
+
+
+        <div class="member-quick-actions">
+
+            {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
+                <a
+                    class="member-action-card"
+                    href="/employee"
+                >
+                    <small>EMPLOYEE</small>
+                    <strong>員工中心</strong>
+                    <span>
+                        派單、分潤與員工功能 →
+                    </span>
+                </a>
+            {% endif %}
+
+            {% if user.is_customer_service %}
+                <a
+                    class="member-action-card member-action-service"
+                    href="/service"
+                >
+                    <small>SERVICE</small>
+                    <strong>客服後台</strong>
+                    <span>
+                        訂單、人員、薪資與管理 →
+                    </span>
+                </a>
+            {% endif %}
+
+            <a
+                class="member-action-card"
+                href="/order"
+            >
+                <small>ORDER</small>
+                <strong>前往點單</strong>
+                <span>
+                    查看服務與方案 →
+                </span>
+            </a>
+
+        </div>
+    </div>
+</section>
+
+
+<section class="site-section member-dashboard">
+
+    {% if request.query_params.get('denied') %}
+        <div class="member-alert">
+            目前 Discord 身分組沒有該入口權限。
+            系統已重新確認你的伺服器身分。
+        </div>
+    {% endif %}
+
+
+    <div class="section-heading">
+        <div>
+            <div class="section-eyebrow">
+                OVERVIEW
+            </div>
+
+            <h2>
+                我的魔丸
+            </h2>
+        </div>
+
+        <p>
+            會員資料直接讀取目前正式系統，
+            不另外建立第二份會員資料。
+        </p>
+    </div>
+
+
+    <div class="member-stat-grid">
+
+        <article class="member-stat-card">
+            <small>
+                VIP LEVEL
+            </small>
+
+            <strong class="member-stat-name">
+                {{ member.vip_name }}
+            </strong>
+
+            {% if member.vip_progress.next_name %}
+                <span>
+                    距 {{ member.vip_progress.next_name }}
+                    尚差 {{ "{:,}".format(member.vip_progress.remaining) }}T
+                </span>
+            {% else %}
+                <span>
+                    已達最高 VIP 等級
+                </span>
+            {% endif %}
+        </article>
+
+
+        <article class="member-stat-card">
+            <small>
+                POINTS
+            </small>
+
+            <strong>
+                {{ "{:,}".format(member.points) }}
+            </strong>
+
+            <span>
+                目前可用點數
+            </span>
+        </article>
+
+
+        <article class="member-stat-card">
+            <small>
+                WALLET
+            </small>
+
+            <strong>
+                {{ member.wallet_balance_text }}
+            </strong>
+
+            <span>
+                魔丸錢包餘額
+            </span>
+        </article>
+
+
+        <article class="member-stat-card">
+            <small>
+                ORDERS
+            </small>
+
+            <strong>
+                {{ member.completed_orders }}
+            </strong>
+
+            <span>
+                已完成訂單
+            </span>
+        </article>
+
+    </div>
+
+
+    <section class="member-vip-progress">
+
+        <div class="member-vip-progress-head">
+
+            <div>
+                <small>
+                    TOTAL SPENT
+                </small>
+
+                <strong>
+                    累積有效消費
+                    {{ member.total_spent_text }}
+                </strong>
+            </div>
+
+            {% if member.vip_progress.next_name %}
+                <span>
+                    下一級 · {{ member.vip_progress.next_name }}
+                </span>
+            {% else %}
+                <span>
+                    BLACK DIAMOND
+                </span>
+            {% endif %}
+
+        </div>
+
+        <div class="member-progress-track">
+            <div
+                class="member-progress-fill"
+                style="width: {{ member.vip_progress.percent }}%"
+            ></div>
+        </div>
+
+    </section>
+
+
+    <div class="member-panels">
+
+        <section
+            class="member-panel"
+            id="orders"
+        >
+            <div class="member-panel-head">
+                <div>
+                    <small>
+                        RECENT ORDERS
+                    </small>
+
+                    <h3>
+                        最近訂單
+                    </h3>
+                </div>
+
+                <a href="/order">
+                    去點單 →
+                </a>
+            </div>
+
+            {% if member.recent_orders %}
+
+                <div class="member-order-list">
+
+                    {% for order in member.recent_orders %}
+
+                        <article class="member-order-row">
+
+                            <div>
+                                <small>
+                                    {{ order.order_no }}
+                                </small>
+
+                                <strong>
+                                    {{ order.item }}
+                                </strong>
+
+                                <span>
+                                    {{ order.created_at }}
+                                </span>
+                            </div>
+
+                            <div class="member-order-meta">
+                                <span
+                                    class="order-status status-{{ order.status }}"
+                                >
+                                    {{ order.status_label }}
+                                </span>
+
+                                <strong>
+                                    {{ order.amount_text }}
+                                </strong>
+                            </div>
+
+                        </article>
+
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+
+                <div class="member-empty">
+                    <span class="member-empty-icon">
+                        ◈
+                    </span>
+
+                    <strong>
+                        還沒有訂單紀錄
+                    </strong>
+
+                    <p>
+                        完成點單後，最近訂單會顯示在這裡。
+                    </p>
+                </div>
+
+            {% endif %}
+
+        </section>
+
+
+        <section
+            class="member-panel"
+            id="favorites"
+        >
+            <div class="member-panel-head">
+                <div>
+                    <small>
+                        FAVORITES
+                    </small>
+
+                    <h3>
+                        我的收藏
+                    </h3>
+                </div>
+
+                <a href="/staff">
+                    找陪玩 →
+                </a>
+            </div>
+
+            {% if member.favorite_profiles %}
+
+                <div class="member-favorite-list">
+
+                    {% for staff in member.favorite_profiles %}
+
+                        <a
+                            class="member-favorite-row"
+                            href="/staff/{{ staff.staff_id }}"
+                        >
+                            <img
+                                src="{{ staff.avatar_url }}"
+                                alt=""
+                            >
+
+                            <div>
+                                <strong>
+                                    {{ staff.display_name }}
+                                </strong>
+
+                                <span>
+                                    {{ staff.role_title }}
+                                </span>
+                            </div>
+
+                            <b>→</b>
+                        </a>
+
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+
+                <div class="member-empty">
+                    <span class="member-empty-icon">
+                        ♡
+                    </span>
+
+                    <strong>
+                        還沒有收藏陪玩
+                    </strong>
+
+                    <p>
+                        到陪玩陣容找找看今晚想一起玩的人。
+                    </p>
+                </div>
+
+            {% endif %}
+
+        </section>
+
+
+        <section
+            class="member-panel member-panel-wide"
+            id="vip"
+        >
+            <div class="member-panel-head">
+                <div>
+                    <small>
+                        MEMBERSHIP
+                    </small>
+
+                    <h3>
+                        VIP 會員
+                    </h3>
+                </div>
+
+                <a href="/vip">
+                    查看完整 VIP 制度 →
+                </a>
+            </div>
+
+            <div class="member-benefit-row">
+
+                <div>
+                    <span>
+                        目前等級
+                    </span>
+
+                    <strong>
+                        {{ member.vip_name }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        累積有效消費
+                    </span>
+
+                    <strong>
+                        {{ member.total_spent_text }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>
+                        收藏陪玩
+                    </span>
+
+                    <strong>
+                        {{ member.favorite_count }}
+                    </strong>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+</section>
+
+{% endblock %}

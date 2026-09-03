@@ -1,0 +1,56 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ title }}</title>
+<style>*{box-sizing:border-box}:root{--b:#080807;--p:#11110f;--l:#26251f;--g:#f2d68d;--t:#f4f2eb;--m:#969289}body{margin:0;background:var(--b);color:var(--t);font:14px Inter,"Noto Sans TC","Microsoft JhengHei",sans-serif}a{color:inherit;text-decoration:none}.sh{min-height:100vh;display:grid;grid-template-columns:244px 1fr}.sb{padding:24px 16px;border-right:1px solid var(--l)}.brand{font-size:24px;font-weight:900}.brand small{display:block;color:#dfb75c;font-size:10px;letter-spacing:.18em}.nav{display:grid;gap:5px;margin-top:25px}.nav a{padding:13px;border-radius:9px;color:var(--m);font-weight:800}.nav a:hover,.nav .on{background:#16140e;color:var(--g)}main{padding:30px}.top{display:flex;justify-content:space-between}.k{color:#dfb75c;font-size:11px;font-weight:900;letter-spacing:.18em}h1{font-size:42px;margin:6px 0}.m{color:var(--m)}.btn{display:inline-flex;padding:11px 13px;border:1px solid var(--l);border-radius:9px;background:transparent;color:var(--t);cursor:pointer}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin:20px 0}.stat,.card{border:1px solid var(--l);border-radius:12px;background:var(--p)}.stat{padding:14px}.stat span{color:var(--m);font-size:11px}.stat b{display:block;color:var(--g);font-size:25px;margin-top:7px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}.card{overflow:hidden;margin-bottom:12px}.card h2{font-size:15px;margin:0;padding:15px;border-bottom:1px solid var(--l)}.row{display:grid;grid-template-columns:115px 1fr 75px 85px;gap:8px;padding:12px;border-bottom:1px solid var(--l);font-size:12px}.item{padding:12px;border-bottom:1px solid var(--l);font-size:12px;line-height:1.6}.g{color:var(--g)}form{padding:14px}.field{margin-bottom:11px}.field label{display:block;color:var(--m);font-size:11px;margin-bottom:5px}.field input,.field select,.field textarea{width:100%;padding:10px;border:1px solid var(--l);border-radius:8px;background:#0a0a09;color:var(--t)}.field textarea{min-height:100px}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:980px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.sh{display:block}.sb{border-right:0}.nav{grid-template-columns:repeat(2,1fr)}main{padding:18px 12px}.top{display:block}.stats{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}</style>
+
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+<!-- BEGIN MAWAN_R72_STAFF_WIDTH -->
+<style>
+body.mw-r5-admin .mw-r5-legacy-body,
+body.mw-r5-admin .mw-r5-legacy-body>.sh{width:100%!important;max-width:none!important;min-width:0!important}
+body.mw-r5-admin .mw-r5-legacy-body>.sh{min-height:0!important;display:block!important;grid-template-columns:none!important}
+body.mw-r5-admin .mw-r5-legacy-body>.sh>main{display:block!important;width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;box-sizing:border-box!important}
+body.mw-r5-admin .mw-r5-legacy-body>.sh>main>.stats,
+body.mw-r5-admin .mw-r5-legacy-body>.sh>main>.grid{width:100%!important;max-width:none!important;min-width:0!important}
+</style>
+<!-- END MAWAN_R72_STAFF_WIDTH -->
+</head><body class="mw-r5-admin">
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+
+<div class="mw-r5-shell">
+
+    {% include "_admin_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+
+        <header class="mw-r5-page-header">
+
+            <div class="mw-r5-kicker">
+                STAFF WORKSPACE
+            </div>
+
+            <h1>
+                人員工作區
+            </h1>
+
+            <p>
+                查看與編輯人員資料、個人牆與服務資訊。
+            </p>
+
+        </header>
+
+        <div class="mw-r5-legacy-body">
+
+
+<div class="sh"><main><div class="top"><div><div class="k">STAFF WORKSPACE</div><div class="m">{{ member.discord_id }}</div></div><a class="btn" href="/admin/staff">← 返回</a></div>
+<div class="stats">{% for label,value in [("服務訂單",order_stats.total),("完成",order_stats.completed),("進行中",order_stats.active),("評價",review_stats.count),("收藏",favorite_count)] %}<div class="stat"><span>{{ label }}</span><b>{{ value }}</b></div>{% endfor %}</div>
+<div class="grid"><section><div class="card"><h2>近期服務訂單</h2>{% for o in recent_orders %}<a class="row" href="/admin/order-workspace/{{ o.id }}"><span class="g">{{ o.order_no }}</span><span>{{ o.item }}</span><span>{{ o.amount }}T</span><span class="m">{{ o.status_label }}</span></a>{% else %}<div class="item m">目前沒有服務訂單。</div>{% endfor %}</div>
+<div class="card"><h2>最近評價</h2>{% for r in review_stats.recent %}<div class="item"><span class="g">{{ r.rating if r.rating is not none else "—" }} / 5</span><br>{{ r.comment or "沒有文字內容" }}<br><span class="m">{{ r.created_at }}</span></div>{% else %}<div class="item m">尚無公開評價。</div>{% endfor %}</div></section>
+</div></main></div>
+<script>async function save(f){let r=await fetch(f.action,{method:"POST",body:new FormData(f),credentials:"same-origin"});if(!r.ok){alert("儲存失敗");return}location.reload()}for(let id of ["pf","vis"]){document.getElementById(id).addEventListener("submit",function(e){e.preventDefault();save(this)})}</script>
+
+
+        </div>
+
+    </section>
+
+</div>
+</body></html>

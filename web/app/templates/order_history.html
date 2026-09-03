@@ -1,523 +1,1251 @@
 {% extends "layout.html" %}
 
-{% block page_title %}歷史訂單{% endblock %}
+{% block page_title %}訂單管理
+<script>
+document.addEventListener("click", function (event) {
+    const button = event.target.closest("button.history-dossier-toggle[data-dossier-target]");
+    if (!button) return;
+
+    const targetId = button.getAttribute("data-dossier-target");
+    const row = document.getElementById(targetId);
+
+    if (!row) return;
+
+    const isHidden = row.hasAttribute("hidden");
+
+    document.querySelectorAll(".history-dossier-detail-row").forEach(function (item) {
+        if (item !== row) {
+            item.setAttribute("hidden", "");
+        }
+    });
+
+    document.querySelectorAll("button.history-dossier-toggle[data-dossier-target]").forEach(function (item) {
+        if (item !== button) {
+            item.textContent = "\u6aa2\u8996\u5377\u5b97";
+        }
+    });
+
+    if (isHidden) {
+        row.removeAttribute("hidden");
+        button.textContent = "\u6536\u8d77\u5377\u5b97";
+    } else {
+        row.setAttribute("hidden", "");
+        button.textContent = "\u6aa2\u8996\u5377\u5b97";
+    }
+});
+</script>
+
+<script>
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        if (
+            params.get("open")
+            !== "1"
+        ) {
+            return;
+        }
+
+        const button =
+            document.querySelector(
+                "button.history-dossier-toggle[data-dossier-target]"
+            );
+
+        if (!button) {
+            return;
+        }
+
+        window.setTimeout(
+            function () {
+
+                button.click();
+
+                button.scrollIntoView(
+                    {
+                        block:
+                            "center",
+
+                        behavior:
+                            "smooth"
+                    }
+                );
+
+            },
+            80
+        );
+    }
+);
+</script>
+<!-- MAWAN_R5R3_AUTO_OPEN_ORDER -->
+
+
+
+
+
+
+
+{% endblock %}
 
 {% block content %}
 <style>
-.history-filter-form {
+.history-ledger-page {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) auto auto;
-    gap: 10px;
+    gap: 18px;
+}
+
+.history-ledger-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 28px;
+    border: 1px solid rgba(245, 198, 107, .2);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at 88% 18%, rgba(207, 62, 62, .22), transparent 35%),
+        radial-gradient(circle at 12% 0%, rgba(245, 198, 107, .16), transparent 35%),
+        linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+        rgba(8, 10, 18, .94);
+    box-shadow: 0 28px 78px rgba(0,0,0,.34);
+}
+
+.history-ledger-hero::after {
+    content: "ORDER ARCHIVE";
+    position: absolute;
+    right: 22px;
+    bottom: 18px;
+    color: rgba(255,255,255,.055);
+    font-size: clamp(34px, 7vw, 92px);
+    font-weight: 950;
+    letter-spacing: .12em;
+    pointer-events: none;
+}
+
+.history-ledger-title {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    font-size: clamp(34px, 5vw, 68px);
+    line-height: 1;
+    letter-spacing: .08em;
+    font-weight: 950;
+}
+
+.history-ledger-filter {
+    display: grid;
+    grid-template-columns: minmax(170px, 220px) minmax(150px, 210px) minmax(260px, 1fr) auto auto;
+    gap: 12px;
     align-items: end;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 22px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.022)),
+        rgba(10, 13, 22, .88);
 }
-.history-filter-form label {
+
+.history-ledger-filter label {
     display: grid;
-    gap: 6px;
-}
-.history-filter-form label > span {
-    color: rgba(226, 200, 134, 0.78);
+    gap: 7px;
+    color: var(--mw-muted, #a7a0b5);
     font-size: 13px;
     font-weight: 800;
 }
 
-.history-customer-list {
-    display: grid;
-    gap: 14px;
+.history-ledger-filter .input,
+.history-ledger-filter select,
+.history-ledger-filter input {
+    min-height: 42px;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.3) !important;
+    color: var(--mw-text, #f4f0e8) !important;
 }
-.history-customer-group {
-    border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 16px;
-    background: rgba(15, 23, 42, 0.44);
-    overflow: hidden;
-}
-.history-customer-group > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 16px;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 16px;
-    align-items: center;
-}
-.history-customer-group > summary::-webkit-details-marker {
-    display: none;
-}
-.history-customer-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-}
-.history-customer-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    background: rgba(99, 102, 241, 0.22);
-    border: 1px solid rgba(129, 140, 248, 0.38);
-    font-weight: 800;
-}
-.history-customer-name {
-    margin: 0;
-    font-size: 18px;
-}
-.history-customer-id {
-    margin: 4px 0 0;
-    color: #9ca3af;
-    font-size: 13px;
-    word-break: break-all;
-}
-.history-customer-meta {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-.history-customer-pill {
-    border-radius: 12px;
-    background: rgba(2, 6, 23, 0.42);
-    padding: 8px 12px;
-    min-width: 86px;
-    text-align: right;
-}
-.history-customer-pill span {
-    display: block;
-    color: #9ca3af;
-    font-size: 12px;
-}
-.history-customer-pill strong {
-    display: block;
-    margin-top: 3px;
-}
-.history-customer-orders {
-    border-top: 1px solid rgba(148, 163, 184, 0.16);
-    padding: 14px;
-    display: grid;
-    gap: 12px;
-}
-.history-order-card {
-    border: 1px solid rgba(148, 163, 184, 0.16);
-    border-radius: 14px;
-    padding: 14px;
-    background: rgba(2, 6, 23, 0.28);
-}
-.history-order-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 10px;
-}
-.history-order-no {
-    font-weight: 800;
-}
-.history-order-status {
-    border-radius: 999px;
-    padding: 4px 10px;
-    background: rgba(148, 163, 184, 0.16);
-    font-size: 13px;
-}
-.history-edit-grid {
+
+.history-ledger-stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    gap: 14px;
 }
-.history-edit-grid label {
-    display: grid;
-    gap: 5px;
+
+.history-ledger-stat {
+    min-height: 118px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(245, 198, 107, .18);
+    background:
+        linear-gradient(145deg, rgba(245,198,107,.12), rgba(255,255,255,.025)),
+        rgba(10, 13, 22, .92);
+    box-shadow: 0 20px 56px rgba(0,0,0,.28);
+    position: relative;
+    overflow: hidden;
 }
-.history-edit-grid span {
-    color: #9ca3af;
-    font-size: 12px;
+
+.history-ledger-stat::after {
+    content: "魔丸";
+    position: absolute;
+    right: 14px;
+    bottom: 12px;
+    color: rgba(245, 198, 107, .2);
+    border: 1px solid rgba(245, 198, 107, .14);
+    border-radius: 8px;
+    padding: 4px 6px;
+    font-weight: 950;
+    font-size: 15px;
+    transform: rotate(-3deg);
 }
-.history-edit-grid input,
-.history-edit-grid select {
-    width: 100%;
-    box-sizing: border-box;
+
+.history-ledger-stat span {
+    display: block;
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .08em;
 }
-.history-assignment-box,
-.history-payout-box {
-    margin-top: 14px;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding-top: 14px;
-    display: grid;
-    gap: 10px;
-    max-width: 760px;
+
+.history-ledger-stat strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: .02em;
 }
-.history-assignment-title,
-.history-payout-title {
-    color: #cbd5e1;
+
+.history-ledger-stat small {
+    display: block;
+    margin-top: 10px;
+    color: var(--mw-muted, #a7a0b5);
     font-weight: 800;
-    font-size: 14px;
 }
-.history-assignment-row,
-.history-payout-row {
+
+.history-ledger-panel {
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px;
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.022)),
+        rgba(8, 11, 19, .94);
+    box-shadow: 0 24px 68px rgba(0,0,0,.3);
+    overflow: hidden;
+}
+
+.history-ledger-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
+}
+
+.history-ledger-head h3 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: .08em;
+}
+
+.history-ledger-table-wrap {
+    overflow-x: auto;
+}
+
+.history-ledger-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1160px;
+}
+
+.history-ledger-table th,
+.history-ledger-table td {
+    padding: 12px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.075);
+    vertical-align: middle;
+}
+
+.history-ledger-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+    letter-spacing: .1em;
+    background: rgba(8, 10, 18, .96);
+    white-space: nowrap;
+}
+
+.history-ledger-table td {
+    color: rgba(255, 247, 226, .92);
+}
+
+.history-ledger-table tbody tr:hover td {
+    background: rgba(245, 198, 107, .045);
+}
+
+.history-ledger-table .input,
+.history-ledger-table select,
+.history-ledger-table input {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    border-radius: 12px !important;
+    background: rgba(0,0,0,.28) !important;
+    border-color: rgba(255,255,255,.12) !important;
+    color: rgba(255, 247, 226, .94) !important;
+}
+
+.history-ledger-table input[type="number"] {
+    text-align: right;
+}
+
+.history-ledger-no {
+    font-weight: 950;
+    color: var(--mw-gold, #f5c66b);
+    white-space: nowrap;
+}
+
+.history-ledger-content {
     display: grid;
-    grid-template-columns: 90px minmax(160px, 1fr) 120px 90px;
-    gap: 12px;
-    align-items: end;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    min-width: 230px;
 }
-.history-payout-row {
-    grid-template-columns: 90px minmax(160px, 1fr) 150px;
+
+.history-ledger-content input {
+    min-width: 190px;
 }
-.history-assignment-row label,
-.history-payout-row label {
-    display: grid;
-    gap: 5px;
+
+.history-ledger-person {
+    min-width: 190px;
 }
-.history-assignment-row span,
-.history-payout-row span {
-    color: #9ca3af;
+
+.history-ledger-person strong {
+    display: block;
+}
+
+.history-ledger-person small {
+    display: block;
+    margin-top: 3px;
+    color: rgba(255,255,255,.45);
     font-size: 12px;
 }
-.history-assignment-row select,
-.history-payout-row input {
-    width: 100%;
-    box-sizing: border-box;
+
+.history-ledger-workers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 170px;
 }
-.history-assignment-row strong,
-.history-payout-row strong {
-    overflow-wrap: anywhere;
+
+.history-ledger-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 5px 9px;
+    border: 1px solid rgba(245, 198, 107, .24);
+    background: rgba(245, 198, 107, .08);
+    color: #f2dfb0;
+    font-size: 12px;
+    font-weight: 900;
 }
-.history-delete-check {
-    display: flex !important;
-    gap: 8px !important;
-    align-items: center !important;
+
+.history-ledger-status select {
+    min-width: 96px;
 }
-.history-delete-check input {
-    width: auto !important;
+
+.history-ledger-amount {
+    min-width: 118px;
 }
+
+.history-ledger-action {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.history-ledger-action .seal-button,
+.seal-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(245, 198, 107, .38);
+    color: var(--mw-text, #f4f0e8);
+    background: linear-gradient(135deg, rgba(245,198,107,.18), rgba(207,62,62,.16));
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-weight: 950;
+    letter-spacing: .06em;
+    cursor: pointer;
+}
+
+.history-ledger-hidden-fields {
+    display: none;
+}
+
+.history-ledger-pagination,
+.history-bulk-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 18px;
+    border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.history-page-links {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.history-page-links a,
+.history-page-links span {
+    min-width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(245, 198, 107, .22);
+    color: #e9d6a7;
+    text-decoration: none;
+}
+
+.history-page-links .active {
+    background: rgba(145, 35, 28, .74);
+    border-color: rgba(238, 86, 70, .58);
+    color: #fff4d7;
+}
+
 .history-bulk-toolbar {
     position: sticky;
     bottom: 14px;
-    z-index: 30;
-    margin-top: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(15, 23, 42, 0.94);
+    z-index: 5;
+    margin-top: 12px;
+    border: 1px solid rgba(245, 198, 107, .28);
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at 92% 28%, rgba(142, 31, 24, .28), transparent 44%),
+        linear-gradient(90deg, rgba(13, 10, 8, .94), rgba(24, 13, 11, .91));
+    box-shadow: 0 -14px 36px rgba(0,0,0,.42);
     backdrop-filter: blur(12px);
-    border-radius: 18px;
-    padding: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
 }
-.history-bulk-toolbar .muted-text {
-    margin: 0;
-}
+
 .history-bulk-actions {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
 }
-.history-payout-row input::placeholder {
-    color: #64748b;
-}
-.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator {
+
+.history-date-input::-webkit-calendar-picker-indicator {
     filter: invert(1);
-    opacity: 0.9;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-}
-.history-edit-grid input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.12);
+    opacity: .9;
 }
 
-@media (max-width: 900px) {
-    .history-filter-form,
-    .history-edit-grid,
-    .history-customer-group > summary,
-    .history-assignment-row,
-    .history-payout-row {
+.history-dossier-toggle {
+    cursor: pointer;
+}
+
+.history-dossier-detail-row[hidden] {
+    display: none !important;
+}
+
+.history-dossier-detail-row td {
+    padding: 0 !important;
+}
+
+.history-dossier-detail {
+    padding: 18px !important;
+    background:
+        linear-gradient(145deg, rgba(245,198,107,.08), rgba(255,255,255,.025)),
+        rgba(0,0,0,.22);
+    border-bottom: 1px solid rgba(245,198,107,.14);
+}
+
+@media (max-width: 1100px) {
+    .history-ledger-filter,
+    .history-ledger-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .history-ledger-filter,
+    .history-ledger-stats {
         grid-template-columns: 1fr;
     }
-    .history-customer-meta {
-        justify-content: flex-start;
-    }
-    .history-customer-pill {
-        text-align: left;
-    }
+
+    .history-ledger-head,
+    .history-ledger-pagination,
     .history-bulk-toolbar {
-        align-items: stretch;
+        align-items: flex-start;
         flex-direction: column;
     }
-    .history-bulk-actions {
-        width: 100%;
+}
+
+/* ===== 卷宗編輯器：卡片式操作面板 ===== */
+.history-dossier-detail {
+    padding: 20px !important;
+    background:
+        radial-gradient(circle at 92% 18%, rgba(207, 62, 62, .14), transparent 34%),
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(7, 9, 15, .96) !important;
+}
+
+.history-dossier-detail,
+.history-dossier-detail * {
+    box-sizing: border-box;
+}
+
+.history-dossier-detail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,.09);
+}
+
+.history-dossier-detail-head h4 {
+    margin: 4px 0 0 !important;
+    color: var(--mw-gold, #f5c66b);
+    font-size: 19px;
+    letter-spacing: .06em;
+}
+
+.history-dossier-summary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.history-dossier-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(245,198,107,.25);
+    background: rgba(245,198,107,.08);
+    color: #ffe3a3;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 950;
+}
+
+.history-dossier-overview {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr .8fr .8fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.history-dossier-info-card {
+    min-width: 0;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.035);
+    padding: 12px;
+}
+
+.history-dossier-info-card span {
+    display: block;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.history-dossier-info-card strong {
+    display: block;
+    color: var(--mw-text, #f4f0e8);
+    font-size: 15px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.history-dossier-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+    gap: 14px;
+    align-items: start;
+}
+
+.history-dossier-card {
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.09);
+    background:
+        linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+        rgba(0,0,0,.18);
+    padding: 14px;
+    min-width: 0;
+}
+
+.history-dossier-card-wide {
+    grid-column: 1 / -1;
+}
+
+.history-dossier-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.history-dossier-card-head h5 {
+    margin: 0 !important;
+    color: #fff3cf;
+    font-size: 16px;
+    letter-spacing: .06em;
+}
+
+.history-dossier-card-head p {
+    margin: 4px 0 0 !important;
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.history-dossier-person-list,
+.history-dossier-add-list,
+.history-dossier-payout-list {
+    display: grid;
+    gap: 10px;
+}
+
+.history-dossier-person-row,
+.history-dossier-add-row {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.075);
+    background: rgba(255,255,255,.032);
+    padding: 11px;
+}
+
+.history-dossier-person-row {
+    grid-template-columns: minmax(260px, 1fr) 128px 92px;
+}
+
+.history-dossier-add-row {
+    grid-template-columns: minmax(260px, 1fr) 128px;
+}
+
+.history-dossier-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.history-dossier-field span {
+    color: var(--mw-muted, #a7a0b5);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.history-dossier-detail select,
+.history-dossier-detail input:not([type="checkbox"]) {
+    width: 100% !important;
+    min-height: 42px !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    background: rgba(0,0,0,.32) !important;
+    color: var(--mw-text, #f4f0e8) !important;
+    padding: 9px 12px !important;
+}
+
+.history-dossier-toggle {
+    min-height: 42px;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 !important;
+    padding: 9px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(245,198,107,.2);
+    background: rgba(245,198,107,.06);
+    color: #fff1c4;
+    font-size: 12px;
+    font-weight: 950;
+    cursor: pointer;
+}
+
+.history-dossier-toggle.danger {
+    border-color: rgba(255,107,138,.28);
+    background: rgba(255,107,138,.08);
+    color: #ffd7df;
+}
+
+.history-dossier-toggle input {
+    width: 15px !important;
+    height: 15px !important;
+    margin: 0 !important;
+    accent-color: #f5c66b;
+}
+
+.history-dossier-payout-row {
+    display: grid !important;
+    grid-template-columns: 130px minmax(260px, 1fr) 180px !important;
+    gap: 10px !important;
+    align-items: center !important;
+    padding: 12px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    background: rgba(255,255,255,.035) !important;
+}
+
+.history-dossier-payout-type {
+    color: var(--mw-gold, #f5c66b);
+    font-weight: 950;
+}
+
+.history-dossier-payout-person {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.history-dossier-payout-person span {
+    color: var(--mw-text, #f4f0e8);
+    font-weight: 900;
+    word-break: break-word;
+}
+
+.history-dossier-payout-person small {
+    color: rgba(255,255,255,.42);
+    word-break: break-all;
+}
+
+.history-dossier-empty {
+    border-radius: 16px;
+    border: 1px dashed rgba(255,255,255,.14);
+    background: rgba(255,255,255,.025);
+    padding: 14px;
+    color: var(--mw-muted, #a7a0b5);
+}
+
+@media (max-width: 1180px) {
+    .history-dossier-overview,
+    .history-dossier-layout {
+        grid-template-columns: 1fr;
     }
-    .history-bulk-actions .button {
-        flex: 1;
+
+    .history-dossier-card-wide {
+        grid-column: auto;
     }
 }
+
+@media (max-width: 860px) {
+    .history-dossier-detail-head,
+    .history-dossier-card-head {
+        flex-direction: column;
+    }
+
+    .history-dossier-summary {
+        justify-content: flex-start;
+    }
+
+    .history-dossier-person-row,
+    .history-dossier-add-row,
+    .history-dossier-payout-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    .history-dossier-toggle {
+        justify-content: flex-start;
+    }
+}
+
+.admin-rule-snapshot-section {
+    display: grid !important;
+    gap: 12px !important;
+}
+
+.rule-snapshot-grid,
+.history-rule-snapshot-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+}
+
+.rule-snapshot-card {
+    border: 1px solid rgba(245, 198, 107, .16) !important;
+    border-radius: 14px !important;
+    padding: 11px 12px !important;
+    background: rgba(245, 198, 107, .055) !important;
+    min-width: 0 !important;
+}
+
+.rule-snapshot-card span {
+    display: block !important;
+    color: var(--mw-muted, #a7a0b5) !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+}
+
+.rule-snapshot-card strong {
+    display: block !important;
+    margin-top: 6px !important;
+    color: #fff3cf !important;
+    font-size: 14px !important;
+    word-break: break-all !important;
+}
+
+.rule-snapshot-details {
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 14px !important;
+    padding: 10px 12px !important;
+    background: rgba(0,0,0,.18) !important;
+}
+
+.rule-snapshot-details summary {
+    cursor: pointer !important;
+    color: var(--mw-gold, #f5c66b) !important;
+    font-weight: 900 !important;
+}
+
+.rule-snapshot-raw {
+    margin: 10px 0 0 !important;
+    max-height: 260px !important;
+    overflow: auto !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+    background: rgba(0,0,0,.32) !important;
+    color: rgba(255,247,226,.9) !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+}
+
+@media (max-width: 980px) {
+    .rule-snapshot-grid,
+    .history-rule-snapshot-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+.history-rule-snapshot-card {
+    display: grid !important;
+    gap: 12px !important;
+}
+
+.history-rule-snapshot-card .rule-snapshot-details {
+    margin-top: 0 !important;
+}
+
 </style>
 
-<section class="panel">
-    <div class="section-title-row">
-        <div>
-            <p class="order-no">ORDER ARCHIVE</p>
-            <h2>歷史訂單｜卷宗庫</h2>
-            <p class="muted-text">已存單、已結單與歷史訂單會保留在這裡，可修正訂單資料、結單日期、人員與分潤。</p>
-        </div>
-        <a class="button secondary" href="/admin">回總控後台</a>
-    </div>
-</section>
-
-<section class="panel">
-    <form method="get" action="/admin/orders/history" class="history-filter-form">
+<div class="history-ledger-page">
+    <section class="panel">
+        <form method="get" action="/admin/orders/history" class="history-ledger-filter">
+            <label>
+                <span>訂單狀態</span>
+                <select class="input" name="status">
+                    {% for value, label in status_options %}
+                        <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
         <label>
-            <span>老闆名稱</span>
-            <select class="input" name="customer">
-                <option value="">全部老闆</option>
-                {% for option in customer_options %}
-                    <option value="{{ option.value }}" {% if customer == option.value %}selected{% endif %}>{{ option.label }}</option>
+            <span>月份</span>
+            <select name="month">
+                <option value="" {% if not month_filter and not request.query_params.get('month') %}selected{% endif %}>全部月份</option>
+                {% for month_option in month_options %}
+                    <option value="{{ month_option.value }}" {% if (month_filter or request.query_params.get('month')) == month_option.value %}selected{% endif %}>{{ month_option.label }}</option>
                 {% endfor %}
             </select>
         </label>
 
-        <button class="button" type="submit">套用篩選</button>
-        <a class="button secondary" href="/admin/orders/history">清除</a>
-    </form>
-</section>
 
-<form id="historyBulkForm" method="post" action="/admin/orders/history/bulk-update">
-{% if customer_groups %}
-    <section class="history-customer-list">
-        {% for group in customer_groups %}
-            <details class="history-customer-group">
-                <summary>
-                    <div class="history-customer-title">
-                        <div class="history-customer-avatar">{{ (group.customer_name or '?')[:1] }}</div>
-                        <div>
-                            <h3 class="history-customer-name">{{ group.customer_name }}</h3>
-                            <p class="history-customer-id">
-                                {% if group.customer_id %}
-                                    ID：{{ group.customer_id }}
-                                {% else %}
-                                    未記錄 Discord ID
-                                {% endif %}
-                            </p>
-                        </div>
+            <label>
+                <span>搜尋訂單編號 / 內容 / 委託人</span>
+                <input class="input" type="search" name="keyword" value="{{ keyword }}" placeholder="輸入關鍵字">
+            </label>
+
+            <button class="button" type="submit">套用篩選</button>
+            <a class="button secondary" href="/admin/orders/history">重設條件</a>
+        </form>
+    </section>
+
+    <section class="history-ledger-stats">
+        <div class="history-ledger-stat">
+            <span>訂單總數 ◆</span>
+            <strong>{{ total_orders }}</strong>
+            <small>每頁顯示 {{ per_page }} 筆</small>
+        </div>
+        <div class="history-ledger-stat">
+            <span>已結單 ◆</span>
+            <strong>{{ history_closed_count }}</strong>
+            <small>已完成卷宗</small>
+        </div>
+        <div class="history-ledger-stat">
+            <span>存單 ◆</span>
+            <strong>{{ history_stored_count }}</strong>
+            <small>存單紀錄</small>
+        </div>
+        <div class="history-ledger-stat">
+            <span>總金額 ◆</span>
+            <strong>{{ history_total_amount }}</strong>
+            <small>TWD / T</small>
+        </div>
+    </section>
+
+    <form id="historyBulkForm" method="post" action="/admin/orders/history/bulk-update">
+        <input type="hidden" name="page" value="{{ page }}">
+
+        {% if orders %}
+            <section class="history-ledger-panel">
+                <div class="history-ledger-head">
+                    <div>
+                        <p class="order-no">ORDER LIST</p>
+                        <h3>卷宗庫 / 訂單管理卷宗</h3>
                     </div>
+                    <div class="muted-text">第 {{ page }} / {{ total_pages }} 頁，共 {{ total_orders }} 筆</div>
+                </div>
 
-                    <div class="history-customer-meta">
-                        <div class="history-customer-pill">
-                            <span>訂單數</span>
-                            <strong>{{ group.order_count }}</strong>
-                        </div>
-                        <div class="history-customer-pill">
-                            <span>總金額</span>
-                            <strong>{{ group.total_amount }}T</strong>
-                        </div>
-                    </div>
-                </summary>
+                <div class="history-ledger-table-wrap">
+                    <table class="history-ledger-table">
+                        <thead>
+                            <tr>
+                                <th>訂單編號</th>
+                                <th>結單日期</th>
+                                <th>委託人</th>
+                                <th>內容</th>
+                                <th>接單人員</th>
+                                <th>魔丸♫客服</th>
+                                <th>狀態</th>
+                                <th>金額</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                                {% set assignment_rows = assignments_by_order_id.get(order.id, []) %}
+                                <tr>
+                                    <td>
+                                        <input type="hidden" name="order_id" value="{{ order.id }}">
+                                        <div class="history-ledger-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</div>
+                                    </td>
 
-                <div class="history-customer-orders">
-                    {% for order in group.orders %}
-                        <article class="history-order-card">
-                            <div class="history-order-head">
-                                <div class="history-order-no">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</div>
-                                <div class="history-order-status">
-                                    {{ {'active': '進行中', 'stored': '存單', 'closed': '已結單'}.get(order.status, order.status) }}
-                                </div>
-                            </div>
+                                    <td>
+                                        <input
+                                            class="input history-date-input"
+                                            type="date"
+                                            name="closed_date_{{ order.id }}"
+                                            value="{{ closed_dates_by_order_id.get(order.id, "") }}"
+                                        >
+                                    </td>
 
-                            <input type="hidden" name="order_id" value="{{ order.id }}">
+                                    <td>
+                                        <div class="history-ledger-person">
+                                            <input class="input" type="text" name="customer_display_name_{{ order.id }}" value="{{ order.customer_display_name or '' }}" placeholder="委託人">
+                                            <input type="hidden" name="customer_discord_id_{{ order.id }}" value="{{ order.customer_discord_id or '' }}">
+                                            {% if order.customer_discord_id %}
+                                                <small>ID：{{ order.customer_discord_id }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
 
-                            <div class="history-edit-grid">
-                                <label>
-                                    <span>老闆名稱</span>
-                                    <input class="input" type="text" name="customer_display_name_{{ order.id }}" value="{{ order.customer_display_name or '' }}">
-                                </label>
+                                    <td>
+                                        <div class="history-ledger-content">
+                                            <input type="hidden" name="category_{{ order.id }}" value="{{ order.category or '' }}">
+                                            <input class="input" type="text" name="item_{{ order.id }}" value="{{ order.item or '' }}" placeholder="訂單內容">
+                                        </div>
+                                    </td>
 
-                                <label>
-                                    <span>老闆 Discord ID</span>
-                                    <input class="input" type="text" name="customer_discord_id_{{ order.id }}" value="{{ order.customer_discord_id or '' }}">
-                                </label>
+                                    <td>
+                                        <div class="history-ledger-workers">
+                                            {% if assignment_rows %}
+                                                {% for assignment in assignment_rows %}
+                                                    <span class="history-ledger-chip">{{ assignment.worker_display_name or assignment.worker_discord_id }}</span>
+{% endfor %}
+                                            {% else %}
+                                                <span class="muted-text">未記錄</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
 
-                                <label>
-                                    <span>類別</span>
-                                    <input class="input" type="text" name="category_{{ order.id }}" value="{{ order.category or '' }}">
-                                </label>
-
-                                <label>
-                                    <span>項目</span>
-                                    <input class="input" type="text" name="item_{{ order.id }}" value="{{ order.item or '' }}">
-                                </label>
-
-                                <label>
-                                    <span>金額</span>
-                                    <input class="input" type="number" name="amount_{{ order.id }}" value="{{ order.amount or 0 }}">
-                                </label>
-
-                                <label>
-                                    <span>狀態</span>
-                                    <select class="input" name="status_{{ order.id }}">
-                                        <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
-                                        <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
-                                        <option value="closed" {% if order.status == "closed" %}selected{% endif %}>已結單</option>
-                                    </select>
-                                </label>
-
-                                <label>
-                                    <span>建立時間</span>
-                                    <input class="input" type="text" value="{{ order.created_at }}" disabled>
-                                </label>
-
-                                <label>
-                                    <span>結單日期</span>
-                                    <input
-                                        class="input"
-                                        type="date"
-                                        name="closed_date_{{ order.id }}"
-                                        value="{{ history_effective_closed_date(order) }}"
-                                    >
-                                </label>
-
-                                <label>
-                                    <span>更新時間</span>
-                                    <input class="input" type="text" value="{{ order.updated_at or '' }}" disabled>
-                                </label>
-                            </div>
-
-                            <div class="history-assignment-box">
-                                <div class="history-assignment-title">客服</div>
-
-                                <div class="history-assignment-row">
-                                    <div>
-                                        <span>身份</span>
-                                        <strong>客服</strong>
-                                    </div>
-
-                                    <label>
-                                        <span>人員</span>
+                                    <td>
                                         <select class="input" name="customer_service_{{ order.id }}">
                                             <option value="">無</option>
                                             {% for option in history_staff_options.customer_services %}
-                                                <option value="{{ option.id }}" {% if order.customer_service_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
+                                                <option value="{{ option.value or option.id }}" {% if order.customer_service_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
                                             {% endfor %}
                                         </select>
-                                    </label>
+                                    </td>
 
-                                    <div></div>
-                                    <div></div>
-                                </div>
-                            </div>
+                                    <td class="history-status-cell">
+                                        <select class="history-status-select" name="status_{{ order.id }}">
+                                            <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
+                                            <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
+                                            <option value="closed" {% if order.status == "closed" %}selected{% endif %}>已結單</option>
+                                            <option value="cancelled" {% if order.status == "cancelled" %}selected{% endif %}>取消</option>
+                                        </select>
+                                    </td>
 
-                            <div class="history-assignment-box">
-                                <div class="history-assignment-title">打手</div>
+                                    <td>
+                                        <input class="input history-ledger-amount" type="number" name="amount_{{ order.id }}" value="{{ order.amount or 0 }}">
+                                    </td>
 
-                                {% set assignment_rows = assignments_by_order_id.get(order.id, []) %}
-                                {% for assignment in assignment_rows %}
-                                    <div class="history-assignment-row">
-                                        <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
+                                    <td class="history-ledger-action">
+                                        <button class="seal-button history-dossier-toggle" type="button" data-dossier-target="dossier-{{ order.id }}">查看詳情</button>
+                                    </td>
+                                </tr>
+                                  <tr class="history-dossier-detail-row" id="dossier-{{ order.id }}" hidden>
+                                      <td colspan="9">
+                                          <div class="history-dossier-detail">
+                                              <div class="history-dossier-detail-head">
+                                                  <div>
+                                                      <p class="order-no">DOSSIER EDITOR</p>
+                                                      <h4>{{ order.bot_order_no or ("WEB-" ~ order.id) }}｜卷宗修改</h4>
+                                                  </div>
 
-                                        <div>
-                                            <span>身份</span>
-                                            <strong>打手</strong>
-                                        </div>
+                                                  <div class="history-dossier-summary">
+                                                      <span class="history-dossier-pill">{{ order.status }}</span>
+                                                      <span class="history-dossier-pill">{{ order.amount or 0 }}T</span>
+                                                      <span class="history-dossier-pill">{{ assignment_rows | length }} 位接單</span>
+                                                  </div>
+                                              </div>
 
-                                        <label>
-                                            <span>人員</span>
-                                            <select class="input" name="assignment_worker_{{ assignment.id }}">
-                                                {% for option in history_staff_options.workers %}
-                                                    <option value="{{ option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </label>
+                                              <div class="history-dossier-overview">
+                                                  <div class="history-dossier-info-card">
+                                                      <span>委託人</span>
+                                                      <strong>{{ order.customer_display_name or "未記錄" }}</strong>
+                                                  </div>
 
-                                        <label class="history-delete-check">
-                                            <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
-                                            <span>掛名 +5%</span>
-                                        </label>
+                                                  <div class="history-dossier-info-card">
+                                                      <span>訂單內容</span>
+                                                      <strong>{{ order.category }}｜{{ order.item }}</strong>
+                                                  </div>
 
-                                        <label class="history-delete-check">
-                                            <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
-                                            <span>刪除</span>
-                                        </label>
-                                    </div>
-                                {% endfor %}
+                                                  <div class="history-dossier-info-card">
+                                                      <span>魔丸♫客服</span>
+                                                      <strong>{{ order.customer_service_display_name or order.customer_service_discord_id or "未指定" }}</strong>
+                                                  </div>
 
-                                {% for i in [1, 2, 3] %}
-                                    <div class="history-assignment-row">
-                                        <div>
-                                            <span>身份</span>
-                                            <strong>新增</strong>
-                                        </div>
+                                                  <div class="history-dossier-info-card">
+                                                      <span>結單日期</span>
+                                                      <strong>{{ closed_dates_by_order_id.get(order.id, "未記錄") or "未記錄" }}</strong>
+                                                  </div>
+                                              </div>
 
-                                        <label>
-                                            <span>新增打手</span>
-                                            <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
-                                                <option value="">不新增</option>
-                                                {% for option in history_staff_options.workers %}
-                                                    <option value="{{ option.id }}">{{ option.name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </label>
+                                              <div class="history-dossier-layout">
+                                                  <section class="history-dossier-card">
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>目前接單人員</h5>
+                                                              <p>更換人員、調整掛名 +5%，或勾選移除。</p>
+                                                          </div>
+                                                          <span class="history-dossier-pill">{{ assignment_rows | length }} 人</span>
+                                                      </div>
 
-                                        <label class="history-delete-check">
-                                            <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
-                                            <span>掛名 +5%</span>
-                                        </label>
+                                                      {% if assignment_rows %}
+                                                          <div class="history-dossier-person-list">
+                                                              {% for assignment in assignment_rows %}
+                                                                  <div class="history-dossier-person-row">
+                                                                      <input type="hidden" name="assignment_id_{{ order.id }}" value="{{ assignment.id }}">
 
-                                        <div></div>
-                                    </div>
-                                {% endfor %}
-                            </div>
+                                                                      <label class="history-dossier-field">
+                                                                          <span>接單人員</span>
+                                                                          <select class="input" name="assignment_worker_{{ assignment.id }}">
+                                                                              {% for option in history_staff_options.workers %}
+                                                                                  <option value="{{ option.value or option.id }}" {% if assignment.worker_discord_id == option.id %}selected{% endif %}>{{ option.name }}</option>
+                                                                              {% endfor %}
+                                                                          </select>
+                                                                      </label>
 
-                            {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
-                            {% if payout_rows %}
-                                <div class="history-payout-box">
-                                    <div class="history-payout-title">分潤調整</div>
+                                                                      <label class="history-dossier-toggle">
+                                                                          <input type="checkbox" name="assignment_named_bonus_{{ assignment.id }}" value="1" {% if assignment.has_named_bonus %}checked{% endif %}>
+                                                                          掛名 +5%
+                                                                      </label>
 
-                                    {% for payout in payout_rows %}
-                                        <div class="history-payout-row">
-                                            <div>
-                                                <span>身份</span>
-                                                <strong>{{ payout.label }}</strong>
-                                            </div>
+                                                                      <label class="history-dossier-toggle danger">
+                                                                          <input type="checkbox" name="delete_assignment_{{ assignment.id }}" value="1">
+                                                                          移除
+                                                                      </label>
+                                                                  </div>
+                                                              {% endfor %}
+                                                          </div>
+                                                      {% else %}
+                                                          <div class="history-dossier-empty">目前沒有接單人員，可使用右側新增欄位補上。</div>
+                                                      {% endif %}
+                                                  </section>
 
-                                            <div>
-                                                <span>人員</span>
-                                                <strong>{{ payout.person_name }}</strong>
-                                            </div>
+                                                  <section class="history-dossier-card">
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>新增護航 / 陪玩</h5>
+                                                              <p>最多先提供 3 個新增欄位，儲存後重新計算分潤。</p>
+                                                          </div>
+                                                      </div>
 
-                                            <label>
-                                                <span>分潤金額</span>
-                                                {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
-                                                <input
-                                                    class="input"
-                                                    type="number"
-                                                    name="{{ payout.input_name }}"
-                                                    value="{{ manual_payout_overrides.get(manual_key, '') }}"
-                                                    placeholder="自動"
-                                                >
-                                            </label>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </article>
-                    {% endfor %}
+                                                      <div class="history-dossier-add-list">
+                                                          {% for i in range(3) %}
+                                                              <div class="history-dossier-add-row">
+                                                                  <label class="history-dossier-field">
+                                                                      <span>新增接單人員 {{ i + 1 }}</span>
+                                                                      <select class="input" name="new_worker_{{ order.id }}_{{ i }}">
+                                                                          <option value="">不新增</option>
+                                                                          {% for option in history_staff_options.workers %}
+                                                                              <option value="{{ option.value or option.id }}">{{ option.name }}</option>
+                                                                          {% endfor %}
+                                                                      </select>
+                                                                  </label>
+
+                                                                  <label class="history-dossier-toggle">
+                                                                      <input type="checkbox" name="new_worker_named_bonus_{{ order.id }}_{{ i }}" value="1">
+                                                                      掛名 +5%
+                                                                  </label>
+                                                              </div>
+                                                          {% endfor %}
+                                                      </div>
+                                                  </section>
+
+                                                  
+                                                  <section class="history-dossier-card history-dossier-card-wide history-rule-snapshot-card">
+                                                      {% set rule_snapshot_json = order.rule_snapshot_json | default("", true) %}
+                                                      {% set price_snapshot_json = order.price_snapshot_json | default("", true) %}
+
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>規則快照 / 價格快照</h5>
+                                                              <p>保存下單當下的規則、金額、折扣與點數資訊，避免之後改價或改人數時混淆。</p>
+                                                          </div>
+                                                      </div>
+
+                                                      <div class="history-rule-snapshot-grid">
+                                                          <div class="rule-snapshot-card">
+                                                              <span>規則 Key</span>
+                                                              <strong>{{ order.order_rule_key | default("未保存", true) }}</strong>
+                                                          </div>
+
+                                                          <div class="rule-snapshot-card">
+                                                              <span>規則版本</span>
+                                                              <strong>{{ order.rule_version | default("未保存", true) }}</strong>
+                                                          </div>
+
+                                                          <div class="rule-snapshot-card">
+                                                              <span>訂單金額</span>
+                                                              <strong>{{ order.amount or 0 }}T</strong>
+                                                          </div>
+
+                                                          <div class="rule-snapshot-card">
+                                                              <span>分潤基準</span>
+                                                              <strong>{{ order.payout_base_amount | default(order.amount, true) or 0 }}T</strong>
+                                                          </div>
+                                                      </div>
+
+                                                      {% if rule_snapshot_json or price_snapshot_json %}
+                                                          {% if price_snapshot_json %}
+                                                              <details class="rule-snapshot-details">
+                                                                  <summary>展開價格快照 JSON</summary>
+                                                                  <pre class="rule-snapshot-raw">{{ price_snapshot_json }}</pre>
+                                                              </details>
+                                                          {% endif %}
+
+                                                          {% if rule_snapshot_json %}
+                                                              <details class="rule-snapshot-details">
+                                                                  <summary>展開規則快照 JSON</summary>
+                                                                  <pre class="rule-snapshot-raw">{{ rule_snapshot_json }}</pre>
+                                                              </details>
+                                                          {% endif %}
+                                                      {% else %}
+                                                          <div class="history-dossier-empty">這張訂單建立時尚未保存快照；之後的新自助單才會顯示完整規則與價格快照。</div>
+                                                      {% endif %}
+                                                  </section>
+
+<section class="history-dossier-card history-dossier-card-wide">
+                                                      <div class="history-dossier-card-head">
+                                                          <div>
+                                                              <h5>分潤調整</h5>
+                                                              <p>留空代表自動計算；填入金額後會以手動分潤覆蓋。</p>
+                                                          </div>
+                                                      </div>
+
+                                                      {% set payout_rows = payouts_by_order_id.get(order.id, []) %}
+                                                      {% if payout_rows %}
+                                                          <div class="history-dossier-payout-list">
+                                                              {% for payout in payout_rows %}
+                                                                  {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
+                                                                  <div class="history-dossier-payout-row">
+                                                                      <strong class="history-dossier-payout-type">{{ payout.label }}</strong>
+
+                                                                      <div class="history-dossier-payout-person">
+                                                                          <span>{{ payout.person_name or payout.person_id }}</span>
+                                                                          <small>{{ payout.person_id }}</small>
+                                                                      </div>
+
+                                                                      <label class="history-dossier-field">
+                                                                          <span>手動金額</span>
+                                                                          <input
+                                                                              class="input"
+                                                                              type="number"
+                                                                              name="{{ payout.input_name }}"
+                                                                              value="{{ manual_payout_overrides.get(manual_key, '') }}"
+                                                                              placeholder="自動"
+                                                                          >
+                                                                      </label>
+                                                                  </div>
+                                                              {% endfor %}
+                                                          </div>
+                                                      {% else %}
+                                                          <div class="history-dossier-empty">目前沒有分潤資料；儲存後系統會依接單人員重新計算。</div>
+                                                      {% endif %}
+                                                  </section>
+                                              </div>
+                                          </div>
+                                      </td>
+                                  </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </details>
-        {% endfor %}
-    </section>
 
-    <div class="history-bulk-toolbar">
-        <p class="muted-text">修改完成後請按「儲存全部修改」，系統會一次更新本頁所有訂單資料。</p>
+                <div class="history-ledger-pagination">
+                    <div class="muted-text">共 {{ total_orders }} 筆記錄</div>
+                    <div class="history-page-links">
+                        {% if has_prev_page %}
+                            <a href="/admin/orders/history?page={{ prev_page }}&status={{ current_status }}&keyword={{ keyword }}">‹</a>
+                        {% else %}
+                            <span>‹</span>
+                        {% endif %}
 
-        <div class="history-bulk-actions">
-            <button class="button secondary" type="reset">還原</button>
-            <button class="button" type="submit">儲存全部修改</button>
-        </div>
-    </div>
-{% else %}
-    <section class="panel">
-        <div class="empty-state">目前沒有歷史訂單。</div>
-    </section>
-{% endif %}
-</form>
+                        {% for p in range(1, total_pages + 1) %}
+                            {% if p == page %}
+                                <span class="active">{{ p }}</span>
+                            {% elif p <= 5 or p == total_pages or (p >= page - 1 and p <= page + 1) %}
+                                <a href="/admin/orders/history?page={{ p }}&status={{ current_status }}&keyword={{ keyword }}">{{ p }}</a>
+                            {% elif p == 6 and page > 7 %}
+                                <span>…</span>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if has_next_page %}
+                            <a href="/admin/orders/history?page={{ next_page }}&status={{ current_status }}&keyword={{ keyword }}">›</a>
+                        {% else %}
+                            <span>›</span>
+                        {% endif %}
+                    </div>
+                    <div class="muted-text">每頁顯示 {{ per_page }}</div>
+                </div>
+            </section>
+
+            <div class="history-bulk-toolbar">
+                <p class="muted-text">已進行的變更將暫存在本頁，請按「儲存全部修改」套用至這 10 筆卷宗。</p>
+                <div class="history-bulk-actions">
+                    <button class="button secondary" type="reset">重設</button>
+                    <button class="button" type="submit">儲存全部修改</button>
+                </div>
+            </div>
+        {% else %}
+            <section class="panel">
+                <div class="empty-state">目前沒有訂單管理。</div>
+            </section>
+        {% endif %}
+    </form>
+</div>
 {% endblock %}

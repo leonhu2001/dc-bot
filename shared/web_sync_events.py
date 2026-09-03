@@ -138,10 +138,7 @@ def get_web_order_sync_payload(order_id: int) -> dict:
                 continue
 
             role_type = str(assignment.role_type or "booster").lower()
-            if role_type == "companion":
-                companion_ids.append(worker_id)
-            else:
-                booster_ids.append(worker_id)
+            booster_ids.append(worker_id)
 
         return {
             "id": order.id,
