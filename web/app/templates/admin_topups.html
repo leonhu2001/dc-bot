@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block page_title %}儲值審核{% endblock %}
+{% block content %}
+<section class="wallet-page">
+  <section class="wallet-card wallet-intro" style="padding:22px">
+    <p class="order-no">TOPUP REVIEW</p>
+    <h2>儲值審核</h2>
+    <p>客服確認付款後核准，Bot 會統一完成錢包入帳、VIP 累積與當筆返利。</p>
+  </section>
+
+  {% if error %}<div class="member-alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="member-alert">{{ ok }}</div>{% endif %}
+
+  <section class="wallet-panel">
+    <div class="wallet-panel-head">
+      <div><p class="order-no">TOPUPS</p><h3>儲值單</h3></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="wallet-link" href="/admin/topups">全部</a>
+        <a class="wallet-link" href="/admin/topups?status=pending_review">待審核</a>
+        <a class="wallet-link" href="/admin/topups?status=completed">已完成</a>
+      </div>
+    </div>
+    <div class="wallet-table-wrap">
+      <table class="wallet-table">
+        <thead><tr><th>儲值單</th><th>老闆</th><th>金額</th><th>末五碼</th><th>來源</th><th>狀態</th><th>操作</th></tr></thead>
+        <tbody>
+        {% for topup in topups %}
+          <tr>
+            <td><strong>{{ topup.topup_no }}</strong><div class="wallet-code">{{ topup.created_at }}</div></td>
+            <td><div class="wallet-boss-name">{{ topup.customer_display_name or '—' }}</div><div class="wallet-boss-id">{{ topup.customer_discord_id }}</div></td>
+            <td class="wallet-amount">{{ topup.amount_text }}</td>
+            <td>{{ topup.bank_last5 or '—' }}</td>
+            <td>{{ '網站' if topup.source == 'web' else 'Discord' }}</td>
+            <td>{{ topup.status_label }}</td>
+            <td>
+              {% if topup.status == 'pending_review' %}
+              <form method="post" action="/admin/topups/{{ topup.id }}/approve" style="display:inline"><button class="wallet-link" type="submit">確認入帳</button></form>
+              <form method="post" action="/admin/topups/{{ topup.id }}/reject" style="display:inline"><input type="hidden" name="reason" value="客服駁回"><button class="wallet-link" type="submit">駁回</button></form>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="wallet-empty">目前沒有儲值單。</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
