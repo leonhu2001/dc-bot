@@ -19,11 +19,7 @@ from services.wallet_service import adjust_wallet_balance, find_wallet_transacti
 
 
 def install_wallet_vip_guard() -> None:
-    """把 bot.py 已匯入的結單 VIP 函式包一層，防止錢包付款重複累積 VIP。
-
-    儲值本金在儲值完成時已計入 total_spent，因此之後用該錢包餘額下單時，
-    結單只增加完成訂單數，不再把訂單金額加到 total_spent。
-    """
+    """把 bot.py 已匯入的結單 VIP 函式包一層，防止錢包付款重複累積 VIP。"""
     target_module = None
     for module in list(sys.modules.values()):
         if module is None:
@@ -149,10 +145,17 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
 
         if reward_key not in reward_keys:
             old_level = rewards.get_effective_member_level(data)
+            points_before = rewards.get_current_reward_points(data)
+
             data["total_spent"] = int(data.get("total_spent", 0) or 0) + amount
             reward_keys.append(reward_key)
             data["manual_purchase_keys"] = reward_keys[-500:]
-            data["points"] = rewards.get_current_reward_points(data)
+
+            # 儲值本金只計 VIP，不額外產生消費點數。
+            base_points_after = rewards.calculate_reward_points(int(data["total_spent"]))
+            data["point_adjustment"] = int(points_before) - int(base_points_after)
+            data["points"] = int(points_before)
+
             rewards.sync_vip_level_to_cumulative_if_higher(data)
 
             guild = None
