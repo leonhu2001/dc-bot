@@ -865,6 +865,8 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
             await interaction.response.send_message("只有這張票口的老闆可以收藏成員。", ephemeral=True)
             return
 
+        await interaction.response.defer(ephemeral=True)
+
         selected_ids = {str(value) for value in self.values}
         added = []
         already = []
@@ -896,7 +898,7 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
         if not lines:
             lines.append("沒有新增收藏。")
 
-        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+        await interaction.followup.send("\n".join(lines), ephemeral=True)
 
         guild = interaction.guild
         if guild is not None:
@@ -1074,10 +1076,12 @@ class ReviewButtonView(discord.ui.View):
             await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
             return
 
+        await interaction.response.defer(ephemeral=True)
+
         _order, targets = get_review_targets(channel.id)
 
         if not targets:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "這張單目前找不到接單成員資料，暫時無法收藏本次成員。",
                 ephemeral=True,
             )
@@ -1098,7 +1102,7 @@ class ReviewButtonView(discord.ui.View):
             status = "已收藏" if staff_id in favorite_ids else "尚未收藏"
             lines.append(f"{_target_label(item)}｜{status}")
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "\n".join(lines),
             ephemeral=True,
             view=FavoriteCurrentMembersView(
