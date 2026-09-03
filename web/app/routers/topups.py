@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -37,6 +38,14 @@ def _display_name(user: dict) -> str:
         or user.get("username")
         or user.get("id")
         or "老闆"
+    )
+
+
+def _redirect_message(path: str, key: str, message: object) -> RedirectResponse:
+    separator = "&" if "?" in path else "?"
+    return RedirectResponse(
+        f"{path}{separator}{key}={quote(str(message), safe='')}",
+        status_code=303,
     )
 
 
@@ -92,7 +101,7 @@ async def member_wallet_topup_create(
             payment_method="bank_transfer",
         )
     except ValueError as exc:
-        return RedirectResponse(f"/me/wallet?error={str(exc)}", status_code=303)
+        return _redirect_message("/me/wallet", "error", exc)
 
     return RedirectResponse(f"/me/wallet/topup/{int(order['id'])}", status_code=303)
 
@@ -106,10 +115,25 @@ async def member_wallet_topup_detail(request: Request, topup_id: int):
     order = get_topup_order(topup_id)
     customer_id = str(user.get("id") or "")
     if not order or str(order.get("customer_discord_id")) != customer_id:
-        return RedirectResponse("/me/wallet?error=找不到這筆儲值單", status_code=303)
+        return _redirect_message("/me/wallet", "error", "找不到這筆儲值單")
 
     member = get_member_summary(customer_id)
-    preview = calculate_topup_preview(member.get("total_spent", 0), int(order.get("amount") or 0))
+
+    if str(order.get("status") or "") == "completed":
+        preview = {
+            "vip_total_before": int(order.get("vip_total_before") or 0),
+            "vip_total_after": int(order.get("vip_total_after") or 0),
+            "vip_level_before": str(order.get("vip_level_before") or "普通魔丸"),
+            "vip_level_after": str(order.get("vip_level_after") or member.get("vip_name") or "普通魔丸"),
+            "rebate_percent": int(order.get("rebate_percent") or 0),
+            "rebate_amount": int(order.get("rebate_amount") or 0),
+            "credited_amount": int(order.get("credited_amount") or order.get("amount") or 0),
+        }
+    else:
+        preview = calculate_topup_preview(
+            member.get("total_spent", 0),
+            int(order.get("amount") or 0),
+        )
 
     return templates.TemplateResponse(
         request=request,
@@ -146,8 +170,12 @@ async def member_wallet_topup_submit(
             payment_note=payment_note,
         )
     except ValueError as exc:
-        return RedirectResponse(f"/me/wallet/topup/{topup_id}?error={str(exc)}", status_code=303)
-    return RedirectResponse(f"/me/wallet/topup/{topup_id}?ok=付款資料已送出，等待客服審核", status_code=303)
+        return _redirect_message(f"/me/wallet/topup/{topup_id}", "error", exc)
+    return _redirect_message(
+        f"/me/wallet/topup/{topup_id}",
+        "ok",
+        "付款資料已送出，等待客服審核",
+    )
 
 
 @router.post("/me/wallet/topup/{topup_id}/cancel")
@@ -158,8 +186,8 @@ async def member_wallet_topup_cancel(request: Request, topup_id: int):
     try:
         cancel_topup_order(topup_id, customer_discord_id=str(user.get("id") or ""))
     except ValueError as exc:
-        return RedirectResponse(f"/me/wallet/topup/{topup_id}?error={str(exc)}", status_code=303)
-    return RedirectResponse("/me/wallet?ok=儲值單已取消", status_code=303)
+        return _redirect_message(f"/me/wallet/topup/{topup_id}", "error", exc)
+    return _redirect_message("/me/wallet", "ok", "儲值單已取消")
 
 
 @router.get("/admin/topups", response_class=HTMLResponse)
@@ -193,8 +221,12 @@ async def admin_topup_approve(request: Request, topup_id: int):
             operator_display_name=_display_name(user),
         )
     except ValueError as exc:
-        return RedirectResponse(f"/admin/topups?error={str(exc)}", status_code=303)
-    return RedirectResponse("/admin/topups?ok=已核准，Bot 將自動完成錢包與 VIP 入帳", status_code=303)
+        return _redirect_message("/admin/topups", "error", exc)
+    return _redirect_message(
+        "/admin/topups",
+        "ok",
+        "已核准，Bot 將自動完成錢包與 VIP 入帳",
+    )
 
 
 @router.post("/admin/topups/{topup_id}/reject")
@@ -213,5 +245,5 @@ async def admin_topup_reject(
             reason=reason,
         )
     except ValueError as exc:
-        return RedirectResponse(f"/admin/topups?error={str(exc)}", status_code=303)
-    return RedirectResponse("/admin/topups?ok=儲值單已駁回", status_code=303)
+        return _redirect_message("/admin/topups", "error", exc)
+    return _redirect_message("/admin/topups", "ok", "儲值單已駁回")
