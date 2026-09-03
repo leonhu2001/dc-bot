@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from shared.db import create_all_tables
+from services.topups import ensure_topup_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -58,6 +59,7 @@ app.include_router(admin_payouts_grouped.router)
 @app.on_event("startup")
 async def startup_event():
     create_all_tables()
+    ensure_topup_tables()
 
 
 def get_current_user(request: Request) -> dict | None:
