@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import traceback
 
 import discord
 
 import services.rewards as rewards
+from core.time_utils import get_taipei_now_iso
 from services.topups import (
     calculate_topup_preview,
     get_pending_credit_topups,
@@ -14,6 +16,75 @@ from services.topups import (
     reset_topup_credit_error,
 )
 from services.wallet_service import adjust_wallet_balance, find_wallet_transaction, get_wallet_balance
+
+
+def install_wallet_vip_guard() -> None:
+    """把 bot.py 已匯入的結單 VIP 函式包一層，防止錢包付款重複累積 VIP。
+
+    儲值本金在儲值完成時已計入 total_spent，因此之後用該錢包餘額下單時，
+    結單只增加完成訂單數，不再把訂單金額加到 total_spent。
+    """
+    target_module = None
+    for module in list(sys.modules.values()):
+        if module is None:
+            continue
+        if hasattr(module, "SELF_SERVICE_ORDER_SELECTIONS") and hasattr(module, "add_customer_reward_from_order"):
+            target_module = module
+            break
+
+    if target_module is None or getattr(target_module, "_wallet_vip_guard_installed", False):
+        return
+
+    original = getattr(target_module, "add_customer_reward_from_order")
+
+    async def guarded_add_customer_reward_from_order(
+        guild,
+        order_channel_id: int,
+        customer_id: int,
+        amount_text: str,
+        notify_channel=None,
+    ) -> str:
+        order_data = getattr(target_module, "SELF_SERVICE_ORDER_SELECTIONS", {}).get(order_channel_id, {})
+        payment_method = str(order_data.get("payment_method") or "").strip()
+
+        if payment_method != "我的錢包":
+            return await original(
+                guild,
+                order_channel_id,
+                customer_id,
+                amount_text,
+                notify_channel=notify_channel,
+            )
+
+        if order_data.get("reward_counted"):
+            return "此訂單已處理會員紀錄，未重複累積。"
+
+        data = rewards.get_customer_reward_data(customer_id)
+        data["order_count"] = int(data.get("order_count", 0) or 0) + 1
+        data["last_order_at"] = get_taipei_now_iso()
+        data["points"] = rewards.get_current_reward_points(data)
+
+        order_data["reward_counted"] = True
+        order_data["reward_amount"] = 0
+        order_data["reward_excluded"] = True
+        order_data["reward_excluded_reason"] = "錢包付款：儲值本金已於儲值時累積 VIP，避免重複計算"
+        order_data["reward_counted_at"] = get_taipei_now_iso()
+
+        selections = getattr(target_module, "SELF_SERVICE_ORDER_SELECTIONS", None)
+        if isinstance(selections, dict):
+            selections[order_channel_id] = order_data
+
+        if rewards._SAVE_BOT_DATA is not None:
+            rewards._SAVE_BOT_DATA()
+
+        return (
+            "會員紀錄已更新：完成訂單 +1；本單使用錢包付款，"
+            "儲值本金已於儲值時累積 VIP，因此未再次增加累積消費。"
+        )
+
+    setattr(target_module, "add_customer_reward_from_order", guarded_add_customer_reward_from_order)
+    target_module._wallet_vip_guard_installed = True
+    print("[topup] wallet VIP double-count guard installed", flush=True)
 
 
 async def _process_one_topup(bot: discord.Client, row: dict) -> None:
@@ -37,7 +108,6 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
 
         before_total = int(data.get("total_spent", 0) or 0)
         if reward_key in reward_keys:
-            # 已經套用過 VIP 累積；用現況回推本筆前總額，避免 worker 重啟重複累積。
             before_total = max(0, before_total - amount)
 
         preview = calculate_topup_preview(before_total, amount)
@@ -146,6 +216,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
 
 
 def ensure_topup_credit_worker_started(bot: discord.Client) -> None:
+    install_wallet_vip_guard()
     if getattr(bot, "_topup_credit_worker_started", False):
         return
     bot._topup_credit_worker_started = True
