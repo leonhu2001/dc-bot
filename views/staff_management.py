@@ -14,9 +14,19 @@ from core.permissions import (
 REQUIRED_COMMAND_PATHS = (
     "order_search",
     "stored_orders",
+    "fix_order_amount",
+    "fix_order_customer",
+    "resend_dispatch",
     "reward customer_points",
+    "reward adjust_points",
+    "reward add_purchase",
     "customer notes",
+    "customer add_note",
+    "customer remove_note",
     "wallet_history",
+    "wallet_add",
+    "wallet_adjust",
+    "wallet_refund",
     "stats today",
     "stats month",
     "stats top_customers",
@@ -321,6 +331,942 @@ class OrderSearchModal(
         )
 
 
+
+def parse_yes_no(
+    value: str,
+    *,
+    default: bool = True,
+) -> bool | None:
+    text = str(
+        value
+        or ""
+    ).strip().lower()
+
+    if not text:
+        return default
+
+    yes_values = {
+        "是",
+        "要",
+        "有",
+        "yes",
+        "y",
+        "true",
+        "1",
+    }
+
+    no_values = {
+        "否",
+        "不要",
+        "沒有",
+        "no",
+        "n",
+        "false",
+        "0",
+    }
+
+    if text in yes_values:
+        return True
+
+    if text in no_values:
+        return False
+
+    return None
+
+
+class ConfirmCommandView(
+    discord.ui.View
+):
+    def __init__(
+        self,
+        *,
+        actor_id: int,
+        command_path: str,
+        command_kwargs: dict,
+    ):
+        super().__init__(
+            timeout=60,
+        )
+
+        self.actor_id = int(
+            actor_id
+        )
+
+        self.command_path = str(
+            command_path
+        )
+
+        self.command_kwargs = dict(
+            command_kwargs
+        )
+
+        self.completed = False
+
+    async def interaction_check(
+        self,
+        interaction: discord.Interaction,
+    ) -> bool:
+        if int(
+            interaction.user.id
+        ) == self.actor_id:
+            return True
+
+        await interaction.response.send_message(
+            "這個確認操作只能由原本發起的客服執行。",
+            ephemeral=True,
+        )
+
+        return False
+
+    @discord.ui.button(
+        label="確認執行",
+        emoji="✅",
+        style=discord.ButtonStyle.danger,
+    )
+    async def confirm(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if self.completed:
+            await interaction.response.send_message(
+                "這個操作已經處理過了。",
+                ephemeral=True,
+            )
+            return
+
+        self.completed = True
+
+        for item in self.children:
+            item.disabled = True
+
+        try:
+            await invoke_existing_command(
+                interaction,
+                self.command_path,
+                **self.command_kwargs,
+            )
+
+        except Exception as exc:
+            self.completed = False
+
+            for item in self.children:
+                item.disabled = False
+
+            message = (
+                "執行失敗："
+                f"{type(exc).__name__}: {exc}"
+            )
+
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    message,
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    message,
+                    ephemeral=True,
+                )
+
+    @discord.ui.button(
+        label="取消",
+        emoji="✖️",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def cancel(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if self.completed:
+            await interaction.response.send_message(
+                "這個操作已經處理過了。",
+                ephemeral=True,
+            )
+            return
+
+        self.completed = True
+
+        await interaction.response.edit_message(
+            embed=build_menu_embed(
+                "已取消",
+                "沒有修改任何資料。",
+            ),
+            view=None,
+        )
+
+
+async def show_confirmation(
+    interaction: discord.Interaction,
+    *,
+    title: str,
+    description: str,
+    command_path: str,
+    command_kwargs: dict,
+):
+    if not await require_staff(
+        interaction
+    ):
+        return
+
+    embed = discord.Embed(
+        title=f"⚠️ {title}",
+        description=(
+            description
+            + "\n\n"
+            + "**請再次確認後再執行。**"
+        ),
+        color=discord.Color.orange(),
+    )
+
+    await interaction.response.send_message(
+        embed=embed,
+        view=ConfirmCommandView(
+            actor_id=interaction.user.id,
+            command_path=command_path,
+            command_kwargs=command_kwargs,
+        ),
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions(
+            users=False,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+
+class FixOrderAmountModal(
+    discord.ui.Modal,
+    title="修正訂單金額",
+):
+    order = discord.ui.TextInput(
+        label="訂單編號或票口 ID",
+        placeholder="MO2026... 或票口頻道 ID",
+        max_length=100,
+    )
+
+    amount = discord.ui.TextInput(
+        label="新金額",
+        placeholder="例如 1275",
+        max_length=12,
+    )
+
+    adjust_customer = discord.ui.TextInput(
+        label="同步會員累積",
+        placeholder="是 / 否",
+        default="是",
+        max_length=10,
+    )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        try:
+            amount = int(
+                str(
+                    self.amount.value
+                )
+                .replace(
+                    ",",
+                    "",
+                )
+                .strip()
+            )
+
+        except ValueError:
+            await interaction.response.send_message(
+                "新金額請輸入數字。",
+                ephemeral=True,
+            )
+            return
+
+        if amount < 0:
+            await interaction.response.send_message(
+                "新金額不能小於 0。",
+                ephemeral=True,
+            )
+            return
+
+        adjust = parse_yes_no(
+            str(
+                self.adjust_customer.value
+            ),
+            default=True,
+        )
+
+        if adjust is None:
+            await interaction.response.send_message(
+                "同步會員累積請輸入「是」或「否」。",
+                ephemeral=True,
+            )
+            return
+
+        order = str(
+            self.order.value
+        ).strip()
+
+        await show_confirmation(
+            interaction,
+            title="修正訂單金額",
+            description=(
+                f"訂單：`{order}`\n"
+                f"新金額：**{amount:,}T**\n"
+                f"同步會員累積："
+                f"{'是' if adjust else '否'}"
+            ),
+            command_path="fix_order_amount",
+            command_kwargs={
+                "order": order,
+                "amount": amount,
+                "adjust_customer": adjust,
+            },
+        )
+
+
+class ResendDispatchModal(
+    discord.ui.Modal,
+    title="重新派單",
+):
+    channel_id = discord.ui.TextInput(
+        label="票口頻道 ID",
+        placeholder="例如 1506962556928131112",
+        max_length=30,
+    )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        channel_id = str(
+            self.channel_id.value
+        ).strip()
+
+        if not channel_id.isdigit():
+            await interaction.response.send_message(
+                "票口頻道 ID 請輸入純數字。",
+                ephemeral=True,
+            )
+            return
+
+        await show_confirmation(
+            interaction,
+            title="重新派單",
+            description=(
+                f"票口頻道 ID："
+                f"`{channel_id}`\n\n"
+                "系統會清理這張票口的舊接單暫存，"
+                "並重新建立新的派單面板。"
+            ),
+            command_path="resend_dispatch",
+            command_kwargs={
+                "order_channel_id": channel_id,
+            },
+        )
+
+
+class FixOrderCustomerSelect(
+    discord.ui.UserSelect
+):
+    def __init__(
+        self,
+        *,
+        order: str,
+        adjust_customer: bool,
+    ):
+        self.order = order
+
+        self.adjust_customer = bool(
+            adjust_customer
+        )
+
+        super().__init__(
+            placeholder="選擇正確的顧客",
+            min_values=1,
+            max_values=1,
+        )
+
+    async def callback(
+        self,
+        interaction: discord.Interaction,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        member = await resolve_selected_member(
+            interaction,
+            self.values[0],
+        )
+
+        if member is None:
+            await interaction.response.send_message(
+                "找不到這位伺服器成員。",
+                ephemeral=True,
+            )
+            return
+
+        await show_confirmation(
+            interaction,
+            title="修正訂單顧客",
+            description=(
+                f"訂單：`{self.order}`\n"
+                f"新顧客：{member.mention}\n"
+                "若訂單已結單，"
+                f"會員累積搬移："
+                f"{'是' if self.adjust_customer else '否'}"
+            ),
+            command_path="fix_order_customer",
+            command_kwargs={
+                "order": self.order,
+                "customer": member,
+                "adjust_customer":
+                    self.adjust_customer,
+            },
+        )
+
+
+class FixOrderCustomerSelectView(
+    discord.ui.View
+):
+    def __init__(
+        self,
+        *,
+        order: str,
+        adjust_customer: bool,
+    ):
+        super().__init__(
+            timeout=120,
+        )
+
+        self.add_item(
+            FixOrderCustomerSelect(
+                order=order,
+                adjust_customer=adjust_customer,
+            )
+        )
+
+
+class FixOrderCustomerModal(
+    discord.ui.Modal,
+    title="修正訂單顧客",
+):
+    order = discord.ui.TextInput(
+        label="訂單編號或票口 ID",
+        placeholder="MO2026... 或票口頻道 ID",
+        max_length=100,
+    )
+
+    adjust_customer = discord.ui.TextInput(
+        label="搬移已結單會員累積",
+        placeholder="是 / 否",
+        default="是",
+        max_length=10,
+    )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        adjust = parse_yes_no(
+            str(
+                self.adjust_customer.value
+            ),
+            default=True,
+        )
+
+        if adjust is None:
+            await interaction.response.send_message(
+                "搬移會員累積請輸入「是」或「否」。",
+                ephemeral=True,
+            )
+            return
+
+        order = str(
+            self.order.value
+        ).strip()
+
+        await interaction.response.send_message(
+            embed=build_menu_embed(
+                "修正訂單顧客",
+                (
+                    f"訂單：`{order}`\n"
+                    "請選擇正確的顧客。"
+                ),
+            ),
+            view=FixOrderCustomerSelectView(
+                order=order,
+                adjust_customer=adjust,
+            ),
+            ephemeral=True,
+        )
+
+
+class AddCustomerNoteModal(
+    discord.ui.Modal
+):
+    def __init__(
+        self,
+        member: discord.Member,
+    ):
+        super().__init__(
+            title="新增顧客備註"
+        )
+
+        self.member = member
+
+        self.note = discord.ui.TextInput(
+            label="備註內容",
+            style=discord.TextStyle.paragraph,
+            max_length=500,
+        )
+
+        self.blacklist = discord.ui.TextInput(
+            label="標記黑名單 / 高風險",
+            placeholder="是 / 否",
+            default="否",
+            max_length=10,
+        )
+
+        self.add_item(
+            self.note
+        )
+
+        self.add_item(
+            self.blacklist
+        )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        blacklist = parse_yes_no(
+            str(
+                self.blacklist.value
+            ),
+            default=False,
+        )
+
+        if blacklist is None:
+            await interaction.response.send_message(
+                "黑名單欄位請輸入「是」或「否」。",
+                ephemeral=True,
+            )
+            return
+
+        note = str(
+            self.note.value
+        ).strip()
+
+        if not note:
+            await interaction.response.send_message(
+                "備註內容不能空白。",
+                ephemeral=True,
+            )
+            return
+
+        await show_confirmation(
+            interaction,
+            title="新增顧客備註",
+            description=(
+                f"顧客：{self.member.mention}\n"
+                f"黑名單 / 高風險："
+                f"{'是' if blacklist else '否'}\n"
+                f"備註：{note}"
+            ),
+            command_path="customer add_note",
+            command_kwargs={
+                "customer": self.member,
+                "note": note,
+                "blacklist": blacklist,
+            },
+        )
+
+
+class RemoveCustomerNoteModal(
+    discord.ui.Modal
+):
+    def __init__(
+        self,
+        member: discord.Member,
+    ):
+        super().__init__(
+            title="刪除顧客備註"
+        )
+
+        self.member = member
+
+        self.index = discord.ui.TextInput(
+            label="備註編號",
+            placeholder="先查看備註，再輸入要刪除的編號",
+            max_length=4,
+        )
+
+        self.add_item(
+            self.index
+        )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        try:
+            index = int(
+                str(
+                    self.index.value
+                ).strip()
+            )
+
+        except ValueError:
+            await interaction.response.send_message(
+                "備註編號請輸入數字。",
+                ephemeral=True,
+            )
+            return
+
+        if index < 1:
+            await interaction.response.send_message(
+                "備註編號必須從 1 開始。",
+                ephemeral=True,
+            )
+            return
+
+        await show_confirmation(
+            interaction,
+            title="刪除顧客備註",
+            description=(
+                f"顧客：{self.member.mention}\n"
+                f"刪除第 **{index}** 筆備註"
+            ),
+            command_path="customer remove_note",
+            command_kwargs={
+                "customer": self.member,
+                "index": index,
+            },
+        )
+
+
+class WalletActionModal(
+    discord.ui.Modal
+):
+    MODES = {
+        "topup": {
+            "title": "客服儲值",
+            "command": "wallet_add",
+            "positive": True,
+        },
+        "adjust": {
+            "title": "修正錢包餘額",
+            "command": "wallet_adjust",
+            "positive": False,
+        },
+        "refund": {
+            "title": "退款到錢包",
+            "command": "wallet_refund",
+            "positive": True,
+        },
+    }
+
+    def __init__(
+        self,
+        member: discord.Member,
+        mode: str,
+    ):
+        config = self.MODES[
+            mode
+        ]
+
+        super().__init__(
+            title=config["title"]
+        )
+
+        self.member = member
+        self.mode = mode
+        self.config = config
+
+        self.amount = discord.ui.TextInput(
+            label="金額",
+            placeholder=(
+                "例如 12000"
+                if mode != "adjust"
+                else "例如 500 或 -300"
+            ),
+            max_length=12,
+        )
+
+        self.note = discord.ui.TextInput(
+            label="原因 / 備註",
+            required=False,
+            max_length=200,
+        )
+
+        self.add_item(
+            self.amount
+        )
+
+        self.add_item(
+            self.note
+        )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        try:
+            amount = int(
+                str(
+                    self.amount.value
+                )
+                .replace(
+                    ",",
+                    "",
+                )
+                .strip()
+            )
+
+        except ValueError:
+            await interaction.response.send_message(
+                "金額請輸入整數。",
+                ephemeral=True,
+            )
+            return
+
+        if self.config["positive"]:
+
+            if amount <= 0:
+                await interaction.response.send_message(
+                    "金額必須大於 0。",
+                    ephemeral=True,
+                )
+                return
+
+        elif amount == 0:
+            await interaction.response.send_message(
+                "異動金額不能為 0。",
+                ephemeral=True,
+            )
+            return
+
+        note = str(
+            self.note.value
+            or ""
+        ).strip() or None
+
+        amount_display = (
+            f"{amount:,}T"
+            if self.mode != "adjust"
+            else f"{amount:+,}T"
+        )
+
+        await show_confirmation(
+            interaction,
+            title=self.config["title"],
+            description=(
+                f"顧客：{self.member.mention}\n"
+                f"金額：**{amount_display}**\n"
+                f"備註：{note or '未填寫'}"
+            ),
+            command_path=self.config["command"],
+            command_kwargs={
+                "customer": self.member,
+                "amount": amount,
+                "note": note,
+            },
+        )
+
+
+class AdjustPointsModal(
+    discord.ui.Modal
+):
+    def __init__(
+        self,
+        member: discord.Member,
+    ):
+        super().__init__(
+            title="調整會員點數"
+        )
+
+        self.member = member
+
+        self.points = discord.ui.TextInput(
+            label="點數異動",
+            placeholder="例如 10 或 -10",
+            max_length=10,
+        )
+
+        self.reason = discord.ui.TextInput(
+            label="原因",
+            required=False,
+            max_length=200,
+        )
+
+        self.add_item(
+            self.points
+        )
+
+        self.add_item(
+            self.reason
+        )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        try:
+            points = int(
+                str(
+                    self.points.value
+                ).strip()
+            )
+
+        except ValueError:
+            await interaction.response.send_message(
+                "點數請輸入整數。",
+                ephemeral=True,
+            )
+            return
+
+        if points == 0:
+            await interaction.response.send_message(
+                "點數異動不能為 0。",
+                ephemeral=True,
+            )
+            return
+
+        reason = str(
+            self.reason.value
+            or ""
+        ).strip() or None
+
+        await show_confirmation(
+            interaction,
+            title="調整會員點數",
+            description=(
+                f"顧客：{self.member.mention}\n"
+                f"點數異動："
+                f"**{points:+,} 點**\n"
+                f"原因：{reason or '未填寫'}"
+            ),
+            command_path="reward adjust_points",
+            command_kwargs={
+                "customer": self.member,
+                "points": points,
+                "reason": reason,
+            },
+        )
+
+
+class AddPurchaseModal(
+    discord.ui.Modal
+):
+    def __init__(
+        self,
+        member: discord.Member,
+    ):
+        super().__init__(
+            title="補登歷史消費"
+        )
+
+        self.member = member
+
+        self.amount = discord.ui.TextInput(
+            label="消費金額",
+            placeholder="例如 900",
+            max_length=12,
+        )
+
+        self.date = discord.ui.TextInput(
+            label="完成日期",
+            placeholder="例如 20260905",
+            max_length=20,
+        )
+
+        self.note = discord.ui.TextInput(
+            label="備註",
+            required=False,
+            max_length=200,
+        )
+
+        self.add_item(
+            self.amount
+        )
+
+        self.add_item(
+            self.date
+        )
+
+        self.add_item(
+            self.note
+        )
+
+    async def on_submit(
+        self,
+        interaction: discord.Interaction,
+    ):
+        try:
+            amount = int(
+                str(
+                    self.amount.value
+                )
+                .replace(
+                    ",",
+                    "",
+                )
+                .strip()
+            )
+
+        except ValueError:
+            await interaction.response.send_message(
+                "消費金額請輸入整數。",
+                ephemeral=True,
+            )
+            return
+
+        if amount <= 0:
+            await interaction.response.send_message(
+                "消費金額必須大於 0。",
+                ephemeral=True,
+            )
+            return
+
+        date = str(
+            self.date.value
+        ).strip()
+
+        if not date:
+            await interaction.response.send_message(
+                "完成日期不能空白。",
+                ephemeral=True,
+            )
+            return
+
+        note = str(
+            self.note.value
+            or ""
+        ).strip() or None
+
+        await show_confirmation(
+            interaction,
+            title="補登歷史消費",
+            description=(
+                f"顧客：{self.member.mention}\n"
+                f"金額：**{amount:,}T**\n"
+                f"日期：`{date}`\n"
+                f"備註：{note or '未填寫'}"
+            ),
+            command_path="reward add_purchase",
+            command_kwargs={
+                "customer": self.member,
+                "amount": amount,
+                "date": date,
+                "note": note,
+            },
+        )
+
+
+
 class OrderMenuView(discord.ui.View):
     def __init__(self):
         super().__init__(
@@ -331,13 +1277,16 @@ class OrderMenuView(discord.ui.View):
         label="搜尋訂單",
         emoji="🔎",
         style=discord.ButtonStyle.primary,
+        row=0,
     )
     async def search_order(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
-        if not await require_staff(interaction):
+        if not await require_staff(
+            interaction
+        ):
             return
 
         await interaction.response.send_modal(
@@ -348,6 +1297,7 @@ class OrderMenuView(discord.ui.View):
         label="最近進行中",
         emoji="📋",
         style=discord.ButtonStyle.secondary,
+        row=0,
     )
     async def active_orders(
         self,
@@ -366,6 +1316,7 @@ class OrderMenuView(discord.ui.View):
         label="最近已結單",
         emoji="✅",
         style=discord.ButtonStyle.secondary,
+        row=0,
     )
     async def closed_orders(
         self,
@@ -378,6 +1329,66 @@ class OrderMenuView(discord.ui.View):
             keyword=None,
             status="closed",
             limit=20,
+        )
+
+    @discord.ui.button(
+        label="修正金額",
+        emoji="💵",
+        style=discord.ButtonStyle.secondary,
+        row=1,
+    )
+    async def fix_amount(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            FixOrderAmountModal()
+        )
+
+    @discord.ui.button(
+        label="修正顧客",
+        emoji="👤",
+        style=discord.ButtonStyle.secondary,
+        row=1,
+    )
+    async def fix_customer(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            FixOrderCustomerModal()
+        )
+
+    @discord.ui.button(
+        label="重新派單",
+        emoji="🔄",
+        style=discord.ButtonStyle.secondary,
+        row=1,
+    )
+    async def resend(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            ResendDispatchModal()
         )
 
 
@@ -471,6 +1482,7 @@ class CustomerReadOnlyView(discord.ui.View):
         label="會員資料",
         emoji="💳",
         style=discord.ButtonStyle.primary,
+        row=0,
     )
     async def member_info(
         self,
@@ -487,6 +1499,7 @@ class CustomerReadOnlyView(discord.ui.View):
         label="顧客備註",
         emoji="📝",
         style=discord.ButtonStyle.secondary,
+        row=0,
     )
     async def notes(
         self,
@@ -497,6 +1510,50 @@ class CustomerReadOnlyView(discord.ui.View):
             interaction,
             "customer notes",
             customer=self.member,
+        )
+
+    @discord.ui.button(
+        label="新增備註",
+        emoji="➕",
+        style=discord.ButtonStyle.secondary,
+        row=1,
+    )
+    async def add_note(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            AddCustomerNoteModal(
+                self.member
+            )
+        )
+
+    @discord.ui.button(
+        label="刪除備註",
+        emoji="🗑️",
+        style=discord.ButtonStyle.danger,
+        row=1,
+    )
+    async def remove_note(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            RemoveCustomerNoteModal(
+                self.member
+            )
         )
 
 
@@ -517,6 +1574,7 @@ class MemberWalletReadOnlyView(
         label="會員資料",
         emoji="💳",
         style=discord.ButtonStyle.primary,
+        row=0,
     )
     async def member_info(
         self,
@@ -531,8 +1589,9 @@ class MemberWalletReadOnlyView(
 
     @discord.ui.button(
         label="錢包流水",
-        emoji="💰",
+        emoji="📒",
         style=discord.ButtonStyle.secondary,
+        row=0,
     )
     async def wallet_history(
         self,
@@ -544,6 +1603,119 @@ class MemberWalletReadOnlyView(
             "wallet_history",
             customer=self.member,
             limit=10,
+        )
+
+    @discord.ui.button(
+        label="客服儲值",
+        emoji="💰",
+        style=discord.ButtonStyle.success,
+        row=1,
+    )
+    async def wallet_topup(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            WalletActionModal(
+                self.member,
+                "topup",
+            )
+        )
+
+    @discord.ui.button(
+        label="錢包調整",
+        emoji="🧮",
+        style=discord.ButtonStyle.secondary,
+        row=1,
+    )
+    async def wallet_adjust(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            WalletActionModal(
+                self.member,
+                "adjust",
+            )
+        )
+
+    @discord.ui.button(
+        label="退款",
+        emoji="↩️",
+        style=discord.ButtonStyle.danger,
+        row=1,
+    )
+    async def wallet_refund(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            WalletActionModal(
+                self.member,
+                "refund",
+            )
+        )
+
+    @discord.ui.button(
+        label="調整點數",
+        emoji="⭐",
+        style=discord.ButtonStyle.secondary,
+        row=2,
+    )
+    async def points(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            AdjustPointsModal(
+                self.member
+            )
+        )
+
+    @discord.ui.button(
+        label="補登消費",
+        emoji="🧾",
+        style=discord.ButtonStyle.secondary,
+        row=2,
+    )
+    async def purchase(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not await require_staff(
+            interaction
+        ):
+            return
+
+        await interaction.response.send_modal(
+            AddPurchaseModal(
+                self.member
+            )
         )
 
 
@@ -589,7 +1761,7 @@ class CustomerSelect(
             title = "會員 / 錢包"
             description = (
                 f"已選擇：{member.mention}\n"
-                "選擇要查看的會員資料。"
+                "選擇要查看或操作的會員功能。"
             )
 
         else:
@@ -600,7 +1772,7 @@ class CustomerSelect(
             title = "顧客管理"
             description = (
                 f"已選擇：{member.mention}\n"
-                "選擇要查看的顧客資料。"
+                "選擇要查看或操作的顧客功能。"
             )
 
         await interaction.response.send_message(
