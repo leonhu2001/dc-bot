@@ -190,8 +190,9 @@ def sync_staff_members_from_discord(db=None) -> dict:
     now = datetime.now()
     scanned = len(members)
     written = 0
+    disabled_count = 0
     active_ids = set()
-
+    latest_role_ids_by_member = {}
     existing_members = {
         str(member.discord_id): member
         for member in db.scalars(select(WebStaffMember)).all()
@@ -206,6 +207,7 @@ def sync_staff_members_from_discord(db=None) -> dict:
 
         role_ids = normalize_role_ids(guild_member.get("roles", []))
 
+        latest_role_ids_by_member[discord_id] = role_ids
         is_customer_service = bool(role_ids & customer_service_role_ids)
         is_receiver = bool(role_ids & RECEIVER_ROLE_IDS)
         is_companion = bool(role_ids & COMPANION_ROLE_IDS)
@@ -239,27 +241,40 @@ def sync_staff_members_from_discord(db=None) -> dict:
 
         written += 1
 
-    # 只有原本就在名單、但現在已經沒有客服或五個新接單身分組的人，才停用。
+    # Disable anyone who no longer has an eligible Discord role.
+    # This also handles members who have left the Discord server.
     for discord_id, member in existing_members.items():
         if discord_id in active_ids:
             continue
 
-        try:
-            role_ids = normalize_role_ids(json.loads(member.roles_json or "[]"))
-        except Exception:
-            role_ids = set()
-
-        still_allowed = bool(
-            role_ids & customer_service_role_ids
-            or role_ids & RECEIVER_ROLE_IDS
-            or role_ids & COMPANION_ROLE_IDS
+        was_active = bool(
+            member.is_active
+            or member.is_customer_service
+            or member.is_worker
+            or member.is_companion
         )
 
-        if not still_allowed:
-            member.is_customer_service = False
-            member.is_worker = False
-            member.is_companion = False
-            member.is_active = False
+        latest_role_ids = latest_role_ids_by_member.get(discord_id)
+
+        if latest_role_ids is None:
+            member.roles_json = json.dumps(
+                [],
+                ensure_ascii=False,
+            )
+        else:
+            member.roles_json = json.dumps(
+                sorted(latest_role_ids),
+                ensure_ascii=False,
+            )
+
+        member.is_customer_service = False
+        member.is_worker = False
+        member.is_companion = False
+        member.is_active = False
+        member.last_synced_at = now
+
+        if was_active:
+            disabled_count += 1
 
     if owns_session:
         db.commit()
@@ -270,5 +285,6 @@ def sync_staff_members_from_discord(db=None) -> dict:
         "written": written,
         "total_seen": scanned,
         "synced_count": written,
+        "disabled_count": disabled_count,
         "message": f"成員同步完成：掃描 {scanned} 人，寫入 {written} 人。",
     }

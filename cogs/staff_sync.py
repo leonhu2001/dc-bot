@@ -47,7 +47,12 @@ class StaffSyncCog(commands.Cog):
             db = SessionLocal()
 
             try:
-                return sync_staff_members_from_discord(db)
+                result = sync_staff_members_from_discord(db)
+                db.commit()
+                return result
+            except Exception:
+                db.rollback()
+                raise
             finally:
                 db.close()
 
