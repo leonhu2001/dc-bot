@@ -178,7 +178,8 @@ def has_active_vip_progress_reset(data: dict) -> bool:
 
     return (
         stored_index == 0
-        and base_total == total_spent
+        and base_total > 0
+        and base_total <= total_spent
     )
 
 
