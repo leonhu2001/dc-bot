@@ -5,6 +5,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from core.vip_levels import has_active_vip_progress_reset
+
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
@@ -390,14 +392,13 @@ def _effective_vip_index(
         None,
     )
 
-    # 沒有降級重置基準時，正常依有效累積金額自動升級。
-    if base_total is None:
+    # 舊版正常升級也可能殘留 base_total；只有真正 reset 才重算進度。
+    if not has_active_vip_progress_reset(customer_data):
         return cumulative_index
 
-    # 有重置基準代表曾降級：只計算降級後新增的有效消費。
     earned_after_reset = max(
         0,
-        total_spent - base_total,
+        total_spent - int(base_total or 0),
     )
 
     if stored_index <= 0:
@@ -500,8 +501,10 @@ def _vip_progress(
     )
 
     active_reset = (
-        base_total is not None
-        and stored_index < cumulative_index
+        stored_index < cumulative_index
+        and has_active_vip_progress_reset(
+            customer_data
+        )
     )
 
     if active_reset:
