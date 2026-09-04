@@ -214,17 +214,25 @@ def get_next_member_level_for_data(data: dict) -> tuple[dict | None, int]:
 def sync_vip_level_to_cumulative_if_higher(data: dict) -> tuple[dict, dict]:
     old_level = get_effective_member_level(data)
     current_stored_index = _to_int(data.get("vip_level_index"))
+    reset_active = has_active_vip_progress_reset(data)
 
     if current_stored_index is None:
         data["vip_level_index"] = get_member_level_index_by_total_spent(int(data.get("total_spent", 0) or 0))
         data["vip_progress_base_total_spent"] = None
+        data["vip_progress_reset_active"] = False
     else:
         effective_index = get_effective_member_level_index(data)
         if effective_index > current_stored_index:
             data["vip_level_index"] = effective_index
-            # 一旦重新達成升級門檻，降級後的重置區間就結束。
-            # 正常升級也不應建立新的重置基準，否則下一級門檻會被延後。
-            data["vip_progress_base_total_spent"] = None
+
+            if reset_active:
+                # 降級 / 手動重置後，每升一級都從升級當下重新計算下一級進度。
+                data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+                data["vip_progress_reset_active"] = True
+            else:
+                # 正常累積升級不建立 reset 基準。
+                data["vip_progress_base_total_spent"] = None
+                data["vip_progress_reset_active"] = False
 
     new_level = get_effective_member_level(data)
     return old_level, new_level
@@ -255,6 +263,7 @@ def get_customer_reward_data(user_id: int) -> dict:
             "manual_purchase_keys": [],
             "vip_level_index": None,
             "vip_progress_base_total_spent": None,
+            "vip_progress_reset_active": False,
             "vip_last_downgrade_check_month": None,
             "vip_downgrade_logs": [],
         }
@@ -270,6 +279,7 @@ def get_customer_reward_data(user_id: int) -> dict:
     data.setdefault("notes", [])
     data.setdefault("vip_level_index", None)
     data.setdefault("vip_progress_base_total_spent", None)
+    data.setdefault("vip_progress_reset_active", False)
     data.setdefault("vip_last_downgrade_check_month", None)
     data.setdefault("vip_downgrade_logs", [])
     if not isinstance(data["manual_purchase_keys"], list):
@@ -865,6 +875,7 @@ async def run_vip_downgrade_check(
         new_level = get_member_level_by_index(new_index)
         data["vip_level_index"] = new_index
         data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+        data["vip_progress_reset_active"] = True
 
         log = {
             "checked_month": check_month_key,
