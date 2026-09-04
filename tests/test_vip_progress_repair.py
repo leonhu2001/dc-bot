@@ -28,7 +28,7 @@ def test_stuck_silver_promotes_to_gold_without_reset_baseline():
     assert data["vip_progress_base_total_spent"] is None
 
 
-def test_reset_baseline_without_log_is_preserved_for_legacy_data():
+def test_legacy_normal_upgrade_baseline_without_reset_evidence_is_repaired():
     data = {
         "total_spent": 8880,
         "vip_level_index": 1,
@@ -36,15 +36,15 @@ def test_reset_baseline_without_log_is_preserved_for_legacy_data():
         "vip_downgrade_logs": [],
     }
 
-    assert has_active_downgrade_reset(data) is True
+    assert has_active_downgrade_reset(data) is False
 
     changed, old_level, new_level = repair_vip_progress_data(data)
 
-    assert changed is False
+    assert changed is True
     assert old_level["name"] == "銀級魔丸"
-    assert new_level["name"] == "銀級魔丸"
-    assert data["vip_level_index"] == 1
-    assert data["vip_progress_base_total_spent"] == 5180
+    assert new_level["name"] == "金級魔丸"
+    assert data["vip_level_index"] == 2
+    assert data["vip_progress_base_total_spent"] is None
 
 
 def test_real_downgrade_reset_is_preserved():
@@ -149,3 +149,22 @@ def test_topup_reaching_effective_platinum_gets_two_percent_rebate():
     assert preview["rebate_percent"] == 2
     assert preview["rebate_amount"] == 120
     assert preview["credited_amount"] == 6120
+
+
+def test_legacy_ordinary_reset_equal_to_current_total_is_preserved():
+    data = {
+        "total_spent": 10965,
+        "vip_level_index": 0,
+        "vip_progress_base_total_spent": 10965,
+        "vip_downgrade_logs": [],
+    }
+
+    assert has_active_downgrade_reset(data) is True
+
+    changed, old_level, new_level = repair_vip_progress_data(data)
+
+    assert changed is False
+    assert old_level["name"] == "普通魔丸"
+    assert new_level["name"] == "普通魔丸"
+    assert data["vip_level_index"] == 0
+    assert data["vip_progress_base_total_spent"] == 10965
