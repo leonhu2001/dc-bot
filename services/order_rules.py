@@ -378,24 +378,79 @@ for key, label, price in [
 # ========= 代解代肝 =========
 
 _add(OrderRule(
-    "farm", "farm_season_3x3_normal", "賽季3x3｜普通", "fixed", 5500,
+    "farm",
+    "farm_season_3x3_normal",
+    "賽季3x3",
+    "fixed",
+    4000,
     allowed_roles=PROTECTOR_ROLES,
     required_staff_count=1,
+    min_quantity=1,
+    max_quantity=1,
     allow_specify=False,
     staff_adjustments={
-        "rush": 1500,
+        "skin": 2500,
         "loss_cover": 500,
-        "early_booking": -500,
     },
     staff_adjustment_labels={
-        "rush": "急單",
+        "skin": "造型",
         "loss_cover": "包損耗",
-        "early_booking": "賽季前一周預約",
     },
 ))
 
 _add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=1, allow_specify=False))
-_add(OrderRule("farm", "farm_season_3x3_contract", "賽季3x3｜命運契約", "unit", 700, "個", allowed_roles=PROTECTOR_ROLES, required_staff_count=1, allow_specify=False, max_quantity=99))
+_add(OrderRule(
+    "farm",
+    "farm_season_3x3_dc_skin",
+    "賽季3x3+造型",
+    "fixed",
+    6500,
+    allowed_roles=PROTECTOR_ROLES,
+    required_staff_count=1,
+    min_quantity=1,
+    max_quantity=1,
+    allow_specify=False,
+))
+
+_add(OrderRule(
+    "farm",
+    "farm_season_3x3_dc_loss",
+    "賽季3x3包損耗",
+    "fixed",
+    4500,
+    allowed_roles=PROTECTOR_ROLES,
+    required_staff_count=1,
+    min_quantity=1,
+    max_quantity=1,
+    allow_specify=False,
+))
+
+_add(OrderRule(
+    "farm",
+    "farm_season_3x3_dc_skin_loss",
+    "賽季3x3+造型包損耗",
+    "fixed",
+    7000,
+    allowed_roles=PROTECTOR_ROLES,
+    required_staff_count=1,
+    min_quantity=1,
+    max_quantity=1,
+    allow_specify=False,
+))
+
+_add(OrderRule(
+    "farm",
+    "farm_season_3x3_contract",
+    "命運契約",
+    "unit",
+    600,
+    "個",
+    allowed_roles=PROTECTOR_ROLES,
+    required_staff_count=1,
+    min_quantity=1,
+    max_quantity=7,
+    allow_specify=False,
+))
 
 _add(OrderRule("farm", "farm_department_task", "代解部門任務", "manual", 0, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False, note="客服填價格"))
 
@@ -656,7 +711,7 @@ def _mm_add_custom_order_rule():
 
     ORDER_RULES["custom_custom_order"] = _mm_replace_order_rule(_template, **_changes)
 
-_mm_override_order_rule("farm_season_3x3_contract", max_quantity=4)
+_mm_override_order_rule("farm_season_3x3_contract", max_quantity=7)
 
 
 
@@ -817,15 +872,34 @@ for _zy_galagame_key in (
 _zy_patch_rule(
     "farm_season_3x3_normal",
     label="賽季3x3",
-    pricing_type="manual",
-    price=0,
+    pricing_type="fixed",
+    price=4000,
     unit_label="單",
     min_quantity=1,
     max_quantity=1,
     allow_specify=False,
+    staff_adjustments={
+        "skin": 2500,
+        "loss_cover": 500,
+    },
+    staff_adjustment_labels={
+        "skin": "造型",
+        "loss_cover": "包損耗",
+    },
+)
+_zy_patch_rule(
+    "farm_season_3x3_contract",
+    label="命運契約",
+    pricing_type="unit",
+    price=600,
+    unit_label="個",
+    min_quantity=1,
+    max_quantity=7,
+    allow_specify=False,
     staff_adjustments={},
     staff_adjustment_labels={},
 )
+
 _zy_patch_rule("farm_department_task", label="部門任務", pricing_type="manual", price=0, unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)

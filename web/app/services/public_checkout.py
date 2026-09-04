@@ -13,6 +13,9 @@ from services.order_rules import (
 
 PUBLIC_DISABLED_RULE_KEYS = {
     "farm_season_3x3_skin",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
 }
 
 
@@ -25,25 +28,22 @@ PUBLIC_ROLE_LABELS = {
 }
 
 
-SEASON_NORMAL_PRICE = 5500
+SEASON_NORMAL_PRICE = 4000
 
-SEASON_CONTRACT_UNIT_PRICE = 700
+SEASON_CONTRACT_UNIT_PRICE = 600
 
-SEASON_CONTRACT_MAX = 5
+SEASON_CONTRACT_MAX = 7
 
-SEASON_CONTRACT_FIVE_PRICE = 3000
 
 
 SEASON_NORMAL_ADJUSTMENTS = {
-    "skin": 3000,
-    "rush": 1500,
+    "skin": 2500,
     "loss_cover": 500,
 }
 
 
 SEASON_NORMAL_ADJUSTMENT_LABELS = {
     "skin": "造型",
-    "rush": "急單",
     "loss_cover": "包損耗",
 }
 
@@ -257,7 +257,7 @@ def build_public_quote(
     ):
 
         raise ValueError(
-            "命運契約最多只能選 5 個。"
+            "命運契約最多只能選 7 個。"
         )
 
 
@@ -364,19 +364,6 @@ def build_public_quote(
     # --------------------------------------------------------
     # 命運契約第 5 個封頂 3000T。
     # --------------------------------------------------------
-
-    if (
-        rule_key
-        == "farm_season_3x3_contract"
-        and quantity_value == 5
-    ):
-
-        base_amount = (
-            SEASON_CONTRACT_FIVE_PRICE
-        )
-
-        special_price_applied = True
-
 
     original_amount = (
         base_amount

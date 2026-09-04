@@ -30,6 +30,9 @@ HIDDEN_PUBLIC_RULE_KEYS = {
     # 造型不再作為獨立商品。
     # 前台改成賽季 3x3｜普通底下 +3000T 的附加選項。
     "farm_season_3x3_skin",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
 }
 
 
@@ -195,9 +198,9 @@ GROUP_SPECS = [
         "category": "farm",
         "label": "賽季 3×3",
         "selector_label": "方案",
-        "description": "普通方案與命運契約整合在同一張商品。",
+        "description": "賽季3x3可加購造型或包損耗；命運契約依數量計價。",
         "variants": [
-            ("farm_season_3x3_normal", "普通"),
+            ("farm_season_3x3_normal", "賽季3x3"),
             ("farm_season_3x3_contract", "命運契約"),
         ],
     },
@@ -344,17 +347,11 @@ def _variant_data(
         min_quantity = 1
         max_quantity = 1
 
-        # 老闆自己可勾選。
         customer_adjustments = [
             {
                 "key": "skin",
                 "label": "造型",
-                "amount": 3000,
-            },
-            {
-                "key": "rush",
-                "label": "急單",
-                "amount": 1500,
+                "amount": 2500,
             },
             {
                 "key": "loss_cover",
@@ -363,9 +360,6 @@ def _variant_data(
             },
         ]
 
-        # early_booking 故意不放進客人可選資料。
-        # 最終送單階段只允許客服後台套用。
-
     elif (
         group_key == "season_3x3"
         and rule_key
@@ -373,13 +367,7 @@ def _variant_data(
     ):
         quantity_enabled = True
         min_quantity = 1
-        max_quantity = 5
-
-        # 1~4 個維持 700T/個；
-        # 5 個時總價固定 3000T。
-        quantity_price_overrides = {
-            "5": 3000,
-        }
+        max_quantity = 7
 
     roles = [
         PUBLIC_ROLE_LABELS.get(

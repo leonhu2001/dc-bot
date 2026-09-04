@@ -138,7 +138,51 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
     ],
     "farm": [
-        {"label": "賽季3x3", "details": [{"label": "賽季3x3", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
+        {
+            "label": "賽季3x3",
+            "details": [
+                {
+                    "label": "3x3",
+                    "value": "season_3x3",
+                    "rule_key": "farm_season_3x3_normal",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "3x3+造型",
+                    "value": "season_3x3_skin",
+                    "rule_key": "farm_season_3x3_dc_skin",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "3x3包損耗",
+                    "value": "season_3x3_loss",
+                    "rule_key": "farm_season_3x3_dc_loss",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "3x3+造型包損耗",
+                    "value": "season_3x3_skin_loss",
+                    "rule_key": "farm_season_3x3_dc_skin_loss",
+                    "quantity_unit": "單",
+                    "min_quantity": 1,
+                    "max_quantity": 1,
+                },
+                {
+                    "label": "命運契約",
+                    "value": "season_contract",
+                    "rule_key": "farm_season_3x3_contract",
+                    "quantity_unit": "個",
+                    "min_quantity": 1,
+                    "max_quantity": 7,
+                },
+            ],
+        },
         {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
         {
             "label": "哈夫幣代洗",
@@ -179,8 +223,19 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
 
 
 # 所有 rule label 仍保留，讓舊訂單 / 舊紀錄可繼續被辨識。
+CATALOG_HIDDEN_RULE_KEYS = {
+    "farm_season_3x3_skin",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
+}
+
 ORDER_ITEMS_BY_CATEGORY = {
-    category: [rule.label for rule in get_rules_by_category(category)]
+    category: [
+        rule.label
+        for rule in get_rules_by_category(category)
+        if rule.key not in CATALOG_HIDDEN_RULE_KEYS
+    ]
     for category in ORDER_CATEGORY_LABELS
 }
 
@@ -213,6 +268,7 @@ ORDER_RULE_KEY_BY_LABEL.update({
     "體驗單 777w": "basic_trial_500",
     "體驗單 1688w": "basic_trial_1000",
     "賽季3x3｜普通": "farm_season_3x3_normal",
+    "賽季3x3｜命運契約": "farm_season_3x3_contract",
     "代解部門任務": "farm_department_task",
     "Steam 陪玩": "steam_play",
     "Valorant 陪玩｜娛樂陪": "valorant_entertain",

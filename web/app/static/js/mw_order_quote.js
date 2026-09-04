@@ -1613,14 +1613,6 @@
             }
 
 
-            if (
-                quote.special_price_applied
-            ) {
-
-                details.push(
-                    "5 個命運契約優惠價 3000T"
-                );
-            }
 
 
             if (

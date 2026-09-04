@@ -88,6 +88,9 @@ VIP_EXCLUDED_RULE_KEYS = {
     "basic_trial_1000",
     "farm_season_3x3_normal",
     "farm_season_3x3_contract",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
 }
 
 
@@ -2343,6 +2346,9 @@ def build_checkout_preview(
 PUBLIC_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_skin",
     "custom_custom_order",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
 }
 
 
@@ -3024,6 +3030,9 @@ def build_staff_order_filter(
 MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_skin",
     "custom_custom_order",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
 }
 
 
