@@ -196,10 +196,11 @@ def get_next_member_level_for_data(data: dict) -> tuple[dict | None, int]:
     base_total = _to_int(data.get("vip_progress_base_total_spent"))
     cumulative_index = get_member_level_index_by_total_spent(total_spent)
 
-    # 真的處於降級 / 手動重置區間時，才從重置基準重新累積。
+    # 真的處於降級 / 手動重置區間時，下一級進度永遠從目前
+    # reset baseline 重新累積。即使剛重新升級、stored_index 已追上
+    # 歷史 cumulative_index，也不能回頭用歷史 total_spent 算進度。
     if (
         stored_index is not None
-        and stored_index < cumulative_index
         and has_active_vip_progress_reset(data)
     ):
         earned_after_reset = max(
