@@ -139,6 +139,49 @@ def get_topup_rebate_percent(level_name: str | None) -> int:
     return int(VIP_TOPUP_REBATE_PERCENT.get(str(level_name or "普通魔丸"), 0))
 
 
+def has_active_vip_progress_reset(data: dict) -> bool:
+    """判斷會員是否真的處於降級 / 手動調整後的重新累積區間。
+
+    舊版曾在「正常升級」時誤寫 vip_progress_base_total_spent，
+    因此不能只看 base_total 是否存在。
+    """
+    if not isinstance(data, dict):
+        return False
+
+    try:
+        base_total = int(data.get("vip_progress_base_total_spent"))
+    except (TypeError, ValueError):
+        return False
+
+    logs = data.get("vip_downgrade_logs")
+    if isinstance(logs, list) and bool(logs):
+        return True
+
+    if (
+        data.get("last_level_manual_fixed_at")
+        or data.get("last_level_manual_fixed_by")
+        or data.get("last_level_manual_fixed_reason")
+    ):
+        return True
+
+    # 舊資料若缺少手動調整 metadata，普通魔丸且基準正好等於
+    # 當前累積金額，仍視為剛被重置到普通等級，避免誤拉回歷史 VIP。
+    try:
+        stored_index = int(data.get("vip_level_index"))
+    except (TypeError, ValueError):
+        stored_index = None
+
+    try:
+        total_spent = int(data.get("total_spent", 0) or 0)
+    except (TypeError, ValueError):
+        total_spent = 0
+
+    return (
+        stored_index == 0
+        and base_total == total_spent
+    )
+
+
 def build_vip_level_benefits() -> dict[str, str]:
     benefits: dict[str, str] = {"普通魔丸": "尚未解鎖 VIP 福利。"}
 
