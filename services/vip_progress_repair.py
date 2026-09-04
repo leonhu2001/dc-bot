@@ -56,6 +56,10 @@ def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
         data["vip_progress_base_total_spent"] = None
         changed = True
 
+    if data.get("vip_progress_reset_active") is not False:
+        data["vip_progress_reset_active"] = False
+        changed = True
+
     if cumulative_index > stored_index:
         data["vip_level_index"] = cumulative_index
         changed = True
