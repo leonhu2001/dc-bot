@@ -6,7 +6,8 @@ import traceback
 import discord
 
 import services.rewards as rewards
-from services.topups import calculate_topup_preview, create_topup_order, mark_topup_completed
+from services.topups import create_topup_order, mark_topup_completed
+from services.vip_progress_repair import calculate_member_topup_preview, repair_vip_progress_data
 
 
 def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
@@ -53,9 +54,10 @@ def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
         topup_no = str(order["topup_no"])
 
         data = rewards.get_customer_reward_data(customer_id)
+        repair_vip_progress_data(data)
         before_total = int(data.get("total_spent", 0) or 0)
         points_before = rewards.get_current_reward_points(data)
-        preview = calculate_topup_preview(before_total, amount)
+        preview = calculate_member_topup_preview(data, amount)
 
         principal_kwargs = dict(kwargs)
         principal_kwargs["order_no"] = topup_no
@@ -89,6 +91,16 @@ def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
         data["point_adjustment"] = int(points_before) - int(base_points_after)
         data["points"] = int(points_before)
         rewards.sync_vip_level_to_cumulative_if_higher(data)
+        repair_vip_progress_data(data)
+
+        # 寫入儲值單的 VIP 顯示以實際完成後的有效等級為準。
+        actual_level = rewards.get_effective_member_level(data)
+        preview = dict(preview)
+        preview["vip_level_after"] = str(
+            actual_level.get("name")
+            or preview["vip_level_after"]
+        )
+        preview["vip_total_after"] = int(data["total_spent"])
 
         if rewards._SAVE_BOT_DATA is not None:
             rewards._SAVE_BOT_DATA()
