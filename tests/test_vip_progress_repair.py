@@ -1,3 +1,4 @@
+from core.database import _deserialize_customer_data
 from core.vip_levels import BASE_MEMBER_LEVELS
 import services.rewards as rewards
 from services.vip_progress_repair import (
@@ -182,3 +183,20 @@ def test_legacy_ordinary_reset_equal_to_current_total_is_preserved():
     assert new_level["name"] == "普通魔丸"
     assert data["vip_level_index"] == 0
     assert data["vip_progress_base_total_spent"] == 10965
+
+
+def test_manual_vip_reset_metadata_survives_database_reload():
+    data = _deserialize_customer_data(
+        {
+            "total_spent": 20000,
+            "vip_level_index": 1,
+            "vip_progress_base_total_spent": 20000,
+            "last_level_manual_fixed_at": "2026-09-04T00:00:00+08:00",
+            "last_level_manual_fixed_by": 123456789,
+            "last_level_manual_fixed_reason": "測試調整",
+        }
+    )
+
+    assert data["last_level_manual_fixed_at"] == "2026-09-04T00:00:00+08:00"
+    assert data["last_level_manual_fixed_by"] == 123456789
+    assert data["last_level_manual_fixed_reason"] == "測試調整"
