@@ -161,6 +161,8 @@ from services.order_flow import (
     get_payment_method_info,
 )
 
+from services.game_roles import GAME_ROLES
+
 from views.review import (
     configure_review_views,
     ReviewButtonView,
@@ -310,6 +312,14 @@ BOOSTER_RECEIVER_ROLE_IDS = [1500234130871550004,1500234170943934544,15007510390
 COMPANION_RECEIVER_ROLE_ID = COMPANION_RECEIVER_ROLE_IDS[0]
 BOOSTER_RECEIVER_ROLE_ID = BOOSTER_RECEIVER_ROLE_IDS[0]
 
+# Game qualification roles only receive voice-channel permissions.
+# They are intentionally excluded from COMPANION_RECEIVER_ROLE_IDS / BOOSTER_RECEIVER_ROLE_IDS,
+# so these roles do not gain any order-claim permission.
+GAME_VOICE_ROLE_IDS = [
+    int(role.role_id)
+    for role in GAME_ROLES
+]
+
 # 收據頻道 ID
 RECEIPT_CHANNEL_ID = 1497623878619627682
 
@@ -345,6 +355,7 @@ PLAY_VOICE_ALLOWED_ROLE_IDS = [
     1500234130871550004,
     1500234170943934544,
     1500751039060643990,
+    *GAME_VOICE_ROLE_IDS,
     1482084782031638548,
     1507204925766242425,
 ]
@@ -356,6 +367,7 @@ VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [
     1500234130871550004,
     1500234170943934544,
     1500751039060643990,
+    *GAME_VOICE_ROLE_IDS,
     1482084782031638548,
     1507204925766242425,
 ]
@@ -451,6 +463,7 @@ configure_voice_helpers(
     voice_move_member_role_ids=[
         *COMPANION_RECEIVER_ROLE_IDS,
         *BOOSTER_RECEIVER_ROLE_IDS,
+        *GAME_VOICE_ROLE_IDS,
         CUSTOMER_ROLE_ID,
     ],
     temp_voice_control_panels=TEMP_VOICE_CONTROL_PANELS,
