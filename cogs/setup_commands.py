@@ -7,6 +7,10 @@ from discord.ext import commands
 from services.topup_runtime import ensure_topup_credit_worker_started
 from views.panels import MainPanelView
 from views.topups import TopupPanelView
+from views.staff_management import (
+    StaffManagementPanelView,
+    validate_staff_panel_commands,
+)
 from views.voice import (
     get_or_create_play_voice_lobby,
     get_or_create_vip_voice_lobby,
@@ -19,6 +23,16 @@ class SetupCommands(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        if not getattr(
+            bot,
+            "_staff_management_panel_view_registered",
+            False,
+        ):
+            bot.add_view(
+                StaffManagementPanelView()
+            )
+            bot._staff_management_panel_view_registered = True
+
         ensure_topup_credit_worker_started(bot)
         if not getattr(bot, "_topup_panel_view_registered", False):
             bot.add_view(TopupPanelView())
@@ -46,6 +60,69 @@ class SetupCommands(commands.Cog):
 
         await interaction.channel.send(embed=embed, view=MainPanelView())
         await interaction.response.send_message("客服面板已建立。", ephemeral=True)
+
+
+    @setup.command(
+        name="staff_panel",
+        description="建立客服專用管理中心 Panel",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.default_permissions(manage_messages=True)
+    async def setup_staff_panel(
+        self,
+        interaction: discord.Interaction,
+    ):
+        if not isinstance(
+            interaction.channel,
+            discord.TextChannel,
+        ):
+            await interaction.response.send_message(
+                "請在文字頻道使用這個指令。",
+                ephemeral=True,
+            )
+            return
+
+        missing = validate_staff_panel_commands(
+            self.bot,
+            interaction.guild_id,
+        )
+
+        if missing:
+            await interaction.response.send_message(
+                "客服管理中心目前缺少對應功能：\n"
+                + "\n".join(
+                    f"- `{item}`"
+                    for item in missing
+                )
+                + "\n請先重新啟動並同步 Bot 指令。",
+                ephemeral=True,
+            )
+            return
+
+        embed = discord.Embed(
+            title="🧭 魔丸娛樂｜客服管理中心",
+            description=(
+                "客服日常操作集中入口。\n\n"
+                "📦 **訂單管理**｜搜尋與查看訂單\n"
+                "💤 **存單管理**｜查看與管理目前存單\n"
+                "👤 **顧客管理**｜會員資料與顧客備註\n"
+                "💰 **會員 / 錢包**｜會員資料與錢包流水\n"
+                "📊 **營運查詢**｜今日、本月與消費排行\n"
+                "🛠️ **系統工具**｜資料健康檢查\n\n"
+                "所有操作結果僅操作人員本人可見。"
+            ),
+            color=discord.Color.purple(),
+        )
+
+        await interaction.channel.send(
+            embed=embed,
+            view=StaffManagementPanelView(),
+        )
+
+        await interaction.response.send_message(
+            "客服管理中心 Panel 已建立。",
+            ephemeral=True,
+        )
 
     @setup.command(
         name="topup_panel",
