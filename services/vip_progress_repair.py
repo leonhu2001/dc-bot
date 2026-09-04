@@ -18,10 +18,12 @@ def _max_member_level_index() -> int:
 
 
 def has_active_downgrade_reset(data: dict) -> bool:
-    """只有真正有降級紀錄的會員，才套用降級後重新累積規則。"""
-    base_total = _to_int(data.get("vip_progress_base_total_spent"))
-    logs = data.get("vip_downgrade_logs")
-    return base_total is not None and isinstance(logs, list) and bool(logs)
+    """只要有重置基準，就視為仍在降級後重新累積區間。
+
+    舊資料不一定保留 vip_downgrade_logs，因此不能只靠紀錄判斷；
+    否則會把真正被降級的會員錯誤拉回歷史累積等級。
+    """
+    return _to_int(data.get("vip_progress_base_total_spent")) is not None
 
 
 def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
@@ -51,12 +53,6 @@ def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
         return False, old_level, rewards.get_effective_member_level(data)
 
     changed = False
-
-    # 沒有降級紀錄卻殘留重置基準，屬於舊版升級流程留下的狀態。
-    # 清掉後回到正常的累積門檻判定。
-    if data.get("vip_progress_base_total_spent") is not None:
-        data["vip_progress_base_total_spent"] = None
-        changed = True
 
     if cumulative_index > stored_index:
         data["vip_level_index"] = cumulative_index
