@@ -300,77 +300,158 @@ def _derive_vip_name(
     return name
 
 
-def _resolve_vip_name(
+def _vip_index_from_total(
+    total_spent: int,
+) -> int:
+    index = 0
+
+    for level_index, level in enumerate(
+        VIP_LEVELS_PUBLIC,
+        start=1,
+    ):
+        if total_spent >= int(
+            level["threshold"]
+        ):
+            index = level_index
+        else:
+            break
+
+    return index
+
+
+def _stored_vip_index(
     customer_data: dict,
-) -> str:
-    level_name = normalize_public_text(
+    total_spent: int,
+) -> int:
+    index = _safe_int(
         customer_data.get(
-            "level"
-        )
+            "vip_level_index"
+        ),
+        None,
     )
 
-    if (
-        level_name
-        in ALL_MEMBER_LEVEL_NAMES
-    ):
-        return level_name
+    if index is None:
+        level_name = normalize_public_text(
+            customer_data.get(
+                "level"
+            )
+        )
 
-    if level_name in {
-        "無會員",
-        "無",
-    }:
-        return "普通魔丸"
+        if level_name in ALL_MEMBER_LEVEL_NAMES:
+            index = ALL_MEMBER_LEVEL_NAMES.index(
+                level_name
+            )
+        elif level_name in {
+            "無會員",
+            "無",
+        }:
+            index = 0
+        else:
+            index = _vip_index_from_total(
+                total_spent
+            )
 
-    index = customer_data.get(
-        "vip_level_index"
+    return max(
+        0,
+        min(
+            int(index),
+            len(ALL_MEMBER_LEVEL_NAMES) - 1,
+        ),
     )
 
-    try:
-        index = int(index)
-    except (
-        TypeError,
-        ValueError,
-    ):
-        index = None
 
-    if (
-        index is not None
-        and 0 <= index
-        < len(
-            ALL_MEMBER_LEVEL_NAMES
-        )
-    ):
-        return (
-            ALL_MEMBER_LEVEL_NAMES[
-                index
-            ]
-        )
-
-    return _derive_vip_name(
+def _effective_vip_index(
+    customer_data: dict,
+) -> int:
+    total_spent = max(
+        0,
         _safe_int(
             customer_data.get(
                 "total_spent"
             )
+        ),
+    )
+
+    cumulative_index = _vip_index_from_total(
+        total_spent
+    )
+    stored_index = _stored_vip_index(
+        customer_data,
+        total_spent,
+    )
+
+    if stored_index >= cumulative_index:
+        return stored_index
+
+    base_total = _safe_int(
+        customer_data.get(
+            "vip_progress_base_total_spent"
+        ),
+        None,
+    )
+
+    # 沒有降級重置基準時，正常依有效累積金額自動升級。
+    if base_total is None:
+        return cumulative_index
+
+    # 有重置基準代表曾降級：只計算降級後新增的有效消費。
+    earned_after_reset = max(
+        0,
+        total_spent - base_total,
+    )
+
+    if stored_index <= 0:
+        current_threshold = 0
+    else:
+        current_threshold = int(
+            VIP_LEVELS_PUBLIC[
+                stored_index - 1
+            ]["threshold"]
         )
+
+    virtual_total = (
+        current_threshold
+        + earned_after_reset
+    )
+
+    progressed_index = _vip_index_from_total(
+        virtual_total
+    )
+
+    return max(
+        stored_index,
+        min(
+            progressed_index,
+            len(ALL_MEMBER_LEVEL_NAMES) - 1,
+        ),
     )
 
 
-def _vip_progress(
-    current_name: str,
-    total_spent: int,
-) -> dict:
-    current_index = 0
-
-    if (
-        current_name
-        in ALL_MEMBER_LEVEL_NAMES
-    ):
-        current_index = (
-            ALL_MEMBER_LEVEL_NAMES
-            .index(
-                current_name
-            )
+def _resolve_vip_name(
+    customer_data: dict,
+) -> str:
+    return ALL_MEMBER_LEVEL_NAMES[
+        _effective_vip_index(
+            customer_data
         )
+    ]
+
+
+def _vip_progress(
+    customer_data: dict,
+) -> dict:
+    total_spent = max(
+        0,
+        _safe_int(
+            customer_data.get(
+                "total_spent"
+            )
+        ),
+    )
+
+    current_index = _effective_vip_index(
+        customer_data
+    )
 
     if current_index >= len(
         VIP_LEVELS_PUBLIC
@@ -382,12 +463,9 @@ def _vip_progress(
             "percent": 100,
         }
 
-    next_level = (
-        VIP_LEVELS_PUBLIC[
-            current_index
-        ]
-    )
-
+    next_level = VIP_LEVELS_PUBLIC[
+        current_index
+    ]
     next_threshold = int(
         next_level["threshold"]
     )
@@ -407,11 +485,45 @@ def _vip_progress(
         - current_threshold,
     )
 
-    progress_value = max(
-        0,
-        total_spent
-        - current_threshold,
+    stored_index = _stored_vip_index(
+        customer_data,
+        total_spent,
     )
+    cumulative_index = _vip_index_from_total(
+        total_spent
+    )
+    base_total = _safe_int(
+        customer_data.get(
+            "vip_progress_base_total_spent"
+        ),
+        None,
+    )
+
+    active_reset = (
+        base_total is not None
+        and stored_index < cumulative_index
+    )
+
+    if active_reset:
+        progress_value = max(
+            0,
+            total_spent - int(base_total),
+        )
+        remaining = max(
+            0,
+            span - progress_value,
+        )
+    else:
+        progress_value = max(
+            0,
+            total_spent
+            - current_threshold,
+        )
+        remaining = max(
+            0,
+            next_threshold
+            - total_spent,
+        )
 
     percent = min(
         100,
@@ -432,11 +544,7 @@ def _vip_progress(
         "next_threshold": (
             next_threshold
         ),
-        "remaining": max(
-            0,
-            next_threshold
-            - total_spent,
-        ),
+        "remaining": remaining,
         "percent": percent,
     }
 
@@ -977,8 +1085,7 @@ def get_member_summary(
     )
 
     vip_progress = _vip_progress(
-        vip_name,
-        total_spent,
+        customer_data
     )
 
     return {
