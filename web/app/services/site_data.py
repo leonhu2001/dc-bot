@@ -501,8 +501,7 @@ def _vip_progress(
     )
 
     active_reset = (
-        stored_index < cumulative_index
-        and has_active_vip_progress_reset(
+        has_active_vip_progress_reset(
             customer_data
         )
     )
