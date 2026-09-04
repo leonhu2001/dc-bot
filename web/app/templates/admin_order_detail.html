@@ -1690,7 +1690,54 @@ body.mw-r5-admin
         </div>
     </div>
 </section>
-<!-- END MAWAN_R8_WORKSPACE_EDITOR -->\n\n<script>\n// MAWAN_R13_FINAL_DATE_AUTOFILL\ndocument.addEventListener("DOMContentLoaded", function () {\n    const statusSelect = document.querySelector('select[name="status"]');\n    const dateInput = document.querySelector('input[name="closed_date"]');\n    const autoInput = document.querySelector('input[name="closed_date_auto"]');\n    const touchedInput = document.querySelector('input[name="closed_date_touched"]');\n\n    if (!statusSelect || !dateInput || !autoInput || !touchedInput) {\n        return;\n    }\n\n    function taipeiDate() {\n        const parts = new Intl.DateTimeFormat("en-US", {\n            timeZone: "Asia/Taipei",\n            year: "numeric",\n            month: "2-digit",\n            day: "2-digit"\n        }).formatToParts(new Date());\n        const values = {};\n        parts.forEach(function (part) {\n            values[part.type] = part.value;\n        });\n        return values.year + "-" + values.month + "-" + values.day;\n    }\n\n    function syncFinalDate() {\n        const isFinal = statusSelect.value === "closed" || statusSelect.value === "cancelled";\n        if (isFinal && !dateInput.value) {\n            dateInput.value = taipeiDate();\n            autoInput.value = "1";\n        } else if (!isFinal && autoInput.value === "1") {\n            dateInput.value = "";\n            autoInput.value = "";\n        }\n    }\n\n    statusSelect.addEventListener("change", syncFinalDate);\n    dateInput.addEventListener("input", function () {\n        autoInput.value = "";\n        touchedInput.value = "1";\n    });\n    syncFinalDate();\n});\n</script>\n
+<!-- END MAWAN_R8_WORKSPACE_EDITOR -->
+
+<script>
+// MAWAN_R13_FINAL_DATE_AUTOFILL
+document.addEventListener("DOMContentLoaded", function () {
+    const statusSelect = document.querySelector('select[name="status"]');
+    const dateInput = document.querySelector('input[name="closed_date"]');
+    const autoInput = document.querySelector('input[name="closed_date_auto"]');
+    const touchedInput = document.querySelector('input[name="closed_date_touched"]');
+
+    if (!statusSelect || !dateInput || !autoInput || !touchedInput) {
+        return;
+    }
+
+    function taipeiDate() {
+        const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: "Asia/Taipei",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+        }).formatToParts(new Date());
+        const values = {};
+        parts.forEach(function (part) {
+            values[part.type] = part.value;
+        });
+        return values.year + "-" + values.month + "-" + values.day;
+    }
+
+    function syncFinalDate() {
+        const isFinal = statusSelect.value === "closed" || statusSelect.value === "cancelled";
+        if (isFinal && !dateInput.value) {
+            dateInput.value = taipeiDate();
+            autoInput.value = "1";
+        } else if (!isFinal && autoInput.value === "1") {
+            dateInput.value = "";
+            autoInput.value = "";
+        }
+    }
+
+    statusSelect.addEventListener("change", syncFinalDate);
+    dateInput.addEventListener("input", function () {
+        autoInput.value = "";
+        touchedInput.value = "1";
+    });
+    syncFinalDate();
+});
+</script>
+
 
 </main>
 

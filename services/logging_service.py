@@ -7,6 +7,7 @@ import discord
 _ORDER_LOG_CHANNEL_NAME: str | None = None
 _ORDER_LOG_CATEGORY_ID: int | None = None
 _get_now: Callable[[], object] | None = None
+_ORDER_LOG_ENABLED: bool = False
 
 
 def configure_order_logging(
@@ -33,6 +34,9 @@ def get_or_create_order_log_channel_sync_hint() -> str:
 
 
 async def get_or_create_order_log_channel(guild: discord.Guild) -> discord.TextChannel | None:
+    if not _ORDER_LOG_ENABLED:
+        return None
+
     channel_name, category_id, _ = _ensure_configured()
 
     category = guild.get_channel(category_id)
@@ -61,6 +65,9 @@ async def send_order_log(
     fields: list[tuple[str, str, bool]] | None = None,
     color: discord.Color | None = None,
 ) -> None:
+    if not _ORDER_LOG_ENABLED:
+        return
+
     if guild is None:
         return
 

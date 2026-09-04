@@ -1,18 +1,26 @@
 {% extends "layout.html" %}
 
-{% block page_title %}操作紀錄{% endblock %}
+{% block page_title %}????{% endblock %}
 
 {% block content %}
     <div class="panel compact-panel">
-        <h2>操作紀錄</h2>
-        <p class="muted-text">最近 300 筆後台操作。可用來查誰改了分潤、誰換了護航 / 陪玩、誰改了客服。</p>
+        <h2>????</h2>
+
+        <p class="muted-text">
+            ?? 300 ?????????????????????????????
+        </p>
 
         <form method="get" action="/admin/audit" class="admin-add-worker-form">
+
             <select class="input" name="action">
-                <option value="">全部操作</option>
+                <option value="">????</option>
+
                 {% for action in actions %}
-                    <option value="{{ action }}" {% if selected_action == action %}selected{% endif %}>
-                        {{ action }}
+                    <option
+                        value="{{ action }}"
+                        {% if selected_action == action %}selected{% endif %}
+                    >
+                        {{ label_action(action) }}
                     </option>
                 {% endfor %}
             </select>
@@ -22,72 +30,126 @@
                 type="text"
                 name="admin_id"
                 value="{{ admin_id }}"
-                placeholder="管理員 Discord ID"
+                placeholder="???? Discord ID"
             >
 
-            <button class="button" type="submit">篩選</button>
-            <a class="button secondary" href="/admin/audit">清除</a>
+            <button class="button" type="submit">
+                ??
+            </button>
+
+            <a class="button secondary" href="/admin/audit">
+                ??
+            </a>
         </form>
     </div>
 
+
     <div class="panel compact-panel">
-        <h2>紀錄列表</h2>
+        <h2>????</h2>
 
         {% if logs %}
+
             <div class="admin-order-list compact-list">
+
                 {% for log in logs %}
+
                     <article class="admin-order-card compact-order-card">
+
                         <div class="order-card-header">
                             <div>
-                                <p class="order-no">#{{ log.id }}｜{{ log.created_at }}</p>
-                                <h3>{{ log.action }}</h3>
+                                <p class="order-no">
+                                    #{{ log.id }}
+                                    ?
+                                    {{ format_datetime(log.created_at) }}
+                                </p>
+
+                                <h3>
+                                    {{ label_action(log.action) }}
+                                </h3>
                             </div>
-                            <span class="badge">{{ log.target_type }}</span>
+
+                            <span class="badge">
+                                {{ label_target_type(log.target_type) }}
+                            </span>
                         </div>
+
 
                         <div class="order-meta compact-meta">
+
                             <div>
-                                <span>管理員</span>
-                                <strong>{{ log.admin_discord_id }}</strong>
+                                <span>????</span>
+                                <strong>
+                                    {{ log.admin_discord_id }}
+                                </strong>
                             </div>
 
                             <div>
-                                <span>目標</span>
-                                <strong>{{ log.target_id or "-" }}</strong>
+                                <span>????</span>
+                                <strong>
+                                    {{ label_target_type(log.target_type) }}
+                                    {% if log.target_id %}
+                                        #{{ log.target_id }}
+                                    {% endif %}
+                                </strong>
                             </div>
 
                             <div>
-                                <span>操作</span>
-                                <strong>{{ log.action }}</strong>
+                                <span>????</span>
+                                <strong>
+                                    {{ label_action(log.action) }}
+                                </strong>
                             </div>
 
                             <div>
-                                <span>時間</span>
-                                <strong>{{ log.created_at }}</strong>
+                                <span>??</span>
+                                <strong>
+                                    {{ format_datetime(log.created_at) }}
+                                </strong>
                             </div>
+
                         </div>
 
+
                         {% if log.before_json or log.after_json %}
+
                             <details class="audit-details">
-                                <summary>查看修改前後資料</summary>
+
+                                <summary>
+                                    ??????
+                                </summary>
 
                                 <div class="audit-json-grid">
+
                                     <div>
-                                        <h4>修改前</h4>
-                                        <pre>{{ parse_json_text(log.before_json) }}</pre>
+                                        <h4>???</h4>
+
+                                        <pre>{{ format_audit_json(log.before_json) }}</pre>
                                     </div>
+
                                     <div>
-                                        <h4>修改後</h4>
-                                        <pre>{{ parse_json_text(log.after_json) }}</pre>
+                                        <h4>???</h4>
+
+                                        <pre>{{ format_audit_json(log.after_json) }}</pre>
                                     </div>
+
                                 </div>
+
                             </details>
+
                         {% endif %}
+
                     </article>
+
                 {% endfor %}
+
             </div>
+
         {% else %}
-            <div class="empty-state">目前沒有操作紀錄。</div>
+
+            <div class="empty-state">
+                ?????????
+            </div>
+
         {% endif %}
     </div>
 {% endblock %}
