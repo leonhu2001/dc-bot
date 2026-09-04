@@ -257,8 +257,8 @@
         || {
             kicker:
                 isAdmin
-                    ? "MAWAN OPERATIONS"
-                    : "MAWAN STAFF",
+                    ? "MOWAN OPERATIONS"
+                    : "MOWAN STAFF",
 
             title:
                 isAdmin
@@ -637,8 +637,8 @@
 
             <small>
                 ${isAdmin
-                    ? "MAWAN OPERATIONS"
-                    : "MAWAN STAFF"}
+                    ? "MOWAN OPERATIONS"
+                    : "MOWAN STAFF"}
             </small>
 
             <strong>
