@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import services.rewards as rewards
-from core.vip_levels import get_topup_rebate_percent
+from core.vip_levels import get_topup_rebate_percent, has_active_vip_progress_reset
 
 
 def _to_int(value: Any, default: int | None = None) -> int | None:
@@ -19,12 +19,8 @@ def _max_member_level_index() -> int:
 
 
 def has_active_downgrade_reset(data: dict) -> bool:
-    """只要有重置基準，就視為仍在降級後重新累積區間。
-
-    舊資料不一定保留 vip_downgrade_logs，因此不能只靠紀錄判斷；
-    否則會把真正被降級的會員錯誤拉回歷史累積等級。
-    """
-    return _to_int(data.get("vip_progress_base_total_spent")) is not None
+    """相容舊呼叫名稱；實際判斷統一使用核心 VIP reset 規則。"""
+    return has_active_vip_progress_reset(data)
 
 
 def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
@@ -54,6 +50,11 @@ def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
         return False, old_level, rewards.get_effective_member_level(data)
 
     changed = False
+
+    # 沒有真正 reset 證據時，base_total 是舊版正常升級留下的髒資料。
+    if data.get("vip_progress_base_total_spent") is not None:
+        data["vip_progress_base_total_spent"] = None
+        changed = True
 
     if cumulative_index > stored_index:
         data["vip_level_index"] = cumulative_index
