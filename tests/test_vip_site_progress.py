@@ -18,21 +18,22 @@ def test_site_normal_progress_auto_upgrades_to_gold():
     assert progress["percent"] == 0
 
 
-def test_site_downgrade_reset_shows_reearned_progress_not_raw_total():
+def test_site_stale_upgrade_baseline_does_not_block_gold():
     data = {
         "total_spent": 8880,
         "level": "銀級魔丸",
         "vip_level_index": 1,
         "vip_progress_base_total_spent": 5180,
+        "vip_downgrade_logs": [],
     }
 
-    assert _resolve_vip_name(data) == "銀級魔丸"
+    assert _resolve_vip_name(data) == "金級魔丸"
 
     progress = _vip_progress(data)
 
-    assert progress["next_name"] == "金級魔丸"
-    assert progress["remaining"] == 300
-    assert progress["percent"] == 92
+    assert progress["next_name"] == "白金魔丸"
+    assert progress["remaining"] == 3120
+    assert progress["percent"] == 48
 
 
 def test_site_downgraded_normal_member_starts_next_level_from_zero():
