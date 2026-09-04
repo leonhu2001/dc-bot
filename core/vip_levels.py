@@ -153,6 +153,9 @@ def has_active_vip_progress_reset(data: dict) -> bool:
     except (TypeError, ValueError):
         return False
 
+    if data.get("vip_progress_reset_active") is True:
+        return True
+
     logs = data.get("vip_downgrade_logs")
     if isinstance(logs, list) and bool(logs):
         return True
