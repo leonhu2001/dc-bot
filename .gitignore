@@ -72,3 +72,13 @@ finish_*.py
 # Local archive
 # =========================
 _archive/
+
+bot_data.json
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.bak.*
+*.before_*
+cogs.bak.*/
+views.bak.*/
