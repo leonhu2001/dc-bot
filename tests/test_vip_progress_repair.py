@@ -1,6 +1,7 @@
 from core.vip_levels import BASE_MEMBER_LEVELS
 import services.rewards as rewards
 from services.vip_progress_repair import (
+    calculate_member_topup_preview,
     has_active_downgrade_reset,
     repair_vip_progress_data,
 )
@@ -109,3 +110,42 @@ def test_downgrade_reset_requires_new_spend_then_clears_after_reupgrade():
 
     assert data["vip_level_index"] == 2
     assert data["vip_progress_base_total_spent"] is None
+
+
+def test_topup_rebate_uses_effective_level_during_downgrade_reset():
+    data = {
+        "total_spent": 10965,
+        "vip_level_index": 0,
+        "vip_progress_base_total_spent": 10965,
+    }
+
+    preview = calculate_member_topup_preview(
+        data,
+        1035,
+    )
+
+    # 歷史累積會到 12,000T，但降級後只重新累積 1,035T，
+    # 所以仍是普通魔丸，不能提前拿白金 2% 返利。
+    assert preview["vip_total_after"] == 12000
+    assert preview["vip_level_after"] == "普通魔丸"
+    assert preview["rebate_percent"] == 0
+    assert preview["credited_amount"] == 1035
+
+
+def test_topup_reaching_effective_platinum_gets_two_percent_rebate():
+    data = {
+        "total_spent": 25000,
+        "vip_level_index": 2,
+        "vip_progress_base_total_spent": 25000,
+    }
+
+    preview = calculate_member_topup_preview(
+        data,
+        6000,
+    )
+
+    assert preview["vip_level_before"] == "金級魔丸"
+    assert preview["vip_level_after"] == "白金魔丸"
+    assert preview["rebate_percent"] == 2
+    assert preview["rebate_amount"] == 120
+    assert preview["credited_amount"] == 6120
