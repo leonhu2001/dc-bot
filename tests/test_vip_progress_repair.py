@@ -90,7 +90,7 @@ def test_core_normal_progress_auto_upgrades_without_reset_baseline():
     assert data["vip_progress_base_total_spent"] is None
 
 
-def test_downgrade_reset_requires_new_spend_then_clears_after_reupgrade():
+def test_downgrade_reset_requires_new_spend_then_rolls_baseline_forward():
     data = {
         "total_spent": 8880,
         "vip_level_index": 1,
@@ -117,7 +117,12 @@ def test_downgrade_reset_requires_new_spend_then_clears_after_reupgrade():
     rewards.sync_vip_level_to_cumulative_if_higher(data)
 
     assert data["vip_level_index"] == 2
-    assert data["vip_progress_base_total_spent"] is None
+    assert data["vip_progress_base_total_spent"] == 9180
+    assert data["vip_progress_reset_active"] is True
+
+    next_level, remaining = rewards.get_next_member_level_for_data(data)
+    assert next_level["name"] == "白金魔丸"
+    assert remaining == 6000
 
 
 def test_topup_rebate_uses_effective_level_during_downgrade_reset():
@@ -194,9 +199,11 @@ def test_manual_vip_reset_metadata_survives_database_reload():
             "last_level_manual_fixed_at": "2026-09-04T00:00:00+08:00",
             "last_level_manual_fixed_by": 123456789,
             "last_level_manual_fixed_reason": "測試調整",
+            "vip_progress_reset_active": True,
         }
     )
 
+    assert data["vip_progress_reset_active"] is True
     assert data["last_level_manual_fixed_at"] == "2026-09-04T00:00:00+08:00"
     assert data["last_level_manual_fixed_by"] == 123456789
     assert data["last_level_manual_fixed_reason"] == "測試調整"
@@ -212,3 +219,18 @@ def test_ordinary_reset_stays_active_after_new_spending():
 
     assert has_active_downgrade_reset(data) is True
     assert rewards.get_effective_member_level(data)["name"] == "普通魔丸"
+
+
+def test_normal_upgrade_never_enters_reset_mode():
+    data = {
+        "total_spent": 6000,
+        "vip_level_index": 1,
+        "vip_progress_base_total_spent": None,
+        "vip_progress_reset_active": False,
+    }
+
+    rewards.sync_vip_level_to_cumulative_if_higher(data)
+
+    assert data["vip_level_index"] == 2
+    assert data["vip_progress_base_total_spent"] is None
+    assert data["vip_progress_reset_active"] is False
