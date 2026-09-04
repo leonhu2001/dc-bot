@@ -1239,7 +1239,7 @@ def point_item_status(
                 False,
 
             "reason":
-                "趣味單 / 高難度稱號不可使用點數福利。",
+                "趣味單不可使用點數福利。",
         }
 
 
@@ -3111,16 +3111,6 @@ MW_ORDER_GROUP_FALLBACKS = {
     "半幣": [
         "farm_halfcoin_120m",
         "farm_halfcoin_360m",
-        "farm_halfcoin_600m",
-    ],
-
-    "炫彩勇敢者": [
-        "title_color_brave_carry",
-        "title_color_brave_play",
-    ],
-
-    "勇敢者": [
-        "title_brave_play",
     ],
 
     "Steam": [

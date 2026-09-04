@@ -21,7 +21,6 @@ CATEGORY_ORDER = [
     "basic",
     "fun",
     "farm",
-    "title",
     "steam",
     "valorant",
 ]
@@ -220,29 +219,10 @@ GROUP_SPECS = [
         "variants": [
             ("farm_halfcoin_120m", "120M"),
             ("farm_halfcoin_360m", "360M"),
-            ("farm_halfcoin_600m", "600M"),
         ],
     },
 
-    {
-        "key": "color_brave",
-        "category": "title",
-        "label": "炫彩勇敢者",
-        "selector_label": "方式",
-        "variants": [
-            ("title_color_brave_carry", "代做"),
-            ("title_color_brave_play", "陪做"),
-        ],
-    },
 
-    {
-        "key": "brave",
-        "category": "title",
-        "label": "勇敢者",
-        "variants": [
-            ("title_brave_play", "陪做"),
-        ],
-    },
 
     {
         "key": "steam",

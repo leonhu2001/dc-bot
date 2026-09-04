@@ -52,7 +52,6 @@ CATEGORY_LABELS: dict[str, str] = {
     "basic": "基礎單",
     "fun": "趣味單",
     "farm": "代解代肝",
-    "title": "高難度稱號",
     "steam": "Steam 陪玩",
     "valorant": "Valorant 陪玩",
 }
@@ -403,16 +402,11 @@ _add(OrderRule("farm", "farm_department_task", "代解部門任務", "manual", 0
 for key, label, price in [
     ("farm_halfcoin_120m", "哈夫幣代洗｜120M", 1250),
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
-    ("farm_halfcoin_600m", "哈夫幣代洗｜600M", 5300),
 ]:
     _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False))
 
 
-# ========= 高難度稱號 =========
 
-_add(OrderRule("title", "title_color_brave_carry", "炫彩勇敢者｜代做", "fixed", 6500, allowed_roles=PROTECTOR_ROLES, required_staff_count=3, allow_specify=False))
-_add(OrderRule("title", "title_color_brave_play", "炫彩勇敢者｜陪做", "fixed", 20000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
-_add(OrderRule("title", "title_brave_play", "勇敢者｜陪做", "fixed", 4500, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
 
 
 # ========= Steam 陪玩 =========
@@ -607,18 +601,6 @@ def _mm_override_order_rule_by_label(_label: str, **_changes):
 
     return _patched
 
-def _mm_override_title_color_brave_carry():
-    _patched = 0
-
-    for _key, _rule in list(ORDER_RULES.items()):
-        _label = str(getattr(_rule, "label", ""))
-
-        if _key == "title_color_brave_carry" or ("炫彩勇敢者" in _label and "代做" in _label):
-            ORDER_RULES[_key] = _mm_replace_order_rule(_rule, max_quantity=3)
-            _patched += 1
-
-    return _patched
-
 def _mm_add_custom_order_rule():
     try:
         CATEGORY_LABELS["custom"] = "自訂單"
@@ -676,18 +658,8 @@ def _mm_add_custom_order_rule():
 
 _mm_override_order_rule("farm_season_3x3_contract", max_quantity=4)
 
-# 炫彩勇敢者｜代做用 key + label 雙保險，避免 key 或 label 寫法不同。
-_mm_override_order_rule("title_color_brave_carry", max_quantity=3)
-_mm_override_order_rule_by_label("炫彩勇敢者｜代做", max_quantity=3)
-_mm_override_title_color_brave_carry()
 
-# 炫彩勇敢者｜陪做只能 1 單
-_mm_override_order_rule("title_color_brave_play", max_quantity=1)
-_mm_override_order_rule_by_label("炫彩勇敢者｜陪做", max_quantity=1)
 
-# 勇敢者｜陪做只能 1 單
-_mm_override_order_rule("title_brave_play", max_quantity=1)
-_mm_override_order_rule_by_label("勇敢者｜陪做", max_quantity=1)
 
 _mm_override_order_rule("basic_bet_1000", label="賭約單 800w")
 _mm_override_order_rule("basic_bet_1500", label="賭約單 1000w")
@@ -760,7 +732,6 @@ CATEGORY_LABELS.update({
     "basic": "基礎單",
     "fun": "趣味單",
     "farm": "代肝代解",
-    "title": "高難度稱號",
     "steam": "Steam遊戲",
     "valorant": "特戰英豪",
     "custom": "自訂",
@@ -858,12 +829,7 @@ _zy_patch_rule(
 _zy_patch_rule("farm_department_task", label="部門任務", pricing_type="manual", price=0, unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("farm_halfcoin_600m", label="哈夫幣代洗｜600M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
-# 高難度稱號：單數視為小時，但不開放指定。
-_zy_patch_rule("title_color_brave_carry", label="炫彩勇敢者｜代做", unit_label="H", min_quantity=1, max_quantity=3, allow_specify=False)
-_zy_patch_rule("title_color_brave_play", label="炫彩勇敢者｜陪做", unit_label="H", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("title_brave_play", label="勇敢者｜陪做", unit_label="H", min_quantity=1, max_quantity=1, allow_specify=False)
 
 # Steam / 特戰英豪：350 / 小時 / 每位；1～4 位。指定費只看小時數，2 小時以上全免。
 _zy_patch_rule(

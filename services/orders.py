@@ -145,19 +145,8 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             "details": [
                 {"label": "120M", "value": "120m", "rule_key": "farm_halfcoin_120m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "360M", "value": "360m", "rule_key": "farm_halfcoin_360m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-                {"label": "600M", "value": "600m", "rule_key": "farm_halfcoin_600m", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
-    ],
-    "title": [
-        {
-            "label": "炫彩勇敢者",
-            "details": [
-                {"label": "代做", "value": "carry", "rule_key": "title_color_brave_carry", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 3},
-                {"label": "陪做", "value": "play", "rule_key": "title_color_brave_play", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 1},
-            ],
-        },
-        {"label": "勇敢者", "details": [{"label": "陪做", "value": "play", "rule_key": "title_brave_play", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 1}]},
     ],
     "steam": [
         {
