@@ -212,6 +212,9 @@ def _deserialize_customer_data(data: dict) -> dict:
         "vip_progress_base_total_spent": _to_int(data.get("vip_progress_base_total_spent")),
         "vip_last_downgrade_check_month": data.get("vip_last_downgrade_check_month"),
         "vip_downgrade_logs": list(data.get("vip_downgrade_logs", [])) if isinstance(data.get("vip_downgrade_logs", []), list) else [],
+        "last_level_manual_fixed_at": data.get("last_level_manual_fixed_at"),
+        "last_level_manual_fixed_by": _to_int(data.get("last_level_manual_fixed_by")),
+        "last_level_manual_fixed_reason": data.get("last_level_manual_fixed_reason"),
     }
 
 def load_bot_data_from_json() -> bool:
