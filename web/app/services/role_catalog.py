@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from services.game_roles import GAME_ROLE_LABEL_BY_ID, game_role_labels_from_role_ids
+
 
 CUSTOMER_SERVICE_ROLE_ID = "1482084782031638548"
 CUSTOMER_SERVICE_LABEL = "魔丸♫客服"
@@ -36,6 +38,10 @@ ROLE_LABEL_BY_ID = {
     for role in RECEIVER_ROLES
 }
 
+# ???????????????? RECEIVER_ROLE_IDS?
+# ??????????????????/?????
+ROLE_LABEL_BY_ID.update(GAME_ROLE_LABEL_BY_ID)
+
 STAFF_ROLE_FILTERS = [
     {"value": "", "label": "全部"},
     {"value": "customer_service", "label": CUSTOMER_SERVICE_LABEL},
@@ -59,6 +65,11 @@ def normalize_role_ids(value) -> set[str]:
         if item.strip()
     }
 
+
+
+def game_role_labels_from_roles(role_ids) -> list[str]:
+    """?? Discord ?????????????????"""
+    return game_role_labels_from_role_ids(role_ids)
 
 def receiver_labels_from_roles(role_ids) -> list[str]:
     role_set = normalize_role_ids(role_ids)
