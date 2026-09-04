@@ -200,3 +200,15 @@ def test_manual_vip_reset_metadata_survives_database_reload():
     assert data["last_level_manual_fixed_at"] == "2026-09-04T00:00:00+08:00"
     assert data["last_level_manual_fixed_by"] == 123456789
     assert data["last_level_manual_fixed_reason"] == "測試調整"
+
+
+def test_ordinary_reset_stays_active_after_new_spending():
+    data = {
+        "total_spent": 12000,
+        "vip_level_index": 0,
+        "vip_progress_base_total_spent": 10965,
+        "vip_downgrade_logs": [],
+    }
+
+    assert has_active_downgrade_reset(data) is True
+    assert rewards.get_effective_member_level(data)["name"] == "普通魔丸"
