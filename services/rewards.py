@@ -12,7 +12,7 @@ import discord
 
 from core.time_utils import get_taipei_now, get_taipei_now_iso
 from core.database import init_database, _db_columns, _json_load_maybe
-from core.vip_levels import VIP_LEVEL_BENEFITS
+from core.vip_levels import VIP_LEVEL_BENEFITS, has_active_vip_progress_reset
 
 _MEMBER_LEVELS: list[dict[str, Any]] = [
     {"name": "普通魔丸", "threshold": 0},
@@ -166,15 +166,14 @@ def get_effective_member_level_index(data: dict) -> int:
 
     stored_index = max(0, min(int(stored_index), len(_MEMBER_LEVELS) - 1))
 
-    # 只有真的存在「降級後重置基準」時，才從該基準重新累積。
-    # 沒有重置基準卻低於累積金額應有等級，代表正常升級資料尚未同步；
-    # 此時應直接依累積金額判斷，避免進度 100% 仍卡在舊階級。
+    # 舊版正常升級也曾誤寫 vip_progress_base_total_spent，
+    # 所以只有真正的降級 / 手動重置才使用重新累積規則。
     base_total = _to_int(data.get("vip_progress_base_total_spent"))
     if stored_index < cumulative_index:
-        if base_total is None:
+        if not has_active_vip_progress_reset(data):
             return cumulative_index
 
-        earned_after_reset = max(0, total_spent - base_total)
+        earned_after_reset = max(0, total_spent - int(base_total or 0))
         virtual_total = int(_MEMBER_LEVELS[stored_index]["threshold"]) + earned_after_reset
         progressed_index = get_member_level_index_by_total_spent(virtual_total)
         return max(stored_index, min(progressed_index, len(_MEMBER_LEVELS) - 1))
@@ -197,12 +196,16 @@ def get_next_member_level_for_data(data: dict) -> tuple[dict | None, int]:
     base_total = _to_int(data.get("vip_progress_base_total_spent"))
     cumulative_index = get_member_level_index_by_total_spent(total_spent)
 
-    # 降階後從該等級的 0 開始重新累積。
-    if stored_index is not None and stored_index < cumulative_index:
-        if base_total is None:
-            earned_after_reset = 0
-        else:
-            earned_after_reset = max(0, total_spent - base_total)
+    # 真的處於降級 / 手動重置區間時，才從重置基準重新累積。
+    if (
+        stored_index is not None
+        and stored_index < cumulative_index
+        and has_active_vip_progress_reset(data)
+    ):
+        earned_after_reset = max(
+            0,
+            total_spent - int(base_total or 0),
+        )
         needed_between_levels = int(next_level["threshold"]) - int(current_level["threshold"])
         return next_level, max(0, needed_between_levels - earned_after_reset)
 
