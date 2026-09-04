@@ -23,6 +23,7 @@ from services.topups import (
     reset_topup_credit_error,
 )
 from services.vip_progress_repair import (
+    calculate_member_topup_preview,
     repair_all_legacy_vip_progress,
     repair_vip_progress_data,
 )
@@ -263,11 +264,39 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
             reward_keys = []
             data["manual_purchase_keys"] = reward_keys
 
-        before_total = int(data.get("total_spent", 0) or 0)
-        if reward_key in reward_keys:
-            before_total = max(0, before_total - amount)
+        already_applied = reward_key in reward_keys
 
-        preview = calculate_topup_preview(before_total, amount)
+        if already_applied:
+            # 上一次處理若已寫入會員資料但尚未標記儲值完成，
+            # 以目前真正有效 VIP 作為重試時的返利基準，避免重複推進。
+            before_total = max(
+                0,
+                int(data.get("total_spent", 0) or 0) - amount,
+            )
+            current_level = rewards.get_effective_member_level(data)
+            preview = calculate_topup_preview(before_total, amount)
+            preview["vip_level_after"] = str(
+                current_level.get("name")
+                or preview["vip_level_after"]
+            )
+            from core.vip_levels import get_topup_rebate_percent
+            preview["rebate_percent"] = get_topup_rebate_percent(
+                preview["vip_level_after"]
+            )
+            preview["rebate_amount"] = (
+                amount
+                * int(preview["rebate_percent"])
+                // 100
+            )
+            preview["credited_amount"] = (
+                amount
+                + int(preview["rebate_amount"])
+            )
+        else:
+            preview = calculate_member_topup_preview(
+                data,
+                amount,
+            )
 
         principal_tx = find_wallet_transaction(
             customer_id=customer_id,
