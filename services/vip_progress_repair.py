@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import services.rewards as rewards
+from core.vip_levels import get_topup_rebate_percent
 
 
 def _to_int(value: Any, default: int | None = None) -> int | None:
@@ -63,6 +64,40 @@ def repair_vip_progress_data(data: dict) -> tuple[bool, dict, dict]:
     )
     return changed, old_level, new_level
 
+
+
+def calculate_member_topup_preview(
+    data: dict,
+    amount: int,
+) -> dict[str, Any]:
+    """依會員真正有效 VIP 狀態計算儲值後等級與返利。
+
+    若會員處於降級後重新累積區間，這裡會保留重置基準，
+    不會因歷史 total_spent 很高就提前取得高階返利。
+    """
+    amount = max(0, int(amount or 0))
+    before_total = max(0, int(data.get("total_spent", 0) or 0))
+
+    before_level = rewards.get_effective_member_level(data)
+
+    simulated = dict(data)
+    simulated["total_spent"] = before_total + amount
+
+    after_level = rewards.get_effective_member_level(simulated)
+    rebate_percent = get_topup_rebate_percent(
+        str(after_level.get("name") or "普通魔丸")
+    )
+    rebate_amount = amount * int(rebate_percent) // 100
+
+    return {
+        "vip_total_before": before_total,
+        "vip_total_after": before_total + amount,
+        "vip_level_before": str(before_level.get("name") or "普通魔丸"),
+        "vip_level_after": str(after_level.get("name") or "普通魔丸"),
+        "rebate_percent": int(rebate_percent),
+        "rebate_amount": int(rebate_amount),
+        "credited_amount": int(amount + rebate_amount),
+    }
 
 def repair_all_legacy_vip_progress() -> list[dict[str, Any]]:
     repaired: list[dict[str, Any]] = []
