@@ -94,6 +94,13 @@ def test_downgrade_reset_requires_new_spend_then_clears_after_reupgrade():
         "total_spent": 8880,
         "vip_level_index": 1,
         "vip_progress_base_total_spent": 5180,
+        "vip_downgrade_logs": [
+            {
+                "old_level": "金級魔丸",
+                "new_level": "銀級魔丸",
+                "progress_reset_total_spent": 5180,
+            }
+        ],
     }
 
     assert rewards.get_effective_member_level(data)["name"] == "銀級魔丸"
@@ -137,6 +144,13 @@ def test_topup_reaching_effective_platinum_gets_two_percent_rebate():
         "total_spent": 25000,
         "vip_level_index": 2,
         "vip_progress_base_total_spent": 25000,
+        "vip_downgrade_logs": [
+            {
+                "old_level": "白金魔丸",
+                "new_level": "金級魔丸",
+                "progress_reset_total_spent": 25000,
+            }
+        ],
     }
 
     preview = calculate_member_topup_preview(
