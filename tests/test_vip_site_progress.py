@@ -51,3 +51,28 @@ def test_site_downgraded_normal_member_starts_next_level_from_zero():
     assert progress["next_name"] == "銀級魔丸"
     assert progress["remaining"] == 2000
     assert progress["percent"] == 0
+
+
+def test_site_reupgraded_gold_starts_platinum_progress_from_zero():
+    data = {
+        "total_spent": 9180,
+        "level": "金級魔丸",
+        "vip_level_index": 2,
+        "vip_progress_base_total_spent": 9180,
+        "vip_progress_reset_active": True,
+        "vip_downgrade_logs": [
+            {
+                "old_level": "金級魔丸",
+                "new_level": "銀級魔丸",
+                "progress_reset_total_spent": 5180,
+            }
+        ],
+    }
+
+    assert _resolve_vip_name(data) == "金級魔丸"
+
+    progress = _vip_progress(data)
+
+    assert progress["next_name"] == "白金魔丸"
+    assert progress["remaining"] == 6000
+    assert progress["percent"] == 0
