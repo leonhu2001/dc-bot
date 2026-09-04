@@ -166,12 +166,13 @@ def get_effective_member_level_index(data: dict) -> int:
 
     stored_index = max(0, min(int(stored_index), len(_MEMBER_LEVELS) - 1))
 
-    # 若顧客曾被降階，不能再用歷史累積總額直接判斷下一級，
-    # 要從降階後的新基準重新累積。
+    # 只有真的存在「降級後重置基準」時，才從該基準重新累積。
+    # 沒有重置基準卻低於累積金額應有等級，代表正常升級資料尚未同步；
+    # 此時應直接依累積金額判斷，避免進度 100% 仍卡在舊階級。
     base_total = _to_int(data.get("vip_progress_base_total_spent"))
     if stored_index < cumulative_index:
         if base_total is None:
-            return stored_index
+            return cumulative_index
 
         earned_after_reset = max(0, total_spent - base_total)
         virtual_total = int(_MEMBER_LEVELS[stored_index]["threshold"]) + earned_after_reset
@@ -213,11 +214,14 @@ def sync_vip_level_to_cumulative_if_higher(data: dict) -> tuple[dict, dict]:
 
     if current_stored_index is None:
         data["vip_level_index"] = get_member_level_index_by_total_spent(int(data.get("total_spent", 0) or 0))
+        data["vip_progress_base_total_spent"] = None
     else:
         effective_index = get_effective_member_level_index(data)
         if effective_index > current_stored_index:
             data["vip_level_index"] = effective_index
-            data["vip_progress_base_total_spent"] = int(data.get("total_spent", 0) or 0)
+            # 一旦重新達成升級門檻，降級後的重置區間就結束。
+            # 正常升級也不應建立新的重置基準，否則下一級門檻會被延後。
+            data["vip_progress_base_total_spent"] = None
 
     new_level = get_effective_member_level(data)
     return old_level, new_level
