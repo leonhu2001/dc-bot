@@ -210,6 +210,7 @@ def _deserialize_customer_data(data: dict) -> dict:
         "notes": list(data.get("notes", [])) if isinstance(data.get("notes", []), list) else [],
         "vip_level_index": _to_int(data.get("vip_level_index")),
         "vip_progress_base_total_spent": _to_int(data.get("vip_progress_base_total_spent")),
+        "vip_progress_reset_active": bool(data.get("vip_progress_reset_active", False)),
         "vip_last_downgrade_check_month": data.get("vip_last_downgrade_check_month"),
         "vip_downgrade_logs": list(data.get("vip_downgrade_logs", [])) if isinstance(data.get("vip_downgrade_logs", []), list) else [],
         "last_level_manual_fixed_at": data.get("last_level_manual_fixed_at"),
