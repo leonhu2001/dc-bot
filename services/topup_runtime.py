@@ -21,6 +21,8 @@ from services.topups import (
     mark_topup_completed,
     mark_topup_processing,
     reset_topup_credit_error,
+    topup_payment_method_label,
+    topup_payment_reference_label,
 )
 from services.vip_progress_repair import (
     calculate_member_topup_preview,
@@ -183,7 +185,14 @@ async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
     customer_name = str(row.get("customer_display_name") or "").strip() or customer_id or "未知"
     topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
     amount = int(row.get("amount") or 0)
-    bank_last5 = str(row.get("bank_last5") or "—")
+    payment_method = str(row.get("payment_method") or "bank_transfer").strip()
+    payment_method_label = topup_payment_method_label(payment_method)
+    payment_reference_label = topup_payment_reference_label(payment_method)
+    payment_reference = str(
+        row.get("payment_reference")
+        or row.get("bank_last5")
+        or "—"
+    )
     source = str(row.get("source") or "").strip()
     source_label = {
         "web": "網站",
@@ -199,7 +208,8 @@ async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
     embed.add_field(name="儲值單", value=f"`{topup_no}`", inline=False)
     embed.add_field(name="老闆", value=f"{customer_name}\n`{customer_id}`", inline=True)
     embed.add_field(name="儲值金額", value=f"{amount:,}T", inline=True)
-    embed.add_field(name="銀行末五碼", value=bank_last5, inline=True)
+    embed.add_field(name="付款方式", value=payment_method_label, inline=True)
+    embed.add_field(name=payment_reference_label, value=payment_reference, inline=False)
     embed.add_field(name="來源", value=source_label, inline=True)
 
     note = str(row.get("payment_note") or "").strip()
