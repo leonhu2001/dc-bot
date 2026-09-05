@@ -6739,7 +6739,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
         lines.append(("陪玩人數", f"{player_count} 位"))
 
     lines.append(("接單需求", f"{required_staff_count} 位"))
-    lines.append(("可接職位", role_labels(rule.allowed_roles)))
+    lines.append(("可接職位", role_labels(rule.allowed_roles, getattr(rule, "allowed_game_roles", ()))))
 
     can_specify_item = bool(getattr(rule, "allow_specify", False))
 
