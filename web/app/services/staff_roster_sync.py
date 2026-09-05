@@ -29,6 +29,15 @@ SERVICE_ROLE_PRIORITY = (
     "male_protector",
     "female_companion",
     "male_companion",
+    "lol_elite",
+    "lol_grandmaster",
+    "lol_master",
+    "apex_predator",
+    "apex_master",
+    "apex_diamond",
+    "valorant_radiant",
+    "valorant_immortal",
+    "valorant_ascendant",
 )
 
 
@@ -47,6 +56,33 @@ FALLBACK_ROLE_TITLE = {
 
     "male_companion":
         "男陪",
+
+    "lol_elite":
+        "菁英",
+
+    "lol_grandmaster":
+        "宗師",
+
+    "lol_master":
+        "LOL 大師",
+
+    "apex_predator":
+        "頂獵",
+
+    "apex_master":
+        "APEX 大師",
+
+    "apex_diamond":
+        "鑽石",
+
+    "valorant_radiant":
+        "輻能",
+
+    "valorant_immortal":
+        "神話",
+
+    "valorant_ascendant":
+        "超凡",
 }
 
 
@@ -65,6 +101,33 @@ FALLBACK_PROFILE_TYPE = {
 
     "male_companion":
         "companion",
+
+    "lol_elite":
+        "game",
+
+    "lol_grandmaster":
+        "game",
+
+    "lol_master":
+        "game",
+
+    "apex_predator":
+        "game",
+
+    "apex_master":
+        "game",
+
+    "apex_diamond":
+        "game",
+
+    "valorant_radiant":
+        "game",
+
+    "valorant_immortal":
+        "game",
+
+    "valorant_ascendant":
+        "game",
 }
 
 
@@ -539,6 +602,9 @@ def ensure_staff_roster_profiles(
     from services.order_rules import (
         ROLE_IDS,
     )
+    from services.game_roles import (
+        GAME_ROLE_BY_KEY,
+    )
 
 
     role_ids_by_key = {
@@ -555,6 +621,22 @@ def ensure_staff_roster_profiles(
         if key
         in ROLE_IDS
     }
+
+    for key in (
+        SERVICE_ROLE_PRIORITY
+    ):
+        game_role = (
+            GAME_ROLE_BY_KEY.get(
+                key
+            )
+        )
+
+        if game_role is not None:
+            role_ids_by_key[
+                key
+            ] = str(
+                game_role.role_id
+            )
 
 
     if not role_ids_by_key:
