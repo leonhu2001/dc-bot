@@ -1209,6 +1209,7 @@ def _staff_role_keys(
     profile: dict,
 ) -> list[str]:
     role_ids: set[str] = set()
+    member_found = False
 
     if (
         _table_exists(
@@ -1240,6 +1241,8 @@ def _staff_role_keys(
             ).fetchone()
 
             if row is not None:
+                member_found = True
+
                 raw_roles = row[
                     "roles_json"
                 ]
@@ -1377,16 +1380,17 @@ def _staff_role_keys(
         ),
     )
 
-    for key, marker in (
-        legacy_checks
-    ):
-        if (
-            marker in text
-            and key not in keys
+    if not member_found:
+        for key, marker in (
+            legacy_checks
         ):
-            keys.append(
-                key
-            )
+            if (
+                marker in text
+                and key not in keys
+            ):
+                keys.append(
+                    key
+                )
 
     return keys
 
@@ -1777,6 +1781,17 @@ def list_public_staff(
             )
             for row
             in rows
+        ]
+
+        # Keep the profile record for history, but do not show
+        # people who no longer have any eligible live Discord role.
+        profiles = [
+            profile
+            for profile
+            in profiles
+            if profile.get(
+                "role_keys"
+            )
         ]
 
     role_filter = str(
