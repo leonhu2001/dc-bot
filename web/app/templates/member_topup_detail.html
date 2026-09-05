@@ -3,7 +3,7 @@
 <section class="site-section" style="max-width:900px;margin:0 auto;padding-top:48px">
   <div class="section-heading">
     <div><div class="section-eyebrow">TOPUP</div><h1>{{ topup.topup_no }}</h1></div>
-    <p>{{ status_label }}</p>
+    <p>{{ topup.payment_method_label }}｜{{ status_label }}</p>
   </div>
 
   {% if error %}<div class="member-alert">{{ error }}</div>{% endif %}
@@ -20,15 +20,41 @@
 
   {% if topup.status == 'pending_payment' or topup.status == 'pending_review' %}
   <section class="member-panel member-panel-wide" style="margin-top:18px">
-    <div class="member-panel-head"><div><small>PAYMENT</small><h3>銀行轉帳</h3></div></div>
+    <div class="member-panel-head"><div><small>PAYMENT</small><h3>{{ topup.payment_method_label }}</h3></div></div>
+
+    {% if topup.payment_method == 'bank_transfer' %}
     <div style="display:grid;gap:10px;margin-bottom:18px">
       <strong>國泰世華 013</strong>
       <strong>帳號：135700021419</strong>
       <span style="opacity:.72">請完成付款後填寫銀行帳號末五碼，客服確認後才會正式入帳。</span>
     </div>
+    {% elif topup.payment_method == 'jkopay' %}
+    <div style="display:grid;gap:10px;margin-bottom:18px">
+      <strong>街口支付</strong>
+      <strong>代碼：396</strong>
+      <strong>帳號：900884222</strong>
+      <span style="opacity:.72">付款後請填寫街口交易序號、付款人名稱或其他可辨識資訊，客服確認後才會正式入帳。</span>
+    </div>
+    {% elif topup.payment_method == 'usdt_trc20' %}
+    <div style="display:grid;gap:10px;margin-bottom:18px">
+      <strong>USDT</strong>
+      <strong>鏈種：TRC20</strong>
+      <strong style="word-break:break-all">錢包地址：TYKcYmvvuMFDSsvYcUfS43FYZfDMQf8c7K</strong>
+      <span style="opacity:.72">請只使用 TRC20。儲值單金額以 T 顯示，實際 USDT 數量請先依客服當下換算確認後再轉帳；完成後填寫 64 位交易 TXID。</span>
+    </div>
+    {% endif %}
+
     <form method="post" action="/me/wallet/topup/{{ topup.id }}/submit" style="display:grid;gap:12px">
-      <input name="bank_last5" inputmode="numeric" maxlength="5" required placeholder="銀行帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
-      <textarea name="payment_note" rows="3" placeholder="付款備註（選填）" style="padding:12px 14px;border-radius:12px"></textarea>
+      {% if topup.payment_method == 'bank_transfer' %}
+      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="銀行帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
+      {% elif topup.payment_method == 'jkopay' %}
+      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" maxlength="100" required placeholder="街口交易序號 / 付款人名稱" style="min-height:48px;padding:0 14px;border-radius:12px">
+      {% elif topup.payment_method == 'usdt_trc20' %}
+      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" minlength="64" maxlength="64" required placeholder="64 位交易 TXID" style="min-height:48px;padding:0 14px;border-radius:12px">
+      {% else %}
+      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" maxlength="100" required placeholder="付款辨識資訊" style="min-height:48px;padding:0 14px;border-radius:12px">
+      {% endif %}
+      <textarea name="payment_note" rows="3" placeholder="付款備註（選填）" style="padding:12px 14px;border-radius:12px">{{ topup.payment_note or '' }}</textarea>
       <button class="discord-login" type="submit" style="justify-content:center">我已完成付款</button>
     </form>
     <form method="post" action="/me/wallet/topup/{{ topup.id }}/cancel" style="margin-top:10px">
@@ -39,6 +65,7 @@
   <section class="member-panel member-panel-wide" style="margin-top:18px">
     <div class="member-panel-head"><div><small>COMPLETED</small><h3>儲值完成</h3></div></div>
     <div class="member-benefit-row">
+      <div><span>付款方式</span><strong>{{ topup.payment_method_label }}</strong></div>
       <div><span>本金</span><strong>{{ topup.amount_text }}</strong></div>
       <div><span>VIP 回饋</span><strong>+{{ topup.rebate_amount_text }}</strong></div>
       <div><span>實際入帳</span><strong>{{ topup.credited_amount_text }}</strong></div>
