@@ -1180,16 +1180,31 @@ STAFF_ROLE_FILTER_DEFS = (
     ("female_protector", "女護"),
     ("male_protector", "男護"),
     ("top_protector", "頂護"),
-    ("lol_elite", "菁英"),
-    ("lol_grandmaster", "宗師"),
     ("lol_master", "LOL 大師"),
-    ("apex_predator", "頂獵"),
-    ("apex_master", "APEX 大師"),
+    ("lol_grandmaster", "宗師"),
+    ("lol_elite", "菁英"),
     ("apex_diamond", "鑽石"),
-    ("valorant_radiant", "輻能"),
-    ("valorant_immortal", "神話"),
+    ("apex_master", "APEX 大師"),
+    ("apex_predator", "頂獵"),
     ("valorant_ascendant", "超凡"),
+    ("valorant_immortal", "神話"),
+    ("valorant_radiant", "輻能"),
 )
+
+
+HOMEPAGE_STAFF_FILTER_KEYS = {
+    "entertainment_female",
+    "entertainment_male",
+    "strong_player",
+}
+
+
+STRONG_PLAYER_ROLE_KEYS = {
+    "top_protector",
+    "lol_elite",
+    "apex_predator",
+    "valorant_radiant",
+}
 
 
 def get_public_staff_role_filters() -> list[dict]:
@@ -1803,47 +1818,105 @@ def list_public_staff(
         role_filter
         and role_filter != "all"
     ):
-        protector_keys = {
-            "top_protector",
-            "female_protector",
-            "male_protector",
-        }
-
-        profiles = [
-            profile
-            for profile
-            in profiles
-            if (
-                (
-                    role_filter
-                    == "protector"
-                    and bool(
-                        protector_keys
-                        & set(
-                            profile.get(
-                                "role_keys"
-                            )
-                            or []
-                        )
+        if (
+            role_filter
+            == "entertainment_female"
+        ):
+            profiles = [
+                profile
+                for profile
+                in profiles
+                if set(
+                    profile.get(
+                        "role_keys"
                     )
+                    or []
                 )
-                or (
-                    role_filter
-                    in (
+                == {
+                    "female_companion",
+                }
+            ]
+
+        elif (
+            role_filter
+            == "entertainment_male"
+        ):
+            profiles = [
+                profile
+                for profile
+                in profiles
+                if set(
+                    profile.get(
+                        "role_keys"
+                    )
+                    or []
+                )
+                == {
+                    "male_companion",
+                }
+            ]
+
+        elif (
+            role_filter
+            == "strong_player"
+        ):
+            profiles = [
+                profile
+                for profile
+                in profiles
+                if bool(
+                    STRONG_PLAYER_ROLE_KEYS
+                    & set(
                         profile.get(
                             "role_keys"
                         )
                         or []
                     )
                 )
-                or (
-                    profile.get(
-                        "role_group"
+            ]
+
+        else:
+            protector_keys = {
+                "top_protector",
+                "female_protector",
+                "male_protector",
+            }
+
+            profiles = [
+                profile
+                for profile
+                in profiles
+                if (
+                    (
+                        role_filter
+                        == "protector"
+                        and bool(
+                            protector_keys
+                            & set(
+                                profile.get(
+                                    "role_keys"
+                                )
+                                or []
+                            )
+                        )
                     )
-                    == role_filter
+                    or (
+                        role_filter
+                        in (
+                            profile.get(
+                                "role_keys"
+                            )
+                            or []
+                        )
+                    )
+                    or (
+                        profile.get(
+                            "role_group"
+                        )
+                        == role_filter
+                    )
                 )
-            )
-        ]
+            ]
 
     return profiles
 
