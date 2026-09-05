@@ -373,67 +373,50 @@
 
     <div class="crew-grid">
 
-        <div class="crew-type-card">
-            <div class="crew-figure">
-                <span>女陪</span>
-            </div>
+        {% for group in home_crew_groups %}
 
-            <div>
-                <small>
-                    COMPANION
-                </small>
+            <a
+                class="crew-type-card"
+                href="/staff?role={{ group.key }}"
+            >
+                <div
+                    class="crew-figure{% if group.profiles %} crew-avatar-mosaic{% endif %}"
+                >
+                    {% if group.profiles %}
+                        <div class="crew-avatar-grid">
+                            {% for profile in group.profiles %}
+                                <img
+                                    src="{{ profile.avatar_url }}"
+                                    alt="{{ profile.display_name }}"
+                                    loading="lazy"
+                                    decoding="async"
+                                    onerror="this.onerror=null;this.src='/static/img/server_logo.gif';"
+                                >
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span>
+                            {{ group.title }}
+                        </span>
+                    {% endif %}
+                </div>
 
-                <h3>
-                    女陪
-                </h3>
+                <div>
+                    <small>
+                        {{ group.eyebrow }}
+                    </small>
 
-                <p>
-                    聊天、娛樂、氣氛互動
-                </p>
-            </div>
-        </div>
+                    <h3>
+                        {{ group.title }}
+                    </h3>
 
+                    <p>
+                        {{ group.description }}
+                    </p>
+                </div>
+            </a>
 
-        <div class="crew-type-card">
-            <div class="crew-figure">
-                <span>男陪</span>
-            </div>
-
-            <div>
-                <small>
-                    COMPANION
-                </small>
-
-                <h3>
-                    男陪
-                </h3>
-
-                <p>
-                    輕鬆開黑、聊天娛樂
-                </p>
-            </div>
-        </div>
-
-
-        <div class="crew-type-card">
-            <div class="crew-figure">
-                <span>護航</span>
-            </div>
-
-            <div>
-                <small>
-                    PROTECTOR
-                </small>
-
-                <h3>
-                    護航
-                </h3>
-
-                <p>
-                    有技術需求時的進階選擇
-                </p>
-            </div>
-        </div>
+        {% endfor %}
 
     </div>
 
