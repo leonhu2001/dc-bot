@@ -58,23 +58,10 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         },
         {
-            "label": "甜蜜陪",
-            "details": [
-                {"label": "單陪", "value": "single", "rule_key": "basic_sweet_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
-            ],
-        },
-        {
             "label": "體驗單",
             "details": [
                 {"label": "777w", "value": "777w", "rule_key": "basic_trial_500", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "1688w", "value": "1688w", "rule_key": "basic_trial_1000", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
-            ],
-        },
-        {
-            "label": "教學單",
-            "details": [
-                {"label": "導師1名", "value": "teacher_1", "rule_key": "basic_teaching_one", "quantity_unit": "小時", "min_quantity": 3, "max_quantity": 24},
-                {"label": "導師2名", "value": "teacher_2", "rule_key": "basic_teaching_two", "quantity_unit": "小時", "min_quantity": 3, "max_quantity": 24},
             ],
         },
         {
@@ -91,6 +78,34 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                 {"label": "火箭燃油", "value": "fuel", "rule_key": "basic_oil_fuel", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "GTI衛星通訊天線", "value": "satellite", "rule_key": "basic_oil_satellite", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
                 {"label": "全包", "value": "all", "rule_key": "basic_oil_all", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+            ],
+        },
+    ],
+    "general": [
+        {
+            "label": "甜蜜單",
+            "details": [
+                {
+                    "label": "單陪",
+                    "value": "single",
+                    "rule_key": "basic_sweet_single",
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                },
+            ],
+        },
+        {
+            "label": "教學單",
+            "details": [
+                {
+                    "label": "1對1教學",
+                    "value": "teacher_1",
+                    "rule_key": "basic_teaching_one",
+                    "quantity_unit": "小時",
+                    "min_quantity": 3,
+                    "max_quantity": 24,
+                },
             ],
         },
     ],
