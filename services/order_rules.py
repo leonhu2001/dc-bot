@@ -62,10 +62,11 @@ ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
 
 
 CATEGORY_LABELS: dict[str, str] = {
-    "basic": "基礎單",
-    "fun": "趣味單",
-    "farm": "代解代肝",
-    "steam": "Steam 陪玩",
+    "basic": "三角洲 基礎單",
+    "fun": "三角洲 趣味單",
+    "farm": "三角洲 代肝代解",
+    "general": "通用單",
+    "steam": "STEAM遊戲 陪玩",
     "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
 }
@@ -302,17 +303,26 @@ for key, label, price, staff_count in [
         specify_free_basis="quantity",
     ))
 
-for key, label, price, staff_count in [
-    ("basic_teaching_one", "教學單｜導師一名", 500, 1),
-    ("basic_teaching_two", "教學單｜導師兩名", 900, 2),
-]:
-    _add(OrderRule(
-        "basic", key, label, "hourly", price, "H",
-        allowed_roles=("top_protector",),
-        required_staff_count=staff_count,
-        min_quantity=3,
-        allow_specify=False,
-    ))
+_add(OrderRule(
+    "general",
+    "basic_teaching_one",
+    "教學單｜1對1",
+    "hourly",
+    500,
+    "H",
+    allowed_roles=("top_protector",),
+    allowed_game_roles=(
+        "lol_elite",
+        "apex_predator",
+        "valorant_radiant",
+    ),
+    required_staff_count=1,
+    min_quantity=3,
+    allow_specify=False,
+))
+
+# 舊雙導師規則不再加入 ORDER_RULES；
+# 已建立訂單仍使用建立當下保存的規則快照，不受影響。
 
 for key, label, price, staff_count in [
     ("basic_entertain_single", "娛樂陪｜單陪", 350, 1),
@@ -332,7 +342,7 @@ for key, label, price, staff_count in [
     ))
 
 _add(OrderRule(
-    "basic", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
+    "general", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
     allowed_roles=("female_protector", "female_companion"),
     required_staff_count=1,
     allow_specify=True,
@@ -892,10 +902,11 @@ def build_order_rule_snapshot(
 from dataclasses import replace as _zy_replace_order_rule
 
 CATEGORY_LABELS.update({
-    "basic": "基礎單",
-    "fun": "趣味單",
-    "farm": "代肝代解",
-    "steam": "Steam遊戲",
+    "basic": "三角洲 基礎單",
+    "fun": "三角洲 趣味單",
+    "farm": "三角洲 代肝代解",
+    "general": "通用單",
+    "steam": "STEAM遊戲 陪玩",
     "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
     "custom": "自訂",
@@ -922,12 +933,35 @@ _zy_patch_rule("basic_tech_topsecret_single", label="技術陪｜絕密單陪", 
 _zy_patch_rule("basic_tech_topsecret_double", label="技術陪｜絕密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
 _zy_patch_rule("basic_entertain_single", label="娛樂陪｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
 _zy_patch_rule("basic_entertain_double", label="娛樂陪｜雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_sweet_single", label="甜蜜陪｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule(
+    "basic_sweet_single",
+    category="general",
+    label="甜蜜陪｜單陪",
+    unit_label="H",
+    min_quantity=1,
+    max_quantity=24,
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+)
 
 _zy_patch_rule("basic_trial_500", label="體驗單｜777w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("basic_trial_1000", label="體驗單｜1688w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_teaching_one", label="教學單｜導師1名", unit_label="H", min_quantity=3, max_quantity=24, allow_specify=False)
-_zy_patch_rule("basic_teaching_two", label="教學單｜導師2名", unit_label="H", min_quantity=3, max_quantity=24, allow_specify=False)
+_zy_patch_rule(
+    "basic_teaching_one",
+    category="general",
+    label="教學單｜1對1",
+    unit_label="H",
+    min_quantity=3,
+    max_quantity=24,
+    required_staff_count=1,
+    allowed_roles=("top_protector",),
+    allowed_game_roles=(
+        "lol_elite",
+        "apex_predator",
+        "valorant_radiant",
+    ),
+    allow_specify=False,
+)
 _zy_patch_rule("basic_bet_1000", label="賭約單｜800w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("basic_bet_1500", label="賭約單｜1000w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule("basic_bet_2500", label="賭約單｜1200w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
