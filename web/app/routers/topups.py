@@ -166,7 +166,8 @@ async def member_wallet_topup_detail(request: Request, topup_id: int):
 async def member_wallet_topup_submit(
     request: Request,
     topup_id: int,
-    payment_reference: str = Form(...),
+    payment_reference: str = Form(default=""),
+    bank_last5: str = Form(default=""),
     payment_note: str = Form(default=""),
 ):
     user = _user(request)
@@ -176,7 +177,7 @@ async def member_wallet_topup_submit(
         submit_topup_payment(
             topup_id,
             customer_discord_id=str(user.get("id") or ""),
-            payment_reference=payment_reference,
+            payment_reference=payment_reference or bank_last5,
             payment_note=payment_note,
         )
     except ValueError as exc:
