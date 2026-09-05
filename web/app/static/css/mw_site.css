@@ -1951,6 +1951,39 @@ textarea {
 
     background:
         rgba(255,255,255,.018);
+
+    transition:
+        transform .25s ease,
+        border-color .25s ease,
+        background .25s ease,
+        box-shadow .25s ease;
+}
+
+
+.crew-type-card:hover,
+.crew-type-card:focus-visible {
+    transform:
+        translateY(-5px);
+
+    border-color:
+        rgba(229,194,116,.28);
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(229,194,116,.055),
+            rgba(255,255,255,.012)
+        );
+
+    box-shadow:
+        0 24px 60px rgba(0,0,0,.22);
+}
+
+
+.crew-type-card:hover .crew-avatar-grid img,
+.crew-type-card:focus-visible .crew-avatar-grid img {
+    filter:
+        brightness(1.04);
 }
 
 
