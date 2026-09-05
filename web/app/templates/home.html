@@ -305,101 +305,46 @@
 
     <div class="service-grid">
 
-        <a
-            class="service-card service-featured"
-            href="/order?view=technical"
-        >
-            <div class="service-tag">
-                POPULAR
-            </div>
+        {% for service in popular_services %}
 
-            <div class="service-art art-delta">
-                <span>
-                    DELTA
-                </span>
-            </div>
+            <a
+                class="service-card{% if loop.first %} service-featured{% endif %}"
+                href="/order?focus={{ service.key }}"
+            >
+                {% if loop.first %}
+                    <div class="service-tag">
+                        POPULAR
+                    </div>
+                {% endif %}
 
-            <div class="service-content">
-                <small>
-                    三角洲行動
-                </small>
+                <div
+                    class="service-art {% if loop.index == 1 %}art-delta{% elif loop.index == 2 %}art-fun{% else %}art-special{% endif %}"
+                >
+                    <span>
+                        TOP {{ "%02d"|format(loop.index) }}
+                    </span>
+                </div>
 
-                <h3>
-                    陪玩 / 護航
-                </h3>
+                <div class="service-content">
+                    <small>
+                        {{ service.category_label }}
+                    </small>
 
-                <p>
-                    從輕鬆娛樂到技術需求，
-                    依你的玩法安排合適人員。
-                </p>
+                    <h3>
+                        {{ service.label }}
+                    </h3>
 
-                <span class="card-link">
-                    查看方案 →
-                </span>
-            </div>
-        </a>
+                    <p>
+                        {{ service.description }}
+                    </p>
 
+                    <span class="card-link">
+                        查看方案 →
+                    </span>
+                </div>
+            </a>
 
-        <a
-            class="service-card"
-            href="/order?view=entertainment"
-        >
-            <div class="service-art art-fun">
-                <span>
-                    FUN
-                </span>
-            </div>
-
-            <div class="service-content">
-                <small>
-                    娛樂開黑
-                </small>
-
-                <h3>
-                    娛樂陪玩
-                </h3>
-
-                <p>
-                    不追求硬實力，
-                    重點是聊天、互動和氣氛。
-                </p>
-
-                <span class="card-link">
-                    查看方案 →
-                </span>
-            </div>
-        </a>
-
-
-        <a
-            class="service-card"
-            href="/order?category=fun"
-        >
-            <div class="service-art art-special">
-                <span>
-                    SPECIAL
-                </span>
-            </div>
-
-            <div class="service-content">
-                <small>
-                    魔丸限定
-                </small>
-
-                <h3>
-                    趣味單
-                </h3>
-
-                <p>
-                    嘎拉給木與不定期特色玩法，
-                    每次點單都能有不同體驗。
-                </p>
-
-                <span class="card-link">
-                    查看玩法 →
-                </span>
-            </div>
-        </a>
+        {% endfor %}
 
     </div>
 </section>
