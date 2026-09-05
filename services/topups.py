@@ -15,6 +15,11 @@ TOPUP_PAYMENT_METHODS = {
     "usdt_trc20": "USDT（TRC20）",
     "staff_confirmed": "客服確認",
 }
+CUSTOMER_TOPUP_PAYMENT_METHODS = {
+    "bank_transfer",
+    "jkopay",
+    "usdt_trc20",
+}
 
 
 def normalize_topup_payment_method(value: str | None) -> str:
@@ -127,6 +132,9 @@ def create_topup_order(
         raise ValueError("單筆儲值金額超過系統上限，請聯絡客服。")
 
     payment_method = normalize_topup_payment_method(payment_method)
+    source = str(source or "web").strip() or "web"
+    if payment_method not in CUSTOMER_TOPUP_PAYMENT_METHODS and source != "discord_staff":
+        raise ValueError("這個付款方式不開放給一般儲值單。")
 
     path = _db_path(db_file)
     now = datetime.now(TAIPEI_TZ)
@@ -146,7 +154,7 @@ def create_topup_order(
                 str(customer_display_name or "").strip() or None,
                 amount,
                 payment_method,
-                str(source or "web"),
+                source,
                 now_text,
                 now_text,
             ),
@@ -228,6 +236,7 @@ def submit_topup_payment(
         )
         conn.commit()
         return dict(conn.execute("SELECT * FROM topup_orders WHERE id=?", (int(topup_id),)).fetchone())
+
 
 def cancel_topup_order(
     topup_id: int,
