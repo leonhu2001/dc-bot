@@ -734,7 +734,7 @@ def _choose_role_key(
         for role_key
         in get_allowed_role_keys(rule)
         if str(
-            ROLE_IDS.get(
+            ALL_ROLE_IDS.get(
                 role_key
             )
         )
