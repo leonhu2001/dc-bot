@@ -17,11 +17,6 @@ def get_payment_method_info(method: str | None) -> str | None:
             "代碼：396\n"
             "帳號：900884222"
         ),
-        "USDT": (
-            "USDT（TRC20）\n"
-            "鏈種：TRC20\n"
-            "錢包地址：TYKcYmvvuMFDSsvYcUfS43FYZfDMQf8c7K"
-        ),
     }.get(str(method or ""))
 
 
