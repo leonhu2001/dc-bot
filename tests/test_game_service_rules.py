@@ -5,6 +5,7 @@ from services.order_rules import (
     ROLE_IDS,
     calculate_price,
     get_allowed_role_ids,
+    get_allowed_role_keys,
 )
 from web.app.services.checkout_preview import (
     list_point_options,
@@ -192,3 +193,101 @@ def test_hourly_point_time_benefits_keep_original_time_units():
     assert options["extra_30"]["name"] == "加時 1 小時"
     assert options["extra_30"]["kind"] == "extra_hours"
     assert options["extra_30"]["hours"] == 1
+
+
+def test_all_new_game_orders_have_exact_receiver_roles():
+    expected = {
+        "valorant_entertain_ng": (
+            "male_companion",
+            "female_companion",
+            "valorant_ascendant",
+            "valorant_immortal",
+            "valorant_radiant",
+        ),
+        "valorant_entertain_ranked": (
+            "male_companion",
+            "female_companion",
+            "valorant_ascendant",
+            "valorant_immortal",
+            "valorant_radiant",
+        ),
+        "valorant_ascendant_ng": (
+            "valorant_ascendant",
+            "valorant_immortal",
+            "valorant_radiant",
+        ),
+        "valorant_ascendant_ranked": (
+            "valorant_ascendant",
+            "valorant_immortal",
+            "valorant_radiant",
+        ),
+        "valorant_immortal_ng": (
+            "valorant_immortal",
+            "valorant_radiant",
+        ),
+        "valorant_immortal_ranked": (
+            "valorant_immortal",
+            "valorant_radiant",
+        ),
+        "valorant_radiant_ng": (
+            "valorant_radiant",
+        ),
+        "valorant_radiant_ranked": (
+            "valorant_radiant",
+        ),
+        "lol_entertain_aram": (
+            "male_companion",
+            "female_companion",
+            "lol_master",
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_entertain_ng": (
+            "male_companion",
+            "female_companion",
+            "lol_master",
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_entertain_ranked": (
+            "male_companion",
+            "female_companion",
+            "lol_master",
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_master_ng": (
+            "lol_master",
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_master_ranked": (
+            "lol_master",
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_grandmaster_ng": (
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_grandmaster_ranked": (
+            "lol_grandmaster",
+            "lol_elite",
+        ),
+        "lol_elite_ng": (
+            "lol_elite",
+        ),
+        "lol_elite_ranked": (
+            "lol_elite",
+        ),
+    }
+
+    for rule_key, expected_keys in expected.items():
+        actual_keys = get_allowed_role_keys(ORDER_RULES[rule_key])
+        assert actual_keys == expected_keys, rule_key
+
+        # LOL / 特戰英豪 orders must never inherit any APEX rank.
+        assert not any(
+            role_key.startswith("apex_")
+            for role_key in actual_keys
+        ), rule_key
