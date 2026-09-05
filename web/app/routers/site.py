@@ -20,6 +20,7 @@ from web.app.services.site_data import (
     get_member_summary,
     get_order_categories,
     list_order_catalog,
+    get_popular_order_groups,
     get_public_staff,
     get_public_staff_role_filters,
     list_public_staff,
@@ -182,6 +183,11 @@ async def home(
             request,
             title="魔丸娛樂｜首頁",
             page_name="home",
+            popular_services=(
+                get_popular_order_groups(
+                    limit=3
+                )
+            ),
         ),
     )
 
@@ -227,6 +233,7 @@ async def public_order(
     category: str = "all",
     staff: str | None = None,
     view: str | None = None,
+    focus: str | None = None,
 ):
     user = get_current_user(request)
     customer_id = str(user.get("id") or "") if user else None
@@ -240,7 +247,39 @@ async def public_order(
     category_filter = category
     all_groups = get_grouped_order_catalog("all")
 
-    if view_key == "technical":
+    focus_key = str(
+        focus
+        or ""
+    ).strip()
+
+    focused_groups = [
+        group
+        for group
+        in all_groups
+        if str(
+            group.get(
+                "key"
+            )
+            or ""
+        )
+        == focus_key
+    ]
+
+    if (
+        focus_key
+        and focused_groups
+    ):
+        groups = focused_groups
+        category_filter = str(
+            focused_groups[
+                0
+            ].get(
+                "category"
+            )
+            or "all"
+        )
+
+    elif view_key == "technical":
         excluded_group_keys = {
             "exbar_gamble",
             "teaching",
@@ -1349,9 +1388,25 @@ async def public_staff(
     role: str = "all",
 ):
     # === PHASE 3B-2.6 ROSTER SYNC ===
+    from web.app.services.staff_service import (
+        refresh_staff_members_if_stale,
+    )
     from web.app.services.staff_roster_sync import (
         ensure_staff_roster_profiles,
     )
+
+    try:
+        refresh_staff_members_if_stale(
+            max_age_seconds=60
+        )
+    except Exception as exc:
+        print(
+            "[public_staff_sync]",
+            repr(
+                exc
+            ),
+        )
+
     ensure_staff_roster_profiles()
     # === /PHASE 3B-2.6 ROSTER SYNC ===
     user = get_current_user(
@@ -1409,9 +1464,25 @@ async def public_staff_detail(
     staff_id: str,
 ):
     # === PHASE 3B-2.6 ROSTER SYNC ===
+    from web.app.services.staff_service import (
+        refresh_staff_members_if_stale,
+    )
     from web.app.services.staff_roster_sync import (
         ensure_staff_roster_profiles,
     )
+
+    try:
+        refresh_staff_members_if_stale(
+            max_age_seconds=60
+        )
+    except Exception as exc:
+        print(
+            "[public_staff_detail_sync]",
+            repr(
+                exc
+            ),
+        )
+
     ensure_staff_roster_profiles()
     # === /PHASE 3B-2.6 ROSTER SYNC ===
     user = get_current_user(
