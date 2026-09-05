@@ -2353,17 +2353,31 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
             placeholder = "請先選擇訂單類別"
         else:
             group_options = ORDER_ITEM_GROUPS_BY_CATEGORY.get(selected_category, [])
-            options = [
-                discord.SelectOption(
-                    label=str(group_label)[:100],
-                    value=str(group_label)[:100],
-                    description=ORDER_CATEGORY_LABELS.get(selected_category, selected_category)[:100],
-                    default=str(group_label) == str(selected_group),
-                )
-                for group_label in group_options[:25]
-            ]
-            disabled = not bool(options)
-            placeholder = "請選擇訂單項目" if options else "此類別目前沒有可用品項"
+
+            if group_options:
+                options = [
+                    discord.SelectOption(
+                        label=str(group_label)[:100],
+                        value=str(group_label)[:100],
+                        description=ORDER_CATEGORY_LABELS.get(selected_category, selected_category)[:100],
+                        default=str(group_label) == str(selected_group),
+                    )
+                    for group_label in group_options[:25]
+                ]
+                disabled = False
+                placeholder = "請選擇訂單項目"
+            else:
+                # Discord Select 即使 disabled 也必須至少有 1 個 option；
+                # 不能傳 options=[]，否則 API 會回 50035 Invalid Form Body。
+                options = [
+                    discord.SelectOption(
+                        label="此類別目前沒有可用品項",
+                        value="no_items",
+                        description="請改選其他訂單類別",
+                    )
+                ]
+                disabled = True
+                placeholder = "此類別目前沒有可用品項"
 
         super().__init__(
             placeholder=placeholder,
