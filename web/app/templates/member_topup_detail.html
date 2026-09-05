@@ -33,14 +33,7 @@
       <strong>街口支付</strong>
       <strong>代碼：396</strong>
       <strong>帳號：900884222</strong>
-      <span style="opacity:.72">付款後請填寫街口交易序號、付款人名稱或其他可辨識資訊，客服確認後才會正式入帳。</span>
-    </div>
-    {% elif topup.payment_method == 'usdt_trc20' %}
-    <div style="display:grid;gap:10px;margin-bottom:18px">
-      <strong>USDT</strong>
-      <strong>鏈種：TRC20</strong>
-      <strong style="word-break:break-all">錢包地址：TYKcYmvvuMFDSsvYcUfS43FYZfDMQf8c7K</strong>
-      <span style="opacity:.72">請只使用 TRC20。儲值單金額以 T 顯示，實際 USDT 數量請先依客服當下換算確認後再轉帳；完成後填寫 64 位交易 TXID。</span>
+      <span style="opacity:.72">付款完成後填寫付款街口帳號末五碼，客服確認後才會正式入帳。</span>
     </div>
     {% endif %}
 
@@ -48,9 +41,7 @@
       {% if topup.payment_method == 'bank_transfer' %}
       <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="銀行帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
       {% elif topup.payment_method == 'jkopay' %}
-      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" maxlength="100" required placeholder="街口交易序號 / 付款人名稱" style="min-height:48px;padding:0 14px;border-radius:12px">
-      {% elif topup.payment_method == 'usdt_trc20' %}
-      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" minlength="64" maxlength="64" required placeholder="64 位交易 TXID" style="min-height:48px;padding:0 14px;border-radius:12px">
+      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="街口帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
       {% else %}
       <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" maxlength="100" required placeholder="付款辨識資訊" style="min-height:48px;padding:0 14px;border-radius:12px">
       {% endif %}

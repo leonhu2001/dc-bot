@@ -14,7 +14,6 @@ from services.topups import (
 _PAYMENT_INFO_KEYS = {
     "bank_transfer": "轉帳",
     "jkopay": "街口",
-    "usdt_trc20": "USDT",
 }
 
 
@@ -27,12 +26,7 @@ def _payment_instruction(payment_method: str) -> str:
     if payment_method == "bank_transfer":
         return "付款完成後請點下方「我已付款」，填寫銀行帳號末五碼。"
     if payment_method == "jkopay":
-        return "付款完成後請點下方「我已付款」，填寫街口交易序號、付款人名稱或其他可辨識資訊。"
-    if payment_method == "usdt_trc20":
-        return (
-            "請只使用 TRC20。儲值單金額以 T 顯示，實際 USDT 數量請先依客服當下換算確認後再轉帳。\n"
-            "付款完成後請點下方「我已付款」，填寫 64 位交易 TXID。"
-        )
+        return "付款完成後請點下方「我已付款」，填寫付款街口帳號末五碼。"
     return "付款完成後請點下方「我已付款」回報付款資料。"
 
 
@@ -73,7 +67,7 @@ class TopupAmountModal(discord.ui.Modal, title="魔丸娛樂儲值"):
             title="選擇儲值付款方式",
             description=(
                 f"儲值金額：**{value:,}T**\n\n"
-                "請選擇這筆儲值要使用的付款方式。"
+                "請從下拉選單選擇這筆儲值要使用的付款方式。"
             ),
             color=discord.Color.gold(),
         )
@@ -114,17 +108,31 @@ class TopupPaymentMethodView(discord.ui.View):
             view=TopupOrderView(int(order["id"]), payment_method),
         )
 
-    @discord.ui.button(label="銀行轉帳", style=discord.ButtonStyle.primary, emoji="🏦")
-    async def bank_transfer(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._create(interaction, "bank_transfer")
-
-    @discord.ui.button(label="街口支付", style=discord.ButtonStyle.primary, emoji="📱")
-    async def jkopay(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._create(interaction, "jkopay")
-
-    @discord.ui.button(label="USDT TRC20", style=discord.ButtonStyle.primary, emoji="🪙")
-    async def usdt(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._create(interaction, "usdt_trc20")
+    @discord.ui.select(
+        placeholder="選擇付款方式",
+        min_values=1,
+        max_values=1,
+        options=[
+            discord.SelectOption(
+                label="銀行轉帳",
+                value="bank_transfer",
+                emoji="🏦",
+                description="國泰世華 013",
+            ),
+            discord.SelectOption(
+                label="街口支付",
+                value="jkopay",
+                emoji="📱",
+                description="街口帳號 900884222",
+            ),
+        ],
+    )
+    async def payment_method_select(
+        self,
+        interaction: discord.Interaction,
+        select: discord.ui.Select,
+    ):
+        await self._create(interaction, str(select.values[0]))
 
 
 class TopupPaymentModal(discord.ui.Modal):
@@ -133,26 +141,17 @@ class TopupPaymentModal(discord.ui.Modal):
         self.topup_id = int(topup_id)
         self.payment_method = str(payment_method or "bank_transfer")
 
-        if self.payment_method == "bank_transfer":
+        if self.payment_method in {"bank_transfer", "jkopay"}:
+            label = (
+                "銀行帳號末五碼"
+                if self.payment_method == "bank_transfer"
+                else "街口帳號末五碼"
+            )
             self.reference = discord.ui.TextInput(
-                label="銀行帳號末五碼",
+                label=label,
                 placeholder="12345",
                 min_length=5,
                 max_length=5,
-            )
-        elif self.payment_method == "jkopay":
-            self.reference = discord.ui.TextInput(
-                label="街口付款辨識資訊",
-                placeholder="交易序號 / 付款人名稱",
-                min_length=1,
-                max_length=100,
-            )
-        elif self.payment_method == "usdt_trc20":
-            self.reference = discord.ui.TextInput(
-                label="交易 TXID",
-                placeholder="64 位 TRC20 交易 TXID",
-                min_length=64,
-                max_length=64,
             )
         else:
             self.reference = discord.ui.TextInput(

@@ -67,7 +67,7 @@ def test_topup_order_review_flow(tmp_path: Path):
     assert stored["status"] == "approved_pending_credit"
 
 
-def test_jkopay_and_usdt_payment_references(tmp_path: Path):
+def test_jkopay_uses_account_last_five_digits(tmp_path: Path):
     db_file = tmp_path / "payment_methods.db"
 
     jko = create_topup_order(
@@ -81,29 +81,10 @@ def test_jkopay_and_usdt_payment_references(tmp_path: Path):
     jko = submit_topup_payment(
         int(jko["id"]),
         customer_discord_id="111",
-        payment_reference="交易序號 ABC123",
+        payment_reference="88422",
         db_file=db_file,
     )
     assert jko["status"] == "pending_review"
     assert jko["payment_method"] == "jkopay"
-    assert jko["payment_reference"] == "交易序號 ABC123"
-    assert jko["bank_last5"] is None
-
-    usdt = create_topup_order(
-        customer_discord_id="222",
-        customer_display_name="USDT Boss",
-        amount=5000,
-        source="discord",
-        payment_method="usdt_trc20",
-        db_file=db_file,
-    )
-    txid = "a" * 64
-    usdt = submit_topup_payment(
-        int(usdt["id"]),
-        customer_discord_id="222",
-        payment_reference=txid,
-        db_file=db_file,
-    )
-    assert usdt["status"] == "pending_review"
-    assert usdt["payment_method"] == "usdt_trc20"
-    assert usdt["payment_reference"] == txid
+    assert jko["payment_reference"] == "88422"
+    assert jko["bank_last5"] == "88422"

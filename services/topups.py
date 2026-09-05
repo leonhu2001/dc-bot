@@ -12,13 +12,11 @@ TAIPEI_TZ = timezone(timedelta(hours=8))
 TOPUP_PAYMENT_METHODS = {
     "bank_transfer": "銀行轉帳",
     "jkopay": "街口支付",
-    "usdt_trc20": "USDT（TRC20）",
     "staff_confirmed": "客服確認",
 }
 CUSTOMER_TOPUP_PAYMENT_METHODS = {
     "bank_transfer",
     "jkopay",
-    "usdt_trc20",
 }
 
 
@@ -38,8 +36,7 @@ def topup_payment_reference_label(value: str | None) -> str:
     method = str(value or "bank_transfer").strip()
     return {
         "bank_transfer": "銀行帳號末五碼",
-        "jkopay": "街口付款辨識資訊",
-        "usdt_trc20": "交易 TXID",
+        "jkopay": "街口帳號末五碼",
         "staff_confirmed": "客服確認",
     }.get(method, "付款辨識資訊")
 
@@ -198,22 +195,13 @@ def submit_topup_payment(
         ).strip()
 
         legacy_bank_last5 = None
-        if method == "bank_transfer":
+        if method in {"bank_transfer", "jkopay"}:
             digits = "".join(ch for ch in reference if ch.isdigit())
             if len(digits) != 5:
-                raise ValueError("銀行帳號末五碼請輸入 5 位數字。")
+                label = "銀行帳號末五碼" if method == "bank_transfer" else "街口帳號末五碼"
+                raise ValueError(f"{label}請輸入 5 位數字。")
             reference = digits
             legacy_bank_last5 = digits
-        elif method == "jkopay":
-            if not reference:
-                raise ValueError("請填寫街口交易序號、付款人名稱或其他可辨識資訊。")
-            if len(reference) > 100:
-                raise ValueError("街口付款辨識資訊請控制在 100 字內。")
-        elif method == "usdt_trc20":
-            if len(reference) != 64 or not all(
-                ch in "0123456789abcdefABCDEF" for ch in reference
-            ):
-                raise ValueError("USDT TRC20 的交易 TXID 應為 64 位十六進位字元。")
         else:
             if not reference:
                 raise ValueError("請填寫付款辨識資訊。")
