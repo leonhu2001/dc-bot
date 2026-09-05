@@ -139,6 +139,99 @@ def upsert_staff_member(
     return member
 
 
+
+def refresh_staff_members_if_stale(
+    max_age_seconds: int = 60,
+) -> dict:
+    """
+    Refresh the Discord staff snapshot on demand, but no more often
+    than max_age_seconds.  This keeps the public roster current without
+    hitting the Discord member-list endpoint on every page view.
+    """
+    db = SessionLocal()
+
+    try:
+        latest = db.execute(
+            select(
+                WebStaffMember.last_synced_at
+            )
+            .where(
+                WebStaffMember.last_synced_at
+                .is_not(
+                    None
+                )
+            )
+            .order_by(
+                WebStaffMember.last_synced_at
+                .desc()
+            )
+            .limit(
+                1
+            )
+        ).scalar_one_or_none()
+
+        now = datetime.utcnow()
+
+        if latest is not None:
+            age_seconds = (
+                now - latest
+            ).total_seconds()
+
+            if (
+                age_seconds
+                < max(
+                    10,
+                    int(
+                        max_age_seconds
+                        or 60
+                    ),
+                )
+            ):
+                return {
+                    "refreshed":
+                        False,
+                    "age_seconds":
+                        max(
+                            0,
+                            int(
+                                age_seconds
+                            ),
+                        ),
+                }
+
+        result = (
+            sync_staff_members_from_discord(
+                db
+            )
+        )
+
+        db.commit()
+
+        return {
+            "refreshed":
+                True,
+            **(
+                result
+                if isinstance(
+                    result,
+                    dict,
+                )
+                else {}
+            ),
+        }
+
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        raise
+
+    finally:
+        db.close()
+
+
 def sync_staff_members_from_discord(db=None) -> dict:
     owns_session = db is None
 
