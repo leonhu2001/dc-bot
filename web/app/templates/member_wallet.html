@@ -17,6 +17,12 @@
       <form method="post" action="/me/wallet/topup" style="display:grid;gap:14px">
         <label>儲值金額</label>
         <input name="amount" type="number" min="1" max="1000000" step="1" required placeholder="例如 12000" style="min-height:48px;padding:0 14px;border-radius:12px">
+        <label>付款方式</label>
+        <select name="payment_method" required style="min-height:48px;padding:0 14px;border-radius:12px">
+          <option value="bank_transfer">銀行轉帳</option>
+          <option value="jkopay">街口支付</option>
+          <option value="usdt_trc20">USDT（TRC20）</option>
+        </select>
         <p style="opacity:.72;margin:0">儲值本金會立即計入 VIP 進度；若本筆儲值後達成回饋等級，本筆就直接套用新等級返利。</p>
         <button class="discord-login" type="submit" style="justify-content:center">建立儲值單</button>
       </form>
@@ -28,7 +34,7 @@
       <div class="member-order-list">
         {% for topup in topups %}
         <a class="member-order-row" href="/me/wallet/topup/{{ topup.id }}" style="text-decoration:none;color:inherit">
-          <div><small>{{ topup.topup_no }}</small><strong>{{ topup.amount_text }}</strong><span>{{ topup.status_label }}</span></div>
+          <div><small>{{ topup.topup_no }}</small><strong>{{ topup.amount_text }}</strong><span>{{ topup.payment_method_label }}｜{{ topup.status_label }}</span></div>
           <div class="member-order-meta"><strong>查看 →</strong></div>
         </a>
         {% endfor %}
