@@ -202,13 +202,40 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         },
     ],
     "valorant": [
-        {
-            "label": "娛樂陪",
-            "details": [
-                {"label": f"陪玩{count}名", "value": f"players_{count}", "rule_key": "valorant_entertain", "player_count": count, "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24}
-                for count in range(1, 5)
-            ],
-        },
+        {"label": "娛樂陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","valorant_entertain_ng"),("積分","ranked","valorant_entertain_ranked")) for count in range(1,5)
+        ]},
+        {"label": "超凡陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","valorant_ascendant_ng"),("積分","ranked","valorant_ascendant_ranked")) for count in range(1,5)
+        ]},
+        {"label": "神話陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","valorant_immortal_ng"),("積分","ranked","valorant_immortal_ranked")) for count in range(1,5)
+        ]},
+        {"label": "輻能陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","valorant_radiant_ng"),("積分","ranked","valorant_radiant_ranked")) for count in range(1,5)
+        ]},
+    ],
+    "lol": [
+        {"label": "娛樂陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": u, "min_quantity": 1, "max_quantity": 24}
+            for m, v, k, u in (("ARAM","aram","lol_entertain_aram","小時"),("NG","ng","lol_entertain_ng","局"),("積分","ranked","lol_entertain_ranked","局")) for count in range(1,5)
+        ]},
+        {"label": "大師陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","lol_master_ng"),("積分","ranked","lol_master_ranked")) for count in range(1,5)
+        ]},
+        {"label": "宗師陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","lol_grandmaster_ng"),("積分","ranked","lol_grandmaster_ranked")) for count in range(1,5)
+        ]},
+        {"label": "菁英陪", "details": [
+            {"label": f"{m}｜陪玩{count}名", "value": f"{v}_{count}", "rule_key": k, "player_count": count, "quantity_unit": "局", "min_quantity": 1, "max_quantity": 24}
+            for m, v, k in (("NG","ng","lol_elite_ng"),("積分","ranked","lol_elite_ranked")) for count in range(1,5)
+        ]},
     ],
     "custom": [
         {
@@ -228,6 +255,9 @@ CATALOG_HIDDEN_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "valorant_entertain",
+    "valorant_tech",
+    "valorant_top_tech",
 }
 
 ORDER_ITEMS_BY_CATEGORY = {

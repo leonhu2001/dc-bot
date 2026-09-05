@@ -5457,7 +5457,7 @@ def _is_specify_preference(value: str | None) -> bool:
 
 
 def _role_key_for_member(rule, member: discord.Member):
-    from services.order_rules import ROLE_IDS
+    from services.order_rules import ALL_ROLE_IDS, get_allowed_role_keys
 
     member_role_ids = {
         str(role.id)
@@ -5467,14 +5467,17 @@ def _role_key_for_member(rule, member: discord.Member):
 
     matched = [
         role_key
-        for role_key in rule.allowed_roles
-        if str(ROLE_IDS.get(role_key)) in member_role_ids
+        for role_key in get_allowed_role_keys(rule)
+        if str(ALL_ROLE_IDS.get(role_key)) in member_role_ids
     ]
 
     if not matched:
         return None
 
-    fee_map = getattr(rule, "specify_fee_by_role", {}) or {}
+    fee_map = {
+        **(getattr(rule, "specify_fee_by_role", {}) or {}),
+        **(getattr(rule, "specify_fee_by_game_role", {}) or {}),
+    }
     matched.sort(key=lambda role_key: int(fee_map.get(role_key, getattr(rule, "specify_fee_default", 0) or 0)), reverse=True)
     return matched[0]
 
@@ -5998,11 +6001,11 @@ async def create_waiting_acceptance_order_from_self_service(
     rule = _get_rule_from_self_service_data(data)
 
     from services.order_rules import (
-        ROLE_IDS,
         calculate_price,
+        get_allowed_role_ids,
         get_required_staff_count,
         build_order_rule_snapshot,
-        role_labels,
+        rule_role_labels,
     )
     from shared.order_acceptance import WAITING_ACCEPTANCE, create_or_update_acceptance_meta
     from shared.web_order_sync import upsert_web_order_from_dispatch
@@ -6029,7 +6032,7 @@ async def create_waiting_acceptance_order_from_self_service(
     price_adjustment = apply_self_service_financials_to_order_data(data, rule, price_result)
     amount = int(price_adjustment["customer_pay_amount"] or 0)
     payout_base_amount = int(price_adjustment["payout_base_amount"] or amount)
-    allowed_role_ids_for_rule = [str(ROLE_IDS[role_key]) for role_key in rule.allowed_roles]
+    allowed_role_ids_for_rule = get_allowed_role_ids(rule)
 
     rule_snapshot = build_order_rule_snapshot(
         rule,
@@ -6152,7 +6155,7 @@ async def create_waiting_acceptance_order_from_self_service(
 
     embed.add_field(
         name="可接職位",
-        value=role_labels(rule.allowed_roles),
+        value=rule_role_labels(rule),
         inline=False,
     )
 
@@ -6277,7 +6280,7 @@ async def create_waiting_acceptance_order_from_self_service(
         order_rule_key=rule.key,
         required_staff_count=required_staff_count,
         min_protector_count=int(rule.min_protector_count or 0),
-        allowed_role_ids=[ROLE_IDS[role_key] for role_key in rule.allowed_roles],
+        allowed_role_ids=allowed_role_ids_for_rule,
         specified_staff_ids=specified_staff_ids,
         point_benefits_allowed=bool(rule.point_benefits_allowed),
         status=WAITING_ACCEPTANCE,
@@ -6861,9 +6864,10 @@ def _truncate_select_text(value: str, limit: int = 100) -> str:
 
 
 def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dict]:
-    from services.order_rules import ROLE_IDS
+    from services.order_rules import ALL_ROLE_IDS, ALL_ROLE_LABELS, get_allowed_role_keys
 
     entries = []
+    allowed_role_keys = list(get_allowed_role_keys(rule))
 
     for member in guild.members:
         if getattr(member, "bot", False):
@@ -6877,21 +6881,24 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
 
         matched_role_keys = [
             role_key
-            for role_key in rule.allowed_roles
-            if str(ROLE_IDS.get(role_key)) in member_role_ids
+            for role_key in allowed_role_keys
+            if str(ALL_ROLE_IDS.get(role_key)) in member_role_ids
         ]
 
         if not matched_role_keys:
             continue
 
         display_role_key = _role_key_for_member(rule, member) or matched_role_keys[0]
-        role_label = SPECIFIED_STAFF_ROLE_LABELS.get(display_role_key, display_role_key)
+        role_label = (
+            SPECIFIED_STAFF_ROLE_LABELS.get(display_role_key)
+            or ALL_ROLE_LABELS.get(display_role_key, display_role_key)
+        )
 
         entries.append({
             "id": str(member.id),
             "label": _truncate_select_text(getattr(member, "display_name", None) or getattr(member, "name", None) or str(member.id)),
             "description": _truncate_select_text(role_label),
-            "role_order": list(rule.allowed_roles).index(display_role_key) if display_role_key in rule.allowed_roles else 999,
+            "role_order": allowed_role_keys.index(display_role_key) if display_role_key in allowed_role_keys else 999,
         })
 
     entries.sort(key=lambda item: (item["role_order"], item["label"].casefold(), item["id"]))
@@ -7152,8 +7159,8 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
 
-    if category in {"steam", "valorant"}:
-        return False, "Steam / Valorant 不可使用點數福利。"
+    if category in {"steam", "valorant", "lol"}:
+        return False, "Steam / Valorant / 英雄聯盟不可使用點數福利。"
 
     if category in {"fun", "title"}:
         return False, "趣味單 / 高難度稱號不可使用點數福利。"

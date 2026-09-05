@@ -10,9 +10,12 @@ from services.order_flow import (
 )
 
 from services.order_rules import (
+    ALL_ROLE_IDS,
+    ALL_ROLE_LABELS,
     ORDER_RULES,
     ROLE_IDS,
     calculate_price,
+    get_allowed_role_keys,
     get_required_staff_count,
 )
 
@@ -729,7 +732,7 @@ def _choose_role_key(
     matched = [
         role_key
         for role_key
-        in rule.allowed_roles
+        in get_allowed_role_keys(rule)
         if str(
             ROLE_IDS.get(
                 role_key
@@ -743,10 +746,10 @@ def _choose_role_key(
         return None
 
 
-    fee_map = (
-        rule.specify_fee_by_role
-        or {}
-    )
+    fee_map = {
+        **(rule.specify_fee_by_role or {}),
+        **(getattr(rule, "specify_fee_by_game_role", {}) or {}),
+    }
 
 
     # Match current Discord self-service logic:
@@ -965,6 +968,9 @@ def list_eligible_staff(
 
                 "role_label":
                     PUBLIC_ROLE_LABELS.get(
+                        role_key
+                    )
+                    or ALL_ROLE_LABELS.get(
                         role_key,
                         role_key,
                     ),
@@ -1221,6 +1227,7 @@ def point_item_status(
     if category in {
         "steam",
         "valorant",
+        "lol",
     }:
 
         return {
@@ -1228,7 +1235,7 @@ def point_item_status(
                 False,
 
             "reason":
-                "Steam / Valorant 不可使用點數福利。",
+                "Steam / Valorant / 英雄聯盟不可使用點數福利。",
         }
 
 
@@ -2349,6 +2356,9 @@ PUBLIC_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "valorant_entertain",
+    "valorant_tech",
+    "valorant_top_tech",
 }
 
 
@@ -2377,7 +2387,7 @@ def _role_keys_from_discord_ids(
 
 
     for role_key, role_id in (
-        ROLE_IDS.items()
+        ALL_ROLE_IDS.items()
     ):
 
         if (
@@ -2600,7 +2610,7 @@ def eligible_rule_keys_for_role_keys(
         if (
             role_set
             & set(
-                rule.allowed_roles
+                get_allowed_role_keys(rule)
             )
         ):
 
@@ -2971,7 +2981,7 @@ def build_staff_order_filter(
 
                 "allowed_roles":
                     list(
-                        rule.allowed_roles
+                        get_allowed_role_keys(rule)
                     ),
 
                 "allow_specify":
@@ -3033,6 +3043,9 @@ MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "valorant_entertain",
+    "valorant_tech",
+    "valorant_top_tech",
 }
 
 
@@ -3126,10 +3139,38 @@ MW_ORDER_GROUP_FALLBACKS = {
         "steam_play",
     ],
 
-    "Valorant": [
-        "valorant_entertain",
-        "valorant_tech",
-        "valorant_top_tech",
+    "Valorant 娛樂陪": [
+        "valorant_entertain_ng",
+        "valorant_entertain_ranked",
+    ],
+    "Valorant 超凡陪": [
+        "valorant_ascendant_ng",
+        "valorant_ascendant_ranked",
+    ],
+    "Valorant 神話陪": [
+        "valorant_immortal_ng",
+        "valorant_immortal_ranked",
+    ],
+    "Valorant 輻能陪": [
+        "valorant_radiant_ng",
+        "valorant_radiant_ranked",
+    ],
+    "英雄聯盟 娛樂陪": [
+        "lol_entertain_aram",
+        "lol_entertain_ng",
+        "lol_entertain_ranked",
+    ],
+    "英雄聯盟 大師陪": [
+        "lol_master_ng",
+        "lol_master_ranked",
+    ],
+    "英雄聯盟 宗師陪": [
+        "lol_grandmaster_ng",
+        "lol_grandmaster_ranked",
+    ],
+    "英雄聯盟 菁英陪": [
+        "lol_elite_ng",
+        "lol_elite_ranked",
     ],
 }
 
@@ -3159,7 +3200,7 @@ def _mw25_role_keys_from_ids(
 
 
     for role_key, role_id in (
-        ROLE_IDS.items()
+        ALL_ROLE_IDS.items()
     ):
 
         if (
@@ -3321,7 +3362,7 @@ def mw25_eligible_rule_keys_for_roles(
         if (
             role_set
             & set(
-                rule.allowed_roles
+                get_allowed_role_keys(rule)
             )
         ):
 
@@ -3728,7 +3769,7 @@ def build_staff_order_filter(
 
             "allowed_roles":
                 list(
-                    rule.allowed_roles
+                    get_allowed_role_keys(rule)
                 ),
 
             "allow_specify":

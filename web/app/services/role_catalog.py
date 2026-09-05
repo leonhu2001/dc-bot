@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from services.game_roles import GAME_ROLE_LABEL_BY_ID, game_role_labels_from_role_ids
+from services.game_roles import (
+    GAME_ROLES,
+    GAME_ROLE_IDS,
+    GAME_ROLE_LABEL_BY_ID,
+    game_role_labels_from_role_ids,
+)
 
 
 CUSTOMER_SERVICE_ROLE_ID = "1482084782031638548"
@@ -48,6 +53,10 @@ STAFF_ROLE_FILTERS = [
     *[
         {"value": role.role_id, "label": role.label}
         for role in RECEIVER_ROLES
+    ],
+    *[
+        {"value": role.role_id, "label": role.label}
+        for role in GAME_ROLES
     ],
 ]
 
@@ -101,11 +110,16 @@ def is_receiver(role_ids) -> bool:
     return bool(normalize_role_ids(role_ids) & RECEIVER_ROLE_IDS)
 
 
+def is_game_receiver(role_ids) -> bool:
+    return bool(normalize_role_ids(role_ids) & GAME_ROLE_IDS)
+
+
 def can_login_dashboard(role_ids, *, admin_role_ids=None, customer_service_role_ids=None) -> bool:
     role_set = normalize_role_ids(role_ids)
 
     is_admin = bool(role_set & normalize_role_ids(admin_role_ids))
     is_cs = is_customer_service(role_set, customer_service_role_ids)
     is_staff_receiver = is_receiver(role_set)
+    is_game_staff_receiver = is_game_receiver(role_set)
 
-    return is_admin or is_cs or is_staff_receiver
+    return is_admin or is_cs or is_staff_receiver or is_game_staff_receiver

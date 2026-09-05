@@ -9,6 +9,7 @@ from web.app.services.role_catalog import (
     can_login_dashboard,
     is_companion as catalog_is_companion,
     is_customer_service as catalog_is_customer_service,
+    is_game_receiver,
     is_protector,
     normalize_role_ids,
 )
@@ -82,7 +83,7 @@ def get_dashboard_access(role_ids: list[str]) -> dict:
 
     is_admin = bool(roles & admin_role_ids)
     is_customer_service = catalog_is_customer_service(roles, customer_service_role_ids)
-    is_worker = is_protector(roles) or catalog_is_companion(roles)
+    is_worker = is_protector(roles) or catalog_is_companion(roles) or is_game_receiver(roles)
     is_companion = catalog_is_companion(roles)
     can_access = can_login_dashboard(
         roles,

@@ -8,6 +8,7 @@ from services.order_rules import (
     ORDER_RULES,
     ROLE_LABELS,
     calculate_price,
+    get_allowed_role_labels,
 )
 
 
@@ -16,6 +17,9 @@ PUBLIC_DISABLED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
+    "valorant_entertain",
+    "valorant_tech",
+    "valorant_top_tech",
 }
 
 
@@ -462,7 +466,9 @@ def build_public_quote(
             ),
 
         "service_quantity":
-            quantity_value,
+            int(
+                result.service_quantity
+            ),
 
         "base_amount":
             base_amount,
@@ -490,13 +496,10 @@ def build_public_quote(
         "customer_adjustments":
             adjustment_details,
 
-        "allowed_roles": [
-            _public_role_label(
-                role
-            )
-            for role
-            in rule.allowed_roles
-        ],
+        "allowed_roles":
+            get_allowed_role_labels(
+                rule
+            ),
 
         "allow_specify":
             bool(

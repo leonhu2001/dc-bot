@@ -243,7 +243,19 @@ async def public_order(
         groups = [g for g in get_grouped_order_catalog("all") if str(g.get("label") or "") in wanted_labels]
         category_filter = "all"
     elif view_key == "entertainment":
-        wanted_labels = {"娛樂陪", "甜蜜單", "Steam 陪玩", "Valorant 陪玩"}
+        wanted_labels = {
+            "娛樂陪",
+            "甜蜜單",
+            "Steam 陪玩",
+            "Valorant｜娛樂陪",
+            "Valorant｜超凡陪",
+            "Valorant｜神話陪",
+            "Valorant｜輻能陪",
+            "英雄聯盟｜娛樂陪",
+            "英雄聯盟｜大師陪",
+            "英雄聯盟｜宗師陪",
+            "英雄聯盟｜菁英陪",
+        }
         groups = [g for g in get_grouped_order_catalog("all") if str(g.get("label") or "") in wanted_labels]
         category_filter = "all"
     else:

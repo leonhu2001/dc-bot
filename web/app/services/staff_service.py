@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
 from shared.staff_models import WebStaffMember
+from services.game_roles import GAME_ROLE_IDS
 from web.app.config import config
 from web.app.services.role_catalog import (
     CUSTOMER_SERVICE_ROLE_ID,
@@ -95,7 +96,7 @@ def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
     )
 
     is_customer_service = catalog_is_customer_service(role_set, customer_service_role_ids)
-    is_worker = is_protector(role_set) or catalog_is_companion(role_set)
+    is_worker = is_protector(role_set) or catalog_is_companion(role_set) or bool(role_set & GAME_ROLE_IDS)
     is_companion = catalog_is_companion(role_set)
 
     return is_customer_service, is_worker, is_companion
@@ -210,10 +211,12 @@ def sync_staff_members_from_discord(db=None) -> dict:
         latest_role_ids_by_member[discord_id] = role_ids
         is_customer_service = bool(role_ids & customer_service_role_ids)
         is_receiver = bool(role_ids & RECEIVER_ROLE_IDS)
+        is_game_receiver = bool(role_ids & GAME_ROLE_IDS)
+        is_worker = bool(is_receiver or is_game_receiver)
         is_companion = bool(role_ids & COMPANION_ROLE_IDS)
 
-        # 網頁只收客服與五個新接單身分組。
-        if not (is_customer_service or is_receiver or is_companion):
+        # 網頁收客服、舊服務職位，以及獨立的遊戲階級接單身分組。
+        if not (is_customer_service or is_worker or is_companion):
             continue
 
         active_ids.add(discord_id)
@@ -234,7 +237,7 @@ def sync_staff_members_from_discord(db=None) -> dict:
         member.avatar = user.get("avatar")
         member.roles_json = json.dumps(sorted(role_ids), ensure_ascii=False)
         member.is_customer_service = is_customer_service
-        member.is_worker = is_receiver
+        member.is_worker = is_worker
         member.is_companion = is_companion
         member.is_active = True
         member.last_synced_at = now

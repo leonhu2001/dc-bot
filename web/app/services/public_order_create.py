@@ -16,6 +16,7 @@ from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
     ROLE_IDS,
+    get_allowed_role_ids,
 )
 from shared.models import (
     SyncEvent,
@@ -992,23 +993,9 @@ def _write_acceptance_meta(
     )
 
 
-    allowed_role_ids = [
-        str(
-            ROLE_IDS[
-                role_key
-            ]
-        )
-
-        for role_key
-        in getattr(
-            rule,
-            "allowed_roles",
-            ()
-        )
-
-        if role_key
-        in ROLE_IDS
-    ]
+    allowed_role_ids = get_allowed_role_ids(
+        rule
+    )
 
 
     now = (
