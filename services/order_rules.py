@@ -936,7 +936,7 @@ _zy_patch_rule("basic_entertain_double", label="娛樂陪｜雙陪", unit_label=
 _zy_patch_rule(
     "basic_sweet_single",
     category="general",
-    label="甜蜜陪｜單陪",
+    label="甜蜜單｜單陪",
     unit_label="H",
     min_quantity=1,
     max_quantity=24,
