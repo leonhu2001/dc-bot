@@ -17,6 +17,8 @@ from services.topups import (
     list_topups_for_admin,
     reject_topup_order,
     submit_topup_payment,
+    topup_payment_method_label,
+    topup_payment_reference_label,
     topup_status_label,
 )
 from web.app.routers.admin_staff import require_admin
@@ -55,6 +57,13 @@ def _decorate(order: dict) -> dict:
     item["amount_text"] = f"{int(item.get('amount') or 0):,}T"
     item["rebate_amount_text"] = f"{int(item.get('rebate_amount') or 0):,}T"
     item["credited_amount_text"] = f"{int(item.get('credited_amount') or 0):,}T"
+    item["payment_method_label"] = topup_payment_method_label(item.get("payment_method"))
+    item["payment_reference_label"] = topup_payment_reference_label(item.get("payment_method"))
+    item["payment_reference_display"] = (
+        str(item.get("payment_reference") or "").strip()
+        or str(item.get("bank_last5") or "").strip()
+        or "—"
+    )
     return item
 
 
@@ -87,6 +96,7 @@ async def member_wallet(request: Request):
 async def member_wallet_topup_create(
     request: Request,
     amount: int = Form(...),
+    payment_method: str = Form(default="bank_transfer"),
 ):
     user = _user(request)
     if not user:
@@ -98,7 +108,7 @@ async def member_wallet_topup_create(
             customer_display_name=_display_name(user),
             amount=int(amount),
             source="web",
-            payment_method="bank_transfer",
+            payment_method=payment_method,
         )
     except ValueError as exc:
         return _redirect_message("/me/wallet", "error", exc)
@@ -156,7 +166,8 @@ async def member_wallet_topup_detail(request: Request, topup_id: int):
 async def member_wallet_topup_submit(
     request: Request,
     topup_id: int,
-    bank_last5: str = Form(...),
+    payment_reference: str = Form(default=""),
+    bank_last5: str = Form(default=""),
     payment_note: str = Form(default=""),
 ):
     user = _user(request)
@@ -166,7 +177,7 @@ async def member_wallet_topup_submit(
         submit_topup_payment(
             topup_id,
             customer_discord_id=str(user.get("id") or ""),
-            bank_last5=bank_last5,
+            payment_reference=payment_reference or bank_last5,
             payment_note=payment_note,
         )
     except ValueError as exc:

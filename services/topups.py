@@ -9,6 +9,40 @@ from core.vip_levels import BASE_MEMBER_LEVELS, get_topup_rebate_percent
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
 
+TOPUP_PAYMENT_METHODS = {
+    "bank_transfer": "銀行轉帳",
+    "jkopay": "街口支付",
+    "usdt_trc20": "USDT（TRC20）",
+    "staff_confirmed": "客服確認",
+}
+CUSTOMER_TOPUP_PAYMENT_METHODS = {
+    "bank_transfer",
+    "jkopay",
+    "usdt_trc20",
+}
+
+
+def normalize_topup_payment_method(value: str | None) -> str:
+    method = str(value or "bank_transfer").strip()
+    if method not in TOPUP_PAYMENT_METHODS:
+        raise ValueError("不支援的儲值付款方式。")
+    return method
+
+
+def topup_payment_method_label(value: str | None) -> str:
+    method = str(value or "bank_transfer").strip()
+    return TOPUP_PAYMENT_METHODS.get(method, method or "未知")
+
+
+def topup_payment_reference_label(value: str | None) -> str:
+    method = str(value or "bank_transfer").strip()
+    return {
+        "bank_transfer": "銀行帳號末五碼",
+        "jkopay": "街口付款辨識資訊",
+        "usdt_trc20": "交易 TXID",
+        "staff_confirmed": "客服確認",
+    }.get(method, "付款辨識資訊")
+
 
 def _now_iso() -> str:
     return datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
@@ -34,6 +68,7 @@ def ensure_topup_tables(db_file: str | Path | None = None) -> None:
                 amount INTEGER NOT NULL,
                 payment_method TEXT NOT NULL DEFAULT 'bank_transfer',
                 bank_last5 TEXT,
+                payment_reference TEXT,
                 payment_note TEXT,
                 source TEXT NOT NULL DEFAULT 'web',
                 status TEXT NOT NULL DEFAULT 'pending_payment',
@@ -59,6 +94,13 @@ def ensure_topup_tables(db_file: str | Path | None = None) -> None:
             )
             """
         )
+        columns = {
+            str(row[1])
+            for row in conn.execute("PRAGMA table_info(topup_orders)").fetchall()
+        }
+        if "payment_reference" not in columns:
+            conn.execute("ALTER TABLE topup_orders ADD COLUMN payment_reference TEXT")
+
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_topup_orders_customer ON topup_orders(customer_discord_id, id DESC)"
         )
@@ -89,6 +131,11 @@ def create_topup_order(
     if amount > 1_000_000:
         raise ValueError("單筆儲值金額超過系統上限，請聯絡客服。")
 
+    payment_method = normalize_topup_payment_method(payment_method)
+    source = str(source or "web").strip() or "web"
+    if payment_method not in CUSTOMER_TOPUP_PAYMENT_METHODS and source != "discord_staff":
+        raise ValueError("這個付款方式不開放給一般儲值單。")
+
     path = _db_path(db_file)
     now = datetime.now(TAIPEI_TZ)
     now_text = now.isoformat(timespec="seconds")
@@ -106,8 +153,8 @@ def create_topup_order(
                 str(customer_discord_id),
                 str(customer_display_name or "").strip() or None,
                 amount,
-                str(payment_method or "bank_transfer"),
-                str(source or "web"),
+                payment_method,
+                source,
                 now_text,
                 now_text,
             ),
@@ -124,17 +171,15 @@ def submit_topup_payment(
     topup_id: int,
     *,
     customer_discord_id: str | int,
-    bank_last5: str,
+    payment_reference: str | None = None,
+    bank_last5: str | None = None,
     payment_note: str | None = None,
     db_file: str | Path | None = None,
 ) -> dict[str, Any]:
     ensure_topup_tables(db_file)
-    last5 = "".join(ch for ch in str(bank_last5 or "") if ch.isdigit())
-    if len(last5) != 5:
-        raise ValueError("銀行帳號末五碼請輸入 5 位數字。")
-
     path = _db_path(db_file)
     now_text = _now_iso()
+
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM topup_orders WHERE id=?", (int(topup_id),)).fetchone()
@@ -143,14 +188,51 @@ def submit_topup_payment(
         if str(row["status"]) not in {"pending_payment", "pending_review"}:
             raise ValueError("這筆儲值單目前不能送出付款資料。")
 
+        method = normalize_topup_payment_method(str(row["payment_method"] or "bank_transfer"))
+        reference = str(
+            payment_reference
+            if payment_reference is not None
+            else bank_last5
+            if bank_last5 is not None
+            else ""
+        ).strip()
+
+        legacy_bank_last5 = None
+        if method == "bank_transfer":
+            digits = "".join(ch for ch in reference if ch.isdigit())
+            if len(digits) != 5:
+                raise ValueError("銀行帳號末五碼請輸入 5 位數字。")
+            reference = digits
+            legacy_bank_last5 = digits
+        elif method == "jkopay":
+            if not reference:
+                raise ValueError("請填寫街口交易序號、付款人名稱或其他可辨識資訊。")
+            if len(reference) > 100:
+                raise ValueError("街口付款辨識資訊請控制在 100 字內。")
+        elif method == "usdt_trc20":
+            if len(reference) != 64 or not all(
+                ch in "0123456789abcdefABCDEF" for ch in reference
+            ):
+                raise ValueError("USDT TRC20 的交易 TXID 應為 64 位十六進位字元。")
+        else:
+            if not reference:
+                raise ValueError("請填寫付款辨識資訊。")
+
         conn.execute(
             """
             UPDATE topup_orders
-            SET bank_last5=?, payment_note=?, status='pending_review',
+            SET bank_last5=?, payment_reference=?, payment_note=?, status='pending_review',
                 submitted_at=COALESCE(submitted_at, ?), updated_at=?
             WHERE id=?
             """,
-            (last5, str(payment_note or "").strip() or None, now_text, now_text, int(topup_id)),
+            (
+                legacy_bank_last5,
+                reference,
+                str(payment_note or "").strip() or None,
+                now_text,
+                now_text,
+                int(topup_id),
+            ),
         )
         conn.commit()
         return dict(conn.execute("SELECT * FROM topup_orders WHERE id=?", (int(topup_id),)).fetchone())
