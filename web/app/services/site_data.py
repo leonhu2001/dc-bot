@@ -2160,6 +2160,312 @@ def toggle_favorite(
 
 
 # ============================================================
+# Homepage popular services
+# ============================================================
+
+def get_popular_order_groups(
+    limit: int = 3,
+) -> list[dict]:
+    """
+    Rank current public order groups by actual placed-order count.
+
+    Cancelled / failed orders are ignored.  Old rows without
+    order_rule_key are matched by their stored item label when possible.
+    """
+    from collections import Counter
+
+    from web.app.services.order_groups import (
+        GROUP_SPECS,
+        get_grouped_order_catalog,
+    )
+
+    groups = get_grouped_order_catalog(
+        "all"
+    )
+
+    if not groups:
+        return []
+
+    group_by_key = {
+        str(
+            group.get(
+                "key"
+            )
+            or ""
+        ):
+            group
+        for group
+        in groups
+    }
+
+    rule_to_group: dict[str, str] = {}
+    item_to_group: dict[str, str] = {}
+
+    for spec in GROUP_SPECS:
+        group_key = str(
+            spec.get(
+                "key"
+            )
+            or ""
+        )
+
+        if group_key not in group_by_key:
+            continue
+
+        group_label = str(
+            spec.get(
+                "label"
+            )
+            or ""
+        ).strip()
+
+        if group_label:
+            item_to_group[
+                group_label
+            ] = group_key
+
+        for (
+            rule_key,
+            public_label,
+        ) in spec.get(
+            "variants",
+            []
+        ):
+            rule_key = str(
+                rule_key
+            )
+
+            rule_to_group[
+                rule_key
+            ] = group_key
+
+            public_label = str(
+                public_label
+                or ""
+            ).strip()
+
+            if public_label:
+                item_to_group[
+                    public_label
+                ] = group_key
+
+            rule = ORDER_RULES.get(
+                rule_key
+            )
+
+            if rule is not None:
+                rule_label = str(
+                    getattr(
+                        rule,
+                        "label",
+                        "",
+                    )
+                    or ""
+                ).strip()
+
+                if rule_label:
+                    item_to_group[
+                        rule_label
+                    ] = group_key
+
+    counts: Counter[str] = Counter()
+
+    if (
+        WEB_DB.exists()
+    ):
+        try:
+            with _connect(
+                WEB_DB
+            ) as conn:
+                if _table_exists(
+                    conn,
+                    "web_orders",
+                ):
+                    cols = _columns(
+                        conn,
+                        "web_orders",
+                    )
+
+                    select_cols = []
+
+                    if (
+                        "order_rule_key"
+                        in cols
+                    ):
+                        select_cols.append(
+                            "order_rule_key"
+                        )
+
+                    if "item" in cols:
+                        select_cols.append(
+                            "item"
+                        )
+
+                    if "status" in cols:
+                        select_cols.append(
+                            "status"
+                        )
+
+                    if select_cols:
+                        rows = conn.execute(
+                            "SELECT "
+                            + ", ".join(
+                                select_cols
+                            )
+                            + " FROM web_orders"
+                        ).fetchall()
+
+                        ignored_statuses = {
+                            "cancelled",
+                            "canceled",
+                            "failed",
+                            "rejected",
+                            "void",
+                        }
+
+                        for row in rows:
+                            status = str(
+                                (
+                                    row["status"]
+                                    if "status"
+                                    in cols
+                                    else ""
+                                )
+                                or ""
+                            ).strip().lower()
+
+                            if (
+                                status
+                                in ignored_statuses
+                            ):
+                                continue
+
+                            group_key = ""
+
+                            if (
+                                "order_rule_key"
+                                in cols
+                            ):
+                                rule_key = str(
+                                    row[
+                                        "order_rule_key"
+                                    ]
+                                    or ""
+                                ).strip()
+
+                                group_key = (
+                                    rule_to_group.get(
+                                        rule_key,
+                                        "",
+                                    )
+                                )
+
+                            if (
+                                not group_key
+                                and "item"
+                                in cols
+                            ):
+                                item = str(
+                                    row[
+                                        "item"
+                                    ]
+                                    or ""
+                                ).strip()
+
+                                group_key = (
+                                    item_to_group.get(
+                                        item,
+                                        "",
+                                    )
+                                )
+
+                            if (
+                                group_key
+                                in group_by_key
+                            ):
+                                counts[
+                                    group_key
+                                ] += 1
+
+        except Exception as exc:
+            print(
+                "[popular_services]",
+                repr(
+                    exc
+                ),
+            )
+
+    ordered = sorted(
+        groups,
+        key=lambda group: (
+            -int(
+                counts.get(
+                    str(
+                        group.get(
+                            "key"
+                        )
+                        or ""
+                    ),
+                    0,
+                )
+            ),
+            groups.index(
+                group
+            ),
+        ),
+    )
+
+    requested = max(
+        1,
+        min(
+            int(
+                limit
+                or 3
+            ),
+            4,
+        ),
+    )
+
+    selected = ordered[
+        :requested
+    ]
+
+    result = []
+
+    for rank, group in enumerate(
+        selected,
+        start=1,
+    ):
+        item = dict(
+            group
+        )
+
+        item[
+            "popularity_rank"
+        ] = rank
+
+        item[
+            "popularity_count"
+        ] = int(
+            counts.get(
+                str(
+                    group.get(
+                        "key"
+                    )
+                    or ""
+                ),
+                0,
+            )
+        )
+
+        result.append(
+            item
+        )
+
+    return result
+
+
+# ============================================================
 # Public order catalog
 # ============================================================
 
