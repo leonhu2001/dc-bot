@@ -1421,6 +1421,19 @@ def list_point_options(
     has_specified_staff: bool = False,
 ) -> list[dict]:
 
+    rule = (
+        ORDER_RULES.get(
+            str(
+                rule_key
+            )
+        )
+    )
+
+    if rule is None:
+
+        return []
+
+
     result = []
 
 
