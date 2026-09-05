@@ -344,6 +344,7 @@ for key, label, price, staff_count in [
 _add(OrderRule(
     "general", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
     allowed_roles=("female_protector", "female_companion"),
+    allowed_game_roles=tuple(GAME_ROLE_BY_KEY.keys()),
     required_staff_count=1,
     allow_specify=True,
     max_specified_count=1,
