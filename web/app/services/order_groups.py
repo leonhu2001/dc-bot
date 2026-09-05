@@ -22,6 +22,7 @@ CATEGORY_ORDER = [
     "basic",
     "fun",
     "farm",
+    "general",
     "steam",
     "valorant",
     "lol",
@@ -82,13 +83,11 @@ GROUP_SPECS = [
 
     {
         "key": "teaching",
-        "category": "basic",
+        "category": "general",
         "label": "教學單",
-        "selector_label": "導師人數",
-        "description": "由頂護航提供教學服務。",
+        "description": "1 對 1 教學；僅頂護、菁英、頂獵、輻能可接。",
         "variants": [
-            ("basic_teaching_one", "1 名導師"),
-            ("basic_teaching_two", "2 名導師"),
+            ("basic_teaching_one", "1 對 1 教學"),
         ],
     },
 
@@ -106,7 +105,7 @@ GROUP_SPECS = [
 
     {
         "key": "sweet",
-        "category": "basic",
+        "category": "general",
         "label": "甜蜜單",
         "variants": [
             ("basic_sweet_single", "單陪"),
