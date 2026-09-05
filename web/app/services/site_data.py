@@ -1173,6 +1173,223 @@ def _staff_role_group(
     return "other"
 
 
+
+STAFF_ROLE_FILTER_DEFS = (
+    ("female_companion", "女陪"),
+    ("male_companion", "男陪"),
+    ("female_protector", "女護"),
+    ("male_protector", "男護"),
+    ("top_protector", "頂護"),
+    ("lol_elite", "菁英"),
+    ("lol_grandmaster", "宗師"),
+    ("lol_master", "LOL 大師"),
+    ("apex_predator", "頂獵"),
+    ("apex_master", "APEX 大師"),
+    ("apex_diamond", "鑽石"),
+    ("valorant_radiant", "輻能"),
+    ("valorant_immortal", "神話"),
+    ("valorant_ascendant", "超凡"),
+)
+
+
+def get_public_staff_role_filters() -> list[dict]:
+    return [
+        {
+            "key": key,
+            "label": label,
+        }
+        for key, label
+        in STAFF_ROLE_FILTER_DEFS
+    ]
+
+
+def _staff_role_keys(
+    conn: sqlite3.Connection,
+    staff_id: str,
+    profile: dict,
+) -> list[str]:
+    role_ids: set[str] = set()
+
+    if (
+        _table_exists(
+            conn,
+            "web_staff_members",
+        )
+    ):
+        member_cols = _columns(
+            conn,
+            "web_staff_members",
+        )
+
+        if {
+            "discord_id",
+            "roles_json",
+        }.issubset(
+            member_cols
+        ):
+            row = conn.execute(
+                """
+                SELECT roles_json
+                FROM web_staff_members
+                WHERE CAST(discord_id AS TEXT) = ?
+                LIMIT 1
+                """,
+                (
+                    str(staff_id),
+                ),
+            ).fetchone()
+
+            if row is not None:
+                raw_roles = row[
+                    "roles_json"
+                ]
+
+                if isinstance(
+                    raw_roles,
+                    (
+                        list,
+                        tuple,
+                        set,
+                    ),
+                ):
+                    role_ids = {
+                        str(item).strip()
+                        for item in raw_roles
+                        if str(item).strip()
+                    }
+                else:
+                    text = str(
+                        raw_roles
+                        or ""
+                    ).strip()
+
+                    if text:
+                        try:
+                            parsed = json.loads(
+                                text
+                            )
+                        except Exception:
+                            parsed = [
+                                part.strip()
+                                for part
+                                in text.split(",")
+                                if part.strip()
+                            ]
+
+                        if isinstance(
+                            parsed,
+                            (
+                                list,
+                                tuple,
+                                set,
+                            ),
+                        ):
+                            role_ids = {
+                                str(item).strip()
+                                for item in parsed
+                                if str(item).strip()
+                            }
+
+    from services.order_rules import (
+        ROLE_IDS,
+    )
+    from services.game_roles import (
+        GAME_ROLE_BY_KEY,
+    )
+
+    role_id_by_key = {
+        key: str(
+            ROLE_IDS.get(
+                key
+            )
+            or ""
+        )
+        for key, _label
+        in STAFF_ROLE_FILTER_DEFS
+        if key in ROLE_IDS
+    }
+
+    for key, _label in (
+        STAFF_ROLE_FILTER_DEFS
+    ):
+        game_role = (
+            GAME_ROLE_BY_KEY.get(
+                key
+            )
+        )
+
+        if game_role is not None:
+            role_id_by_key[
+                key
+            ] = str(
+                game_role.role_id
+            )
+
+    keys = [
+        key
+        for key, _label
+        in STAFF_ROLE_FILTER_DEFS
+        if (
+            role_id_by_key.get(
+                key
+            )
+            and role_id_by_key[
+                key
+            ] in role_ids
+        )
+    ]
+
+    # 舊資料只有個人牆文字時，仍保留服務身分組篩選。
+    text = (
+        normalize_public_text(
+            profile.get(
+                "profile_type"
+            )
+        )
+        + " "
+        + normalize_public_text(
+            profile.get(
+                "role_title"
+            )
+        )
+    )
+
+    legacy_checks = (
+        (
+            "top_protector",
+            "頂護",
+        ),
+        (
+            "female_protector",
+            "女護",
+        ),
+        (
+            "male_protector",
+            "男護",
+        ),
+        (
+            "female_companion",
+            "女陪",
+        ),
+        (
+            "male_companion",
+            "男陪",
+        ),
+    )
+
+    for key, marker in (
+        legacy_checks
+    ):
+        if (
+            marker in text
+            and key not in keys
+        ):
+            keys.append(
+                key
+            )
+
+    return keys
+
 def _stats_for_staff(
     conn: sqlite3.Connection,
     staff_id: str,
@@ -1451,6 +1668,14 @@ def _profile_to_public(
         ),
     }
 
+    result["role_keys"] = (
+        _staff_role_keys(
+            conn,
+            staff_id,
+            result,
+        )
+    )
+
     result["role_group"] = (
         _staff_role_group(
             result
@@ -1563,13 +1788,46 @@ def list_public_staff(
         role_filter
         and role_filter != "all"
     ):
+        protector_keys = {
+            "top_protector",
+            "female_protector",
+            "male_protector",
+        }
+
         profiles = [
             profile
             for profile
             in profiles
-            if profile.get(
-                "role_group"
-            ) == role_filter
+            if (
+                (
+                    role_filter
+                    == "protector"
+                    and bool(
+                        protector_keys
+                        & set(
+                            profile.get(
+                                "role_keys"
+                            )
+                            or []
+                        )
+                    )
+                )
+                or (
+                    role_filter
+                    in (
+                        profile.get(
+                            "role_keys"
+                        )
+                        or []
+                    )
+                )
+                or (
+                    profile.get(
+                        "role_group"
+                    )
+                    == role_filter
+                )
+            )
         ]
 
     return profiles
