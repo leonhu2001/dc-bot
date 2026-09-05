@@ -176,6 +176,83 @@ def _refresh_staff_access(
 async def home(
     request: Request,
 ):
+    from web.app.services.staff_service import (
+        refresh_staff_members_if_stale,
+    )
+    from web.app.services.staff_roster_sync import (
+        ensure_staff_roster_profiles,
+    )
+
+    try:
+        refresh_staff_members_if_stale(
+            max_age_seconds=60
+        )
+    except Exception as exc:
+        print(
+            "[home_staff_sync]",
+            repr(
+                exc
+            ),
+        )
+
+    try:
+        ensure_staff_roster_profiles()
+    except Exception as exc:
+        print(
+            "[home_roster_profiles]",
+            repr(
+                exc
+            ),
+        )
+
+    home_crew_groups = [
+        {
+            "key":
+                "entertainment_female",
+            "title":
+                "娛樂女陪",
+            "eyebrow":
+                "ENTERTAINMENT",
+            "description":
+                "只有女陪身分，主打聊天、娛樂與氣氛互動。",
+            "profiles":
+                list_public_staff(
+                    role_filter=
+                        "entertainment_female",
+                )[:6],
+        },
+        {
+            "key":
+                "entertainment_male",
+            "title":
+                "娛樂男陪",
+            "eyebrow":
+                "ENTERTAINMENT",
+            "description":
+                "只有男陪身分，適合輕鬆開黑與聊天娛樂。",
+            "profiles":
+                list_public_staff(
+                    role_filter=
+                        "entertainment_male",
+                )[:6],
+        },
+        {
+            "key":
+                "strong_player",
+            "title":
+                "強力打手",
+            "eyebrow":
+                "TOP TIER",
+            "description":
+                "頂護、菁英、頂獵、輻能，直接找高階技術人員。",
+            "profiles":
+                list_public_staff(
+                    role_filter=
+                        "strong_player",
+                )[:6],
+        },
+    ]
+
     return templates.TemplateResponse(
         request=request,
         name="home.html",
@@ -188,6 +265,8 @@ async def home(
                     limit=3
                 )
             ),
+            home_crew_groups=
+                home_crew_groups,
         ),
     )
 
@@ -1429,6 +1508,9 @@ async def public_staff(
 
     valid_role_filters = {
         "all",
+        "entertainment_female",
+        "entertainment_male",
+        "strong_player",
         *[
             item["key"]
             for item
