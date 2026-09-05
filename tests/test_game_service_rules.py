@@ -6,12 +6,24 @@ from services.order_rules import (
     calculate_price,
     get_allowed_role_ids,
 )
-from web.app.services.checkout_preview import point_item_status
+from web.app.services.checkout_preview import (
+    list_point_options,
+    point_item_status,
+)
 from web.app.services.role_catalog import can_login_dashboard
 
 
-def test_lol_master_role_id_is_requested_one():
-    assert GAME_ROLE_BY_KEY["lol_master"].role_id == "1545362644607832065"
+def test_lol_and_apex_master_roles_never_mix():
+    lol_master = GAME_ROLE_BY_KEY["lol_master"]
+    apex_master = GAME_ROLE_BY_KEY["apex_master"]
+
+    assert lol_master.game == "lol"
+    assert lol_master.role_id == "1545362644607832065"
+
+    assert apex_master.game == "apex"
+    assert apex_master.role_id == "1545364180905885746"
+
+    assert lol_master.role_id != apex_master.role_id
 
 
 def test_game_rank_orders_do_not_inherit_delta_protector_roles():
@@ -134,3 +146,49 @@ def test_new_game_orders_allow_points_except_extra_game_and_unusable_specify_fee
             point_item_key="free_specify_fee",
             **common,
         )["allowed"] is False
+
+
+
+def test_game_priced_point_time_benefits_become_one_and_two_games():
+    options = {
+        item["key"]: item
+        for item in list_point_options(
+            rule_key="valorant_entertain_ng",
+            point_balance=999,
+            quantity=1,
+            has_specified_staff=False,
+        )
+    }
+
+    assert options["extra_10"]["allowed"] is True
+    assert options["extra_10"]["name"] == "加一局"
+    assert options["extra_10"]["kind"] == "extra_games"
+    assert options["extra_10"]["games"] == 1
+
+    assert options["extra_30"]["allowed"] is True
+    assert options["extra_30"]["name"] == "加兩局"
+    assert options["extra_30"]["kind"] == "extra_games"
+    assert options["extra_30"]["games"] == 2
+
+    # 原本的「加場一場保撤」仍然不適用特戰英豪 / 英雄聯盟。
+    assert options["extra_15"]["allowed"] is False
+
+
+def test_hourly_point_time_benefits_keep_original_time_units():
+    options = {
+        item["key"]: item
+        for item in list_point_options(
+            rule_key="lol_entertain_aram",
+            point_balance=999,
+            quantity=1,
+            has_specified_staff=False,
+        )
+    }
+
+    assert options["extra_10"]["name"] == "加時 30 分鐘"
+    assert options["extra_10"]["kind"] == "extra_hours"
+    assert options["extra_10"]["hours"] == 0.5
+
+    assert options["extra_30"]["name"] == "加時 1 小時"
+    assert options["extra_30"]["kind"] == "extra_hours"
+    assert options["extra_30"]["hours"] == 1

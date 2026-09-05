@@ -1147,6 +1147,32 @@ def resolve_selected_staff(
 # Point benefit rules
 # ============================================================
 
+def _point_item_for_rule(rule, item: dict) -> dict:
+    data = dict(item or {})
+    pricing_type = str(getattr(rule, "pricing_type", "") or "")
+
+    if pricing_type == "game":
+        key = str(data.get("key") or "")
+
+        if key == "extra_10":
+            data.update({
+                "name": "加一局",
+                "kind": "extra_games",
+                "games": 1,
+            })
+            data.pop("hours", None)
+
+        elif key == "extra_30":
+            data.update({
+                "name": "加兩局",
+                "kind": "extra_games",
+                "games": 2,
+            })
+            data.pop("hours", None)
+
+    return data
+
+
 def point_item_status(
     *,
     rule_key: str,
@@ -1345,11 +1371,9 @@ def point_item_status(
         and str(
             rule.pricing_type
         )
-        != "hourly"
-        and category
         not in {
-            "valorant",
-            "lol",
+            "hourly",
+            "game",
         }
     ):
 
@@ -1424,8 +1448,9 @@ def list_point_options(
         )
 
 
-        data = dict(
-            item
+        data = _point_item_for_rule(
+            rule,
+            item,
         )
 
 
@@ -1581,6 +1606,24 @@ def calculate_checkout_financials(
                 point_service_note = (
                     f"服務時間 +{hours:g} 小時"
                 )
+
+
+        elif (
+            kind
+            == "extra_games"
+        ):
+
+            games = int(
+                point_item.get(
+                    "games"
+                )
+                or 0
+            )
+
+
+            point_service_note = (
+                f"服務局數 +{games} 局"
+            )
 
 
         elif (
@@ -2136,8 +2179,9 @@ def build_checkout_preview(
 
 
         selected_point_item = (
-            dict(
-                item
+            _point_item_for_rule(
+                rule,
+                item,
             )
         )
 

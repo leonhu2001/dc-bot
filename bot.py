@@ -7196,13 +7196,41 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
     if kind == "extra_game" and category in {"valorant", "lol"}:
         return False, "特戰英豪 / 英雄聯盟不可使用加場一場保撤。"
 
-    if kind == "extra_hours" and pricing_type != "hourly" and category not in {"valorant", "lol"}:
-        return False, "加時只適用小時計價項目。"
+    if kind == "extra_hours" and pricing_type not in {"hourly", "game"}:
+        return False, "加時只適用小時或局數計價項目。"
 
     if kind == "extra_game" and pricing_type != "game":
         return False, "加場保撤只適用局數計價項目。"
 
     return True, ""
+
+
+def _adapt_order_point_benefit_for_rule(rule, benefit: dict) -> dict:
+    data = dict(benefit or {})
+    pricing_type = str(getattr(rule, "pricing_type", "") or "")
+
+    if pricing_type == "game":
+        key = str(data.get("key") or "")
+
+        if key == "extra_10":
+            data.update({
+                "name": "加一局",
+                "kind": "extra_games",
+                "games": 1,
+                "summary": "服務局數 +1 局，金額與打手分潤不變",
+            })
+            data.pop("hours", None)
+
+        elif key == "extra_30":
+            data.update({
+                "name": "加兩局",
+                "kind": "extra_games",
+                "games": 2,
+                "summary": "服務局數 +2 局，金額與打手分潤不變",
+            })
+            data.pop("hours", None)
+
+    return data
 
 
 def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
@@ -7224,6 +7252,13 @@ def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
 
     merged = dict(item)
     merged.update(spec)
+
+    if rule is not None:
+        merged = _adapt_order_point_benefit_for_rule(
+            rule,
+            merged,
+        )
+
     return merged
 
 
@@ -7355,6 +7390,17 @@ def calculate_self_service_financials(
             float(
                 benefit.get(
                     "hours"
+                )
+                or 0
+            ),
+        )
+
+    elif bkind == "extra_games":
+        extra_games = max(
+            0,
+            int(
+                benefit.get(
+                    "games"
                 )
                 or 0
             ),
@@ -7551,9 +7597,14 @@ def calculate_self_service_financials(
         )
 
     if extra_games:
-        notes.append(
-            f"加場 {extra_games} 場保撤"
-        )
+        if bkind == "extra_games":
+            notes.append(
+                f"服務局數 +{extra_games} 局"
+            )
+        else:
+            notes.append(
+                f"加場 {extra_games} 場保撤"
+            )
 
     if point_specify:
         notes.append(
@@ -7873,6 +7924,10 @@ class SelfServicePointBenefitView(discord.ui.View):
 
             merged = dict(item)
             merged.update(spec)
+            merged = _adapt_order_point_benefit_for_rule(
+                self.rule,
+                merged,
+            )
             result.append(merged)
 
         return result
