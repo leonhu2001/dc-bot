@@ -39,7 +39,7 @@ def _build_topup_embed(order: dict) -> discord.Embed:
             f"儲值金額：**{int(order['amount']):,}T**\n"
             f"付款方式：**{topup_payment_method_label(payment_method)}**\n"
             "狀態：等待付款\n\n"
-            f"\`\`\`text\n{payment_info}\n\`\`\`\n"
+            f"```text\n{payment_info}\n```\n"
             f"{_payment_instruction(payment_method)}"
         ),
         color=discord.Color.gold(),
@@ -182,7 +182,7 @@ class TopupPaymentModal(discord.ui.Modal):
             return
 
         await interaction.response.send_message(
-            f"✅ 儲值單 \`{order['topup_no']}\` 已送出付款資料，等待客服審核。",
+            f"✅ 儲值單 `{order['topup_no']}` 已送出付款資料，等待客服審核。",
             ephemeral=True,
         )
 
