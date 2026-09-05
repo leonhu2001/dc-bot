@@ -2568,9 +2568,11 @@ PUBLIC_ORDER_CATEGORY_ORDER = [
     "basic",
     "fun",
     "farm",
+    "general",
     "title",
     "steam",
     "valorant",
+    "lol",
 ]
 
 
@@ -2583,6 +2585,9 @@ PUBLIC_ORDER_CATEGORY_DESCRIPTIONS = {
 
     "farm":
         "代解、代肝與指定進度服務。",
+
+    "general":
+        "跨遊戲通用服務，目前包含甜蜜單與 1 對 1 教學。",
 
     "title":
         "高難度挑戰與稱號相關方案。",
