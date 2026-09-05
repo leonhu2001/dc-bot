@@ -21,6 +21,7 @@ from web.app.services.site_data import (
     get_order_categories,
     list_order_catalog,
     get_public_staff,
+    get_public_staff_role_filters,
     list_public_staff,
     toggle_favorite,
 )
@@ -237,27 +238,82 @@ async def public_order(
 
     view_key = str(view or "").strip().lower()
     category_filter = category
+    all_groups = get_grouped_order_catalog("all")
 
     if view_key == "technical":
-        wanted_labels = {"絕巴技術陪", "技術陪"}
-        groups = [g for g in get_grouped_order_catalog("all") if str(g.get("label") or "") in wanted_labels]
-        category_filter = "all"
-    elif view_key == "entertainment":
-        wanted_labels = {
-            "娛樂陪",
-            "甜蜜單",
-            "Steam 陪玩",
-            "特戰英豪｜娛樂陪",
-            "特戰英豪｜超凡陪",
-            "特戰英豪｜神話陪",
-            "特戰英豪｜輻能陪",
-            "英雄聯盟｜娛樂陪",
-            "英雄聯盟｜大師陪",
-            "英雄聯盟｜宗師陪",
-            "英雄聯盟｜菁英陪",
+        excluded_group_keys = {
+            "exbar_gamble",
+            "teaching",
+            "entertain",
+            "oil",
+            "bet",
+            "trial",
         }
-        groups = [g for g in get_grouped_order_catalog("all") if str(g.get("label") or "") in wanted_labels]
+        excluded_categories = {
+            "fun",
+            "farm",
+        }
+
+        groups = [
+            group
+            for group
+            in all_groups
+            if (
+                str(
+                    group.get(
+                        "category"
+                    )
+                    or ""
+                )
+                not in excluded_categories
+                and str(
+                    group.get(
+                        "key"
+                    )
+                    or ""
+                )
+                not in excluded_group_keys
+                and "娛樂陪"
+                not in str(
+                    group.get(
+                        "label"
+                    )
+                    or ""
+                )
+            )
+        ]
         category_filter = "all"
+
+    elif view_key == "entertainment":
+        groups = [
+            group
+            for group
+            in all_groups
+            if "娛樂陪"
+            in str(
+                group.get(
+                    "label"
+                )
+                or ""
+            )
+        ]
+        category_filter = "all"
+
+    elif view_key == "teaching":
+        groups = [
+            group
+            for group
+            in all_groups
+            if str(
+                group.get(
+                    "key"
+                )
+                or ""
+            )
+            == "teaching"
+        ]
+        category_filter = "all"
+
     else:
         groups = get_grouped_order_catalog(category)
 
@@ -1312,6 +1368,22 @@ async def public_staff(
             or ""
         )
 
+    role_filters = (
+        get_public_staff_role_filters()
+    )
+
+    valid_role_filters = {
+        "all",
+        *[
+            item["key"]
+            for item
+            in role_filters
+        ],
+    }
+
+    if role not in valid_role_filters:
+        role = "all"
+
     profiles = list_public_staff(
         customer_id=customer_id,
         role_filter=role,
@@ -1326,6 +1398,7 @@ async def public_staff(
             page_name="staff",
             profiles=profiles,
             role_filter=role,
+            role_filters=role_filters,
         ),
     )
 
