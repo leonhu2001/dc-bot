@@ -2156,7 +2156,7 @@ def build_wallet_history_embed(
         embed.add_field(name="最近流水", value="目前沒有錢包流水。", inline=False)
         return embed
 
-    lines = []
+    blocks: list[str] = []
 
     for index, tx in enumerate(transactions, start=1):
         amount = int(tx.get("amount") or 0)
@@ -2169,6 +2169,9 @@ def build_wallet_history_embed(
         note = str(tx.get("note") or "").strip()
         operator_id = str(tx.get("operator_discord_id") or "").strip()
         operator_name = str(tx.get("operator_display_name") or "").strip()
+
+        if len(note) > 300:
+            note = note[:297] + "…"
 
         block = [
             f"**{index}. {tx_type}｜{sign}{format_t_amount(abs(amount))}**",
@@ -2187,15 +2190,34 @@ def build_wallet_history_embed(
             block.append(f"備註：{note}")
 
         block.append(f"時間：{created_at}")
+        blocks.append("\n".join(block))
 
-        lines.append("\n".join(block))
+    # Discord 每個 embed field 的 value 上限是 1024 字元。
+    # 將流水依完整交易區塊分段，避免整批 10～25 筆塞進同一個 field 導致 400。
+    chunks: list[str] = []
+    current = ""
 
-    text = "\n\n".join(lines)
+    for block in blocks:
+        if len(block) > 1000:
+            block = block[:997] + "…"
 
-    if len(text) > 3900:
-        text = text[:3900] + "\n…（流水太長，已截斷）"
+        candidate = block if not current else current + "\n\n" + block
+        if len(candidate) <= 1000:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = block
 
-    embed.add_field(name=f"最近 {len(transactions)} 筆流水", value=text, inline=False)
+    if current:
+        chunks.append(current)
+
+    for page, chunk in enumerate(chunks, start=1):
+        field_name = f"最近 {len(transactions)} 筆流水"
+        if len(chunks) > 1:
+            field_name += f"（{page}/{len(chunks)}）"
+        embed.add_field(name=field_name, value=chunk, inline=False)
+
     return embed
 
 
