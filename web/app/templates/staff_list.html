@@ -35,26 +35,14 @@
             全部
         </a>
 
-        <a
-            href="/staff?role=female_companion"
-            class="{% if role_filter == 'female_companion' %}is-active{% endif %}"
-        >
-            女陪
-        </a>
-
-        <a
-            href="/staff?role=male_companion"
-            class="{% if role_filter == 'male_companion' %}is-active{% endif %}"
-        >
-            男陪
-        </a>
-
-        <a
-            href="/staff?role=protector"
-            class="{% if role_filter == 'protector' %}is-active{% endif %}"
-        >
-            護航
-        </a>
+        {% for role_item in role_filters %}
+            <a
+                href="/staff?role={{ role_item.key }}"
+                class="{% if role_filter == role_item.key %}is-active{% endif %}"
+            >
+                {{ role_item.label }}
+            </a>
+        {% endfor %}
 
     </div>
 
