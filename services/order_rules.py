@@ -66,7 +66,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "fun": "趣味單",
     "farm": "代解代肝",
     "steam": "Steam 陪玩",
-    "valorant": "Valorant 陪玩",
+    "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
 }
 
@@ -493,6 +493,7 @@ for key, label, price in [
 _add(OrderRule(
     "steam", "steam_play", "Steam 陪玩", "hourly", 350, "H",
     allowed_roles=ALL_RECEIVER_ROLES,
+    allowed_game_roles=tuple(GAME_ROLE_BY_KEY.keys()),
     required_staff_count="player_count",
     player_count_enabled=True,
     max_player_count=None,
@@ -506,10 +507,10 @@ _add(OrderRule(
 ))
 
 
-# ========= Valorant 陪玩 =========
+# ========= 特戰英豪 陪玩 =========
 
 _add(OrderRule(
-    "valorant", "valorant_entertain", "Valorant 陪玩｜娛樂陪", "hourly", 350, "H",
+    "valorant", "valorant_entertain", "特戰英豪｜娛樂陪", "hourly", 350, "H",
     allowed_roles=ALL_RECEIVER_ROLES,
     required_staff_count="player_count",
     player_count_enabled=True,
@@ -524,7 +525,7 @@ _add(OrderRule(
 ))
 
 _add(OrderRule(
-    "valorant", "valorant_tech", "Valorant 陪玩｜技術陪", "game", 200, "局",
+    "valorant", "valorant_tech", "特戰英豪｜技術陪", "game", 200, "局",
     allowed_roles=PROTECTOR_ROLES,
     required_staff_count="player_count",
     player_count_enabled=True,
@@ -543,7 +544,7 @@ _add(OrderRule(
 ))
 
 _add(OrderRule(
-    "valorant", "valorant_top_tech", "Valorant 陪玩｜頂級技術陪", "game", 350, "局",
+    "valorant", "valorant_top_tech", "特戰英豪｜頂級技術陪", "game", 350, "局",
     allowed_roles=("top_protector",),
     required_staff_count="player_count",
     player_count_enabled=True,
@@ -558,7 +559,7 @@ _add(OrderRule(
 ))
 
 
-# ========= Valorant / 英雄聯盟新制陪玩 =========
+# ========= 特戰英豪 / 英雄聯盟新制陪玩 =========
 # 遊戲階級與舊男陪 / 女陪 / 護航完全分開，只在商品規則中明確列出可接資格。
 VALORANT_GAME_ROLES = ("valorant_ascendant", "valorant_immortal", "valorant_radiant")
 LOL_GAME_ROLES = ("lol_master", "lol_grandmaster", "lol_elite")
@@ -585,27 +586,27 @@ def _add_game_service_rule(
         min_player_count=1,
         max_player_count=4,
         price_multiply_player_count=True,
-        allow_specify=True,
-        max_specified_count=4,
-        specify_fee_default=specify_fee,
-        specify_fee_by_role={role: specify_fee for role in allowed_service_roles},
-        specify_fee_by_game_role={role: specify_fee for role in allowed_game_roles},
-        specify_free_min_units=2,
+        allow_specify=False,
+        max_specified_count=0,
+        specify_fee_default=0,
+        specify_fee_by_role={},
+        specify_fee_by_game_role={},
+        specify_free_min_units=None,
         specify_free_basis="quantity_x_player_count",
-        point_benefits_allowed=False,
+        point_benefits_allowed=True,
         service_bonus_buy=8,
         service_bonus_gift=1,
     ))
 
 
-_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="Valorant｜娛樂陪｜NG", pricing_type="game", price=200, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
-_add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="Valorant｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="Valorant｜超凡陪｜NG", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="Valorant｜超凡陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="Valorant｜神話陪｜NG", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="Valorant｜神話陪｜積分", pricing_type="game", price=500, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="Valorant｜輻能陪｜NG", pricing_type="game", price=600, unit_label="局", allowed_game_roles=("valorant_radiant",))
-_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="Valorant｜輻能陪｜積分", pricing_type="game", price=700, unit_label="局", allowed_game_roles=("valorant_radiant",))
+_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="game", price=200, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
+_add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=500, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="game", price=600, unit_label="局", allowed_game_roles=("valorant_radiant",))
+_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=700, unit_label="局", allowed_game_roles=("valorant_radiant",))
 
 _add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=350, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
 _add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="game", price=200, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
@@ -895,7 +896,7 @@ CATEGORY_LABELS.update({
     "fun": "趣味單",
     "farm": "代肝代解",
     "steam": "Steam遊戲",
-    "valorant": "Valorant 陪玩",
+    "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
     "custom": "自訂",
 })
@@ -1013,7 +1014,7 @@ _zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label=
 _zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
 
-# Steam / 特戰英豪：350 / 小時 / 每位；1～4 位。指定費只看小時數，2 小時以上全免。
+# Steam：350 / 小時 / 每位；1～4 位。5 個舊職位 + 9 個遊戲階級皆可接。
 _zy_patch_rule(
     "steam_play",
     label="Steam遊戲｜娛樂陪",
@@ -1029,6 +1030,7 @@ _zy_patch_rule(
     price_multiply_player_count=True,
     allow_specify=True,
     max_specified_count=4,
+    allowed_game_roles=tuple(GAME_ROLE_BY_KEY.keys()),
     specify_fee_by_role=_all_receiver_fee(150),
     specify_fee_default=150,
     specify_free_min_units=2,

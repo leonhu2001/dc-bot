@@ -302,6 +302,7 @@ ORDER_RULE_KEY_BY_LABEL.update({
     "代解部門任務": "farm_department_task",
     "Steam 陪玩": "steam_play",
     "Valorant 陪玩｜娛樂陪": "valorant_entertain",
+    "特戰英豪｜娛樂陪": "valorant_entertain",
     "自訂單": "custom_custom_order",
 })
 

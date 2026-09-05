@@ -7159,8 +7159,8 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
     rule_key = str(getattr(rule, "key", "") or "")
     rule_label = str(getattr(rule, "label", "") or "")
 
-    if category in {"steam", "valorant", "lol"}:
-        return False, "Steam / Valorant / 英雄聯盟不可使用點數福利。"
+    if category == "steam":
+        return False, "Steam遊戲目前不可使用點數福利。"
 
     if category in {"fun", "title"}:
         return False, "趣味單 / 高難度稱號不可使用點數福利。"
@@ -7193,7 +7193,10 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
         if pricing_type != "hourly":
             return False, "免費陪玩 1 小時只適用小時計價項目。"
 
-    if kind == "extra_hours" and pricing_type != "hourly":
+    if kind == "extra_game" and category in {"valorant", "lol"}:
+        return False, "特戰英豪 / 英雄聯盟不可使用加場一場保撤。"
+
+    if kind == "extra_hours" and pricing_type != "hourly" and category not in {"valorant", "lol"}:
         return False, "加時只適用小時計價項目。"
 
     if kind == "extra_game" and pricing_type != "game":

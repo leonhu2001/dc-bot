@@ -62,7 +62,7 @@ GAME_ROLES: tuple[GameRole, ...] = (
         label="魔丸♞鑽石",
     ),
 
-    # VALORANT
+    # 特戰英豪
     GameRole(
         key="valorant_radiant",
         game="valorant",

@@ -1224,18 +1224,14 @@ def point_item_status(
     )
 
 
-    if category in {
-        "steam",
-        "valorant",
-        "lol",
-    }:
+    if category == "steam":
 
         return {
             "allowed":
                 False,
 
             "reason":
-                "Steam / Valorant / 英雄聯盟不可使用點數福利。",
+                "Steam遊戲目前不可使用點數福利。",
         }
 
 
@@ -1326,11 +1322,35 @@ def point_item_status(
 
     if (
         kind
+        == "extra_game"
+        and category
+        in {
+            "valorant",
+            "lol",
+        }
+    ):
+
+        return {
+            "allowed":
+                False,
+
+            "reason":
+                "特戰英豪 / 英雄聯盟不可使用加場一場保撤。",
+        }
+
+
+    if (
+        kind
         == "extra_hours"
         and str(
             rule.pricing_type
         )
         != "hourly"
+        and category
+        not in {
+            "valorant",
+            "lol",
+        }
     ):
 
         return {
@@ -3139,19 +3159,19 @@ MW_ORDER_GROUP_FALLBACKS = {
         "steam_play",
     ],
 
-    "Valorant 娛樂陪": [
+    "特戰英豪 娛樂陪": [
         "valorant_entertain_ng",
         "valorant_entertain_ranked",
     ],
-    "Valorant 超凡陪": [
+    "特戰英豪 超凡陪": [
         "valorant_ascendant_ng",
         "valorant_ascendant_ranked",
     ],
-    "Valorant 神話陪": [
+    "特戰英豪 神話陪": [
         "valorant_immortal_ng",
         "valorant_immortal_ranked",
     ],
-    "Valorant 輻能陪": [
+    "特戰英豪 輻能陪": [
         "valorant_radiant_ng",
         "valorant_radiant_ranked",
     ],
