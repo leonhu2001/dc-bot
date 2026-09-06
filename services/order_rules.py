@@ -645,16 +645,45 @@ def get_allowed_role_keys(rule: OrderRule) -> tuple[str, ...]:
     return tuple(rule.allowed_roles) + tuple(rule.allowed_game_roles)
 
 
+def _unique_role_keys_by_id(role_keys) -> tuple[str, ...]:
+    result: list[str] = []
+    seen: set[tuple[str, str]] = set()
+
+    for role_key in role_keys:
+        role_id = ALL_ROLE_IDS.get(role_key)
+        identity = (
+            ("id", str(role_id))
+            if role_id is not None
+            else ("key", str(role_key))
+        )
+
+        if identity in seen:
+            continue
+
+        seen.add(identity)
+        result.append(str(role_key))
+
+    return tuple(result)
+
+
 def get_allowed_role_ids(rule: OrderRule) -> list[str]:
-    return [str(ALL_ROLE_IDS[key]) for key in get_allowed_role_keys(rule) if key in ALL_ROLE_IDS]
+    return [
+        str(ALL_ROLE_IDS[key])
+        for key in _unique_role_keys_by_id(get_allowed_role_keys(rule))
+        if key in ALL_ROLE_IDS
+    ]
 
 
 def get_allowed_role_labels(rule: OrderRule) -> list[str]:
-    return [str(ALL_ROLE_LABELS.get(key, key)) for key in get_allowed_role_keys(rule)]
+    return [
+        str(ALL_ROLE_LABELS.get(key, key))
+        for key in _unique_role_keys_by_id(get_allowed_role_keys(rule))
+    ]
 
 
 def role_labels(roles: tuple[str, ...], game_roles: tuple[str, ...] = ()) -> str:
-    return " / ".join(str(ALL_ROLE_LABELS.get(role, role)) for role in tuple(roles) + tuple(game_roles))
+    role_keys = _unique_role_keys_by_id(tuple(roles) + tuple(game_roles))
+    return " / ".join(str(ALL_ROLE_LABELS.get(role, role)) for role in role_keys)
 
 
 def rule_role_labels(rule: OrderRule) -> str:

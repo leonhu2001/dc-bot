@@ -57,6 +57,7 @@ STAFF_ROLE_FILTERS = [
     *[
         {"value": role.role_id, "label": role.label}
         for role in GAME_ROLES
+        if role.role_id not in RECEIVER_ROLE_IDS
     ],
 ]
 

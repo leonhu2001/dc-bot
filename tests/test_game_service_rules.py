@@ -27,6 +27,29 @@ def test_lol_and_apex_master_roles_never_mix():
     assert lol_master.role_id != apex_master.role_id
 
 
+def test_delta_force_protectors_are_registered_as_game_roles():
+    expected = {
+        "delta_top_protector": ("1500234130871550004", "魔丸♛頂護"),
+        "delta_female_protector": ("1500234170943934544", "魔丸♝女護"),
+        "delta_male_protector": ("1500751039060643990", "魔丸♜男護"),
+    }
+
+    for key, (role_id, label) in expected.items():
+        role = GAME_ROLE_BY_KEY[key]
+        assert role.game == "delta_force"
+        assert role.role_id == role_id
+        assert role.label == label
+
+    assert {
+        GAME_ROLE_BY_KEY[key].role_id
+        for key in expected
+    } == {
+        ROLE_IDS["top_protector"],
+        ROLE_IDS["female_protector"],
+        ROLE_IDS["male_protector"],
+    }
+
+
 def test_game_rank_orders_do_not_inherit_delta_protector_roles():
     assert ORDER_RULES["valorant_ascendant_ng"].allowed_roles == ()
     assert ORDER_RULES["lol_master_ng"].allowed_roles == ()
@@ -61,12 +84,13 @@ def test_entertainment_uses_universal_companions_plus_same_game_ranks():
     }
 
 
-def test_steam_accepts_all_five_legacy_roles_and_all_nine_game_ranks():
+def test_steam_accepts_all_five_legacy_roles_and_all_registered_game_roles():
     steam = ORDER_RULES["steam_play"]
     allowed_ids = set(get_allowed_role_ids(steam))
 
     assert set(steam.allowed_roles) == set(ROLE_IDS)
     assert set(steam.allowed_game_roles) == set(GAME_ROLE_BY_KEY)
+    assert len(GAME_ROLE_BY_KEY) == 12
     assert allowed_ids == set(ALL_ROLE_IDS.values())
     assert len(allowed_ids) == 14
 

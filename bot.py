@@ -312,13 +312,12 @@ BOOSTER_RECEIVER_ROLE_IDS = [1500234130871550004,1500234170943934544,15007510390
 COMPANION_RECEIVER_ROLE_ID = COMPANION_RECEIVER_ROLE_IDS[0]
 BOOSTER_RECEIVER_ROLE_ID = BOOSTER_RECEIVER_ROLE_IDS[0]
 
-# Game qualification roles only receive voice-channel permissions.
-# They are intentionally excluded from COMPANION_RECEIVER_ROLE_IDS / BOOSTER_RECEIVER_ROLE_IDS,
-# so these roles do not gain any order-claim permission.
-GAME_VOICE_ROLE_IDS = [
+# 遊戲身分組彙整給語音權限使用；是否能接單仍由訂單規則決定。
+# Delta Force 的頂護 / 女護 / 男護同時也是既有打手接單身分組，因此這裡先去重。
+GAME_VOICE_ROLE_IDS = list(dict.fromkeys(
     int(role.role_id)
     for role in GAME_ROLES
-]
+))
 
 # 收據頻道 ID
 RECEIPT_CHANNEL_ID = 1497623878619627682
@@ -349,7 +348,7 @@ NEW_MEMBER_ROLE_ID = 1483872591457550494
 
 # 陪玩語音入口 / 陪玩語音房可見與可進入身分組 ID
 # 目前只開放：陪玩接單、打手接單、客服
-PLAY_VOICE_ALLOWED_ROLE_IDS = [
+PLAY_VOICE_ALLOWED_ROLE_IDS = list(dict.fromkeys([
     1500751059239440575,
     1482080315798192210,
     1500234130871550004,
@@ -358,10 +357,10 @@ PLAY_VOICE_ALLOWED_ROLE_IDS = [
     *GAME_VOICE_ROLE_IDS,
     1482084782031638548,
     1507204925766242425,
-]
+]))
 
 # 語音房按「隱藏」後，仍可看見房間的身分組 ID
-VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [
+VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = list(dict.fromkeys([
     1500751059239440575,
     1482080315798192210,
     1500234130871550004,
@@ -370,7 +369,7 @@ VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [
     *GAME_VOICE_ROLE_IDS,
     1482084782031638548,
     1507204925766242425,
-]
+]))
 
 
 # 可看見創建後陪玩 / VIP 語音房，但不可連接的身分組 ID
@@ -460,12 +459,12 @@ configure_voice_helpers(
     vip_voice_lobby_role_ids=VIP_VOICE_LOBBY_ROLE_IDS,
     play_voice_allowed_role_ids=PLAY_VOICE_ALLOWED_ROLE_IDS,
     voice_room_hidden_visible_role_ids=VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS,
-    voice_move_member_role_ids=[
+    voice_move_member_role_ids=list(dict.fromkeys([
         *COMPANION_RECEIVER_ROLE_IDS,
         *BOOSTER_RECEIVER_ROLE_IDS,
         *GAME_VOICE_ROLE_IDS,
         CUSTOMER_ROLE_ID,
-    ],
+    ])),
     temp_voice_control_panels=TEMP_VOICE_CONTROL_PANELS,
 )
 

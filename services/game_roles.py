@@ -22,6 +22,26 @@ class GameRole:
 # ============================================================
 
 GAME_ROLES: tuple[GameRole, ...] = (
+    # Delta Force
+    GameRole(
+        key="delta_top_protector",
+        game="delta_force",
+        role_id="1500234130871550004",
+        label="魔丸♛頂護",
+    ),
+    GameRole(
+        key="delta_female_protector",
+        game="delta_force",
+        role_id="1500234170943934544",
+        label="魔丸♝女護",
+    ),
+    GameRole(
+        key="delta_male_protector",
+        game="delta_force",
+        role_id="1500751039060643990",
+        label="魔丸♜男護",
+    ),
+
     # League of Legends
     GameRole(
         key="lol_elite",
