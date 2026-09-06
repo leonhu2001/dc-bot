@@ -189,6 +189,50 @@ def _find_order(ticket_channel_id: int | str | None, dispatch_message_id: int | 
         conn.close()
 
 
+def resolve_ticket_customer_id(
+    channel: discord.TextChannel,
+    fallback_customer_id: int | None = None,
+) -> int | None:
+    """Resolve the ticket owner without relying on an in-memory View instance."""
+    if fallback_customer_id is not None:
+        try:
+            value = int(fallback_customer_id)
+            if value > 0:
+                return value
+        except (TypeError, ValueError):
+            pass
+
+    order = _find_order(channel.id)
+    if order is not None:
+        try:
+            value = int(str(order["customer_discord_id"] or "").strip())
+            if value > 0:
+                return value
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    topic = str(channel.topic or "")
+    if topic:
+        for part in topic.split(";"):
+            if "=" not in part:
+                continue
+            key, raw_value = part.split("=", 1)
+            if key.strip() != "order_customer_id":
+                continue
+            try:
+                value = int(raw_value.strip())
+                if value > 0:
+                    return value
+            except ValueError:
+                pass
+
+    try:
+        value = int(channel.name.rsplit("-", 1)[-1])
+        return value if value > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
 def get_review_targets(ticket_channel_id: int | str | None, dispatch_message_id: int | str | None = None) -> tuple[sqlite3.Row | None, list[dict]]:
     order = _find_order(ticket_channel_id, dispatch_message_id)
     if order is None:
@@ -958,11 +1002,16 @@ class ConfirmCloseTicketView(discord.ui.View):
 
 
 class ReviewButtonView(discord.ui.View):
-    def __init__(self, customer_id: int, order_content: str | None = None):
-        super().__init__(timeout=86400)
+    def __init__(self, customer_id: int | None = None, order_content: str | None = None):
+        # Persistent view: fixed custom_ids + timeout=None let old post-close
+        # buttons keep working after bot restarts.
+        super().__init__(timeout=None)
         self.customer_id = customer_id
         self.order_content = order_content
         ensure_review_tables()
+
+    def _customer_id_for_channel(self, channel: discord.TextChannel) -> int | None:
+        return resolve_ticket_customer_id(channel, self.customer_id)
 
     @discord.ui.button(
         label="⭐ 評價本次服務",
@@ -971,16 +1020,21 @@ class ReviewButtonView(discord.ui.View):
         row=0,
     )
     async def leave_review(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not can_operate_review(interaction, self.customer_id):
-            await interaction.response.send_message("只有這張票口的點單顧客或客服可以留下評價。", ephemeral=True)
-            return
-
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
             return
 
-        order, targets, skipped_all = build_review_status(channel.id, self.customer_id)
+        customer_id = self._customer_id_for_channel(channel)
+        if customer_id is None:
+            await interaction.response.send_message("找不到這張票口的顧客資料，請通知客服。", ephemeral=True)
+            return
+
+        if not can_operate_review(interaction, customer_id):
+            await interaction.response.send_message("只有這張票口的點單顧客或客服可以留下評價。", ephemeral=True)
+            return
+
+        order, targets, skipped_all = build_review_status(channel.id, customer_id)
 
         if skipped_all:
             await interaction.response.send_message("這張單已經選擇不留評價。", ephemeral=True)
@@ -994,11 +1048,7 @@ class ReviewButtonView(discord.ui.View):
             )
             return
 
-        lines = [
-            "請選擇要評價的成員：",
-            "",
-        ]
-
+        lines = ["請選擇要評價的成員：", ""]
         for item in targets:
             status = f"已評價 ⭐ {item['rating']}" if item.get("reviewed") else "尚未評價"
             lines.append(f"{_target_label(item)}｜{status}")
@@ -1007,7 +1057,7 @@ class ReviewButtonView(discord.ui.View):
             "\n".join(lines),
             ephemeral=True,
             view=MemberReviewMenuView(
-                customer_id=self.customer_id,
+                customer_id=customer_id,
                 ticket_channel_id=channel.id,
                 order_content=self.order_content,
             ),
@@ -1020,13 +1070,18 @@ class ReviewButtonView(discord.ui.View):
         row=0,
     )
     async def skip_review(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not can_operate_review(interaction, self.customer_id):
-            await interaction.response.send_message("只有這張票口的點單顧客或客服可以操作。", ephemeral=True)
-            return
-
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            return
+
+        customer_id = self._customer_id_for_channel(channel)
+        if customer_id is None:
+            await interaction.response.send_message("找不到這張票口的顧客資料，請通知客服。", ephemeral=True)
+            return
+
+        if not can_operate_review(interaction, customer_id):
+            await interaction.response.send_message("只有這張票口的點單顧客或客服可以操作。", ephemeral=True)
             return
 
         order, targets = get_review_targets(channel.id)
@@ -1034,16 +1089,20 @@ class ReviewButtonView(discord.ui.View):
             order=order,
             ticket_channel_id=channel.id,
             dispatch_message_id=order["dispatch_message_id"] if order is not None else None,
-            customer_id=self.customer_id,
+            customer_id=customer_id,
             targets=targets,
         )
 
-        for child in self.children:
+        updated_view = ReviewButtonView(
+            customer_id=customer_id,
+            order_content=self.order_content,
+        )
+        for child in updated_view.children:
             if getattr(child, "custom_id", "") in {"review_leave_button", "review_skip_button"}:
                 child.disabled = True
 
         try:
-            await interaction.message.edit(view=self)
+            await interaction.message.edit(view=updated_view)
         except discord.HTTPException:
             pass
 
@@ -1067,19 +1126,23 @@ class ReviewButtonView(discord.ui.View):
         row=1,
     )
     async def favorite_members(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有這張票口的老闆可以收藏成員。", ephemeral=True)
-            return
-
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
             return
 
+        customer_id = self._customer_id_for_channel(channel)
+        if customer_id is None:
+            await interaction.response.send_message("找不到這張票口的顧客資料，請通知客服。", ephemeral=True)
+            return
+
+        if interaction.user.id != customer_id:
+            await interaction.response.send_message("只有這張票口的老闆可以收藏成員。", ephemeral=True)
+            return
+
         await interaction.response.defer(ephemeral=True)
 
         _order, targets = get_review_targets(channel.id)
-
         if not targets:
             await interaction.followup.send(
                 "這張單目前找不到接單成員資料，暫時無法收藏本次成員。",
@@ -1088,15 +1151,11 @@ class ReviewButtonView(discord.ui.View):
             return
 
         favorite_ids = get_staff_favorites(
-            self.customer_id,
+            customer_id,
             [str(item.get("staff_id") or "") for item in targets],
         )
 
-        lines = [
-            "選擇要加入收藏的本次成員：",
-            "",
-        ]
-
+        lines = ["選擇要加入收藏的本次成員：", ""]
         for item in targets:
             staff_id = str(item.get("staff_id") or "")
             status = "已收藏" if staff_id in favorite_ids else "尚未收藏"
@@ -1106,7 +1165,7 @@ class ReviewButtonView(discord.ui.View):
             "\n".join(lines),
             ephemeral=True,
             view=FavoriteCurrentMembersView(
-                customer_id=self.customer_id,
+                customer_id=customer_id,
                 targets=targets,
             ),
         )
@@ -1118,16 +1177,7 @@ class ReviewButtonView(discord.ui.View):
         row=1,
     )
     async def reorder(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # reorder_v2_direct_self_service
-        if interaction.user.id != self.customer_id:
-            await interaction.response.send_message(
-                "只有這張票口的老闆可以使用再約。",
-                ephemeral=True,
-            )
-            return
-
         channel = interaction.channel
-
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message(
                 "無法確認目前票口頻道。",
@@ -1135,10 +1185,19 @@ class ReviewButtonView(discord.ui.View):
             )
             return
 
-        order, targets = get_review_targets(
-            channel.id
-        )
+        customer_id = self._customer_id_for_channel(channel)
+        if customer_id is None:
+            await interaction.response.send_message("找不到這張票口的顧客資料，請通知客服。", ephemeral=True)
+            return
 
+        if interaction.user.id != customer_id:
+            await interaction.response.send_message(
+                "只有這張票口的老闆可以使用再約。",
+                ephemeral=True,
+            )
+            return
+
+        order, targets = get_review_targets(channel.id)
         if order is None:
             await interaction.response.send_message(
                 "找不到這張已結單訂單的網站資料，暫時無法自動建立再約單。",
@@ -1147,7 +1206,6 @@ class ReviewButtonView(discord.ui.View):
             return
 
         creator = _REORDER_TICKET_CREATOR
-
         if creator is None:
             await interaction.response.send_message(
                 "再約系統尚未完成初始化，請通知客服。",
@@ -1155,10 +1213,7 @@ class ReviewButtonView(discord.ui.View):
             )
             return
 
-        await interaction.response.defer(
-            ephemeral=True,
-            thinking=True,
-        )
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
         try:
             result = await creator(
@@ -1170,11 +1225,10 @@ class ReviewButtonView(discord.ui.View):
         except Exception as exc:
             print(
                 f"[reorder] create ticket failed "
-                f"customer_id={self.customer_id} "
+                f"customer_id={customer_id} "
                 f"ticket_channel_id={channel.id}: "
                 f"{type(exc).__name__}: {exc}"
             )
-
             await interaction.followup.send(
                 "建立再約票口失敗，請通知客服確認機器人紀錄。",
                 ephemeral=True,
@@ -1189,25 +1243,15 @@ class ReviewButtonView(discord.ui.View):
             return
 
         new_channel = result.get("channel")
-
-        if not isinstance(
-            new_channel,
-            discord.TextChannel,
-        ):
+        if not isinstance(new_channel, discord.TextChannel):
             await interaction.followup.send(
                 "沒有成功建立再約票口，請通知客服。",
                 ephemeral=True,
             )
             return
 
-        created = bool(
-            result.get("created", True)
-        )
-
-        warning = str(
-            result.get("warning")
-            or ""
-        ).strip()
+        created = bool(result.get("created", True))
+        warning = str(result.get("warning") or "").strip()
 
         if created:
             text = (
@@ -1222,16 +1266,9 @@ class ReviewButtonView(discord.ui.View):
             )
 
         if warning:
-            text += (
-                "\n\n提醒："
-                + warning
-            )
+            text += "\n\n提醒：" + warning
 
-        await interaction.followup.send(
-            text,
-            ephemeral=True,
-        )
-
+        await interaction.followup.send(text, ephemeral=True)
 
     @discord.ui.button(
         label="關閉票口",
@@ -1240,7 +1277,17 @@ class ReviewButtonView(discord.ui.View):
         row=1,
     )
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        is_customer = interaction.user.id == self.customer_id
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            return
+
+        customer_id = self._customer_id_for_channel(channel)
+        if customer_id is None:
+            await interaction.response.send_message("找不到這張票口的顧客資料，請通知客服。", ephemeral=True)
+            return
+
+        is_customer = interaction.user.id == customer_id
         is_staff = isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user)
 
         if not is_customer and not is_staff:
@@ -1250,5 +1297,6 @@ class ReviewButtonView(discord.ui.View):
         await interaction.response.send_message(
             "確定要關閉這個票口嗎？",
             ephemeral=True,
-            view=ConfirmCloseTicketView(customer_id=self.customer_id),
+            view=ConfirmCloseTicketView(customer_id=customer_id),
         )
+

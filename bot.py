@@ -10360,6 +10360,11 @@ async def on_ready():
         bot.add_view(RewardRedeemView())
         bot._reward_redeem_view_registered = True
 
+    if not getattr(bot, "_post_close_review_view_registered", False):
+        bot.add_view(ReviewButtonView(customer_id=None))
+        bot._post_close_review_view_registered = True
+        print("[review] persistent post-close view registered", flush=True)
+
     ensure_wallet_tables()
     ensure_web_sync_event_worker_started()
     global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
