@@ -24,6 +24,14 @@ PROTECTOR_ROLE_IDS = {
     "1500751039060643990",  # 魔丸♜男護
 }
 
+# These two-person fun orders must end with exactly one protector-level
+# staff member and one companion-only staff member. A member who has both
+# a companion role and any protector role is counted as protector-level.
+EXACT_ONE_PROTECTOR_RULE_KEYS = {
+    "fun_lovebirds",
+    "fun_read_no_reply",
+}
+
 
 @dataclass(frozen=True)
 class AcceptanceClaim:
@@ -365,6 +373,7 @@ def claim_acceptance_order(
 
         required_staff_count = _to_int(meta.get("required_staff_count"), 1)
         min_protector_count = _to_int(meta.get("min_protector_count"), 0)
+        order_rule_key = str(meta.get("order_rule_key") or "")
         allowed_role_ids = set(_load_json_list(meta.get("allowed_role_ids_json")))
         specified_staff_ids = _load_json_list(meta.get("specified_staff_ids_json"))
 
@@ -391,8 +400,21 @@ def claim_acceptance_order(
         next_protector_count = current_protector_count + (1 if candidate_is_protector else 0)
         remaining_slots_after_claim = required_staff_count - (len(active_rows) + 1)
 
+        if (
+            order_rule_key in EXACT_ONE_PROTECTOR_RULE_KEYS
+            and next_protector_count > 1
+        ):
+            raise ValueError(
+                "這張單固定 1 護 + 1 陪；已有護級接單，"
+                "下一位不能持有男護、女護或頂護身分。"
+            )
+
         if next_protector_count + remaining_slots_after_claim < min_protector_count:
-            raise ValueError("這張單至少需要護級接單，剩餘名額不能再由陪級接。")
+            raise ValueError(
+                "這張單固定 1 護 + 1 陪；剩餘名額必須由護級接單。"
+                if order_rule_key in EXACT_ONE_PROTECTOR_RULE_KEYS
+                else "這張單至少需要護級接單，剩餘名額不能再由陪級接。"
+            )
 
         existing = conn.execute(text("""
             SELECT id
