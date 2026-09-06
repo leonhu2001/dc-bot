@@ -6613,14 +6613,10 @@ def calculate_manual_price_adjustment(
         int(base_amount or 0),
     )
 
-    (
-        rate,
-        discount_reason,
-        discount_source,
-        vip_level_name,
-    ) = _resolve_self_service_discount_rate(
-        rule,
-        data,
+    rate = (
+        _resolve_manual_discount_rate_percent(
+            data
+        )
     )
 
     after_percent = max(
@@ -7618,10 +7614,14 @@ def calculate_self_service_financials(
         - legacy_free_hour,
     )
 
-    rate = (
-        _resolve_manual_discount_rate_percent(
-            data
-        )
+    (
+        rate,
+        discount_reason,
+        discount_source,
+        vip_level_name,
+    ) = _resolve_self_service_discount_rate(
+        rule,
+        data,
     )
 
     after_percent = max(
