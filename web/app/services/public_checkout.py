@@ -38,6 +38,8 @@ SEASON_CONTRACT_UNIT_PRICE = 600
 
 SEASON_CONTRACT_MAX = 7
 
+APEX_RANKED_SURCHARGE_PER_HOUR_PER_PLAYER = 50
+
 
 
 SEASON_NORMAL_ADJUSTMENTS = {
@@ -148,162 +150,10 @@ def _get_public_rule(
     # 不影響 Discord Bot runtime。
     # --------------------------------------------------------
 
-    if (
-        rule_key
-        == "farm_season_3x3_normal"
-    ):
-
-        return replace(
-            source_rule,
-
-            pricing_type="fixed",
-
-            price=
-                SEASON_NORMAL_PRICE,
-
-            min_quantity=1,
-
-            max_quantity=1,
-
-            staff_adjustments=
-                dict(
-                    SEASON_NORMAL_ADJUSTMENTS
-                ),
-
-            staff_adjustment_labels=
-                dict(
-                    SEASON_NORMAL_ADJUSTMENT_LABELS
-                ),
-        )
-
-
-    if (
-        rule_key
-        == "farm_season_3x3_contract"
-    ):
-
-        return replace(
-            source_rule,
-
-            pricing_type="unit",
-
-            price=
-                SEASON_CONTRACT_UNIT_PRICE,
-
-            unit_label="個",
-
-            min_quantity=1,
-
-            max_quantity=
-                SEASON_CONTRACT_MAX,
-
-            staff_adjustments={},
-
-            staff_adjustment_labels={},
-        )
-
-
-    return source_rule
-
-
-def build_public_quote(
-    *,
-    rule_key: str,
-    quantity: int | None = None,
-    player_count: int | None = None,
-    customer_adjustments: Any = None,
-    specified_staff_id: str | None = None,
-) -> dict:
-
-    rule_key = str(
-        rule_key
-        or ""
-    ).strip()
-
-
-    if not rule_key:
-
-        raise ValueError(
-            "請先選擇商品方案。"
-        )
-
-
-    if (
-        rule_key
-        in PUBLIC_DISABLED_RULE_KEYS
-    ):
-
-        raise ValueError(
-            "這個舊方案已停止提供新訂單。"
-        )
-
-
-    rule = _get_public_rule(
-        rule_key
+    is_apex_base_rule = (
+        str(rule.category) == "apex"
+        and not rule_key.endswith("_ranked")
     )
-
-
-    quantity_value = _to_int(
-        quantity,
-        1,
-    )
-
-
-    if quantity_value <= 0:
-        quantity_value = 1
-
-
-    if (
-        rule_key
-        == "farm_season_3x3_contract"
-        and quantity_value
-        > SEASON_CONTRACT_MAX
-    ):
-
-        raise ValueError(
-            "命運契約最多只能選 7 個。"
-        )
-
-
-    player_count_value = _to_int(
-        player_count,
-        1,
-    )
-
-
-    if player_count_value <= 0:
-        player_count_value = 1
-
-
-    if (
-        rule.player_count_enabled
-        and rule.max_player_count is None
-        and player_count_value > 8
-    ):
-
-        raise ValueError(
-            "網站單次最多選擇 8 位陪玩。"
-        )
-
-
-    adjustments = (
-        _normalize_adjustments(
-            customer_adjustments
-        )
-    )
-
-
-    for key in adjustments:
-
-        if (
-            key
-            in CUSTOMER_FORBIDDEN_ADJUSTMENTS
-        ):
-
-            raise ValueError(
-                "這個優惠只能由客服套用。"
-            )
-
 
     if (
         rule_key
@@ -325,6 +175,20 @@ def build_public_quote(
                 "這張訂單包含未開放的附加需求。"
             )
 
+    elif is_apex_base_rule:
+
+        unknown = [
+            key
+            for key
+            in adjustments
+            if key != "ranked"
+        ]
+
+        if unknown:
+
+            raise ValueError(
+                "這張 APEX 訂單包含未開放的附加需求。"
+            )
 
     elif adjustments:
 
@@ -347,10 +211,12 @@ def build_public_quote(
 
         specified_roles=[],
 
-        staff_adjustments=
-            adjustments,
+        staff_adjustments=(
+            []
+            if is_apex_base_rule
+            else adjustments
+        ),
     )
-
 
     base_amount = int(
         result.base_amount
@@ -360,6 +226,25 @@ def build_public_quote(
     adjustment_amount = int(
         result.staff_adjustment_amount
     )
+
+    apex_ranked_surcharge = 0
+
+    if (
+        is_apex_base_rule
+        and "ranked" in adjustments
+    ):
+        apex_ranked_surcharge = (
+            APEX_RANKED_SURCHARGE_PER_HOUR_PER_PLAYER
+            * int(quantity_value)
+            * int(
+                player_count_value
+                if rule.player_count_enabled
+                else 1
+            )
+        )
+        adjustment_amount += int(
+            apex_ranked_surcharge
+        )
 
 
     special_price_applied = False
@@ -396,6 +281,26 @@ def build_public_quote(
 
     for key in adjustments:
 
+        if (
+            is_apex_base_rule
+            and key == "ranked"
+        ):
+            adjustment_details.append(
+                {
+                    "key":
+                        key,
+
+                    "label":
+                        "積分場（每人每小時 +50T）",
+
+                    "amount":
+                        int(
+                            apex_ranked_surcharge
+                        ),
+                }
+            )
+            continue
+
         adjustment_details.append(
             {
                 "key":
@@ -415,7 +320,6 @@ def build_public_quote(
                     ),
             }
         )
-
 
     return {
         "rule_key":
