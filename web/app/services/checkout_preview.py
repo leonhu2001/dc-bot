@@ -9,6 +9,12 @@ from services.order_flow import (
     get_payment_method_info,
 )
 
+from core.vip_levels import (
+    VIP_DISCOUNT_EXCLUDED_CATEGORIES as VIP_EXCLUDED_CATEGORIES,
+    VIP_DISCOUNT_EXCLUDED_RULE_KEYS as VIP_EXCLUDED_RULE_KEYS,
+    VIP_DISCOUNT_PAY_RATES as VIP_PAY_RATES,
+)
+
 from services.order_rules import (
     ALL_ROLE_IDS,
     ALL_ROLE_LABELS,
@@ -57,17 +63,6 @@ PUBLIC_ROLE_LABELS = {
 # Black Diamond 94%
 # ============================================================
 
-VIP_PAY_RATES = {
-    "普通魔丸": 100,
-    "銀級魔丸": 100,
-    "金級魔丸": 98,
-    "白金魔丸": 98,
-    "鑽石魔丸": 96,
-    "白鑽魔丸": 96,
-    "黑鑽魔丸": 94,
-}
-
-
 VIP_THRESHOLDS = [
     (88888, "黑鑽魔丸"),
     (50000, "白鑽魔丸"),
@@ -76,25 +71,6 @@ VIP_THRESHOLDS = [
     (6000, "金級魔丸"),
     (2000, "銀級魔丸"),
 ]
-
-
-# 因目前公開 VIP 條款的兩處排除文字並不完全一致，
-# 結帳先採保守模式，避免錯誤多給折扣。
-VIP_EXCLUDED_CATEGORIES = {
-    "fun",
-    "title",
-}
-
-
-VIP_EXCLUDED_RULE_KEYS = {
-    "basic_trial_500",
-    "basic_trial_1000",
-    "farm_season_3x3_normal",
-    "farm_season_3x3_contract",
-    "farm_season_3x3_dc_skin",
-    "farm_season_3x3_dc_loss",
-    "farm_season_3x3_dc_skin_loss",
-}
 
 
 # ============================================================
@@ -1695,14 +1671,35 @@ def calculate_checkout_financials(
     )
 
 
+    payout_base = max(
+        0,
+        after_vip
+        + effective_specify_fee,
+    )
+
     return {
         "service_amount":
+            service_amount,
+
+        "original_amount":
             service_amount,
 
         "vip_pay_rate":
             vip_pay_rate,
 
+        "manual_discount_percent":
+            vip_pay_rate,
+
+        "discount_rate_percent":
+            vip_pay_rate,
+
         "vip_discount_amount":
+            vip_discount_amount,
+
+        "manual_discount_amount":
+            vip_discount_amount,
+
+        "percent_discount_amount":
             vip_discount_amount,
 
         "service_after_vip":
@@ -1711,7 +1708,18 @@ def calculate_checkout_financials(
         "specify_fee":
             specify_fee,
 
+        # 官網目前沒有客服固定折扣入口；
+        # 點數折價必須獨立保存，不能誤當固定折扣。
+        "cash_coupon_amount":
+            0,
+
+        "fixed_discount_amount":
+            0,
+
         "point_cash_discount":
+            point_cash_discount,
+
+        "point_discount_coupon_amount":
             point_cash_discount,
 
         "point_waived_specify_fee":
@@ -1726,21 +1734,25 @@ def calculate_checkout_financials(
         "subtotal_before_wallet":
             subtotal,
 
+        "customer_pay_amount":
+            subtotal,
+
         "wallet_use_amount":
             wallet_use,
 
         "remaining_pay_amount":
             remaining,
 
-        # For later final order snapshot.
-        # Percentage discounts affect payout base;
-        # point cash discount is store-absorbed.
+        # 正式建單與 Discord 同步都使用 canonical 欄位；
+        # *_preview 保留給舊前端相容。
+        "payout_base_amount":
+            payout_base,
+
         "payout_base_preview":
-            max(
-                0,
-                after_vip
-                + effective_specify_fee,
-            ),
+            payout_base,
+
+        "store_absorbed_amount":
+            point_cash_discount,
 
         "store_absorbed_preview":
             point_cash_discount,
