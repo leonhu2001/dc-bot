@@ -343,8 +343,8 @@ for key, label, price, staff_count in [
 
 _add(OrderRule(
     "general", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
-    allowed_roles=ALL_RECEIVER_ROLES,
-    allowed_game_roles=tuple(GAME_ROLE_BY_KEY.keys()),
+    allowed_roles=COMPANION_ROLES,
+    allowed_game_roles=(),
     required_staff_count=1,
     allow_specify=True,
     max_specified_count=1,
@@ -970,6 +970,8 @@ _zy_patch_rule(
     unit_label="H",
     min_quantity=1,
     max_quantity=24,
+    allowed_roles=COMPANION_ROLES,
+    allowed_game_roles=(),
     specify_free_min_units=2,
     specify_free_basis="quantity",
 )
