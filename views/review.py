@@ -969,32 +969,98 @@ class ConfirmCloseTicketView(discord.ui.View):
         super().__init__(timeout=60)
         self.customer_id = customer_id
 
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        item: discord.ui.Item,
+    ) -> None:
+        print(
+            f"[ticket-close] confirm callback error "
+            f"user_id={getattr(interaction.user, 'id', None)} "
+            f"channel_id={getattr(interaction.channel, 'id', None)} "
+            f"item={getattr(item, 'custom_id', None)} "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
+
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    "關閉票口時發生錯誤，請再試一次或通知客服。",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    "關閉票口時發生錯誤，請再試一次或通知客服。",
+                    ephemeral=True,
+                )
+        except discord.HTTPException:
+            pass
+
     @discord.ui.button(label="確認關閉票口", style=discord.ButtonStyle.danger, custom_id="post_close_confirm_delete_ticket")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        channel = interaction.channel
+
+        print(
+            f"[ticket-close] confirm clicked "
+            f"user_id={interaction.user.id} "
+            f"customer_id={self.customer_id} "
+            f"channel_id={getattr(channel, 'id', None)}",
+            flush=True,
+        )
+
+        # Acknowledge immediately so transient DB / Discord latency cannot make
+        # the interaction expire and look like the button did nothing.
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
         is_customer = interaction.user.id == self.customer_id
         is_staff = isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user)
 
         if not is_customer and not is_staff:
-            await interaction.response.send_message("只有這張票口的點單顧客或客服可以關閉票口。", ephemeral=True)
+            await interaction.followup.send(
+                "只有這張票口的點單顧客或客服可以關閉票口。",
+                ephemeral=True,
+            )
             return
 
-        channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            await interaction.followup.send("無法確認目前票口頻道。", ephemeral=True)
             return
 
-        await interaction.response.send_message("已確認關閉票口，頻道將在 3 秒後刪除。", ephemeral=True)
+        await interaction.followup.send(
+            "已確認關閉票口，頻道將在 3 秒後刪除。",
+            ephemeral=True,
+        )
 
         try:
             await channel.send(
                 f"{interaction.user.mention} 已確認關閉票口，頻道將在 3 秒後刪除。",
                 allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
             )
-        except discord.HTTPException:
-            pass
+        except discord.HTTPException as exc:
+            print(
+                f"[ticket-close] channel notice failed "
+                f"channel_id={channel.id} {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         await asyncio.sleep(3)
-        await channel.delete(reason=f"Closed post-order ticket by {interaction.user}")
+
+        try:
+            await channel.delete(reason=f"Closed post-order ticket by {interaction.user}")
+            print(
+                f"[ticket-close] channel deleted "
+                f"channel_id={channel.id} user_id={interaction.user.id}",
+                flush=True,
+            )
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
+            print(
+                f"[ticket-close] channel delete failed "
+                f"channel_id={channel.id} {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            raise
 
     @discord.ui.button(label="先不要關閉", style=discord.ButtonStyle.secondary, custom_id="post_close_keep_ticket")
     async def keep(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1278,23 +1344,50 @@ class ReviewButtonView(discord.ui.View):
     )
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         channel = interaction.channel
+
+        print(
+            f"[ticket-close] close clicked "
+            f"user_id={interaction.user.id} "
+            f"channel_id={getattr(channel, 'id', None)}",
+            flush=True,
+        )
+
+        # Acknowledge before resolving persisted ticket data. This makes the
+        # close button resilient to short SQLite / event-loop stalls.
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
         if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("無法確認目前票口頻道。", ephemeral=True)
+            await interaction.followup.send("無法確認目前票口頻道。", ephemeral=True)
             return
 
         customer_id = self._customer_id_for_channel(channel)
         if customer_id is None:
-            await interaction.response.send_message("找不到這張票口的顧客資料，請通知客服。", ephemeral=True)
+            await interaction.followup.send(
+                "找不到這張票口的顧客資料，請通知客服。",
+                ephemeral=True,
+            )
             return
 
         is_customer = interaction.user.id == customer_id
         is_staff = isinstance(interaction.user, discord.Member) and is_customer_staff(interaction.user)
 
+        print(
+            f"[ticket-close] close resolved "
+            f"user_id={interaction.user.id} "
+            f"customer_id={customer_id} "
+            f"is_customer={is_customer} is_staff={is_staff} "
+            f"channel_id={channel.id}",
+            flush=True,
+        )
+
         if not is_customer and not is_staff:
-            await interaction.response.send_message("只有這張票口的點單顧客或客服可以關閉票口。", ephemeral=True)
+            await interaction.followup.send(
+                "只有這張票口的點單顧客或客服可以關閉票口。",
+                ephemeral=True,
+            )
             return
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "確定要關閉這個票口嗎？",
             ephemeral=True,
             view=ConfirmCloseTicketView(customer_id=customer_id),
