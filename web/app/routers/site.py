@@ -214,7 +214,7 @@ async def home(
             "eyebrow":
                 "ENTERTAINMENT",
             "description":
-                "只有女陪身分，主打聊天、娛樂與氣氛互動。",
+                "持有女陪身分，主打聊天、娛樂與氣氛互動。",
             "profiles":
                 list_public_staff(
                     role_filter=
@@ -229,7 +229,7 @@ async def home(
             "eyebrow":
                 "ENTERTAINMENT",
             "description":
-                "只有男陪身分，適合輕鬆開黑與聊天娛樂。",
+                "持有男陪身分，適合輕鬆開黑與聊天娛樂。",
             "profiles":
                 list_public_staff(
                     role_filter=
