@@ -264,10 +264,33 @@
             )
             .forEach(
                 input => {
-                    total += Number(
+                    let amount = Number(
                         input.dataset.amount
                         || 0
                     );
+
+                    const mode =
+                        input.dataset.amountMode
+                        || "flat";
+
+                    if (
+                        mode
+                        === "quantity_x_player_count"
+                    ) {
+                        amount *=
+                            quantity
+                            * playerCount;
+                    } else if (
+                        mode === "quantity"
+                    ) {
+                        amount *= quantity;
+                    } else if (
+                        mode === "player_count"
+                    ) {
+                        amount *= playerCount;
+                    }
+
+                    total += amount;
                 }
             );
 
@@ -510,6 +533,12 @@
                     String(
                         adjustment.amount
                         || 0
+                    );
+
+                input.dataset.amountMode =
+                    String(
+                        adjustment.amount_mode
+                        || "flat"
                     );
 
 
