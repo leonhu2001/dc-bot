@@ -150,6 +150,163 @@ def _get_public_rule(
     # 不影響 Discord Bot runtime。
     # --------------------------------------------------------
 
+    if (
+        rule_key
+        == "farm_season_3x3_normal"
+    ):
+
+        return replace(
+            source_rule,
+
+            pricing_type="fixed",
+
+            price=
+                SEASON_NORMAL_PRICE,
+
+            min_quantity=1,
+
+            max_quantity=1,
+
+            staff_adjustments=
+                dict(
+                    SEASON_NORMAL_ADJUSTMENTS
+                ),
+
+            staff_adjustment_labels=
+                dict(
+                    SEASON_NORMAL_ADJUSTMENT_LABELS
+                ),
+        )
+
+
+    if (
+        rule_key
+        == "farm_season_3x3_contract"
+    ):
+
+        return replace(
+            source_rule,
+
+            pricing_type="unit",
+
+            price=
+                SEASON_CONTRACT_UNIT_PRICE,
+
+            unit_label="個",
+
+            min_quantity=1,
+
+            max_quantity=
+                SEASON_CONTRACT_MAX,
+
+            staff_adjustments={},
+
+            staff_adjustment_labels={},
+        )
+
+
+    return source_rule
+
+
+def build_public_quote(
+    *,
+    rule_key: str,
+    quantity: int | None = None,
+    player_count: int | None = None,
+    customer_adjustments: Any = None,
+    specified_staff_id: str | None = None,
+) -> dict:
+
+    rule_key = str(
+        rule_key
+        or ""
+    ).strip()
+
+
+    if not rule_key:
+
+        raise ValueError(
+            "請先選擇商品方案。"
+        )
+
+
+    if (
+        rule_key
+        in PUBLIC_DISABLED_RULE_KEYS
+    ):
+
+        raise ValueError(
+            "這個舊方案已停止提供新訂單。"
+        )
+
+
+    rule = _get_public_rule(
+        rule_key
+    )
+
+
+    quantity_value = _to_int(
+        quantity,
+        1,
+    )
+
+
+    if quantity_value <= 0:
+        quantity_value = 1
+
+
+    if (
+        rule_key
+        == "farm_season_3x3_contract"
+        and quantity_value
+        > SEASON_CONTRACT_MAX
+    ):
+
+        raise ValueError(
+            "命運契約最多只能選 7 個。"
+        )
+
+
+    player_count_value = _to_int(
+        player_count,
+        1,
+    )
+
+
+    if player_count_value <= 0:
+        player_count_value = 1
+
+
+    if (
+        rule.player_count_enabled
+        and rule.max_player_count is None
+        and player_count_value > 8
+    ):
+
+        raise ValueError(
+            "網站單次最多選擇 8 位陪玩。"
+        )
+
+
+    adjustments = (
+        _normalize_adjustments(
+            customer_adjustments
+        )
+    )
+
+
+    for key in adjustments:
+
+        if (
+            key
+            in CUSTOMER_FORBIDDEN_ADJUSTMENTS
+        ):
+
+            raise ValueError(
+                "這個優惠只能由客服套用。"
+            )
+
+
     is_apex_base_rule = (
         str(rule.category) == "apex"
         and not rule_key.endswith("_ranked")
@@ -196,7 +353,6 @@ def _get_public_rule(
             "這個方案沒有開放附加需求。"
         )
 
-
     result = calculate_price(
         rule,
 
@@ -217,6 +373,7 @@ def _get_public_rule(
             else adjustments
         ),
     )
+
 
     base_amount = int(
         result.base_amount
