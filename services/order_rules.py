@@ -503,8 +503,8 @@ for key, label, price in [
 
 _add(OrderRule(
     "steam", "steam_play", "Steam 陪玩", "hourly", 350, "H",
-    allowed_roles=ALL_RECEIVER_ROLES,
-    allowed_game_roles=tuple(GAME_ROLE_BY_KEY.keys()),
+    allowed_roles=COMPANION_ROLES,
+    allowed_game_roles=(),
     required_staff_count="player_count",
     player_count_enabled=True,
     max_player_count=None,
@@ -1078,7 +1078,7 @@ _zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label=
 _zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
 
-# Steam：350 / 小時 / 每位；1～4 位。5 個舊職位 + 9 個遊戲階級皆可接。
+# Steam：350 / 小時 / 每位；1～4 位。只看基本男陪 / 女陪身分；技術階級不另外放行。
 _zy_patch_rule(
     "steam_play",
     label="Steam遊戲｜娛樂陪",
@@ -1094,8 +1094,9 @@ _zy_patch_rule(
     price_multiply_player_count=True,
     allow_specify=True,
     max_specified_count=4,
-    allowed_game_roles=tuple(GAME_ROLE_BY_KEY.keys()),
-    specify_fee_by_role=_all_receiver_fee(150),
+    allowed_roles=COMPANION_ROLES,
+    allowed_game_roles=(),
+    specify_fee_by_role={role: 150 for role in COMPANION_ROLES},
     specify_fee_default=150,
     specify_free_min_units=2,
     specify_free_basis="quantity",
