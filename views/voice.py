@@ -385,8 +385,8 @@ def build_public_lobby_overwrites(guild: discord.Guild) -> dict:
 
 
 def build_public_voice_overwrites(guild: discord.Guild) -> dict:
-    """公共臨時房：所有人完整權限。"""
-    return {
+    """公共臨時房：所有人可正常使用；客服、陪玩／打手與遊戲資格身分組可移動成員。"""
+    overwrites = {
         guild.default_role: build_full_temp_voice_overwrite(connect=True),
         guild.me: build_full_temp_voice_overwrite(
             connect=True,
@@ -394,6 +394,17 @@ def build_public_voice_overwrites(guild: discord.Guild) -> dict:
             manage_channels=True,
         ),
     }
+
+    for role in get_play_voice_allowed_roles(guild):
+        if not is_receiver_voice_role(role):
+            continue
+
+        overwrites[role] = build_full_temp_voice_overwrite(
+            connect=True,
+            move_members=True,
+        )
+
+    return overwrites
 
 async def get_or_create_play_voice_lobby(guild: discord.Guild) -> discord.VoiceChannel | None:
     category = guild.get_channel(PLAY_VOICE_LOBBY_CATEGORY_ID)
