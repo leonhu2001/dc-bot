@@ -252,6 +252,74 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             for m, v, k in (("NG","ng","lol_elite_ng"),("積分","ranked","lol_elite_ranked")) for count in range(1,5)
         ]},
     ],
+    "apex": [
+        {
+            "label": group_label,
+            "details": [
+                {
+                    "label": f"{rank_label}｜{'單陪' if count == 1 else '雙陪'}",
+                    "value": f"{rank_value}_{count}",
+                    "rule_key": f"{rule_prefix}_{rank_value}{'_ranked' if ranked else ''}",
+                    "player_count": count,
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                }
+                for rank_label, rank_value in rank_options
+                for count in (1, 2)
+            ],
+        }
+        for group_label, rule_prefix, ranked, rank_options in (
+            (
+                "娛樂陪",
+                "apex_entertain",
+                False,
+                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
+            ),
+            (
+                "娛樂陪 積分",
+                "apex_entertain",
+                True,
+                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
+            ),
+            (
+                "鑽石陪",
+                "apex_diamond",
+                False,
+                (("白金以下", "platinum"), ("鑽石", "diamond")),
+            ),
+            (
+                "鑽石陪 積分",
+                "apex_diamond",
+                True,
+                (("白金以下", "platinum"), ("鑽石", "diamond")),
+            ),
+            (
+                "大師陪",
+                "apex_master",
+                False,
+                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
+            ),
+            (
+                "大師陪 積分",
+                "apex_master",
+                True,
+                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
+            ),
+            (
+                "頂獵陪",
+                "apex_predator",
+                False,
+                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
+            ),
+            (
+                "頂獵陪 積分",
+                "apex_predator",
+                True,
+                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
+            ),
+        )
+    ],
     "custom": [
         {
             "label": "自訂",
