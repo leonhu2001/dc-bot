@@ -26,6 +26,7 @@ CATEGORY_ORDER = [
     "steam",
     "valorant",
     "lol",
+    "apex",
 ]
 
 
@@ -248,6 +249,54 @@ GROUP_SPECS = [
     {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"大師、宗師、菁英可接；全部買 8 送 1。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
     {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"宗師、菁英可接；全部買 8 送 1。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
     {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"僅菁英可接；全部買 8 送 1。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
+
+    {
+        "key": "apex_entertain",
+        "category": "apex",
+        "label": "APEX｜娛樂陪",
+        "selector_label": "老闆目前段位",
+        "description": "男陪、女陪可接；可選單陪或雙陪，積分場每人每小時 +50T。",
+        "variants": [
+            ("apex_entertain_platinum", "白金以下"),
+            ("apex_entertain_diamond", "鑽石"),
+            ("apex_entertain_master", "大師 / 頂獵"),
+        ],
+    },
+    {
+        "key": "apex_diamond",
+        "category": "apex",
+        "label": "APEX｜鑽石陪",
+        "selector_label": "老闆目前段位",
+        "description": "鑽石、大師、頂獵可接；可選單陪或雙陪，積分場每人每小時 +50T。",
+        "variants": [
+            ("apex_diamond_platinum", "白金以下"),
+            ("apex_diamond_diamond", "鑽石"),
+        ],
+    },
+    {
+        "key": "apex_master",
+        "category": "apex",
+        "label": "APEX｜大師陪",
+        "selector_label": "老闆目前段位",
+        "description": "大師、頂獵可接；可選單陪或雙陪，積分場每人每小時 +50T。",
+        "variants": [
+            ("apex_master_platinum", "白金以下"),
+            ("apex_master_diamond", "鑽石"),
+            ("apex_master_master", "大師 / 頂獵"),
+        ],
+    },
+    {
+        "key": "apex_predator",
+        "category": "apex",
+        "label": "APEX｜頂獵陪",
+        "selector_label": "老闆目前段位",
+        "description": "僅頂獵可接；可選單陪或雙陪，積分場每人每小時 +50T。",
+        "variants": [
+            ("apex_predator_platinum", "白金以下"),
+            ("apex_predator_diamond", "鑽石"),
+            ("apex_predator_master", "大師 / 頂獵"),
+        ],
+    },
 ]
 
 
@@ -368,6 +417,19 @@ def _variant_data(
         quantity_enabled = True
         min_quantity = 1
         max_quantity = 7
+
+    elif (
+        str(rule.category) == "apex"
+        and not str(rule_key).endswith("_ranked")
+    ):
+        customer_adjustments = [
+            {
+                "key": "ranked",
+                "label": "積分場（每人每小時）",
+                "amount": 50,
+                "amount_mode": "quantity_x_player_count",
+            },
+        ]
 
     roles = get_allowed_role_labels(rule)
 
