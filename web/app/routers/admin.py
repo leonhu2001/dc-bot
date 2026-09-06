@@ -3246,6 +3246,7 @@ async def admin_order_workspace_edit_r8(
                     item = :item,
                     quantity = :quantity,
                     amount = :amount,
+                    payout_base_amount = :amount,
                     customer_pay_amount = CASE
                         WHEN customer_pay_amount IS NULL THEN NULL
                         ELSE :amount
