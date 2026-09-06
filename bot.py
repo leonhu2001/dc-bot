@@ -199,6 +199,7 @@ from core.vip_levels import (
     SILVER_MEMBER_ROLE_ID as DEFAULT_SILVER_MEMBER_ROLE_ID,
     VIP_ROLE_IDS,
     VIP_ROLE_TIERS,
+    get_vip_discount_pay_rate,
 )
 from views.voice import (
     configure_voice_helpers,
@@ -5868,7 +5869,7 @@ def add_self_service_financial_breakdown_fields(
             )
 
         text += (
-            "\n店內吸收，不扣打手分潤"
+            "\n同步降低打手分潤基準"
         )
 
         embed.add_field(
@@ -6509,6 +6510,100 @@ def _resolve_manual_discount_rate_percent(data: dict) -> float:
     return 100.0 - value
 
 
+def _resolve_self_service_discount_rate(
+    rule,
+    data: dict,
+) -> tuple[float, str, str, str]:
+    """統一解析 DC 訂單百分比折扣。
+
+    客服有明確輸入百分比時，以客服設定覆蓋 VIP，避免雙重疊加；
+    否則依顧客目前有效 VIP 等級自動套用。
+    """
+    raw = data.get("manual_discount_percent")
+    override = data.get("manual_discount_percent_override")
+
+    if override is None:
+        # 相容更新前已存在的客服折扣草稿：
+        # 舊版 modal 會留下 set_by，但空白也會被寫成 100。
+        override = (
+            data.get("manual_price_adjustment_set_by") is not None
+            and raw is not None
+            and str(raw).strip() != ""
+            and _resolve_manual_discount_rate_percent(data) < 100
+        )
+
+    if bool(override):
+        rate = _resolve_manual_discount_rate_percent(data)
+        reason = str(
+            data.get("manual_discount_reason")
+            or ""
+        ).strip()
+        return (
+            rate,
+            reason,
+            "manual",
+            "",
+        )
+
+    customer_id = _to_int(
+        data.get("customer_id")
+    )
+    vip_name = "普通魔丸"
+
+    if customer_id is not None:
+        try:
+            reward_data = get_customer_reward_data(
+                int(customer_id)
+            )
+            vip_name = str(
+                get_effective_member_level(
+                    reward_data
+                ).get("name")
+                or "普通魔丸"
+            )
+        except Exception:
+            vip_name = "普通魔丸"
+
+    rate = float(
+        get_vip_discount_pay_rate(
+            vip_name,
+            category=str(
+                getattr(
+                    rule,
+                    "category",
+                    "",
+                )
+                or ""
+            ),
+            rule_key=str(
+                getattr(
+                    rule,
+                    "key",
+                    "",
+                )
+                or ""
+            ),
+        )
+    )
+
+    reason = (
+        f"{vip_name} 自動 VIP 折扣"
+        if rate < 100
+        else ""
+    )
+
+    return (
+        rate,
+        reason,
+        (
+            "vip"
+            if rate < 100
+            else "none"
+        ),
+        vip_name,
+    )
+
+
 def calculate_manual_price_adjustment(
     base_amount: int,
     data: dict,
@@ -6518,10 +6613,14 @@ def calculate_manual_price_adjustment(
         int(base_amount or 0),
     )
 
-    rate = (
-        _resolve_manual_discount_rate_percent(
-            data
-        )
+    (
+        rate,
+        discount_reason,
+        discount_source,
+        vip_level_name,
+    ) = _resolve_self_service_discount_rate(
+        rule,
+        data,
     )
 
     after_percent = max(
@@ -6577,14 +6676,19 @@ def calculate_manual_price_adjustment(
         "manual_discount_amount": percent_off,
         "percent_discount_amount": percent_off,
 
-        "payout_base_amount": after_percent,
+        # 百分比與固定折扣都會降低打手分潤基準。
+        "payout_base_amount": max(
+            0,
+            after_percent - fixed,
+        ),
 
         # 舊 DB 欄位仍保留相容，
         # 但畫面統一叫固定折扣。
         "cash_coupon_amount": fixed,
         "fixed_discount_amount": fixed,
 
-        "store_absorbed_amount": fixed,
+        # 固定折扣改由打手分潤共同承擔，不再列店內吸收。
+        "store_absorbed_amount": 0,
 
         "customer_pay_amount": max(
             0,
@@ -6717,7 +6821,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
             reason = adjustment["cash_coupon_reason"] or "未填原因"
             detail_parts.append(
                 f"固定折扣 -{_format_plain_amount(adjustment['cash_coupon_amount'])}"
-                f"（{reason}，店內吸收）"
+                f"（{reason}，同步降低打手分潤基準）"
             )
 
         lines.append(("金額明細", "｜".join(detail_parts)))
@@ -7581,11 +7685,11 @@ def calculate_self_service_financials(
         - point_cash,
     )
 
-    # 固定折扣 / 點數折價由店內吸收，
-    # 所以不扣打手分潤。
+    # 百分比折扣與固定折扣都會降低打手分潤；
+    # 點數折價仍由店內吸收，不影響打手分潤。
     payout_base = max(
         0,
-        after_percent
+        after_fixed
         + specify_effective,
     )
 
@@ -7706,12 +7810,17 @@ def calculate_self_service_financials(
         "manual_discount_amount": percent_off,
         "percent_discount_amount": percent_off,
 
-        "manual_discount_reason": str(
-            data.get(
-                "manual_discount_reason"
-            )
-            or ""
-        ).strip(),
+        "manual_discount_reason": (
+            discount_reason
+        ),
+
+        "discount_source": (
+            discount_source
+        ),
+
+        "vip_level_name": (
+            vip_level_name
+        ),
 
         "cash_coupon_amount": fixed,
         "fixed_discount_amount": fixed,
@@ -7781,8 +7890,7 @@ def calculate_self_service_financials(
         ),
 
         "store_absorbed_amount": (
-            fixed
-            + point_cash
+            point_cash
         ),
 
         "customer_pay_amount": (
@@ -8214,16 +8322,40 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
             await interaction.response.send_message("請先選擇訂單項目，再設定折扣。", ephemeral=True)
             return
 
+        discount_percent_text = str(
+            self.discount_percent.value
+            or ""
+        ).strip()
+
         try:
-            discount_percent = _parse_discount_percent_text(str(self.discount_percent.value or ""))
-            coupon_amount = _parse_cash_amount_text(str(self.cash_coupon_amount.value or ""))
+            discount_percent = _parse_discount_percent_text(
+                discount_percent_text
+            )
+            coupon_amount = _parse_cash_amount_text(
+                str(
+                    self.cash_coupon_amount.value
+                    or ""
+                )
+            )
         except ValueError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
-        data["manual_discount_mode"] = "pay_rate"
-        data["manual_discount_percent"] = discount_percent
-        data["manual_discount_reason"] = str(self.discount_reason.value or "").strip()
+        if discount_percent_text:
+            data["manual_discount_mode"] = "pay_rate"
+            data["manual_discount_percent"] = discount_percent
+            data["manual_discount_percent_override"] = True
+            data["manual_discount_reason"] = str(
+                self.discount_reason.value
+                or ""
+            ).strip()
+        else:
+            # 百分比留空 = 清除客服百分比覆蓋，回到 VIP 自動折扣。
+            data.pop("manual_discount_mode", None)
+            data.pop("manual_discount_percent", None)
+            data.pop("manual_discount_reason", None)
+            data["manual_discount_percent_override"] = False
+
         data["cash_coupon_amount"] = coupon_amount
         data["fixed_discount_amount"] = coupon_amount
         data["cash_coupon_reason"] = str(self.cash_coupon_reason.value or "").strip()
@@ -8253,14 +8385,25 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
                 edited_panel = False
 
         adjustment_note = []
-        if discount_percent < 100:
-            adjustment_note.append(f"折後比例：{_format_percent_value(discount_percent)}%")
+        if discount_percent_text:
+            adjustment_note.append(
+                "客服百分比：折後 "
+                f"{_format_percent_value(discount_percent)}%"
+            )
+        else:
+            adjustment_note.append(
+                "客服百分比已清除，改由顧客 VIP 等級自動套用。"
+            )
+
         if coupon_amount > 0:
-            adjustment_note.append(f"固定折扣：-{_format_plain_amount(coupon_amount)}（店內吸收，不扣打手分潤）")
+            adjustment_note.append(
+                f"固定折扣：-{_format_plain_amount(coupon_amount)}"
+                "（同步降低打手分潤基準）"
+            )
 
         await interaction.followup.send(
             "已設定折扣。"
-            + ("\n" + "\n".join(adjustment_note) if adjustment_note else "\n目前折後 100%，無固定折扣。")
+            + ("\n" + "\n".join(adjustment_note) if adjustment_note else "")
             + ("" if edited_panel else "\n\n提醒：面板沒有自動刷新，請重新選一次數量即可刷新試算。"),
             ephemeral=True,
         )
