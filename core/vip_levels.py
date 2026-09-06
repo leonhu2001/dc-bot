@@ -135,6 +135,61 @@ VIP_TOPUP_REBATE_PERCENT: dict[str, int] = {
 }
 
 
+# VIP 訂單折扣統一規則。
+# 數值代表「折後應付比例」：98 = 98 折後比例（即 98%）。
+VIP_DISCOUNT_PAY_RATES: dict[str, int] = {
+    "普通魔丸": 100,
+    "銀級魔丸": 100,
+    "金級魔丸": 98,
+    "白金魔丸": 98,
+    "鑽石魔丸": 96,
+    "白鑽魔丸": 96,
+    "黑鑽魔丸": 94,
+}
+
+# 體驗單、趣味單與目前明確排除的方案不套用 VIP 折扣。
+VIP_DISCOUNT_EXCLUDED_CATEGORIES: frozenset[str] = frozenset({
+    "fun",
+    "title",
+})
+
+VIP_DISCOUNT_EXCLUDED_RULE_KEYS: frozenset[str] = frozenset({
+    "basic_trial_500",
+    "basic_trial_1000",
+    "farm_season_3x3_normal",
+    "farm_season_3x3_contract",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin_loss",
+})
+
+
+def get_vip_discount_pay_rate(
+    level_name: str | None,
+    *,
+    category: str | None = None,
+    rule_key: str | None = None,
+) -> int:
+    """回傳訂單應套用的 VIP 折後比例；不適用時回傳 100。"""
+    rate = int(
+        VIP_DISCOUNT_PAY_RATES.get(
+            str(level_name or "普通魔丸"),
+            100,
+        )
+    )
+
+    if rate >= 100:
+        return 100
+
+    if str(category or "").strip() in VIP_DISCOUNT_EXCLUDED_CATEGORIES:
+        return 100
+
+    if str(rule_key or "").strip() in VIP_DISCOUNT_EXCLUDED_RULE_KEYS:
+        return 100
+
+    return max(0, min(100, rate))
+
+
 def get_topup_rebate_percent(level_name: str | None) -> int:
     return int(VIP_TOPUP_REBATE_PERCENT.get(str(level_name or "普通魔丸"), 0))
 
