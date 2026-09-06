@@ -69,6 +69,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "steam": "STEAM遊戲 陪玩",
     "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
+    "apex": "APEX 陪玩",
 }
 
 
@@ -630,6 +631,119 @@ _add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟�
 _add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=550, unit_label="局", allowed_game_roles=("lol_elite",))
 
 
+# ========= APEX Legends 陪玩 =========
+# 價格依「陪玩階級 × 老闆目前段位」決定，積分場每人每小時 +50T。
+# 網站以前台勾選積分場呈現；Discord 則直接使用獨立的積分 rule。
+APEX_GAME_ROLES = ("apex_diamond", "apex_master", "apex_predator")
+
+
+def _add_apex_service_rule(
+    *,
+    key: str,
+    label: str,
+    price: int,
+    allowed_service_roles: tuple[RoleKey, ...] = (),
+    allowed_game_roles: tuple[str, ...] = (),
+) -> None:
+    _add(OrderRule(
+        "apex",
+        key,
+        label,
+        "hourly",
+        price,
+        "H",
+        allowed_roles=allowed_service_roles,
+        allowed_game_roles=allowed_game_roles,
+        required_staff_count="player_count",
+        min_quantity=1,
+        max_quantity=24,
+        player_count_enabled=True,
+        min_player_count=1,
+        max_player_count=2,
+        price_multiply_player_count=True,
+        allow_specify=False,
+        max_specified_count=0,
+        specify_fee_default=0,
+        specify_fee_by_role={},
+        specify_fee_by_game_role={},
+        specify_free_min_units=None,
+        specify_free_basis="quantity_x_player_count",
+        point_benefits_allowed=True,
+    ))
+
+
+_APEX_SERVICE_SPECS = (
+    # key prefix, display label, allowed service roles, allowed game roles,
+    # customer-rank prices: (suffix, label, hourly price)
+    (
+        "apex_entertain",
+        "娛樂陪",
+        COMPANION_ROLES,
+        (),
+        (
+            ("platinum", "白金以下", 250),
+            ("diamond", "鑽石", 300),
+            ("master", "大師/頂獵", 400),
+        ),
+    ),
+    (
+        "apex_diamond",
+        "鑽石陪",
+        (),
+        ("apex_diamond", "apex_master", "apex_predator"),
+        (
+            ("platinum", "白金以下", 300),
+            ("diamond", "鑽石", 350),
+        ),
+    ),
+    (
+        "apex_master",
+        "大師陪",
+        (),
+        ("apex_master", "apex_predator"),
+        (
+            ("platinum", "白金以下", 350),
+            ("diamond", "鑽石", 450),
+            ("master", "大師/頂獵", 550),
+        ),
+    ),
+    (
+        "apex_predator",
+        "頂獵陪",
+        (),
+        ("apex_predator",),
+        (
+            ("platinum", "白金以下", 450),
+            ("diamond", "鑽石", 550),
+            ("master", "大師/頂獵", 650),
+        ),
+    ),
+)
+
+for (
+    _apex_prefix,
+    _apex_service_label,
+    _apex_service_roles,
+    _apex_game_roles,
+    _apex_rank_prices,
+) in _APEX_SERVICE_SPECS:
+    for _rank_suffix, _rank_label, _hourly_price in _apex_rank_prices:
+        _add_apex_service_rule(
+            key=f"{_apex_prefix}_{_rank_suffix}",
+            label=f"APEX｜{_apex_service_label}｜{_rank_label}",
+            price=_hourly_price,
+            allowed_service_roles=_apex_service_roles,
+            allowed_game_roles=_apex_game_roles,
+        )
+        _add_apex_service_rule(
+            key=f"{_apex_prefix}_{_rank_suffix}_ranked",
+            label=f"APEX｜{_apex_service_label}｜{_rank_label}｜積分",
+            price=_hourly_price + 50,
+            allowed_service_roles=_apex_service_roles,
+            allowed_game_roles=_apex_game_roles,
+        )
+
+
 def get_rules_by_category(category: str) -> list[OrderRule]:
     return [rule for rule in ORDER_RULES.values() if rule.category == category]
 
@@ -939,6 +1053,7 @@ CATEGORY_LABELS.update({
     "steam": "STEAM遊戲 陪玩",
     "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
+    "apex": "APEX 陪玩",
     "custom": "自訂",
 })
 
