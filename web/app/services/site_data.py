@@ -1826,13 +1826,15 @@ def list_public_staff(
                 profile
                 for profile
                 in profiles
-                if "female_companion"
-                in set(
+                if set(
                     profile.get(
                         "role_keys"
                     )
                     or []
                 )
+                == {
+                    "female_companion"
+                }
             ]
 
         elif (
@@ -1843,13 +1845,15 @@ def list_public_staff(
                 profile
                 for profile
                 in profiles
-                if "male_companion"
-                in set(
+                if set(
                     profile.get(
                         "role_keys"
                     )
                     or []
                 )
+                == {
+                    "male_companion"
+                }
             ]
 
         elif (
