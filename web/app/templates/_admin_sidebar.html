@@ -18,10 +18,17 @@
         </a>
 
         <a
-            class="{% if _p.startswith('/admin/staff') %}active{% endif %}"
+            class="{% if _p.startswith('/admin/staff') and not _p.startswith('/admin/staff_profiles') %}active{% endif %}"
             href="/admin/staff"
         >
             人員管理
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/staff_profiles') %}active{% endif %}"
+            href="/admin/staff_profiles/"
+        >
+            個人牆管理
         </a>
 
         <a
