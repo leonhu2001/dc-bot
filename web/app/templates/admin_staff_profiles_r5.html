@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+    <style>
+        .profile-toolbar {
+            display:flex;
+            justify-content:space-between;
+            gap:12px;
+            align-items:center;
+            margin-bottom:14px;
+            flex-wrap:wrap;
+        }
+        .profile-toolbar-note {
+            color:var(--r5-muted);
+            font-size:12px;
+            line-height:1.65;
+        }
+        .profile-button {
+            min-height:38px;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            padding:0 13px;
+            border:1px solid var(--r5-line);
+            border-radius:9px;
+            color:#c7c2b7 !important;
+            background:rgba(255,255,255,.025);
+            font-size:12px;
+            font-weight:800;
+            text-decoration:none !important;
+            cursor:pointer;
+        }
+        .profile-button:hover,
+        .profile-button.gold {
+            color:var(--r5-gold-soft) !important;
+            border-color:rgba(223,183,92,.30);
+            background:rgba(223,183,92,.065);
+        }
+        .profile-stats {
+            display:grid;
+            grid-template-columns:repeat(4,minmax(0,1fr));
+            gap:10px;
+            margin-bottom:14px;
+        }
+        .profile-stat {
+            min-height:94px;
+            padding:15px;
+            border:1px solid var(--r5-line);
+            border-radius:12px;
+            background:var(--r5-panel);
+        }
+        .profile-stat span {
+            display:block;
+            color:var(--r5-muted);
+            font-size:11px;
+            font-weight:800;
+        }
+        .profile-stat strong {
+            display:block;
+            margin-top:8px;
+            color:var(--r5-gold-soft);
+            font-size:30px;
+            line-height:1;
+        }
+        .profile-panel {
+            overflow:hidden;
+            border:1px solid var(--r5-line);
+            border-radius:13px;
+            background:var(--r5-panel);
+        }
+        .profile-panel-head {
+            display:flex;
+            justify-content:space-between;
+            gap:12px;
+            align-items:center;
+            min-height:60px;
+            padding:12px 15px;
+            border-bottom:1px solid var(--r5-line);
+        }
+        .profile-panel-head h2 {
+            margin:0;
+            font-size:16px;
+        }
+        .profile-panel-head small {
+            display:block;
+            margin-top:4px;
+            color:var(--r5-muted);
+            font-size:11px;
+        }
+        .profile-scroll { overflow:auto; }
+        .profile-table {
+            width:100%;
+            min-width:1240px;
+            border-collapse:collapse;
+        }
+        .profile-table th,
+        .profile-table td {
+            padding:13px 14px;
+            border-bottom:1px solid rgba(255,255,255,.065);
+            text-align:left;
+            vertical-align:top;
+            font-size:12px;
+        }
+        .profile-table th {
+            color:#8f8a80;
+            background:#0d0d0c;
+            font-size:10px;
+            font-weight:800;
+            letter-spacing:.04em;
+            white-space:nowrap;
+        }
+        .profile-table tbody tr:hover { background:#10100e; }
+        .profile-member strong {
+            display:block;
+            color:var(--r5-text);
+            font-size:13px;
+        }
+        .profile-member code,
+        .profile-muted {
+            display:block;
+            margin-top:4px;
+            color:#777269;
+            font-size:10.5px;
+            word-break:break-all;
+        }
+        .profile-tags {
+            display:flex;
+            flex-wrap:wrap;
+            gap:5px;
+            margin-top:5px;
+        }
+        .profile-tag,
+        .profile-status {
+            display:inline-flex;
+            align-items:center;
+            min-height:23px;
+            padding:3px 7px;
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:999px;
+            color:#b7b2a8;
+            background:rgba(255,255,255,.025);
+            font-size:10px;
+            font-weight:800;
+        }
+        .profile-status.public,
+        .profile-status.ready {
+            color:#a9dfb9;
+            border-color:rgba(123,213,155,.22);
+            background:rgba(123,213,155,.055);
+        }
+        .profile-status.hidden,
+        .profile-status.missing {
+            color:#dfa0a0;
+            border-color:rgba(228,116,116,.22);
+            background:rgba(228,116,116,.055);
+        }
+        .profile-number {
+            color:var(--r5-gold-soft);
+            font-weight:800;
+        }
+        .profile-metrics {
+            line-height:1.65;
+            white-space:nowrap;
+        }
+        .profile-bio {
+            max-width:260px;
+            color:#bbb6ac;
+            line-height:1.6;
+            white-space:pre-wrap;
+        }
+        .profile-wall {
+            min-width:225px;
+        }
+        .profile-wall > a {
+            color:var(--r5-gold-soft) !important;
+            font-weight:800;
+            text-decoration:none;
+        }
+        .profile-wall details {
+            margin-top:7px;
+            padding:8px 9px;
+            border:1px solid rgba(255,255,255,.075);
+            border-radius:9px;
+            background:#0a0a09;
+        }
+        .profile-wall summary {
+            color:#aaa59b;
+            cursor:pointer;
+            font-size:10.5px;
+            font-weight:800;
+        }
+        .profile-panel-meta {
+            margin-top:7px;
+            color:#777269;
+            font-size:10px;
+            line-height:1.55;
+            word-break:break-all;
+        }
+        .profile-command {
+            display:block;
+            margin-top:7px;
+            padding:7px 8px;
+            border-radius:7px;
+            color:#e2ca8d;
+            background:#12120f;
+            font-size:10px;
+            white-space:normal;
+            word-break:break-all;
+        }
+        .profile-actions {
+            display:grid;
+            gap:7px;
+            min-width:88px;
+        }
+        .profile-actions form { margin:0; }
+        .profile-actions .profile-button { width:100%; }
+        .profile-empty {
+            padding:42px 20px !important;
+            color:var(--r5-muted);
+            text-align:center !important;
+        }
+        @media (max-width:900px) {
+            .profile-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width:620px) {
+            .profile-stats { grid-template-columns:1fr 1fr; }
+            .profile-toolbar { align-items:flex-start; }
+        }
+    </style>
+</head>
+<body class="mw-r5-admin">
+<div class="mw-r5-shell">
+    {% include "_admin_sidebar.html" %}
+
+    <section class="mw-r5-main-host">
+        <header class="mw-r5-page-header">
+            <div class="mw-r5-kicker">STAFF PROFILE MANAGEMENT</div>
+            <h1>個人牆管理</h1>
+            <p>管理成員個人牆、公開狀態、Discord Panel 與服務數據。個人牆資料不影響接單與薪資計算。</p>
+        </header>
+
+        <div class="profile-toolbar">
+            <div class="profile-toolbar-note">
+                後台修改個人牆資料後，可展開 Panel 資訊取得同步指令，再同步至 Discord。
+            </div>
+            <a class="profile-button" href="/admin/staff">返回人員管理</a>
+        </div>
+
+        <section class="profile-stats">
+            <article class="profile-stat"><span>全部個人牆</span><strong>{{ stats.total }}</strong></article>
+            <article class="profile-stat"><span>公開中</span><strong>{{ stats.public }}</strong></article>
+            <article class="profile-stat"><span>已隱藏</span><strong>{{ stats.hidden }}</strong></article>
+            <article class="profile-stat"><span>Panel 已建立</span><strong>{{ stats.panel_ready }}</strong></article>
+        </section>
+
+        <section class="profile-panel">
+            <div class="profile-panel-head">
+                <div>
+                    <h2>成員個人牆</h2>
+                    <small>共 {{ rows|length }} 筆，數據包含累積與近 30 天表現。</small>
+                </div>
+            </div>
+
+            <div class="profile-scroll">
+                <table class="profile-table">
+                    <thead>
+                        <tr>
+                            <th>成員</th>
+                            <th>身分 / 職位</th>
+                            <th>遊戲 / 服務</th>
+                            <th>累積數據</th>
+                            <th>近 30 天</th>
+                            <th>個人牆 / Panel</th>
+                            <th>狀態</th>
+                            <th>介紹</th>
+                            <th>更新時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            <td class="profile-member">
+                                <strong>{{ row.display_name }}</strong>
+                                <code>{{ row.staff_id }}</code>
+                            </td>
+                            <td>
+                                <span class="profile-tag">{{ row.profile_type or "成員" }}</span>
+                                {% if row.role_title %}<div class="profile-muted">{{ row.role_title }}</div>{% endif %}
+                            </td>
+                            <td>
+                                {% if row.main_games %}<div>{{ row.main_games }}</div>{% else %}<div class="profile-muted">未設定遊戲</div>{% endif %}
+                                {% if row.service_tags %}<div class="profile-muted">{{ row.service_tags }}</div>{% endif %}
+                            </td>
+                            <td class="profile-metrics">
+                                收藏 <span class="profile-number">{{ row.favorite_count }}</span><br>
+                                完成 <span class="profile-number">{{ row.completed_count }}</span><br>
+                                評價 <span class="profile-number">{{ "%.1f"|format(row.average_rating) }}</span> / 5（{{ row.review_count }}）
+                            </td>
+                            <td class="profile-metrics">
+                                完成 <span class="profile-number">{{ row.recent_completed_count }}</span><br>
+                                評價 <span class="profile-number">{{ row.recent_review_count }}</span><br>
+                                <span class="profile-muted">最近 {{ row.latest_review_at }}</span>
+                            </td>
+                            <td class="profile-wall">
+                                {% if row.discord_link %}
+                                    <a href="{{ row.discord_link }}" target="_blank" rel="noopener">打開 Discord 個人牆 ↗</a>
+                                {% else %}
+                                    <span class="profile-muted">尚未記錄 Discord 個人牆</span>
+                                {% endif %}
+
+                                <details>
+                                    <summary>
+                                        {% if row.has_panel %}Panel 已建立{% else %}Panel 未建立{% endif %} · 查看同步資訊
+                                    </summary>
+                                    <div class="profile-panel-meta">
+                                        {% if row.has_panel %}
+                                            Thread {{ row.thread_id }}<br>
+                                            Message {{ row.message_id }}
+                                        {% else %}
+                                            尚未記錄 Panel 位置
+                                        {% endif %}
+                                    </div>
+                                    <code class="profile-command">{{ row.sync_command }}</code>
+                                </details>
+                            </td>
+                            <td>
+                                <span class="profile-status {% if row.is_public %}public{% else %}hidden{% endif %}">
+                                    {% if row.is_public %}公開{% else %}隱藏{% endif %}
+                                </span>
+                                <div style="margin-top:6px">
+                                    <span class="profile-status {% if row.has_panel %}ready{% else %}missing{% endif %}">
+                                        {% if row.has_panel %}Panel 正常{% else %}無 Panel{% endif %}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="profile-bio">{{ row.bio or "—" }}</td>
+                            <td><span class="profile-muted" style="margin-top:0">{{ row.updated_at }}</span></td>
+                            <td>
+                                <div class="profile-actions">
+                                    <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}">編輯</a>
+                                    <form method="post" action="/admin/staff_profiles/toggle_public">
+                                        <input type="hidden" name="staff_discord_id" value="{{ row.staff_id }}">
+                                        <button class="profile-button" type="submit">
+                                            {% if row.is_public %}設為隱藏{% else %}設為公開{% endif %}
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td class="profile-empty" colspan="10">目前還沒有成員個人牆。</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </section>
+</div>
+</body>
+</html>
