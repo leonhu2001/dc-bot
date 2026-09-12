@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=r9_20260903_181715">
+<style>
+.profile-edit-wrap{max-width:1040px}.profile-edit-card{padding:18px;border:1px solid var(--r5-line);border-radius:13px;background:var(--r5-panel)}.profile-edit-meta{margin-bottom:16px;padding:11px 13px;border:1px solid rgba(255,255,255,.07);border-radius:10px;color:var(--r5-muted);background:#0c0c0b;font-size:11px;line-height:1.7}.profile-edit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.profile-field{display:grid;gap:6px;margin-bottom:13px}.profile-field.full{grid-column:1/-1}.profile-field label{color:#aaa59b;font-size:11px;font-weight:800}.profile-input,.profile-textarea{width:100%;border:1px solid var(--r5-line);border-radius:9px;outline:0;color:var(--r5-text);background:#0a0a09;font-size:13px}.profile-input{min-height:42px;padding:0 11px}.profile-textarea{min-height:130px;resize:vertical;padding:10px 11px;line-height:1.6}.profile-input:focus,.profile-textarea:focus{border-color:rgba(223,183,92,.40)}.profile-preview{margin-top:3px;padding:12px;border:1px solid rgba(255,255,255,.075);border-radius:10px;background:#090908}.profile-preview-label{margin-bottom:9px;color:var(--r5-muted);font-size:10.5px;font-weight:800}.profile-preview img{display:block;max-width:100%;max-height:460px;border-radius:9px}.profile-no-image{padding:28px 14px;color:#777269;text-align:center;font-size:12px}.profile-edit-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:17px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}.profile-button{min-height:40px;display:inline-flex;align-items:center;justify-content:center;padding:0 15px;border:1px solid var(--r5-line);border-radius:9px;color:#c7c2b7!important;background:rgba(255,255,255,.025);font-size:12px;font-weight:800;text-decoration:none!important;cursor:pointer}.profile-button:hover,.profile-button.gold{color:var(--r5-gold-soft)!important;border-color:rgba(223,183,92,.30);background:rgba(223,183,92,.065)}@media(max-width:760px){.profile-edit-grid{grid-template-columns:1fr}.profile-field.full{grid-column:auto}}
+</style>
+</head>
+<body class="mw-r5-admin">
+<div class="mw-r5-shell">
+{% include "_admin_sidebar.html" %}
+<section class="mw-r5-main-host">
+<header class="mw-r5-page-header"><div class="mw-r5-kicker">STAFF PROFILE MANAGEMENT</div><h1>編輯個人牆</h1><p>修改成員對外顯示的個人牆資料。這些欄位不會影響訂單、接單資格或薪資計算。</p></header>
+<div class="profile-edit-wrap">
+<form class="profile-edit-card" method="post" action="/admin/staff_profiles/edit/{{ profile.staff_id }}">
+<div class="profile-edit-meta">Discord ID：{{ profile.staff_id }}<br>最後更新：{{ profile.updated_at or "—" }}<br>儲存後回到個人牆管理頁，可取得 Discord Panel 同步指令。</div>
+<div class="profile-edit-grid">
+<div class="profile-field"><label>顯示名稱</label><input class="profile-input" name="display_name" value="{{ profile.display_name }}" maxlength="80"></div>
+<div class="profile-field"><label>類型</label><input class="profile-input" name="profile_type" value="{{ profile.profile_type }}" maxlength="40" placeholder="打手 / 陪玩 / 主播"></div>
+<div class="profile-field"><label>階級 / 職位</label><input class="profile-input" name="role_title" value="{{ profile.role_title }}" maxlength="80"></div>
+<div class="profile-field"><label>主要遊戲</label><input class="profile-input" name="main_games" value="{{ profile.main_games }}" maxlength="120"></div>
+<div class="profile-field full"><label>服務項目</label><input class="profile-input" name="service_tags" value="{{ profile.service_tags }}" maxlength="200" placeholder="娛樂陪 / 技術陪 / 代做"></div>
+<div class="profile-field full"><label>個人特色</label><textarea class="profile-textarea" name="bio" maxlength="1200">{{ profile.bio }}</textarea></div>
+<div class="profile-field full"><label>名片圖片 URL</label><input class="profile-input" name="card_image_url" value="{{ profile.card_image_url }}" maxlength="1000"><div class="profile-preview"><div class="profile-preview-label">目前名片圖片預覽</div>{% if profile.card_image_url %}<img src="{{ profile.card_image_url }}" alt="名片預覽">{% else %}<div class="profile-no-image">尚未設定名片圖片 URL</div>{% endif %}</div></div>
+</div>
+<div class="profile-edit-actions"><button class="profile-button gold" type="submit">儲存變更</button><a class="profile-button" href="/admin/staff_profiles/">返回個人牆管理</a></div>
+</form>
+</div>
+</section>
+</div>
+</body>
+</html>
