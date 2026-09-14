@@ -17,6 +17,14 @@ def _parse_role_ids(env_name: str, default_value: str) -> set[str]:
     }
 
 
+def _parse_csv_values(env_name: str, default_value: str) -> tuple[str, ...]:
+    return tuple(
+        value.strip().rstrip("/")
+        for value in os.getenv(env_name, default_value).split(",")
+        if value.strip()
+    )
+
+
 class WebConfig:
     BASE_DIR = BASE_DIR
 
@@ -29,9 +37,11 @@ class WebConfig:
     DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
     DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
 
+    # 總管：整店最高管理層。既有 is_admin 欄位保留相容，但真正的
+    # 全店敏感功能應以這組角色作為 manager 判斷來源。
     ADMIN_ROLE_IDS = _parse_role_ids(
         "ADMIN_ROLE_IDS",
-        "1482084782031638548",
+        "1537067761141030972",
     )
 
     CUSTOMER_SERVICE_ROLE_IDS = _parse_role_ids(
@@ -59,10 +69,17 @@ class WebConfig:
     if not WEB_SECRET_KEY or WEB_SECRET_KEY == "change-this-secret":
         raise RuntimeError("WEB_SECRET_KEY 未設定或仍為預設值，請在 web/.env 設定正式密鑰")
 
+    # 正式環境預設一定使用 Secure cookie；本機 HTTP 開發若真的需要，
+    # 可在自己的 web/.env 明確設 WEB_COOKIE_HTTPS_ONLY=false。
     WEB_COOKIE_HTTPS_ONLY = os.getenv(
         "WEB_COOKIE_HTTPS_ONLY",
-        "false",
+        "true",
     ).strip().lower() in {"1", "true", "yes", "on"}
+
+    WEB_ALLOWED_ORIGINS = _parse_csv_values(
+        "WEB_ALLOWED_ORIGINS",
+        "https://mowanentertainment.com,https://www.mowanentertainment.com",
+    )
 
 
 config = WebConfig()
