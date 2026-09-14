@@ -43,15 +43,20 @@ async def discord_callback(
     error: str | None = None,
 ):
     if error:
-        raise HTTPException(status_code=400, detail=f"Discord OAuth error: {error}")
+        raise HTTPException(status_code=400, detail="Discord OAuth authorization failed")
 
     if not code:
         raise HTTPException(status_code=400, detail="Missing Discord OAuth code")
 
+    # OAuth state 必須同時存在於 session 與 callback，且以 constant-time 比較。
+    # 過去 session 裡沒有 expected_state 時會跳過檢查，現在一律 fail closed。
     expected_state = request.session.pop("oauth_state", None)
-    if expected_state is not None:
-        if not state or state != expected_state:
-            raise HTTPException(status_code=400, detail="Invalid Discord OAuth state")
+    if (
+        not expected_state
+        or not state
+        or not secrets.compare_digest(str(state), str(expected_state))
+    ):
+        raise HTTPException(status_code=400, detail="Invalid Discord OAuth state")
 
     async with httpx.AsyncClient(timeout=15) as client:
         token_response = await client.post(
@@ -69,9 +74,10 @@ async def discord_callback(
         )
 
         if token_response.status_code != 200:
+            # 不把 Discord 的錯誤 body 回傳給瀏覽器。
             raise HTTPException(
                 status_code=400,
-                detail=f"Discord token exchange failed: {token_response.status_code} {token_response.text}",
+                detail=f"Discord token exchange failed: HTTP {token_response.status_code}",
             )
 
         token_data = token_response.json()
@@ -100,11 +106,7 @@ async def discord_callback(
     if not discord_id:
         raise HTTPException(status_code=400, detail="Missing Discord user id")
 
-    # General customers may log in even when they do not
-    # have an employee role in the Mawan Discord server.
-    #
-    # If the user is not currently in the guild, treat them as
-    # a normal member with no staff permissions.
+    # 一般顧客可登入；不在 guild 時視為無員工權限。
     try:
         role_ids = get_member_role_ids(discord_id)
     except HTTPException as exc:
@@ -115,29 +117,20 @@ async def discord_callback(
 
     access = get_dashboard_access(role_ids)
 
-    is_customer_service = bool(
-        access.get(
-            "is_customer_service",
-            False,
-        )
+    is_manager = bool(
+        access.get("is_manager", False)
+        or access.get("is_admin", False)
     )
+    is_customer_service = bool(access.get("is_customer_service", False))
+    is_worker = bool(access.get("is_worker", False))
+    is_companion = bool(access.get("is_companion", False))
 
-    is_worker = bool(
-        access.get(
-            "is_worker",
-            False,
-        )
-    )
-
-    is_companion = bool(
-        access.get(
-            "is_companion",
-            False,
-        )
-    )
-
+    # 舊後台大量 route 仍使用 is_admin 表示「可進入營運後台」。
+    # 因此保留總管或客服皆 True；真正的全店敏感功能另外檢查 is_manager。
+    is_admin = bool(is_manager or is_customer_service)
     is_employee = bool(
-        is_customer_service
+        is_manager
+        or is_customer_service
         or is_worker
         or is_companion
     )
@@ -149,20 +142,16 @@ async def discord_callback(
         "display_name": global_name or username,
         "avatar": avatar,
         "role_ids": role_ids,
-
-        # Customer service is the highest web permission.
-        #
-        # Keep is_admin for compatibility with existing
-        # /admin routers until the old backend is renamed.
-        "is_admin": is_customer_service,
+        "is_manager": is_manager,
+        "is_admin": is_admin,
         "is_customer_service": is_customer_service,
-
         "is_worker": is_worker,
         "is_companion": is_companion,
         "is_employee": is_employee,
     }
 
     return RedirectResponse(url="/")
+
 
 @router.get("/logout")
 async def logout(request: Request):
