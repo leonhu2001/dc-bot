@@ -973,21 +973,23 @@
                                     <div class="staff-summary-actions">
                                         <button class="staff-summary-button" type="button" data-summary-target="staff-summary-detail-{{ loop.index }}">明細</button>
 
-                                        <form method="post" action="/admin/payouts/summary/person-status">
-                                            <input type="hidden" name="month" value="{{ month }}">
-                                            <input type="hidden" name="current_role" value="{{ role }}">
-                                            <input type="hidden" name="person_role" value="{{ row.role }}">
-                                            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
-                                            <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">已發放</button>
-                                        </form>
+                                        {% if user and user.is_manager %}
+                                            <form method="post" action="/admin/payouts/summary/person-status">
+                                                <input type="hidden" name="month" value="{{ month }}">
+                                                <input type="hidden" name="current_role" value="{{ role }}">
+                                                <input type="hidden" name="person_role" value="{{ row.role }}">
+                                                <input type="hidden" name="person_id" value="{{ row.discord_id }}">
+                                                <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">已發放</button>
+                                            </form>
 
-                                        <form method="post" action="/admin/payouts/summary/person-status">
-                                            <input type="hidden" name="month" value="{{ month }}">
-                                            <input type="hidden" name="current_role" value="{{ role }}">
-                                            <input type="hidden" name="person_role" value="{{ row.role }}">
-                                            <input type="hidden" name="person_id" value="{{ row.discord_id }}">
-                                            <button class="staff-summary-button" type="submit" name="target_status" value="unpaid">未發放</button>
-                                        </form>
+                                            <form method="post" action="/admin/payouts/summary/person-status">
+                                                <input type="hidden" name="month" value="{{ month }}">
+                                                <input type="hidden" name="current_role" value="{{ role }}">
+                                                <input type="hidden" name="person_role" value="{{ row.role }}">
+                                                <input type="hidden" name="person_id" value="{{ row.discord_id }}">
+                                                <button class="staff-summary-button" type="submit" name="target_status" value="unpaid">未發放</button>
+                                            </form>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
