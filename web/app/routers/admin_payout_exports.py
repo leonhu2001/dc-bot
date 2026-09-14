@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +15,8 @@ from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, WorkerPayout, WebOrder
 
 router = APIRouter(tags=["admin-payout-exports"])
+
+_FILENAME_SAFE_RE = re.compile(r"[^A-Za-z0-9_-]+")
 
 
 def get_current_user(request: Request) -> dict | None:
@@ -79,13 +82,27 @@ def write_csv(rows: list[list[str]]) -> str:
     return "\ufeff" + output.getvalue()
 
 
+def _safe_filename_component(value: str | None, default: str = "all") -> str:
+    text = str(value or "").strip()
+    if not text:
+        return default
+
+    text = _FILENAME_SAFE_RE.sub("_", text).strip("_-")
+    return (text or default)[:40]
+
+
 def csv_response(filename: str, rows: list[list[str]]) -> StreamingResponse:
+    safe_filename = _safe_filename_component(
+        filename.removesuffix(".csv"),
+        default="payouts",
+    ) + ".csv"
+
     content = write_csv(rows)
     return StreamingResponse(
         iter([content.encode("utf-8-sig")]),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
         },
     )
 
@@ -204,9 +221,9 @@ async def export_payouts_csv(
     finally:
         db.close()
 
-    safe_month = month or "all"
-    safe_status = status or "all"
-    safe_role = role or "all"
+    safe_month = _safe_filename_component(month)
+    safe_status = _safe_filename_component(status)
+    safe_role = _safe_filename_component(role)
 
     return csv_response(
         filename=f"payouts_{safe_month}_{safe_status}_{safe_role}.csv",
