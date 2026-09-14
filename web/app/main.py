@@ -55,6 +55,24 @@ _MANAGER_ONLY_ADMIN_PREFIXES = (
 _RATE_BUCKETS: dict[tuple[str, str], deque[float]] = {}
 _RATE_REQUEST_COUNTER = 0
 
+# 目前模板仍有不少 inline style/script，因此 CSP 保留 unsafe-inline，
+# 但把 object/frame/base/form/connect 等高風險來源收緊，不破壞現有 UI。
+_CONTENT_SECURITY_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "upgrade-insecure-requests",
+    )
+)
+
 
 def _is_admin_path(path: str) -> bool:
     return path == "/admin" or path.startswith("/admin/")
@@ -326,10 +344,14 @@ async def security_and_refresh_access(request: Request, call_next):
     response = await call_next(request)
     response = await _sanitize_csv_response(response)
 
-    # Safe baseline headers; does not impose a CSP that could break current UI.
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Strict-Transport-Security",
+        "max-age=31536000",
+    )
+    response.headers.setdefault("Content-Security-Policy", _CONTENT_SECURITY_POLICY)
     return response
 
 
@@ -340,6 +362,9 @@ app.add_middleware(
     secret_key=config.WEB_SECRET_KEY,
     same_site="lax",
     https_only=config.WEB_COOKIE_HTTPS_ONLY,
+    # Signed-cookie sessions are integrity protected, not encrypted. Keep the
+    # lifetime bounded and never place OAuth tokens/secrets in the session.
+    max_age=60 * 60 * 12,
 )
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
