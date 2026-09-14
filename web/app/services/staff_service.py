@@ -37,7 +37,6 @@ WORKER_ROLE_ID = next(iter(WORKER_ROLE_IDS))
 COMPANION_ROLE_ID = next(iter(COMPANION_ROLE_IDS))
 
 
-
 def get_staff_display_name(member: WebStaffMember) -> str:
     return str(
         member.display_name
@@ -88,6 +87,14 @@ def list_companion_members(db: Session) -> list[WebStaffMember]:
     return list(db.scalars(statement).all())
 
 
+def is_manager_role(role_ids) -> bool:
+    role_set = normalize_role_ids(role_ids)
+    return bool(
+        role_set
+        & normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
+    )
+
+
 def classify_roles(role_ids: list[str]) -> tuple[bool, bool, bool]:
     role_set = normalize_role_ids(role_ids)
 
@@ -118,6 +125,7 @@ def upsert_staff_member(
     role_ids = [str(role_id) for role_id in role_ids]
 
     is_customer_service, is_worker, is_companion = classify_roles(role_ids)
+    is_manager = is_manager_role(role_ids)
 
     member = db.get(WebStaffMember, discord_id)
 
@@ -133,11 +141,10 @@ def upsert_staff_member(
     member.is_customer_service = bool(is_customer_service)
     member.is_worker = bool(is_worker)
     member.is_companion = bool(is_companion)
-    member.is_active = bool(is_customer_service or is_worker or is_companion)
+    member.is_active = bool(is_manager or is_customer_service or is_worker or is_companion)
     member.last_synced_at = synced_at
 
     return member
-
 
 
 def refresh_staff_members_if_stale(
@@ -247,6 +254,9 @@ def sync_staff_members_from_discord(db=None) -> dict:
     if not bot_token:
         raise RuntimeError("DISCORD_BOT_TOKEN 未設定")
 
+    manager_role_ids = normalize_role_ids(
+        getattr(config, "ADMIN_ROLE_IDS", set())
+    )
     customer_service_role_ids = normalize_role_ids(
         getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set())
     )
@@ -302,14 +312,15 @@ def sync_staff_members_from_discord(db=None) -> dict:
         role_ids = normalize_role_ids(guild_member.get("roles", []))
 
         latest_role_ids_by_member[discord_id] = role_ids
+        is_manager = bool(role_ids & manager_role_ids)
         is_customer_service = bool(role_ids & customer_service_role_ids)
         is_receiver = bool(role_ids & RECEIVER_ROLE_IDS)
         is_game_receiver = bool(role_ids & GAME_ROLE_IDS)
         is_worker = bool(is_receiver or is_game_receiver)
         is_companion = bool(role_ids & COMPANION_ROLE_IDS)
 
-        # 網頁收客服、舊服務職位，以及獨立的遊戲階級接單身分組。
-        if not (is_customer_service or is_worker or is_companion):
+        # 總管是獨立最高管理身分，不強制偽裝成客服；但仍保留在人員快照。
+        if not (is_manager or is_customer_service or is_worker or is_companion):
             continue
 
         active_ids.add(discord_id)
