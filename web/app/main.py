@@ -46,8 +46,11 @@ app = FastAPI(title="MW Worker Dashboard")
 _UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/wallets",
-    "/admin/payouts",
     "/admin/audit",
+    # 客服可以查看分潤與匯出資料；只有下列會改發放狀態的端點限總管。
+    "/admin/payouts/summary/mark-paid",
+    "/admin/payouts/summary/mark-unpaid",
+    "/admin/payouts/summary/person-status",
 )
 _RATE_BUCKETS: dict[tuple[str, str], deque[float]] = {}
 _RATE_REQUEST_COUNTER = 0
