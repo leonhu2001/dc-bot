@@ -38,6 +38,13 @@ def require_admin(request: Request) -> dict | None:
     return user
 
 
+def require_manager(request: Request) -> dict | None:
+    user = current_user(request)
+    if not user or not user.get("is_manager"):
+        return None
+    return user
+
+
 def normalize_role(role: str | None) -> str:
     return role if role in {"all", "worker", "customer_service"} else "all"
 
@@ -597,7 +604,6 @@ def build_combined_summary_rows(unpaid_rows: list[dict], paid_rows: list[dict]) 
             str(row.get("display_name") or ""),
         )
     )
-
     return rows
 
 
@@ -703,7 +709,7 @@ async def admin_payout_summary_csv(request: Request, month: str | None = "", rol
     if not user:
         return RedirectResponse(url="/no-access", status_code=303)
 
-    rows, totals = fetch_rows(month, role, q, status)
+    rows, totals = fetch_rows(month, role, q, "unpaid")
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -784,10 +790,10 @@ async def admin_month_options(request: Request):
 
 @router.post("/admin/payouts/summary/mark-paid")
 async def mark_summary_payouts_paid(request: Request):
-    user = request.session.get("user")
+    user = require_manager(request)
 
-    if not user or not user.get("is_admin"):
-        return RedirectResponse(url="/", status_code=303)
+    if not user:
+        return RedirectResponse(url="/no-access", status_code=303)
 
     form = await request.form()
     month = str(form.get("month") or "").strip()
@@ -800,10 +806,10 @@ async def mark_summary_payouts_paid(request: Request):
 
 @router.post("/admin/payouts/summary/mark-unpaid")
 async def mark_summary_payouts_unpaid(request: Request):
-    user = request.session.get("user")
+    user = require_manager(request)
 
-    if not user or not user.get("is_admin"):
-        return RedirectResponse(url="/", status_code=303)
+    if not user:
+        return RedirectResponse(url="/no-access", status_code=303)
 
     form = await request.form()
     month = str(form.get("month") or "").strip()
@@ -816,10 +822,10 @@ async def mark_summary_payouts_unpaid(request: Request):
 
 @router.post("/admin/payouts/summary/person-status")
 async def update_summary_person_status(request: Request):
-    user = request.session.get("user")
+    user = require_manager(request)
 
-    if not user or not user.get("is_admin"):
-        return RedirectResponse(url="/", status_code=303)
+    if not user:
+        return RedirectResponse(url="/no-access", status_code=303)
 
     form = await request.form()
 
@@ -847,4 +853,3 @@ async def update_summary_person_status(request: Request):
         url += "?" + urlencode(query)
 
     return RedirectResponse(url=url, status_code=303)
-
