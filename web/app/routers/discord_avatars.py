@@ -197,7 +197,17 @@ def read_env_file() -> dict[str, str]:
     if not path.exists():
         return env
 
-    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+    try:
+        raw_lines = path.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        ).splitlines()
+    except OSError:
+        # The web service intentionally runs as an unprivileged account and
+        # should not require read access to the bot's root .env file.
+        return env
+
+    for raw in raw_lines:
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
