@@ -44,8 +44,52 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference ON wallet_transactions(customer_discord_id, order_no, type)"
+            "CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference "
+            "ON wallet_transactions(customer_discord_id, order_no, type)"
         )
+
+        # Even if historical duplicate references already exist, this trigger blocks
+        # all future duplicates. This is safer than blindly deleting old financial rows.
+        conn.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS trg_wallet_tx_unique_reference
+            BEFORE INSERT ON wallet_transactions
+            WHEN NEW.order_no IS NOT NULL
+              AND TRIM(NEW.order_no) <> ''
+              AND EXISTS (
+                  SELECT 1
+                  FROM wallet_transactions
+                  WHERE customer_discord_id = NEW.customer_discord_id
+                    AND order_no = NEW.order_no
+                    AND type = NEW.type
+              )
+            BEGIN
+                SELECT RAISE(ABORT, 'duplicate wallet transaction reference');
+            END
+            """
+        )
+
+        duplicate = conn.execute(
+            """
+            SELECT 1
+            FROM wallet_transactions
+            WHERE order_no IS NOT NULL
+              AND TRIM(order_no) <> ''
+            GROUP BY customer_discord_id, order_no, type
+            HAVING COUNT(*) > 1
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if duplicate is None:
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_tx_reference
+                ON wallet_transactions(customer_discord_id, order_no, type)
+                WHERE order_no IS NOT NULL AND TRIM(order_no) <> ''
+                """
+            )
+
         conn.commit()
 
 
@@ -101,9 +145,40 @@ def adjust_wallet_balance(
     if amount == 0:
         raise ValueError("異動金額不能為 0。")
 
+    normalized_order_no = str(order_no or "").strip() or None
+    normalized_type = str(tx_type)
+
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
+
+        # Idempotency check must happen inside the same write transaction and before
+        # balance calculation. Repeated delivery of the same reference returns the
+        # original transaction instead of crediting/debiting a second time.
+        if normalized_order_no:
+            existing = conn.execute(
+                """
+                SELECT *
+                FROM wallet_transactions
+                WHERE customer_discord_id=? AND order_no=? AND type=?
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                (
+                    str(customer_id),
+                    normalized_order_no,
+                    normalized_type,
+                ),
+            ).fetchone()
+
+            if existing is not None:
+                if int(existing["amount"] or 0) != amount:
+                    raise ValueError(
+                        "同一錢包交易識別碼已存在，但金額不同；已拒絕重複入帳。"
+                    )
+                conn.rollback()
+                return dict(existing)
+
         row = conn.execute(
             "SELECT balance FROM customer_wallets WHERE customer_discord_id=?",
             (str(customer_id),),
@@ -132,9 +207,9 @@ def adjust_wallet_balance(
             ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
-                str(customer_id), amount, before, after, str(tx_type),
+                str(customer_id), amount, before, after, normalized_type,
                 str(order_channel_id) if order_channel_id is not None else None,
-                str(order_no) if order_no else None,
+                normalized_order_no,
                 str(operator_discord_id) if operator_discord_id else None,
                 str(operator_display_name or "").strip() or None,
                 str(note or "").strip() or None,
@@ -149,7 +224,8 @@ def adjust_wallet_balance(
             "amount": amount,
             "balance_before": before,
             "balance_after": after,
-            "type": str(tx_type),
+            "type": normalized_type,
+            "order_no": normalized_order_no,
             "note": note,
             "created_at": now_text,
         }
