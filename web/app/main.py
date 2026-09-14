@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
 from shared.db import create_all_tables
@@ -23,6 +24,7 @@ from web.app.routers.topups import router as topups_router
 from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
+from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
 
 APP_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -30,6 +32,94 @@ STATIC_DIR = APP_DIR / "static"
 
 app = FastAPI(title="MW Worker Dashboard")
 
+
+def _is_admin_path(path: str) -> bool:
+    return path == "/admin" or path.startswith("/admin/")
+
+
+def _apply_live_access(user: dict, role_ids: list[str]) -> dict:
+    access = get_dashboard_access(role_ids)
+    is_customer_service = bool(access.get("is_customer_service", False))
+    is_admin = bool(access.get("is_admin", False) or is_customer_service)
+    is_worker = bool(access.get("is_worker", False))
+    is_companion = bool(access.get("is_companion", False))
+
+    user.update(
+        {
+            "role_ids": list(role_ids),
+            "is_admin": is_admin,
+            "is_customer_service": is_customer_service,
+            "is_worker": is_worker,
+            "is_companion": is_companion,
+            "is_employee": bool(
+                is_admin
+                or is_customer_service
+                or is_worker
+                or is_companion
+            ),
+        }
+    )
+    return user
+
+
+def _revoke_staff_access(user: dict) -> dict:
+    user.update(
+        {
+            "role_ids": [],
+            "is_admin": False,
+            "is_customer_service": False,
+            "is_worker": False,
+            "is_companion": False,
+            "is_employee": False,
+        }
+    )
+    return user
+
+
+@app.middleware("http")
+async def refresh_admin_access(request: Request, call_next):
+    """Never trust the staff/admin flags stored at OAuth login time.
+
+    Every request entering /admin re-checks the member's current Discord roles.
+    If Discord cannot be checked, fail closed for staff privileges instead of
+    continuing to trust a stale privileged session.
+    """
+    if _is_admin_path(request.url.path):
+        user = request.session.get("user")
+
+        if user:
+            refreshed_user = dict(user)
+            discord_id = str(refreshed_user.get("id") or "").strip()
+
+            if not discord_id:
+                refreshed_user = _revoke_staff_access(refreshed_user)
+            else:
+                try:
+                    role_ids = await run_in_threadpool(
+                        get_member_role_ids,
+                        discord_id,
+                    )
+                    refreshed_user = _apply_live_access(
+                        refreshed_user,
+                        role_ids,
+                    )
+                except Exception as exc:
+                    # Security-sensitive paths fail closed. Do not preserve a
+                    # previous is_admin=True snapshot when Discord is unavailable.
+                    refreshed_user = _revoke_staff_access(refreshed_user)
+                    print(
+                        "[admin_access_refresh_failed]",
+                        type(exc).__name__,
+                    )
+
+            request.session["user"] = refreshed_user
+
+    return await call_next(request)
+
+
+# SessionMiddleware must wrap refresh_admin_access so request.session exists
+# before the authorization middleware runs. Keep this registration after the
+# @app.middleware declaration above.
 app.add_middleware(
     SessionMiddleware,
     secret_key=config.WEB_SECRET_KEY,
