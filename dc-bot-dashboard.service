@@ -9,15 +9,16 @@ EnvironmentFile=/opt/dc-bot/web/.env
 ExecStart=/opt/dc-bot/venv/bin/python -m uvicorn web.app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
-User=root
+User=dc-bot-web
+Group=dc-bot-web
 
-# Defense in depth while the dashboard still shares writable SQLite files with
-# the bot process. The listener is loopback-only, so public traffic must pass
-# through Nginx/Cloudflare instead of reaching Uvicorn directly.
+# The dashboard runs as a dedicated unprivileged account. SQLite data lives in
+# /opt/dc-bot/data and legacy DB paths are symlinks into that directory.
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true
-ProtectSystem=full
+ProtectSystem=strict
+ReadWritePaths=/opt/dc-bot/data
 ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
