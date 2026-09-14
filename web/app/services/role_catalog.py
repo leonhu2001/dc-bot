@@ -10,6 +10,8 @@ from services.game_roles import (
 )
 
 
+GENERAL_MANAGER_ROLE_ID = "1537067761141030972"
+GENERAL_MANAGER_LABEL = "總管"
 CUSTOMER_SERVICE_ROLE_ID = "1482084782031638548"
 CUSTOMER_SERVICE_LABEL = "魔丸♫客服"
 
@@ -39,16 +41,18 @@ COMPANION_ROLE_IDS = {role.role_id for role in COMPANION_ROLES}
 RECEIVER_ROLE_IDS = {role.role_id for role in RECEIVER_ROLES}
 
 ROLE_LABEL_BY_ID = {
-    role.role_id: role.label
-    for role in RECEIVER_ROLES
+    GENERAL_MANAGER_ROLE_ID: GENERAL_MANAGER_LABEL,
+    CUSTOMER_SERVICE_ROLE_ID: CUSTOMER_SERVICE_LABEL,
+    **{
+        role.role_id: role.label
+        for role in RECEIVER_ROLES
+    },
 }
-
-# ???????????????? RECEIVER_ROLE_IDS?
-# ??????????????????/?????
 ROLE_LABEL_BY_ID.update(GAME_ROLE_LABEL_BY_ID)
 
 STAFF_ROLE_FILTERS = [
     {"value": "", "label": "全部"},
+    {"value": GENERAL_MANAGER_ROLE_ID, "label": GENERAL_MANAGER_LABEL},
     {"value": "customer_service", "label": CUSTOMER_SERVICE_LABEL},
     *[
         {"value": role.role_id, "label": role.label}
@@ -76,10 +80,9 @@ def normalize_role_ids(value) -> set[str]:
     }
 
 
-
 def game_role_labels_from_roles(role_ids) -> list[str]:
-    """?? Discord ?????????????????"""
     return game_role_labels_from_role_ids(role_ids)
+
 
 def receiver_labels_from_roles(role_ids) -> list[str]:
     role_set = normalize_role_ids(role_ids)
@@ -88,6 +91,13 @@ def receiver_labels_from_roles(role_ids) -> list[str]:
         for role in RECEIVER_ROLES
         if role.role_id in role_set
     ]
+
+
+def is_general_manager(role_ids, manager_role_ids=None) -> bool:
+    role_set = normalize_role_ids(role_ids)
+    if manager_role_ids:
+        return bool(role_set & normalize_role_ids(manager_role_ids))
+    return GENERAL_MANAGER_ROLE_ID in role_set
 
 
 def is_customer_service(role_ids, customer_service_role_ids=None) -> bool:
