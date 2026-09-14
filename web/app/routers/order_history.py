@@ -62,52 +62,10 @@ def redirect_to_history(**params) -> RedirectResponse:
             status_code=303,
         )
 
-
-    conn = sqlite3.connect(history_db_path())
-
-    try:
-        for key, value in form.multi_items():
-            if key.startswith("worker_payout_"):
-                payout_id = history_to_int(key.replace("worker_payout_", ""), 0)
-                amount = history_to_int(value, 0)
-
-                if payout_id > 0:
-                    conn.execute(
-                        """
-                        UPDATE worker_payouts
-                        SET
-                            gross_share = ?,
-                            base_payout = ?,
-                            named_bonus_amount = 0,
-                            final_payout = ?
-                        WHERE id = ?
-                        """,
-                        (amount, amount, amount, payout_id),
-                    )
-
-            if key.startswith("cs_payout_"):
-                payout_id = history_to_int(key.replace("cs_payout_", ""), 0)
-                amount = history_to_int(value, 0)
-
-                if payout_id > 0:
-                    conn.execute(
-                        """
-                        UPDATE customer_service_payouts
-                        SET payout_amount = ?
-                        WHERE id = ?
-                        """,
-                        (amount, payout_id),
-                    )
-
-        conn.commit()
-    finally:
-        conn.close()
-
     return RedirectResponse(
-        url=f"/admin/orders/history?page={form.get('page') or 1}",
+        url="/admin/orders/history",
         status_code=303,
     )
-
 
 
 def parse_history_month_filter(month_filter: str | None):
@@ -258,53 +216,6 @@ def list_history_month_options() -> list[dict[str, str]]:
         })
 
     return options
-
-
-def history_to_int(value, default: int = 0) -> int:
-    try:
-        return int(str(value or "").strip())
-    except Exception:
-        return default
-
-
-def history_safe_status(value) -> str:
-    """歷史訂單狀態正規化。取消代表已退款，不進分潤。"""
-    status = str(value or "").strip().lower()
-
-    aliases = {
-        "active": "active",
-        "ongoing": "active",
-        "進行中": "active",
-
-        "stored": "stored",
-        "saved": "stored",
-        "存單": "stored",
-        "審核中": "stored",
-
-        "closed": "closed",
-        "done": "closed",
-        "已結單": "closed",
-        "結單": "closed",
-
-        "cancelled": "cancelled",
-        "canceled": "cancelled",
-        "cancel": "cancelled",
-        "取消": "cancelled",
-        "已取消": "cancelled",
-        "退款": "cancelled",
-        "已退款": "cancelled",
-    }
-
-    status = aliases.get(status, status)
-
-    if status in {"active", "stored", "closed", "cancelled"}:
-        return status
-
-    return "closed"
-
-
-def history_db_path() -> str:
-    return str(Path.cwd() / "web_dashboard.db")
 
 
 
