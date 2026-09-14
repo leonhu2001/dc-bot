@@ -35,12 +35,12 @@ def has_any_allowed_web_role(roles) -> bool:
     role_set = _normalize_role_ids(roles)
 
     allowed_role_ids = set()
+    allowed_role_ids |= _normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
     allowed_role_ids |= _normalize_role_ids(getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set()))
     allowed_role_ids |= _normalize_role_ids(getattr(config, "WORKER_ROLE_IDS", set()))
     allowed_role_ids |= _normalize_role_ids(getattr(config, "COMPANION_ROLE_IDS", set()))
 
     return bool(role_set & allowed_role_ids)
-
 
 
 def fetch_guild_member(discord_user_id: str) -> dict:
@@ -62,9 +62,10 @@ def fetch_guild_member(discord_user_id: str) -> dict:
         raise HTTPException(status_code=403, detail="你不在指定 Discord 伺服器內")
 
     if response.status_code != 200:
+        # 不把 Discord 回傳 body 直接暴露給前端，避免洩漏上游細節。
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to fetch guild member: {response.text}",
+            detail=f"Failed to fetch guild member: HTTP {response.status_code}",
         )
 
     return response.json()
@@ -78,23 +79,23 @@ def get_member_role_ids(discord_user_id: str) -> list[str]:
 def get_dashboard_access(role_ids: list[str]) -> dict:
     roles = normalize_role_ids(role_ids)
 
-    admin_role_ids = normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
+    manager_role_ids = normalize_role_ids(getattr(config, "ADMIN_ROLE_IDS", set()))
     customer_service_role_ids = normalize_role_ids(getattr(config, "CUSTOMER_SERVICE_ROLE_IDS", set()))
 
-    is_admin = bool(roles & admin_role_ids)
+    is_manager = bool(roles & manager_role_ids)
     is_customer_service = catalog_is_customer_service(roles, customer_service_role_ids)
     is_worker = is_protector(roles) or catalog_is_companion(roles) or is_game_receiver(roles)
     is_companion = catalog_is_companion(roles)
     can_access = can_login_dashboard(
         roles,
-        admin_role_ids=admin_role_ids,
+        admin_role_ids=manager_role_ids,
         customer_service_role_ids=customer_service_role_ids,
     )
 
     print(
         "[dashboard_access]",
         "roles=", sorted(roles),
-        "admin=", is_admin,
+        "manager=", is_manager,
         "cs=", is_customer_service,
         "worker=", is_worker,
         "companion=", is_companion,
@@ -103,7 +104,10 @@ def get_dashboard_access(role_ids: list[str]) -> dict:
 
     return {
         "can_access": can_access,
-        "is_admin": is_admin,
+        # is_admin 保留給舊路由作為「總管」原始旗標；session 層會另外
+        # 建立相容用 is_admin = 總管或客服。
+        "is_admin": is_manager,
+        "is_manager": is_manager,
         "is_customer_service": is_customer_service,
         "is_worker": is_worker,
         "is_companion": is_companion,
