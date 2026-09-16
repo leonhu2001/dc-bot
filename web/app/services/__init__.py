@@ -10,15 +10,33 @@ from . import order_groups as _order_groups
 
 
 for _spec in _order_groups.GROUP_SPECS:
+    _category = str(_spec.get("category") or "")
+    _key = str(_spec.get("key") or "")
+
+    # Keep selector copy aligned with the new storefront prices / guarantees.
+    if _key == "exbar_tech":
+        _spec["description"] = (
+            "絕巴技術陪服務。保底三選一："
+            "800w / 500w + 2 沙色保險 / 4 沙色保險。"
+        )
+    elif _key == "bet":
+        _spec["variants"] = [
+            ("basic_bet_1000", "800w"),
+            ("basic_bet_1500", "1000w"),
+            ("basic_bet_2500", "1200w"),
+        ]
+    elif _key == "trial":
+        _spec["variants"] = [
+            ("basic_trial_500", "777w"),
+            ("basic_trial_1000", "1688w"),
+        ]
+
     _description = str(_spec.get("description") or "")
     if not _description:
         continue
 
     # Shared specify fee is now 100T.
     _description = _description.replace("+150T", "+100T")
-
-    _category = str(_spec.get("category") or "")
-    _key = str(_spec.get("key") or "")
 
     if _category == "valorant":
         _description = _description.replace(
