@@ -938,3 +938,61 @@ body.mw-public-r5 #social.mw-social-hub .mw-social-card span {
     }
 }
 /* END MAWAN_R9_SOCIAL_EXACT_ALIGN */
+
+/* BEGIN MAWAN_ORDER_DIALOG_SCROLL_PERF_V1 */
+
+/*
+   Order dialog scroll performance
+   - dialog 本體不捲動
+   - shell 負責原生捲動
+   - 移除 backdrop 即時 blur
+*/
+
+.order3-dialog {
+    max-height: calc(100vh - 35px);
+    max-height: calc(100dvh - 35px);
+
+    overflow:
+        hidden;
+}
+
+
+.order3-dialog-shell {
+    max-height: calc(100vh - 35px);
+    max-height: calc(100dvh - 35px);
+
+    overflow-y:
+        auto;
+
+    overflow-x:
+        hidden;
+
+    overscroll-behavior:
+        contain;
+
+    -webkit-overflow-scrolling:
+        touch;
+
+    touch-action:
+        pan-y;
+
+    scrollbar-gutter:
+        stable;
+
+    scroll-behavior:
+        auto;
+}
+
+
+.order3-dialog::backdrop {
+    background:
+        rgba(0, 0, 0, .78);
+
+    backdrop-filter:
+        none;
+
+    -webkit-backdrop-filter:
+        none;
+}
+
+/* END MAWAN_ORDER_DIALOG_SCROLL_PERF_V1 */
