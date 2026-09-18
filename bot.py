@@ -226,6 +226,7 @@ from views.voice import (
     delete_voice_control_panel,
     get_room_targets_for_control,
     create_voice_control_panel,
+    refresh_vip_voice_control_panel_if_needed,
     VoiceRoomControlView,
     sync_voice_control_panel_state_from_channel,
     grant_play_voice_room_chat_access,
@@ -10578,6 +10579,31 @@ async def on_voice_state_update(
 
     if before.channel != after.channel:
         await grant_play_voice_room_chat_access(after.channel, member)
+
+        # VIP 房主直接點自己的永久房時，也要檢查 Panel 是否已被聊天訊息埋住。
+        vip_room_row = get_vip_voice_room_by_channel(after.channel.id)
+        if vip_room_row and int(vip_room_row.get("owner_id") or 0) == member.id:
+            try:
+                panel_message, panel_refreshed = await refresh_vip_voice_control_panel_if_needed(
+                    after.channel,
+                    member,
+                    message_threshold=10,
+                )
+                if panel_message is not None:
+                    upsert_vip_voice_room(
+                        member.id,
+                        after.channel.id,
+                        panel_message.id,
+                    )
+                if panel_refreshed:
+                    print(
+                        f"Refreshed VIP voice control panel: "
+                        f"owner={member.id} channel={after.channel.id} message={panel_message.id if panel_message else 0}"
+                    )
+            except discord.Forbidden:
+                print(f"Bot 權限不足，無法刷新 VIP 語音房 Panel：{after.channel.id}")
+            except discord.HTTPException as exc:
+                print(f"刷新 VIP 語音房 Panel 失敗：{after.channel.id}：{exc}")
 
     # 進入一般陪玩入口：建立一般陪玩語音房
     if after.channel is not None and play_lobby_channel is not None and after.channel.id == play_lobby_channel.id:
