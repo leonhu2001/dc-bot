@@ -386,10 +386,11 @@ class StaffSyncCog(commands.Cog):
                     room_type,
                     _runtime_owner_id(before.channel.id),
                 )
-                await self._delete_managed_voice_room(
-                    before.channel,
-                    reason="Persistent temporary voice room is empty",
-                )
+                if room_type != "vip":
+                    await self._delete_managed_voice_room(
+                        before.channel,
+                        reason="Persistent temporary voice room is empty",
+                    )
 
     @commands.Cog.listener()
     async def on_guild_channel_update(
@@ -464,7 +465,11 @@ class StaffSyncCog(commands.Cog):
 
                 # Give a just-created room enough time for the creator move operation.
                 # If move_to fails (Discord 40032), the orphan is removed on this sweep.
-                if not channel.members and _registry_age_seconds(row) >= 15:
+                if (
+                    str(row.get("room_type") or "") != "vip"
+                    and not channel.members
+                    and _registry_age_seconds(row) >= 15
+                ):
                     await self._delete_managed_voice_room(
                         channel,
                         reason="Temporary voice room orphan/empty sweeper",
