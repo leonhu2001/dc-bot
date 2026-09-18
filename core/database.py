@@ -817,6 +817,13 @@ def init_database() -> None:
         )
         """)
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS hidden_vip_users (
+            user_id INTEGER PRIMARY KEY,
+            added_by INTEGER,
+            created_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS lottery_settings (
             key TEXT PRIMARY KEY,
             data TEXT NOT NULL,
@@ -942,6 +949,82 @@ def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: i
             conn.commit()
     except sqlite3.Error as e:
         print(f"刪除 claims 資料失敗：{e}")
+
+
+def add_hidden_vip_user(user_id: int, *, added_by: int | None = None) -> bool:
+    """新增 Hidden VIP。已存在時不重複新增，回傳是否真的新增。"""
+    _ensure_database_ready()
+    now = get_taipei_now_iso()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO hidden_vip_users (user_id, added_by, created_at)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    int(user_id),
+                    int(added_by) if added_by is not None else None,
+                    now,
+                ),
+            )
+            conn.commit()
+            return bool(cur.rowcount)
+    except sqlite3.Error as e:
+        print(f"新增 Hidden VIP 失敗：{e}")
+        return False
+
+
+def remove_hidden_vip_user(user_id: int) -> bool:
+    """移除 Hidden VIP，回傳是否真的刪除資料。"""
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            cur = conn.execute(
+                "DELETE FROM hidden_vip_users WHERE user_id=?",
+                (int(user_id),),
+            )
+            conn.commit()
+            return bool(cur.rowcount)
+    except sqlite3.Error as e:
+        print(f"移除 Hidden VIP 失敗：{e}")
+        return False
+
+
+def is_hidden_vip_user(user_id: int) -> bool:
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            row = conn.execute(
+                "SELECT 1 FROM hidden_vip_users WHERE user_id=? LIMIT 1",
+                (int(user_id),),
+            ).fetchone()
+            return row is not None
+    except sqlite3.Error as e:
+        print(f"讀取 Hidden VIP 狀態失敗：{e}")
+        return False
+
+
+def list_hidden_vip_users() -> list[dict]:
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT user_id, added_by, created_at
+                FROM hidden_vip_users
+                ORDER BY created_at, user_id
+                """
+            ).fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        print(f"讀取 Hidden VIP 清單失敗：{e}")
+        return []
 
 
 def upsert_vip_voice_room(
