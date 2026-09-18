@@ -56,6 +56,9 @@ from core.database import (
     get_vip_voice_room_by_channel,
     list_vip_voice_rooms,
     delete_vip_voice_room_record,
+    add_hidden_vip_user,
+    remove_hidden_vip_user,
+    list_hidden_vip_users,
     remember_order_data,
     remember_claim_data,
     run_daily_backup_once,
@@ -208,6 +211,7 @@ from core.vip_levels import (
 )
 from views.voice import (
     configure_voice_helpers,
+    set_hidden_vip_user_ids,
     safe_voice_channel_name,
     safe_vip_voice_channel_name,
     safe_public_voice_channel_name,
@@ -300,9 +304,8 @@ VIP_VOICE_LOBBY_ROLE_ID = DEFAULT_SILVER_MEMBER_ROLE_ID
 VIP_VOICE_LOBBY_ROLE_IDS = list(VIP_ROLE_IDS)
 
 # 不公開 VIP 身分組、但語音系統仍視為 VIP 的指定會員。
-HIDDEN_VIP_USER_IDS = [
-    448915700145192961,
-]
+# 實際可管理白名單存於 bot.db；此清單只保留給環境設定的固定例外。
+HIDDEN_VIP_USER_IDS = []
 
 # 身分組 ID
 CUSTOMER_ROLE_ID = 1482084782031638548
@@ -451,6 +454,7 @@ PLAY_VOICE_ALLOWED_ROLE_IDS = _config_int_list("PLAY_VOICE_ALLOWED_ROLE_IDS", PL
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = _config_int_list("VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS", VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS)
 VOICE_VIEW_ONLY_ROLE_IDS = _config_int_list("VOICE_VIEW_ONLY_ROLE_IDS", VOICE_VIEW_ONLY_ROLE_IDS)
 HIDDEN_VIP_USER_IDS = _config_int_list("HIDDEN_VIP_USER_IDS", HIDDEN_VIP_USER_IDS)
+CONFIG_HIDDEN_VIP_USER_IDS = list(HIDDEN_VIP_USER_IDS)
 
 # 名稱 / 其他設定
 PLAY_VOICE_CREATE_CHANNEL_NAME = _config_str("PLAY_VOICE_CREATE_CHANNEL_NAME", PLAY_VOICE_CREATE_CHANNEL_NAME)
@@ -483,6 +487,27 @@ configure_voice_helpers(
     ])),
     temp_voice_control_panels=TEMP_VOICE_CONTROL_PANELS,
 )
+
+
+def refresh_hidden_vip_runtime_ids() -> list[int]:
+    """把環境固定名單 + bot.db 可管理名單同步到 runtime 與語音入口權限模組。"""
+    global HIDDEN_VIP_USER_IDS
+
+    db_user_ids = {
+        int(row.get("user_id") or 0)
+        for row in list_hidden_vip_users()
+        if int(row.get("user_id") or 0)
+    }
+    configured_user_ids = {
+        int(user_id)
+        for user_id in CONFIG_HIDDEN_VIP_USER_IDS
+        if int(user_id)
+    }
+
+    HIDDEN_VIP_USER_IDS = sorted(db_user_ids | configured_user_ids)
+    set_hidden_vip_user_ids(HIDDEN_VIP_USER_IDS)
+    return list(HIDDEN_VIP_USER_IDS)
+
 
 configure_rewards(
     member_levels=MEMBER_LEVELS,
@@ -1871,6 +1896,7 @@ async def check_vip_downgrades_once(guild: discord.Guild | None = None, force: b
 
 
 load_bot_data()
+refresh_hidden_vip_runtime_ids()
 cleanup_old_closed_orders()
 
 COMPANION_PREFERENCE_OPTIONS = [
@@ -10285,6 +10311,170 @@ def member_has_vip_voice_role(member: discord.Member | None) -> bool:
 
     vip_role_ids = {int(role_id) for role_id in VIP_VOICE_LOBBY_ROLE_IDS}
     return any(int(role.id) in vip_role_ids for role in getattr(member, "roles", []))
+
+
+@vip_group.command(
+    name="hidden_add",
+    description="管理員把成員加入 Hidden VIP 白名單",
+)
+@app_commands.describe(member="要加入 Hidden VIP 白名單的成員")
+@app_commands.default_permissions(administrator=True)
+async def vip_hidden_add(interaction: discord.Interaction, member: discord.Member):
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("這個指令只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("只有管理員可以管理 Hidden VIP 白名單。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    already_active = int(member.id) in {int(user_id) for user_id in HIDDEN_VIP_USER_IDS}
+    added = add_hidden_vip_user(member.id, added_by=interaction.user.id)
+    refresh_hidden_vip_runtime_ids()
+
+    try:
+        await get_or_create_vip_voice_lobby(interaction.guild)
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        await interaction.followup.send(
+            f"白名單已更新，但刷新 VIP 建立入口權限失敗：{exc}",
+            ephemeral=True,
+        )
+        return
+
+    if already_active and not added:
+        await interaction.followup.send(
+            f"{member.mention} 已經在 Hidden VIP 白名單內。",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.followup.send(
+        f"已將 {member.mention} 加入 Hidden VIP 白名單。\n"
+        "不需要公開 VIP 身分組，也會被系統視為有效 VIP。",
+        ephemeral=True,
+    )
+
+
+@vip_group.command(
+    name="hidden_remove",
+    description="管理員把成員移出 Hidden VIP 白名單",
+)
+@app_commands.describe(member="要移出 Hidden VIP 白名單的成員")
+@app_commands.default_permissions(administrator=True)
+async def vip_hidden_remove(interaction: discord.Interaction, member: discord.Member):
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("這個指令只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("只有管理員可以管理 Hidden VIP 白名單。", ephemeral=True)
+        return
+
+    if int(member.id) in {int(user_id) for user_id in CONFIG_HIDDEN_VIP_USER_IDS}:
+        await interaction.response.send_message(
+            "這位成員是由 HIDDEN_VIP_USER_IDS 環境設定固定加入，無法用指令移除。",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    removed = remove_hidden_vip_user(member.id)
+    refresh_hidden_vip_runtime_ids()
+
+    try:
+        await get_or_create_vip_voice_lobby(interaction.guild)
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        await interaction.followup.send(
+            f"白名單已更新，但刷新 VIP 建立入口權限失敗：{exc}",
+            ephemeral=True,
+        )
+        return
+
+    if not removed:
+        await interaction.followup.send(
+            f"{member.mention} 原本就不在可管理的 Hidden VIP 白名單內。",
+            ephemeral=True,
+        )
+        return
+
+    vip_role_ids = {int(role_id) for role_id in VIP_VOICE_LOBBY_ROLE_IDS}
+    has_public_vip_role = any(
+        int(role.id) in vip_role_ids
+        for role in getattr(member, "roles", [])
+    )
+
+    room_deleted = False
+    if not has_public_vip_role:
+        room_deleted = await delete_vip_voice_room_for_owner(
+            interaction.guild,
+            member.id,
+            reason=f"Hidden VIP whitelist removed by {interaction.user}",
+        )
+
+    suffix = (
+        "；因為他沒有正式 VIP 身分組，原本的 VIP 房也已刪除。"
+        if room_deleted
+        else "。"
+    )
+
+    await interaction.followup.send(
+        f"已將 {member.mention} 移出 Hidden VIP 白名單{suffix}",
+        ephemeral=True,
+    )
+
+
+@vip_group.command(
+    name="hidden_list",
+    description="管理員查看目前 Hidden VIP 白名單",
+)
+@app_commands.default_permissions(administrator=True)
+async def vip_hidden_list(interaction: discord.Interaction):
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("這個指令只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("只有管理員可以查看 Hidden VIP 白名單。", ephemeral=True)
+        return
+
+    rows = list_hidden_vip_users()
+    configured_ids = {
+        int(user_id)
+        for user_id in CONFIG_HIDDEN_VIP_USER_IDS
+        if int(user_id)
+    }
+    db_by_id = {
+        int(row.get("user_id") or 0): row
+        for row in rows
+        if int(row.get("user_id") or 0)
+    }
+
+    all_ids = sorted(set(db_by_id) | configured_ids)
+    if not all_ids:
+        await interaction.response.send_message(
+            "目前 Hidden VIP 白名單是空的。",
+            ephemeral=True,
+        )
+        return
+
+    lines: list[str] = []
+    for user_id in all_ids[:40]:
+        member = interaction.guild.get_member(user_id)
+        label = member.mention if member is not None else f"<@{user_id}>"
+        source = "設定檔" if user_id in configured_ids else "指令新增"
+        lines.append(f"• {label} — {user_id}（{source}）")
+
+    if len(all_ids) > 40:
+        lines.append(f"…另有 {len(all_ids) - 40} 位未顯示")
+
+    await interaction.response.send_message(
+        "Hidden VIP 白名單：\n" + "\n".join(lines),
+        ephemeral=True,
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
 
 
 @vip_group.command(
