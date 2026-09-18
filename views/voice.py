@@ -100,6 +100,16 @@ def configure_voice_helpers(
     TEMP_VOICE_CONTROL_PANELS = temp_voice_control_panels
 
 
+def set_hidden_vip_user_ids(user_ids: list[int] | set[int] | tuple[int, ...]) -> None:
+    """更新 Hidden VIP runtime 清單；用於 DB 白名單即時同步。"""
+    global HIDDEN_VIP_USER_IDS
+    HIDDEN_VIP_USER_IDS = sorted({
+        int(user_id)
+        for user_id in (user_ids or [])
+        if int(user_id)
+    })
+
+
 def safe_voice_channel_name(member: discord.Member) -> str:
     display_name = member.display_name.strip() or member.name
     # Discord 語音頻道名稱最多 100 字，這裡留一點安全長度
