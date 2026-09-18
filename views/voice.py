@@ -907,6 +907,50 @@ async def apply_voice_hidden_state(
         reason=f"Voice room {'hidden' if hidden else 'shown'} by control panel",
     )
 
+VOICE_ROOM_NAME_SEPARATORS = ("┃", "｜", "│")
+
+
+def build_preserved_voice_room_name(current_name: str, requested_name: str) -> str | None:
+    """只允許修改名稱後半段，保留原本的「表情符號 + 分隔線」前綴。"""
+    current = str(current_name or "").strip()
+    requested = str(requested_name or "").strip()
+
+    if not requested:
+        return None
+
+    prefix = ""
+    separator_index: int | None = None
+
+    for separator in VOICE_ROOM_NAME_SEPARATORS:
+        index = current.find(separator)
+        if index <= 0:
+            continue
+        if separator_index is None or index < separator_index:
+            separator_index = index
+            prefix = current[: index + len(separator)]
+
+    # 使用者若貼上完整格式，只取分隔線後面的房名，避免出現 👑┃👑┃房名。
+    requested_separator_index: int | None = None
+    for separator in VOICE_ROOM_NAME_SEPARATORS:
+        index = requested.find(separator)
+        if index < 0:
+            continue
+        if requested_separator_index is None or index < requested_separator_index:
+            requested_separator_index = index
+
+    if requested_separator_index is not None:
+        requested = requested[requested_separator_index + 1 :].strip()
+
+    if not requested:
+        return None
+
+    if not prefix:
+        return requested[:95]
+
+    max_suffix_length = max(1, 95 - len(prefix))
+    return f"{prefix}{requested[:max_suffix_length]}"
+
+
 class VoiceRoomRenameModal(discord.ui.Modal, title="更改語音房名稱"):
     new_name = discord.ui.TextInput(
         label="新的頻道名稱",
@@ -935,9 +979,21 @@ class VoiceRoomRenameModal(discord.ui.Modal, title="更改語音房名稱"):
             await interaction.response.send_message("找不到對應的語音房。", ephemeral=True)
             return
 
+        new_channel_name = build_preserved_voice_room_name(
+            voice_channel.name,
+            self.new_name.value,
+        )
+
+        if not new_channel_name:
+            await interaction.response.send_message(
+                "請輸入有效的房間名稱；前面的表情符號與分隔線會由系統保留。",
+                ephemeral=True,
+            )
+            return
+
         try:
             await voice_channel.edit(
-                name=self.new_name.value.strip()[:95],
+                name=new_channel_name,
                 reason=f"Voice room renamed by {interaction.user}"
             )
         except discord.Forbidden:
@@ -1079,6 +1135,8 @@ def build_voice_control_base_lines(description: str | None) -> list[str]:
             continue
         if "當包廂內無人時" in line:
             continue
+        if "VIP 失效時" in line or "VIP 有效期間" in line:
+            continue
 
         lines.append(raw_line.rstrip())
 
@@ -1094,12 +1152,20 @@ def inject_voice_control_status_line(description: str | None, voice_channel_id: 
     if not lines:
         lines = ["歡迎來到您的專屬包廂！", "可以使用遙控器管理頻道。"]
 
+    data = TEMP_VOICE_CONTROL_PANELS.get(int(voice_channel_id), {})
+    room_type = str(data.get("room_type") or "public")
+
+    if room_type == "vip":
+        lifecycle_line = "👑 VIP 有效期間內包廂會永久保留；VIP 失效時自動刪除。"
+    else:
+        lifecycle_line = "⚠️ 當包廂內無人時，將自動銷毀。"
+
     return chr(10).join([
         *lines,
         "",
         get_voice_control_status_line(voice_channel_id),
         "",
-        "⚠️ 當包廂內無人時，將自動銷毀。",
+        lifecycle_line,
     ])
 
 
@@ -1355,8 +1421,7 @@ async def create_voice_control_panel(
         title="專屬語音房",
         description=(
             f"歡迎來到您的專屬包廂！{member.mention}\n"
-            "可以使用遙控器管理頻道。\n\n"
-            "⚠️ 當包廂內無人時，將自動銷毀。"
+            "可以使用遙控器管理頻道。"
         ),
         color=discord.Color.purple(),
     )
@@ -1378,4 +1443,5 @@ async def create_voice_control_panel(
     )
 
     TEMP_VOICE_CONTROL_PANELS[voice_channel.id]["panel_message_id"] = message.id
+    return message
 
