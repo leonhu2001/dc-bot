@@ -19,6 +19,7 @@ OLD_VIP_VOICE_CREATE_CHANNEL_NAMES: list[str] = []
 PUBLIC_VOICE_CREATE_CHANNEL_NAME = "➕┃點我創建公共頻道"
 VIP_VOICE_LOBBY_ROLE_ID = 0
 VIP_VOICE_LOBBY_ROLE_IDS: list[int] = []
+HIDDEN_VIP_USER_IDS: list[int] = []
 PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = []
 DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS: list[int] = [
     1500751059239440575,
@@ -56,6 +57,7 @@ def configure_voice_helpers(
     public_voice_create_channel_name: str,
     vip_voice_lobby_role_id: int,
     vip_voice_lobby_role_ids: list[int] | None = None,
+    hidden_vip_user_ids: list[int] | None = None,
     play_voice_allowed_role_ids: list[int],
     voice_room_hidden_visible_role_ids: list[int],
     voice_move_member_role_ids: list[int] | None = None,
@@ -69,6 +71,7 @@ def configure_voice_helpers(
     global PUBLIC_VOICE_CREATE_CHANNEL_NAME
     global VIP_VOICE_LOBBY_ROLE_ID
     global VIP_VOICE_LOBBY_ROLE_IDS
+    global HIDDEN_VIP_USER_IDS
     global PLAY_VOICE_ALLOWED_ROLE_IDS
     global VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS
     global VOICE_VIEW_ONLY_ROLE_IDS
@@ -83,6 +86,7 @@ def configure_voice_helpers(
     PUBLIC_VOICE_CREATE_CHANNEL_NAME = str(public_voice_create_channel_name)
     VIP_VOICE_LOBBY_ROLE_ID = int(vip_voice_lobby_role_id)
     VIP_VOICE_LOBBY_ROLE_IDS = [int(role_id) for role_id in (vip_voice_lobby_role_ids or [VIP_VOICE_LOBBY_ROLE_ID]) if int(role_id)]
+    HIDDEN_VIP_USER_IDS = [int(user_id) for user_id in (hidden_vip_user_ids or []) if int(user_id)]
     PLAY_VOICE_ALLOWED_ROLE_IDS = [int(role_id) for role_id in (play_voice_allowed_role_ids or DEFAULT_PLAY_VOICE_ALLOWED_ROLE_IDS)]
     VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = [int(role_id) for role_id in (voice_room_hidden_visible_role_ids or [])]
     VOICE_MOVE_MEMBER_ROLE_IDS = [
@@ -320,6 +324,20 @@ def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
         vip_role = guild.get_role(int(vip_role_id))
         if vip_role is not None:
             overwrites[vip_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                connect=True,
+                speak=True,
+                stream=True,
+                use_voice_activation=True,
+                send_messages=True,
+                read_message_history=True,
+            )
+
+    # 隱藏 VIP 使用個人 overwrite，不需要任何公開 VIP 身分組。
+    for user_id in HIDDEN_VIP_USER_IDS:
+        member = guild.get_member(int(user_id))
+        if member is not None:
+            overwrites[member] = discord.PermissionOverwrite(
                 view_channel=True,
                 connect=True,
                 speak=True,
