@@ -10280,13 +10280,43 @@ async def delete_vip_voice_room_for_owner(
     owner_id: int,
     *,
     reason: str,
+    verify_vip_inactive: bool = False,
+    verify_delay_seconds: float = 0,
 ) -> bool:
     row = get_vip_voice_room_by_owner(int(owner_id))
     if not row:
         return False
 
     channel_id = int(row.get("channel_id") or 0)
+
+    # VIP 失效刪房一定做最後一次 Discord 即時驗證。
+    # 任何暫時性的 member_update / 身分組同步事件都不能直接刪永久房。
+    if verify_vip_inactive:
+        if verify_delay_seconds > 0:
+            await asyncio.sleep(float(verify_delay_seconds))
+
+        latest_member = await fetch_member_safely(guild, int(owner_id))
+
+        if latest_member is None:
+            print(
+                f"[vip-voice] skip delete: unable to verify member "
+                f"owner={owner_id} channel={channel_id} reason={reason}"
+            )
+            return False
+
+        if member_has_vip_voice_role(latest_member):
+            print(
+                f"[vip-voice] skip delete: VIP still active "
+                f"owner={owner_id} channel={channel_id} reason={reason}"
+            )
+            return False
+
     channel = guild.get_channel(channel_id) if channel_id else None
+
+    print(
+        f"[vip-voice] deleting room "
+        f"owner={owner_id} channel={channel_id} reason={reason}"
+    )
 
     if isinstance(channel, discord.VoiceChannel):
         try:
@@ -10378,6 +10408,7 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
                 guild,
                 owner_id,
                 reason="VIP membership is no longer active",
+                verify_vip_inactive=True,
             )
             continue
 
@@ -10461,6 +10492,8 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             after.guild,
             after.id,
             reason="VIP membership expired",
+            verify_vip_inactive=True,
+            verify_delay_seconds=3,
         )
 
 
