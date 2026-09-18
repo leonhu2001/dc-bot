@@ -51,6 +51,11 @@ from core.database import (
     save_bot_data,
     delete_order_row_from_db,
     delete_claim_row_from_db,
+    upsert_vip_voice_room,
+    get_vip_voice_room_by_owner,
+    get_vip_voice_room_by_channel,
+    list_vip_voice_rooms,
+    delete_vip_voice_room_record,
     remember_order_data,
     remember_claim_data,
     run_daily_backup_once,
@@ -221,6 +226,8 @@ from views.voice import (
     delete_voice_control_panel,
     get_room_targets_for_control,
     create_voice_control_panel,
+    VoiceRoomControlView,
+    sync_voice_control_panel_state_from_channel,
     grant_play_voice_room_chat_access,
     revoke_play_voice_room_chat_access,
 )
@@ -10259,6 +10266,149 @@ configure_panel_views(
 
 # ========= Bot 事件 =========
 
+
+def member_has_vip_voice_role(member: discord.Member | None) -> bool:
+    if member is None:
+        return False
+    vip_role_ids = {int(role_id) for role_id in VIP_VOICE_LOBBY_ROLE_IDS}
+    return any(int(role.id) in vip_role_ids for role in getattr(member, "roles", []))
+
+
+async def delete_vip_voice_room_for_owner(
+    guild: discord.Guild,
+    owner_id: int,
+    *,
+    reason: str,
+) -> bool:
+    row = get_vip_voice_room_by_owner(int(owner_id))
+    if not row:
+        return False
+
+    channel_id = int(row.get("channel_id") or 0)
+    channel = guild.get_channel(channel_id) if channel_id else None
+
+    if isinstance(channel, discord.VoiceChannel):
+        try:
+            await channel.delete(reason=reason)
+        except discord.NotFound:
+            pass
+        except discord.Forbidden:
+            print(f"Bot 權限不足，無法刪除 VIP 語音房：{channel_id}")
+            return False
+        except discord.HTTPException as e:
+            print(f"刪除 VIP 語音房失敗：{channel_id}：{e}")
+            return False
+
+    TEMP_VIP_VOICE_CHANNEL_IDS.discard(channel_id)
+    await delete_voice_control_panel(guild, channel_id)
+    delete_vip_voice_room_record(owner_id=int(owner_id), channel_id=channel_id)
+    return True
+
+
+async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
+    # 先接管更新前已存在、但還沒寫入資料庫的 VIP 房。
+    known_channel_ids = {
+        int(row.get("channel_id") or 0)
+        for row in list_vip_voice_rooms()
+        if int(row.get("channel_id") or 0)
+    }
+    vip_category = guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
+
+    if isinstance(vip_category, discord.CategoryChannel):
+        for channel in vip_category.voice_channels:
+            if channel.id in known_channel_ids or channel.name == VIP_VOICE_CREATE_CHANNEL_NAME:
+                continue
+
+            owner_id = 0
+            panel_message_id = 0
+
+            try:
+                async for message in channel.history(limit=100):
+                    if bot.user is not None and message.author.id != bot.user.id:
+                        continue
+                    if not message.embeds:
+                        continue
+
+                    embed = message.embeds[0]
+                    if str(embed.title or "") != "專屬語音房":
+                        continue
+
+                    match = re.search(r"<@!?(\d+)>", str(embed.description or ""))
+                    if match is None:
+                        continue
+
+                    owner_id = int(match.group(1))
+                    panel_message_id = int(message.id)
+                    break
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+
+            owner = await fetch_member_safely(guild, owner_id) if owner_id else None
+            if owner is None or not member_has_vip_voice_role(owner):
+                continue
+
+            upsert_vip_voice_room(owner_id, channel.id, panel_message_id or None)
+            known_channel_ids.add(channel.id)
+
+    restored = 0
+
+    for row in list_vip_voice_rooms():
+        owner_id = int(row.get("owner_id") or 0)
+        channel_id = int(row.get("channel_id") or 0)
+        panel_message_id = int(row.get("panel_message_id") or 0)
+
+        if not owner_id or not channel_id:
+            delete_vip_voice_room_record(owner_id=owner_id or None, channel_id=channel_id or None)
+            continue
+
+        channel = guild.get_channel(channel_id)
+        owner = await fetch_member_safely(guild, owner_id)
+
+        if not isinstance(channel, discord.VoiceChannel):
+            delete_vip_voice_room_record(owner_id=owner_id, channel_id=channel_id)
+            continue
+
+        # 成員資料暫時抓不到時不要誤刪永久房；真的離開伺服器會由 on_member_remove 清理。
+        if owner is None:
+            continue
+
+        if not member_has_vip_voice_role(owner):
+            await delete_vip_voice_room_for_owner(
+                guild,
+                owner_id,
+                reason="VIP membership is no longer active",
+            )
+            continue
+
+        TEMP_VIP_VOICE_CHANNEL_IDS.add(channel_id)
+        TEMP_VOICE_CONTROL_PANELS[channel_id] = {
+            "owner_id": owner_id,
+            "panel_channel_id": channel_id,
+            "panel_message_id": panel_message_id or None,
+            "room_type": "vip",
+            "locked": False,
+            "hidden": False,
+        }
+        sync_voice_control_panel_state_from_channel(channel)
+
+        if panel_message_id:
+            try:
+                bot.add_view(
+                    VoiceRoomControlView(
+                        voice_channel_id=channel_id,
+                        owner_id=owner_id,
+                        room_type="vip",
+                    ),
+                    message_id=panel_message_id,
+                )
+            except ValueError:
+                pass
+
+        restored += 1
+
+    return restored
+
+
 @bot.event
 async def on_member_join(member: discord.Member):
     role = member.guild.get_role(NEW_MEMBER_ROLE_ID)
@@ -10301,10 +10451,38 @@ async def on_member_join(member: discord.Member):
 
 
 @bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    had_vip = member_has_vip_voice_role(before)
+    has_vip = member_has_vip_voice_role(after)
+
+    if had_vip and not has_vip:
+        await delete_vip_voice_room_for_owner(
+            after.guild,
+            after.id,
+            reason="VIP membership expired",
+        )
+
+
+@bot.event
+async def on_member_remove(member: discord.Member):
+    await delete_vip_voice_room_for_owner(
+        member.guild,
+        member.id,
+        reason="VIP member left the server",
+    )
+
+
+@bot.event
 async def on_guild_channel_delete(channel: discord.abc.GuildChannel):
     # 如果入職票口被手動刪除，也嘗試收回申請人暫時身分組。
     await remove_recruit_applicant_role(channel.guild, channel)
 
+    if isinstance(channel, discord.VoiceChannel):
+        row = get_vip_voice_room_by_channel(channel.id)
+        if row:
+            TEMP_VIP_VOICE_CHANNEL_IDS.discard(channel.id)
+            await delete_voice_control_panel(channel.guild, channel.id)
+            delete_vip_voice_room_record(channel_id=channel.id)
 
 
 @bot.event
@@ -10315,8 +10493,8 @@ async def on_voice_state_update(
 ):
     guild = member.guild
 
-    # 離開機器人建立的陪玩 / VIP / 公共語音房後，如果房間沒人就自動刪除
-    # 這裡除了看暫存 ID，也會用頻道名稱判斷，避免 Bot 重開後忘記之前建立的臨時房。
+    # 離開受管理語音房時先收回訪客的個人權限。
+    # 陪玩 / 公共房仍在空房時刪除；VIP 房則持續保留到 VIP 失效。
     if before.channel is not None:
         is_temp_play_voice_room = (
             before.channel.id in TEMP_PLAY_VOICE_CHANNEL_IDS
@@ -10350,7 +10528,6 @@ async def on_voice_state_update(
 
         if (
             before.channel != after.channel
-            and len(before.channel.members) > 0
             and (
                 is_temp_play_voice_room
                 or is_temp_vip_voice_room
@@ -10370,19 +10547,6 @@ async def on_voice_state_update(
                 print("Bot 權限不足，無法刪除陪玩語音房。")
             except discord.HTTPException as e:
                 print(f"刪除陪玩語音房失敗：{e}")
-            return
-
-        if is_temp_vip_voice_room and len(before.channel.members) == 0:
-            TEMP_VIP_VOICE_CHANNEL_IDS.discard(before.channel.id)
-            await delete_voice_control_panel(guild, before.channel.id)
-            try:
-                await before.channel.delete(reason="Temporary VIP voice room is empty")
-            except discord.NotFound:
-                pass
-            except discord.Forbidden:
-                print("Bot 權限不足，無法刪除 VIP 語音房。")
-            except discord.HTTPException as e:
-                print(f"刪除 VIP 語音房失敗：{e}")
             return
 
         if is_temp_public_voice_room and len(before.channel.members) == 0:
@@ -10452,9 +10616,26 @@ async def on_voice_state_update(
 
         return
 
-    # 進入 VIP 入口：建立 VIP 專用語音房
+    # 進入 VIP 入口：已有永久包廂就直接送回原房，沒有才建立。
     if after.channel is not None and vip_lobby_channel is not None and after.channel.id == vip_lobby_channel.id:
         try:
+            existing_room = get_vip_voice_room_by_owner(member.id)
+
+            if existing_room:
+                existing_channel_id = int(existing_room.get("channel_id") or 0)
+                existing_channel = guild.get_channel(existing_channel_id)
+
+                if isinstance(existing_channel, discord.VoiceChannel):
+                    TEMP_VIP_VOICE_CHANNEL_IDS.add(existing_channel.id)
+                    await grant_play_voice_room_chat_access(existing_channel, member)
+                    await member.move_to(
+                        existing_channel,
+                        reason="Move VIP member to existing permanent voice room",
+                    )
+                    return
+
+                delete_vip_voice_room_record(owner_id=member.id, channel_id=existing_channel_id)
+
             category = guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
             if category is None or not isinstance(category, discord.CategoryChannel):
                 category = vip_lobby_channel.category
@@ -10463,21 +10644,23 @@ async def on_voice_state_update(
                 name=safe_vip_voice_channel_name(member),
                 category=category,
                 overwrites=build_vip_room_overwrites(guild, member),
-                reason=f"Temporary VIP voice room created by {member}"
+                reason=f"Permanent VIP voice room created by {member}"
             )
             TEMP_VIP_VOICE_CHANNEL_IDS.add(new_channel.id)
+            upsert_vip_voice_room(member.id, new_channel.id, None)
 
-            await create_voice_control_panel(
+            panel_message = await create_voice_control_panel(
                 guild=guild,
                 category=category,
                 member=member,
                 voice_channel=new_channel,
                 room_type="vip"
             )
+            upsert_vip_voice_room(member.id, new_channel.id, panel_message.id)
 
             await member.move_to(
                 new_channel,
-                reason="Move member to created VIP voice room"
+                reason="Move member to permanent VIP voice room"
             )
         except discord.Forbidden:
             print("Bot 權限不足，無法建立或移動 VIP 語音房。")
@@ -10623,6 +10806,12 @@ async def on_ready():
             await get_or_create_play_voice_lobby(guild_for_voice)
             await get_or_create_vip_voice_lobby(guild_for_voice)
             await get_or_create_public_voice_lobby(guild_for_voice)
+
+            if not getattr(bot, "_vip_voice_views_registered", False):
+                restored_vip_rooms = await restore_persistent_vip_voice_rooms(guild_for_voice)
+                bot._vip_voice_views_registered = True
+                if restored_vip_rooms:
+                    print(f"Restored VIP voice rooms: {restored_vip_rooms}")
         except discord.Forbidden:
             print("Bot 權限不足，無法建立陪玩 / VIP / 公共語音入口。")
         except discord.HTTPException as e:
