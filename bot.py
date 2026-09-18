@@ -10333,7 +10333,7 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
                     if str(embed.title or "") != "專屬語音房":
                         continue
 
-                    match = re.search(r"<@!?(\\d+)>", str(embed.description or ""))
+                    match = re.search(r"<@!?(\d+)>", str(embed.description or ""))
                     if match is None:
                         continue
 
