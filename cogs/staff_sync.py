@@ -325,6 +325,17 @@ class StaffSyncCog(commands.Cog):
         *,
         reason: str,
     ) -> bool:
+        # VIP 房現在是永久房：空房、孤兒掃描都不得刪除。
+        # 真正 VIP 失效的刪除由 bot.py 的 VIP lifecycle 流程負責。
+        room_type = _managed_room_type(channel)
+        if room_type == "vip":
+            print(
+                f"[voice-guard] skip empty delete for persistent VIP room "
+                f"channel={channel.id} reason={reason}",
+                flush=True,
+            )
+            return False
+
         if channel.members:
             return False
 
