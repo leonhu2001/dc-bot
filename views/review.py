@@ -685,7 +685,7 @@ async def _send_review_channel_embed(
     return
 
 
-class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
+class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內容會公開"):
     rating = discord.ui.TextInput(
         label="星等",
         placeholder="請輸入 1～5",
@@ -737,12 +737,17 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
 
         order, _targets = get_review_targets(self.ticket_channel_id)
 
-        customer_display_name = str(
-            (
-                order["customer_display_name"]
-                if order is not None
-                else None
+        order_customer_display_name = (
+            str(order["customer_display_name"] or "").strip()
+            if (
+                order is not None
+                and "customer_display_name" in order.keys()
             )
+            else ""
+        )
+
+        customer_display_name = str(
+            order_customer_display_name
             or getattr(interaction.user, "display_name", None)
             or getattr(interaction.user, "name", None)
             or self.customer_id
