@@ -1984,8 +1984,35 @@ def _public_reviews(
             row
         )
 
+        customer_name_public = bool(
+            _safe_int(
+                data.get(
+                    "customer_name_public"
+                ),
+                0,
+            )
+        )
+
+        customer_display_name = (
+            normalize_public_text(
+                data.get(
+                    "customer_display_name"
+                )
+            )
+        )
+
         result.append(
             {
+                "customer_name_public":
+                    customer_name_public,
+                "customer_name": (
+                    customer_display_name
+                    if (
+                        customer_name_public
+                        and customer_display_name
+                    )
+                    else "匿名老闆"
+                ),
                 "rating": max(
                     0,
                     min(
