@@ -202,6 +202,8 @@ def build_full_temp_voice_overwrite(
         use_external_stickers=True,
         move_members=move_members,
         manage_channels=manage_channels,
+        # 只有 Bot 使用 manage_channels=True；同時補 pin/unpin Panel 需要的權限。
+        manage_messages=True if manage_channels else None,
     )
 
 
@@ -1397,6 +1399,126 @@ async def sync_temp_voice_room_permissions_on_create(
     except discord.HTTPException as exc:
         print(f"同步語音房權限失敗：{voice_channel.name} ({voice_channel.id}) {exc}")
 
+def build_voice_control_panel_embed(
+    member: discord.Member,
+    voice_channel_id: int,
+) -> discord.Embed:
+    embed = discord.Embed(
+        title="專屬語音房",
+        description=(
+            f"歡迎來到您的專屬包廂！{member.mention}\n"
+            "可以使用遙控器管理頻道。"
+        ),
+        color=discord.Color.purple(),
+    )
+    embed.description = inject_voice_control_status_line(
+        embed.description or "",
+        voice_channel_id,
+    )
+    return embed
+
+
+async def pin_voice_control_panel_message(message: discord.Message | None) -> None:
+    if message is None or message.pinned:
+        return
+
+    try:
+        await message.pin(reason="Pin voice room control panel")
+    except discord.Forbidden:
+        print(f"Bot 權限不足，無法釘選語音房控制 Panel：{message.channel.id}")
+    except discord.HTTPException as exc:
+        print(f"釘選語音房控制 Panel 失敗：{message.channel.id}：{exc}")
+
+
+async def refresh_vip_voice_control_panel_if_needed(
+    voice_channel: discord.VoiceChannel,
+    owner: discord.Member,
+    *,
+    message_threshold: int = 10,
+) -> tuple[discord.Message | None, bool]:
+    """VIP 房主進房時，若 Panel 後方訊息過多就把 Panel 重建到最底部。"""
+    data = TEMP_VOICE_CONTROL_PANELS.get(int(voice_channel.id))
+
+    if not isinstance(data, dict):
+        return None, False
+
+    if str(data.get("room_type") or "") != "vip":
+        return None, False
+
+    if int(data.get("owner_id") or 0) != int(owner.id):
+        return None, False
+
+    sync_voice_control_panel_state_from_channel(voice_channel)
+
+    panel_message_id = int(data.get("panel_message_id") or 0)
+    old_message: discord.Message | None = None
+
+    if panel_message_id:
+        try:
+            old_message = await voice_channel.fetch_message(panel_message_id)
+        except discord.NotFound:
+            old_message = None
+        except discord.Forbidden:
+            print(f"Bot 權限不足，無法讀取 VIP 語音房 Panel：{voice_channel.id}")
+            return None, False
+        except discord.HTTPException as exc:
+            print(f"讀取 VIP 語音房 Panel 失敗：{voice_channel.id}：{exc}")
+            return None, False
+
+    if old_message is not None:
+        await pin_voice_control_panel_message(old_message)
+
+        messages_after_panel = 0
+        try:
+            async for _ in voice_channel.history(
+                limit=max(1, int(message_threshold)) + 1,
+                after=old_message,
+                oldest_first=True,
+            ):
+                messages_after_panel += 1
+                if messages_after_panel > int(message_threshold):
+                    break
+        except discord.Forbidden:
+            print(f"Bot 權限不足，無法檢查 VIP 語音房聊天紀錄：{voice_channel.id}")
+            return old_message, False
+        except discord.HTTPException as exc:
+            print(f"檢查 VIP 語音房聊天紀錄失敗：{voice_channel.id}：{exc}")
+            return old_message, False
+
+        if messages_after_panel <= int(message_threshold):
+            return old_message, False
+
+    view = VoiceRoomControlView(
+        voice_channel_id=voice_channel.id,
+        owner_id=owner.id,
+        room_type="vip",
+    )
+    new_message = await voice_channel.send(
+        embed=build_voice_control_panel_embed(owner, voice_channel.id),
+        view=view,
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+    data["panel_message_id"] = new_message.id
+    await pin_voice_control_panel_message(new_message)
+
+    if old_message is not None:
+        try:
+            await old_message.delete()
+        except discord.NotFound:
+            pass
+        except discord.Forbidden:
+            print(f"Bot 權限不足，無法刪除舊 VIP 語音房 Panel：{voice_channel.id}")
+        except discord.HTTPException as exc:
+            print(f"刪除舊 VIP 語音房 Panel 失敗：{voice_channel.id}：{exc}")
+
+    return new_message, True
+
+
 async def create_voice_control_panel(
     guild: discord.Guild,
     category: discord.CategoryChannel,
@@ -1417,19 +1539,8 @@ async def create_voice_control_panel(
     await grant_play_voice_room_chat_access(voice_channel, member)
     sync_voice_control_panel_state_from_channel(voice_channel)
 
-    embed = discord.Embed(
-        title="專屬語音房",
-        description=(
-            f"歡迎來到您的專屬包廂！{member.mention}\n"
-            "可以使用遙控器管理頻道。"
-        ),
-        color=discord.Color.purple(),
-    )
-
-    embed.description = inject_voice_control_status_line(embed.description or "", voice_channel.id)
-
     message = await voice_channel.send(
-        embed=embed,
+        embed=build_voice_control_panel_embed(member, voice_channel.id),
         view=VoiceRoomControlView(
             voice_channel_id=voice_channel.id,
             owner_id=member.id,
@@ -1443,5 +1554,9 @@ async def create_voice_control_panel(
     )
 
     TEMP_VOICE_CONTROL_PANELS[voice_channel.id]["panel_message_id"] = message.id
+
+    if str(room_type or "") == "vip":
+        await pin_voice_control_panel_message(message)
+
     return message
 
