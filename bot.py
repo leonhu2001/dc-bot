@@ -10343,7 +10343,7 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
             except (discord.Forbidden, discord.HTTPException):
                 continue
 
-            owner = guild.get_member(owner_id) if owner_id else None
+            owner = await fetch_member_safely(guild, owner_id) if owner_id else None
             if owner is None or not member_has_vip_voice_role(owner):
                 continue
 
@@ -10362,13 +10362,17 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
             continue
 
         channel = guild.get_channel(channel_id)
-        owner = guild.get_member(owner_id)
+        owner = await fetch_member_safely(guild, owner_id)
 
         if not isinstance(channel, discord.VoiceChannel):
             delete_vip_voice_room_record(owner_id=owner_id, channel_id=channel_id)
             continue
 
-        if owner is None or not member_has_vip_voice_role(owner):
+        # 成員資料暫時抓不到時不要誤刪永久房；真的離開伺服器會由 on_member_remove 清理。
+        if owner is None:
+            continue
+
+        if not member_has_vip_voice_role(owner):
             await delete_vip_voice_room_for_owner(
                 guild,
                 owner_id,
@@ -10457,6 +10461,15 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             after.id,
             reason="VIP membership expired",
         )
+
+
+@bot.event
+async def on_member_remove(member: discord.Member):
+    await delete_vip_voice_room_for_owner(
+        member.guild,
+        member.id,
+        reason="VIP member left the server",
+    )
 
 
 @bot.event
