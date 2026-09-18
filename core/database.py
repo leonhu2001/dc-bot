@@ -808,6 +808,15 @@ def init_database() -> None:
         )
         """)
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS vip_voice_rooms (
+            owner_id INTEGER PRIMARY KEY,
+            channel_id INTEGER NOT NULL UNIQUE,
+            panel_message_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """)
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS lottery_settings (
             key TEXT PRIMARY KEY,
             data TEXT NOT NULL,
@@ -933,6 +942,144 @@ def delete_claim_row_from_db(message_id: int | None = None, source_channel_id: i
             conn.commit()
     except sqlite3.Error as e:
         print(f"刪除 claims 資料失敗：{e}")
+
+
+def upsert_vip_voice_room(
+    owner_id: int,
+    channel_id: int,
+    panel_message_id: int | None = None,
+) -> None:
+    """保存 VIP 專屬語音房；同一位 VIP 永遠只對應一間房。"""
+    _ensure_database_ready()
+    now = get_taipei_now_iso()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            conn.execute(
+                "DELETE FROM vip_voice_rooms WHERE channel_id=? AND owner_id<>?",
+                (int(channel_id), int(owner_id)),
+            )
+            conn.execute(
+                """
+                INSERT INTO vip_voice_rooms (
+                    owner_id,
+                    channel_id,
+                    panel_message_id,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(owner_id) DO UPDATE SET
+                    channel_id=excluded.channel_id,
+                    panel_message_id=excluded.panel_message_id,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    int(owner_id),
+                    int(channel_id),
+                    int(panel_message_id) if panel_message_id is not None else None,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"保存 VIP 語音房資料失敗：{e}")
+
+
+def get_vip_voice_room_by_owner(owner_id: int) -> dict | None:
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT owner_id, channel_id, panel_message_id, created_at, updated_at
+                FROM vip_voice_rooms
+                WHERE owner_id=?
+                """,
+                (int(owner_id),),
+            ).fetchone()
+    except sqlite3.Error as e:
+        print(f"讀取 VIP 語音房資料失敗：{e}")
+        return None
+
+    return dict(row) if row is not None else None
+
+
+def get_vip_voice_room_by_channel(channel_id: int) -> dict | None:
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT owner_id, channel_id, panel_message_id, created_at, updated_at
+                FROM vip_voice_rooms
+                WHERE channel_id=?
+                """,
+                (int(channel_id),),
+            ).fetchone()
+    except sqlite3.Error as e:
+        print(f"讀取 VIP 語音房資料失敗：{e}")
+        return None
+
+    return dict(row) if row is not None else None
+
+
+def list_vip_voice_rooms() -> list[dict]:
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT owner_id, channel_id, panel_message_id, created_at, updated_at
+                FROM vip_voice_rooms
+                ORDER BY owner_id
+                """
+            ).fetchall()
+    except sqlite3.Error as e:
+        print(f"讀取 VIP 語音房清單失敗：{e}")
+        return []
+
+    return [dict(row) for row in rows]
+
+
+def delete_vip_voice_room_record(
+    *,
+    owner_id: int | None = None,
+    channel_id: int | None = None,
+) -> None:
+    """刪除 VIP 語音房對應資料。owner_id / channel_id 可擇一或同時提供。"""
+    if owner_id is None and channel_id is None:
+        return
+
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            if owner_id is not None and channel_id is not None:
+                conn.execute(
+                    "DELETE FROM vip_voice_rooms WHERE owner_id=? OR channel_id=?",
+                    (int(owner_id), int(channel_id)),
+                )
+            elif owner_id is not None:
+                conn.execute(
+                    "DELETE FROM vip_voice_rooms WHERE owner_id=?",
+                    (int(owner_id),),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM vip_voice_rooms WHERE channel_id=?",
+                    (int(channel_id),),
+                )
+            conn.commit()
+    except sqlite3.Error as e:
+        print(f"刪除 VIP 語音房資料失敗：{e}")
 
 
 def run_daily_backup_once() -> str | None:
