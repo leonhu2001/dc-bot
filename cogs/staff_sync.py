@@ -325,6 +325,17 @@ class StaffSyncCog(commands.Cog):
         *,
         reason: str,
     ) -> bool:
+        # VIP 房現在是永久房：空房、孤兒掃描都不得刪除。
+        # 真正 VIP 失效的刪除由 bot.py 的 VIP lifecycle 流程負責。
+        room_type = _managed_room_type(channel)
+        if room_type == "vip":
+            print(
+                f"[voice-guard] skip empty delete for persistent VIP room "
+                f"channel={channel.id} reason={reason}",
+                flush=True,
+            )
+            return False
+
         if channel.members:
             return False
 
@@ -375,10 +386,11 @@ class StaffSyncCog(commands.Cog):
                     room_type,
                     _runtime_owner_id(before.channel.id),
                 )
-                await self._delete_managed_voice_room(
-                    before.channel,
-                    reason="Persistent temporary voice room is empty",
-                )
+                if room_type != "vip":
+                    await self._delete_managed_voice_room(
+                        before.channel,
+                        reason="Persistent temporary voice room is empty",
+                    )
 
     @commands.Cog.listener()
     async def on_guild_channel_update(
@@ -453,7 +465,11 @@ class StaffSyncCog(commands.Cog):
 
                 # Give a just-created room enough time for the creator move operation.
                 # If move_to fails (Discord 40032), the orphan is removed on this sweep.
-                if not channel.members and _registry_age_seconds(row) >= 15:
+                if (
+                    str(row.get("room_type") or "") != "vip"
+                    and not channel.members
+                    and _registry_age_seconds(row) >= 15
+                ):
                     await self._delete_managed_voice_room(
                         channel,
                         reason="Temporary voice room orphan/empty sweeper",
