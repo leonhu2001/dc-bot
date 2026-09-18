@@ -36,6 +36,9 @@ _RULE_UPDATES: dict[str, dict] = {
     "basic_oil_satellite": {"price": 1800},
     "basic_oil_all": {"price": 4000},
 
+    # Steam
+    "steam_play": {"price": 320},
+
     # VALORANT: NG is hourly; ranked remains per game.
     "valorant_entertain_ng": {"price": 300, "pricing_type": "hourly", "unit_label": "H"},
     "valorant_entertain_ranked": {"price": 250, "pricing_type": "game", "unit_label": "局"},
