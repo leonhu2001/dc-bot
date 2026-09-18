@@ -824,6 +824,35 @@ def init_database() -> None:
         )
         """)
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS bot_migrations (
+            migration_key TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL
+        )
+        """)
+
+        # 將既有硬編碼 Hidden VIP 一次性搬進 DB。
+        # 有 migration marker，因此之後管理員用指令移除時不會在重啟後被重新加回。
+        hidden_vip_seed_key = "seed_hidden_vip_448915700145192961_v1"
+        if cur.execute(
+            "SELECT 1 FROM bot_migrations WHERE migration_key=? LIMIT 1",
+            (hidden_vip_seed_key,),
+        ).fetchone() is None:
+            now_text = get_taipei_now_iso()
+            cur.execute(
+                """
+                INSERT OR IGNORE INTO hidden_vip_users (user_id, added_by, created_at)
+                VALUES (?, NULL, ?)
+                """,
+                (448915700145192961, now_text),
+            )
+            cur.execute(
+                """
+                INSERT INTO bot_migrations (migration_key, applied_at)
+                VALUES (?, ?)
+                """,
+                (hidden_vip_seed_key, now_text),
+            )
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS lottery_settings (
             key TEXT PRIMARY KEY,
             data TEXT NOT NULL,
