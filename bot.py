@@ -10306,6 +10306,50 @@ async def delete_vip_voice_room_for_owner(
 
 
 async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
+    # 先接管更新前已存在、但還沒寫入資料庫的 VIP 房。
+    known_channel_ids = {
+        int(row.get("channel_id") or 0)
+        for row in list_vip_voice_rooms()
+        if int(row.get("channel_id") or 0)
+    }
+    vip_category = guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
+
+    if isinstance(vip_category, discord.CategoryChannel):
+        for channel in vip_category.voice_channels:
+            if channel.id in known_channel_ids or channel.name == VIP_VOICE_CREATE_CHANNEL_NAME:
+                continue
+
+            owner_id = 0
+            panel_message_id = 0
+
+            try:
+                async for message in channel.history(limit=100):
+                    if bot.user is not None and message.author.id != bot.user.id:
+                        continue
+                    if not message.embeds:
+                        continue
+
+                    embed = message.embeds[0]
+                    if str(embed.title or "") != "專屬語音房":
+                        continue
+
+                    match = re.search(r"<@!?(\\d+)>", str(embed.description or ""))
+                    if match is None:
+                        continue
+
+                    owner_id = int(match.group(1))
+                    panel_message_id = int(message.id)
+                    break
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+
+            owner = guild.get_member(owner_id) if owner_id else None
+            if owner is None or not member_has_vip_voice_role(owner):
+                continue
+
+            upsert_vip_voice_room(owner_id, channel.id, panel_message_id or None)
+            known_channel_ids.add(channel.id)
+
     restored = 0
 
     for row in list_vip_voice_rooms():
