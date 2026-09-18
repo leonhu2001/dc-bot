@@ -10287,6 +10287,112 @@ def member_has_vip_voice_role(member: discord.Member | None) -> bool:
     return any(int(role.id) in vip_role_ids for role in getattr(member, "roles", []))
 
 
+@vip_group.command(
+    name="create_voice",
+    description="管理員直接替有效 VIP 建立永久 VIP 語音房",
+)
+@app_commands.describe(user_id="要建立 VIP 語音房的 Discord 使用者 ID")
+@app_commands.default_permissions(administrator=True)
+async def vip_create_voice(interaction: discord.Interaction, user_id: str):
+    if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("這個指令只能在伺服器內使用。", ephemeral=True)
+        return
+
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("只有管理員可以使用這個指令。", ephemeral=True)
+        return
+
+    try:
+        owner_id = int(str(user_id).strip())
+    except (TypeError, ValueError):
+        await interaction.response.send_message("Discord 使用者 ID 格式錯誤。", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    member = await fetch_member_safely(interaction.guild, owner_id)
+    if member is None:
+        await interaction.followup.send("找不到這位伺服器成員，請確認使用者 ID。", ephemeral=True)
+        return
+
+    if not member_has_vip_voice_role(member):
+        await interaction.followup.send(
+            "這位成員目前不是有效 VIP，也不在 Hidden VIP 白名單內，因此沒有建立房間。",
+            ephemeral=True,
+        )
+        return
+
+    existing_room = get_vip_voice_room_by_owner(owner_id)
+    if existing_room:
+        existing_channel_id = int(existing_room.get("channel_id") or 0)
+        existing_channel = interaction.guild.get_channel(existing_channel_id)
+
+        if isinstance(existing_channel, discord.VoiceChannel):
+            TEMP_VIP_VOICE_CHANNEL_IDS.add(existing_channel.id)
+            await interaction.followup.send(
+                f"{member.mention} 已有永久 VIP 房：{existing_channel.mention}",
+                ephemeral=True,
+            )
+            return
+
+        delete_vip_voice_room_record(
+            owner_id=owner_id,
+            channel_id=existing_channel_id or None,
+        )
+
+    category = interaction.guild.get_channel(VIP_VOICE_LOBBY_CATEGORY_ID)
+    if not isinstance(category, discord.CategoryChannel):
+        await interaction.followup.send(
+            "找不到 VIP 語音類別，請確認 VIP_VOICE_LOBBY_CATEGORY_ID。",
+            ephemeral=True,
+        )
+        return
+
+    new_channel: discord.VoiceChannel | None = None
+
+    try:
+        new_channel = await interaction.guild.create_voice_channel(
+            name=safe_vip_voice_channel_name(member),
+            category=category,
+            overwrites=build_vip_room_overwrites(interaction.guild, member),
+            reason=f"Permanent VIP voice room manually created by {interaction.user}",
+        )
+
+        TEMP_VIP_VOICE_CHANNEL_IDS.add(new_channel.id)
+        upsert_vip_voice_room(owner_id, new_channel.id, None)
+
+        panel_message = await create_voice_control_panel(
+            guild=interaction.guild,
+            category=category,
+            member=member,
+            voice_channel=new_channel,
+            room_type="vip",
+        )
+
+        upsert_vip_voice_room(owner_id, new_channel.id, panel_message.id)
+
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        if new_channel is not None:
+            TEMP_VIP_VOICE_CHANNEL_IDS.discard(new_channel.id)
+            delete_vip_voice_room_record(owner_id=owner_id, channel_id=new_channel.id)
+            try:
+                await new_channel.delete(reason="Rollback failed manual VIP room creation")
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+
+        await interaction.followup.send(
+            f"建立 VIP 語音房失敗：{exc}",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.followup.send(
+        f"已替 {member.mention} 建立永久 VIP 房：{new_channel.mention}\n"
+        "Panel 已建立並綁定，房主不需要先進入建立入口。",
+        ephemeral=True,
+    )
+
+
 async def delete_vip_voice_room_for_owner(
     guild: discord.Guild,
     owner_id: int,
