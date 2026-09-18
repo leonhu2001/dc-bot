@@ -445,13 +445,15 @@ async def sync_vip_tier_roles(guild, member, data: dict) -> list[str]:
         if role is not None:
             roles_to_add.append(role)
 
-    if roles_to_remove:
-        await member.remove_roles(*roles_to_remove, reason="魔丸娛樂 VIP 階級同步")
-        notices.append("已移除其他 VIP 階級身分組")
-
+    # 升 / 降到另一個 VIP 階級時先加新身分組、再移除舊身分組，
+    # 避免中間短暫出現「完全沒有 VIP 身分」而誤刪永久 VIP 包廂。
     if roles_to_add:
         await member.add_roles(*roles_to_add, reason="魔丸娛樂 VIP 階級同步")
         notices.append(f"已獲得 {target_tier.get('name', 'VIP')} 身分組")
+
+    if roles_to_remove:
+        await member.remove_roles(*roles_to_remove, reason="魔丸娛樂 VIP 階級同步")
+        notices.append("已移除其他 VIP 階級身分組")
 
     return notices
 
