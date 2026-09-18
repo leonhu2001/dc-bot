@@ -855,16 +855,25 @@ async def apply_voice_hidden_state(
     hidden: bool,
     room_type: str,
 ) -> None:
-    """只切換 view_channel，不改 connect，避免隱藏時把鎖定狀態洗掉。"""
+    """隱藏只影響非店內人員；房主、Bot 與店內人員永遠保留可見，不改 connect。"""
     guild = voice_channel.guild
     overwrites = dict(voice_channel.overwrites)
     normalized_room_type = str(room_type or "public")
 
-    if normalized_room_type == "public":
-        everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-        everyone_overwrite.view_channel = False if hidden else True
+    # VIP 房沿用較嚴格的店內名單（不含員工家屬）；
+    # 陪玩 / 公共房則沿用完整店內語音名單。
+    if normalized_room_type == "vip":
+        staff_roles = get_vip_voice_allowed_roles(guild)
+    else:
+        staff_roles = get_play_voice_allowed_roles(guild)
 
-        # 公共房沒有鎖定時預設可進；這裡不強制解鎖，只在沒設定過 connect 時補預設值。
+    staff_role_ids = {int(role.id) for role in staff_roles}
+
+    everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
+    everyone_overwrite.view_channel = False if hidden else True
+
+    if normalized_room_type == "public":
+        # 公共房不改既有鎖定狀態；只有尚未明確設定 connect 時才補預設可進。
         if everyone_overwrite.connect is None:
             everyone_overwrite.connect = True
 
@@ -873,40 +882,62 @@ async def apply_voice_hidden_state(
         everyone_overwrite.use_voice_activation = True
         everyone_overwrite.send_messages = True
         everyone_overwrite.read_message_history = True
-        overwrites[guild.default_role] = everyone_overwrite
-
     else:
-        everyone_overwrite = overwrites.get(guild.default_role, discord.PermissionOverwrite())
-        everyone_overwrite.view_channel = False if hidden else True
         everyone_overwrite.connect = False
         everyone_overwrite.send_messages = False
         everyone_overwrite.read_message_history = False
-        overwrites[guild.default_role] = everyone_overwrite
 
-        targets = get_room_targets_for_control(guild, normalized_room_type)
+    overwrites[guild.default_role] = everyone_overwrite
 
-        for target in targets:
-            overwrite = overwrites.get(target, discord.PermissionOverwrite())
+    # 店內角色永遠看得到；只切換 view_channel，不碰 connect，避免洗掉鎖定狀態。
+    for role in staff_roles:
+        overwrite = overwrites.get(role, discord.PermissionOverwrite())
+        overwrite.view_channel = True
+        overwrite.speak = True
+        overwrite.stream = True
+        overwrite.use_voice_activation = True
+        overwrite.send_messages = True
+        overwrite.read_message_history = True
+        overwrite.attach_files = True
+        overwrite.add_reactions = True
+        overwrite.use_external_emojis = True
+        overwrite.use_external_stickers = True
 
-            overwrite.view_channel = False if hidden else True
-            overwrite.speak = True
-            overwrite.stream = True
-            overwrite.use_voice_activation = True
-            overwrite.send_messages = True
-            overwrite.read_message_history = True
-            overwrite.attach_files = True
-            overwrite.add_reactions = True
-            overwrite.use_external_emojis = True
-            overwrite.use_external_stickers = True
+        if is_receiver_voice_role(role):
+            overwrite.move_members = True
 
-            # 不改 connect，避免「隱藏」把已鎖定的房間打開。
-            if overwrite.connect is None:
-                overwrite.connect = True
+        overwrites[role] = overwrite
 
-            if isinstance(target, discord.Role) and "is_receiver_voice_role" in globals() and is_receiver_voice_role(target):
-                overwrite.move_members = True
+    # 隱藏時，清掉所有非店內角色 / 個人的可見例外，避免曾被拉進房的人仍看得到。
+    # 顯示時則交回 @everyone 的顯示權限，不額外保留「被隱藏」的 deny。
+    for target, overwrite in list(overwrites.items()):
+        if target == guild.default_role:
+            continue
 
+        if isinstance(target, discord.Role):
+            if int(target.id) in staff_role_ids:
+                continue
+            overwrite.view_channel = False if hidden else None
             overwrites[target] = overwrite
+            continue
+
+        if not isinstance(target, discord.Member):
+            continue
+
+        is_owner = int(target.id) == int(owner.id)
+        is_bot = guild.me is not None and int(target.id) == int(guild.me.id)
+        is_staff_member = any(
+            int(role.id) in staff_role_ids
+            for role in getattr(target, "roles", [])
+        )
+
+        if is_owner or is_bot or is_staff_member:
+            overwrite.view_channel = True
+        else:
+            # None 會讓隱藏時繼承 @everyone=False；顯示時繼承 @everyone=True。
+            overwrite.view_channel = None
+
+        overwrites[target] = overwrite
 
     owner_overwrite = overwrites.get(owner, discord.PermissionOverwrite())
     owner_overwrite.view_channel = True
@@ -943,7 +974,7 @@ async def apply_voice_hidden_state(
 
     await voice_channel.edit(
         overwrites=overwrites,
-        reason=f"Voice room {'hidden' if hidden else 'shown'} by control panel",
+        reason=f"Voice room {'hidden from non-staff' if hidden else 'shown'} by control panel",
     )
 
 VOICE_ROOM_NAME_SEPARATORS = ("┃", "｜", "│")
