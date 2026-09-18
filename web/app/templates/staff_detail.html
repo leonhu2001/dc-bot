@@ -197,6 +197,7 @@
 
             <span>
                 {{ profile.review_count }} 則公開評價
+                · 未公開姓名者顯示為匿名老闆
             </span>
 
         </div>
@@ -222,6 +223,8 @@
 
                         <div>
                             <span>
+                                {{ review.customer_name }}
+                                ·
                                 {{ review.service_item or "魔丸訂單" }}
                             </span>
 

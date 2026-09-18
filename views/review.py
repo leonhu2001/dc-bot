@@ -67,6 +67,8 @@ def ensure_review_tables() -> None:
                 staff_discord_id TEXT NOT NULL,
                 staff_display_name TEXT,
                 customer_discord_id TEXT,
+                customer_display_name TEXT,
+                customer_name_public INTEGER NOT NULL DEFAULT 0,
                 rating INTEGER NOT NULL,
                 comment TEXT,
                 service_category TEXT,
@@ -126,6 +128,33 @@ def ensure_review_tables() -> None:
                 ON staff_favorites(staff_discord_id);
             """
         )
+        columns = {
+            str(row["name"])
+            for row in conn.execute(
+                "PRAGMA table_info(order_reviews)"
+            ).fetchall()
+        }
+
+        if "customer_display_name" not in columns:
+            conn.execute(
+                "ALTER TABLE order_reviews "
+                "ADD COLUMN customer_display_name TEXT"
+            )
+
+        if "customer_name_public" not in columns:
+            conn.execute(
+                "ALTER TABLE order_reviews "
+                "ADD COLUMN customer_name_public INTEGER NOT NULL DEFAULT 0"
+            )
+
+        conn.execute(
+            """
+            UPDATE order_reviews
+            SET customer_name_public = 0
+            WHERE customer_name_public IS NULL
+            """
+        )
+
         conn.commit()
     finally:
         conn.close()
@@ -143,11 +172,18 @@ def rating_to_stars(rating_text: str) -> tuple[int | None, str | None]:
     return rating, "⭐" * rating
 
 
-def is_public_answer(text: str | None) -> bool:
+def is_customer_name_public_answer(text: str | None) -> bool:
     value = str(text or "").strip().lower()
-    if value in {"否", "不", "不公開", "no", "n", "false", "0"}:
-        return False
-    return True
+    return value in {
+        "是",
+        "公開",
+        "公開姓名",
+        "要",
+        "yes",
+        "y",
+        "true",
+        "1",
+    }
 
 
 def can_operate_review(interaction: discord.Interaction, customer_id: int) -> bool:
@@ -436,9 +472,10 @@ def record_member_review(
     staff_id: str,
     staff_display_name: str,
     customer_id: int,
+    customer_display_name: str,
+    customer_name_public: bool,
     rating: int,
     comment: str,
-    is_public: bool,
     order_content: str | None,
 ) -> tuple[bool, str]:
     ensure_review_tables()
@@ -483,6 +520,8 @@ def record_member_review(
                 staff_discord_id,
                 staff_display_name,
                 customer_discord_id,
+                customer_display_name,
+                customer_name_public,
                 rating,
                 comment,
                 service_category,
@@ -494,7 +533,7 @@ def record_member_review(
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'discord', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 'discord', ?, ?)
             """,
             (
                 order_id,
@@ -504,12 +543,13 @@ def record_member_review(
                 str(staff_id),
                 str(staff_display_name or staff_id),
                 str(customer_id),
+                str(customer_display_name or "").strip(),
+                1 if customer_name_public else 0,
                 int(rating),
                 str(comment or "").strip(),
                 str(order["category"] or "") if order is not None else "",
                 str(order["item"] or "") if order is not None else "",
                 str(order_content or ""),
-                1 if is_public else 0,
                 now,
                 now,
             ),
@@ -634,7 +674,7 @@ async def _send_review_channel_embed(
     target: dict,
     rating: int,
     comment: str,
-    is_public: bool,
+    customer_name_public: bool,
     order_content: str | None,
 ) -> None:
     """評價只寫入網站 DB，不再轉發到 Discord 評價頻道。
@@ -645,7 +685,7 @@ async def _send_review_channel_embed(
     return
 
 
-class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
+class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內容會公開"):
     rating = discord.ui.TextInput(
         label="星等",
         placeholder="請輸入 1～5",
@@ -659,9 +699,9 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
         required=False,
         max_length=1000,
     )
-    public_answer = discord.ui.TextInput(
-        label="是否公開到個人牆",
-        placeholder="空白或輸入「是」=公開；輸入「否」=不公開",
+    customer_name_public_answer = discord.ui.TextInput(
+        label="是否公開老闆姓名",
+        placeholder="評價內容會公開；輸入「是」才顯示姓名，空白或「否」=匿名",
         required=False,
         max_length=10,
     )
@@ -696,15 +736,40 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
             return
 
         order, _targets = get_review_targets(self.ticket_channel_id)
+
+        order_customer_display_name = (
+            str(order["customer_display_name"] or "").strip()
+            if (
+                order is not None
+                and "customer_display_name" in order.keys()
+            )
+            else ""
+        )
+
+        customer_display_name = str(
+            order_customer_display_name
+            or getattr(interaction.user, "display_name", None)
+            or getattr(interaction.user, "name", None)
+            or self.customer_id
+        ).strip()
+
+        customer_name_public = (
+            interaction.user.id == self.customer_id
+            and is_customer_name_public_answer(
+                self.customer_name_public_answer.value
+            )
+        )
+
         ok, message = record_member_review(
             order=order,
             ticket_channel_id=self.ticket_channel_id,
             staff_id=str(self.target.get("staff_id")),
             staff_display_name=str(self.target.get("display_name") or self.target.get("staff_id")),
             customer_id=self.customer_id,
+            customer_display_name=customer_display_name,
+            customer_name_public=customer_name_public,
             rating=rating_number,
             comment=str(self.comment.value or ""),
-            is_public=is_public_answer(self.public_answer.value),
             order_content=self.order_content,
         )
 
@@ -724,18 +789,29 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員"):
             target=self.target,
             rating=rating_number,
             comment=str(self.comment.value or ""),
-            is_public=is_public_answer(self.public_answer.value),
+            customer_name_public=customer_name_public,
             order_content=self.order_content,
         )
 
         _order, statuses, _skipped_all = build_review_status(self.ticket_channel_id, self.customer_id)
         all_done = bool(statuses) and all(bool(item.get("reviewed")) for item in statuses)
 
+        name_status = (
+            f"老闆姓名：公開（{customer_display_name}）"
+            if customer_name_public
+            else "老闆姓名：匿名"
+        )
+
         text = (
-            f"已送出 {_target_label(self.target)} 的評價：{stars}\n\n"
+            f"已送出 {_target_label(self.target)} 的評價：{stars}\n"
+            f"{name_status}\n\n"
             "全部成員都已評價完成，可以回到票口按「關閉票口」。"
             if all_done
-            else f"已送出 {_target_label(self.target)} 的評價：{stars}\n\n還可以繼續評價其他成員。"
+            else (
+                f"已送出 {_target_label(self.target)} 的評價：{stars}\n"
+                f"{name_status}\n\n"
+                "還可以繼續評價其他成員。"
+            )
         )
 
         await interaction.response.send_message(

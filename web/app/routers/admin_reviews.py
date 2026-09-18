@@ -91,6 +91,8 @@ def _ensure_tables() -> None:
                 staff_discord_id TEXT NOT NULL,
                 staff_display_name TEXT,
                 customer_discord_id TEXT,
+                customer_display_name TEXT,
+                customer_name_public INTEGER NOT NULL DEFAULT 0,
                 rating INTEGER NOT NULL,
                 comment TEXT,
                 service_category TEXT,
@@ -115,6 +117,33 @@ def _ensure_tables() -> None:
                 source TEXT NOT NULL DEFAULT 'discord',
                 created_at TEXT NOT NULL
             );
+            """
+        )
+
+        columns = {
+            str(row["name"])
+            for row in conn.execute(
+                "PRAGMA table_info(order_reviews)"
+            ).fetchall()
+        }
+
+        if "customer_display_name" not in columns:
+            conn.execute(
+                "ALTER TABLE order_reviews "
+                "ADD COLUMN customer_display_name TEXT"
+            )
+
+        if "customer_name_public" not in columns:
+            conn.execute(
+                "ALTER TABLE order_reviews "
+                "ADD COLUMN customer_name_public INTEGER NOT NULL DEFAULT 0"
+            )
+
+        conn.execute(
+            """
+            UPDATE order_reviews
+            SET customer_name_public = 0
+            WHERE customer_name_public IS NULL
             """
         )
 

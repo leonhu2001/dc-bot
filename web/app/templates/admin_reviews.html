@@ -31,7 +31,7 @@
     <label>
 
         <span>
-            公開狀態
+            評價公開狀態
         </span>
 
         <select name="public">
@@ -83,6 +83,7 @@
         {{ skip_count }}
     </strong>
     筆。
+    老闆姓名公開為獨立設定；舊評價預設匿名。
 
 </div>
 
@@ -149,10 +150,29 @@
                         </td>
 
                         <td>
-                            {{
-                                row.customer_discord_id
-                                or "—"
-                            }}
+                            <strong>
+                                {{
+                                    row.customer_display_name
+                                    or "未記錄"
+                                }}
+                            </strong>
+
+                            <br>
+
+                            <small>
+                                {{
+                                    row.customer_discord_id
+                                    or "—"
+                                }}
+                            </small>
+
+                            <br>
+
+                            {% if row.customer_name_public %}
+                                姓名公開
+                            {% else %}
+                                匿名
+                            {% endif %}
                         </td>
 
                         <td>
@@ -190,11 +210,11 @@
 
                             {% if row.is_public %}
 
-                                公開
+                                評價公開
 
                             {% else %}
 
-                                不公開
+                                評價不公開
 
                             {% endif %}
 
@@ -238,7 +258,7 @@
                                 >
 
                                     <button type="submit">
-                                        切換公開
+                                        切換評價公開
                                     </button>
 
                                 </form>
