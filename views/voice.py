@@ -362,10 +362,15 @@ def build_vip_lobby_overwrites(guild: discord.Guild) -> dict:
 
 
 def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> dict:
-    """VIP 臨時房：陪玩 / 打手 / 客服 / 創建者完整權限；員工家屬不作為固定放行角色。"""
+    """VIP 房權限：店內人員 / 房主 / Bot 可用；Hidden VIP 預設對其他人完全隱藏。"""
+    hidden_owner = int(member.id) in {
+        int(user_id)
+        for user_id in HIDDEN_VIP_USER_IDS
+    }
+
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(
-            view_channel=True,
+            view_channel=False if hidden_owner else True,
             connect=False,
             send_messages=False,
             read_message_history=False,
@@ -384,7 +389,11 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
             move_members=is_receiver_voice_role(role),
         )
 
-    apply_voice_view_only_role_overwrites(guild, overwrites)
+    # Hidden VIP 房只允許店內人員、房主與 Bot 看見。
+    # 不套用額外的「只看得到」角色，避免其他會員或其他 VIP 意外看到。
+    if not hidden_owner:
+        apply_voice_view_only_role_overwrites(guild, overwrites)
+
     return overwrites
 
 
