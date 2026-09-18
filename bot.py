@@ -10333,15 +10333,20 @@ async def vip_hidden_add(interaction: discord.Interaction, member: discord.Membe
     already_active = int(member.id) in {int(user_id) for user_id in HIDDEN_VIP_USER_IDS}
     added = add_hidden_vip_user(member.id, added_by=interaction.user.id)
     refresh_hidden_vip_runtime_ids()
+    now_active = int(member.id) in {int(user_id) for user_id in HIDDEN_VIP_USER_IDS}
 
-    try:
-        await get_or_create_vip_voice_lobby(interaction.guild)
-    except (discord.Forbidden, discord.HTTPException) as exc:
+    if not now_active:
         await interaction.followup.send(
-            f"白名單已更新，但刷新 VIP 建立入口權限失敗：{exc}",
+            "Hidden VIP 白名單寫入失敗，沒有套用任何權限變更。",
             ephemeral=True,
         )
         return
+
+    lobby_warning = None
+    try:
+        await get_or_create_vip_voice_lobby(interaction.guild)
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        lobby_warning = f"；但刷新 VIP 建立入口權限失敗：{exc}"
 
     if already_active and not added:
         await interaction.followup.send(
@@ -10352,7 +10357,7 @@ async def vip_hidden_add(interaction: discord.Interaction, member: discord.Membe
 
     await interaction.followup.send(
         f"已將 {member.mention} 加入 Hidden VIP 白名單。\n"
-        "不需要公開 VIP 身分組，也會被系統視為有效 VIP。",
+        f"不需要公開 VIP 身分組，也會被系統視為有效 VIP{lobby_warning or '。'}",
         ephemeral=True,
     )
 
@@ -10384,14 +10389,11 @@ async def vip_hidden_remove(interaction: discord.Interaction, member: discord.Me
     removed = remove_hidden_vip_user(member.id)
     refresh_hidden_vip_runtime_ids()
 
+    lobby_warning = None
     try:
         await get_or_create_vip_voice_lobby(interaction.guild)
     except (discord.Forbidden, discord.HTTPException) as exc:
-        await interaction.followup.send(
-            f"白名單已更新，但刷新 VIP 建立入口權限失敗：{exc}",
-            ephemeral=True,
-        )
-        return
+        lobby_warning = f"；但刷新 VIP 建立入口權限失敗：{exc}"
 
     if not removed:
         await interaction.followup.send(
@@ -10415,13 +10417,13 @@ async def vip_hidden_remove(interaction: discord.Interaction, member: discord.Me
         )
 
     suffix = (
-        "；因為他沒有正式 VIP 身分組，原本的 VIP 房也已刪除。"
+        "；因為他沒有正式 VIP 身分組，原本的 VIP 房也已刪除"
         if room_deleted
-        else "。"
+        else ""
     )
 
     await interaction.followup.send(
-        f"已將 {member.mention} 移出 Hidden VIP 白名單{suffix}",
+        f"已將 {member.mention} 移出 Hidden VIP 白名單{suffix}{lobby_warning or '。'}",
         ephemeral=True,
     )
 
