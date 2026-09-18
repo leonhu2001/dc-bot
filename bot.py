@@ -3573,11 +3573,14 @@ async def restore_acceptance_payment_panel_for_order(
         if str(data.get("payment_method") or "") == "待付款":
             data.pop("payment_method", None)
 
+        selected_payment_method = str(data.get("payment_method") or "").strip() or None
+
         payment_embed = build_payment_method_embed(
             customer_id=customer_id,
             category_label=str(data.get("category_label") or category_label),
             item=str(data.get("item") or item),
             quantity=_to_int(data.get("quantity"), quantity) or quantity,
+            payment_method=selected_payment_method,
             companion_preference=data.get("companion_preference"),
             amount=_to_int(data.get("amount"), amount) or amount,
         )
@@ -3585,6 +3588,7 @@ async def restore_acceptance_payment_panel_for_order(
         payment_view = PaymentMethodView(
             customer_id=customer_id,
             channel_id=ticket_channel_id,
+            selected_method=selected_payment_method,
         )
 
         existing_message_id = _to_int(data.get("payment_message_id"))
@@ -4143,7 +4147,12 @@ async def finalize_accepted_pending_payment(
                 payment_message = await payment_channel.fetch_message(payment_message_id)
                 await payment_message.edit(
                     embed=submitted_embed,
-                    view=PaymentMethodView(customer_id=customer_id, channel_id=channel_id, submitted=True),
+                    view=PaymentMethodView(
+                        customer_id=customer_id,
+                        channel_id=channel_id,
+                        submitted=True,
+                        selected_method=str(payment_method),
+                    ),
                     allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
                 )
             except discord.HTTPException:
@@ -5308,17 +5317,34 @@ async def finalize_payment_and_dispatch(
 
 
 class PaymentMethodSelect(discord.ui.Select):
-    def __init__(self, customer_id: int, channel_id: int):
+    def __init__(
+        self,
+        customer_id: int,
+        channel_id: int,
+        selected_method: str | None = None,
+    ):
         self.customer_id = customer_id
         self.channel_id = channel_id
 
+        normalized_selected_method = str(selected_method or "").strip()
+
         options = [
-            discord.SelectOption(label=method, value=method)
+            discord.SelectOption(
+                label=method,
+                value=method,
+                default=(method == normalized_selected_method),
+            )
             for method in PAYMENT_METHOD_OPTIONS
         ]
 
+        placeholder = (
+            f"✓ 已選擇：{normalized_selected_method}"
+            if normalized_selected_method in PAYMENT_METHOD_OPTIONS
+            else "請選擇付款方式"
+        )
+
         super().__init__(
-            placeholder="請選擇付款方式",
+            placeholder=placeholder,
             min_values=1,
             max_values=1,
             options=options,
@@ -5335,6 +5361,11 @@ class PaymentMethodSelect(discord.ui.Select):
         data["customer_id"] = self.customer_id
         selected_method = self.values[0]
         data["payment_method"] = selected_method
+
+        self.placeholder = f"✓ 已選擇：{selected_method}"
+        for option in self.options:
+            option.default = option.value == selected_method
+
         remember_order_data(self.channel_id, data)
         await log_self_service_proxy_action(
             interaction,
@@ -5390,12 +5421,24 @@ class PaymentMethodSelect(discord.ui.Select):
 
 
 class PaymentMethodView(discord.ui.View):
-    def __init__(self, customer_id: int, channel_id: int, submitted: bool = False):
+    def __init__(
+        self,
+        customer_id: int,
+        channel_id: int,
+        submitted: bool = False,
+        selected_method: str | None = None,
+    ):
         super().__init__(timeout=86400)
         self.customer_id = customer_id
         self.channel_id = channel_id
         self.submitted = submitted
-        self.add_item(PaymentMethodSelect(customer_id, channel_id))
+        self.add_item(
+            PaymentMethodSelect(
+                customer_id,
+                channel_id,
+                selected_method=selected_method,
+            )
+        )
 
         if submitted:
             for child in self.children:
