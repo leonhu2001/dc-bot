@@ -299,6 +299,11 @@ SILVER_MEMBER_ROLE_ID = DEFAULT_SILVER_MEMBER_ROLE_ID
 VIP_VOICE_LOBBY_ROLE_ID = DEFAULT_SILVER_MEMBER_ROLE_ID
 VIP_VOICE_LOBBY_ROLE_IDS = list(VIP_ROLE_IDS)
 
+# 不公開 VIP 身分組、但語音系統仍視為 VIP 的指定會員。
+HIDDEN_VIP_USER_IDS = [
+    448915700145192961,
+]
+
 # 身分組 ID
 CUSTOMER_ROLE_ID = 1482084782031638548
 EXAMINER_ROLE_ID = 1482084782031638548  # 已轉移：原考官權限改由客服身分組持有
@@ -445,6 +450,7 @@ NEW_MEMBER_ROLE_ID = _config_int("NEW_MEMBER_ROLE_ID", NEW_MEMBER_ROLE_ID)
 PLAY_VOICE_ALLOWED_ROLE_IDS = _config_int_list("PLAY_VOICE_ALLOWED_ROLE_IDS", PLAY_VOICE_ALLOWED_ROLE_IDS)
 VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS = _config_int_list("VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS", VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS)
 VOICE_VIEW_ONLY_ROLE_IDS = _config_int_list("VOICE_VIEW_ONLY_ROLE_IDS", VOICE_VIEW_ONLY_ROLE_IDS)
+HIDDEN_VIP_USER_IDS = _config_int_list("HIDDEN_VIP_USER_IDS", HIDDEN_VIP_USER_IDS)
 
 # 名稱 / 其他設定
 PLAY_VOICE_CREATE_CHANNEL_NAME = _config_str("PLAY_VOICE_CREATE_CHANNEL_NAME", PLAY_VOICE_CREATE_CHANNEL_NAME)
@@ -466,6 +472,7 @@ configure_voice_helpers(
     public_voice_create_channel_name=PUBLIC_VOICE_CREATE_CHANNEL_NAME,
     vip_voice_lobby_role_id=VIP_VOICE_LOBBY_ROLE_ID,
     vip_voice_lobby_role_ids=VIP_VOICE_LOBBY_ROLE_IDS,
+    hidden_vip_user_ids=HIDDEN_VIP_USER_IDS,
     play_voice_allowed_role_ids=PLAY_VOICE_ALLOWED_ROLE_IDS,
     voice_room_hidden_visible_role_ids=VOICE_ROOM_HIDDEN_VISIBLE_ROLE_IDS,
     voice_move_member_role_ids=list(dict.fromkeys([
@@ -10271,6 +10278,11 @@ configure_panel_views(
 def member_has_vip_voice_role(member: discord.Member | None) -> bool:
     if member is None:
         return False
+
+    # 隱藏 VIP 不需要公開 VIP role，但在語音房生命週期中等同有效 VIP。
+    if int(member.id) in {int(user_id) for user_id in HIDDEN_VIP_USER_IDS}:
+        return True
+
     vip_role_ids = {int(role_id) for role_id in VIP_VOICE_LOBBY_ROLE_IDS}
     return any(int(role.id) in vip_role_ids for role in getattr(member, "roles", []))
 
