@@ -358,6 +358,22 @@ _add(OrderRule(
     specify_free_basis="quantity",
 ))
 
+_add(OrderRule(
+    "general", "basic_sweet_double", "甜蜜單｜雙陪", "hourly", 850, "H",
+    allowed_roles=COMPANION_ROLES,
+    allowed_game_roles=(),
+    required_staff_count=2,
+    allow_specify=True,
+    max_specified_count=2,
+    specify_fee_default=150,
+    specify_fee_by_role={
+        role: 150
+        for role in COMPANION_ROLES
+    },
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+))
+
 for key, label, price in [
     ("basic_oil_fuel", "油鍋單｜火箭燃油", 3000),
     ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 2000),

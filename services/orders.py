@@ -93,6 +93,14 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
                     "min_quantity": 1,
                     "max_quantity": 24,
                 },
+                {
+                    "label": "雙陪",
+                    "value": "double",
+                    "rule_key": "basic_sweet_double",
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                },
             ],
         },
         {

@@ -27,6 +27,7 @@ _RULE_UPDATES: dict[str, dict] = {
         "note": "保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
     },
     "basic_sweet_single": {"price": 450},
+    "basic_sweet_double": {"price": 850},
     "basic_trial_500": {"price": 450},
     "basic_trial_1000": {"price": 900},
     "basic_bet_1000": {"price": 800},
