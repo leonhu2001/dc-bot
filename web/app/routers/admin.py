@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, text
 
 from shared.db import SessionLocal
-from shared.models import CustomerServicePayout, PayoutStatus
+from shared.models import CustomerServicePayout, PayoutStatus, SyncEventType
 from shared.order_acceptance import (
     PREPAY_ACCEPTANCE_STATUSES,
     claim_acceptance_order,
@@ -25,7 +25,11 @@ from web.app.services.admin_service import (
     set_worker_payout_status,
     toggle_named_bonus_for_assignment,
 )
-from web.app.services.order_service import create_demo_orders_if_empty, list_admin_orders
+from web.app.services.order_service import (
+    create_demo_orders_if_empty,
+    create_sync_event,
+    list_admin_orders,
+)
 from web.app.services.staff_service import (
     get_staff_display_name,
     get_staff_member_by_id,
@@ -3451,6 +3455,24 @@ async def admin_order_workspace_add_worker_r8(
                 source=f"admin_web:{user.get('id') or 'unknown'}",
             )
 
+            create_sync_event(
+                db,
+                event_type=SyncEventType.ORDER_CLAIMED,
+                order_id=int(order_id),
+                payload={
+                    "order_id": int(order_id),
+                    "worker_discord_id": str(worker_discord_id),
+                    "worker_display_name": worker_display_name,
+                    "source": "admin_web",
+                    "admin_discord_id": str(user.get("id") or ""),
+                    "prepay_acceptance": True,
+                    "accepted_count": state.accepted_count,
+                    "required_staff_count": state.required_staff_count,
+                    "status": state.status,
+                },
+            )
+            db.commit()
+
             if state.is_full:
                 return _mw4a2r6_redirect(
                     order_id,
@@ -3500,14 +3522,37 @@ async def admin_order_workspace_remove_acceptance_r8(
     if not user:
         return RedirectResponse(url="/service", status_code=303)
 
+    db = SessionLocal()
+
     try:
         state = unclaim_acceptance_order(
             order_id=int(order_id),
             staff_discord_id=str(staff_discord_id),
             source=f"admin_web_remove:{user.get('id') or 'unknown'}",
         )
+
+        create_sync_event(
+            db,
+            event_type=SyncEventType.ORDER_UNCLAIMED,
+            order_id=int(order_id),
+            payload={
+                "order_id": int(order_id),
+                "worker_discord_id": str(staff_discord_id),
+                "source": "admin_web",
+                "admin_discord_id": str(user.get("id") or ""),
+                "prepay_acceptance": True,
+                "accepted_count": state.accepted_count,
+                "required_staff_count": state.required_staff_count,
+                "status": state.status,
+            },
+        )
+        db.commit()
+
     except ValueError as exc:
+        db.rollback()
         return _mw4a2r6_redirect(order_id, error=str(exc))
+    finally:
+        db.close()
 
     return _mw4a2r6_redirect(
         order_id,
