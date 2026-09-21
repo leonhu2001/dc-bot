@@ -108,8 +108,10 @@ GROUP_SPECS = [
         "key": "sweet",
         "category": "general",
         "label": "甜蜜單",
+        "selector_label": "陪玩人數",
         "variants": [
             ("basic_sweet_single", "單陪"),
+            ("basic_sweet_double", "雙陪"),
         ],
     },
 

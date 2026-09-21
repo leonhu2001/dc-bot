@@ -3173,6 +3173,7 @@ MW_ORDER_GROUP_FALLBACKS = {
 
     "甜蜜單": [
         "basic_sweet_single",
+        "basic_sweet_double",
     ],
 
     "油鍋": [

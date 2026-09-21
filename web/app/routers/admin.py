@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import sqlite3
 from urllib.parse import urlencode
 
@@ -9,6 +10,12 @@ from sqlalchemy import select, text
 
 from shared.db import SessionLocal
 from shared.models import CustomerServicePayout, PayoutStatus
+from shared.order_acceptance import (
+    PREPAY_ACCEPTANCE_STATUSES,
+    claim_acceptance_order,
+    get_acceptance_state,
+    unclaim_acceptance_order,
+)
 from web.app.services.admin_service import (
     add_worker_to_order,
     remove_worker_from_order,
@@ -3114,6 +3121,13 @@ async def admin_order_workspace_r8(
         workspace_assignments = _mw_r8_worker_rows(db, int(order_id))
         workspace_cs_payouts = _mw_r8_cs_payout_rows(db, int(order_id))
 
+        acceptance_state = None
+        if str(order.get("status") or "").strip().lower() in PREPAY_ACCEPTANCE_STATUSES:
+            try:
+                acceptance_state = get_acceptance_state(int(order_id))
+            except ValueError:
+                acceptance_state = None
+
     finally:
         db.close()
 
@@ -3130,6 +3144,7 @@ async def admin_order_workspace_r8(
             "worker_members": worker_members,
             "workspace_assignments": workspace_assignments,
             "workspace_cs_payouts": workspace_cs_payouts,
+            "acceptance_state": acceptance_state,
             "paid_status": PayoutStatus.PAID.value,
             "unpaid_status": PayoutStatus.UNPAID.value,
             "message": message,
@@ -3396,13 +3411,64 @@ async def admin_order_workspace_add_worker_r8(
     db = SessionLocal()
 
     try:
-        payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
+        order_row = db.execute(
+            text("SELECT status FROM web_orders WHERE id = :order_id LIMIT 1"),
+            {"order_id": int(order_id)},
+        ).mappings().first()
+
+        if order_row is None:
+            raise ValueError("找不到這張訂單。")
+
+        order_status = str(order_row.get("status") or "").strip().lower()
         staff_member = get_staff_member_by_id(db, discord_id=worker_discord_id)
-        worker_display_name = (
-            get_staff_display_name(staff_member)
-            if staff_member is not None
-            else worker_discord_id
-        )
+
+        if staff_member is None or not bool(getattr(staff_member, "is_active", False)):
+            raise ValueError("找不到這位有效的接單人員。")
+
+        if not (
+            bool(getattr(staff_member, "is_worker", False))
+            or bool(getattr(staff_member, "is_companion", False))
+        ):
+            raise ValueError("這位人員目前沒有可接單的打手 / 陪玩身分。")
+
+        worker_display_name = get_staff_display_name(staff_member)
+
+        if order_status in PREPAY_ACCEPTANCE_STATUSES:
+            try:
+                staff_role_ids = json.loads(staff_member.roles_json or "[]")
+            except Exception:
+                staff_role_ids = []
+
+            # claim_acceptance_order 使用獨立交易；先結束這個唯讀 Session 的 transaction，
+            # 避免 SQLite 在同一時間持有讀鎖。
+            db.rollback()
+
+            state = claim_acceptance_order(
+                order_id=int(order_id),
+                staff_discord_id=str(worker_discord_id),
+                staff_display_name=worker_display_name,
+                staff_role_ids=staff_role_ids,
+                source=f"admin_web:{user.get('id') or 'unknown'}",
+            )
+
+            if state.is_full:
+                return _mw4a2r6_redirect(
+                    order_id,
+                    message=(
+                        f"已補登接單人員（{state.accepted_count}/{state.required_staff_count}），"
+                        "人數已滿，可進入付款程序。"
+                    ),
+                )
+
+            return _mw4a2r6_redirect(
+                order_id,
+                message=f"已補登接單人員（{state.accepted_count}/{state.required_staff_count}）。",
+            )
+
+        if order_status in {"closed", "completed", "done", "cancelled", "canceled"}:
+            raise ValueError("這張訂單已結案，不能再新增接單人員。")
+
+        payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
         add_worker_to_order(
             db,
             order_id=order_id,
@@ -3413,6 +3479,7 @@ async def admin_order_workspace_add_worker_r8(
         )
         _mw_r8_restore_payout_status(db, int(order_id), payout_snapshot)
         db.commit()
+
     except ValueError as exc:
         db.rollback()
         return _mw4a2r6_redirect(order_id, error=str(exc))
@@ -3420,6 +3487,32 @@ async def admin_order_workspace_add_worker_r8(
         db.close()
 
     return _mw4a2r6_redirect(order_id, message="已新增接單人員，分潤已重新計算。")
+
+
+@router.post("/admin/order-workspace/{order_id}/acceptance/{staff_discord_id}/remove")
+async def admin_order_workspace_remove_acceptance_r8(
+    order_id: int,
+    staff_discord_id: str,
+    request: Request,
+):
+    user = require_admin_user(request)
+
+    if not user:
+        return RedirectResponse(url="/service", status_code=303)
+
+    try:
+        state = unclaim_acceptance_order(
+            order_id=int(order_id),
+            staff_discord_id=str(staff_discord_id),
+            source=f"admin_web_remove:{user.get('id') or 'unknown'}",
+        )
+    except ValueError as exc:
+        return _mw4a2r6_redirect(order_id, error=str(exc))
+
+    return _mw4a2r6_redirect(
+        order_id,
+        message=f"已移除付款前接單人員（{state.accepted_count}/{state.required_staff_count}）。",
+    )
 
 
 @router.post("/admin/order-workspace/{order_id}/assignments/{assignment_id}/named-bonus")
