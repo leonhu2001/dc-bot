@@ -446,6 +446,7 @@ def build_summary_bulk_redirect(month: str | None, status: str | None, role: str
 
 def update_summary_payout_status(month: str | None, role: str | None, target_status: str) -> None:
     """依人員總表目前月份/身份篩選，批量標記分潤狀態。"""
+    ensure_worker_tip_table()
     month = normalize_summary_month(month)
     role = str(role or "all").strip()
     target_status = "paid" if target_status == "paid" else "unpaid"
@@ -524,6 +525,7 @@ def update_summary_person_payout_status(month: str, person_role: str, person_id:
 
     混合身分要同時更新護航 / 陪玩分潤與魔丸♫客服分潤。
     """
+    ensure_worker_tip_table()
     person_id = str(person_id or "").strip()
     if not person_id:
         return
