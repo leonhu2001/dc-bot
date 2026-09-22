@@ -4434,6 +4434,8 @@ async def finalize_accepted_pending_payment(
             data["operation_panel_message_id"] = operation_message.id
 
         data.pop("payment_finalizing", None)
+        if data.get("payment_review_approved") and data.get("payment_review_id"):
+            data["payment_review_finalized_id"] = int(data["payment_review_id"])
         remember_order_data(channel_id, data)
         save_bot_data()
 
