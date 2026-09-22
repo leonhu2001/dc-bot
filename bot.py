@@ -175,6 +175,9 @@ from views.review import (
     configure_review_views,
     ReviewButtonView,
     configure_reorder_ticket_creator,
+    configure_worker_tip_callbacks,
+    get_pending_worker_tip_confirmations,
+    WorkerTipPaymentConfirmView,
 )
 
 from views.staff_profiles import (
@@ -2076,6 +2079,73 @@ def adjust_customer_wallet_balance(
         raise
     finally:
         conn.close()
+
+
+async def process_worker_tip_wallet_payment(
+    *,
+    customer_id: int,
+    amount: int,
+    order_channel_id: int,
+    order_no: str,
+    worker_id: str,
+    worker_name: str,
+    operator,
+) -> dict:
+    """雞腿使用我的錢包付款：只扣顧客錢包，不計 VIP / 點數 / 原單金額。"""
+    amount = int(amount or 0)
+
+    if amount <= 0:
+        raise ValueError("雞腿金額必須大於 0。")
+
+    return adjust_customer_wallet_balance(
+        customer_id=customer_id,
+        amount=-amount,
+        tx_type="tip_payment",
+        operator=operator,
+        order_channel_id=order_channel_id,
+        order_no=order_no,
+        note=f"雞腿給 {worker_name or worker_id}（100% 給指定成員）",
+        allow_negative=False,
+    )
+
+
+async def log_worker_tip_event(*, event: str, interaction: discord.Interaction, tip: dict) -> None:
+    guild = interaction.guild
+    if guild is None:
+        return
+
+    event_labels = {
+        "pending": "雞腿待付款確認",
+        "paid": "雞腿付款完成",
+        "cancelled": "雞腿已取消",
+    }
+    color_map = {
+        "pending": discord.Color.gold(),
+        "paid": discord.Color.green(),
+        "cancelled": discord.Color.red(),
+    }
+
+    await send_order_log(
+        guild,
+        title=event_labels.get(str(event), "雞腿紀錄更新"),
+        fields=[
+            ("雞腿編號", f"TIP-{tip.get('id')}", True),
+            ("老闆", f"<@{tip.get('customer_discord_id')}>", True),
+            ("指定成員", f"<@{tip.get('worker_discord_id')}>", True),
+            ("金額", format_t_amount(int(tip.get("amount") or 0)), True),
+            ("付款方式", str(tip.get("payment_method") or "未紀錄"), True),
+            ("付款狀態", str(tip.get("payment_status") or "未紀錄"), True),
+            ("原訂單", str(tip.get("receipt_id") or tip.get("order_id") or "未紀錄"), True),
+            ("規則", "100% 給指定成員；不計原單抽成 / VIP / 點數", False),
+        ],
+        color=color_map.get(str(event), discord.Color.gold()),
+    )
+
+
+configure_worker_tip_callbacks(
+    wallet_handler=process_worker_tip_wallet_payment,
+    log_handler=log_worker_tip_event,
+)
 
 
 def build_customer_info_with_wallet_embed(member: discord.Member, *, show_staff_notes: bool = True) -> discord.Embed:
@@ -11099,6 +11169,38 @@ async def on_ready():
         bot._reward_redeem_view_registered = True
 
     ensure_wallet_tables()
+
+    if not getattr(bot, "_worker_tip_confirm_views_registered", False):
+        restored_worker_tip_views = 0
+
+        for row in get_pending_worker_tip_confirmations():
+            try:
+                tip_id = int(row.get("id") or 0)
+                customer_id = int(str(row.get("customer_discord_id") or "0"))
+                message_id = int(str(row.get("confirmation_message_id") or "0"))
+            except (TypeError, ValueError):
+                continue
+
+            if not tip_id or not customer_id or not message_id:
+                continue
+
+            try:
+                bot.add_view(
+                    WorkerTipPaymentConfirmView(
+                        tip_id=tip_id,
+                        customer_id=customer_id,
+                    ),
+                    message_id=message_id,
+                )
+                restored_worker_tip_views += 1
+            except ValueError:
+                pass
+
+        bot._worker_tip_confirm_views_registered = True
+
+        if restored_worker_tip_views:
+            print(f"Restored worker tip payment views: {restored_worker_tip_views}")
+
     ensure_web_sync_event_worker_started()
     global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
     bot.add_view(MainPanelView())
