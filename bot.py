@@ -4148,6 +4148,30 @@ async def finalize_accepted_pending_payment(
         quantity = _to_int(data.get("quantity"), 1) or 1
         companion_preference = data.get("companion_preference")
 
+        dispatch_channel = guild.get_channel(dispatch_channel_id)
+        if isinstance(dispatch_channel, discord.TextChannel):
+            try:
+                dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+                claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+                claim_data["locked"] = True
+                claim_data["status"] = "payment_review_pending"
+                remember_claim_data(dispatch_message_id, claim_data)
+                await dispatch_message.edit(
+                    view=DispatchClaimView(
+                        customer_id=customer_id,
+                        category_label=category_label,
+                        item=item,
+                        quantity=quantity,
+                        payment_method=str(payment_method),
+                        source_channel_id=channel_id,
+                        companion_preference=companion_preference,
+                        locked=True,
+                        status="payment_review_pending",
+                    ),
+                )
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+
         payment_channel_id = _to_int(
             data.get("payment_channel_id"),
             interaction.channel.id,
@@ -11558,6 +11582,36 @@ async def _apply_rejected_order_payment_review(review: dict) -> None:
     amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
     payment_method = str(data.get("payment_method") or review.get("payment_method") or "未紀錄")
     companion_preference = data.get("companion_preference")
+
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    dispatch_channel_id = _to_int(
+        data.get("dispatch_channel_id"),
+        DISPATCH_CHANNEL_ID,
+    ) or DISPATCH_CHANNEL_ID
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+    if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
+        try:
+            dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+            claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+            claim_data["locked"] = False
+            claim_data["status"] = "accepted_pending_pay"
+            remember_claim_data(dispatch_message_id, claim_data)
+            await dispatch_message.edit(
+                view=DispatchClaimView(
+                    customer_id=int(str(review.get("customer_discord_id") or "0")),
+                    category_label=category_label,
+                    item=item,
+                    quantity=quantity,
+                    payment_method=payment_method,
+                    source_channel_id=channel_id,
+                    companion_preference=companion_preference,
+                    locked=False,
+                    status="accepted_pending_pay",
+                ),
+            )
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
 
     payment_channel_id = _to_int(data.get("payment_channel_id"), channel.id) or channel.id
     payment_message_id = _to_int(data.get("payment_message_id"))
