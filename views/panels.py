@@ -162,6 +162,16 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
         customer_role = guild.get_role(customer_role_id)
         applicant_role = guild.get_role(applicant_role_id)
 
+        recruit_staff_roles = []
+        seen_role_ids = set()
+
+        for role in (examiner_role, manager_role, customer_role):
+            if role is None or role.id in seen_role_ids:
+                continue
+
+            seen_role_ids.add(role.id)
+            recruit_staff_roles.append(role)
+
         if applicant_role is not None:
             try:
                 await member.add_roles(applicant_role, reason="Recruit ticket opened")
@@ -183,7 +193,7 @@ class RecruitModal(discord.ui.Modal, title="我要入職"):
             interaction=interaction,
             category_id=exam_category_id,
             channel_name=name_builder("入職", member),
-            allowed_roles=[examiner_role, manager_role, customer_role],
+            allowed_roles=recruit_staff_roles,
             intro_message=intro,
             view=recruit_view_factory(),
             topic=f"recruit_member_id={member.id};recruit_nickname={self.nickname.value};recruit_position={self.position.value}",
