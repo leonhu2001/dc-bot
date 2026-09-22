@@ -988,6 +988,7 @@ async def ensure_payment_submit_receipt(
     amount: int,
     payment_method: str,
     companion_preference: str | None = None,
+    payment_status_text: str = "已送出，待客服確認",
 ) -> tuple[str | None, discord.Message | None]:
     """在付款方式 panel 按下送出後產生交易收據。
 
@@ -1045,7 +1046,7 @@ async def ensure_payment_submit_receipt(
         f"數量：{quantity} 單\n"
         f"金額：{amount_text}\n"
         f"付款方式：{payment_method}\n"
-        "付款狀態：已送出，待客服確認\n"
+        f"付款狀態：{payment_status_text}\n"
         "\n"
         f"客服人員：{staff_name}\n"
         "\n"
@@ -1065,7 +1066,7 @@ async def ensure_payment_submit_receipt(
     embed.add_field(name="顧客", value=f"<@{customer_id}>", inline=True)
     embed.add_field(name="金額", value=amount_text, inline=True)
     embed.add_field(name="付款方式", value=payment_method, inline=True)
-    embed.add_field(name="付款狀態", value="已送出，待客服確認", inline=True)
+    embed.add_field(name="付款狀態", value=payment_status_text, inline=True)
     embed.add_field(name="票口", value=order_channel.mention, inline=False)
     embed.set_footer(text="此收據為交易紀錄，非統一發票。")
 
@@ -1101,7 +1102,7 @@ async def ensure_payment_submit_receipt(
             ("顧客", f"<@{customer_id}>", True),
             ("金額", amount_text, True),
             ("付款方式", payment_method, True),
-            ("付款狀態", "已送出，待客服確認", True),
+            ("付款狀態", payment_status_text, True),
             ("客服人員", getattr(staff_member, "mention", staff_name), True),
             ("票口", order_channel.mention, False),
             ("收據訊息", receipt_message.jump_url, False),
@@ -4348,6 +4349,13 @@ async def finalize_accepted_pending_payment(
             amount=amount,
             payment_method=payment_method,
             companion_preference=companion_preference,
+            payment_status_text=(
+                "已付款"
+                if str(payment_method) == WALLET_PAYMENT_METHOD
+                else "客服已確認收款"
+                if external_review_approved
+                else "已送出，待客服確認"
+            ),
         )
 
         if receipt_id:
