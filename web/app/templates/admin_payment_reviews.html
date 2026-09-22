@@ -1,0 +1,113 @@
+{% extends "layout.html" %}
+{% block page_title %}付款審核{% endblock %}
+{% block content %}
+<style>
+.pay-review-page{display:grid;gap:18px}.pay-review-card,.pay-review-panel{border:1px solid rgba(245,198,107,.18);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),rgba(8,11,19,.94);box-shadow:0 24px 68px rgba(0,0,0,.28)}.pay-review-card{padding:22px}.pay-review-kicker{margin:0;color:var(--mw-gold,#f5c66b);font-weight:950;letter-spacing:.16em}.pay-review-card h2{margin:6px 0 8px;font-size:30px}.pay-review-card>p:last-child{margin:0;color:var(--mw-muted,#a7a0b5);line-height:1.8}.pay-review-alert{padding:13px 16px;border:1px solid rgba(245,198,107,.22);border-radius:14px;background:rgba(245,198,107,.08)}.pay-review-panel{overflow:hidden}.pay-review-head{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08)}.pay-review-head h3{margin:4px 0 0;font-size:24px}.pay-review-filter{display:flex;gap:8px;flex-wrap:wrap}.pay-review-link,.pay-review-action{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(245,198,107,.28);border-radius:999px;background:rgba(245,198,107,.08);color:#ffe3a3;padding:8px 12px;font-weight:950;text-decoration:none;cursor:pointer}.pay-review-action.reject{border-color:rgba(255,120,120,.22);background:rgba(255,120,120,.07);color:#ffc2c2}.pay-review-table-wrap{overflow-x:auto}.pay-review-table{width:100%;min-width:1180px;border-collapse:separate;border-spacing:0}.pay-review-table th,.pay-review-table td{padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.075);text-align:left;vertical-align:middle}.pay-review-table th{color:var(--mw-gold,#f5c66b);font-weight:950;letter-spacing:.06em;background:rgba(255,255,255,.025);white-space:nowrap}.pay-review-table tbody tr:hover td{background:rgba(245,198,107,.045)}.pay-review-name{font-weight:950}.pay-review-muted{margin-top:4px;color:rgba(255,255,255,.48);font-size:12px;word-break:break-all}.pay-review-amount{color:var(--mw-gold,#f5c66b);font-weight:950}.pay-review-actions{display:flex;gap:7px;flex-wrap:wrap}.pay-review-empty{text-align:center;padding:34px!important;color:var(--mw-muted,#a7a0b5)}.pay-review-reason{width:150px;border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.04);color:#fff;padding:8px 9px}@media(max-width:720px){.pay-review-head{align-items:flex-start;flex-direction:column}}
+</style>
+
+<section class="pay-review-page">
+  <section class="pay-review-card">
+    <p class="pay-review-kicker">PAYMENT REVIEW</p>
+    <h2>付款審核</h2>
+    <p>點單與雞腿的街口／轉帳付款會直接進入此頁。客服請先查看原 Discord 票口內的付款截圖，再確認收款。儲值審核也統一顯示在這裡。</p>
+  </section>
+
+  {% if error %}<div class="pay-review-alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="pay-review-alert">{{ ok }}</div>{% endif %}
+
+  <section class="pay-review-panel">
+    <div class="pay-review-head">
+      <div><p class="pay-review-kicker">REVIEWS</p><h3>付款紀錄</h3></div>
+      <div class="pay-review-filter">
+        <a class="pay-review-link" href="/admin/payment-reviews">全部</a>
+        <a class="pay-review-link" href="/admin/payment-reviews?status=pending">待審核</a>
+        <a class="pay-review-link" href="/admin/payment-reviews?status=completed">已完成</a>
+        <a class="pay-review-link" href="/admin/payment-reviews?status=rejected">已駁回</a>
+      </div>
+    </div>
+
+    <div class="pay-review-table-wrap">
+      <table class="pay-review-table">
+        <thead>
+          <tr>
+            <th>類型</th>
+            <th>審核編號</th>
+            <th>來源</th>
+            <th>老闆</th>
+            <th>對象</th>
+            <th>金額</th>
+            <th>付款方式</th>
+            <th>核對資訊</th>
+            <th>狀態</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in entries %}
+          <tr>
+            <td><strong>{{ item.kind_label }}</strong></td>
+            <td>
+              <strong>{{ item.display_no }}</strong>
+              <div class="pay-review-muted">{{ item.created_at }}</div>
+            </td>
+            <td>
+              {{ item.source_display }}
+              {% if item.ticket_channel_id %}
+                <div class="pay-review-muted">票口 {{ item.ticket_channel_id }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="pay-review-name">{{ item.customer_display }}</div>
+              <div class="pay-review-muted">{{ item.customer_discord_id }}</div>
+            </td>
+            <td>
+              {{ item.target_display }}
+              {% if item.target_discord_id %}
+                <div class="pay-review-muted">{{ item.target_discord_id }}</div>
+              {% endif %}
+            </td>
+            <td class="pay-review-amount">{{ item.amount_text }}</td>
+            <td>{{ item.payment_method_label }}</td>
+            <td>
+              {% if item.kind == "topup" %}
+                {{ item.payment_reference_display }}
+              {% else %}
+                請查看原票口付款截圖
+              {% endif %}
+            </td>
+            <td>{{ item.status_label }}</td>
+            <td>
+              {% if item.is_pending %}
+                <div class="pay-review-actions">
+                  {% if item.kind == "topup" %}
+                    <form method="post" action="/admin/payment-reviews/topup/{{ item.id }}/approve">
+                      <button class="pay-review-action" type="submit">確認收款</button>
+                    </form>
+                    <form method="post" action="/admin/payment-reviews/topup/{{ item.id }}/reject">
+                      <input class="pay-review-reason" name="reason" value="客服駁回" aria-label="駁回原因">
+                      <button class="pay-review-action reject" type="submit">駁回</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="/admin/payment-reviews/{{ item.id }}/approve">
+                      <button class="pay-review-action" type="submit">確認收款</button>
+                    </form>
+                    <form method="post" action="/admin/payment-reviews/{{ item.id }}/reject">
+                      <input class="pay-review-reason" name="reason" value="客服未確認到款項" aria-label="駁回原因">
+                      <button class="pay-review-action reject" type="submit">駁回</button>
+                    </form>
+                  {% endif %}
+                </div>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="10" class="pay-review-empty">目前沒有付款審核紀錄。</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}
