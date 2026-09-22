@@ -4202,6 +4202,9 @@ async def finalize_accepted_pending_payment(
         try:
             precheck_order_point_benefit_for_payment(data, customer_id)
         except ValueError as exc:
+            data.pop("payment_finalizing", None)
+            remember_order_data(channel_id, data)
+            save_bot_data()
             message = str(exc)
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
@@ -4251,6 +4254,9 @@ async def finalize_accepted_pending_payment(
                 channel_id=channel_id,
             )
         except ValueError as exc:
+            data.pop("payment_finalizing", None)
+            remember_order_data(channel_id, data)
+            save_bot_data()
             message = str(exc)
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
