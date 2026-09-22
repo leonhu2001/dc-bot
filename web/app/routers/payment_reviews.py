@@ -29,6 +29,7 @@ from services.topups import (
 from web.app.routers.admin_staff import require_admin
 
 router = APIRouter(tags=["payment_reviews"])
+DISCORD_GUILD_ID = 1129474191226306672
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -91,6 +92,12 @@ def _review_entry(row: dict) -> dict:
         PAYMENT_REVIEW_PENDING,
         PAYMENT_REVIEW_APPLY_ERROR,
     }
+    ticket_channel_id = str(item.get("ticket_channel_id") or "").strip()
+    item["ticket_url"] = (
+        f"https://discord.com/channels/{DISCORD_GUILD_ID}/{ticket_channel_id}"
+        if ticket_channel_id.isdigit()
+        else ""
+    )
     item["created_sort"] = str(item.get("created_at") or "")
     item["customer_display"] = (
         str(item.get("customer_display_name") or "").strip()
