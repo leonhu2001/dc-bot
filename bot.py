@@ -11492,6 +11492,14 @@ async def _apply_approved_order_payment_review(review: dict) -> None:
     acceptance_state = get_acceptance_state(
         int(review.get("order_id") or review.get("reference_id") or 0)
     )
+    acceptance_status = str(
+        getattr(acceptance_state, "status", "") or ""
+    ).lower()
+    if acceptance_status != "accepted_pending_pay":
+        raise RuntimeError(
+            f"訂單目前狀態為 {acceptance_status or '未知'}，"
+            "不能再套用付款核准。"
+        )
     if not acceptance_state.is_full:
         raise RuntimeError(
             "接單人數已變動，尚未滿人，不能完成付款審核。"
@@ -11568,8 +11576,25 @@ async def _apply_rejected_order_payment_review(review: dict) -> None:
     if not isinstance(data, dict):
         raise RuntimeError(f"找不到訂單 runtime 資料：{channel_id}")
 
-    if str(data.get("status") or "").lower() == "active":
+    current_status = str(data.get("status") or "").lower().strip()
+
+    if current_status == "active":
         raise RuntimeError("訂單已成立，不能套用付款駁回。")
+
+    if current_status in {"closed", "cancelled", "canceled", "stored"}:
+        await channel.send(
+            (
+                f"❌ **付款審核已駁回**\n"
+                f"原因：**{review.get('rejected_reason') or '客服駁回'}**\n"
+                f"訂單目前已是 **{current_status}** 狀態，因此不會重新開放付款。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+        return
 
     data["status"] = "accepted_pending_pay"
     data["payment_review_rejected_at"] = get_taipei_now_iso()
