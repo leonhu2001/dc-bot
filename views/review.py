@@ -23,7 +23,7 @@ WORKER_TIP_POLICY_TEXT = (
     "• 雞腿採獨立帳務，不併入原訂單金額。\n"
     "• 雞腿不計原單抽成，也不影響原訂單分潤。\n"
     "• 雞腿不列入 VIP 累積消費，也不增加會員點數。\n"
-    "• 使用「我的錢包」會立即扣款；街口／轉帳需等客服確認收款後才會入帳。"
+    "• 使用「我的錢包」會立即扣款；街口／轉帳送出後會進網站審核，請在票口貼付款截圖，客服確認後才會入帳。"
 )
 
 
@@ -1112,7 +1112,7 @@ def has_pending_worker_tips(ticket_channel_id: int | str) -> bool:
             SELECT id
             FROM worker_tips
             WHERE ticket_channel_id = ?
-              AND payment_status = 'pending'
+              AND payment_status IN ('pending', 'pending_review')
             LIMIT 1
             """,
             (str(ticket_channel_id),),
@@ -1354,7 +1354,11 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             target=self.target,
             amount=self.amount,
             payment_method=payment_method,
-            payment_status="pending",
+            payment_status=(
+                "pending"
+                if payment_method == "我的錢包"
+                else "pending_review"
+            ),
         )
 
         if payment_method == "我的錢包":
@@ -1410,31 +1414,71 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             )
             return
 
-        confirm_message = await channel.send(
+        try:
+            from services.payment_reviews import (
+                create_payment_review,
+                set_payment_review_notification,
+            )
+
+            review = create_payment_review(
+                source_type="worker_tip",
+                source_id=tip_id,
+                ticket_channel_id=channel.id,
+                customer_discord_id=self.customer_id,
+                customer_display_name=customer_name,
+                target_discord_id=str(self.target.get("staff_id") or ""),
+                target_display_name=str(
+                    self.target.get("display_name")
+                    or self.target.get("staff_id")
+                    or ""
+                ),
+                amount=self.amount,
+                payment_method=payment_method,
+            )
+        except Exception as exc:
+            mark_worker_tip_cancelled(tip_id, cancelled_by=interaction.user)
+            await interaction.followup.send(
+                f"建立雞腿付款審核失敗：{exc}",
+                ephemeral=True,
+            )
+            return
+
+        review_message = await channel.send(
             (
-                f"🍗 **雞腿待付款確認**\n"
+                f"🍗 **雞腿付款已送出網站審核**\n"
                 f"老闆：{interaction.user.mention}\n"
                 f"指定成員：<@{self.target.get('staff_id')}>\n"
                 f"金額：**{self.amount:,}T**\n"
                 f"付款方式：**{payment_method}**\n\n"
                 "雞腿 100% 給指定成員；不計原單抽成、不影響原訂單金額，"
-                "也不列入 VIP 累積或會員點數。\n"
-                "請客服確認實際收款後按下方按鈕，確認後才會列入打手薪資。"
+                "也不列入 VIP 累積或會員點數。\n\n"
+                "📎 **請將轉帳／街口付款截圖直接傳在此票口**，"
+                "方便客服核對後到網站完成付款審核。\n"
+                "客服確認前，這筆雞腿不會列入打手薪資。"
             ),
-            view=WorkerTipPaymentConfirmView(
-                tip_id=tip_id,
-                customer_id=self.customer_id,
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
             ),
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
-        set_worker_tip_confirmation_message(tip_id, confirm_message.id)
+        set_worker_tip_confirmation_message(tip_id, review_message.id)
+
+        try:
+            set_payment_review_notification(
+                int(review["id"]),
+                review_message.id,
+            )
+        except Exception:
+            pass
+
         tip_row = _worker_tip_row(tip_id)
         await _log_worker_tip("pending", interaction=interaction, tip_row=tip_row)
 
         await interaction.followup.send(
             (
-                f"已建立 **{self.amount:,}T** 雞腿，付款方式：**{payment_method}**。\n"
-                "目前狀態是「待客服確認收款」；確認前不會算進打手薪資。"
+                f"已建立 **{self.amount:,}T** 雞腿並送出網站審核。\n"
+                "請把付款截圖貼在這個票口，等待客服確認。"
             ),
             ephemeral=True,
         )

@@ -1008,6 +1008,12 @@ async def ensure_payment_submit_receipt(
     )
 
     amount_text = format_t_amount(amount)
+    payment_status_text = (
+        "已確認收款"
+        if payment_method == WALLET_PAYMENT_METHOD
+        or bool(order_data.get("payment_review_approved"))
+        else "已送出，待客服確認"
+    )
     order_content = f"{category_label}｜{item}｜數量：{quantity} 單"
     if companion_preference:
         order_content += f"｜{companion_preference}"
@@ -1028,7 +1034,7 @@ async def ensure_payment_submit_receipt(
         f"數量：{quantity} 單\n"
         f"金額：{amount_text}\n"
         f"付款方式：{payment_method}\n"
-        "付款狀態：已送出，待客服確認\n"
+        f"付款狀態：{payment_status_text}\n"
         "\n"
         f"客服人員：{staff_name}\n"
         "\n"
@@ -1048,7 +1054,7 @@ async def ensure_payment_submit_receipt(
     embed.add_field(name="顧客", value=f"<@{customer_id}>", inline=True)
     embed.add_field(name="金額", value=amount_text, inline=True)
     embed.add_field(name="付款方式", value=payment_method, inline=True)
-    embed.add_field(name="付款狀態", value="已送出，待客服確認", inline=True)
+    embed.add_field(name="付款狀態", value=payment_status_text, inline=True)
     embed.add_field(name="票口", value=order_channel.mention, inline=False)
     embed.set_footer(text="此收據為交易紀錄，非統一發票。")
 
@@ -1084,7 +1090,7 @@ async def ensure_payment_submit_receipt(
             ("顧客", f"<@{customer_id}>", True),
             ("金額", amount_text, True),
             ("付款方式", payment_method, True),
-            ("付款狀態", "已送出，待客服確認", True),
+            ("付款狀態", payment_status_text, True),
             ("客服人員", getattr(staff_member, "mention", staff_name), True),
             ("票口", order_channel.mention, False),
             ("收據訊息", receipt_message.jump_url, False),
@@ -4020,6 +4026,157 @@ async def finalize_accepted_pending_payment(
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
         return
 
+    external_review_methods = {"街口", "轉帳"}
+
+    if str(payment_method) in external_review_methods and not data.get("payment_review_approved"):
+        if data.get("payment_review_pending"):
+            await interaction.response.send_message(
+                "這筆付款已送出網站審核，請不要重複送出。\n"
+                "請將付款截圖直接傳在此票口，方便客服核對。",
+                ephemeral=True,
+            )
+            return
+
+        web_order_id = _to_int(data.get("web_order_id"))
+
+        if web_order_id is None:
+            try:
+                from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
+                web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+            except Exception:
+                web_order_id = None
+
+        if web_order_id is None:
+            await interaction.response.send_message(
+                "找不到這張訂單的網站資料，暫時無法送出付款審核，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        customer_member_for_review = guild.get_member(customer_id)
+        customer_display_name = (
+            getattr(customer_member_for_review, "display_name", None)
+            or getattr(customer_member_for_review, "name", None)
+            or str(customer_id)
+        )
+
+        try:
+            from services.payment_reviews import (
+                create_payment_review,
+                set_payment_review_notification,
+            )
+
+            review = create_payment_review(
+                source_type="order",
+                source_id=web_order_id,
+                ticket_channel_id=channel_id,
+                customer_discord_id=customer_id,
+                customer_display_name=customer_display_name,
+                amount=amount,
+                payment_method=str(payment_method),
+            )
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        data["web_order_id"] = int(web_order_id)
+        data["payment_review_id"] = int(review["id"])
+        data["payment_review_no"] = str(review.get("review_no") or "")
+        data["payment_review_pending"] = True
+        data["payment_review_submitted_at"] = get_taipei_now_iso()
+        data["payment_review_submitted_by"] = int(getattr(interaction.user, "id", 0) or 0)
+        remember_order_data(channel_id, data)
+        save_bot_data()
+
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        category_label = str(
+            data.get("category_label")
+            or ORDER_CATEGORY_LABELS.get(
+                data.get("category"),
+                data.get("category") or "未紀錄",
+            )
+        )
+        item = str(data.get("item") or "未紀錄")
+        quantity = _to_int(data.get("quantity"), 1) or 1
+        companion_preference = data.get("companion_preference")
+
+        pending_embed = build_payment_method_embed(
+            customer_id=customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            payment_method=str(payment_method),
+            companion_preference=companion_preference,
+            amount=amount,
+        )
+        pending_embed.add_field(
+            name="付款狀態",
+            value=(
+                "已送出網站審核，等待客服確認收款。\n"
+                "請將付款截圖直接傳在本票口，方便客服核對。"
+            ),
+            inline=False,
+        )
+
+        payment_channel_id = _to_int(
+            data.get("payment_channel_id"),
+            interaction.channel.id,
+        ) or interaction.channel.id
+        payment_message_id = _to_int(data.get("payment_message_id"))
+        payment_channel = guild.get_channel(payment_channel_id)
+
+        if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
+            try:
+                payment_message = await payment_channel.fetch_message(payment_message_id)
+                await payment_message.edit(
+                    embed=pending_embed,
+                    view=PaymentMethodView(
+                        customer_id=customer_id,
+                        channel_id=channel_id,
+                        submitted=True,
+                        selected_method=str(payment_method),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+            except discord.HTTPException:
+                pass
+
+        review_notice = await interaction.channel.send(
+            (
+                f"<@{customer_id}> ✅ **付款資料已送出審核**\n"
+                f"付款方式：**{payment_method}**｜金額：**{amount:,}T**\n\n"
+                "📎 **請將轉帳／街口付款截圖直接傳在此票口**，"
+                "方便客服核對後到網站完成付款審核。\n"
+                "客服確認前，訂單不會正式成立。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+
+        data["payment_review_notification_message_id"] = review_notice.id
+        remember_order_data(channel_id, data)
+        save_bot_data()
+
+        try:
+            set_payment_review_notification(int(review["id"]), review_notice.id)
+        except Exception:
+            pass
+
+        await interaction.followup.send(
+            "付款已送出網站審核。請記得把付款截圖貼在這個票口，等待客服確認。",
+            ephemeral=True,
+        )
+        return
+
     data["payment_finalizing"] = True
     remember_order_data(channel_id, data)
 
@@ -4045,6 +4202,9 @@ async def finalize_accepted_pending_payment(
         try:
             precheck_order_point_benefit_for_payment(data, customer_id)
         except ValueError as exc:
+            data.pop("payment_finalizing", None)
+            remember_order_data(channel_id, data)
+            save_bot_data()
             message = str(exc)
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
@@ -4094,6 +4254,9 @@ async def finalize_accepted_pending_payment(
                 channel_id=channel_id,
             )
         except ValueError as exc:
+            data.pop("payment_finalizing", None)
+            remember_order_data(channel_id, data)
+            save_bot_data()
             message = str(exc)
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
@@ -4106,8 +4269,8 @@ async def finalize_accepted_pending_payment(
         data["amount_text"] = _format_plain_amount(amount) if "_format_plain_amount" in globals() else format_t_amount(amount)
         data["payment_submitted_at"] = get_taipei_now_iso()
         data["payment_submitted_by"] = interaction.user.id
-        data["status"] = "active"
         data["closed"] = False
+        data["payment_processing"] = True
         remember_order_data(channel_id, data)
 
         reward_result = await add_customer_reward_from_order(
@@ -4279,7 +4442,15 @@ async def finalize_accepted_pending_payment(
             operation_message = await interaction.channel.send(embed=operation_embed, view=StaffOrderOperationView())
             data["operation_panel_message_id"] = operation_message.id
 
+        data["status"] = "active"
+        data["closed"] = False
+        data.pop("payment_processing", None)
         data.pop("payment_finalizing", None)
+        if data.get("payment_review_approved"):
+            data["payment_review_pending"] = False
+            data["payment_review_applied_at"] = get_taipei_now_iso()
+        if data.get("payment_review_approved") and data.get("payment_review_id"):
+            data["payment_review_finalized_id"] = int(data["payment_review_id"])
         remember_order_data(channel_id, data)
         save_bot_data()
 
@@ -4307,6 +4478,7 @@ async def finalize_accepted_pending_payment(
         )
 
     except Exception as exc:
+        data.pop("payment_processing", None)
         data.pop("payment_finalizing", None)
         remember_order_data(channel_id, data)
         save_bot_data()

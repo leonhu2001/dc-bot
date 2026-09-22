@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services.topup_runtime import ensure_topup_credit_worker_started
+from services.payment_review_runtime import ensure_payment_review_worker_started
 from views.panels import MainPanelView
 from views.topups import TopupPanelView
 from views.staff_management import (
@@ -34,6 +35,7 @@ class SetupCommands(commands.Cog):
             bot._staff_management_panel_view_registered = True
 
         ensure_topup_credit_worker_started(bot)
+        ensure_payment_review_worker_started(bot)
         if not getattr(bot, "_topup_panel_view_registered", False):
             bot.add_view(TopupPanelView())
             bot._topup_panel_view_registered = True
