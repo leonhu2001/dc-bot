@@ -2240,6 +2240,7 @@ def wallet_transaction_type_label(tx_type: str) -> str:
     mapping = {
         "topup": "儲值",
         "payment": "訂單扣款",
+        "tip_payment": "雞腿扣款",
         "refund": "退款",
         "adjustment": "修正",
     }
