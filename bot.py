@@ -4076,6 +4076,9 @@ async def finalize_accepted_pending_payment(
             or str(customer_id)
         )
 
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
         try:
             review = create_or_resubmit_payment_review(
                 review_type="order",
@@ -4088,10 +4091,10 @@ async def finalize_accepted_pending_payment(
                 payment_method=str(payment_method),
             )
         except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+            await interaction.followup.send(str(exc), ephemeral=True)
             return
         except Exception as exc:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"建立付款審核失敗：{type(exc).__name__}: {exc}",
                 ephemeral=True,
             )
@@ -4194,7 +4197,7 @@ async def finalize_accepted_pending_payment(
             color=discord.Color.gold(),
         )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "付款已送出網站審核。請把付款截圖上傳到這個票口，等待客服確認。",
             ephemeral=True,
         )
