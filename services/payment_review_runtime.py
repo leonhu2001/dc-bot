@@ -183,8 +183,11 @@ async def _apply_order_approval(bot: discord.Client, row: dict) -> None:
     )
 
     data = target.SELF_SERVICE_ORDER_SELECTIONS.get(channel.id, {})
-    if str(data.get("status") or "").lower() != "active":
-        raise RuntimeError("Bot 未能將訂單切換為 active，請查看 Bot 日誌。")
+    if (
+        str(data.get("status") or "").lower() != "active"
+        or int(data.get("payment_review_finalized_id") or 0) != int(row["id"])
+    ):
+        raise RuntimeError("Bot 未完整套用付款審核結果，請查看 Bot 日誌。")
 
     await _edit_review_notification(
         channel,
