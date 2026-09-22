@@ -173,7 +173,12 @@ def create_or_resubmit_payment_review(
             )
         else:
             status = str(row["status"] or "")
-            if status in {PENDING_REVIEW, APPROVED_PENDING_APPLY, PROCESSING}:
+            if status in {
+                PENDING_REVIEW,
+                APPROVED_PENDING_APPLY,
+                REJECTED_PENDING_APPLY,
+                PROCESSING,
+            }:
                 raise ValueError("這筆付款已經在審核中，請勿重複送出。")
             if status == COMPLETED:
                 raise ValueError("這筆付款已完成審核。")
