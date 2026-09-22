@@ -402,9 +402,34 @@ def list_pending_payment_review_actions(
             ORDER BY updated_at ASC, id ASC
             LIMIT ?
             """,
-            (safe_limit,),
+            (min(500, safe_limit * 3),),
         ).fetchall()
-        return [dict(row) for row in rows]
+
+        now = datetime.now(TAIPEI_TZ)
+        result = []
+
+        for row in rows:
+            item = dict(row)
+
+            if str(item.get("status") or "") == PROCESSING:
+                try:
+                    updated_at = datetime.fromisoformat(
+                        str(item.get("updated_at") or "")
+                    )
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=TAIPEI_TZ)
+
+                    if (now - updated_at).total_seconds() < 30:
+                        continue
+                except (TypeError, ValueError):
+                    pass
+
+            result.append(item)
+
+            if len(result) >= safe_limit:
+                break
+
+        return result
 
 
 def mark_payment_review_processing(
