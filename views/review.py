@@ -10,6 +10,7 @@ import discord
 from views.staff_profiles import refresh_staff_profile_panel_for_staff
 
 from core.permissions import is_customer_staff
+from services.payment_reviews import create_or_resubmit_payment_review
 
 
 _REVIEW_CHANNEL_ID: int | None = None
@@ -23,7 +24,7 @@ WORKER_TIP_POLICY_TEXT = (
     "• 雞腿採獨立帳務，不併入原訂單金額。\n"
     "• 雞腿不計原單抽成，也不影響原訂單分潤。\n"
     "• 雞腿不列入 VIP 累積消費，也不增加會員點數。\n"
-    "• 使用「我的錢包」會立即扣款；街口／轉帳需等客服確認收款後才會入帳。"
+    "• 使用「我的錢包」會立即扣款；街口／轉帳會送到網站付款審核，請把付款截圖上傳到原票口。"
 )
 
 
@@ -1410,31 +1411,48 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             )
             return
 
-        confirm_message = await channel.send(
+        try:
+            review = create_or_resubmit_payment_review(
+                review_type="tip",
+                reference_id=tip_id,
+                order_id=int(order["id"]),
+                ticket_channel_id=channel.id,
+                customer_discord_id=self.customer_id,
+                customer_display_name=customer_name,
+                amount=self.amount,
+                payment_method=payment_method,
+            )
+        except Exception as exc:
+            mark_worker_tip_cancelled(tip_id, cancelled_by=interaction.user)
+            await interaction.followup.send(
+                f"雞腿付款審核建立失敗：{exc}",
+                ephemeral=True,
+            )
+            return
+
+        await channel.send(
             (
-                f"🍗 **雞腿待付款確認**\n"
+                f"🍗 **雞腿付款已送出網站審核**\n"
                 f"老闆：{interaction.user.mention}\n"
                 f"指定成員：<@{self.target.get('staff_id')}>\n"
                 f"金額：**{self.amount:,}T**\n"
-                f"付款方式：**{payment_method}**\n\n"
+                f"付款方式：**{payment_method}**\n"
+                f"審核編號：`{review.get('review_no')}`\n\n"
+                "📸 **請老闆把付款成功／轉帳完成截圖直接上傳到這個票口，方便客服核對。**\n"
+                "客服會在網站「付款審核」確認款項；確認前不會列入打手薪資。\n\n"
                 "雞腿 100% 給指定成員；不計原單抽成、不影響原訂單金額，"
-                "也不列入 VIP 累積或會員點數。\n"
-                "請客服確認實際收款後按下方按鈕，確認後才會列入打手薪資。"
-            ),
-            view=WorkerTipPaymentConfirmView(
-                tip_id=tip_id,
-                customer_id=self.customer_id,
+                "也不列入 VIP 累積或會員點數。"
             ),
             allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
-        set_worker_tip_confirmation_message(tip_id, confirm_message.id)
+
         tip_row = _worker_tip_row(tip_id)
         await _log_worker_tip("pending", interaction=interaction, tip_row=tip_row)
 
         await interaction.followup.send(
             (
-                f"已建立 **{self.amount:,}T** 雞腿，付款方式：**{payment_method}**。\n"
-                "目前狀態是「待客服確認收款」；確認前不會算進打手薪資。"
+                f"已送出 **{self.amount:,}T** 雞腿付款審核，付款方式：**{payment_method}**。\n"
+                "請記得把付款截圖上傳到原票口，客服會從網站審核。"
             ),
             ephemeral=True,
         )

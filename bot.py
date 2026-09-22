@@ -169,6 +169,18 @@ from services.order_flow import (
     get_payment_method_info,
 )
 
+from services.payment_reviews import (
+    APPROVED_PENDING_APPLY,
+    REJECTED_PENDING_APPLY,
+    create_or_resubmit_payment_review,
+    ensure_payment_review_tables,
+    list_pending_payment_review_actions,
+    mark_payment_review_processing,
+    mark_payment_review_completed,
+    mark_payment_review_rejected_applied,
+    mark_payment_review_apply_failed,
+)
+
 from services.game_roles import GAME_ROLES
 
 from views.review import (
@@ -178,6 +190,11 @@ from views.review import (
     configure_worker_tip_callbacks,
     get_pending_worker_tip_confirmations,
     WorkerTipPaymentConfirmView,
+    _worker_tip_row,
+    mark_worker_tip_paid,
+    mark_worker_tip_cancelled,
+    _notify_worker_tip_paid,
+    _log_worker_tip,
 )
 
 from views.staff_profiles import (
@@ -971,6 +988,7 @@ async def ensure_payment_submit_receipt(
     amount: int,
     payment_method: str,
     companion_preference: str | None = None,
+    payment_status_text: str = "已送出，待客服確認",
 ) -> tuple[str | None, discord.Message | None]:
     """在付款方式 panel 按下送出後產生交易收據。
 
@@ -1028,7 +1046,7 @@ async def ensure_payment_submit_receipt(
         f"數量：{quantity} 單\n"
         f"金額：{amount_text}\n"
         f"付款方式：{payment_method}\n"
-        "付款狀態：已送出，待客服確認\n"
+        f"付款狀態：{payment_status_text}\n"
         "\n"
         f"客服人員：{staff_name}\n"
         "\n"
@@ -1048,7 +1066,7 @@ async def ensure_payment_submit_receipt(
     embed.add_field(name="顧客", value=f"<@{customer_id}>", inline=True)
     embed.add_field(name="金額", value=amount_text, inline=True)
     embed.add_field(name="付款方式", value=payment_method, inline=True)
-    embed.add_field(name="付款狀態", value="已送出，待客服確認", inline=True)
+    embed.add_field(name="付款狀態", value=payment_status_text, inline=True)
     embed.add_field(name="票口", value=order_channel.mention, inline=False)
     embed.set_footer(text="此收據為交易紀錄，非統一發票。")
 
@@ -1084,7 +1102,7 @@ async def ensure_payment_submit_receipt(
             ("顧客", f"<@{customer_id}>", True),
             ("金額", amount_text, True),
             ("付款方式", payment_method, True),
-            ("付款狀態", "已送出，待客服確認", True),
+            ("付款狀態", payment_status_text, True),
             ("客服人員", getattr(staff_member, "mention", staff_name), True),
             ("票口", order_channel.mention, False),
             ("收據訊息", receipt_message.jump_url, False),
@@ -3624,6 +3642,33 @@ async def restore_acceptance_payment_panel_for_order(
         if row is None:
             return False, f"找不到 WEB-{order_id}。"
 
+        try:
+            review_row = conn.execute(
+                """
+                SELECT id, status
+                FROM payment_reviews
+                WHERE review_type = 'order'
+                  AND reference_id = ?
+                  AND status IN (
+                      'pending_review',
+                      'approved_pending_apply',
+                      'rejected_pending_apply',
+                      'processing'
+                  )
+                LIMIT 1
+                """,
+                (int(order_id),),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            review_row = None
+
+        if review_row is not None:
+            return (
+                False,
+                f"WEB-{order_id} 目前正在網站付款審核中，"
+                f"review_id={review_row['id']} status={review_row['status']}，略過付款 panel 修復。",
+            )
+
         row_keys = set(row.keys())
         current_status = str(row["status"] or "").lower()
 
@@ -3980,6 +4025,7 @@ async def finalize_accepted_pending_payment(
     interaction: discord.Interaction,
     customer_id: int,
     channel_id: int,
+    external_review_approved: bool = False,
 ) -> None:
     guild = interaction.guild
 
@@ -3992,8 +4038,16 @@ async def finalize_accepted_pending_payment(
         return
 
     data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+    current_status = str(data.get("status") or "").lower().strip()
 
-    if str(data.get("status") or "").lower() != "accepted_pending_pay":
+    if current_status == "payment_review_pending" and not external_review_approved:
+        await interaction.response.send_message(
+            "這張單的付款已送出網站審核，請等待客服確認；不需要重複送出。",
+            ephemeral=True,
+        )
+        return
+
+    if current_status != "accepted_pending_pay":
         await interaction.response.send_message("這張單目前不是等待付款狀態。", ephemeral=True)
         return
 
@@ -4018,6 +4072,187 @@ async def finalize_accepted_pending_payment(
 
     if dispatch_message_id is None:
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
+        return
+
+    if str(payment_method) != WALLET_PAYMENT_METHOD and not external_review_approved:
+        try:
+            precheck_order_point_benefit_for_payment(data, customer_id)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        web_order_id = _to_int(data.get("web_order_id"))
+        if web_order_id is None:
+            try:
+                from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
+                web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+            except Exception:
+                web_order_id = None
+
+        if web_order_id is None:
+            await interaction.response.send_message(
+                "找不到網站訂單資料，暫時無法建立付款審核，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        customer_member = guild.get_member(customer_id)
+        customer_name = (
+            getattr(customer_member, "display_name", None)
+            or getattr(interaction.user, "display_name", None)
+            or getattr(interaction.user, "name", None)
+            or str(customer_id)
+        )
+
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+        try:
+            review = create_or_resubmit_payment_review(
+                review_type="order",
+                reference_id=int(web_order_id),
+                order_id=int(web_order_id),
+                ticket_channel_id=channel_id,
+                customer_discord_id=customer_id,
+                customer_display_name=customer_name,
+                amount=amount,
+                payment_method=str(payment_method),
+            )
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.followup.send(
+                f"建立付款審核失敗：{type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        data["payment_review_id"] = int(review["id"])
+        data["payment_review_no"] = str(review.get("review_no") or "")
+        data["payment_review_submitted_at"] = get_taipei_now_iso()
+        data["payment_review_submitted_by"] = interaction.user.id
+        data["status"] = "payment_review_pending"
+        data["closed"] = False
+        remember_order_data(channel_id, data)
+        save_bot_data()
+
+        category_label = str(
+            data.get("category_label")
+            or ORDER_CATEGORY_LABELS.get(
+                data.get("category"),
+                data.get("category") or "未紀錄",
+            )
+        )
+        item = str(data.get("item") or "未紀錄")
+        quantity = _to_int(data.get("quantity"), 1) or 1
+        companion_preference = data.get("companion_preference")
+
+        dispatch_channel = guild.get_channel(dispatch_channel_id)
+        if isinstance(dispatch_channel, discord.TextChannel):
+            try:
+                dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+                claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+                claim_data["locked"] = True
+                claim_data["status"] = "payment_review_pending"
+                remember_claim_data(dispatch_message_id, claim_data)
+                await dispatch_message.edit(
+                    view=DispatchClaimView(
+                        customer_id=customer_id,
+                        category_label=category_label,
+                        item=item,
+                        quantity=quantity,
+                        payment_method=str(payment_method),
+                        source_channel_id=channel_id,
+                        companion_preference=companion_preference,
+                        locked=True,
+                        status="payment_review_pending",
+                    ),
+                )
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+
+        payment_channel_id = _to_int(
+            data.get("payment_channel_id"),
+            interaction.channel.id,
+        ) or interaction.channel.id
+        payment_message_id = _to_int(data.get("payment_message_id"))
+        payment_channel = guild.get_channel(payment_channel_id)
+
+        review_embed = build_payment_method_embed(
+            customer_id=customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            payment_method=str(payment_method),
+            companion_preference=companion_preference,
+            amount=amount,
+        )
+        review_embed.add_field(
+            name="付款狀態",
+            value=(
+                "已送出網站付款審核。\n"
+                "請把付款成功／轉帳完成截圖上傳到本票口，等待客服核對。"
+            ),
+            inline=False,
+        )
+
+        if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
+            try:
+                payment_message = await payment_channel.fetch_message(payment_message_id)
+                await payment_message.edit(
+                    embed=review_embed,
+                    view=PaymentMethodView(
+                        customer_id=customer_id,
+                        channel_id=channel_id,
+                        submitted=True,
+                        selected_method=str(payment_method),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+            except discord.HTTPException:
+                pass
+
+        await interaction.channel.send(
+            (
+                f"💳 **付款已送出網站審核**\n"
+                f"老闆：<@{customer_id}>\n"
+                f"訂單：**{category_label}｜{item} x{quantity}**\n"
+                f"金額：**{amount:,}T**\n"
+                f"付款方式：**{payment_method}**\n"
+                f"審核編號：`{review.get('review_no')}`\n\n"
+                "📸 **請老闆把付款成功／轉帳完成截圖直接上傳到這個票口，方便客服核對。**\n"
+                "客服會在網站「付款審核」確認款項；審核通過後訂單才會正式成立。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+
+        await send_order_log(
+            guild,
+            title="訂單付款已送審",
+            fields=[
+                ("顧客", f"<@{customer_id}>", True),
+                ("訂單", f"{category_label}｜{item} x{quantity}", False),
+                ("金額", format_t_amount(amount), True),
+                ("付款方式", str(payment_method), True),
+                ("審核編號", str(review.get("review_no") or review.get("id")), True),
+                ("票口", interaction.channel.mention, False),
+            ],
+            color=discord.Color.gold(),
+        )
+
+        await interaction.followup.send(
+            "付款已送出網站審核。請把付款截圖上傳到這個票口，等待客服確認。",
+            ephemeral=True,
+        )
         return
 
     data["payment_finalizing"] = True
@@ -4138,6 +4373,13 @@ async def finalize_accepted_pending_payment(
             amount=amount,
             payment_method=payment_method,
             companion_preference=companion_preference,
+            payment_status_text=(
+                "已付款"
+                if str(payment_method) == WALLET_PAYMENT_METHOD
+                else "客服已確認收款"
+                if external_review_approved
+                else "已送出，待客服確認"
+            ),
         )
 
         if receipt_id:
@@ -11146,6 +11388,533 @@ async def on_voice_state_update(
 
         return
 
+class _PaymentReviewActor:
+    def __init__(self, user_id: int | str | None, display_name: str | None = None):
+        try:
+            self.id = int(str(user_id or "0"))
+        except (TypeError, ValueError):
+            self.id = 0
+        self.display_name = str(display_name or self.id or "網站客服")
+        self.name = self.display_name
+
+    @property
+    def mention(self) -> str:
+        return f"<@{self.id}>" if self.id else self.display_name
+
+
+class _PaymentReviewProxyResponse:
+    def __init__(self, holder):
+        self.holder = holder
+
+    def is_done(self) -> bool:
+        return True
+
+    async def defer(self, *args, **kwargs):
+        return None
+
+    async def send_message(self, content=None, *args, **kwargs):
+        if content:
+            self.holder.messages.append(str(content))
+        return None
+
+
+class _PaymentReviewProxyFollowup:
+    def __init__(self, holder):
+        self.holder = holder
+
+    async def send(self, content=None, *args, **kwargs):
+        if content:
+            self.holder.messages.append(str(content))
+        return None
+
+
+class _PaymentReviewInteractionProxy:
+    def __init__(self, *, guild, channel, user):
+        self.guild = guild
+        self.channel = channel
+        self.user = user
+        self.messages: list[str] = []
+        self.response = _PaymentReviewProxyResponse(self)
+        self.followup = _PaymentReviewProxyFollowup(self)
+
+
+async def _resolve_payment_review_actor(
+    guild: discord.Guild,
+    *,
+    user_id,
+    display_name,
+):
+    try:
+        parsed_id = int(str(user_id or "0"))
+    except (TypeError, ValueError):
+        parsed_id = 0
+
+    if parsed_id:
+        member = guild.get_member(parsed_id)
+        if member is None:
+            try:
+                member = await guild.fetch_member(parsed_id)
+            except Exception:
+                member = None
+        if member is not None:
+            return member
+
+    return _PaymentReviewActor(parsed_id, display_name)
+
+
+async def _apply_approved_order_payment_review(review: dict) -> None:
+    guild = bot.get_guild(GUILD_ID)
+    if guild is None:
+        raise RuntimeError("找不到 Discord 伺服器。")
+
+    channel_id = _to_int(review.get("ticket_channel_id"))
+    if channel_id is None:
+        raise RuntimeError("付款審核沒有對應票口。")
+
+    channel = guild.get_channel(channel_id)
+    if not isinstance(channel, discord.TextChannel):
+        try:
+            channel = await guild.fetch_channel(channel_id)
+        except Exception:
+            channel = None
+
+    if not isinstance(channel, discord.TextChannel):
+        raise RuntimeError(f"找不到付款審核票口：{channel_id}")
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id)
+    if not isinstance(data, dict):
+        raise RuntimeError(f"找不到訂單 runtime 資料：{channel_id}")
+
+    if str(data.get("status") or "").lower() == "active":
+        return
+
+    from shared.order_acceptance import get_acceptance_state
+    acceptance_state = get_acceptance_state(
+        int(review.get("order_id") or review.get("reference_id") or 0)
+    )
+    acceptance_status = str(
+        getattr(acceptance_state, "status", "") or ""
+    ).lower()
+    if acceptance_status != "accepted_pending_pay":
+        raise RuntimeError(
+            f"訂單目前狀態為 {acceptance_status or '未知'}，"
+            "不能再套用付款核准。"
+        )
+    if not acceptance_state.is_full:
+        raise RuntimeError(
+            "接單人數已變動，尚未滿人，不能完成付款審核。"
+        )
+
+    actor = await _resolve_payment_review_actor(
+        guild,
+        user_id=review.get("approved_by_discord_id"),
+        display_name=review.get("approved_by_display_name"),
+    )
+
+    data["status"] = "accepted_pending_pay"
+    data["payment_review_approved"] = True
+    data["payment_review_approved_at"] = get_taipei_now_iso()
+    data["payment_review_approved_by"] = getattr(actor, "id", None)
+    data.pop("payment_finalizing", None)
+    remember_order_data(channel_id, data)
+    save_bot_data()
+
+    proxy = _PaymentReviewInteractionProxy(
+        guild=guild,
+        channel=channel,
+        user=actor,
+    )
+
+    await finalize_accepted_pending_payment(
+        interaction=proxy,
+        customer_id=int(str(review.get("customer_discord_id") or "0")),
+        channel_id=channel_id,
+        external_review_approved=True,
+    )
+
+    refreshed = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+    if str(refreshed.get("status") or "").lower() != "active":
+        detail = proxy.messages[-1] if proxy.messages else "訂單沒有進入 active 狀態"
+        raise RuntimeError(detail)
+
+    await channel.send(
+        (
+            f"✅ **付款審核已通過**\n"
+            f"老闆：<@{review.get('customer_discord_id')}>\n"
+            f"金額：**{int(review.get('amount') or 0):,}T**\n"
+            f"付款方式：**{review.get('payment_method')}**\n\n"
+            "客服已於網站確認收款，訂單正式成立。"
+        ),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+
+async def _apply_rejected_order_payment_review(review: dict) -> None:
+    guild = bot.get_guild(GUILD_ID)
+    if guild is None:
+        raise RuntimeError("找不到 Discord 伺服器。")
+
+    channel_id = _to_int(review.get("ticket_channel_id"))
+    if channel_id is None:
+        raise RuntimeError("付款審核沒有對應票口。")
+
+    channel = guild.get_channel(channel_id)
+    if not isinstance(channel, discord.TextChannel):
+        try:
+            channel = await guild.fetch_channel(channel_id)
+        except Exception:
+            channel = None
+
+    if not isinstance(channel, discord.TextChannel):
+        raise RuntimeError(f"找不到付款審核票口：{channel_id}")
+
+    data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id)
+    if not isinstance(data, dict):
+        raise RuntimeError(f"找不到訂單 runtime 資料：{channel_id}")
+
+    current_status = str(data.get("status") or "").lower().strip()
+
+    if current_status == "active":
+        raise RuntimeError("訂單已成立，不能套用付款駁回。")
+
+    if current_status in {"closed", "cancelled", "canceled", "stored"}:
+        await channel.send(
+            (
+                f"❌ **付款審核已駁回**\n"
+                f"原因：**{review.get('rejected_reason') or '客服駁回'}**\n"
+                f"訂單目前已是 **{current_status}** 狀態，因此不會重新開放付款。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+        return
+
+    data["status"] = "accepted_pending_pay"
+    data["payment_review_rejected_at"] = get_taipei_now_iso()
+    data["payment_review_rejected_reason"] = str(review.get("rejected_reason") or "客服駁回")
+    data.pop("payment_review_approved", None)
+    data.pop("payment_finalizing", None)
+    remember_order_data(channel_id, data)
+    save_bot_data()
+
+    category_label = str(
+        data.get("category_label")
+        or ORDER_CATEGORY_LABELS.get(
+            data.get("category"),
+            data.get("category") or "未紀錄",
+        )
+    )
+    item = str(data.get("item") or "未紀錄")
+    quantity = _to_int(data.get("quantity"), 1) or 1
+    amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
+    payment_method = str(data.get("payment_method") or review.get("payment_method") or "未紀錄")
+    companion_preference = data.get("companion_preference")
+
+    dispatch_message_id = _to_int(data.get("dispatch_message_id"))
+    dispatch_channel_id = _to_int(
+        data.get("dispatch_channel_id"),
+        DISPATCH_CHANNEL_ID,
+    ) or DISPATCH_CHANNEL_ID
+    dispatch_channel = guild.get_channel(dispatch_channel_id)
+
+    if isinstance(dispatch_channel, discord.TextChannel) and dispatch_message_id is not None:
+        try:
+            dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+            claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+            claim_data["locked"] = False
+            claim_data["status"] = "accepted_pending_pay"
+            remember_claim_data(dispatch_message_id, claim_data)
+            await dispatch_message.edit(
+                view=DispatchClaimView(
+                    customer_id=int(str(review.get("customer_discord_id") or "0")),
+                    category_label=category_label,
+                    item=item,
+                    quantity=quantity,
+                    payment_method=payment_method,
+                    source_channel_id=channel_id,
+                    companion_preference=companion_preference,
+                    locked=False,
+                    status="accepted_pending_pay",
+                ),
+            )
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    payment_channel_id = _to_int(data.get("payment_channel_id"), channel.id) or channel.id
+    payment_message_id = _to_int(data.get("payment_message_id"))
+    payment_channel = guild.get_channel(payment_channel_id)
+
+    embed = build_payment_method_embed(
+        customer_id=int(str(review.get("customer_discord_id") or "0")),
+        category_label=category_label,
+        item=item,
+        quantity=quantity,
+        payment_method=payment_method,
+        companion_preference=companion_preference,
+        amount=amount,
+    )
+    embed.add_field(
+        name="付款狀態",
+        value=(
+            "❌ 上次網站付款審核未通過。\n"
+            f"原因：{review.get('rejected_reason') or '客服駁回'}\n"
+            "確認付款後可重新按「送出」，並把正確付款截圖上傳到本票口。"
+        ),
+        inline=False,
+    )
+
+    if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
+        try:
+            message = await payment_channel.fetch_message(payment_message_id)
+            await message.edit(
+                embed=embed,
+                view=PaymentMethodView(
+                    customer_id=int(str(review.get("customer_discord_id") or "0")),
+                    channel_id=channel_id,
+                    submitted=False,
+                    selected_method=payment_method,
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False,
+                ),
+            )
+        except discord.HTTPException:
+            pass
+
+    await channel.send(
+        (
+            f"❌ **付款審核未通過**\n"
+            f"老闆：<@{review.get('customer_discord_id')}>\n"
+            f"付款方式：**{payment_method}**\n"
+            f"原因：**{review.get('rejected_reason') or '客服駁回'}**\n\n"
+            "請確認付款狀態；需要再次送審時直接重新按付款面板的「送出」，"
+            "並把付款截圖上傳到這個票口。"
+        ),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+
+async def _apply_approved_tip_payment_review(review: dict) -> None:
+    guild = bot.get_guild(GUILD_ID)
+    if guild is None:
+        raise RuntimeError("找不到 Discord 伺服器。")
+
+    tip_id = int(review.get("reference_id") or 0)
+    tip_row = _worker_tip_row(tip_id)
+    if tip_row is None:
+        raise RuntimeError(f"找不到雞腿紀錄：{tip_id}")
+
+    actor = await _resolve_payment_review_actor(
+        guild,
+        user_id=review.get("approved_by_discord_id"),
+        display_name=review.get("approved_by_display_name"),
+    )
+
+    was_already_paid = str(tip_row["payment_status"] or "") == "paid"
+
+    if not was_already_paid:
+        tip_row = mark_worker_tip_paid(
+            tip_id,
+            confirmed_by=actor,
+        )
+
+    channel_id = _to_int(review.get("ticket_channel_id"))
+    channel = guild.get_channel(channel_id) if channel_id is not None else None
+    if channel is None and channel_id is not None:
+        try:
+            channel = await guild.fetch_channel(channel_id)
+        except Exception:
+            channel = None
+
+    proxy = _PaymentReviewInteractionProxy(
+        guild=guild,
+        channel=channel,
+        user=actor,
+    )
+
+    if not was_already_paid:
+        await _notify_worker_tip_paid(proxy, tip_row)
+        await _log_worker_tip("paid", interaction=proxy, tip_row=tip_row)
+
+    if isinstance(channel, discord.TextChannel):
+        await channel.send(
+            (
+                f"✅ **雞腿付款審核已通過**\n"
+                f"老闆：<@{tip_row['customer_discord_id']}>\n"
+                f"指定成員：<@{tip_row['worker_discord_id']}>\n"
+                f"金額：**{int(tip_row['amount'] or 0):,}T**\n"
+                f"付款方式：**{tip_row['payment_method']}**\n\n"
+                "客服已於網站確認收款，此筆雞腿已列入指定成員薪資。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+
+
+async def _apply_rejected_tip_payment_review(review: dict) -> None:
+    guild = bot.get_guild(GUILD_ID)
+    if guild is None:
+        raise RuntimeError("找不到 Discord 伺服器。")
+
+    tip_id = int(review.get("reference_id") or 0)
+    tip_row = _worker_tip_row(tip_id)
+    if tip_row is None:
+        raise RuntimeError(f"找不到雞腿紀錄：{tip_id}")
+
+    actor = await _resolve_payment_review_actor(
+        guild,
+        user_id=review.get("rejected_by_discord_id"),
+        display_name=review.get("rejected_by_display_name"),
+    )
+
+    if str(tip_row["payment_status"] or "") == "paid":
+        raise RuntimeError("雞腿已完成付款，不能套用駁回。")
+
+    if str(tip_row["payment_status"] or "") != "cancelled":
+        tip_row = mark_worker_tip_cancelled(
+            tip_id,
+            cancelled_by=actor,
+        )
+
+    channel_id = _to_int(review.get("ticket_channel_id"))
+    channel = guild.get_channel(channel_id) if channel_id is not None else None
+    if channel is None and channel_id is not None:
+        try:
+            channel = await guild.fetch_channel(channel_id)
+        except Exception:
+            channel = None
+
+    if isinstance(channel, discord.TextChannel):
+        await channel.send(
+            (
+                f"❌ **雞腿付款審核未通過**\n"
+                f"老闆：<@{tip_row['customer_discord_id']}>\n"
+                f"指定成員：<@{tip_row['worker_discord_id']}>\n"
+                f"金額：**{int(tip_row['amount'] or 0):,}T**\n"
+                f"原因：**{review.get('rejected_reason') or '客服駁回'}**\n\n"
+                "這筆雞腿沒有列入薪資；若仍要加雞腿，請重新按「🍗 加雞腿」送出。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+
+
+async def process_one_payment_review_action(review: dict) -> None:
+    review_id = int(review.get("id") or 0)
+    stored_status = str(review.get("status") or "")
+
+    if stored_status == "processing":
+        pending_status = (
+            REJECTED_PENDING_APPLY
+            if review.get("rejected_at")
+            else APPROVED_PENDING_APPLY
+        )
+    else:
+        pending_status = stored_status
+
+    if not review_id or pending_status not in {
+        APPROVED_PENDING_APPLY,
+        REJECTED_PENDING_APPLY,
+    }:
+        return
+
+    claimed = mark_payment_review_processing(
+        review_id,
+        expected_status=stored_status,
+    )
+    if not claimed:
+        return
+
+    try:
+        review_type = str(review.get("review_type") or "").lower()
+
+        if pending_status == APPROVED_PENDING_APPLY:
+            if review_type == "order":
+                await _apply_approved_order_payment_review(review)
+            elif review_type == "tip":
+                await _apply_approved_tip_payment_review(review)
+            else:
+                raise RuntimeError(f"未知付款審核類型：{review_type}")
+
+            mark_payment_review_completed(review_id)
+            print(
+                f"[payment-review] approved applied id={review_id} type={review_type}",
+                flush=True,
+            )
+            return
+
+        if review_type == "order":
+            await _apply_rejected_order_payment_review(review)
+        elif review_type == "tip":
+            await _apply_rejected_tip_payment_review(review)
+        else:
+            raise RuntimeError(f"未知付款審核類型：{review_type}")
+
+        mark_payment_review_rejected_applied(review_id)
+        print(
+            f"[payment-review] rejection applied id={review_id} type={review_type}",
+            flush=True,
+        )
+
+    except Exception as exc:
+        mark_payment_review_apply_failed(
+            review_id,
+            original_pending_status=pending_status,
+            error_message=f"{type(exc).__name__}: {exc}",
+        )
+        print(
+            f"[payment-review] apply failed id={review_id}: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+async def payment_review_worker() -> None:
+    await bot.wait_until_ready()
+    ensure_payment_review_tables()
+
+    while not bot.is_closed():
+        try:
+            rows = list_pending_payment_review_actions(limit=20)
+            for row in rows:
+                await process_one_payment_review_action(row)
+        except Exception as exc:
+            print(
+                f"[payment-review] worker error: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+        await asyncio.sleep(4)
+
+
+def ensure_payment_review_worker_started() -> None:
+    ensure_payment_review_tables()
+
+    if getattr(bot, "_payment_review_worker_started", False):
+        return
+
+    bot._payment_review_worker_started = True
+    bot.loop.create_task(payment_review_worker())
+    print("[payment-review] worker started", flush=True)
+
+
 @bot.event
 async def on_ready():
     # zYao 3C3B2R3 persistent CS view v1
@@ -11170,6 +11939,7 @@ async def on_ready():
         bot._reward_redeem_view_registered = True
 
     ensure_wallet_tables()
+    ensure_payment_review_worker_started()
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0
