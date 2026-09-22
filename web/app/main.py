@@ -14,6 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from shared.db import create_all_tables
 from services.topups import ensure_topup_tables
+from services.payment_reviews import ensure_payment_review_tables
 from services.wallet_service import ensure_wallet_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
@@ -28,6 +29,7 @@ from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
 from web.app.routers.order_history import router as order_history_router
 from web.app.routers.topups import router as topups_router
+from web.app.routers.payment_reviews import router as payment_reviews_router
 from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
@@ -374,6 +376,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.include_router(auth_router)
 app.include_router(site_router)
 app.include_router(topups_router)
+app.include_router(payment_reviews_router)
 app.include_router(admin_staff_profiles_ui.router)
 app.include_router(admin_staff_profiles.router)
 app.include_router(admin_router)
@@ -392,6 +395,7 @@ app.include_router(admin_payouts_grouped.router)
 async def startup_event():
     create_all_tables()
     ensure_topup_tables()
+    ensure_payment_review_tables()
     ensure_wallet_tables()
 
 
