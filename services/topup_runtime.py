@@ -33,11 +33,7 @@ from services.wallet_service import adjust_wallet_balance, find_wallet_transacti
 
 TOPUP_REVIEW_CHANNEL_ID = 1502040302649872394
 CUSTOMER_SERVICE_ROLE_ID = 1482084782031638548
-TOPUP_REVIEW_URL = (
-    "https://mowanentertainment.com/admin/topups?ok="
-    "%E5%B7%B2%E6%A0%B8%E5%87%86%EF%BC%8CBot%20%E5%B0%87%E8%87%AA%E5%8B%95%E5%AE%8C%E6%88%90"
-    "%E9%8C%A2%E5%8C%85%E8%88%87%20VIP%20%E5%85%A5%E5%B8%B3"
-)
+TOPUP_REVIEW_URL = "https://mowanentertainment.com/admin/payment-reviews?status=pending"
 
 
 async def _sync_member_vip_benefits(
