@@ -393,7 +393,7 @@ def list_pending_payment_review_actions(
             """
             SELECT *
             FROM payment_reviews
-            WHERE status IN ('approved_pending_apply', 'rejected_pending_apply')
+            WHERE status IN ('approved_pending_apply', 'rejected_pending_apply', 'processing')
             ORDER BY updated_at ASC, id ASC
             LIMIT ?
             """,
