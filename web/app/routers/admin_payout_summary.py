@@ -27,6 +27,44 @@ def db_path() -> str:
     return str(Path.cwd() / "web_dashboard.db")
 
 
+def ensure_worker_tip_table() -> None:
+    conn = sqlite3.connect(db_path())
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS worker_tips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER,
+                ticket_channel_id TEXT NOT NULL,
+                dispatch_message_id TEXT,
+                receipt_id TEXT,
+                customer_discord_id TEXT NOT NULL,
+                customer_display_name TEXT,
+                worker_discord_id TEXT NOT NULL,
+                worker_display_name TEXT,
+                amount INTEGER NOT NULL,
+                payment_method TEXT NOT NULL,
+                payment_status TEXT NOT NULL DEFAULT 'pending',
+                payout_status TEXT NOT NULL DEFAULT 'unpaid',
+                wallet_transaction_id INTEGER,
+                confirmation_message_id TEXT,
+                confirmed_by_discord_id TEXT,
+                confirmed_by_display_name TEXT,
+                paid_at TEXT,
+                payout_paid_at TEXT,
+                cancelled_at TEXT,
+                note TEXT,
+                source TEXT NOT NULL DEFAULT 'discord',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def current_user(request: Request) -> dict | None:
     return request.session.get("user")
 
@@ -69,7 +107,7 @@ def month_filter_sql(month: str | None, alias: str) -> tuple[str, list[str]]:
     return f" AND substr({payout_order_date_expr(alias)}, 1, 7) = ? ", [month]
 
 
-def add_person(people: dict[str, dict], *, discord_id, display_name, role, amount, order_no, category, item, payout_status, customer_name=None, closed_at=None):
+def add_person(people: dict[str, dict], *, discord_id, display_name, role, amount, order_no, category, item, payout_status, customer_name=None, closed_at=None, item_role_label=None):
     discord_id = str(discord_id or "").strip()
     if not discord_id:
         return
@@ -114,7 +152,7 @@ def add_person(people: dict[str, dict], *, discord_id, display_name, role, amoun
         "item": item or "",
         "customer_name": customer_name,
         "closed_date": closed_date,
-        "role": "護航 / 陪玩" if role == "worker" else "客服",
+        "role": item_role_label or ("護航 / 陪玩" if role == "worker" else "客服"),
         "amount": amount,
         "payout_status": payout_status,
         "status_label": "已支付" if payout_status == "paid" else "未支付",
@@ -186,6 +224,7 @@ def normalize_payout_status(status: str | None) -> str:
 
 
 def fetch_rows(month: str | None, role: str | None, q: str | None, status: str | None = "unpaid"):
+    ensure_worker_tip_table()
     role = normalize_role(role)
     status = normalize_payout_status(status)
     people: dict[str, dict] = {}
@@ -239,6 +278,46 @@ def fetch_rows(month: str | None, role: str | None, q: str | None, status: str |
                     order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
                     category=row["category"],
                     item=row["item"],
+                )
+
+        if role in {"all", "worker"}:
+            month_sql, params = month_filter_sql(month, "w")
+            tip_rows = conn.execute(f"""
+                SELECT
+                    p.worker_discord_id AS discord_id,
+                    p.worker_display_name AS display_name,
+                    p.amount AS amount,
+                    p.payout_status AS payout_status,
+                    w.bot_order_no,
+                    w.id AS web_order_id,
+                    w.category,
+                    w.item,
+                    COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
+                    COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
+                FROM worker_tips p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE w.status = 'closed'
+                  AND p.payment_status = 'paid'
+                  AND COALESCE(p.amount, 0) > 0
+                  {payout_status_sql}
+                  {month_sql}
+                ORDER BY p.id DESC
+            """, [*payout_status_params, *params]).fetchall()
+
+            for row in tip_rows:
+                add_person(
+                    people,
+                    discord_id=row["discord_id"],
+                    display_name=row["display_name"],
+                    role="worker",
+                    amount=row["amount"],
+                    payout_status=row["payout_status"],
+                    customer_name=row["customer_name"],
+                    closed_at=row["closed_at"],
+                    order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
+                    category=row["category"],
+                    item=row["item"],
+                    item_role_label="🍗 雞腿",
                 )
 
         if role in {"all", "customer_service"}:
@@ -367,6 +446,7 @@ def build_summary_bulk_redirect(month: str | None, status: str | None, role: str
 
 def update_summary_payout_status(month: str | None, role: str | None, target_status: str) -> None:
     """依人員總表目前月份/身份篩選，批量標記分潤狀態。"""
+    ensure_worker_tip_table()
     month = normalize_summary_month(month)
     role = str(role or "all").strip()
     target_status = "paid" if target_status == "paid" else "unpaid"
@@ -391,6 +471,22 @@ def update_summary_payout_status(month: str | None, role: str | None, target_sta
                 SET payout_status = ?,
                     paid_at = {paid_at_sql}
                 WHERE order_id IN (
+                    SELECT w.id
+                    FROM web_orders w
+                    WHERE {order_filter}
+                )
+                """,
+                [target_status, *params],
+            )
+
+            conn.execute(
+                f"""
+                UPDATE worker_tips
+                SET payout_status = ?,
+                    payout_paid_at = {paid_at_sql},
+                    updated_at = datetime('now', '+8 hours')
+                WHERE payment_status = 'paid'
+                  AND order_id IN (
                     SELECT w.id
                     FROM web_orders w
                     WHERE {order_filter}
@@ -429,6 +525,7 @@ def update_summary_person_payout_status(month: str, person_role: str, person_id:
 
     混合身分要同時更新護航 / 陪玩分潤與魔丸♫客服分潤。
     """
+    ensure_worker_tip_table()
     person_id = str(person_id or "").strip()
     if not person_id:
         return
@@ -497,6 +594,23 @@ def update_summary_person_payout_status(month: str, person_role: str, person_id:
                 SET payout_status = ?,
                     paid_at = {paid_at_sql}
                 WHERE worker_discord_id = ?
+                  AND order_id IN (
+                      SELECT w.id
+                      FROM web_orders w
+                      WHERE {order_filter}
+                  )
+                """,
+                params_worker,
+            )
+
+            conn.execute(
+                f"""
+                UPDATE worker_tips
+                SET payout_status = ?,
+                    payout_paid_at = {paid_at_sql},
+                    updated_at = datetime('now', '+8 hours')
+                WHERE payment_status = 'paid'
+                  AND worker_discord_id = ?
                   AND order_id IN (
                       SELECT w.id
                       FROM web_orders w

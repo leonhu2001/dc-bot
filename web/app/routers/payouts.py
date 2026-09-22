@@ -29,6 +29,44 @@ def my_payout_db_path() -> str:
     raise RuntimeError("My payouts page only supports sqlite DATABASE_URL for now.")
 
 
+def ensure_worker_tip_table() -> None:
+    conn = sqlite3.connect(my_payout_db_path())
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS worker_tips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER,
+                ticket_channel_id TEXT NOT NULL,
+                dispatch_message_id TEXT,
+                receipt_id TEXT,
+                customer_discord_id TEXT NOT NULL,
+                customer_display_name TEXT,
+                worker_discord_id TEXT NOT NULL,
+                worker_display_name TEXT,
+                amount INTEGER NOT NULL,
+                payment_method TEXT NOT NULL,
+                payment_status TEXT NOT NULL DEFAULT 'pending',
+                payout_status TEXT NOT NULL DEFAULT 'unpaid',
+                wallet_transaction_id INTEGER,
+                confirmation_message_id TEXT,
+                confirmed_by_discord_id TEXT,
+                confirmed_by_display_name TEXT,
+                paid_at TEXT,
+                payout_paid_at TEXT,
+                cancelled_at TEXT,
+                note TEXT,
+                source TEXT NOT NULL DEFAULT 'discord',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def my_payout_order_date_expr(alias: str = "w") -> str:
     return (
         f"COALESCE("
@@ -192,6 +230,7 @@ def add_my_payout_item(
 
 
 def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all") -> tuple[list[dict], list[dict], dict]:
+    ensure_worker_tip_table()
     discord_id = str(discord_id or "").strip()
     month = str(month or "").strip()
     status = normalize_my_payout_status(status)
@@ -274,6 +313,48 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
                 category=row["category"],
                 item=row["item"],
                 role_label="護航 / 陪玩",
+                payout_status=row["payout_status"],
+                amount=row["amount"],
+            )
+
+        tip_rows = conn.execute(
+            f"""
+            SELECT
+                p.worker_discord_id AS discord_id,
+                COALESCE(NULLIF(p.worker_display_name, ''), p.worker_discord_id) AS display_name,
+                p.amount AS amount,
+                p.payout_status AS payout_status,
+                COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
+                w.category,
+                w.item,
+                COALESCE(NULLIF(w.customer_display_name, ''), NULLIF(w.customer_discord_id, ''), '未紀錄') AS customer_name,
+                {my_payout_order_date_expr('w')} AS closed_at
+            FROM worker_tips p
+            JOIN web_orders w ON w.id = p.order_id
+            WHERE w.status = 'closed'
+              AND p.payment_status = 'paid'
+              AND CAST(p.worker_discord_id AS TEXT) = ?
+              AND COALESCE(p.amount, 0) > 0
+              {payout_status_sql}
+              {month_sql}
+            ORDER BY closed_at DESC, p.id DESC
+            """,
+            [discord_id, *payout_status_params, *month_params],
+        ).fetchall()
+
+        for row in tip_rows:
+            if row["display_name"] and not person["display_name"]:
+                person["display_name"] = row["display_name"]
+
+            person["roles"].add("worker")
+            add_my_payout_item(
+                person,
+                order_no=row["order_no"],
+                closed_at=row["closed_at"],
+                customer_name=row["customer_name"],
+                category=row["category"],
+                item=row["item"],
+                role_label="🍗 雞腿",
                 payout_status=row["payout_status"],
                 amount=row["amount"],
             )
