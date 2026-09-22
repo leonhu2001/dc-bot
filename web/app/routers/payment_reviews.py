@@ -164,7 +164,11 @@ async def admin_payment_reviews(
 
     selected_status = _normalize_status(status)
     rows = [_decorate_external(row) for row in list_payment_reviews(limit=300)]
-    rows.extend(_decorate_topup(row) for row in list_topups_for_admin(limit=300))
+    rows.extend(
+        _decorate_topup(row)
+        for row in list_topups_for_admin(limit=300)
+        if str(row.get("status") or "") != "pending_payment"
+    )
 
     if selected_status != "all":
         rows = [row for row in rows if row["status_bucket"] == selected_status]
@@ -184,7 +188,11 @@ async def admin_payment_reviews(
     }
 
     all_external = [_decorate_external(row) for row in list_payment_reviews(limit=300)]
-    all_topups = [_decorate_topup(row) for row in list_topups_for_admin(limit=300)]
+    all_topups = [
+        _decorate_topup(row)
+        for row in list_topups_for_admin(limit=300)
+        if str(row.get("status") or "") != "pending_payment"
+    ]
     all_rows = all_external + all_topups
     counts = {
         bucket: sum(1 for row in all_rows if row["status_bucket"] == bucket)
