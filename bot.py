@@ -3997,6 +3997,7 @@ async def finalize_accepted_pending_payment(
     interaction: discord.Interaction,
     customer_id: int,
     channel_id: int,
+    external_review_approved: bool = False,
 ) -> None:
     guild = interaction.guild
 
@@ -4009,8 +4010,16 @@ async def finalize_accepted_pending_payment(
         return
 
     data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+    current_status = str(data.get("status") or "").lower().strip()
 
-    if str(data.get("status") or "").lower() != "accepted_pending_pay":
+    if current_status == "payment_review_pending" and not external_review_approved:
+        await interaction.response.send_message(
+            "這張單的付款已送出網站審核，請等待客服確認；不需要重複送出。",
+            ephemeral=True,
+        )
+        return
+
+    if current_status != "accepted_pending_pay":
         await interaction.response.send_message("這張單目前不是等待付款狀態。", ephemeral=True)
         return
 
@@ -4035,6 +4044,160 @@ async def finalize_accepted_pending_payment(
 
     if dispatch_message_id is None:
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
+        return
+
+    if str(payment_method) != WALLET_PAYMENT_METHOD and not external_review_approved:
+        try:
+            precheck_order_point_benefit_for_payment(data, customer_id)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        web_order_id = _to_int(data.get("web_order_id"))
+        if web_order_id is None:
+            try:
+                from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
+                web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+            except Exception:
+                web_order_id = None
+
+        if web_order_id is None:
+            await interaction.response.send_message(
+                "找不到網站訂單資料，暫時無法建立付款審核，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        customer_member = guild.get_member(customer_id)
+        customer_name = (
+            getattr(customer_member, "display_name", None)
+            or getattr(interaction.user, "display_name", None)
+            or getattr(interaction.user, "name", None)
+            or str(customer_id)
+        )
+
+        try:
+            review = create_or_resubmit_payment_review(
+                review_type="order",
+                reference_id=int(web_order_id),
+                order_id=int(web_order_id),
+                ticket_channel_id=channel_id,
+                customer_discord_id=customer_id,
+                customer_display_name=customer_name,
+                amount=amount,
+                payment_method=str(payment_method),
+            )
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.response.send_message(
+                f"建立付款審核失敗：{type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        data["payment_review_id"] = int(review["id"])
+        data["payment_review_no"] = str(review.get("review_no") or "")
+        data["payment_review_submitted_at"] = get_taipei_now_iso()
+        data["payment_review_submitted_by"] = interaction.user.id
+        data["status"] = "payment_review_pending"
+        data["closed"] = False
+        remember_order_data(channel_id, data)
+        save_bot_data()
+
+        category_label = str(
+            data.get("category_label")
+            or ORDER_CATEGORY_LABELS.get(
+                data.get("category"),
+                data.get("category") or "未紀錄",
+            )
+        )
+        item = str(data.get("item") or "未紀錄")
+        quantity = _to_int(data.get("quantity"), 1) or 1
+        companion_preference = data.get("companion_preference")
+
+        payment_channel_id = _to_int(
+            data.get("payment_channel_id"),
+            interaction.channel.id,
+        ) or interaction.channel.id
+        payment_message_id = _to_int(data.get("payment_message_id"))
+        payment_channel = guild.get_channel(payment_channel_id)
+
+        review_embed = build_payment_method_embed(
+            customer_id=customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            payment_method=str(payment_method),
+            companion_preference=companion_preference,
+            amount=amount,
+        )
+        review_embed.add_field(
+            name="付款狀態",
+            value=(
+                "已送出網站付款審核。\n"
+                "請把付款成功／轉帳完成截圖上傳到本票口，等待客服核對。"
+            ),
+            inline=False,
+        )
+
+        if isinstance(payment_channel, discord.TextChannel) and payment_message_id is not None:
+            try:
+                payment_message = await payment_channel.fetch_message(payment_message_id)
+                await payment_message.edit(
+                    embed=review_embed,
+                    view=PaymentMethodView(
+                        customer_id=customer_id,
+                        channel_id=channel_id,
+                        submitted=True,
+                        selected_method=str(payment_method),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+            except discord.HTTPException:
+                pass
+
+        await interaction.channel.send(
+            (
+                f"💳 **付款已送出網站審核**\n"
+                f"老闆：<@{customer_id}>\n"
+                f"訂單：**{category_label}｜{item} x{quantity}**\n"
+                f"金額：**{amount:,}T**\n"
+                f"付款方式：**{payment_method}**\n"
+                f"審核編號：`{review.get('review_no')}`\n\n"
+                "📸 **請老闆把付款成功／轉帳完成截圖直接上傳到這個票口，方便客服核對。**\n"
+                "客服會在網站「付款審核」確認款項；審核通過後訂單才會正式成立。"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+
+        await send_order_log(
+            guild,
+            title="訂單付款已送審",
+            fields=[
+                ("顧客", f"<@{customer_id}>", True),
+                ("訂單", f"{category_label}｜{item} x{quantity}", False),
+                ("金額", format_t_amount(amount), True),
+                ("付款方式", str(payment_method), True),
+                ("審核編號", str(review.get("review_no") or review.get("id")), True),
+                ("票口", interaction.channel.mention, False),
+            ],
+            color=discord.Color.gold(),
+        )
+
+        await interaction.response.send_message(
+            "付款已送出網站審核。請把付款截圖上傳到這個票口，等待客服確認。",
+            ephemeral=True,
+        )
         return
 
     data["payment_finalizing"] = True
