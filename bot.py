@@ -11488,6 +11488,15 @@ async def _apply_approved_order_payment_review(review: dict) -> None:
     if str(data.get("status") or "").lower() == "active":
         return
 
+    from shared.order_acceptance import get_acceptance_state
+    acceptance_state = get_acceptance_state(
+        int(review.get("order_id") or review.get("reference_id") or 0)
+    )
+    if not acceptance_state.is_full:
+        raise RuntimeError(
+            "接單人數已變動，尚未滿人，不能完成付款審核。"
+        )
+
     actor = await _resolve_payment_review_actor(
         guild,
         user_id=review.get("approved_by_discord_id"),
