@@ -1499,7 +1499,6 @@ class WorkerTipPaymentConfirmView(discord.ui.View):
                 "此筆已列入指定成員的獨立雞腿薪資。"
             ),
             view=None,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
         await _notify_worker_tip_paid(interaction, tip_row)
         await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
@@ -1536,7 +1535,6 @@ class WorkerTipPaymentConfirmView(discord.ui.View):
                 f"原付款方式：**{tip_row['payment_method']}**"
             ),
             view=None,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
         )
         await _log_worker_tip("cancelled", interaction=interaction, tip_row=tip_row)
 
