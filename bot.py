@@ -11698,7 +11698,9 @@ async def _apply_approved_tip_payment_review(review: dict) -> None:
         display_name=review.get("approved_by_display_name"),
     )
 
-    if str(tip_row["payment_status"] or "") != "paid":
+    was_already_paid = str(tip_row["payment_status"] or "") == "paid"
+
+    if not was_already_paid:
         tip_row = mark_worker_tip_paid(
             tip_id,
             confirmed_by=actor,
@@ -11718,8 +11720,9 @@ async def _apply_approved_tip_payment_review(review: dict) -> None:
         user=actor,
     )
 
-    await _notify_worker_tip_paid(proxy, tip_row)
-    await _log_worker_tip("paid", interaction=proxy, tip_row=tip_row)
+    if not was_already_paid:
+        await _notify_worker_tip_paid(proxy, tip_row)
+        await _log_worker_tip("paid", interaction=proxy, tip_row=tip_row)
 
     if isinstance(channel, discord.TextChannel):
         await channel.send(
