@@ -11729,7 +11729,16 @@ async def _apply_rejected_tip_payment_review(review: dict) -> None:
 
 async def process_one_payment_review_action(review: dict) -> None:
     review_id = int(review.get("id") or 0)
-    pending_status = str(review.get("status") or "")
+    stored_status = str(review.get("status") or "")
+
+    if stored_status == "processing":
+        pending_status = (
+            REJECTED_PENDING_APPLY
+            if review.get("rejected_at")
+            else APPROVED_PENDING_APPLY
+        )
+    else:
+        pending_status = stored_status
 
     if not review_id or pending_status not in {
         APPROVED_PENDING_APPLY,
@@ -11739,7 +11748,7 @@ async def process_one_payment_review_action(review: dict) -> None:
 
     claimed = mark_payment_review_processing(
         review_id,
-        expected_status=pending_status,
+        expected_status=stored_status,
     )
     if not claimed:
         return
