@@ -427,6 +427,49 @@ def mark_payment_review_rejection_applied(
         conn.commit()
 
 
+def retry_payment_review_apply(
+    review_id: int,
+    *,
+    db_file: str | Path | None = None,
+) -> dict[str, Any]:
+    ensure_payment_review_tables(db_file)
+    now = _now_iso()
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM payment_reviews WHERE id = ?",
+            (int(review_id),),
+        ).fetchone()
+
+        if row is None:
+            raise ValueError("找不到這筆付款審核。")
+        if str(row["status"]) != PAYMENT_REVIEW_APPLY_ERROR:
+            raise ValueError("只有套用失敗的付款可以重新套用。")
+
+        conn.execute(
+            """
+            UPDATE payment_reviews
+            SET status = ?,
+                apply_error = NULL,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                PAYMENT_REVIEW_APPROVED,
+                now,
+                int(review_id),
+            ),
+        )
+        conn.commit()
+
+        result = conn.execute(
+            "SELECT * FROM payment_reviews WHERE id = ?",
+            (int(review_id),),
+        ).fetchone()
+        return dict(result)
+
+
 def mark_payment_review_apply_error(
     review_id: int,
     error: str,
