@@ -39,10 +39,10 @@
         </a>
 
         <a
-            class="{% if _p.startswith('/admin/topups') %}active{% endif %}"
-            href="/admin/topups"
+            class="{% if _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') %}active{% endif %}"
+            href="/admin/payment-reviews"
         >
-            儲值審核
+            付款審核
         </a>
 
         <a
