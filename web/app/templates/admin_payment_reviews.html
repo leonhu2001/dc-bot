@@ -88,15 +88,27 @@
                       <button class="pay-review-action reject" type="submit">駁回</button>
                     </form>
                   {% else %}
-                    <form method="post" action="/admin/payment-reviews/{{ item.id }}/approve">
-                      <button class="pay-review-action" type="submit">確認收款</button>
-                    </form>
-                    <form method="post" action="/admin/payment-reviews/{{ item.id }}/reject">
-                      <input class="pay-review-reason" name="reason" value="客服未確認到款項" aria-label="駁回原因">
-                      <button class="pay-review-action reject" type="submit">駁回</button>
-                    </form>
+                    {% if item.can_approve %}
+                      <form method="post" action="/admin/payment-reviews/{{ item.id }}/approve">
+                        <button class="pay-review-action" type="submit">確認收款</button>
+                      </form>
+                    {% endif %}
+                    {% if item.can_retry %}
+                      <form method="post" action="/admin/payment-reviews/{{ item.id }}/retry">
+                        <button class="pay-review-action" type="submit">重新套用</button>
+                      </form>
+                    {% endif %}
+                    {% if item.can_reject %}
+                      <form method="post" action="/admin/payment-reviews/{{ item.id }}/reject">
+                        <input class="pay-review-reason" name="reason" value="客服未確認到款項" aria-label="駁回原因">
+                        <button class="pay-review-action reject" type="submit">駁回</button>
+                      </form>
+                    {% endif %}
                   {% endif %}
                 </div>
+                {% if item.apply_error %}
+                  <div class="pay-review-muted">錯誤：{{ item.apply_error }}</div>
+                {% endif %}
               {% else %}
                 —
               {% endif %}
