@@ -3641,6 +3641,33 @@ async def restore_acceptance_payment_panel_for_order(
         if row is None:
             return False, f"找不到 WEB-{order_id}。"
 
+        try:
+            review_row = conn.execute(
+                """
+                SELECT id, status
+                FROM payment_reviews
+                WHERE review_type = 'order'
+                  AND reference_id = ?
+                  AND status IN (
+                      'pending_review',
+                      'approved_pending_apply',
+                      'rejected_pending_apply',
+                      'processing'
+                  )
+                LIMIT 1
+                """,
+                (int(order_id),),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            review_row = None
+
+        if review_row is not None:
+            return (
+                False,
+                f"WEB-{order_id} 目前正在網站付款審核中，"
+                f"review_id={review_row['id']} status={review_row['status']}，略過付款 panel 修復。",
+            )
+
         row_keys = set(row.keys())
         current_status = str(row["status"] or "").lower()
 
