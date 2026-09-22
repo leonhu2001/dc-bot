@@ -10,11 +10,13 @@ from fastapi.templating import Jinja2Templates
 from services.payment_reviews import (
     PAYMENT_REVIEW_APPLIED,
     PAYMENT_REVIEW_APPROVED,
+    PAYMENT_REVIEW_APPLY_ERROR,
     PAYMENT_REVIEW_PENDING,
     PAYMENT_REVIEW_REJECTED,
     approve_payment_review,
     list_payment_reviews,
     reject_payment_review,
+    retry_payment_review_apply,
     source_label,
 )
 from services.topups import (
@@ -58,7 +60,7 @@ def _review_status_label(status: str | None) -> str:
         PAYMENT_REVIEW_APPROVED: "已核准，等待 Bot 套用",
         PAYMENT_REVIEW_APPLIED: "已完成",
         PAYMENT_REVIEW_REJECTED: "已駁回",
-        "apply_error": "套用失敗",
+        PAYMENT_REVIEW_APPLY_ERROR: "套用失敗",
     }.get(value, value or "未知")
 
 
@@ -78,7 +80,17 @@ def _review_entry(row: dict) -> dict:
     item["amount_text"] = f"{int(item.get('amount') or 0):,}T"
     item["payment_method_label"] = str(item.get("payment_method") or "—")
     item["status_label"] = _review_status_label(item.get("status"))
-    item["is_pending"] = str(item.get("status") or "") == PAYMENT_REVIEW_PENDING
+    review_status = str(item.get("status") or "")
+    item["is_pending"] = review_status in {
+        PAYMENT_REVIEW_PENDING,
+        PAYMENT_REVIEW_APPLY_ERROR,
+    }
+    item["can_approve"] = review_status == PAYMENT_REVIEW_PENDING
+    item["can_retry"] = review_status == PAYMENT_REVIEW_APPLY_ERROR
+    item["can_reject"] = review_status in {
+        PAYMENT_REVIEW_PENDING,
+        PAYMENT_REVIEW_APPLY_ERROR,
+    }
     item["created_sort"] = str(item.get("created_at") or "")
     item["customer_display"] = (
         str(item.get("customer_display_name") or "").strip()
@@ -184,6 +196,24 @@ async def admin_payment_review_approve(request: Request, review_id: int):
     return _redirect(
         "ok",
         "付款已核准，Bot 將自動回原票口完成後續。",
+        status="pending",
+    )
+
+
+@router.post("/admin/payment-reviews/{review_id}/retry")
+async def admin_payment_review_retry(request: Request, review_id: int):
+    user = require_admin(request)
+    if not user:
+        return RedirectResponse("/admin", status_code=303)
+
+    try:
+        retry_payment_review_apply(review_id)
+    except ValueError as exc:
+        return _redirect("error", exc, status="pending")
+
+    return _redirect(
+        "ok",
+        "已重新排入 Bot 套用付款結果。",
         status="pending",
     )
 
