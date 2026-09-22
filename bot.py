@@ -4263,11 +4263,8 @@ async def finalize_accepted_pending_payment(
         data["amount_text"] = _format_plain_amount(amount) if "_format_plain_amount" in globals() else format_t_amount(amount)
         data["payment_submitted_at"] = get_taipei_now_iso()
         data["payment_submitted_by"] = interaction.user.id
-        data["status"] = "active"
         data["closed"] = False
-        if data.get("payment_review_approved"):
-            data["payment_review_pending"] = False
-            data["payment_review_applied_at"] = get_taipei_now_iso()
+        data["payment_processing"] = True
         remember_order_data(channel_id, data)
 
         reward_result = await add_customer_reward_from_order(
@@ -4439,7 +4436,13 @@ async def finalize_accepted_pending_payment(
             operation_message = await interaction.channel.send(embed=operation_embed, view=StaffOrderOperationView())
             data["operation_panel_message_id"] = operation_message.id
 
+        data["status"] = "active"
+        data["closed"] = False
+        data.pop("payment_processing", None)
         data.pop("payment_finalizing", None)
+        if data.get("payment_review_approved"):
+            data["payment_review_pending"] = False
+            data["payment_review_applied_at"] = get_taipei_now_iso()
         if data.get("payment_review_approved") and data.get("payment_review_id"):
             data["payment_review_finalized_id"] = int(data["payment_review_id"])
         remember_order_data(channel_id, data)
@@ -4469,6 +4472,7 @@ async def finalize_accepted_pending_payment(
         )
 
     except Exception as exc:
+        data.pop("payment_processing", None)
         data.pop("payment_finalizing", None)
         remember_order_data(channel_id, data)
         save_bot_data()
