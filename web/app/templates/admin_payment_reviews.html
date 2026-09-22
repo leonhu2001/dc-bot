@@ -52,7 +52,9 @@
             </td>
             <td>
               {{ item.source_display }}
-              {% if item.ticket_channel_id %}
+              {% if item.ticket_url %}
+                <div class="pay-review-muted"><a class="pay-review-link" href="{{ item.ticket_url }}" target="_blank" rel="noopener">查看原票口</a></div>
+              {% elif item.ticket_channel_id %}
                 <div class="pay-review-muted">票口 {{ item.ticket_channel_id }}</div>
               {% endif %}
             </td>
