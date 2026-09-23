@@ -359,7 +359,7 @@ _add(OrderRule(
 ))
 
 _add(OrderRule(
-    "general", "basic_sweet_double", "甜蜜單｜雙陪", "hourly", 850, "H",
+    "general", "basic_sweet_double", "甜蜜單｜雙陪", "hourly", 1314, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
     required_staff_count=2,
