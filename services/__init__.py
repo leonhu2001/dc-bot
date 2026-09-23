@@ -13,7 +13,7 @@ import importlib.util
 from . import order_rules as _order_rules
 
 
-# 2026-09-16 confirmed storefront prices.
+# 2026-09-24 confirmed storefront prices.
 _RULE_UPDATES: dict[str, dict] = {
     # Delta Force
     "basic_entertain_single": {"price": 320},
@@ -26,8 +26,8 @@ _RULE_UPDATES: dict[str, dict] = {
         "price": 1000,
         "note": "保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
     },
-    "basic_sweet_single": {"price": 450},
-    "basic_sweet_double": {"price": 850},
+    "basic_sweet_single": {"price": 520},
+    "basic_sweet_double": {"price": 1314},
     "basic_trial_500": {"price": 450},
     "basic_trial_1000": {"price": 900},
     "basic_bet_1000": {"price": 800},
