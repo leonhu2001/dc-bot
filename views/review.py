@@ -1372,19 +1372,31 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
                 )
                 return
 
+            base_order_no = str(order["bot_order_no"] or f"WEB-{order['id']}")
+            wallet_reference = f"{base_order_no}:TIP-{tip_id}"
+
             try:
                 tx = await handler(
                     customer_id=self.customer_id,
                     amount=self.amount,
                     order_channel_id=channel.id,
-                    order_no=str(order["bot_order_no"] or f"WEB-{order['id']}"),
+                    order_no=wallet_reference,
                     worker_id=str(self.target.get("staff_id") or ""),
                     worker_name=str(self.target.get("display_name") or self.target.get("staff_id") or ""),
                     operator=interaction.user,
                 )
             except Exception as exc:
                 mark_worker_tip_cancelled(tip_id, cancelled_by=interaction.user)
-                await interaction.followup.send(str(exc), ephemeral=True)
+                error_text = str(exc).strip()
+                if "duplicate wallet transaction reference" in error_text.lower():
+                    error_text = (
+                        "雞腿付款未完成：系統偵測到重複交易，"
+                        "本次操作已取消且不會重複扣款。請重新開啟「加雞腿」再試一次。"
+                    )
+                elif not error_text:
+                    error_text = "雞腿付款失敗，這筆雞腿沒有扣款，請重新操作。"
+
+                await interaction.followup.send(error_text, ephemeral=True)
                 return
 
             tip_row = mark_worker_tip_paid(

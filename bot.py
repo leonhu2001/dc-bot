@@ -1997,16 +1997,45 @@ def adjust_customer_wallet_balance(
         raise ValueError("異動金額不能為 0。")
 
     conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
 
     try:
         conn.execute("BEGIN IMMEDIATE")
+
+        normalized_order_no = str(order_no or "").strip() or None
+        normalized_type = str(tx_type or "adjustment").strip() or "adjustment"
+
+        # 同一交易識別碼重送時必須保持冪等，避免 Discord 重送造成二次扣款；
+        # 也避免把資料庫 trigger 的英文錯誤直接丟給顧客。
+        if normalized_order_no:
+            existing = conn.execute(
+                """
+                SELECT *
+                FROM wallet_transactions
+                WHERE customer_discord_id = ?
+                  AND order_no = ?
+                  AND type = ?
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                (customer_id_text, normalized_order_no, normalized_type),
+            ).fetchone()
+
+            if existing is not None:
+                if int(existing["amount"] or 0) != amount:
+                    raise ValueError(
+                        "同一錢包交易識別碼已存在，但金額不同；已拒絕重複入帳。"
+                    )
+
+                conn.rollback()
+                return dict(existing)
 
         row = conn.execute(
             "SELECT balance FROM customer_wallets WHERE customer_discord_id = ?",
             (customer_id_text,),
         ).fetchone()
 
-        balance_before = int(row[0] or 0) if row is not None else 0
+        balance_before = int(row["balance"] or 0) if row is not None else 0
         balance_after = balance_before + amount
 
         if balance_after < 0 and not allow_negative:
@@ -2056,9 +2085,9 @@ def adjust_customer_wallet_balance(
                 amount,
                 balance_before,
                 balance_after,
-                str(tx_type or "adjustment"),
+                normalized_type,
                 str(order_channel_id) if order_channel_id is not None else None,
-                str(order_no) if order_no is not None else None,
+                normalized_order_no,
                 operator_id or None,
                 operator_name,
                 str(note or "").strip() or None,
