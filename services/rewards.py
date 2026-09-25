@@ -250,6 +250,57 @@ def get_current_reward_points(data: dict) -> int:
     adjustment = int(data.get("point_adjustment", 0) or 0)
     return max(0, base_points + adjustment)
 
+
+def correct_customer_reward_amount(
+    customer_id: int,
+    old_amount: int,
+    new_amount: int,
+) -> dict[str, Any]:
+    """Correct an already-counted order amount without double-counting rewards.
+
+    The order count and manual point adjustments stay unchanged. Normal VIP
+    progress is recalculated from the corrected cumulative spend so both upward
+    and downward threshold crossings are reflected. If the member is currently
+    in a manual/downgrade reset period, preserve that reset state instead of
+    guessing historical reset boundaries.
+    """
+    customer_id = int(customer_id)
+    old_amount = max(0, int(old_amount or 0))
+    new_amount = max(0, int(new_amount or 0))
+    delta = new_amount - old_amount
+
+    data = get_customer_reward_data(customer_id)
+    old_total_spent = max(0, int(data.get("total_spent", 0) or 0))
+    old_points = get_current_reward_points(data)
+    old_level = get_effective_member_level(data)
+    reset_active = has_active_vip_progress_reset(data)
+
+    data["total_spent"] = max(0, old_total_spent + delta)
+
+    if not reset_active:
+        data["vip_level_index"] = get_member_level_index_by_total_spent(
+            int(data["total_spent"])
+        )
+        data["vip_progress_base_total_spent"] = None
+        data["vip_progress_reset_active"] = False
+
+    data["points"] = get_current_reward_points(data)
+    new_level = get_effective_member_level(data)
+
+    return {
+        "customer_id": customer_id,
+        "old_amount": old_amount,
+        "new_amount": new_amount,
+        "delta": delta,
+        "old_total_spent": old_total_spent,
+        "new_total_spent": int(data["total_spent"]),
+        "old_points": old_points,
+        "new_points": int(data["points"]),
+        "old_level": str(old_level.get("name") or "普通魔丸"),
+        "new_level": str(new_level.get("name") or "普通魔丸"),
+        "reset_preserved": bool(reset_active),
+    }
+
 def get_customer_reward_data(user_id: int) -> dict:
     data = _CUSTOMER_REWARDS.setdefault(
         user_id,
