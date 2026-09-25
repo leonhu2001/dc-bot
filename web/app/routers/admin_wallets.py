@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 import sqlite3
 
-from fastapi import APIRouter, Request, Query, HTTPException
+from fastapi import APIRouter, Request, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -248,9 +248,6 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
             (str(customer_discord_id),),
         ).fetchone()
 
-        if wallet_row is None:
-            raise HTTPException(status_code=404, detail="找不到此顧客錢包。")
-
         tx_rows = conn.execute(
             """
             SELECT
@@ -274,7 +271,16 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
             (str(customer_discord_id), safe_limit),
         ).fetchall()
 
-    wallet = dict(wallet_row)
+    if wallet_row is not None:
+        wallet = dict(wallet_row)
+    else:
+        latest_tx = tx_rows[0] if tx_rows else None
+        wallet = {
+            "customer_discord_id": str(customer_discord_id),
+            "balance": int(latest_tx["balance_after"] or 0) if latest_tx is not None else 0,
+            "updated_at": latest_tx["created_at"] if latest_tx is not None else None,
+        }
+
     customer_id = str(wallet.get("customer_discord_id") or "")
     display_names = fetch_customer_display_names([customer_id])
     wallet["customer_display_name"] = display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
