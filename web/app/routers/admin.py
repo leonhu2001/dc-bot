@@ -3336,6 +3336,26 @@ async def admin_order_workspace_edit_r8(
 
         db.flush()
 
+        previous_amount = _mw4a2r6_safe_int(
+            before.get("amount"),
+            0,
+        ) or 0
+
+        if int(previous_amount) != int(amount):
+            create_sync_event(
+                db,
+                event_type=SyncEventType.ORDER_UPDATED,
+                order_id=int(order_id),
+                payload={
+                    "order_id": int(order_id),
+                    "source": "admin_order_workspace",
+                    "sync_kind": "order_amount_correction",
+                    "old_amount": int(previous_amount),
+                    "new_amount": int(amount),
+                    "admin_discord_id": str(user.get("id") or ""),
+                },
+            )
+
         active_assignment = db.execute(
             text(
                 """
