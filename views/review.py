@@ -723,92 +723,97 @@ def build_post_close_status_embed(
 ) -> discord.Embed:
     status = get_post_close_status(ticket_channel_id, customer_id)
     targets = status["targets"]
+    favorite_ids = set(status["favorite_ids"])
+    tip_rows = status["tip_rows"]
 
-    review_lines: list[str] = []
-    if status["skipped_all"]:
-        review_lines.append("⏭️ 已選擇不留評價")
+    tips_by_staff: dict[str, list[sqlite3.Row]] = {}
+    for row in tip_rows:
+        staff_id = str(row["worker_discord_id"] or "")
+        tips_by_staff.setdefault(staff_id, []).append(row)
 
-    if not targets:
-        review_lines.append("尚無可評價的接單成員資料")
-    else:
-        for item in targets:
-            name = str(item.get("display_name") or item.get("staff_id") or "成員")
-            if item.get("reviewed"):
-                rating = int(item.get("rating") or 0)
-                review_lines.append(
-                    f"✅ {name}｜{'⭐' * rating}（{rating}/5）"
-                )
-            elif not status["skipped_all"]:
-                review_lines.append(f"▫️ {name}｜尚未評價")
-
-    tip_lines: list[str] = []
-    paid_total = int(status["tip_paid_total"] or 0)
-    pending_total = int(status["tip_pending_total"] or 0)
-
-    if paid_total:
-        tip_lines.append(f"✅ 已付款：{paid_total:,}T")
-    if pending_total:
-        tip_lines.append(f"⏳ 待客服確認：{pending_total:,}T")
-
-    for row in status["tip_rows"]:
-        tip_status = str(row["payment_status"] or "")
-        if tip_status == "paid":
-            label = "已付款"
-            icon = "✅"
-        elif tip_status == "pending_review":
-            label = "待客服確認"
-            icon = "⏳"
-        else:
-            label = "處理中"
-            icon = "⏳"
-
-        worker_name = str(
-            row["worker_display_name"]
-            or row["worker_discord_id"]
-            or "成員"
-        )
-        tip_lines.append(
-            f"{icon} {worker_name}｜{int(row['amount'] or 0):,}T｜{label}"
-        )
-
-    if not tip_lines:
-        tip_lines.append("尚未加雞腿")
-
-    favorite_names = [
-        str(item.get("display_name") or item.get("staff_id") or "成員")
-        for item in targets
-        if str(item.get("staff_id") or "") in status["favorite_ids"]
+    description_lines = [
+        "這裡顯示本次服務的正式結果；操作與修改會在只有你看得到的面板中進行。"
     ]
-    if favorite_names:
-        favorite_text = "❤️ 已收藏：" + "、".join(favorite_names)
-    elif targets:
-        favorite_text = "尚未收藏本次成員"
-    else:
-        favorite_text = "尚無可收藏的接單成員資料"
+    if status["skipped_all"]:
+        description_lines.append("⏭️ 老闆已選擇不留評價。")
 
     embed = discord.Embed(
-        title="結單後操作狀態",
-        description="操作完成後，此面板會自動更新目前狀態。",
+        title="本次服務紀錄",
+        description="\n".join(description_lines),
         color=discord.Color.gold(),
     )
-    embed.add_field(
-        name="⭐ 評價",
-        value=_clip_post_close_value("\n".join(review_lines)),
-        inline=False,
-    )
-    embed.add_field(
-        name="🍗 雞腿",
-        value=_clip_post_close_value("\n".join(tip_lines)),
-        inline=False,
-    )
-    embed.add_field(
-        name="❤️ 收藏",
-        value=_clip_post_close_value(favorite_text),
-        inline=False,
-    )
-    embed.set_footer(text="看到狀態更新，就代表操作已成功記錄。")
-    return embed
 
+    if not targets:
+        embed.add_field(
+            name="服務成員",
+            value="目前找不到接單成員資料。",
+            inline=False,
+        )
+    else:
+        for item in targets[:20]:
+            staff_id = str(item.get("staff_id") or "")
+            name = str(item.get("display_name") or staff_id or "成員")
+            lines: list[str] = []
+
+            if item.get("reviewed"):
+                rating = int(item.get("rating") or 0)
+                lines.append(f"⭐ **評星**｜{'⭐' * rating}（{rating}/5）")
+                comment = str(item.get("comment") or "").strip()
+                lines.append(
+                    "💬 **評價**｜"
+                    + (_clip_post_close_value(comment, 420) if comment else "未填寫文字評價")
+                )
+            elif status["skipped_all"]:
+                lines.append("⭐ **評星**｜已略過")
+                lines.append("💬 **評價**｜已選擇不留評價")
+            else:
+                lines.append("⭐ **評星**｜尚未評價")
+                lines.append("💬 **評價**｜尚未填寫")
+
+            staff_tips = tips_by_staff.get(staff_id, [])
+            if staff_tips:
+                tip_parts: list[str] = []
+                for row in staff_tips:
+                    amount = int(row["amount"] or 0)
+                    tip_status = str(row["payment_status"] or "")
+                    if tip_status == "paid":
+                        label = "✅ 已付款"
+                    elif tip_status == "pending_review":
+                        label = "⏳ 待客服確認"
+                    else:
+                        label = "⏳ 處理中"
+                    tip_parts.append(f"{amount:,}T {label}")
+                lines.append("🍗 **雞腿**｜" + "、".join(tip_parts))
+            else:
+                lines.append("🍗 **雞腿**｜尚未加")
+
+            lines.append(
+                "❤️ **收藏**｜"
+                + ("已收藏" if staff_id in favorite_ids else "尚未收藏")
+            )
+
+            embed.add_field(
+                name=name,
+                value=_clip_post_close_value("\n".join(lines)),
+                inline=False,
+            )
+
+    paid_total = int(status["tip_paid_total"] or 0)
+    pending_total = int(status["tip_pending_total"] or 0)
+    if paid_total or pending_total:
+        totals: list[str] = []
+        if paid_total:
+            totals.append(f"已付款 {paid_total:,}T")
+        if pending_total:
+            totals.append(f"待確認 {pending_total:,}T")
+        embed.add_field(
+            name="雞腿總覽",
+            value="｜".join(totals),
+            inline=False,
+        )
+
+    embed.set_footer(text="公開 Embed = 正式結果｜私人面板 = 選擇、預覽與修改")
+    return embed
 
 def _is_post_close_panel_message(message: discord.Message) -> bool:
     for row in getattr(message, "components", []) or []:
