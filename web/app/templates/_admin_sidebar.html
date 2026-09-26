@@ -60,6 +60,13 @@
         </a>
 
         <a
+            class="{% if _p.startswith('/admin/tickets') %}active{% endif %}"
+            href="/admin/tickets"
+        >
+            票口紀錄
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/audit') %}active{% endif %}"
             href="/admin/audit"
         >
