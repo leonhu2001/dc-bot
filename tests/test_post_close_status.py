@@ -134,6 +134,7 @@ def test_post_close_embed_reflects_review_tip_and_favorite(tmp_path, monkeypatch
     embed = review.build_post_close_status_embed(555, 100)
     fields = {field.name: field.value for field in embed.fields}
 
+    assert embed.title == "莫莫"
     assert "莫莫" in fields
     assert "5/5" in fields["莫莫"]
     assert "很好聊，也很有耐心" in fields["莫莫"]
