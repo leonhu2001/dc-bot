@@ -1568,6 +1568,69 @@ async def _notify_worker_tip_paid(interaction: discord.Interaction, tip_row: sql
             pass
 
 
+def _worker_tip_preview_text(*, target: dict, amount: int) -> str:
+    return (
+        f"{WORKER_TIP_POLICY_TEXT}\n\n"
+        f"指定成員：**{target.get('display_name') or target.get('staff_id')}**\n"
+        f"雞腿金額：**{int(amount):,}T**\n\n"
+        "確認金額後，請選擇付款方式；付款前仍可修改金額。"
+    )
+
+
+class WorkerTipAmountEditModal(discord.ui.Modal, title="修改雞腿金額"):
+    def __init__(
+        self,
+        *,
+        customer_id: int,
+        ticket_channel_id: int,
+        target: dict,
+        amount: int,
+    ):
+        super().__init__(timeout=300)
+        self.customer_id = int(customer_id)
+        self.ticket_channel_id = int(ticket_channel_id)
+        self.target = dict(target)
+        self.amount_input = discord.ui.TextInput(
+            label="雞腿金額",
+            default=str(int(amount)),
+            placeholder="請輸入正整數，例如：100、500、1000",
+            required=True,
+            min_length=1,
+            max_length=9,
+        )
+        self.add_item(self.amount_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message(
+                "只有這張票口的老闆可以修改雞腿金額。",
+                ephemeral=True,
+            )
+            return
+
+        raw = str(self.amount_input.value or "").strip().replace(",", "")
+        if not raw.isdigit() or int(raw) <= 0:
+            await interaction.response.send_message(
+                "雞腿金額必須是大於 0 的正整數。",
+                ephemeral=True,
+            )
+            return
+
+        amount = int(raw)
+        await interaction.response.edit_message(
+            content=_worker_tip_preview_text(
+                target=self.target,
+                amount=amount,
+            ),
+            view=WorkerTipPaymentMethodView(
+                customer_id=self.customer_id,
+                ticket_channel_id=self.ticket_channel_id,
+                target=self.target,
+                amount=amount,
+            ),
+        )
+
+
 class WorkerTipAmountModal(discord.ui.Modal, title="🍗 加雞腿"):
     amount = discord.ui.TextInput(
         label="雞腿金額",
@@ -1585,27 +1648,25 @@ class WorkerTipAmountModal(discord.ui.Modal, title="🍗 加雞腿"):
 
     async def on_submit(self, interaction: discord.Interaction):
         if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("只有這張票口的老闆可以加雞腿。", ephemeral=True)
+            await interaction.response.send_message(
+                "只有這張票口的老闆可以加雞腿。",
+                ephemeral=True,
+            )
             return
 
         raw = str(self.amount.value or "").strip().replace(",", "")
-
-        if not raw.isdigit():
-            await interaction.response.send_message("雞腿金額只能輸入正整數。", ephemeral=True)
+        if not raw.isdigit() or int(raw) <= 0:
+            await interaction.response.send_message(
+                "雞腿金額必須是大於 0 的正整數。",
+                ephemeral=True,
+            )
             return
 
         amount = int(raw)
-
-        if amount <= 0:
-            await interaction.response.send_message("雞腿金額必須大於 0。", ephemeral=True)
-            return
-
         await interaction.response.send_message(
-            (
-                f"{WORKER_TIP_POLICY_TEXT}\n\n"
-                f"指定成員：**{self.target.get('display_name') or self.target.get('staff_id')}**\n"
-                f"雞腿金額：**{amount:,}T**\n\n"
-                "請選擇付款方式。"
+            _worker_tip_preview_text(
+                target=self.target,
+                amount=amount,
             ),
             ephemeral=True,
             view=WorkerTipPaymentMethodView(
