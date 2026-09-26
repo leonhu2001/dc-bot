@@ -1,0 +1,51 @@
+{% extends "site_layout.html" %}
+{% block content %}
+<style>
+.tx-page{width:min(1180px,calc(100% - 28px));margin:55px auto 90px}
+.tx-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin-bottom:22px}
+.tx-kicker{color:#dfb75c;font-size:11px;font-weight:900;letter-spacing:.18em}
+.tx-page h1{font-size:clamp(34px,5vw,52px);margin:7px 0 6px}
+.tx-muted{color:rgba(235,232,222,.55)}
+.tx-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tx-btn,.tx-link{display:inline-flex;align-items:center;justify-content:center;padding:11px 13px;border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#eee9dc;text-decoration:none;background:#11110f}
+.tx-search{display:flex;gap:8px;margin:18px 0}
+.tx-search input{flex:1;min-width:0;padding:12px 14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:#0d0d0c;color:#f3eee3}
+.tx-search button{padding:12px 16px;border:1px solid rgba(223,183,92,.45);border-radius:10px;background:rgba(223,183,92,.12);color:#f2d68d;font-weight:800}
+.tx-card{border:1px solid rgba(255,255,255,.085);border-radius:13px;background:#11110f;overflow:hidden;margin-bottom:10px}
+.tx-row{display:grid;grid-template-columns:140px 1.2fr 1fr 90px 140px;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px}
+.tx-row:last-child{border-bottom:0}
+.tx-gold{color:#f2d68d}.tx-row a{color:#f2d68d;text-decoration:none;font-weight:800}
+.tx-empty{padding:30px;text-align:center;color:rgba(235,232,222,.5)}
+@media(max-width:900px){.tx-row{grid-template-columns:105px 1fr 80px}.tx-row>:nth-child(3),.tx-row>:nth-child(5){display:none}}
+@media(max-width:600px){.tx-top{display:block}.tx-actions{margin-top:14px}.tx-row{grid-template-columns:1fr 86px}.tx-row>:nth-child(1),.tx-row>:nth-child(3),.tx-row>:nth-child(5){display:none}}
+</style>
+<section class="tx-page">
+  <div class="tx-top">
+    <div>
+      <div class="tx-kicker">TICKET ARCHIVE</div>
+      <h1>票口聊天紀錄</h1>
+      <div class="tx-muted">客服與總管可查閱。票口刪除前會自動保存聊天內容。</div>
+    </div>
+    <div class="tx-actions"><a class="tx-btn" href="/employee">返回員工中心</a></div>
+  </div>
+
+  <form class="tx-search" method="get" action="/employee/tickets">
+    <input name="q" value="{{ q or '' }}" placeholder="搜尋訂單編號、客人、票口名稱或 Discord ID">
+    <button type="submit">搜尋</button>
+  </form>
+
+  <div class="tx-card">
+    {% for t in transcripts %}
+      <div class="tx-row">
+        <span class="tx-muted">{{ (t.closed_at or '')[:16] }}</span>
+        <span><a href="/employee/tickets/{{ t.id }}">#{{ t.channel_name or t.ticket_channel_id }}</a><br><span class="tx-muted">{{ t.receipt_id or ('WEB-' ~ t.order_id if t.order_id else '未連結訂單') }}</span></span>
+        <span>{{ t.customer_display_name or t.customer_discord_id or '未紀錄顧客' }}</span>
+        <span class="tx-gold">{{ t.message_count or 0 }} 則</span>
+        <span class="tx-muted">關閉：{{ t.closed_by_display_name or t.closed_by_discord_id or '未知' }}</span>
+      </div>
+    {% else %}
+      <div class="tx-empty">目前沒有票口聊天紀錄。</div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
