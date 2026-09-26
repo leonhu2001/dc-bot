@@ -49,7 +49,7 @@ async def _require_customer_service(request: Request) -> dict | RedirectResponse
     return user
 
 
-@router.get("/employee/tickets")
+@router.get("/admin/tickets")
 async def ticket_archive_list(
     request: Request,
     q: str = "",
@@ -65,10 +65,10 @@ async def ticket_archive_list(
 
     response = templates.TemplateResponse(
         request=request,
-        name="employee_ticket_archives.html",
+        name="admin_ticket_archives.html",
         context={
             "title": "票口紀錄｜魔丸娛樂",
-            "page_name": "employee_ticket_archives",
+            "page_name": "admin_ticket_archives",
             "user": user,
             "archives": archives,
             "query": str(q or "").strip(),
@@ -79,7 +79,7 @@ async def ticket_archive_list(
     return response
 
 
-@router.get("/employee/tickets/{archive_id}")
+@router.get("/admin/tickets/{archive_id}")
 async def ticket_archive_detail(
     request: Request,
     archive_id: int,
@@ -94,10 +94,10 @@ async def ticket_archive_detail(
 
     response = templates.TemplateResponse(
         request=request,
-        name="employee_ticket_archive_detail.html",
+        name="admin_ticket_archive_detail.html",
         context={
             "title": "票口聊天紀錄｜魔丸娛樂",
-            "page_name": "employee_ticket_archive_detail",
+            "page_name": "admin_ticket_archive_detail",
             "user": user,
             **bundle,
         },
@@ -105,3 +105,16 @@ async def ticket_archive_detail(
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return response
+
+
+@router.get("/employee/tickets")
+async def legacy_employee_ticket_archive_list(request: Request):
+    return RedirectResponse(url="/admin/tickets", status_code=303)
+
+
+@router.get("/employee/tickets/{archive_id}")
+async def legacy_employee_ticket_archive_detail(request: Request, archive_id: int):
+    return RedirectResponse(
+        url=f"/admin/tickets/{int(archive_id)}",
+        status_code=303,
+    )
