@@ -986,7 +986,7 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內�
             await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
             return
 
-        rating_number, stars = rating_to_stars(self.rating.value)
+        rating_number, _stars = rating_to_stars(self.rating.value)
         if rating_number is None:
             await interaction.response.send_message("星等請輸入 1～5 的數字。", ephemeral=True)
             return
@@ -1033,6 +1033,9 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內�
             await interaction.response.send_message(message, ephemeral=True)
             return
 
+        # 成功狀態直接反映在公開結單 Embed；這裡只 ACK，不再另外留下成功提示。
+        await interaction.response.defer()
+
         await refresh_staff_profile_panel_for_staff(
             guild,
             str(self.target.get("staff_id") or ""),
@@ -1049,35 +1052,13 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內�
             order_content=self.order_content,
         )
 
-        _order, statuses, _skipped_all = build_review_status(self.ticket_channel_id, self.customer_id)
-        all_done = bool(statuses) and all(bool(item.get("reviewed")) for item in statuses)
-
-        name_status = (
-            f"老闆姓名：公開（{customer_display_name}）"
-            if customer_name_public
-            else "老闆姓名：匿名"
+        _order, statuses, _skipped_all = build_review_status(
+            self.ticket_channel_id,
+            self.customer_id,
         )
-
-        text = (
-            f"已送出 {_target_label(self.target)} 的評價：{stars}\n"
-            f"{name_status}\n\n"
-            "全部成員都已評價完成，可以回到票口按「關閉票口」。"
-            if all_done
-            else (
-                f"已送出 {_target_label(self.target)} 的評價：{stars}\n"
-                f"{name_status}\n\n"
-                "還可以繼續評價其他成員。"
-            )
-        )
-
-        await interaction.response.send_message(
-            text,
-            ephemeral=True,
-            view=MemberReviewMenuView(
-                customer_id=self.customer_id,
-                ticket_channel_id=self.ticket_channel_id,
-                order_content=self.order_content,
-            ),
+        all_done = bool(statuses) and all(
+            bool(item.get("reviewed"))
+            for item in statuses
         )
 
         if isinstance(interaction.channel, discord.TextChannel):
@@ -1085,6 +1066,32 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內�
                 interaction.channel,
                 self.customer_id,
             )
+
+        # 多人單還沒評完時，保留原本的選人面板方便繼續；
+        # 全部評完就把只給當事人看的面板收掉，不再多留成功訊息。
+        try:
+            if all_done:
+                await interaction.delete_original_response()
+            else:
+                lines = ["請選擇要評價的成員：", ""]
+                for item in statuses:
+                    status = (
+                        f"已評價 ⭐ {item['rating']}"
+                        if item.get("reviewed")
+                        else "尚未評價"
+                    )
+                    lines.append(f"{_target_label(item)}｜{status}")
+
+                await interaction.edit_original_response(
+                    content="\n".join(lines),
+                    view=MemberReviewMenuView(
+                        customer_id=self.customer_id,
+                        ticket_channel_id=self.ticket_channel_id,
+                        order_content=self.order_content,
+                    ),
+                )
+        except (discord.NotFound, discord.HTTPException):
+            pass
 
 
 
@@ -1623,15 +1630,13 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             await _notify_worker_tip_paid(interaction, tip_row)
             await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
 
-            await interaction.followup.send(
-                (
-                    f"✅ 雞腿付款完成：**{self.amount:,}T** → "
-                    f"**{self.target.get('display_name') or self.target.get('staff_id')}**\n"
-                    f"錢包餘額：**{int(tx.get('balance_after') or 0):,}T**"
-                ),
-                ephemeral=True,
-            )
             await refresh_post_close_panel(channel, self.customer_id)
+
+            # 已付款會直接顯示在公開 Embed；把付款方式選單收掉即可。
+            try:
+                await interaction.delete_original_response()
+            except (discord.NotFound, discord.HTTPException):
+                pass
             return
 
         try:
@@ -1695,12 +1700,14 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
         tip_row = _worker_tip_row(tip_id)
         await _log_worker_tip("pending", interaction=interaction, tip_row=tip_row)
 
-        await interaction.followup.send(
-            (
+        # 這是仍需要使用者下一步動作的提示，因此保留；
+        # 直接取代原付款方式選單，避免再多生一則私人訊息。
+        await interaction.edit_original_response(
+            content=(
                 f"已建立 **{self.amount:,}T** 雞腿並送出網站審核。\n"
                 "請把付款截圖貼在這個票口，等待客服確認。"
             ),
-            ephemeral=True,
+            view=None,
         )
         await refresh_post_close_panel(channel, self.customer_id)
 
@@ -1930,11 +1937,9 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
             await interaction.response.send_message("只有這張票口的老闆可以收藏成員。", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         selected_ids = {str(value) for value in self.values}
-        added = []
-        already = []
 
         for target in self.targets:
             staff_id = str(target.get("staff_id") or "")
@@ -1942,28 +1947,12 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
                 continue
 
             display_name = str(target.get("display_name") or staff_id)
-            inserted = add_staff_favorite(
+            add_staff_favorite(
                 customer_id=self.customer_id,
                 staff_id=staff_id,
                 staff_display_name=display_name,
                 source="post_close",
             )
-
-            if inserted:
-                added.append(display_name)
-            else:
-                already.append(display_name)
-
-        lines = []
-        if added:
-            lines.append("已收藏：" + "、".join(added))
-        if already:
-            lines.append("原本已收藏：" + "、".join(already))
-
-        if not lines:
-            lines.append("沒有新增收藏。")
-
-        await interaction.followup.send("\n".join(lines), ephemeral=True)
 
         guild = interaction.guild
         if guild is not None:
@@ -1979,6 +1968,12 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
                 interaction.channel,
                 self.customer_id,
             )
+
+        # 收藏結果已反映在公開 Embed，收掉私人收藏選單。
+        try:
+            await interaction.delete_original_response()
+        except (discord.NotFound, discord.HTTPException):
+            pass
 
 
 class FavoriteCurrentMembersView(discord.ui.View):
@@ -2164,15 +2159,13 @@ class ReviewButtonView(discord.ui.View):
             if getattr(child, "custom_id", "") in {"review_leave_button", "review_skip_button"}:
                 child.disabled = True
 
+        # 不另外留下私人成功訊息；公開 Embed 會直接顯示「已選擇不留評價」。
+        await interaction.response.defer()
+
         try:
             await interaction.message.edit(view=self)
         except discord.HTTPException:
             pass
-
-        await interaction.response.send_message(
-            "已記錄不留評價。票口不會自動關閉，需要時可以按「關閉票口」。",
-            ephemeral=True,
-        )
 
         try:
             await channel.send(
