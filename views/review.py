@@ -642,6 +642,207 @@ def get_staff_favorites(customer_id: int | str, staff_ids: list[str] | None = No
         conn.close()
 
 
+def _get_post_close_tip_rows(ticket_channel_id: int | str) -> list[sqlite3.Row]:
+    ensure_review_tables()
+    conn = _connect()
+    try:
+        return conn.execute(
+            """
+            SELECT
+                worker_discord_id,
+                worker_display_name,
+                amount,
+                payment_method,
+                payment_status
+            FROM worker_tips
+            WHERE ticket_channel_id = ?
+              AND payment_status <> 'cancelled'
+            ORDER BY id ASC
+            """,
+            (str(ticket_channel_id),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def get_post_close_status(ticket_channel_id: int | str, customer_id: int | str) -> dict:
+    _order, targets, skipped_all = build_review_status(
+        ticket_channel_id,
+        int(customer_id),
+    )
+
+    target_ids = [
+        str(item.get("staff_id") or "")
+        for item in targets
+        if str(item.get("staff_id") or "")
+    ]
+    favorite_ids = get_staff_favorites(customer_id, target_ids)
+    tip_rows = _get_post_close_tip_rows(ticket_channel_id)
+
+    paid_total = 0
+    pending_total = 0
+    for row in tip_rows:
+        amount = int(row["amount"] or 0)
+        status = str(row["payment_status"] or "")
+        if status == "paid":
+            paid_total += amount
+        elif status in {"pending", "pending_review"}:
+            pending_total += amount
+
+    return {
+        "targets": targets,
+        "skipped_all": bool(skipped_all),
+        "favorite_ids": favorite_ids,
+        "tip_rows": tip_rows,
+        "tip_paid_total": paid_total,
+        "tip_pending_total": pending_total,
+    }
+
+
+def _clip_post_close_value(value: str, limit: int = 1000) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    if len(text) <= limit:
+        return text
+    return text[: max(1, limit - 1)].rstrip() + "…"
+
+
+def build_post_close_status_embed(
+    ticket_channel_id: int | str,
+    customer_id: int | str,
+) -> discord.Embed:
+    status = get_post_close_status(ticket_channel_id, customer_id)
+    targets = status["targets"]
+
+    review_lines: list[str] = []
+    if status["skipped_all"]:
+        review_lines.append("⏭️ 已選擇不留評價")
+
+    if not targets:
+        review_lines.append("尚無可評價的接單成員資料")
+    else:
+        for item in targets:
+            name = str(item.get("display_name") or item.get("staff_id") or "成員")
+            if item.get("reviewed"):
+                rating = int(item.get("rating") or 0)
+                review_lines.append(
+                    f"✅ {name}｜{'⭐' * rating}（{rating}/5）"
+                )
+            elif not status["skipped_all"]:
+                review_lines.append(f"▫️ {name}｜尚未評價")
+
+    tip_lines: list[str] = []
+    paid_total = int(status["tip_paid_total"] or 0)
+    pending_total = int(status["tip_pending_total"] or 0)
+
+    if paid_total:
+        tip_lines.append(f"✅ 已付款：{paid_total:,}T")
+    if pending_total:
+        tip_lines.append(f"⏳ 待客服確認：{pending_total:,}T")
+
+    for row in status["tip_rows"]:
+        tip_status = str(row["payment_status"] or "")
+        if tip_status == "paid":
+            label = "已付款"
+            icon = "✅"
+        elif tip_status == "pending_review":
+            label = "待客服確認"
+            icon = "⏳"
+        else:
+            label = "處理中"
+            icon = "⏳"
+
+        worker_name = str(
+            row["worker_display_name"]
+            or row["worker_discord_id"]
+            or "成員"
+        )
+        tip_lines.append(
+            f"{icon} {worker_name}｜{int(row['amount'] or 0):,}T｜{label}"
+        )
+
+    if not tip_lines:
+        tip_lines.append("尚未加雞腿")
+
+    favorite_names = [
+        str(item.get("display_name") or item.get("staff_id") or "成員")
+        for item in targets
+        if str(item.get("staff_id") or "") in status["favorite_ids"]
+    ]
+    if favorite_names:
+        favorite_text = "❤️ 已收藏：" + "、".join(favorite_names)
+    elif targets:
+        favorite_text = "尚未收藏本次成員"
+    else:
+        favorite_text = "尚無可收藏的接單成員資料"
+
+    embed = discord.Embed(
+        title="結單後操作狀態",
+        description="操作完成後，此面板會自動更新目前狀態。",
+        color=discord.Color.gold(),
+    )
+    embed.add_field(
+        name="⭐ 評價",
+        value=_clip_post_close_value("\n".join(review_lines)),
+        inline=False,
+    )
+    embed.add_field(
+        name="🍗 雞腿",
+        value=_clip_post_close_value("\n".join(tip_lines)),
+        inline=False,
+    )
+    embed.add_field(
+        name="❤️ 收藏",
+        value=_clip_post_close_value(favorite_text),
+        inline=False,
+    )
+    embed.set_footer(text="看到狀態更新，就代表操作已成功記錄。")
+    return embed
+
+
+def _is_post_close_panel_message(message: discord.Message) -> bool:
+    for row in getattr(message, "components", []) or []:
+        for child in getattr(row, "children", []) or []:
+            if getattr(child, "custom_id", None) == "review_leave_button":
+                return True
+    return False
+
+
+async def refresh_post_close_panel(
+    channel: discord.TextChannel | None,
+    customer_id: int | str,
+) -> bool:
+    if not isinstance(channel, discord.TextChannel):
+        return False
+
+    try:
+        panel_message = None
+        async for message in channel.history(limit=100):
+            if _is_post_close_panel_message(message):
+                panel_message = message
+                break
+
+        if panel_message is None:
+            return False
+
+        await panel_message.edit(
+            embed=build_post_close_status_embed(
+                channel.id,
+                customer_id,
+            )
+        )
+        return True
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+        return False
+    except Exception as exc:
+        print(
+            f"[post-close-status] refresh failed "
+            f"ticket_channel_id={channel.id}: {type(exc).__name__}: {exc}"
+        )
+        return False
+
+
 def add_staff_favorite(
     *,
     customer_id: int | str,
@@ -878,6 +1079,12 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜評價內�
                 order_content=self.order_content,
             ),
         )
+
+        if isinstance(interaction.channel, discord.TextChannel):
+            await refresh_post_close_panel(
+                interaction.channel,
+                self.customer_id,
+            )
 
 
 
@@ -1424,6 +1631,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
                 ),
                 ephemeral=True,
             )
+            await refresh_post_close_panel(channel, self.customer_id)
             return
 
         try:
@@ -1494,6 +1702,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             ),
             ephemeral=True,
         )
+        await refresh_post_close_panel(channel, self.customer_id)
 
 
 class WorkerTipPaymentMethodView(discord.ui.View):
@@ -1558,6 +1767,11 @@ class WorkerTipPaymentConfirmView(discord.ui.View):
         )
         await _notify_worker_tip_paid(interaction, tip_row)
         await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
+        if isinstance(interaction.channel, discord.TextChannel):
+            await refresh_post_close_panel(
+                interaction.channel,
+                self.customer_id,
+            )
 
     @discord.ui.button(
         label="取消雞腿",
@@ -1593,6 +1807,11 @@ class WorkerTipPaymentConfirmView(discord.ui.View):
             view=None,
         )
         await _log_worker_tip("cancelled", interaction=interaction, tip_row=tip_row)
+        if isinstance(interaction.channel, discord.TextChannel):
+            await refresh_post_close_panel(
+                interaction.channel,
+                self.customer_id,
+            )
 
 
 class MemberReviewSelect(discord.ui.Select):
@@ -1754,6 +1973,12 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
                     staff_id,
                     reason="post_close_favorite",
                 )
+
+        if isinstance(interaction.channel, discord.TextChannel):
+            await refresh_post_close_panel(
+                interaction.channel,
+                self.customer_id,
+            )
 
 
 class FavoriteCurrentMembersView(discord.ui.View):
@@ -1956,6 +2181,8 @@ class ReviewButtonView(discord.ui.View):
             )
         except discord.HTTPException:
             pass
+
+        await refresh_post_close_panel(channel, self.customer_id)
 
     @discord.ui.button(
         label="❤️ 收藏本次成員",
