@@ -1,0 +1,52 @@
+{% extends "site_layout.html" %}
+{% block content %}
+<style>
+.tx-page{width:min(1080px,calc(100% - 28px));margin:48px auto 90px}
+.tx-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:18px}
+.tx-kicker{color:#dfb75c;font-size:11px;font-weight:900;letter-spacing:.18em}
+.tx-page h1{font-size:clamp(30px,5vw,46px);margin:7px 0}
+.tx-meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:18px 0}
+.tx-meta-card{padding:13px;border:1px solid rgba(255,255,255,.08);border-radius:11px;background:#11110f}
+.tx-meta-card span{display:block;color:rgba(235,232,222,.48);font-size:10px;margin-bottom:5px}.tx-meta-card strong{font-size:12px}
+.tx-actions{display:flex;gap:8px;flex-wrap:wrap}.tx-btn{display:inline-flex;padding:11px 13px;border:1px solid rgba(255,255,255,.1);border-radius:9px;color:#eee9dc;text-decoration:none;background:#11110f}
+.ticket-transcript{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:#0f0f0e;overflow:hidden}
+.tx-head{display:flex;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:#131310}
+.tx-head span{color:rgba(235,232,222,.48);font-size:11px}
+.tx-warning{margin:12px;padding:11px 13px;border:1px solid rgba(255,193,7,.28);border-radius:9px;color:#f2d68d;background:rgba(255,193,7,.06);font-size:12px}
+.tx-messages{padding:4px 0}
+.tx-message{display:grid;grid-template-columns:42px 1fr;gap:11px;padding:11px 16px}
+.tx-message:hover{background:rgba(255,255,255,.025)}
+.tx-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#222}
+.tx-avatar-fallback{display:flex;align-items:center;justify-content:center;color:#f2d68d;font-weight:900}
+.tx-meta{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px}.tx-meta strong{font-size:13px}.tx-meta time,.tx-author-id{font-size:10px;color:rgba(235,232,222,.38)}
+.tx-bot{font-size:9px;padding:1px 5px;border-radius:5px;background:rgba(223,183,92,.18);color:#f2d68d}
+.tx-content{font-size:13px;line-height:1.65;word-break:break-word}.tx-muted{color:rgba(235,232,222,.45)}
+.tx-embed{margin:7px 0;padding:10px 12px;border-left:3px solid #dfb75c;background:rgba(255,255,255,.025);border-radius:0 8px 8px 0}
+.tx-embed-title{font-weight:800;margin-bottom:5px}.tx-embed-description{font-size:12px;line-height:1.6}.tx-embed-field{margin-top:7px}.tx-embed-field strong,.tx-embed-field span{display:block;font-size:11px}
+.tx-attachment{margin-top:7px;font-size:11px}.tx-attachment a{color:#f2d68d}.tx-image img{display:block;max-width:min(520px,100%);max-height:420px;border-radius:9px;border:1px solid rgba(255,255,255,.08);margin-bottom:5px}
+.tx-empty{padding:28px;text-align:center;color:rgba(235,232,222,.5)}
+@media(max-width:760px){.tx-top{display:block}.tx-actions{margin-top:12px}.tx-meta-grid{grid-template-columns:repeat(2,1fr)}.tx-message{grid-template-columns:34px 1fr;padding:10px}.tx-avatar{width:32px;height:32px}.tx-author-id{display:none}}
+</style>
+<section class="tx-page">
+  <div class="tx-top">
+    <div>
+      <div class="tx-kicker">TICKET TRANSCRIPT</div>
+      <h1>#{{ transcript.channel_name or transcript.ticket_channel_id }}</h1>
+      <div class="tx-muted">保存於 {{ transcript.closed_at or '' }}</div>
+    </div>
+    <div class="tx-actions">
+      <a class="tx-btn" href="/employee/tickets">返回紀錄列表</a>
+      <a class="tx-btn" href="/employee/tickets/{{ transcript.id }}/text" target="_blank">文字版</a>
+    </div>
+  </div>
+
+  <div class="tx-meta-grid">
+    <div class="tx-meta-card"><span>訂單</span><strong>{{ transcript.receipt_id or ('WEB-' ~ transcript.order_id if transcript.order_id else '未連結') }}</strong></div>
+    <div class="tx-meta-card"><span>顧客</span><strong>{{ transcript.customer_display_name or transcript.customer_discord_id or '未紀錄' }}</strong></div>
+    <div class="tx-meta-card"><span>訊息</span><strong>{{ transcript.message_count or 0 }} 則 / {{ transcript.participant_count or 0 }} 人</strong></div>
+    <div class="tx-meta-card"><span>關閉人員</span><strong>{{ transcript.closed_by_display_name or transcript.closed_by_discord_id or '未知' }}</strong></div>
+  </div>
+
+  {{ transcript.transcript_html | safe }}
+</section>
+{% endblock %}
