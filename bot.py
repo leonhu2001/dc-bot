@@ -9798,6 +9798,159 @@ async def build_reorder_self_service_draft(
     return data, warnings
 
 
+def _reorder_message_has_component(
+    message: discord.Message,
+    custom_id: str,
+) -> bool:
+    for row in getattr(message, "components", []) or []:
+        for child in getattr(row, "children", []) or []:
+            if str(getattr(child, "custom_id", "") or "") == str(custom_id):
+                return True
+    return False
+
+
+async def _find_reorder_panel_message(
+    channel: discord.TextChannel,
+    custom_id: str,
+) -> discord.Message | None:
+    try:
+        async for message in channel.history(limit=80):
+            if _reorder_message_has_component(message, custom_id):
+                return message
+    except (discord.Forbidden, discord.HTTPException):
+        return None
+    return None
+
+
+async def ensure_reorder_ticket_panels(
+    *,
+    guild: discord.Guild,
+    channel: discord.TextChannel,
+    customer_id: int,
+    data: dict,
+    source_order_id: int | None,
+) -> tuple[discord.Message, discord.Message]:
+    """
+    再約票口固定維持兩個正式面板：
+    1. 客服操作：填寫自助下單 / 取消訂單
+    2. 已預填的自助下單面板
+
+    重複按「再約」時會修復缺少的面板，不會一直重複建立。
+    """
+
+    support_role = guild.get_role(CUSTOMER_ROLE_ID)
+    support_mention = support_role.mention if support_role is not None else "客服"
+    source_text = (
+        f"WEB-{source_order_id}"
+        if source_order_id is not None
+        else "上一張訂單"
+    )
+
+    control_message = await _find_reorder_panel_message(
+        channel,
+        "order_control_select",
+    )
+
+    control_embed = discord.Embed(
+        title="客服操作選項",
+        description=(
+            f"這是由 {source_text} 建立的再約草稿。\n"
+            "下方使用一般訂單控制：客服可開啟／更新自助下單，"
+            "或直接取消這張再約訂單。"
+        ),
+        color=discord.Color.gold(),
+    )
+    control_embed.set_footer(
+        text=(
+            f"REORDER-{source_order_id or channel.id}"
+            "｜客服操作"
+        )
+    )
+
+    if control_message is None:
+        control_message = await channel.send(
+            content=f"{support_mention} 再約草稿待確認。",
+            embed=control_embed,
+            view=OrderControlView(),
+            allowed_mentions=discord.AllowedMentions(
+                users=False,
+                roles=True,
+                everyone=False,
+            ),
+        )
+    else:
+        try:
+            await control_message.edit(
+                embed=control_embed,
+                view=OrderControlView(),
+                allowed_mentions=discord.AllowedMentions(
+                    users=False,
+                    roles=True,
+                    everyone=False,
+                ),
+            )
+        except discord.HTTPException:
+            pass
+
+    self_service_message = await _find_reorder_panel_message(
+        channel,
+        "self_service_order_category_select",
+    )
+
+    panel_embed = build_self_service_panel_embed(
+        customer_id,
+        data,
+        guild,
+    )
+    panel_embed.set_footer(
+        text=(
+            f"REORDER-{source_order_id or channel.id}"
+            "｜再約預填自助下單"
+        )
+    )
+    panel_view = SelfServiceOrderView(
+        customer_id=customer_id,
+        channel_id=channel.id,
+        selected_category=data.get("category"),
+    )
+
+    if self_service_message is None:
+        self_service_message = await channel.send(
+            content=(
+                f"<@{customer_id}> "
+                "這張是你的再約草稿，系統已帶入上一單可沿用內容，"
+                "你可以直接修改。"
+            ),
+            embed=panel_embed,
+            view=panel_view,
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+    else:
+        try:
+            await self_service_message.edit(
+                embed=panel_embed,
+                view=panel_view,
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False,
+                ),
+            )
+        except discord.HTTPException:
+            pass
+
+    data["reorder_control_message_id"] = control_message.id
+    data["self_service_panel_message_id"] = self_service_message.id
+    remember_order_data(channel.id, data)
+    save_bot_data()
+
+    return control_message, self_service_message
+
+
 async def create_reorder_ticket_from_closed_order(
     *,
     interaction: discord.Interaction,
@@ -9903,12 +10056,43 @@ async def create_reorder_ticket_from_closed_order(
                     "canceled",
                 }
             ):
+                repair_warnings: list[str] = []
+
+                # 舊版再約草稿可能只建立了文字訊息，
+                # 或 Bot 重啟後缺少 panel message id。
+                # 只有資料真的不存在時才重新從來源單建立草稿；
+                # 已經被老闆修改過的草稿絕不覆蓋。
+                if not existing_data:
+                    existing_data, repair_warnings = (
+                        await build_reorder_self_service_draft(
+                            guild=guild,
+                            order=order,
+                            targets=targets,
+                            customer_id=member.id,
+                        )
+                    )
+                    SELF_SERVICE_ORDER_SELECTIONS[
+                        possible_channel.id
+                    ] = existing_data
+                    remember_order_data(
+                        possible_channel.id,
+                        existing_data,
+                    )
+
+                await ensure_reorder_ticket_panels(
+                    guild=guild,
+                    channel=possible_channel,
+                    customer_id=member.id,
+                    data=existing_data,
+                    source_order_id=source_order_id,
+                )
+
                 return {
                     "channel": (
                         possible_channel
                     ),
                     "created": False,
-                    "warning": "",
+                    "warning": "；".join(repair_warnings),
                 }
 
     category = guild.get_channel(
@@ -10078,44 +10262,13 @@ async def create_reorder_ticket_from_closed_order(
             ),
         )
 
-        panel_message = (
-            await new_channel.send(
-                content=(
-                    f"{member.mention} "
-                    "這張是你的再約草稿，可以自行修改。"
-                ),
-                embed=build_self_service_panel_embed(
-                    member.id,
-                    data,
-                    guild,
-                ),
-                view=SelfServiceOrderView(
-                    customer_id=member.id,
-                    channel_id=new_channel.id,
-                    selected_category=data.get(
-                        "category"
-                    ),
-                ),
-                allowed_mentions=(
-                    discord.AllowedMentions(
-                        users=True,
-                        roles=False,
-                        everyone=False,
-                    )
-                ),
-            )
+        await ensure_reorder_ticket_panels(
+            guild=guild,
+            channel=new_channel,
+            customer_id=member.id,
+            data=data,
+            source_order_id=source_order_id,
         )
-
-        data[
-            "self_service_panel_message_id"
-        ] = panel_message.id
-
-        remember_order_data(
-            new_channel.id,
-            data,
-        )
-
-        save_bot_data()
 
         try:
             await send_order_log(
