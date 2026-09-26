@@ -10,6 +10,7 @@ import discord
 from views.staff_profiles import refresh_staff_profile_panel_for_staff
 
 from core.permissions import is_customer_staff
+from services.ticket_transcripts import archive_ticket_channel
 
 
 _REVIEW_CHANNEL_ID: int | None = None
@@ -2012,11 +2013,35 @@ class ConfirmCloseTicketView(discord.ui.View):
             )
             return
 
-        await interaction.response.send_message("已確認關閉票口，頻道將在 3 秒後刪除。", ephemeral=True)
+        # 先 ACK，避免完整聊天紀錄讀取時間較長造成 Discord interaction timeout。
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            transcript = await archive_ticket_channel(
+                channel,
+                closed_by=interaction.user,
+                customer_id=self.customer_id,
+            )
+        except Exception as exc:
+            await interaction.edit_original_response(
+                content=(
+                    "票口聊天紀錄備份失敗，因此本次沒有刪除頻道。\n"
+                    f"錯誤：{str(exc)[:500]}"
+                )
+            )
+            return
+
+        try:
+            await interaction.delete_original_response()
+        except (discord.NotFound, discord.HTTPException):
+            pass
 
         try:
             await channel.send(
-                f"{interaction.user.mention} 已確認關閉票口，頻道將在 3 秒後刪除。",
+                (
+                    f"{interaction.user.mention} 已確認關閉票口，頻道將在 3 秒後刪除。\n"
+                    f"聊天紀錄已保存至員工專區（{int(transcript.get('message_count') or 0):,} 則訊息）。"
+                ),
                 allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
             )
         except discord.HTTPException:
