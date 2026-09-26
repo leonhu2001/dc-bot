@@ -31,6 +31,15 @@
             完整薪資
         </a>
 
+        {% if user and (user.is_customer_service or user.is_manager) %}
+        <a
+            class="{% if _p.startswith('/employee/tickets') %}active{% endif %}"
+            href="/employee/tickets"
+        >
+            票口紀錄
+        </a>
+        {% endif %}
+
         <a href="/">
             返回官網
         </a>
