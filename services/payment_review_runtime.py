@@ -19,6 +19,7 @@ from views.review import (
     _worker_tip_row,
     mark_worker_tip_cancelled,
     mark_worker_tip_paid,
+    refresh_post_close_panel,
 )
 
 
@@ -377,6 +378,10 @@ async def _apply_tip_approval(bot: discord.Client, row: dict) -> None:
         except Exception:
             pass
 
+    await refresh_post_close_panel(
+        channel,
+        str(tip_row["customer_discord_id"] or ""),
+    )
     mark_payment_review_applied(int(row["id"]))
 
 
@@ -408,6 +413,10 @@ async def _apply_tip_rejection(bot: discord.Client, row: dict) -> None:
         ),
     )
 
+    await refresh_post_close_panel(
+        channel,
+        str(tip_row["customer_discord_id"] or ""),
+    )
     mark_payment_review_rejection_applied(int(row["id"]))
 
 
