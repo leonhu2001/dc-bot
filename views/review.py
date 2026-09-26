@@ -1945,14 +1945,52 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
 
 
 class WorkerTipPaymentMethodView(discord.ui.View):
-    def __init__(self, *, customer_id: int, ticket_channel_id: int, target: dict, amount: int):
+    def __init__(
+        self,
+        *,
+        customer_id: int,
+        ticket_channel_id: int,
+        target: dict,
+        amount: int,
+    ):
         super().__init__(timeout=600)
+        self.customer_id = int(customer_id)
+        self.ticket_channel_id = int(ticket_channel_id)
+        self.target = dict(target)
+        self.amount = int(amount)
         self.add_item(
             WorkerTipPaymentMethodSelect(
-                customer_id=customer_id,
-                ticket_channel_id=ticket_channel_id,
-                target=target,
-                amount=amount,
+                customer_id=self.customer_id,
+                ticket_channel_id=self.ticket_channel_id,
+                target=self.target,
+                amount=self.amount,
+            )
+        )
+
+    @discord.ui.button(
+        label="修改金額",
+        style=discord.ButtonStyle.secondary,
+        custom_id="worker_tip_edit_amount",
+        row=1,
+    )
+    async def modify_amount(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message(
+                "只有這張票口的老闆可以修改雞腿金額。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_modal(
+            WorkerTipAmountEditModal(
+                customer_id=self.customer_id,
+                ticket_channel_id=self.ticket_channel_id,
+                target=self.target,
+                amount=self.amount,
             )
         )
 
