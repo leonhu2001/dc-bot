@@ -178,6 +178,7 @@ from views.review import (
     configure_reorder_ticket_creator,
     configure_worker_tip_callbacks,
     get_pending_worker_tip_confirmations,
+    build_post_close_status_embed,
     WorkerTipPaymentConfirmView,
 )
 
@@ -1291,6 +1292,7 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
             f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
             f"{reward_result}\n\n"
             f"可以選擇評價本次服務、加雞腿、不留評價，或關閉票口。",
+            embed=build_post_close_status_embed(order_channel.id, customer_id),
             view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -1463,6 +1465,7 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
         f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
         f"{reward_result}\n\n"
         f"可以選擇評價本次服務、加雞腿、不留評價，或關閉票口。",
+        embed=build_post_close_status_embed(order_channel.id, customer_id),
         view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
         allowed_mentions=discord.AllowedMentions(
             users=True,
