@@ -736,8 +736,17 @@ def build_post_close_status_embed(
     if status["skipped_all"]:
         description_lines.append("⏭️ 老闆已選擇不留評價。")
 
+    embed_title = (
+        str(
+            targets[0].get("display_name")
+            or targets[0].get("staff_id")
+            or "服務成員"
+        )
+        if len(targets) == 1
+        else "本次服務紀錄"
+    )
     embed = discord.Embed(
-        title="本次服務紀錄",
+        title=embed_title,
         description="\n".join(description_lines),
         color=discord.Color.gold(),
     )
