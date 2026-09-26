@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+{% block page_title %}票口聊天紀錄{% endblock %}
+{% block content %}
+<style>
+.td-page{display:grid;gap:18px}
+.td-card{border:1px solid rgba(245,198,107,.18);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),rgba(8,11,19,.94);box-shadow:0 24px 68px rgba(0,0,0,.28)}
+.td-top{display:flex;justify-content:space-between;gap:16px;align-items:start;padding:22px}.td-k{color:var(--mw-gold,#f5c66b);font-size:11px;font-weight:950;letter-spacing:.16em}.td-top h2{font-size:30px;margin:6px 0}.td-sub{color:var(--mw-muted,#a7a0b5)}
+.td-back{display:inline-flex;padding:10px 13px;border:1px solid rgba(245,198,107,.28);border-radius:12px;text-decoration:none;color:#ffe3a3;background:rgba(245,198,107,.08);font-weight:900}
+.td-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.td-meta>div{border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;background:rgba(255,255,255,.025)}.td-meta span{display:block;color:rgba(255,255,255,.46);font-size:11px;margin-bottom:6px}.td-meta b{font-size:13px;word-break:break-all}
+.chat{padding:18px 14px}.msg{display:flex;margin:11px 0}.msg.customer{justify-content:flex-end}.msg.bot{justify-content:center}.bubble{max-width:min(720px,86%);background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.075);border-radius:14px;padding:11px 13px}.customer .bubble{background:rgba(245,198,107,.1);border-color:rgba(245,198,107,.22)}.cs .bubble{background:rgba(116,150,255,.09);border-color:rgba(116,150,255,.18)}.bot .bubble{max-width:82%;background:rgba(255,255,255,.025)}
+.who{display:flex;gap:8px;align-items:baseline;margin-bottom:7px}.who b{font-size:12px}.who small{color:rgba(255,255,255,.42);font-size:10px}.content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:13px}.files{display:grid;gap:6px;margin-top:9px}.files a{display:block;padding:8px 9px;border-radius:8px;background:rgba(255,255,255,.045);font-size:12px;overflow-wrap:anywhere}.embed-box{margin-top:8px;border-left:3px solid var(--mw-gold,#f5c66b);background:rgba(255,255,255,.035);padding:9px 10px;border-radius:5px}.embed-box strong{display:block;margin-bottom:5px}.embed-box p{margin:4px 0;white-space:pre-wrap}.embed-field{margin-top:7px;font-size:12px}.edited{opacity:.45;font-size:10px;margin-left:5px}
+@media(max-width:780px){.td-meta{grid-template-columns:1fr 1fr}.td-top{display:block}.td-back{margin-top:12px}.bubble{max-width:94%}}
+</style>
+
+<section class="td-page">
+  <section class="td-card">
+    <div class="td-top">
+      <div>
+        <div class="td-k">TICKET CHAT ARCHIVE</div>
+        <h2>{{ archive.order_no or ("WEB-" ~ archive.order_id if archive.order_id else archive.ticket_channel_name) }}</h2>
+        <div class="td-sub">{{ archive.ticket_channel_name }} · {{ archive.message_count }} 則訊息</div>
+      </div>
+      <a class="td-back" href="/admin/tickets">返回票口紀錄</a>
+    </div>
+  </section>
+
+  <div class="td-meta">
+    <div><span>老闆</span><b>{{ archive.customer_display_name or "未知" }}<br>{{ archive.customer_discord_id or "無 ID" }}</b></div>
+    <div><span>對接客服</span><b>{{ archive.customer_service_display_name or "未記錄" }}<br>{{ archive.customer_service_discord_id or "無 ID" }}</b></div>
+    <div><span>實際關閉者</span><b>{{ archive.closed_by_display_name or "未知" }}<br>{{ archive.closed_by_discord_id or "無 ID" }}</b></div>
+    <div><span>關閉時間</span><b>{{ (archive.closed_at or "")|replace("T"," ") }}</b></div>
+  </div>
+
+  <section class="td-card chat">
+    {% for m in messages %}
+      {% set is_customer = (m.author_discord_id|string) == (archive.customer_discord_id|string) %}
+      {% set is_cs = (m.author_discord_id|string) == (archive.customer_service_discord_id|string) %}
+      <div class="msg {% if is_customer %}customer{% elif m.author_is_bot %}bot{% elif is_cs %}cs{% else %}other{% endif %}">
+        <div class="bubble">
+          <div class="who">
+            <b>{{ m.author_display_name or "未知使用者" }}</b>
+            <small>{{ m.author_discord_id or "無 ID" }} · {{ (m.created_at or "")|replace("T"," ") }}</small>
+            {% if m.edited_at %}<span class="edited">已編輯</span>{% endif %}
+          </div>
+          {% if m.content %}<div class="content">{{ m.content }}</div>{% endif %}
+
+          {% if m.attachments %}
+            <div class="files">
+            {% for a in m.attachments %}
+              <a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">📎 {{ a.filename or "附件" }}</a>
+            {% endfor %}
+            </div>
+          {% endif %}
+
+          {% for e in m.embeds %}
+            <div class="embed-box">
+              {% if e.title %}<strong>{{ e.title }}</strong>{% endif %}
+              {% if e.description %}<p>{{ e.description }}</p>{% endif %}
+              {% for f in e.fields or [] %}
+                <div class="embed-field"><b>{{ f.name }}</b><br>{{ f.value }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <div style="text-align:center;color:var(--mw-muted,#a7a0b5);padding:24px">此封存沒有訊息。</div>
+    {% endfor %}
+  </section>
+</section>
+{% endblock %}
