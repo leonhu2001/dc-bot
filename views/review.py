@@ -402,6 +402,12 @@ def build_review_status(ticket_channel_id: int | str, customer_id: int) -> tuple
         item = dict(target)
         item["reviewed"] = row is not None
         item["rating"] = int(row["rating"]) if row is not None else None
+        item["comment"] = str(row["comment"] or "") if row is not None else ""
+        item["customer_name_public"] = (
+            bool(row["customer_name_public"])
+            if row is not None and "customer_name_public" in row.keys()
+            else False
+        )
         item["skipped"] = skipped_all
         enriched.append(item)
 
