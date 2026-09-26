@@ -63,7 +63,7 @@ async def ticket_archive_list(
         limit=200,
     )
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="employee_ticket_archives.html",
         context={
@@ -74,6 +74,9 @@ async def ticket_archive_list(
             "query": str(q or "").strip(),
         },
     )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 @router.get("/employee/tickets/{archive_id}")
@@ -89,7 +92,7 @@ async def ticket_archive_detail(
     if bundle is None:
         raise HTTPException(status_code=404, detail="找不到這份票口紀錄。")
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="employee_ticket_archive_detail.html",
         context={
@@ -99,3 +102,6 @@ async def ticket_archive_detail(
             **bundle,
         },
     )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
