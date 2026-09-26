@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block page_title %}票口紀錄{% endblock %}
+{% block content %}
+<style>
+.ta-page{display:grid;gap:18px}
+.ta-card{border:1px solid rgba(245,198,107,.18);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),rgba(8,11,19,.94);box-shadow:0 24px 68px rgba(0,0,0,.28);overflow:hidden}
+.ta-intro{padding:22px}.ta-kicker{margin:0;color:var(--mw-gold,#f5c66b);font-weight:950;letter-spacing:.16em}.ta-intro h2{margin:6px 0 8px;font-size:30px}.ta-muted{color:var(--mw-muted,#a7a0b5);line-height:1.7}
+.ta-search{display:flex;gap:9px;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.ta-search input{flex:1;min-width:0;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.1);color:#f0ede4;border-radius:12px;padding:13px 14px}
+.ta-search button{border:1px solid rgba(245,198,107,.28);border-radius:12px;padding:0 18px;background:rgba(245,198,107,.12);color:#ffe3a3;font-weight:950;cursor:pointer}
+.ta-row{display:grid;grid-template-columns:150px minmax(180px,1fr) minmax(180px,1fr) 120px 150px;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);text-decoration:none;color:inherit}
+.ta-row:hover{background:rgba(245,198,107,.045)}.ta-row:last-child{border-bottom:0}.ta-id{color:var(--mw-gold,#f5c66b);font-weight:950}.ta-person b{display:block}.ta-person small{display:block;margin-top:4px;color:rgba(255,255,255,.48);word-break:break-all}.ta-count,.ta-time{color:rgba(255,255,255,.56);font-size:12px}.ta-empty{padding:34px;text-align:center;color:var(--mw-muted,#a7a0b5)}
+@media(max-width:900px){.ta-row{grid-template-columns:120px 1fr 90px}.ta-row .ta-cs,.ta-row .ta-time{display:none}.ta-search{flex-direction:column}.ta-search button{min-height:44px}}
+</style>
+
+<section class="ta-page">
+  <section class="ta-card ta-intro">
+    <p class="ta-kicker">TICKET CHAT ARCHIVE</p>
+    <h2>票口聊天紀錄</h2>
+    <div class="ta-muted">票口關閉前由 Bot 自動封存。可用老闆姓名／ID、對接客服姓名／ID、訂單編號或對話內容搜尋。</div>
+  </section>
+
+  <section class="ta-card">
+    <form class="ta-search" method="get" action="/admin/tickets">
+      <input name="q" value="{{ query }}" placeholder="搜尋老闆姓名 / ID、客服姓名 / ID、訂單編號、對話內容">
+      <button type="submit">搜尋</button>
+    </form>
+
+    {% for a in archives %}
+      <a class="ta-row" href="/admin/tickets/{{ a.id }}">
+        <div>
+          <div class="ta-id">{{ a.order_no or ("WEB-" ~ a.order_id if a.order_id else "票口") }}</div>
+          <div class="ta-count">{{ a.message_count }} 則訊息</div>
+        </div>
+        <div class="ta-person">
+          <b>{{ a.customer_display_name or "未知老闆" }}</b>
+          <small>{{ a.customer_discord_id or "無 ID" }}</small>
+        </div>
+        <div class="ta-person ta-cs">
+          <b>{{ a.customer_service_display_name or "未記錄客服" }}</b>
+          <small>{{ a.customer_service_discord_id or "無 ID" }}</small>
+        </div>
+        <div class="ta-count">{{ a.ticket_channel_name or "ticket" }}</div>
+        <div class="ta-time">{{ (a.closed_at or "")|replace("T"," ") }}</div>
+      </a>
+    {% else %}
+      <div class="ta-empty">目前沒有符合條件的票口紀錄。</div>
+    {% endfor %}
+  </section>
+</section>
+{% endblock %}
