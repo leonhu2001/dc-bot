@@ -2256,6 +2256,127 @@ class FavoriteCurrentMembersView(discord.ui.View):
             self.add_item(FavoriteCurrentMembersSelect(customer_id=customer_id, targets=targets))
 
 
+def _taipei_iso(value: datetime | None = None) -> str:
+    current = value or datetime.now(tz=ZoneInfo("Asia/Taipei"))
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=ZoneInfo("Asia/Taipei"))
+    else:
+        current = current.astimezone(ZoneInfo("Asia/Taipei"))
+    return current.isoformat(timespec="seconds")
+
+
+async def archive_ticket_channel(
+    channel: discord.TextChannel,
+    *,
+    customer_id: int,
+    closed_by: discord.Member | discord.User,
+) -> int:
+    order, _targets = get_review_targets(channel.id)
+
+    customer_member = channel.guild.get_member(int(customer_id))
+    customer_name = (
+        str(order["customer_display_name"] or "").strip()
+        if order is not None and "customer_display_name" in order.keys()
+        else ""
+    )
+    if not customer_name:
+        customer_name = str(
+            getattr(customer_member, "display_name", None)
+            or getattr(customer_member, "name", None)
+            or customer_id
+        )
+
+    cs_id = ""
+    cs_name = ""
+    if order is not None:
+        if "customer_service_discord_id" in order.keys():
+            cs_id = str(order["customer_service_discord_id"] or "").strip()
+        if "customer_service_display_name" in order.keys():
+            cs_name = str(order["customer_service_display_name"] or "").strip()
+
+    if not cs_id and isinstance(closed_by, discord.Member) and is_customer_staff(closed_by):
+        cs_id = str(closed_by.id)
+        cs_name = str(
+            getattr(closed_by, "display_name", None)
+            or getattr(closed_by, "name", None)
+            or closed_by.id
+        )
+
+    messages: list[dict] = []
+    async for message in channel.history(limit=None, oldest_first=True):
+        attachments = [
+            {
+                "filename": str(attachment.filename or "附件"),
+                "url": str(attachment.url),
+                "content_type": str(attachment.content_type or ""),
+                "size": int(attachment.size or 0),
+            }
+            for attachment in message.attachments
+        ]
+
+        embeds = []
+        for embed in message.embeds:
+            try:
+                embeds.append(embed.to_dict())
+            except Exception:
+                continue
+
+        messages.append(
+            {
+                "discord_message_id": str(message.id),
+                "author_discord_id": str(getattr(message.author, "id", "") or ""),
+                "author_display_name": str(
+                    getattr(message.author, "display_name", None)
+                    or getattr(message.author, "global_name", None)
+                    or getattr(message.author, "name", None)
+                    or getattr(message.author, "id", "未知使用者")
+                ),
+                "author_is_bot": bool(getattr(message.author, "bot", False)),
+                "content": str(message.content or ""),
+                "attachments": attachments,
+                "embeds": embeds,
+                "reply_to_message_id": str(
+                    getattr(getattr(message, "reference", None), "message_id", "")
+                    or ""
+                ),
+                "created_at": _taipei_iso(message.created_at),
+                "edited_at": (
+                    _taipei_iso(message.edited_at)
+                    if message.edited_at is not None
+                    else ""
+                ),
+            }
+        )
+
+    now_text = _taipei_iso()
+    order_id = int(order["id"]) if order is not None else None
+    order_no = (
+        str(order["bot_order_no"] or "").strip()
+        if order is not None and "bot_order_no" in order.keys()
+        else ""
+    )
+
+    return save_ticket_archive(
+        ticket_channel_id=channel.id,
+        ticket_channel_name=channel.name,
+        order_id=order_id,
+        order_no=order_no,
+        customer_discord_id=customer_id,
+        customer_display_name=customer_name,
+        customer_service_discord_id=cs_id,
+        customer_service_display_name=cs_name,
+        closed_by_discord_id=getattr(closed_by, "id", ""),
+        closed_by_display_name=str(
+            getattr(closed_by, "display_name", None)
+            or getattr(closed_by, "name", None)
+            or getattr(closed_by, "id", "未知")
+        ),
+        closed_at=now_text,
+        archived_at=now_text,
+        messages=messages,
+    )
+
+
 class ConfirmCloseTicketView(discord.ui.View):
     def __init__(self, *, customer_id: int):
         super().__init__(timeout=60)
@@ -2282,18 +2403,45 @@ class ConfirmCloseTicketView(discord.ui.View):
             )
             return
 
-        await interaction.response.send_message("已確認關閉票口，頻道將在 3 秒後刪除。", ephemeral=True)
+        # 關閉前一定先封存；封存失敗就保留票口，避免爭議紀錄一起消失。
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            archive_id = await archive_ticket_channel(
+                channel,
+                customer_id=self.customer_id,
+                closed_by=interaction.user,
+            )
+        except Exception as exc:
+            print(
+                f"[ticket-archive] failed channel_id={channel.id}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            await interaction.followup.send(
+                "票口聊天紀錄封存失敗，因此本次沒有刪除票口。請客服稍後重試。",
+                ephemeral=True,
+            )
+            return
 
         try:
             await channel.send(
-                f"{interaction.user.mention} 已確認關閉票口，頻道將在 3 秒後刪除。",
-                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                (
+                    f"{interaction.user.mention} 已確認關閉票口。"
+                    f"聊天紀錄已封存（紀錄 #{archive_id}），頻道將在 3 秒後刪除。"
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False,
+                ),
             )
         except discord.HTTPException:
             pass
 
         await asyncio.sleep(3)
-        await channel.delete(reason=f"Closed post-order ticket by {interaction.user}")
+        await channel.delete(
+            reason=f"Closed post-order ticket by {interaction.user}"
+        )
 
     @discord.ui.button(label="先不要關閉", style=discord.ButtonStyle.secondary, custom_id="post_close_keep_ticket")
     async def keep(self, interaction: discord.Interaction, button: discord.ui.Button):
