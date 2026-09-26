@@ -1260,9 +1260,8 @@ class MemberReviewModal(discord.ui.Modal, title="評價指定成員｜先預覽�
             comment=str(self.comment.value or ""),
         )
 
-        await interaction.response.send_message(
-            preview_view.preview_text(),
-            ephemeral=True,
+        await interaction.response.edit_message(
+            content=preview_view.preview_text(),
             view=preview_view,
         )
 
@@ -1663,12 +1662,11 @@ class WorkerTipAmountModal(discord.ui.Modal, title="🍗 加雞腿"):
             return
 
         amount = int(raw)
-        await interaction.response.send_message(
-            _worker_tip_preview_text(
+        await interaction.response.edit_message(
+            content=_worker_tip_preview_text(
                 target=self.target,
                 amount=amount,
             ),
-            ephemeral=True,
             view=WorkerTipPaymentMethodView(
                 customer_id=self.customer_id,
                 ticket_channel_id=self.ticket_channel_id,
