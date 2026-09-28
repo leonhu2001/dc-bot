@@ -995,7 +995,8 @@ def _report_period(
     str | None,
 ]:
     period = str(period or "quarter").strip().lower()
-    now = datetime.utcnow()
+    # web_orders.closed_at is stored in Taipei local time.
+    now = datetime.utcnow() + timedelta(hours=8)
 
     if period == "all":
         return "all", None, "全部期間", None, None, None
