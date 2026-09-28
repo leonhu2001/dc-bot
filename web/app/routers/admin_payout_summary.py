@@ -1086,8 +1086,11 @@ def build_operations_report(period: str | None) -> dict:
     conn.row_factory = sqlite3.Row
 
     closed_expr = (
-        "COALESCE(NULLIF(w.closed_at,''), "
-        "NULLIF(w.updated_at,''), w.created_at)"
+        "COALESCE("
+        "NULLIF(w.closed_at,''), "
+        "datetime(NULLIF(w.updated_at,''), '+8 hours'), "
+        "datetime(w.created_at, '+8 hours')"
+        ")"
     )
 
     def order_window(
