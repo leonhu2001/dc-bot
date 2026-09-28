@@ -739,9 +739,9 @@ _APEX_SERVICE_SPECS = (
         COMPANION_ROLES,
         (),
         (
-            ("platinum", "白金以下", 350),
-            ("diamond", "鑽石", 400),
-            ("master", "大師/頂獵", 450),
+            ("platinum", "白金以下", 300),
+            ("diamond", "鑽石", 330),
+            ("master", "大師/頂獵", 350),
         ),
     ),
     (
@@ -750,8 +750,8 @@ _APEX_SERVICE_SPECS = (
         (),
         ("apex_diamond", "apex_master", "apex_predator"),
         (
-            ("platinum", "白金以下", 400),
-            ("diamond", "鑽石", 450),
+            ("platinum", "白金以下", 360),
+            ("diamond", "鑽石", 400),
         ),
     ),
     (
@@ -760,9 +760,9 @@ _APEX_SERVICE_SPECS = (
         (),
         ("apex_master", "apex_predator"),
         (
-            ("platinum", "白金以下", 500),
-            ("diamond", "鑽石", 550),
-            ("master", "大師/頂獵", 600),
+            ("platinum", "白金以下", 420),
+            ("diamond", "鑽石", 460),
+            ("master", "大師/頂獵", 500),
         ),
     ),
     (
@@ -771,9 +771,9 @@ _APEX_SERVICE_SPECS = (
         (),
         ("apex_predator",),
         (
-            ("platinum", "白金以下", 600),
-            ("diamond", "鑽石", 650),
-            ("master", "大師/頂獵", 700),
+            ("platinum", "白金以下", 500),
+            ("diamond", "鑽石", 550),
+            ("master", "大師/頂獵", 600),
         ),
     ),
 )
