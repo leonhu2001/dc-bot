@@ -20,6 +20,7 @@ def _create_report_db(path):
                 manual_discount_amount INTEGER,
                 cash_coupon_amount INTEGER,
                 store_absorbed_amount INTEGER,
+                payment_method TEXT,
                 status TEXT,
                 closed_at TEXT,
                 updated_at TEXT,
@@ -54,12 +55,13 @@ def _create_report_db(path):
                 manual_discount_amount,
                 cash_coupon_amount,
                 store_absorbed_amount,
+                payment_method,
                 status,
                 closed_at,
                 updated_at,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -74,6 +76,7 @@ def _create_report_db(path):
                     100,
                     50,
                     25,
+                    "wallet",
                     "closed",
                     "2026-09-10 12:00:00",
                     "2026-09-10 12:00:00",
@@ -91,6 +94,7 @@ def _create_report_db(path):
                     0,
                     0,
                     0,
+                    "bank",
                     "closed",
                     "2026-09-11 12:00:00",
                     "2026-09-11 12:00:00",
@@ -108,10 +112,29 @@ def _create_report_db(path):
                     0,
                     0,
                     0,
+                    "wallet",
                     "closed",
                     "2026-08-10 12:00:00",
                     "2026-08-10 12:00:00",
                     "2026-08-10 12:00:00",
+                ),
+                (
+                    4,
+                    "ORD-CANCEL",
+                    "basic",
+                    "Service B",
+                    "customer-3",
+                    "Cancelled Customer",
+                    800,
+                    800,
+                    0,
+                    0,
+                    0,
+                    "wallet",
+                    "cancelled",
+                    "2026-09-12 12:00:00",
+                    "2026-09-12 12:00:00",
+                    "2026-09-12 12:00:00",
                 ),
             ],
         )
@@ -193,6 +216,30 @@ def test_operations_report_profitability_and_period_comparison(tmp_path, monkeyp
     assert report["customer_count"] == 1
     assert report["repeat_customers"] == 1
     assert report["repeat_rate"] == 100.0
+
+    assert report["new_customer_revenue"] == 1000
+    assert report["new_customer_orders"] == 1
+    assert report["new_customer_revenue_share"] == 66.7
+    assert report["repeat_customer_revenue"] == 500
+    assert report["repeat_customer_orders"] == 1
+    assert report["repeat_customer_revenue_share"] == 33.3
+    assert report["unidentified_customer_revenue"] == 0
+    assert report["unidentified_customer_orders"] == 0
+
+    assert report["created_orders"] == 3
+    assert report["cancelled_orders"] == 1
+    assert report["cancellation_rate"] == 33.3
+
+    payment_rows = {
+        row["label"]: row
+        for row in report["payment_rows"]
+    }
+    assert payment_rows["wallet"]["orders"] == 1
+    assert payment_rows["wallet"]["revenue"] == 1000
+    assert payment_rows["wallet"]["share"] == 66.7
+    assert payment_rows["bank"]["orders"] == 1
+    assert payment_rows["bank"]["revenue"] == 500
+    assert payment_rows["bank"]["share"] == 33.3
 
     service = report["service_rows"][0]
     assert service["label"] == "Service A"
