@@ -70,6 +70,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "valorant": "特戰英豪 陪玩",
     "lol": "英雄聯盟 陪玩",
     "apex": "APEX 陪玩",
+    "custom": "自訂",
 }
 
 
@@ -267,10 +268,10 @@ def _add(rule: OrderRule) -> None:
 # ========= 基礎單 =========
 
 for key, label, price in [
-    ("basic_exbar_gamble_zongheng", "絕巴四幻神賭單｜賭縱橫", 16888),
-    ("basic_exbar_gamble_leiguan", "絕巴四幻神賭單｜賭淚冠", 16888),
-    ("basic_exbar_gamble_tianyuan", "絕巴四幻神賭單｜賭天圓地方", 8888),
-    ("basic_exbar_gamble_rangefinder", "絕巴四幻神賭單｜賭測距儀", 12888),
+    ("basic_exbar_gamble_zongheng", "絕巴四幻神賭單｜縱橫", 16888),
+    ("basic_exbar_gamble_leiguan", "絕巴四幻神賭單｜萬金淚冠", 16888),
+    ("basic_exbar_gamble_tianyuan", "絕巴四幻神賭單｜天圓地方", 8888),
+    ("basic_exbar_gamble_rangefinder", "絕巴四幻神賭單｜測距儀", 12888),
 ]:
     _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
@@ -411,10 +412,10 @@ for key, label, price in [
 
 # ========= 趣味單 =========
 
-_add(OrderRule("fun", "fun_lovebirds", "比翼雙飛", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=2, min_protector_count=1, allow_specify=False))
-_add(OrderRule("fun", "fun_read_no_reply", "已讀亂回", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=2, min_protector_count=1, allow_specify=False))
-_add(OrderRule("fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
-_add(OrderRule("fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
+_add(OrderRule("fun", "fun_lovebirds", "比翼雙飛", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_read_no_reply", "已讀亂回", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 # 魔丸娛樂嘎拉給木
 # 固定 1 單 / 2 位 / 只允許女陪或女護
@@ -527,13 +528,13 @@ _add(OrderRule(
     allow_specify=False,
 ))
 
-_add(OrderRule("farm", "farm_department_task", "代解部門任務", "manual", 0, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False, note="客服填價格"))
+_add(OrderRule("farm", "farm_department_task", "部門任務", "manual", 0, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False, note="客服填價格"))
 
 for key, label, price in [
     ("farm_halfcoin_120m", "哈夫幣代洗｜120M", 1250),
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
 ]:
-    _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False))
+    _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 
 
 
@@ -803,6 +804,32 @@ for (
         )
 
 
+# ========= 自訂單 =========
+_add(OrderRule(
+    "custom",
+    "custom_custom_order",
+    "自訂｜自訂",
+    "manual",
+    0,
+    "H",
+    allowed_roles=ALL_RECEIVER_ROLES,
+    required_staff_count="player_count",
+    min_quantity=1,
+    max_quantity=24,
+    allow_specify=True,
+    max_specified_count=4,
+    specify_fee_default=100,
+    specify_fee_by_role=_all_receiver_fee(100),
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+    player_count_enabled=True,
+    min_player_count=1,
+    max_player_count=4,
+    price_multiply_player_count=False,
+    point_benefits_allowed=False,
+))
+
+
 def get_rules_by_category(category: str) -> list[OrderRule]:
     return [rule for rule in ORDER_RULES.values() if rule.category == category]
 
@@ -914,114 +941,6 @@ __all__ = [
     "validate_rules",
 ]
 
-# ===== legacy/custom compatibility helpers start =====
-# 只保留自訂單建立與舊資料相容所需 helper；正式店面規格直接定義在上方 OrderRule。
-
-from dataclasses import fields as _mm_dataclass_fields
-from dataclasses import is_dataclass as _mm_is_dataclass
-from dataclasses import replace as _mm_dataclass_replace
-
-def _mm_order_rule_field_names(_rule):
-    if _mm_is_dataclass(_rule):
-        return {field.name for field in _mm_dataclass_fields(_rule)}
-    return set(getattr(_rule, "__dict__", {}).keys())
-
-def _mm_filter_rule_changes(_rule, _changes):
-    _fields = _mm_order_rule_field_names(_rule)
-    return {key: value for key, value in _changes.items() if key in _fields}
-
-def _mm_replace_order_rule(_rule, **_changes):
-    _filtered = _mm_filter_rule_changes(_rule, _changes)
-
-    if not _filtered:
-        return _rule
-
-    if _mm_is_dataclass(_rule):
-        try:
-            return _mm_dataclass_replace(_rule, **_filtered)
-        except Exception:
-            pass
-
-    try:
-        for _field, _value in _filtered.items():
-            setattr(_rule, _field, _value)
-        return _rule
-    except Exception:
-        pass
-
-    try:
-        for _field, _value in _filtered.items():
-            object.__setattr__(_rule, _field, _value)
-    except Exception:
-        pass
-
-    return _rule
-
-def _mm_add_custom_order_rule():
-    try:
-        CATEGORY_LABELS["custom"] = "自訂單"
-    except Exception:
-        pass
-
-    try:
-        ORDER_CATEGORY_LABELS["custom"] = "自訂單"
-    except Exception:
-        pass
-
-    _template = (
-        ORDER_RULES.get("farm_department_task")
-        or ORDER_RULES.get("basic_entertain_single")
-        or next(iter(ORDER_RULES.values()))
-    )
-
-    _allowed_roles = tuple(
-        role for role in (
-            "top_protector",
-            "female_protector",
-            "male_protector",
-            "male_companion",
-            "female_companion",
-        )
-    )
-
-    _changes = {
-        "key": "custom_custom_order",
-        "category": "custom",
-        "label": "自訂單",
-        "pricing_type": "manual",
-        "quantity_unit": "單",
-        "min_quantity": 1,
-        "max_quantity": 24,
-        "allow_specify": True,
-        "max_specified_count": 4,
-        "allowed_roles": _allowed_roles,
-        "required_staff_count": "player_count",
-        "price_multiply_player_count": False,
-        "max_player_count": 4,
-        "min_player_count": 1,
-        "player_count_enabled": True,
-        "min_protector_count": 0,
-        "point_benefits_allowed": False,
-        "base_amount": 0,
-        "base_price": 0,
-        "price": 0,
-        "unit_price": 0,
-        "hourly_price": 0,
-        "specify_fee": 0,
-    }
-
-    ORDER_RULES["custom_custom_order"] = _mm_replace_order_rule(_template, **_changes)
-
-
-
-
-
-
-
-_mm_add_custom_order_rule()
-# ===== legacy/custom compatibility helpers end =====
-
-
 ORDER_RULE_SNAPSHOT_VERSION = 1
 
 
@@ -1075,178 +994,3 @@ def build_order_rule_snapshot(
     }
 
     return _order_rule_snapshot_safe(snapshot)
-# ===== zYao self-service catalog v2 start =====
-# 新自助下單只使用明確 catalog；這裡只負責 rule 的價格、顯示名稱、數量、人數與指定規則。
-from dataclasses import replace as _zy_replace_order_rule
-
-CATEGORY_LABELS.update({
-    "basic": "三角洲 基礎單",
-    "fun": "三角洲 趣味單",
-    "farm": "三角洲 代肝代解",
-    "general": "通用單",
-    "steam": "STEAM遊戲 陪玩",
-    "valorant": "特戰英豪 陪玩",
-    "lol": "英雄聯盟 陪玩",
-    "apex": "APEX 陪玩",
-    "custom": "自訂",
-})
-
-
-def _zy_patch_rule(_key: str, **_changes):
-    _rule = ORDER_RULES.get(_key)
-    if _rule is None:
-        raise RuntimeError(f"missing order rule for self-service catalog v2: {_key}")
-    ORDER_RULES[_key] = _zy_replace_order_rule(_rule, **_changes)
-
-
-# 基礎單：固定套餐只有 1 單；小時計價品項依實際小時數計算。
-_zy_patch_rule("basic_exbar_gamble_zongheng", label="絕巴四幻神賭單｜縱橫", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_exbar_gamble_leiguan", label="絕巴四幻神賭單｜萬金淚冠", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_exbar_gamble_rangefinder", label="絕巴四幻神賭單｜測距儀", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_exbar_gamble_tianyuan", label="絕巴四幻神賭單｜天圓地方", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-
-_zy_patch_rule("basic_exbar_tech", label="絕巴技術陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_secret_single", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_secret_double", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_topsecret_single", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_topsecret_double", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_entertain_single", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_entertain_double", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_mobile_tech_secret_single", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_mobile_tech_secret_double", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_mobile_tech_topsecret_single", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_mobile_tech_topsecret_double", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_mobile_entertain_single", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_mobile_entertain_double", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule(
-    "basic_sweet_single",
-    category="general",
-    label="甜蜜單｜單陪",
-    unit_label="H",
-    min_quantity=1,
-    max_quantity=24,
-    allowed_roles=COMPANION_ROLES,
-    allowed_game_roles=(),
-    specify_free_min_units=2,
-    specify_free_basis="quantity",
-)
-
-_zy_patch_rule(
-    "basic_teaching_one",
-    category="general",
-    label="教學單｜1對1",
-    unit_label="H",
-    min_quantity=3,
-    max_quantity=24,
-    required_staff_count=1,
-    allowed_roles=("top_protector",),
-    allowed_game_roles=(
-        "lol_elite",
-        "apex_predator",
-        "valorant_radiant",
-    ),
-    allow_specify=False,
-)
-
-# 一般趣味單：固定 1 單，不開放指定。
-for _zy_fun_key in (
-    "fun_lovebirds",
-    "fun_read_no_reply",
-    "fun_rich_enough",
-    "fun_eat_yourself",
-):
-    _zy_patch_rule(
-        _zy_fun_key,
-        unit_label="單",
-        min_quantity=1,
-        max_quantity=1,
-        allow_specify=False,
-    )
-
-# 魔丸娛樂嘎拉給木：
-# 固定 1 單，可指定 1～2 位，但只限女陪 / 女護，指定費固定 0T。
-for _zy_galagame_key in (
-    "fun_mawan_galagame_basic",
-    "fun_mawan_galagame_standard",
-    "fun_mawan_galagame_hard",
-    "fun_mawan_galagame_hell",
-):
-    _zy_patch_rule(
-        _zy_galagame_key,
-        unit_label="單",
-        min_quantity=1,
-        max_quantity=1,
-        allow_specify=True,
-        max_specified_count=2,
-        allowed_roles=(
-            "female_companion",
-            "female_protector",
-        ),
-        specify_fee_default=0,
-        specify_fee_by_role={
-            "female_companion": 0,
-            "female_protector": 0,
-        },
-        point_benefits_allowed=False,
-    )
-
-# 代肝代解：賽季 3x3 / 部門任務由客服手動填價；哈夫幣固定 1 單。
-_zy_patch_rule(
-    "farm_season_3x3_normal",
-    label="賽季3x3",
-    pricing_type="fixed",
-    price=4000,
-    unit_label="單",
-    min_quantity=1,
-    max_quantity=1,
-    allow_specify=False,
-    staff_adjustments={
-        "skin": 2500,
-        "loss_cover": 500,
-    },
-    staff_adjustment_labels={
-        "skin": "造型",
-        "loss_cover": "包損耗",
-    },
-)
-_zy_patch_rule(
-    "farm_season_3x3_contract",
-    label="命運契約",
-    pricing_type="unit",
-    price=600,
-    unit_label="個",
-    min_quantity=1,
-    max_quantity=7,
-    allow_specify=False,
-    staff_adjustments={},
-    staff_adjustment_labels={},
-)
-
-_zy_patch_rule("farm_department_task", label="部門任務", pricing_type="manual", price=0, unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-
-
-# 自訂：1～4 位、1～24 小時，價格由客服手動填；仍可指定。
-_zy_patch_rule(
-    "custom_custom_order",
-    label="自訂｜自訂",
-    pricing_type="manual",
-    price=0,
-    unit_label="H",
-    min_quantity=1,
-    max_quantity=24,
-    min_player_count=1,
-    max_player_count=4,
-    player_count_enabled=True,
-    required_staff_count="player_count",
-    price_multiply_player_count=False,
-    allow_specify=True,
-    max_specified_count=4,
-    specify_fee_by_role=_all_receiver_fee(100),
-    specify_fee_default=100,
-    specify_free_min_units=2,
-    specify_free_basis="quantity",
-    point_benefits_allowed=False,
-)
-# ===== zYao self-service catalog v2 end =====
