@@ -7,9 +7,9 @@
 .ops-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .ops-card,.ops-panel{background:#15130f;border:1px solid rgba(223,183,92,.28);border-radius:16px;padding:16px;opacity:0;transform:translateY(8px);transition:opacity .38s ease,transform .38s ease,border-color .2s ease,box-shadow .2s ease}
 .ops-card.is-visible,.ops-panel.is-visible{opacity:1;transform:none}.ops-card:hover,.ops-panel:hover{border-color:rgba(223,183,92,.42);box-shadow:0 10px 24px rgba(0,0,0,.16)}
-.ops-card span{display:block;font-size:12px;opacity:.68;margin-bottom:8px}.ops-card strong{font-size:27px}.ops-card small{display:block;margin-top:6px;opacity:.58}
+.ops-card>span{display:block;font-size:12px;opacity:.68;margin-bottom:8px}.ops-card strong{font-size:27px}.ops-card small{display:block;margin-top:6px;opacity:.58;line-height:1.45}.ops-change{color:#dfb75c;opacity:.9}.ops-rate-caption{opacity:.72}
 .ops-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}.ops-panel{position:relative}.ops-panel h2{font-size:16px;margin:0 0 14px}
-.ops-canvas{width:100%;height:280px;display:block}.ops-table{width:100%;border-collapse:collapse}.ops-table th,.ops-table td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.ops-table th{font-size:12px;opacity:.65}.ops-table td:nth-child(n+2),.ops-table th:nth-child(n+2){text-align:right}
+.ops-canvas{width:100%;height:280px;display:block}.ops-table-wrap{width:100%;overflow-x:auto}.ops-table{width:100%;min-width:720px;border-collapse:collapse}.ops-table th,.ops-table td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.ops-table th{font-size:12px;opacity:.65}.ops-table td:nth-child(n+2),.ops-table th:nth-child(n+2){text-align:right}
 .ops-note{font-size:12px;opacity:.58;margin-top:10px}.ops-tooltip{position:absolute;z-index:4;pointer-events:none;min-width:110px;padding:8px 10px;border:1px solid rgba(223,183,92,.32);border-radius:10px;background:rgba(20,18,14,.96);box-shadow:0 8px 22px rgba(0,0,0,.22);font-size:12px;line-height:1.45;opacity:0;transform:translateY(4px);transition:opacity .16s ease,transform .16s ease}.ops-tooltip.is-visible{opacity:1;transform:none}.ops-tooltip strong{display:block;color:#dfb75c;font-size:12px;margin-bottom:2px}
 @media(max-width:900px){.ops-kpis{grid-template-columns:repeat(2,1fr)}.ops-grid{grid-template-columns:1fr}}
 @media(max-width:560px){.ops-kpis{grid-template-columns:1fr}}
@@ -32,14 +32,46 @@
   </div>
 
   <section class="ops-kpis">
-    <div class="ops-card"><span>營收</span><strong data-count="{{ report.revenue }}">{{ report.revenue }}</strong><small>{{ report.order_count }} 筆已結單</small></div>
-    <div class="ops-card"><span>人員薪資成本</span><strong data-count="{{ report.payroll }}">{{ report.payroll }}</strong><small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }}</small></div>
-    <div class="ops-card"><span>店家實留</span><strong data-count="{{ report.retained }}">{{ report.retained }}</strong><small>營收扣除陪玩與客服分潤</small></div>
-    <div class="ops-card"><span>平均客單</span><strong data-count="{{ report.avg_order }}">{{ report.avg_order }}</strong><small>每筆已結單平均營收</small></div>
-    <div class="ops-card"><span>付費客戶</span><strong data-count="{{ report.customer_count }}">{{ report.customer_count }}</strong><small>期間內不重複 Discord 客戶</small></div>
-    <div class="ops-card"><span>回購客戶</span><strong data-count="{{ report.repeat_customers }}">{{ report.repeat_customers }}</strong><small>期間內至少 2 筆 · {{ report.repeat_rate }}%</small></div>
-    <div class="ops-card"><span>陪玩薪資</span><strong data-count="{{ report.worker_cost }}">{{ report.worker_cost }}</strong><small>已結單產生之分潤</small></div>
-    <div class="ops-card"><span>客服薪資</span><strong data-count="{{ report.service_cost }}">{{ report.service_cost }}</strong><small>已結單產生之客服分潤</small></div>
+    <div class="ops-card">
+      <span>營收</span>
+      <strong data-count="{{ report.revenue }}">{{ report.revenue }}</strong>
+      <small>{{ report.order_count }} 筆已結單{% if report.comparison and report.comparison.order_count %} · 筆數 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.order_count.rate is not none %}{% if report.comparison.order_count.rate > 0 %}+{% endif %}{{ report.comparison.order_count.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}{% if report.comparison and report.comparison.revenue %}<br>營收 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.revenue.rate is not none %}{% if report.comparison.revenue.rate > 0 %}+{% endif %}{{ report.comparison.revenue.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+    </div>
+    <div class="ops-card">
+      <span>人員薪資成本</span>
+      <strong data-count="{{ report.payroll }}">{{ report.payroll }}</strong>
+      <small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }} · <span class="ops-rate-caption">成本率 {{ report.payroll_rate }}%</span>{% if report.comparison and report.comparison.payroll %}<br>成本 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.payroll.rate is not none %}{% if report.comparison.payroll.rate > 0 %}+{% endif %}{{ report.comparison.payroll.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+    </div>
+    <div class="ops-card">
+      <span>店家實留</span>
+      <strong data-count="{{ report.retained }}">{{ report.retained }}</strong>
+      <small>營收扣除陪玩與客服分潤{% if report.comparison and report.comparison.retained %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.retained.rate is not none %}{% if report.comparison.retained.rate > 0 %}+{% endif %}{{ report.comparison.retained.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+    </div>
+    <div class="ops-card">
+      <span>店家實留率</span>
+      <strong><span data-count="{{ report.retained_rate }}" data-decimals="1">{{ report.retained_rate }}</span>%</strong>
+      <small>店家實留 ÷ 營收；不含其他營運費用</small>
+    </div>
+    <div class="ops-card">
+      <span>平均客單</span>
+      <strong data-count="{{ report.avg_order }}">{{ report.avg_order }}</strong>
+      <small>每筆已結單平均營收{% if report.comparison and report.comparison.avg_order %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.avg_order.rate is not none %}{% if report.comparison.avg_order.rate > 0 %}+{% endif %}{{ report.comparison.avg_order.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+    </div>
+    <div class="ops-card">
+      <span>付費客戶</span>
+      <strong data-count="{{ report.customer_count }}">{{ report.customer_count }}</strong>
+      <small>期間內不重複 Discord 客戶{% if report.comparison and report.comparison.customer_count %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.customer_count.rate is not none %}{% if report.comparison.customer_count.rate > 0 %}+{% endif %}{{ report.comparison.customer_count.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+    </div>
+    <div class="ops-card">
+      <span>回購客戶</span>
+      <strong data-count="{{ report.repeat_customers }}">{{ report.repeat_customers }}</strong>
+      <small>期間內至少 2 筆 · 回購率 {{ report.repeat_rate }}%</small>
+    </div>
+    <div class="ops-card">
+      <span>優惠減免</span>
+      <strong data-count="{{ report.discount_total }}">{{ report.discount_total }}</strong>
+      <small>比例折扣 {{ report.percent_discount }} · 固定折扣 {{ report.fixed_discount }} · 點數折抵 {{ report.point_discount }}</small>
+    </div>
   </section>
 
   <section class="ops-grid">
@@ -49,10 +81,13 @@
 
   <section class="ops-grid">
     <div class="ops-panel">
-      <h2>服務營收排行</h2>
-      <table class="ops-table"><thead><tr><th>服務</th><th>訂單</th><th>營收</th></tr></thead><tbody>
-      {% for row in report.service_rows %}<tr><td>{{ row.label }}</td><td>{{ row.orders }}</td><td>{{ row.revenue }}</td></tr>{% else %}<tr><td colspan="3">目前沒有資料</td></tr>{% endfor %}
-      </tbody></table>
+      <h2>服務營運效率</h2>
+      <div class="ops-table-wrap">
+        <table class="ops-table"><thead><tr><th>服務</th><th>訂單</th><th>營收</th><th>人員成本</th><th>店家實留</th><th>實留率</th></tr></thead><tbody>
+        {% for row in report.service_rows %}<tr><td>{{ row.label }}</td><td>{{ row.orders }}</td><td>{{ row.revenue }}</td><td>{{ row.payroll }}</td><td>{{ row.retained }}</td><td>{{ row.retained_rate }}%</td></tr>{% else %}<tr><td colspan="6">目前沒有資料</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+      <div class="ops-note">店家實留僅扣除陪玩與客服分潤，不等同會計淨利。</div>
     </div>
     <div class="ops-panel">
       <h2>陪玩分潤排行</h2>
@@ -190,15 +225,23 @@
  function animateCounters(){
    document.querySelectorAll('[data-count]').forEach((el)=>{
      const target=Number(el.dataset.count||0);
+     const decimals=Math.max(0,Number(el.dataset.decimals||0));
      if(!Number.isFinite(target))return;
-     if(reduceMotion){el.textContent=numberFormat.format(target);return}
+     const formatter=decimals
+       ? new Intl.NumberFormat('zh-TW',{minimumFractionDigits:decimals,maximumFractionDigits:decimals})
+       : numberFormat;
+     const render=(value)=>{
+       const next=decimals?Number(value.toFixed(decimals)):Math.round(value);
+       el.textContent=formatter.format(next);
+     };
+     if(reduceMotion){render(target);return}
      const duration=650,start=performance.now();
      function step(now){
        const t=Math.min(1,(now-start)/duration),eased=1-Math.pow(1-t,3);
-       el.textContent=numberFormat.format(Math.round(target*eased));
+       render(target*eased);
        if(t<1)requestAnimationFrame(step);
      }
-     el.textContent='0';requestAnimationFrame(step);
+     render(0);requestAnimationFrame(step);
    });
  }
 

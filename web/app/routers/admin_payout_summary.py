@@ -970,34 +970,143 @@ async def update_summary_person_status(request: Request):
     return RedirectResponse(url=url, status_code=303)
 
 
-def _report_period(period: str | None) -> tuple[str, str | None, str]:
+def _shift_month_start(value: datetime, months: int) -> datetime:
+    total_months = value.year * 12 + (value.month - 1) + months
+    year, month_zero = divmod(total_months, 12)
+    return value.replace(
+        year=year,
+        month=month_zero + 1,
+        day=1,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+
+def _report_period(
+    period: str | None,
+) -> tuple[
+    str,
+    str | None,
+    str,
+    str | None,
+    str | None,
+    str | None,
+]:
     period = str(period or "quarter").strip().lower()
-    now = datetime.utcnow()
-    if period == "month":
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        return period, start.strftime("%Y-%m-%d %H:%M:%S"), "本月"
-    if period == "year":
-        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        return period, start.strftime("%Y-%m-%d %H:%M:%S"), "本年度"
+    # web_orders.closed_at is stored in Taipei local time.
+    now = datetime.utcnow() + timedelta(hours=8)
+
     if period == "all":
-        return period, None, "全部期間"
-    quarter_month = ((now.month - 1) // 3) * 3 + 1
-    start = now.replace(month=quarter_month, day=1, hour=0, minute=0, second=0, microsecond=0)
-    return "quarter", start.strftime("%Y-%m-%d %H:%M:%S"), "本季度"
+        return "all", None, "全部期間", None, None, None
+
+    if period == "month":
+        start = now.replace(
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        previous_start = _shift_month_start(start, -1)
+        previous_label = "上月同期"
+        period_label = "本月"
+    elif period == "year":
+        start = now.replace(
+            month=1,
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        previous_start = start.replace(year=start.year - 1)
+        previous_label = "去年同期"
+        period_label = "本年度"
+    else:
+        period = "quarter"
+        quarter_month = ((now.month - 1) // 3) * 3 + 1
+        start = now.replace(
+            month=quarter_month,
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        previous_start = _shift_month_start(start, -3)
+        previous_label = "上季同期"
+        period_label = "本季度"
+
+    # Compare the same elapsed length instead of a full previous period,
+    # so a month-to-date report is not compared with an entire prior month.
+    previous_end = min(
+        start,
+        previous_start + (now - start),
+    )
+
+    return (
+        period,
+        start.strftime("%Y-%m-%d %H:%M:%S"),
+        period_label,
+        previous_start.strftime("%Y-%m-%d %H:%M:%S"),
+        previous_end.strftime("%Y-%m-%d %H:%M:%S"),
+        previous_label,
+    )
+
+
+def _report_change(current: int | float, previous: int | float) -> dict:
+    current_value = float(current or 0)
+    previous_value = float(previous or 0)
+    delta = current_value - previous_value
+    rate = None
+
+    if previous_value:
+        rate = round(delta * 100 / previous_value, 1)
+
+    return {
+        "previous": round(previous_value, 1),
+        "delta": round(delta, 1),
+        "rate": rate,
+    }
 
 
 def build_operations_report(period: str | None) -> dict:
-    period, start_at, period_label = _report_period(period)
+    (
+        period,
+        start_at,
+        period_label,
+        previous_start_at,
+        previous_end_at,
+        previous_label,
+    ) = _report_period(period)
+
     conn = sqlite3.connect(db_path())
     conn.row_factory = sqlite3.Row
-    where = "WHERE w.status = 'closed'"
-    params: list[str] = []
-    if start_at:
-        where += " AND COALESCE(NULLIF(w.closed_at,''), NULLIF(w.updated_at,''), w.created_at) >= ?"
-        params.append(start_at)
 
-    try:
-        orders = conn.execute(f"""
+    closed_expr = (
+        "COALESCE(NULLIF(w.closed_at,''), "
+        "NULLIF(w.updated_at,''), w.created_at)"
+    )
+
+    def order_window(
+        start_value: str | None,
+        end_value: str | None = None,
+    ) -> tuple[list[sqlite3.Row], str, list[str]]:
+        where = "WHERE w.status = 'closed'"
+        params: list[str] = []
+
+        if start_value:
+            where += f" AND {closed_expr} >= ?"
+            params.append(start_value)
+
+        if end_value:
+            where += f" AND {closed_expr} < ?"
+            params.append(end_value)
+
+        rows = conn.execute(
+            f"""
             SELECT
                 w.id,
                 w.bot_order_no,
@@ -1006,76 +1115,263 @@ def build_operations_report(period: str | None) -> dict:
                 w.customer_discord_id,
                 w.customer_display_name,
                 COALESCE(w.customer_pay_amount, w.amount, 0) AS revenue,
-                COALESCE(NULLIF(w.closed_at,''), NULLIF(w.updated_at,''), w.created_at) AS closed_at,
-                COALESCE((SELECT SUM(p.final_payout) FROM worker_payouts p WHERE p.order_id = w.id), 0) AS worker_cost,
-                COALESCE((SELECT SUM(p.payout_amount) FROM customer_service_payouts p WHERE p.order_id = w.id), 0) AS service_cost
+                COALESCE(w.manual_discount_amount, 0) AS percent_discount,
+                COALESCE(w.cash_coupon_amount, 0) AS fixed_discount,
+                COALESCE(w.store_absorbed_amount, 0) AS point_discount,
+                {closed_expr} AS closed_at,
+                COALESCE((
+                    SELECT SUM(p.final_payout)
+                    FROM worker_payouts p
+                    WHERE p.order_id = w.id
+                ), 0) AS worker_cost,
+                COALESCE((
+                    SELECT SUM(p.payout_amount)
+                    FROM customer_service_payouts p
+                    WHERE p.order_id = w.id
+                ), 0) AS service_cost
             FROM web_orders w
             {where}
             ORDER BY closed_at ASC
-        """, params).fetchall()
+            """,
+            params,
+        ).fetchall()
 
-        worker_rows = conn.execute(f"""
+        return rows, where, params
+
+    def summarize(rows: list[sqlite3.Row]) -> dict:
+        revenue = sum(int(row["revenue"] or 0) for row in rows)
+        worker_cost = sum(int(row["worker_cost"] or 0) for row in rows)
+        service_cost = sum(int(row["service_cost"] or 0) for row in rows)
+        payroll = worker_cost + service_cost
+        retained = revenue - payroll
+        order_count = len(rows)
+        avg_order = round(revenue / order_count) if order_count else 0
+
+        percent_discount = sum(
+            max(0, int(row["percent_discount"] or 0))
+            for row in rows
+        )
+        fixed_discount = sum(
+            max(0, int(row["fixed_discount"] or 0))
+            for row in rows
+        )
+        point_discount = sum(
+            max(0, int(row["point_discount"] or 0))
+            for row in rows
+        )
+        discount_total = (
+            percent_discount
+            + fixed_discount
+            + point_discount
+        )
+
+        retained_rate = (
+            round(retained * 100 / revenue, 1)
+            if revenue
+            else 0.0
+        )
+        payroll_rate = (
+            round(payroll * 100 / revenue, 1)
+            if revenue
+            else 0.0
+        )
+
+        customers: dict[str, int] = {}
+        for row in rows:
+            customer_id = str(
+                row["customer_discord_id"] or ""
+            ).strip()
+            if customer_id:
+                customers[customer_id] = (
+                    customers.get(customer_id, 0) + 1
+                )
+
+        repeat_customers = sum(
+            1
+            for count in customers.values()
+            if count >= 2
+        )
+        repeat_rate = (
+            round(
+                repeat_customers * 100 / len(customers),
+                1,
+            )
+            if customers
+            else 0.0
+        )
+
+        return {
+            "revenue": revenue,
+            "worker_cost": worker_cost,
+            "service_cost": service_cost,
+            "payroll": payroll,
+            "retained": retained,
+            "retained_rate": retained_rate,
+            "payroll_rate": payroll_rate,
+            "order_count": order_count,
+            "avg_order": avg_order,
+            "customer_count": len(customers),
+            "repeat_customers": repeat_customers,
+            "repeat_rate": repeat_rate,
+            "percent_discount": percent_discount,
+            "fixed_discount": fixed_discount,
+            "point_discount": point_discount,
+            "discount_total": discount_total,
+        }
+
+    try:
+        orders, current_where, current_params = order_window(
+            start_at,
+        )
+
+        previous_orders: list[sqlite3.Row] = []
+        if previous_start_at and previous_end_at:
+            previous_orders, _, _ = order_window(
+                previous_start_at,
+                previous_end_at,
+            )
+
+        worker_rows = conn.execute(
+            f"""
             SELECT
                 p.worker_discord_id,
-                COALESCE(NULLIF(p.worker_display_name,''), p.worker_discord_id) AS name,
+                COALESCE(
+                    NULLIF(p.worker_display_name,''),
+                    p.worker_discord_id
+                ) AS name,
                 SUM(COALESCE(p.final_payout,0)) AS amount,
                 COUNT(*) AS jobs
             FROM worker_payouts p
             JOIN web_orders w ON w.id = p.order_id
-            {where}
+            {current_where}
             GROUP BY p.worker_discord_id, name
             HAVING amount > 0
             ORDER BY amount DESC
             LIMIT 8
-        """, params).fetchall()
+            """,
+            current_params,
+        ).fetchall()
     finally:
         conn.close()
 
-    revenue = sum(int(row["revenue"] or 0) for row in orders)
-    worker_cost = sum(int(row["worker_cost"] or 0) for row in orders)
-    service_cost = sum(int(row["service_cost"] or 0) for row in orders)
-    payroll = worker_cost + service_cost
-    retained = revenue - payroll
-    order_count = len(orders)
-    avg_order = round(revenue / order_count) if order_count else 0
+    current = summarize(orders)
+    previous = summarize(previous_orders)
 
     daily: dict[str, int] = {}
     services: dict[str, dict] = {}
-    customers: dict[str, int] = {}
+
     for row in orders:
         day = str(row["closed_at"] or "")[:10] or "未紀錄"
-        daily[day] = daily.get(day, 0) + int(row["revenue"] or 0)
-        service = str(row["item"] or row["category"] or "其他")
-        bucket = services.setdefault(service, {"label": service, "revenue": 0, "orders": 0})
-        bucket["revenue"] += int(row["revenue"] or 0)
-        bucket["orders"] += 1
-        customer_id = str(row["customer_discord_id"] or "").strip()
-        if customer_id:
-            customers[customer_id] = customers.get(customer_id, 0) + 1
+        daily[day] = (
+            daily.get(day, 0)
+            + int(row["revenue"] or 0)
+        )
 
-    service_rows = sorted(services.values(), key=lambda x: (-x["revenue"], x["label"]))
-    repeat_customers = sum(1 for count in customers.values() if count >= 2)
-    repeat_rate = round(repeat_customers * 100 / len(customers), 1) if customers else 0.0
+        service = str(
+            row["item"]
+            or row["category"]
+            or "其他"
+        )
+        bucket = services.setdefault(
+            service,
+            {
+                "label": service,
+                "revenue": 0,
+                "orders": 0,
+                "worker_cost": 0,
+                "service_cost": 0,
+                "payroll": 0,
+                "retained": 0,
+                "retained_rate": 0.0,
+            },
+        )
+
+        row_revenue = int(row["revenue"] or 0)
+        row_worker_cost = int(row["worker_cost"] or 0)
+        row_service_cost = int(row["service_cost"] or 0)
+
+        bucket["revenue"] += row_revenue
+        bucket["orders"] += 1
+        bucket["worker_cost"] += row_worker_cost
+        bucket["service_cost"] += row_service_cost
+        bucket["payroll"] += (
+            row_worker_cost + row_service_cost
+        )
+
+    for bucket in services.values():
+        bucket["retained"] = (
+            bucket["revenue"]
+            - bucket["payroll"]
+        )
+        bucket["retained_rate"] = (
+            round(
+                bucket["retained"]
+                * 100
+                / bucket["revenue"],
+                1,
+            )
+            if bucket["revenue"]
+            else 0.0
+        )
+
+    service_rows = sorted(
+        services.values(),
+        key=lambda item: (
+            -item["revenue"],
+            item["label"],
+        ),
+    )
+
+    comparison = {}
+    if previous_start_at and previous_end_at:
+        comparison = {
+            "revenue": _report_change(
+                current["revenue"],
+                previous["revenue"],
+            ),
+            "payroll": _report_change(
+                current["payroll"],
+                previous["payroll"],
+            ),
+            "retained": _report_change(
+                current["retained"],
+                previous["retained"],
+            ),
+            "avg_order": _report_change(
+                current["avg_order"],
+                previous["avg_order"],
+            ),
+            "order_count": _report_change(
+                current["order_count"],
+                previous["order_count"],
+            ),
+            "customer_count": _report_change(
+                current["customer_count"],
+                previous["customer_count"],
+            ),
+        }
 
     return {
         "period": period,
         "period_label": period_label,
-        "revenue": revenue,
-        "worker_cost": worker_cost,
-        "service_cost": service_cost,
-        "payroll": payroll,
-        "retained": retained,
-        "order_count": order_count,
-        "avg_order": avg_order,
-        "customer_count": len(customers),
-        "repeat_customers": repeat_customers,
-        "repeat_rate": repeat_rate,
+        "previous_label": previous_label,
+        "comparison": comparison,
+        **current,
         "daily_labels": list(daily.keys()),
         "daily_values": list(daily.values()),
         "service_rows": service_rows[:10],
-        "service_labels": [row["label"] for row in service_rows[:8]],
-        "service_values": [row["revenue"] for row in service_rows[:8]],
-        "worker_rows": [dict(row) for row in worker_rows],
+        "service_labels": [
+            row["label"]
+            for row in service_rows[:8]
+        ],
+        "service_values": [
+            row["revenue"]
+            for row in service_rows[:8]
+        ],
+        "worker_rows": [
+            dict(row)
+            for row in worker_rows
+        ],
     }
 
 
