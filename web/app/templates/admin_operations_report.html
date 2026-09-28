@@ -11,9 +11,11 @@
 .ops-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}.ops-panel{position:relative}.ops-panel h2{font-size:16px;margin:0 0 14px}
 .ops-canvas{width:100%;height:280px;display:block}.ops-table-wrap{width:100%;overflow-x:auto}.ops-table{width:100%;min-width:720px;border-collapse:collapse}.ops-table th,.ops-table td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.ops-table th{font-size:12px;opacity:.65}.ops-table td:nth-child(n+2),.ops-table th:nth-child(n+2){text-align:right}
 .ops-note{font-size:12px;opacity:.58;margin-top:10px}.ops-tooltip{position:absolute;z-index:4;pointer-events:none;min-width:110px;padding:8px 10px;border:1px solid rgba(223,183,92,.32);border-radius:10px;background:rgba(20,18,14,.96);box-shadow:0 8px 22px rgba(0,0,0,.22);font-size:12px;line-height:1.45;opacity:0;transform:translateY(4px);transition:opacity .16s ease,transform .16s ease}.ops-tooltip.is-visible{opacity:1;transform:none}.ops-tooltip strong{display:block;color:#dfb75c;font-size:12px;margin-bottom:2px}
-@media(max-width:900px){.ops-kpis{grid-template-columns:repeat(2,1fr)}.ops-grid{grid-template-columns:1fr}}
+.ops-grid-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.ops-insight-value{font-size:30px;font-weight:700;line-height:1.1}.ops-insight-sub{font-size:12px;opacity:.62;margin-top:6px}.ops-share-list{display:grid;gap:12px}.ops-share-head{display:flex;justify-content:space-between;gap:12px;align-items:baseline;font-size:13px}.ops-share-head span:last-child{opacity:.72;white-space:nowrap}.ops-share-track{height:7px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px}.ops-share-fill{height:100%;width:0;border-radius:inherit;background:#dfb75c;transition:width .75s cubic-bezier(.22,.8,.25,1)}.ops-panel.is-visible .ops-share-fill{width:var(--share)}.ops-share-meta{font-size:11px;opacity:.55;margin-top:4px}
+@media(max-width:1100px){.ops-grid-three{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.ops-kpis{grid-template-columns:repeat(2,1fr)}.ops-grid,.ops-grid-three{grid-template-columns:1fr}}
 @media(max-width:560px){.ops-kpis{grid-template-columns:1fr}}
-@media(prefers-reduced-motion:reduce){.ops-card,.ops-panel{opacity:1;transform:none;transition:none}.ops-card:hover,.ops-panel:hover{box-shadow:none}}
+@media(prefers-reduced-motion:reduce){.ops-card,.ops-panel{opacity:1;transform:none;transition:none}.ops-card:hover,.ops-panel:hover{box-shadow:none}.ops-share-fill{width:var(--share);transition:none}}
 </style>
 
 <div class="ops-report">
@@ -77,6 +79,55 @@
   <section class="ops-grid">
     <div class="ops-panel"><h2>營收趨勢</h2><canvas id="revenueTrend" class="ops-canvas"></canvas><div class="ops-note">依結單日彙總。</div></div>
     <div class="ops-panel"><h2>服務營收占比</h2><canvas id="servicePie" class="ops-canvas"></canvas><div class="ops-note">顯示營收最高的前 8 個服務。</div></div>
+  </section>
+
+  <section class="ops-grid-three">
+    <div class="ops-panel">
+      <h2>客戶營收結構</h2>
+      <div class="ops-share-list">
+        <div>
+          <div class="ops-share-head"><span>新客首單營收</span><span>{{ report.new_customer_revenue }} · {{ report.new_customer_revenue_share }}%</span></div>
+          <div class="ops-share-track"><div class="ops-share-fill" style="--share:{{ report.new_customer_revenue_share }}%"></div></div>
+          <div class="ops-share-meta">{{ report.new_customer_orders }} 筆首單</div>
+        </div>
+        <div>
+          <div class="ops-share-head"><span>回購營收</span><span>{{ report.repeat_customer_revenue }} · {{ report.repeat_customer_revenue_share }}%</span></div>
+          <div class="ops-share-track"><div class="ops-share-fill" style="--share:{{ report.repeat_customer_revenue_share }}%"></div></div>
+          <div class="ops-share-meta">{{ report.repeat_customer_orders }} 筆第二單以上</div>
+        </div>
+        {% if report.unidentified_customer_revenue %}
+        <div>
+          <div class="ops-share-head"><span>未識別客戶</span><span>{{ report.unidentified_customer_revenue }}</span></div>
+          <div class="ops-share-meta">{{ report.unidentified_customer_orders }} 筆沒有 Discord 客戶 ID，不納入新客／回購占比。</div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="ops-note">新客＝該客戶第一筆已結單；其後已結單皆列為回購營收。</div>
+    </div>
+
+    <div class="ops-panel">
+      <h2>訂單取消狀況</h2>
+      <div class="ops-insight-value"><span data-count="{{ report.cancellation_rate }}" data-decimals="1">{{ report.cancellation_rate }}</span>%</div>
+      <div class="ops-insight-sub">{{ report.cancelled_orders }} 筆取消 / {{ report.created_orders }} 筆建立訂單</div>
+      <div class="ops-share-track" style="margin-top:14px"><div class="ops-share-fill" style="--share:{{ report.cancellation_rate }}%"></div></div>
+      <div class="ops-note">依訂單建立日計算；包含期間內尚未結單的訂單作為分母。</div>
+    </div>
+
+    <div class="ops-panel">
+      <h2>付款方式占比</h2>
+      <div class="ops-share-list">
+        {% for row in report.payment_rows %}
+        <div>
+          <div class="ops-share-head"><span>{{ row.label }}</span><span>{{ row.revenue }} · {{ row.share }}%</span></div>
+          <div class="ops-share-track"><div class="ops-share-fill" style="--share:{{ row.share }}%"></div></div>
+          <div class="ops-share-meta">{{ row.orders }} 筆已結單</div>
+        </div>
+        {% else %}
+        <div class="muted">目前沒有付款資料</div>
+        {% endfor %}
+      </div>
+      <div class="ops-note">占比依已結單實收營收計算；「待付款／未紀錄」若出現代表舊資料尚未補齊。</div>
+    </div>
   </section>
 
   <section class="ops-grid">
