@@ -5,13 +5,15 @@
 .ops-head h1{margin:4px 0 0}.ops-kicker{font-size:12px;letter-spacing:.16em;opacity:.65}
 .ops-filter{display:flex;gap:8px;align-items:center}.ops-filter select{min-width:130px}
 .ops-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.ops-card,.ops-panel{background:#15130f;border:1px solid rgba(223,183,92,.28);border-radius:16px;padding:16px}
+.ops-card,.ops-panel{background:#15130f;border:1px solid rgba(223,183,92,.28);border-radius:16px;padding:16px;opacity:0;transform:translateY(8px);transition:opacity .38s ease,transform .38s ease,border-color .2s ease,box-shadow .2s ease}
+.ops-card.is-visible,.ops-panel.is-visible{opacity:1;transform:none}.ops-card:hover,.ops-panel:hover{border-color:rgba(223,183,92,.42);box-shadow:0 10px 24px rgba(0,0,0,.16)}
 .ops-card span{display:block;font-size:12px;opacity:.68;margin-bottom:8px}.ops-card strong{font-size:27px}.ops-card small{display:block;margin-top:6px;opacity:.58}
-.ops-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}.ops-panel h2{font-size:16px;margin:0 0 14px}
+.ops-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}.ops-panel{position:relative}.ops-panel h2{font-size:16px;margin:0 0 14px}
 .ops-canvas{width:100%;height:280px;display:block}.ops-table{width:100%;border-collapse:collapse}.ops-table th,.ops-table td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.ops-table th{font-size:12px;opacity:.65}.ops-table td:nth-child(n+2),.ops-table th:nth-child(n+2){text-align:right}
-.ops-note{font-size:12px;opacity:.58;margin-top:10px}
+.ops-note{font-size:12px;opacity:.58;margin-top:10px}.ops-tooltip{position:absolute;z-index:4;pointer-events:none;min-width:110px;padding:8px 10px;border:1px solid rgba(223,183,92,.32);border-radius:10px;background:rgba(20,18,14,.96);box-shadow:0 8px 22px rgba(0,0,0,.22);font-size:12px;line-height:1.45;opacity:0;transform:translateY(4px);transition:opacity .16s ease,transform .16s ease}.ops-tooltip.is-visible{opacity:1;transform:none}.ops-tooltip strong{display:block;color:#dfb75c;font-size:12px;margin-bottom:2px}
 @media(max-width:900px){.ops-kpis{grid-template-columns:repeat(2,1fr)}.ops-grid{grid-template-columns:1fr}}
 @media(max-width:560px){.ops-kpis{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.ops-card,.ops-panel{opacity:1;transform:none;transition:none}.ops-card:hover,.ops-panel:hover{box-shadow:none}}
 </style>
 
 <div class="ops-report">
@@ -30,14 +32,14 @@
   </div>
 
   <section class="ops-kpis">
-    <div class="ops-card"><span>營收</span><strong>{{ report.revenue }}</strong><small>{{ report.order_count }} 筆已結單</small></div>
-    <div class="ops-card"><span>人員薪資成本</span><strong>{{ report.payroll }}</strong><small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }}</small></div>
-    <div class="ops-card"><span>店家實留</span><strong>{{ report.retained }}</strong><small>營收扣除陪玩與客服分潤</small></div>
-    <div class="ops-card"><span>平均客單</span><strong>{{ report.avg_order }}</strong><small>每筆已結單平均營收</small></div>
-    <div class="ops-card"><span>付費客戶</span><strong>{{ report.customer_count }}</strong><small>期間內不重複 Discord 客戶</small></div>
-    <div class="ops-card"><span>回購客戶</span><strong>{{ report.repeat_customers }}</strong><small>期間內至少 2 筆 · {{ report.repeat_rate }}%</small></div>
-    <div class="ops-card"><span>陪玩薪資</span><strong>{{ report.worker_cost }}</strong><small>已結單產生之分潤</small></div>
-    <div class="ops-card"><span>客服薪資</span><strong>{{ report.service_cost }}</strong><small>已結單產生之客服分潤</small></div>
+    <div class="ops-card"><span>營收</span><strong data-count="{{ report.revenue }}">{{ report.revenue }}</strong><small>{{ report.order_count }} 筆已結單</small></div>
+    <div class="ops-card"><span>人員薪資成本</span><strong data-count="{{ report.payroll }}">{{ report.payroll }}</strong><small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }}</small></div>
+    <div class="ops-card"><span>店家實留</span><strong data-count="{{ report.retained }}">{{ report.retained }}</strong><small>營收扣除陪玩與客服分潤</small></div>
+    <div class="ops-card"><span>平均客單</span><strong data-count="{{ report.avg_order }}">{{ report.avg_order }}</strong><small>每筆已結單平均營收</small></div>
+    <div class="ops-card"><span>付費客戶</span><strong data-count="{{ report.customer_count }}">{{ report.customer_count }}</strong><small>期間內不重複 Discord 客戶</small></div>
+    <div class="ops-card"><span>回購客戶</span><strong data-count="{{ report.repeat_customers }}">{{ report.repeat_customers }}</strong><small>期間內至少 2 筆 · {{ report.repeat_rate }}%</small></div>
+    <div class="ops-card"><span>陪玩薪資</span><strong data-count="{{ report.worker_cost }}">{{ report.worker_cost }}</strong><small>已結單產生之分潤</small></div>
+    <div class="ops-card"><span>客服薪資</span><strong data-count="{{ report.service_cost }}">{{ report.service_cost }}</strong><small>已結單產生之客服分潤</small></div>
   </section>
 
   <section class="ops-grid">
@@ -53,7 +55,7 @@
       </tbody></table>
     </div>
     <div class="ops-panel">
-      <h2>陪玩產值排行</h2>
+      <h2>陪玩分潤排行</h2>
       <table class="ops-table"><thead><tr><th>人員</th><th>筆數</th><th>分潤</th></tr></thead><tbody>
       {% for row in report.worker_rows %}<tr><td>{{ row.name }}</td><td>{{ row.jobs }}</td><td>{{ row.amount }}</td></tr>{% else %}<tr><td colspan="3">目前沒有資料</td></tr>{% endfor %}
       </tbody></table>
@@ -65,10 +67,158 @@
 (function(){
  const trendLabels={{ report.daily_labels|tojson }}, trendValues={{ report.daily_values|tojson }};
  const pieLabels={{ report.service_labels|tojson }}, pieValues={{ report.service_values|tojson }};
- function fit(c){const d=devicePixelRatio||1,r=c.getBoundingClientRect();c.width=Math.max(1,r.width*d);c.height=Math.max(1,r.height*d);const x=c.getContext('2d');x.scale(d,d);return [x,r.width,r.height]}
- function lineChart(){const c=document.getElementById('revenueTrend'),[x,w,h]=fit(c);x.clearRect(0,0,w,h);const p=34,max=Math.max(1,...trendValues);x.strokeStyle='rgba(223,183,92,.25)';x.fillStyle='rgba(255,255,255,.55)';x.font='11px sans-serif';for(let i=0;i<5;i++){let y=p+(h-p*2)*i/4;x.beginPath();x.moveTo(p,y);x.lineTo(w-p,y);x.stroke();x.fillText(Math.round(max*(4-i)/4),2,y+4)}if(!trendValues.length)return;x.strokeStyle='#dfb75c';x.lineWidth=2;x.beginPath();trendValues.forEach((v,i)=>{let xx=p+(w-p*2)*(trendValues.length===1?.5:i/(trendValues.length-1)),yy=h-p-(h-p*2)*v/max;i?x.lineTo(xx,yy):x.moveTo(xx,yy)});x.stroke();x.fillStyle='#dfb75c';trendValues.forEach((v,i)=>{let xx=p+(w-p*2)*(trendValues.length===1?.5:i/(trendValues.length-1)),yy=h-p-(h-p*2)*v/max;x.beginPath();x.arc(xx,yy,3,0,Math.PI*2);x.fill()})}
- function pieChart(){const c=document.getElementById('servicePie'),[x,w,h]=fit(c);x.clearRect(0,0,w,h);const total=pieValues.reduce((a,b)=>a+b,0);if(!total)return;const colors=['#dfb75c','#8fa7c7','#c88f8f','#86aa91','#a991c2','#c6a77c','#78aeb2','#b59aa7'];let a=-Math.PI/2,cx=w*.38,cy=h*.5,r=Math.min(w*.3,h*.38);pieValues.forEach((v,i)=>{let n=a+Math.PI*2*v/total;x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,r,a,n);x.closePath();x.fillStyle=colors[i%colors.length];x.fill();a=n});x.font='11px sans-serif';pieLabels.forEach((label,i)=>{let y=20+i*27;x.fillStyle=colors[i%colors.length];x.fillRect(w*.72,y-9,10,10);x.fillStyle='rgba(255,255,255,.78)';x.fillText(label.slice(0,12),w*.72+16,y)})}
- function draw(){lineChart();pieChart()} draw();let t;addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(draw,120)})
+ const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const numberFormat=new Intl.NumberFormat('zh-TW');
+ let lineGeometry=null,pieGeometry=null,lineHover=-1,pieHover=-1;
+
+ function fit(c){
+   const d=window.devicePixelRatio||1,r=c.getBoundingClientRect();
+   const width=Math.max(1,Math.round(r.width*d)),height=Math.max(1,Math.round(r.height*d));
+   if(c.width!==width||c.height!==height){c.width=width;c.height=height}
+   const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);
+   return [x,r.width,r.height]
+ }
+
+ function lineChart(progress,hoverIndex=lineHover){
+   const c=document.getElementById('revenueTrend'),[x,w,h]=fit(c);
+   x.clearRect(0,0,w,h);
+   const p=34,max=Math.max(1,...trendValues);
+   x.strokeStyle='rgba(223,183,92,.25)';x.fillStyle='rgba(255,255,255,.55)';x.font='11px sans-serif';
+   for(let i=0;i<5;i++){const y=p+(h-p*2)*i/4;x.beginPath();x.moveTo(p,y);x.lineTo(w-p,y);x.stroke();x.fillText(Math.round(max*(4-i)/4),2,y+4)}
+   if(!trendValues.length){lineGeometry=null;return}
+   const points=trendValues.map((v,i)=>({
+     x:p+(w-p*2)*(trendValues.length===1?.5:i/(trendValues.length-1)),
+     y:h-p-(h-p*2)*v/max,
+     value:v,
+     label:trendLabels[i]||''
+   }));
+   lineGeometry={points};
+   x.strokeStyle='#dfb75c';x.lineWidth=2;x.lineCap='round';x.lineJoin='round';x.beginPath();x.moveTo(points[0].x,points[0].y);
+   if(points.length>1){
+     const target=Math.max(0,Math.min(points.length-1,progress*(points.length-1)));
+     const full=Math.floor(target);
+     for(let i=1;i<=full;i++)x.lineTo(points[i].x,points[i].y);
+     if(full<points.length-1){
+       const part=target-full,a=points[full],b=points[full+1];
+       x.lineTo(a.x+(b.x-a.x)*part,a.y+(b.y-a.y)*part);
+     }
+   }
+   x.stroke();
+   x.fillStyle='#dfb75c';
+   points.forEach((pt,i)=>{
+     const threshold=points.length===1?0:i/(points.length-1);
+     if(progress+0.001<threshold)return;
+     x.beginPath();x.arc(pt.x,pt.y,i===hoverIndex?5:3,0,Math.PI*2);x.fill();
+     if(i===hoverIndex){x.strokeStyle='rgba(223,183,92,.32)';x.lineWidth=5;x.beginPath();x.arc(pt.x,pt.y,8,0,Math.PI*2);x.stroke()}
+   });
+ }
+
+ function pieChart(progress,hoverIndex=pieHover){
+   const c=document.getElementById('servicePie'),[x,w,h]=fit(c);
+   x.clearRect(0,0,w,h);
+   const total=pieValues.reduce((a,b)=>a+b,0);if(!total){pieGeometry=null;return}
+   const colors=['#dfb75c','#8fa7c7','#c88f8f','#86aa91','#a991c2','#c6a77c','#78aeb2','#b59aa7'];
+   const start=-Math.PI/2,sweep=Math.PI*2*Math.max(0,Math.min(1,progress)),limit=start+sweep;
+   let a=start,cx=w*.38,cy=h*.5,r=Math.min(w*.3,h*.38),segments=[];
+   pieValues.forEach((v,i)=>{
+     const n=a+Math.PI*2*v/total,visibleEnd=Math.min(n,limit),mid=(a+n)/2,offset=i===hoverIndex?6:0;
+     const ox=Math.cos(mid)*offset,oy=Math.sin(mid)*offset;
+     segments.push({start:a,end:n,mid,index:i,value:v,label:pieLabels[i]||'',cx,cy,r});
+     if(visibleEnd>a){
+       x.beginPath();x.moveTo(cx+ox,cy+oy);x.arc(cx+ox,cy+oy,r,a,visibleEnd);x.closePath();x.fillStyle=colors[i%colors.length];x.fill();
+     }
+     a=n;
+   });
+   pieGeometry={segments,cx,cy,r,total};
+   x.globalAlpha=Math.min(1,progress*1.4);x.font='11px sans-serif';
+   pieLabels.forEach((label,i)=>{const y=20+i*27;x.fillStyle=colors[i%colors.length];x.fillRect(w*.72,y-9,10,10);x.fillStyle='rgba(255,255,255,.78)';x.fillText(label.slice(0,12),w*.72+16,y)});
+   x.globalAlpha=1;
+ }
+
+ function tooltipFor(canvas){
+   const panel=canvas.closest('.ops-panel');
+   let tip=panel.querySelector('.ops-tooltip');
+   if(!tip){tip=document.createElement('div');tip.className='ops-tooltip';panel.appendChild(tip)}
+   return tip;
+ }
+
+ function showTooltip(canvas,tip,x,y,title,value){
+   const strong=document.createElement('strong');strong.textContent=title;
+   tip.replaceChildren(strong,document.createTextNode(value));
+   tip.style.left=Math.min(canvas.offsetLeft+x+12,canvas.offsetLeft+canvas.clientWidth-150)+'px';
+   tip.style.top=Math.max(42,canvas.offsetTop+y-18)+'px';
+   tip.classList.add('is-visible');
+ }
+ function hideTooltip(tip){tip.classList.remove('is-visible')}
+
+ function bindChartHover(){
+   const line=document.getElementById('revenueTrend'),lineTip=tooltipFor(line);
+   line.addEventListener('mousemove',(event)=>{
+     if(!lineGeometry)return;
+     const mx=event.offsetX,my=event.offsetY;
+     let best=-1,bestDist=Infinity;
+     lineGeometry.points.forEach((pt,i)=>{const dx=mx-pt.x,dy=my-pt.y,d=Math.sqrt(dx*dx+dy*dy);if(d<bestDist){bestDist=d;best=i}});
+     if(bestDist<=14){
+       lineHover=best;const pt=lineGeometry.points[best];lineChart(1);
+       showTooltip(line,lineTip,pt.x,pt.y,pt.label,numberFormat.format(pt.value));
+     }else{lineHover=-1;lineChart(1);hideTooltip(lineTip)}
+   });
+   line.addEventListener('mouseleave',()=>{lineHover=-1;lineChart(1);hideTooltip(lineTip)});
+
+   const pie=document.getElementById('servicePie'),pieTip=tooltipFor(pie);
+   pie.addEventListener('mousemove',(event)=>{
+     if(!pieGeometry)return;
+     const dx=event.offsetX-pieGeometry.cx,dy=event.offsetY-pieGeometry.cy,dist=Math.sqrt(dx*dx+dy*dy);
+     if(dist>pieGeometry.r+8){pieHover=-1;pieChart(1);hideTooltip(pieTip);return}
+     let angle=Math.atan2(dy,dx);if(angle<-Math.PI/2)angle+=Math.PI*2;
+     const seg=pieGeometry.segments.find(s=>angle>=s.start&&angle<=s.end);
+     if(!seg){pieHover=-1;pieChart(1);hideTooltip(pieTip);return}
+     pieHover=seg.index;pieChart(1);
+     const pct=pieGeometry.total?Math.round(seg.value*1000/pieGeometry.total)/10:0;
+     showTooltip(pie,pieTip,event.offsetX,event.offsetY,seg.label,numberFormat.format(seg.value)+' · '+pct+'%');
+   });
+   pie.addEventListener('mouseleave',()=>{pieHover=-1;pieChart(1);hideTooltip(pieTip)});
+ }
+
+ function revealPanels(){
+   document.querySelectorAll('.ops-card,.ops-panel').forEach((el,i)=>{
+     if(reduceMotion){el.classList.add('is-visible');return}
+     setTimeout(()=>el.classList.add('is-visible'),Math.min(i*55,420));
+   });
+ }
+
+ function animateCounters(){
+   document.querySelectorAll('[data-count]').forEach((el)=>{
+     const target=Number(el.dataset.count||0);
+     if(!Number.isFinite(target))return;
+     if(reduceMotion){el.textContent=numberFormat.format(target);return}
+     const duration=650,start=performance.now();
+     function step(now){
+       const t=Math.min(1,(now-start)/duration),eased=1-Math.pow(1-t,3);
+       el.textContent=numberFormat.format(Math.round(target*eased));
+       if(t<1)requestAnimationFrame(step);
+     }
+     el.textContent='0';requestAnimationFrame(step);
+   });
+ }
+
+ function animateCharts(){
+   if(reduceMotion){lineChart(1);pieChart(1);return}
+   const duration=850,start=performance.now();
+   function frame(now){
+     const t=Math.min(1,(now-start)/duration),eased=1-Math.pow(1-t,3);
+     lineChart(eased,-1);pieChart(eased,-1);
+     if(t<1)requestAnimationFrame(frame);
+   }
+   requestAnimationFrame(frame);
+ }
+
+ revealPanels();animateCounters();animateCharts();bindChartHover();
+ let resizeTimer;
+ addEventListener('resize',()=>{
+   clearTimeout(resizeTimer);
+   resizeTimer=setTimeout(()=>{lineHover=-1;pieHover=-1;lineChart(1);pieChart(1)},120);
+ });
 })();
 </script>
 {% endblock %}
