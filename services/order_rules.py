@@ -1125,12 +1125,18 @@ _zy_patch_rule("basic_exbar_gamble_rangefinder", label="絕巴四幻神賭單｜
 _zy_patch_rule("basic_exbar_gamble_tianyuan", label="絕巴四幻神賭單｜天圓地方", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
 _zy_patch_rule("basic_exbar_tech", label="絕巴技術陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_secret_single", label="技術陪｜機密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_secret_double", label="技術陪｜機密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_topsecret_single", label="技術陪｜絕密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_tech_topsecret_double", label="技術陪｜絕密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_entertain_single", label="娛樂陪｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
-_zy_patch_rule("basic_entertain_double", label="娛樂陪｜雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_secret_single", label="技術陪〈端遊〉｜機密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_secret_double", label="技術陪〈端遊〉｜機密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_topsecret_single", label="技術陪〈端遊〉｜絕密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_tech_topsecret_double", label="技術陪〈端遊〉｜絕密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_entertain_single", label="娛樂陪〈端遊〉｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_entertain_double", label="娛樂陪〈端遊〉｜雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_mobile_tech_secret_single", label="技術陪〈手遊〉｜機密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_mobile_tech_secret_double", label="技術陪〈手遊〉｜機密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_mobile_tech_topsecret_single", label="技術陪〈手遊〉｜絕密單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_mobile_tech_topsecret_double", label="技術陪〈手遊〉｜絕密雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_mobile_entertain_single", label="娛樂陪〈手遊〉｜單陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
+_zy_patch_rule("basic_mobile_entertain_double", label="娛樂陪〈手遊〉｜雙陪", unit_label="H", min_quantity=1, max_quantity=24, specify_free_min_units=2, specify_free_basis="quantity")
 _zy_patch_rule(
     "basic_sweet_single",
     category="general",
