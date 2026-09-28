@@ -320,18 +320,18 @@ def test_all_new_game_orders_have_exact_receiver_roles():
 
 def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_entertain_single"].price == 320
-    assert ORDER_RULES["basic_entertain_double"].price == 640
+    assert ORDER_RULES["basic_entertain_double"].price == 600
     assert ORDER_RULES["basic_mobile_entertain_single"].price == 320
-    assert ORDER_RULES["basic_mobile_entertain_double"].price == 640
+    assert ORDER_RULES["basic_mobile_entertain_double"].price == 600
 
     assert ORDER_RULES["basic_tech_secret_single"].price == 400
     assert ORDER_RULES["basic_tech_topsecret_single"].price == 450
     assert ORDER_RULES["basic_mobile_tech_secret_single"].price == 380
     assert ORDER_RULES["basic_mobile_tech_topsecret_single"].price == 420
-    assert ORDER_RULES["basic_exbar_tech"].price == 1200
+    assert ORDER_RULES["basic_exbar_tech"].price == 1000
 
-    assert ORDER_RULES["basic_tech_secret_double"].price == 800
-    assert ORDER_RULES["basic_tech_topsecret_double"].price == 900
+    assert ORDER_RULES["basic_tech_secret_double"].price == 750
+    assert ORDER_RULES["basic_tech_topsecret_double"].price == 850
     assert ORDER_RULES["basic_mobile_tech_secret_double"].price == 760
     assert ORDER_RULES["basic_mobile_tech_topsecret_double"].price == 840
 
@@ -404,5 +404,5 @@ def test_web_delta_catalog_exposes_desktop_and_mobile_groups():
     ]
     assert [variant["price"] for variant in groups["entertain_mobile"]["variants"]] == [
         320,
-        640,
+        600,
     ]
