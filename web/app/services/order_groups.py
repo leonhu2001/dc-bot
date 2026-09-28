@@ -269,14 +269,14 @@ GROUP_SPECS = [
         ],
     },
 
-    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"男陪、女陪、超凡、神話、輻能可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
-    {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"超凡、神話、輻能可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
-    {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"神話、輻能可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
-    {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"僅輻能可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
-    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"男陪、女陪、大師、宗師、菁英可接；買 5 送 1；指定每位 +100T，2 小時 / 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
-    {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"大師、宗師、菁英可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
-    {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"宗師、菁英可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
-    {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"僅菁英可接；買 5 送 1；指定每位 +100T，2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
+    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"男陪、女陪、超凡、神話、輻能可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
+    {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"超凡、神話、輻能可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
+    {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"神話、輻能可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
+    {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"僅輻能可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
+    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"男陪、女陪、大師、宗師、菁英可接；買 5 送 1；指定每位 +100T，2 小時 / NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
+    {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"大師、宗師、菁英可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
+    {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"宗師、菁英可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
+    {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"僅菁英可接；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
 
     {
         "key": "apex_entertain",
