@@ -42,7 +42,7 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         },
         {
-            "label": "技術陪",
+            "label": "技術陪〈端遊〉",
             "details": [
                 {"label": "機密單陪", "value": "secret_single", "rule_key": "basic_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
                 {"label": "機密雙陪", "value": "secret_double", "rule_key": "basic_tech_secret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
@@ -51,10 +51,26 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         },
         {
-            "label": "娛樂陪",
+            "label": "技術陪〈手遊〉",
+            "details": [
+                {"label": "機密單陪", "value": "mobile_secret_single", "rule_key": "basic_mobile_tech_secret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "機密雙陪", "value": "mobile_secret_double", "rule_key": "basic_mobile_tech_secret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "絕密單陪", "value": "mobile_topsecret_single", "rule_key": "basic_mobile_tech_topsecret_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "絕密雙陪", "value": "mobile_topsecret_double", "rule_key": "basic_mobile_tech_topsecret_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "娛樂陪〈端遊〉",
             "details": [
                 {"label": "單陪", "value": "single", "rule_key": "basic_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
                 {"label": "雙陪", "value": "double", "rule_key": "basic_entertain_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            ],
+        },
+        {
+            "label": "娛樂陪〈手遊〉",
+            "details": [
+                {"label": "單陪", "value": "mobile_single", "rule_key": "basic_mobile_entertain_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "雙陪", "value": "mobile_double", "rule_key": "basic_mobile_entertain_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
