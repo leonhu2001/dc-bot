@@ -285,6 +285,7 @@ _add(OrderRule(
     specify_free_basis="quantity",
     service_bonus_buy=5,
     service_bonus_gift=1,
+    note="保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
 ))
 
 for key, label, price, staff_count in [
