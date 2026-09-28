@@ -134,13 +134,13 @@ def test_new_lol_and_valorant_orders_cannot_specify_and_max_four_staff():
 def test_buy_8_get_1_and_prices():
     rule = ORDER_RULES["valorant_radiant_ranked"]
     result = calculate_price(rule, quantity=8, player_count=2)
-    assert rule.price == 700
-    assert result.base_amount == 11200
+    assert rule.price == 400
+    assert result.base_amount == 6400
     assert result.service_quantity == 9
     assert set(get_allowed_role_ids(rule)) == {"1545357782906314782"}
 
     lol = ORDER_RULES["lol_entertain_aram"]
-    assert lol.price == 350
+    assert lol.price == 300
     assert lol.unit_label == "H"
     assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 9
 
@@ -332,22 +332,7 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_exbar_tech"].price == 1000
     assert ORDER_RULES["basic_exbar_tech"].note == "保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險"
 
-    delta_keys = {
-        "basic_entertain_single",
-        "basic_entertain_double",
-        "basic_tech_secret_single",
-        "basic_tech_secret_double",
-        "basic_tech_topsecret_single",
-        "basic_tech_topsecret_double",
-        "basic_exbar_tech",
-        "basic_mobile_entertain_single",
-        "basic_mobile_entertain_double",
-        "basic_mobile_tech_secret_single",
-        "basic_mobile_tech_secret_double",
-        "basic_mobile_tech_topsecret_single",
-        "basic_mobile_tech_topsecret_double",
-    }
-    assert not delta_keys.intersection(services._RULE_UPDATES)
+    assert not hasattr(services, "_RULE_UPDATES")
 
     assert ORDER_RULES["basic_tech_secret_double"].price == 750
     assert ORDER_RULES["basic_tech_topsecret_double"].price == 850
@@ -425,3 +410,81 @@ def test_web_delta_catalog_exposes_desktop_and_mobile_groups():
         320,
         600,
     ]
+
+
+
+def test_storefront_business_values_are_direct_rules():
+    expected = {
+        "basic_sweet_single": ("hourly", 520, "H"),
+        "basic_sweet_double": ("hourly", 1314, "H"),
+        "basic_trial_500": ("fixed", 450, "單"),
+        "basic_trial_1000": ("fixed", 900, "單"),
+        "basic_bet_1000": ("fixed", 800, "單"),
+        "basic_bet_1500": ("fixed", 1200, "單"),
+        "basic_bet_2500": ("fixed", 1500, "單"),
+        "basic_oil_fuel": ("fixed", 2600, "單"),
+        "basic_oil_satellite": ("fixed", 1800, "單"),
+        "basic_oil_all": ("fixed", 4000, "單"),
+        "steam_play": ("hourly", 320, "H"),
+
+        "valorant_entertain_ng": ("hourly", 300, "H"),
+        "valorant_entertain_ranked": ("game", 250, "局"),
+        "valorant_ascendant_ng": ("hourly", 340, "H"),
+        "valorant_ascendant_ranked": ("game", 300, "局"),
+        "valorant_immortal_ng": ("hourly", 360, "H"),
+        "valorant_immortal_ranked": ("game", 350, "局"),
+        "valorant_radiant_ng": ("hourly", 400, "H"),
+        "valorant_radiant_ranked": ("game", 400, "局"),
+
+        "lol_entertain_aram": ("hourly", 300, "H"),
+        "lol_entertain_ng": ("hourly", 300, "H"),
+        "lol_entertain_ranked": ("game", 250, "局"),
+        "lol_master_ng": ("hourly", 340, "H"),
+        "lol_master_ranked": ("game", 300, "局"),
+        "lol_grandmaster_ng": ("hourly", 360, "H"),
+        "lol_grandmaster_ranked": ("game", 350, "局"),
+        "lol_elite_ng": ("hourly", 400, "H"),
+        "lol_elite_ranked": ("game", 400, "局"),
+
+        "apex_entertain_platinum": ("hourly", 300, "H"),
+        "apex_entertain_platinum_ranked": ("hourly", 350, "H"),
+        "apex_entertain_diamond": ("hourly", 330, "H"),
+        "apex_entertain_diamond_ranked": ("hourly", 380, "H"),
+        "apex_entertain_master": ("hourly", 350, "H"),
+        "apex_entertain_master_ranked": ("hourly", 400, "H"),
+        "apex_diamond_platinum": ("hourly", 360, "H"),
+        "apex_diamond_platinum_ranked": ("hourly", 410, "H"),
+        "apex_diamond_diamond": ("hourly", 400, "H"),
+        "apex_diamond_diamond_ranked": ("hourly", 450, "H"),
+        "apex_master_platinum": ("hourly", 420, "H"),
+        "apex_master_platinum_ranked": ("hourly", 470, "H"),
+        "apex_master_diamond": ("hourly", 460, "H"),
+        "apex_master_diamond_ranked": ("hourly", 510, "H"),
+        "apex_master_master": ("hourly", 500, "H"),
+        "apex_master_master_ranked": ("hourly", 550, "H"),
+        "apex_predator_platinum": ("hourly", 500, "H"),
+        "apex_predator_platinum_ranked": ("hourly", 550, "H"),
+        "apex_predator_diamond": ("hourly", 550, "H"),
+        "apex_predator_diamond_ranked": ("hourly", 600, "H"),
+        "apex_predator_master": ("hourly", 600, "H"),
+        "apex_predator_master_ranked": ("hourly", 650, "H"),
+    }
+
+    for key, (pricing_type, price, unit_label) in expected.items():
+        rule = ORDER_RULES[key]
+        assert rule.pricing_type == pricing_type, key
+        assert rule.price == price, key
+        assert rule.unit_label == unit_label, key
+
+
+def test_no_current_rule_uses_old_150_specify_fee():
+    for key, rule in ORDER_RULES.items():
+        assert int(rule.specify_fee_default or 0) != 150, key
+        assert 150 not in {
+            int(value or 0)
+            for value in (rule.specify_fee_by_role or {}).values()
+        }, key
+        assert 150 not in {
+            int(value or 0)
+            for value in (rule.specify_fee_by_game_role or {}).values()
+        }, key
