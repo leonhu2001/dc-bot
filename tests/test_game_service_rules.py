@@ -103,7 +103,7 @@ def test_apex_roles_can_login_employee_website_before_apex_orders_exist():
         assert can_login_dashboard([role_id]) is True
 
 
-def test_new_lol_and_valorant_orders_cannot_specify_and_max_four_staff():
+def test_new_lol_and_valorant_orders_allow_specify_with_100t_fee_and_max_four_staff():
     keys = [
         "valorant_entertain_ng",
         "valorant_entertain_ranked",
@@ -126,9 +126,12 @@ def test_new_lol_and_valorant_orders_cannot_specify_and_max_four_staff():
 
     for key in keys:
         rule = ORDER_RULES[key]
-        assert rule.allow_specify is False
+        assert rule.allow_specify is True
         assert rule.max_player_count == 4
         assert rule.point_benefits_allowed is True
+        assert rule.specify_fee_default == 100
+        assert all(int(value) == 100 for value in rule.specify_fee_by_role.values())
+        assert all(int(value) == 100 for value in rule.specify_fee_by_game_role.values())
 
 
 def test_buy_8_get_1_and_prices():
@@ -167,7 +170,7 @@ def test_new_game_orders_allow_points_except_extra_game_and_unusable_specify_fee
             **common,
         )["allowed"] is False
 
-        # 商品目前不開放指定，不能讓客人浪費點數換免指定費。
+        # 沒有指定陪玩時，不應出現免指定費兌換。
         assert point_item_status(
             rule_key=rule_key,
             point_item_key="free_specify_fee",
@@ -180,7 +183,7 @@ def test_game_priced_point_time_benefits_become_one_and_two_games():
     options = {
         item["key"]: item
         for item in list_point_options(
-            rule_key="valorant_entertain_ng",
+            rule_key="valorant_entertain_ranked",
             point_balance=999,
             quantity=1,
             has_specified_staff=False,
