@@ -35,12 +35,12 @@
     <div class="ops-card">
       <span>營收</span>
       <strong data-count="{{ report.revenue }}">{{ report.revenue }}</strong>
-      <small>{{ report.order_count }} 筆已結單{% if report.comparison and report.comparison.revenue %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.revenue.rate is not none %}{% if report.comparison.revenue.rate > 0 %}+{% endif %}{{ report.comparison.revenue.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+      <small>{{ report.order_count }} 筆已結單{% if report.comparison and report.comparison.order_count %} · 筆數 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.order_count.rate is not none %}{% if report.comparison.order_count.rate > 0 %}+{% endif %}{{ report.comparison.order_count.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}{% if report.comparison and report.comparison.revenue %}<br>營收 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.revenue.rate is not none %}{% if report.comparison.revenue.rate > 0 %}+{% endif %}{{ report.comparison.revenue.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>人員薪資成本</span>
       <strong data-count="{{ report.payroll }}">{{ report.payroll }}</strong>
-      <small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }} · <span class="ops-rate-caption">成本率 {{ report.payroll_rate }}%</span></small>
+      <small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }} · <span class="ops-rate-caption">成本率 {{ report.payroll_rate }}%</span>{% if report.comparison and report.comparison.payroll %}<br>成本 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.payroll.rate is not none %}{% if report.comparison.payroll.rate > 0 %}+{% endif %}{{ report.comparison.payroll.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>店家實留</span>
