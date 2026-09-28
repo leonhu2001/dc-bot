@@ -1,3 +1,4 @@
+import services
 from services.game_roles import GAME_ROLE_BY_KEY
 from services.order_rules import (
     ALL_ROLE_IDS,
@@ -329,6 +330,24 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_mobile_tech_secret_single"].price == 380
     assert ORDER_RULES["basic_mobile_tech_topsecret_single"].price == 420
     assert ORDER_RULES["basic_exbar_tech"].price == 1000
+    assert ORDER_RULES["basic_exbar_tech"].note == "保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險"
+
+    delta_keys = {
+        "basic_entertain_single",
+        "basic_entertain_double",
+        "basic_tech_secret_single",
+        "basic_tech_secret_double",
+        "basic_tech_topsecret_single",
+        "basic_tech_topsecret_double",
+        "basic_exbar_tech",
+        "basic_mobile_entertain_single",
+        "basic_mobile_entertain_double",
+        "basic_mobile_tech_secret_single",
+        "basic_mobile_tech_secret_double",
+        "basic_mobile_tech_topsecret_single",
+        "basic_mobile_tech_topsecret_double",
+    }
+    assert not delta_keys.intersection(services._RULE_UPDATES)
 
     assert ORDER_RULES["basic_tech_secret_double"].price == 750
     assert ORDER_RULES["basic_tech_topsecret_double"].price == 850

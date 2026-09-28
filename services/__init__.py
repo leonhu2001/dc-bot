@@ -15,26 +15,8 @@ from . import order_rules as _order_rules
 
 # 2026-09-24 confirmed storefront prices.
 _RULE_UPDATES: dict[str, dict] = {
-    # Delta Force
-    "basic_entertain_single": {"price": 320},
-    "basic_entertain_double": {"price": 600},
-    "basic_tech_secret_single": {"price": 400},
-    "basic_tech_secret_double": {"price": 750},
-    "basic_tech_topsecret_single": {"price": 450},
-    "basic_tech_topsecret_double": {"price": 850},
-    "basic_exbar_tech": {
-        "price": 1000,
-        "note": "保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
-    },
-
-    # Delta Force mobile
-    # Entertainment mirrors desktop pricing; technical uses the approved mobile rates.
-    "basic_mobile_entertain_single": {"price": 320},
-    "basic_mobile_entertain_double": {"price": 600},
-    "basic_mobile_tech_secret_single": {"price": 380},
-    "basic_mobile_tech_secret_double": {"price": 760},
-    "basic_mobile_tech_topsecret_single": {"price": 420},
-    "basic_mobile_tech_topsecret_double": {"price": 840},
+    # Delta Force prices live directly in services/order_rules.py.
+    # Keep this override layer only for legacy catalogs that still need runtime storefront adjustments.
     "basic_sweet_single": {"price": 520},
     "basic_sweet_double": {"price": 1314},
     "basic_trial_500": {"price": 450},
