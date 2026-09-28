@@ -1115,6 +1115,7 @@ def build_operations_report(period: str | None) -> dict:
                 w.customer_discord_id,
                 w.customer_display_name,
                 COALESCE(w.customer_pay_amount, w.amount, 0) AS revenue,
+                COALESCE(NULLIF(TRIM(w.payment_method), ''), '未紀錄') AS payment_method,
                 COALESCE(w.manual_discount_amount, 0) AS percent_discount,
                 COALESCE(w.cash_coupon_amount, 0) AS fixed_discount,
                 COALESCE(w.store_absorbed_amount, 0) AS point_discount,
@@ -1251,6 +1252,84 @@ def build_operations_report(period: str | None) -> dict:
             """,
             current_params,
         ).fetchall()
+
+        # First-ever closed order per customer. This lets the report split
+        # first-purchase revenue from later repeat-purchase revenue even in
+        # the all-time view.
+        customer_history = conn.execute(
+            f"""
+            SELECT
+                w.id,
+                w.customer_discord_id,
+                {closed_expr} AS closed_at
+            FROM web_orders w
+            WHERE w.status = 'closed'
+              AND TRIM(COALESCE(w.customer_discord_id, '')) <> ''
+            ORDER BY closed_at ASC, w.id ASC
+            """
+        ).fetchall()
+
+        first_closed_order_ids: set[int] = set()
+        seen_customer_ids: set[str] = set()
+        for history_row in customer_history:
+            customer_id = str(
+                history_row["customer_discord_id"] or ""
+            ).strip()
+            if customer_id and customer_id not in seen_customer_ids:
+                seen_customer_ids.add(customer_id)
+                first_closed_order_ids.add(int(history_row["id"]))
+
+        created_taipei_expr = "datetime(w.created_at, '+8 hours')"
+
+        def cancellation_stats(
+            start_value: str | None,
+            end_value: str | None = None,
+        ) -> dict:
+            status_where = "WHERE 1 = 1"
+            status_params: list[str] = []
+
+            if start_value:
+                status_where += f" AND {created_taipei_expr} >= ?"
+                status_params.append(start_value)
+
+            if end_value:
+                status_where += f" AND {created_taipei_expr} < ?"
+                status_params.append(end_value)
+
+            row = conn.execute(
+                f"""
+                SELECT
+                    COUNT(*) AS total_orders,
+                    SUM(
+                        CASE
+                            WHEN LOWER(TRIM(COALESCE(w.status, '')))
+                                 IN ('cancelled', 'canceled')
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) AS cancelled_orders
+                FROM web_orders w
+                {status_where}
+                """,
+                status_params,
+            ).fetchone()
+
+            total_orders = int(row["total_orders"] or 0)
+            cancelled_orders = int(row["cancelled_orders"] or 0)
+            cancellation_rate = (
+                round(cancelled_orders * 100 / total_orders, 1)
+                if total_orders
+                else 0.0
+            )
+
+            return {
+                "created_orders": total_orders,
+                "cancelled_orders": cancelled_orders,
+                "cancellation_rate": cancellation_rate,
+            }
+
+        cancellation = cancellation_stats(start_at)
+
     finally:
         conn.close()
 
@@ -1259,6 +1338,14 @@ def build_operations_report(period: str | None) -> dict:
 
     daily: dict[str, int] = {}
     services: dict[str, dict] = {}
+    payment_methods: dict[str, dict] = {}
+
+    new_customer_revenue = 0
+    repeat_customer_revenue = 0
+    unidentified_customer_revenue = 0
+    new_customer_orders = 0
+    repeat_customer_orders = 0
+    unidentified_customer_orders = 0
 
     for row in orders:
         day = str(row["closed_at"] or "")[:10] or "未紀錄"
@@ -1289,6 +1376,34 @@ def build_operations_report(period: str | None) -> dict:
         row_revenue = int(row["revenue"] or 0)
         row_worker_cost = int(row["worker_cost"] or 0)
         row_service_cost = int(row["service_cost"] or 0)
+
+        customer_id = str(
+            row["customer_discord_id"] or ""
+        ).strip()
+        if not customer_id:
+            unidentified_customer_revenue += row_revenue
+            unidentified_customer_orders += 1
+        elif int(row["id"]) in first_closed_order_ids:
+            new_customer_revenue += row_revenue
+            new_customer_orders += 1
+        else:
+            repeat_customer_revenue += row_revenue
+            repeat_customer_orders += 1
+
+        payment_method = str(
+            row["payment_method"] or "未紀錄"
+        ).strip() or "未紀錄"
+        payment_bucket = payment_methods.setdefault(
+            payment_method,
+            {
+                "label": payment_method,
+                "orders": 0,
+                "revenue": 0,
+                "share": 0.0,
+            },
+        )
+        payment_bucket["orders"] += 1
+        payment_bucket["revenue"] += row_revenue
 
         bucket["revenue"] += row_revenue
         bucket["orders"] += 1
@@ -1321,6 +1436,50 @@ def build_operations_report(period: str | None) -> dict:
             item["label"],
         ),
     )
+
+    tracked_customer_revenue = (
+        new_customer_revenue
+        + repeat_customer_revenue
+    )
+    new_customer_revenue_share = (
+        round(
+            new_customer_revenue
+            * 100
+            / tracked_customer_revenue,
+            1,
+        )
+        if tracked_customer_revenue
+        else 0.0
+    )
+    repeat_customer_revenue_share = (
+        round(
+            repeat_customer_revenue
+            * 100
+            / tracked_customer_revenue,
+            1,
+        )
+        if tracked_customer_revenue
+        else 0.0
+    )
+
+    payment_rows = sorted(
+        payment_methods.values(),
+        key=lambda item: (
+            -item["revenue"],
+            item["label"],
+        ),
+    )
+    for payment_row in payment_rows:
+        payment_row["share"] = (
+            round(
+                payment_row["revenue"]
+                * 100
+                / current["revenue"],
+                1,
+            )
+            if current["revenue"]
+            else 0.0
+        )
 
     comparison = {}
     if previous_start_at and previous_end_at:
@@ -1372,6 +1531,16 @@ def build_operations_report(period: str | None) -> dict:
             dict(row)
             for row in worker_rows
         ],
+        "new_customer_revenue": new_customer_revenue,
+        "new_customer_orders": new_customer_orders,
+        "new_customer_revenue_share": new_customer_revenue_share,
+        "repeat_customer_revenue": repeat_customer_revenue,
+        "repeat_customer_orders": repeat_customer_orders,
+        "repeat_customer_revenue_share": repeat_customer_revenue_share,
+        "unidentified_customer_revenue": unidentified_customer_revenue,
+        "unidentified_customer_orders": unidentified_customer_orders,
+        "payment_rows": payment_rows,
+        **cancellation,
     }
 
 
