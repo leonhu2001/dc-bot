@@ -406,7 +406,7 @@ for key, label, price in [
     ("basic_trial_500", "體驗單｜777w", 450),
     ("basic_trial_1000", "體驗單｜1688w", 900),
 ]:
-    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
+    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 
 # ========= 趣味單 =========
