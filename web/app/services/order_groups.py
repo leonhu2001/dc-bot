@@ -71,14 +71,28 @@ GROUP_SPECS = [
     {
         "key": "tech_play",
         "category": "basic",
-        "label": "技術陪",
-        "selector_label": "難度 / 護航人數",
-        "description": "依難度與護航人數選擇方案。",
+        "label": "技術陪〈端遊〉",
+        "selector_label": "難度 / 陪玩人數",
+        "description": "三角洲端遊技術陪，依難度與陪玩人數選擇方案。",
         "variants": [
-            ("basic_tech_secret_single", "機密｜1 位護航"),
-            ("basic_tech_secret_double", "機密｜2 位護航"),
-            ("basic_tech_topsecret_single", "絕密｜1 位護航"),
-            ("basic_tech_topsecret_double", "絕密｜2 位護航"),
+            ("basic_tech_secret_single", "機密｜單陪"),
+            ("basic_tech_secret_double", "機密｜雙陪"),
+            ("basic_tech_topsecret_single", "絕密｜單陪"),
+            ("basic_tech_topsecret_double", "絕密｜雙陪"),
+        ],
+    },
+
+    {
+        "key": "tech_play_mobile",
+        "category": "basic",
+        "label": "技術陪〈手遊〉",
+        "selector_label": "難度 / 陪玩人數",
+        "description": "三角洲手遊技術陪，機密 380T/H、絕密 420T/H。",
+        "variants": [
+            ("basic_mobile_tech_secret_single", "機密｜單陪"),
+            ("basic_mobile_tech_secret_double", "機密｜雙陪"),
+            ("basic_mobile_tech_topsecret_single", "絕密｜單陪"),
+            ("basic_mobile_tech_topsecret_double", "絕密｜雙陪"),
         ],
     },
 
@@ -95,12 +109,24 @@ GROUP_SPECS = [
     {
         "key": "entertain",
         "category": "basic",
-        "label": "娛樂陪",
+        "label": "娛樂陪〈端遊〉",
         "selector_label": "陪玩人數",
-        "description": "以聊天、娛樂與遊戲體驗為主。",
+        "description": "三角洲端遊娛樂陪，以聊天、娛樂與遊戲體驗為主。",
         "variants": [
             ("basic_entertain_single", "單陪"),
             ("basic_entertain_double", "雙陪"),
+        ],
+    },
+
+    {
+        "key": "entertain_mobile",
+        "category": "basic",
+        "label": "娛樂陪〈手遊〉",
+        "selector_label": "陪玩人數",
+        "description": "三角洲手遊娛樂陪，價格與端遊相同。",
+        "variants": [
+            ("basic_mobile_entertain_single", "單陪"),
+            ("basic_mobile_entertain_double", "雙陪"),
         ],
     },
 
