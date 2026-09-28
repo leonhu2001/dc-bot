@@ -12,6 +12,7 @@ from web.app.services.checkout_preview import (
     point_item_status,
 )
 from web.app.services.role_catalog import can_login_dashboard
+from web.app.services.order_groups import get_grouped_order_catalog
 
 
 def test_lol_and_apex_master_roles_never_mix():
@@ -371,3 +372,37 @@ def test_all_season_3x3_variants_allow_all_five_store_roles():
 
     # 命運契約不是 3x3，本次不放寬。
     assert set(ORDER_RULES["farm_season_3x3_contract"].allowed_roles) != expected
+
+
+
+def test_web_delta_catalog_exposes_desktop_and_mobile_groups():
+    groups = {
+        group["key"]: group
+        for group in get_grouped_order_catalog("basic")
+    }
+
+    assert groups["tech_play"]["label"] == "技術陪〈端遊〉"
+    assert groups["tech_play_mobile"]["label"] == "技術陪〈手遊〉"
+    assert groups["entertain"]["label"] == "娛樂陪〈端遊〉"
+    assert groups["entertain_mobile"]["label"] == "娛樂陪〈手遊〉"
+
+    assert [variant["rule_key"] for variant in groups["tech_play_mobile"]["variants"]] == [
+        "basic_mobile_tech_secret_single",
+        "basic_mobile_tech_secret_double",
+        "basic_mobile_tech_topsecret_single",
+        "basic_mobile_tech_topsecret_double",
+    ]
+    assert [variant["price"] for variant in groups["tech_play_mobile"]["variants"]] == [
+        380,
+        760,
+        420,
+        840,
+    ]
+    assert [variant["rule_key"] for variant in groups["entertain_mobile"]["variants"]] == [
+        "basic_mobile_entertain_single",
+        "basic_mobile_entertain_double",
+    ]
+    assert [variant["price"] for variant in groups["entertain_mobile"]["variants"]] == [
+        320,
+        640,
+    ]
