@@ -315,3 +315,32 @@ def test_all_new_game_orders_have_exact_receiver_roles():
             role_key.startswith("apex_")
             for role_key in actual_keys
         ), rule_key
+
+
+def test_delta_desktop_and_mobile_pricing_are_separate():
+    assert ORDER_RULES["basic_entertain_single"].price == 320
+    assert ORDER_RULES["basic_entertain_double"].price == 640
+    assert ORDER_RULES["basic_mobile_entertain_single"].price == 320
+    assert ORDER_RULES["basic_mobile_entertain_double"].price == 640
+
+    assert ORDER_RULES["basic_tech_secret_single"].price == 400
+    assert ORDER_RULES["basic_tech_topsecret_single"].price == 450
+    assert ORDER_RULES["basic_mobile_tech_secret_single"].price == 380
+    assert ORDER_RULES["basic_mobile_tech_topsecret_single"].price == 420
+    assert ORDER_RULES["basic_exbar_tech"].price == 1200
+
+
+def test_all_season_3x3_variants_allow_all_five_store_roles():
+    keys = (
+        "farm_season_3x3_normal",
+        "farm_season_3x3_skin",
+        "farm_season_3x3_dc_skin",
+        "farm_season_3x3_dc_loss",
+        "farm_season_3x3_dc_skin_loss",
+    )
+    expected = set(ROLE_IDS)
+    for key in keys:
+        assert set(ORDER_RULES[key].allowed_roles) == expected, key
+
+    # 命運契約不是 3x3，本次不放寬。
+    assert set(ORDER_RULES["farm_season_3x3_contract"].allowed_roles) != expected
