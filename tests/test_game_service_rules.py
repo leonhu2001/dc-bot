@@ -329,6 +329,33 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_mobile_tech_topsecret_single"].price == 420
     assert ORDER_RULES["basic_exbar_tech"].price == 1200
 
+    assert ORDER_RULES["basic_tech_secret_double"].price == 800
+    assert ORDER_RULES["basic_tech_topsecret_double"].price == 900
+    assert ORDER_RULES["basic_mobile_tech_secret_double"].price == 760
+    assert ORDER_RULES["basic_mobile_tech_topsecret_double"].price == 840
+
+
+def test_delta_platform_labels_survive_runtime_overrides():
+    expected = {
+        "basic_tech_secret_single": "技術陪〈端遊〉｜機密單陪",
+        "basic_tech_secret_double": "技術陪〈端遊〉｜機密雙陪",
+        "basic_tech_topsecret_single": "技術陪〈端遊〉｜絕密單陪",
+        "basic_tech_topsecret_double": "技術陪〈端遊〉｜絕密雙陪",
+        "basic_mobile_tech_secret_single": "技術陪〈手遊〉｜機密單陪",
+        "basic_mobile_tech_secret_double": "技術陪〈手遊〉｜機密雙陪",
+        "basic_mobile_tech_topsecret_single": "技術陪〈手遊〉｜絕密單陪",
+        "basic_mobile_tech_topsecret_double": "技術陪〈手遊〉｜絕密雙陪",
+        "basic_entertain_single": "娛樂陪〈端遊〉｜單陪",
+        "basic_entertain_double": "娛樂陪〈端遊〉｜雙陪",
+        "basic_mobile_entertain_single": "娛樂陪〈手遊〉｜單陪",
+        "basic_mobile_entertain_double": "娛樂陪〈手遊〉｜雙陪",
+    }
+    for key, label in expected.items():
+        rule = ORDER_RULES[key]
+        assert rule.label == label, key
+        assert rule.min_quantity == 1, key
+        assert rule.max_quantity == 24, key
+
 
 def test_all_season_3x3_variants_allow_all_five_store_roles():
     keys = (
