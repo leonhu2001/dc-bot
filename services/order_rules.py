@@ -914,8 +914,8 @@ __all__ = [
     "validate_rules",
 ]
 
-# ===== 魔丸 runtime rule overrides start =====
-# 這段放在 ORDER_RULES 建立完成後，用 runtime key / label 直接覆蓋顯示名稱、數量限制與自訂單。
+# ===== legacy/custom compatibility helpers start =====
+# 只保留自訂單建立與舊資料相容所需 helper；正式店面規格直接定義在上方 OrderRule。
 
 from dataclasses import fields as _mm_dataclass_fields
 from dataclasses import is_dataclass as _mm_is_dataclass
@@ -956,25 +956,6 @@ def _mm_replace_order_rule(_rule, **_changes):
         pass
 
     return _rule
-
-def _mm_override_order_rule(_key: str, **_changes):
-    _rule = ORDER_RULES.get(_key)
-
-    if _rule is None:
-        return False
-
-    ORDER_RULES[_key] = _mm_replace_order_rule(_rule, **_changes)
-    return True
-
-def _mm_override_order_rule_by_label(_label: str, **_changes):
-    _patched = 0
-
-    for _key, _rule in list(ORDER_RULES.items()):
-        if str(getattr(_rule, "label", "")) == str(_label):
-            ORDER_RULES[_key] = _mm_replace_order_rule(_rule, **_changes)
-            _patched += 1
-
-    return _patched
 
 def _mm_add_custom_order_rule():
     try:
@@ -1038,7 +1019,7 @@ def _mm_add_custom_order_rule():
 
 
 _mm_add_custom_order_rule()
-# ===== 魔丸 runtime rule overrides end =====
+# ===== legacy/custom compatibility helpers end =====
 
 
 ORDER_RULE_SNAPSHOT_VERSION = 1
