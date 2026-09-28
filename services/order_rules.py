@@ -804,6 +804,32 @@ for (
         )
 
 
+# ========= 自訂單 =========
+_add(OrderRule(
+    "custom",
+    "custom_custom_order",
+    "自訂｜自訂",
+    "manual",
+    0,
+    "H",
+    allowed_roles=ALL_RECEIVER_ROLES,
+    required_staff_count="player_count",
+    min_quantity=1,
+    max_quantity=24,
+    allow_specify=True,
+    max_specified_count=4,
+    specify_fee_default=100,
+    specify_fee_by_role=_all_receiver_fee(100),
+    specify_free_min_units=2,
+    specify_free_basis="quantity",
+    player_count_enabled=True,
+    min_player_count=1,
+    max_player_count=4,
+    price_multiply_player_count=False,
+    point_benefits_allowed=False,
+))
+
+
 def get_rules_by_category(category: str) -> list[OrderRule]:
     return [rule for rule in ORDER_RULES.values() if rule.category == category]
 
@@ -914,113 +940,6 @@ __all__ = [
     "rule_role_labels",
     "validate_rules",
 ]
-
-# ===== legacy/custom compatibility helpers start =====
-# 只保留自訂單建立與舊資料相容所需 helper；正式店面規格直接定義在上方 OrderRule。
-
-from dataclasses import fields as _mm_dataclass_fields
-from dataclasses import is_dataclass as _mm_is_dataclass
-from dataclasses import replace as _mm_dataclass_replace
-
-def _mm_order_rule_field_names(_rule):
-    if _mm_is_dataclass(_rule):
-        return {field.name for field in _mm_dataclass_fields(_rule)}
-    return set(getattr(_rule, "__dict__", {}).keys())
-
-def _mm_filter_rule_changes(_rule, _changes):
-    _fields = _mm_order_rule_field_names(_rule)
-    return {key: value for key, value in _changes.items() if key in _fields}
-
-def _mm_replace_order_rule(_rule, **_changes):
-    _filtered = _mm_filter_rule_changes(_rule, _changes)
-
-    if not _filtered:
-        return _rule
-
-    if _mm_is_dataclass(_rule):
-        try:
-            return _mm_dataclass_replace(_rule, **_filtered)
-        except Exception:
-            pass
-
-    try:
-        for _field, _value in _filtered.items():
-            setattr(_rule, _field, _value)
-        return _rule
-    except Exception:
-        pass
-
-    try:
-        for _field, _value in _filtered.items():
-            object.__setattr__(_rule, _field, _value)
-    except Exception:
-        pass
-
-    return _rule
-
-def _mm_add_custom_order_rule():
-    try:
-        CATEGORY_LABELS["custom"] = "自訂"
-    except Exception:
-        pass
-
-    try:
-        ORDER_CATEGORY_LABELS["custom"] = "自訂單"
-    except Exception:
-        pass
-
-    _template = (
-        ORDER_RULES.get("farm_department_task")
-        or ORDER_RULES.get("basic_entertain_single")
-        or next(iter(ORDER_RULES.values()))
-    )
-
-    _allowed_roles = tuple(
-        role for role in (
-            "top_protector",
-            "female_protector",
-            "male_protector",
-            "male_companion",
-            "female_companion",
-        )
-    )
-
-    _changes = {
-        "key": "custom_custom_order",
-        "category": "custom",
-        "label": "自訂｜自訂",
-        "pricing_type": "manual",
-        "price": 0,
-        "unit_label": "H",
-        "min_quantity": 1,
-        "max_quantity": 24,
-        "allow_specify": True,
-        "max_specified_count": 4,
-        "allowed_roles": _allowed_roles,
-        "required_staff_count": "player_count",
-        "price_multiply_player_count": False,
-        "max_player_count": 4,
-        "min_player_count": 1,
-        "player_count_enabled": True,
-        "min_protector_count": 0,
-        "point_benefits_allowed": False,
-        "specify_fee_default": 100,
-        "specify_fee_by_role": _all_receiver_fee(100),
-        "specify_free_min_units": 2,
-        "specify_free_basis": "quantity",
-    }
-
-    ORDER_RULES["custom_custom_order"] = _mm_replace_order_rule(_template, **_changes)
-
-
-
-
-
-
-
-_mm_add_custom_order_rule()
-# ===== legacy/custom compatibility helpers end =====
-
 
 ORDER_RULE_SNAPSHOT_VERSION = 1
 
