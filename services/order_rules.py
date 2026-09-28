@@ -472,7 +472,7 @@ _add(OrderRule(
     },
 ))
 
-_add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=1, allow_specify=False))
+_add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False))
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin",
