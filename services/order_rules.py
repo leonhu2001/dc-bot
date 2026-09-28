@@ -130,9 +130,9 @@ class PriceResult:
 
 def _protectors_fee() -> dict[RoleKey, int]:
     return {
-        "top_protector": 150,
-        "female_protector": 150,
-        "male_protector": 150,
+        "top_protector": 100,
+        "female_protector": 100,
+        "male_protector": 100,
     }
 
 
@@ -272,7 +272,7 @@ for key, label, price in [
     ("basic_exbar_gamble_tianyuan", "絕巴四幻神賭單｜賭天圓地方", 8888),
     ("basic_exbar_gamble_rangefinder", "絕巴四幻神賭單｜賭測距儀", 12888),
 ]:
-    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
+    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 _add(OrderRule(
     "basic", "basic_exbar_tech", "絕巴技術陪", "hourly", 1000, "H",
@@ -357,7 +357,7 @@ for key, label, price, staff_count in [
         required_staff_count=staff_count,
         allow_specify=True,
         max_specified_count=staff_count,
-        specify_fee_by_role=_all_receiver_fee(150),
+        specify_fee_by_role=_all_receiver_fee(100),
         specify_free_min_units=2,
         specify_free_basis="quantity",
         service_bonus_buy=5,
@@ -371,9 +371,9 @@ _add(OrderRule(
     required_staff_count=1,
     allow_specify=True,
     max_specified_count=1,
-    specify_fee_default=150,
+    specify_fee_default=100,
     specify_fee_by_role={
-        role: 150
+        role: 100
         for role in COMPANION_ROLES
     },
     specify_free_min_units=2,
@@ -387,9 +387,9 @@ _add(OrderRule(
     required_staff_count=2,
     allow_specify=True,
     max_specified_count=2,
-    specify_fee_default=150,
+    specify_fee_default=100,
     specify_fee_by_role={
-        role: 150
+        role: 100
         for role in COMPANION_ROLES
     },
     specify_free_min_units=2,
@@ -397,16 +397,16 @@ _add(OrderRule(
 ))
 
 for key, label, price in [
-    ("basic_oil_fuel", "油鍋單｜火箭燃油", 3000),
-    ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 2000),
-    ("basic_oil_all", "油鍋單｜全包", 4500),
-    ("basic_bet_1000", "賭約單 1000", 1000),
-    ("basic_bet_1500", "賭約單 1500", 1500),
-    ("basic_bet_2500", "賭約單 2500", 2500),
-    ("basic_trial_500", "體驗單 500", 500),
-    ("basic_trial_1000", "體驗單 1000", 1000),
+    ("basic_oil_fuel", "油鍋單｜火箭燃油", 2600),
+    ("basic_oil_satellite", "油鍋單｜GTI衛星通訊天線", 1800),
+    ("basic_oil_all", "油鍋單｜全包", 4000),
+    ("basic_bet_1000", "賭約單｜800w", 800),
+    ("basic_bet_1500", "賭約單｜1000w", 1200),
+    ("basic_bet_2500", "賭約單｜1200w", 1500),
+    ("basic_trial_500", "體驗單｜777w", 450),
+    ("basic_trial_1000", "體驗單｜1688w", 900),
 ]:
-    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, allow_specify=False))
+    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 
 # ========= 趣味單 =========
@@ -542,18 +542,22 @@ for key, label, price in [
 # ========= Steam 陪玩 =========
 
 _add(OrderRule(
-    "steam", "steam_play", "Steam 陪玩", "hourly", 350, "H",
+    "steam", "steam_play", "Steam遊戲｜娛樂陪", "hourly", 320, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
     required_staff_count="player_count",
     player_count_enabled=True,
-    max_player_count=None,
+    max_player_count=4,
     price_multiply_player_count=True,
     allow_specify=True,
-    max_specified_count=None,
-    specify_fee_by_role=_all_receiver_fee(150),
+    max_specified_count=4,
+    specify_fee_default=100,
+    specify_fee_by_role={
+        role: 100
+        for role in COMPANION_ROLES
+    },
     specify_free_min_units=2,
-    specify_free_basis="quantity_x_player_count",
+    specify_free_basis="quantity",
     point_benefits_allowed=False,
 ))
 
@@ -569,9 +573,10 @@ _add(OrderRule(
     price_multiply_player_count=True,
     allow_specify=True,
     max_specified_count=4,
-    specify_fee_by_role=_all_receiver_fee(150),
+    specify_fee_default=100,
+    specify_fee_by_role=_all_receiver_fee(100),
     specify_free_min_units=2,
-    specify_free_basis="quantity_x_player_count",
+    specify_free_basis="quantity",
     point_benefits_allowed=False,
 ))
 
@@ -584,11 +589,11 @@ _add(OrderRule(
     price_multiply_player_count=True,
     allow_specify=True,
     max_specified_count=4,
-    specify_fee_default=150,
+    specify_fee_default=100,
     specify_fee_by_role={
-        "top_protector": 150,
-        "female_protector": 150,
-        "male_protector": 150,
+        "top_protector": 100,
+        "female_protector": 100,
+        "male_protector": 100,
     },
     specify_free_min_units=2,
     specify_free_basis="quantity_x_player_count",
@@ -604,8 +609,8 @@ _add(OrderRule(
     price_multiply_player_count=True,
     allow_specify=True,
     max_specified_count=4,
-    specify_fee_default=150,
-    specify_fee_by_role=_top_fee(150),
+    specify_fee_default=100,
+    specify_fee_by_role=_top_fee(100),
     specify_free_min_units=2,
     specify_free_basis="quantity_x_player_count",
     point_benefits_allowed=False,
@@ -640,13 +645,13 @@ def _add_game_service_rule(
         price_multiply_player_count=True,
         allow_specify=True,
         max_specified_count=4,
-        specify_fee_default=150,
+        specify_fee_default=100,
         specify_fee_by_role={
-            role: 150
+            role: 100
             for role in allowed_service_roles
         },
         specify_fee_by_game_role={
-            role: 150
+            role: 100
             for role in allowed_game_roles
         },
         specify_free_min_units=2,
@@ -657,24 +662,24 @@ def _add_game_service_rule(
     ))
 
 
-_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="game", price=200, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
+_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
 _add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_radiant",))
-_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=450, unit_label="局", allowed_game_roles=("valorant_radiant",))
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
+_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("valorant_radiant",))
+_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_radiant",))
 
-_add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=350, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
-_add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="game", price=200, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
+_add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
+_add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
 _add_game_service_rule(category="lol", key="lol_entertain_ranked", label="英雄聯盟｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
-_add_game_service_rule(category="lol", key="lol_master_ng", label="英雄聯盟｜大師陪｜NG", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_master_ranked", label="英雄聯盟｜大師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_elite",))
-_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=450, unit_label="局", allowed_game_roles=("lol_elite",))
+_add_game_service_rule(category="lol", key="lol_master_ng", label="英雄聯盟｜大師陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"))
+_add_game_service_rule(category="lol", key="lol_master_ranked", label="英雄聯盟｜大師陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"))
+_add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"))
+_add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"))
+_add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",))
+_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_elite",))
 
 
 # ========= APEX Legends 陪玩 =========
@@ -709,13 +714,13 @@ def _add_apex_service_rule(
         price_multiply_player_count=True,
         allow_specify=True,
         max_specified_count=2,
-        specify_fee_default=150,
+        specify_fee_default=100,
         specify_fee_by_role={
-            role: 150
+            role: 100
             for role in allowed_service_roles
         },
         specify_fee_by_game_role={
-            role: 150
+            role: 100
             for role in allowed_game_roles
         },
         specify_free_min_units=2,
@@ -735,9 +740,9 @@ _APEX_SERVICE_SPECS = (
         COMPANION_ROLES,
         (),
         (
-            ("platinum", "白金以下", 350),
-            ("diamond", "鑽石", 400),
-            ("master", "大師/頂獵", 450),
+            ("platinum", "白金以下", 300),
+            ("diamond", "鑽石", 330),
+            ("master", "大師/頂獵", 350),
         ),
     ),
     (
@@ -746,8 +751,8 @@ _APEX_SERVICE_SPECS = (
         (),
         ("apex_diamond", "apex_master", "apex_predator"),
         (
-            ("platinum", "白金以下", 400),
-            ("diamond", "鑽石", 450),
+            ("platinum", "白金以下", 360),
+            ("diamond", "鑽石", 400),
         ),
     ),
     (
@@ -756,9 +761,9 @@ _APEX_SERVICE_SPECS = (
         (),
         ("apex_master", "apex_predator"),
         (
-            ("platinum", "白金以下", 500),
-            ("diamond", "鑽石", 550),
-            ("master", "大師/頂獵", 600),
+            ("platinum", "白金以下", 420),
+            ("diamond", "鑽石", 460),
+            ("master", "大師/頂獵", 500),
         ),
     ),
     (
@@ -767,9 +772,9 @@ _APEX_SERVICE_SPECS = (
         (),
         ("apex_predator",),
         (
-            ("platinum", "白金以下", 600),
-            ("diamond", "鑽石", 650),
-            ("master", "大師/頂獵", 700),
+            ("platinum", "白金以下", 500),
+            ("diamond", "鑽石", 550),
+            ("master", "大師/頂獵", 600),
         ),
     ),
 )
@@ -909,8 +914,8 @@ __all__ = [
     "validate_rules",
 ]
 
-# ===== 魔丸 runtime rule overrides start =====
-# 這段放在 ORDER_RULES 建立完成後，用 runtime key / label 直接覆蓋顯示名稱、數量限制與自訂單。
+# ===== legacy/custom compatibility helpers start =====
+# 只保留自訂單建立與舊資料相容所需 helper；正式店面規格直接定義在上方 OrderRule。
 
 from dataclasses import fields as _mm_dataclass_fields
 from dataclasses import is_dataclass as _mm_is_dataclass
@@ -951,25 +956,6 @@ def _mm_replace_order_rule(_rule, **_changes):
         pass
 
     return _rule
-
-def _mm_override_order_rule(_key: str, **_changes):
-    _rule = ORDER_RULES.get(_key)
-
-    if _rule is None:
-        return False
-
-    ORDER_RULES[_key] = _mm_replace_order_rule(_rule, **_changes)
-    return True
-
-def _mm_override_order_rule_by_label(_label: str, **_changes):
-    _patched = 0
-
-    for _key, _rule in list(ORDER_RULES.items()):
-        if str(getattr(_rule, "label", "")) == str(_label):
-            ORDER_RULES[_key] = _mm_replace_order_rule(_rule, **_changes)
-            _patched += 1
-
-    return _patched
 
 def _mm_add_custom_order_rule():
     try:
@@ -1026,20 +1012,14 @@ def _mm_add_custom_order_rule():
 
     ORDER_RULES["custom_custom_order"] = _mm_replace_order_rule(_template, **_changes)
 
-_mm_override_order_rule("farm_season_3x3_contract", max_quantity=7)
 
 
 
 
-_mm_override_order_rule("basic_bet_1000", label="賭約單 800w")
-_mm_override_order_rule("basic_bet_1500", label="賭約單 1000w")
-_mm_override_order_rule("basic_bet_2500", label="賭約單 1200w")
 
-_mm_override_order_rule("basic_trial_500", label="體驗單 777w")
-_mm_override_order_rule("basic_trial_1000", label="體驗單 1688w")
 
 _mm_add_custom_order_rule()
-# ===== 魔丸 runtime rule overrides end =====
+# ===== legacy/custom compatibility helpers end =====
 
 
 ORDER_RULE_SNAPSHOT_VERSION = 1
@@ -1151,8 +1131,6 @@ _zy_patch_rule(
     specify_free_basis="quantity",
 )
 
-_zy_patch_rule("basic_trial_500", label="體驗單｜777w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_trial_1000", label="體驗單｜1688w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 _zy_patch_rule(
     "basic_teaching_one",
     category="general",
@@ -1169,12 +1147,6 @@ _zy_patch_rule(
     ),
     allow_specify=False,
 )
-_zy_patch_rule("basic_bet_1000", label="賭約單｜800w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_bet_1500", label="賭約單｜1000w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_bet_2500", label="賭約單｜1200w", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_oil_fuel", label="油鍋單｜火箭燃油", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_oil_satellite", label="油鍋單｜GTI衛星通訊天線", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
-_zy_patch_rule("basic_oil_all", label="油鍋單｜全包", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
 # 一般趣味單：固定 1 單，不開放指定。
 for _zy_fun_key in (
@@ -1255,52 +1227,6 @@ _zy_patch_rule("farm_halfcoin_120m", label="哈夫幣代洗｜120M", unit_label=
 _zy_patch_rule("farm_halfcoin_360m", label="哈夫幣代洗｜360M", unit_label="單", min_quantity=1, max_quantity=1, allow_specify=False)
 
 
-# Steam：350 / 小時 / 每位；1～4 位。只看基本男陪 / 女陪身分；技術階級不另外放行。
-_zy_patch_rule(
-    "steam_play",
-    label="Steam遊戲｜娛樂陪",
-    pricing_type="hourly",
-    price=350,
-    unit_label="H",
-    min_quantity=1,
-    max_quantity=24,
-    min_player_count=1,
-    max_player_count=4,
-    player_count_enabled=True,
-    required_staff_count="player_count",
-    price_multiply_player_count=True,
-    allow_specify=True,
-    max_specified_count=4,
-    allowed_roles=COMPANION_ROLES,
-    allowed_game_roles=(),
-    specify_fee_by_role={role: 150 for role in COMPANION_ROLES},
-    specify_fee_default=150,
-    specify_free_min_units=2,
-    specify_free_basis="quantity",
-    point_benefits_allowed=False,
-)
-_zy_patch_rule(
-    "valorant_entertain",
-    label="特戰英豪｜娛樂陪",
-    pricing_type="hourly",
-    price=350,
-    unit_label="H",
-    min_quantity=1,
-    max_quantity=24,
-    min_player_count=1,
-    max_player_count=4,
-    player_count_enabled=True,
-    required_staff_count="player_count",
-    price_multiply_player_count=True,
-    allow_specify=True,
-    max_specified_count=4,
-    specify_fee_by_role=_all_receiver_fee(150),
-    specify_fee_default=150,
-    specify_free_min_units=2,
-    specify_free_basis="quantity",
-    point_benefits_allowed=False,
-)
-
 # 自訂：1～4 位、1～24 小時，價格由客服手動填；仍可指定。
 _zy_patch_rule(
     "custom_custom_order",
@@ -1317,8 +1243,8 @@ _zy_patch_rule(
     price_multiply_player_count=False,
     allow_specify=True,
     max_specified_count=4,
-    specify_fee_by_role=_all_receiver_fee(150),
-    specify_fee_default=150,
+    specify_fee_by_role=_all_receiver_fee(100),
+    specify_fee_default=100,
     specify_free_min_units=2,
     specify_free_basis="quantity",
     point_benefits_allowed=False,
