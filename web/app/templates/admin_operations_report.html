@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+.ops-report{display:grid;gap:18px}.ops-head{display:flex;justify-content:space-between;gap:16px;align-items:end;flex-wrap:wrap}
+.ops-head h1{margin:4px 0 0}.ops-kicker{font-size:12px;letter-spacing:.16em;opacity:.65}
+.ops-filter{display:flex;gap:8px;align-items:center}.ops-filter select{min-width:130px}
+.ops-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ops-card,.ops-panel{background:#15130f;border:1px solid rgba(223,183,92,.28);border-radius:16px;padding:16px}
+.ops-card span{display:block;font-size:12px;opacity:.68;margin-bottom:8px}.ops-card strong{font-size:27px}.ops-card small{display:block;margin-top:6px;opacity:.58}
+.ops-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}.ops-panel h2{font-size:16px;margin:0 0 14px}
+.ops-canvas{width:100%;height:280px;display:block}.ops-table{width:100%;border-collapse:collapse}.ops-table th,.ops-table td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.ops-table th{font-size:12px;opacity:.65}.ops-table td:nth-child(n+2),.ops-table th:nth-child(n+2){text-align:right}
+.ops-note{font-size:12px;opacity:.58;margin-top:10px}
+@media(max-width:900px){.ops-kpis{grid-template-columns:repeat(2,1fr)}.ops-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.ops-kpis{grid-template-columns:1fr}}
+</style>
+
+<div class="ops-report">
+  <div class="ops-head">
+    <div><div class="ops-kicker">OPERATIONS & FINANCE</div><h1>營運財務報表</h1><div class="muted">{{ report.period_label }} · 已結單資料</div></div>
+    <form class="ops-filter" method="get" action="/admin/payouts/report">
+      <select class="input" name="period">
+        <option value="month" {% if report.period == "month" %}selected{% endif %}>本月</option>
+        <option value="quarter" {% if report.period == "quarter" %}selected{% endif %}>本季度</option>
+        <option value="year" {% if report.period == "year" %}selected{% endif %}>本年度</option>
+        <option value="all" {% if report.period == "all" %}selected{% endif %}>全部期間</option>
+      </select>
+      <button class="button" type="submit">套用</button>
+      <a class="button secondary" href="/admin/payouts/summary">返回薪資結算</a>
+    </form>
+  </div>
+
+  <section class="ops-kpis">
+    <div class="ops-card"><span>營收</span><strong>{{ report.revenue }}</strong><small>{{ report.order_count }} 筆已結單</small></div>
+    <div class="ops-card"><span>人員薪資成本</span><strong>{{ report.payroll }}</strong><small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }}</small></div>
+    <div class="ops-card"><span>店家實留</span><strong>{{ report.retained }}</strong><small>營收扣除陪玩與客服分潤</small></div>
+    <div class="ops-card"><span>平均客單</span><strong>{{ report.avg_order }}</strong><small>每筆已結單平均營收</small></div>
+    <div class="ops-card"><span>付費客戶</span><strong>{{ report.customer_count }}</strong><small>期間內不重複 Discord 客戶</small></div>
+    <div class="ops-card"><span>回購客戶</span><strong>{{ report.repeat_customers }}</strong><small>期間內至少 2 筆 · {{ report.repeat_rate }}%</small></div>
+    <div class="ops-card"><span>陪玩薪資</span><strong>{{ report.worker_cost }}</strong><small>已結單產生之分潤</small></div>
+    <div class="ops-card"><span>客服薪資</span><strong>{{ report.service_cost }}</strong><small>已結單產生之客服分潤</small></div>
+  </section>
+
+  <section class="ops-grid">
+    <div class="ops-panel"><h2>營收趨勢</h2><canvas id="revenueTrend" class="ops-canvas"></canvas><div class="ops-note">依結單日彙總。</div></div>
+    <div class="ops-panel"><h2>服務營收占比</h2><canvas id="servicePie" class="ops-canvas"></canvas><div class="ops-note">顯示營收最高的前 8 個服務。</div></div>
+  </section>
+
+  <section class="ops-grid">
+    <div class="ops-panel">
+      <h2>服務營收排行</h2>
+      <table class="ops-table"><thead><tr><th>服務</th><th>訂單</th><th>營收</th></tr></thead><tbody>
+      {% for row in report.service_rows %}<tr><td>{{ row.label }}</td><td>{{ row.orders }}</td><td>{{ row.revenue }}</td></tr>{% else %}<tr><td colspan="3">目前沒有資料</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div class="ops-panel">
+      <h2>陪玩產值排行</h2>
+      <table class="ops-table"><thead><tr><th>人員</th><th>筆數</th><th>分潤</th></tr></thead><tbody>
+      {% for row in report.worker_rows %}<tr><td>{{ row.name }}</td><td>{{ row.jobs }}</td><td>{{ row.amount }}</td></tr>{% else %}<tr><td colspan="3">目前沒有資料</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+ const trendLabels={{ report.daily_labels|tojson }}, trendValues={{ report.daily_values|tojson }};
+ const pieLabels={{ report.service_labels|tojson }}, pieValues={{ report.service_values|tojson }};
+ function fit(c){const d=devicePixelRatio||1,r=c.getBoundingClientRect();c.width=Math.max(1,r.width*d);c.height=Math.max(1,r.height*d);const x=c.getContext('2d');x.scale(d,d);return [x,r.width,r.height]}
+ function lineChart(){const c=document.getElementById('revenueTrend'),[x,w,h]=fit(c);x.clearRect(0,0,w,h);const p=34,max=Math.max(1,...trendValues);x.strokeStyle='rgba(223,183,92,.25)';x.fillStyle='rgba(255,255,255,.55)';x.font='11px sans-serif';for(let i=0;i<5;i++){let y=p+(h-p*2)*i/4;x.beginPath();x.moveTo(p,y);x.lineTo(w-p,y);x.stroke();x.fillText(Math.round(max*(4-i)/4),2,y+4)}if(!trendValues.length)return;x.strokeStyle='#dfb75c';x.lineWidth=2;x.beginPath();trendValues.forEach((v,i)=>{let xx=p+(w-p*2)*(trendValues.length===1?.5:i/(trendValues.length-1)),yy=h-p-(h-p*2)*v/max;i?x.lineTo(xx,yy):x.moveTo(xx,yy)});x.stroke();x.fillStyle='#dfb75c';trendValues.forEach((v,i)=>{let xx=p+(w-p*2)*(trendValues.length===1?.5:i/(trendValues.length-1)),yy=h-p-(h-p*2)*v/max;x.beginPath();x.arc(xx,yy,3,0,Math.PI*2);x.fill()})}
+ function pieChart(){const c=document.getElementById('servicePie'),[x,w,h]=fit(c);x.clearRect(0,0,w,h);const total=pieValues.reduce((a,b)=>a+b,0);if(!total)return;const colors=['#dfb75c','#8fa7c7','#c88f8f','#86aa91','#a991c2','#c6a77c','#78aeb2','#b59aa7'];let a=-Math.PI/2,cx=w*.38,cy=h*.5,r=Math.min(w*.3,h*.38);pieValues.forEach((v,i)=>{let n=a+Math.PI*2*v/total;x.beginPath();x.moveTo(cx,cy);x.arc(cx,cy,r,a,n);x.closePath();x.fillStyle=colors[i%colors.length];x.fill();a=n});x.font='11px sans-serif';pieLabels.forEach((label,i)=>{let y=20+i*27;x.fillStyle=colors[i%colors.length];x.fillRect(w*.72,y-9,10,10);x.fillStyle='rgba(255,255,255,.78)';x.fillText(label.slice(0,12),w*.72+16,y)})}
+ function draw(){lineChart();pieChart()} draw();let t;addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(draw,120)})
+})();
+</script>
+{% endblock %}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -967,3 +968,139 @@ async def update_summary_person_status(request: Request):
         url += "?" + urlencode(query)
 
     return RedirectResponse(url=url, status_code=303)
+
+
+def _report_period(period: str | None) -> tuple[str, str | None, str]:
+    period = str(period or "quarter").strip().lower()
+    now = datetime.utcnow()
+    if period == "month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return period, start.strftime("%Y-%m-%d %H:%M:%S"), "本月"
+    if period == "year":
+        start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        return period, start.strftime("%Y-%m-%d %H:%M:%S"), "本年度"
+    if period == "all":
+        return period, None, "全部期間"
+    quarter_month = ((now.month - 1) // 3) * 3 + 1
+    start = now.replace(month=quarter_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+    return "quarter", start.strftime("%Y-%m-%d %H:%M:%S"), "本季度"
+
+
+def build_operations_report(period: str | None) -> dict:
+    period, start_at, period_label = _report_period(period)
+    conn = sqlite3.connect(db_path())
+    conn.row_factory = sqlite3.Row
+    where = "WHERE w.status = 'closed'"
+    params: list[str] = []
+    if start_at:
+        where += " AND COALESCE(NULLIF(w.closed_at,''), NULLIF(w.updated_at,''), w.created_at) >= ?"
+        params.append(start_at)
+
+    try:
+        orders = conn.execute(f"""
+            SELECT
+                w.id,
+                w.bot_order_no,
+                w.category,
+                w.item,
+                w.customer_discord_id,
+                w.customer_display_name,
+                COALESCE(w.customer_pay_amount, w.amount, 0) AS revenue,
+                COALESCE(NULLIF(w.closed_at,''), NULLIF(w.updated_at,''), w.created_at) AS closed_at,
+                COALESCE((SELECT SUM(p.final_payout) FROM worker_payouts p WHERE p.order_id = w.id), 0) AS worker_cost,
+                COALESCE((SELECT SUM(p.payout_amount) FROM customer_service_payouts p WHERE p.order_id = w.id), 0) AS service_cost
+            FROM web_orders w
+            {where}
+            ORDER BY closed_at ASC
+        """, params).fetchall()
+
+        worker_rows = conn.execute(f"""
+            SELECT
+                p.worker_discord_id,
+                COALESCE(NULLIF(p.worker_display_name,''), p.worker_discord_id) AS name,
+                SUM(COALESCE(p.final_payout,0)) AS amount,
+                COUNT(*) AS jobs
+            FROM worker_payouts p
+            JOIN web_orders w ON w.id = p.order_id
+            {where}
+            GROUP BY p.worker_discord_id, name
+            HAVING amount > 0
+            ORDER BY amount DESC
+            LIMIT 8
+        """, params).fetchall()
+    finally:
+        conn.close()
+
+    revenue = sum(int(row["revenue"] or 0) for row in orders)
+    worker_cost = sum(int(row["worker_cost"] or 0) for row in orders)
+    service_cost = sum(int(row["service_cost"] or 0) for row in orders)
+    payroll = worker_cost + service_cost
+    retained = revenue - payroll
+    order_count = len(orders)
+    avg_order = round(revenue / order_count) if order_count else 0
+
+    daily: dict[str, int] = {}
+    services: dict[str, dict] = {}
+    customers: dict[str, int] = {}
+    for row in orders:
+        day = str(row["closed_at"] or "")[:10] or "未紀錄"
+        daily[day] = daily.get(day, 0) + int(row["revenue"] or 0)
+        service = str(row["item"] or row["category"] or "其他")
+        bucket = services.setdefault(service, {"label": service, "revenue": 0, "orders": 0})
+        bucket["revenue"] += int(row["revenue"] or 0)
+        bucket["orders"] += 1
+        customer_id = str(row["customer_discord_id"] or "").strip()
+        if customer_id:
+            customers[customer_id] = customers.get(customer_id, 0) + 1
+
+    service_rows = sorted(services.values(), key=lambda x: (-x["revenue"], x["label"]))
+    repeat_customers = sum(1 for count in customers.values() if count >= 2)
+    repeat_rate = round(repeat_customers * 100 / len(customers), 1) if customers else 0.0
+
+    return {
+        "period": period,
+        "period_label": period_label,
+        "revenue": revenue,
+        "worker_cost": worker_cost,
+        "service_cost": service_cost,
+        "payroll": payroll,
+        "retained": retained,
+        "order_count": order_count,
+        "avg_order": avg_order,
+        "customer_count": len(customers),
+        "repeat_customers": repeat_customers,
+        "repeat_rate": repeat_rate,
+        "daily_labels": list(daily.keys()),
+        "daily_values": list(daily.values()),
+        "service_rows": service_rows[:10],
+        "service_labels": [row["label"] for row in service_rows[:8]],
+        "service_values": [row["revenue"] for row in service_rows[:8]],
+        "worker_rows": [dict(row) for row in worker_rows],
+    }
+
+
+@router.get("/admin/payouts/report")
+async def admin_operations_report(request: Request, period: str | None = "quarter"):
+    user = require_admin(request)
+    if not user:
+        return templates.TemplateResponse(
+            request=request,
+            name="no_access.html",
+            context={
+                "title": "沒有權限",
+                "message": "你沒有客服後台權限。",
+                "user": current_user(request),
+            },
+            status_code=403,
+        )
+
+    report = build_operations_report(period)
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_operations_report.html",
+        context={
+            "title": "營運財務報表",
+            "user": user,
+            "report": report,
+        },
+    )

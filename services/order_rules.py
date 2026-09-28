@@ -288,10 +288,10 @@ _add(OrderRule(
 ))
 
 for key, label, price, staff_count in [
-    ("basic_tech_secret_single", "技術陪｜機密單護", 400, 1),
-    ("basic_tech_secret_double", "技術陪｜機密雙護", 800, 2),
-    ("basic_tech_topsecret_single", "技術陪｜絕密單護", 450, 1),
-    ("basic_tech_topsecret_double", "技術陪｜絕密雙護", 900, 2),
+    ("basic_tech_secret_single", "技術陪〈端遊〉｜機密單陪", 400, 1),
+    ("basic_tech_secret_double", "技術陪〈端遊〉｜機密雙陪", 800, 2),
+    ("basic_tech_topsecret_single", "技術陪〈端遊〉｜絕密單陪", 450, 1),
+    ("basic_tech_topsecret_double", "技術陪〈端遊〉｜絕密雙陪", 900, 2),
 ]:
     _add(OrderRule(
         "basic", key, label, "hourly", price, "H",
@@ -303,6 +303,25 @@ for key, label, price, staff_count in [
         specify_free_min_units=2,
         specify_free_basis="quantity",
     ))
+
+# 三角洲手遊技術陪：與端遊使用獨立 rule key，避免歷史訂單與平台價格互相影響。
+for key, label, price, staff_count in [
+    ("basic_mobile_tech_secret_single", "技術陪〈手遊〉｜機密單陪", 380, 1),
+    ("basic_mobile_tech_secret_double", "技術陪〈手遊〉｜機密雙陪", 760, 2),
+    ("basic_mobile_tech_topsecret_single", "技術陪〈手遊〉｜絕密單陪", 420, 1),
+    ("basic_mobile_tech_topsecret_double", "技術陪〈手遊〉｜絕密雙陪", 840, 2),
+]:
+    _add(OrderRule(
+        "basic", key, label, "hourly", price, "H",
+        allowed_roles=PROTECTOR_ROLES,
+        required_staff_count=staff_count,
+        allow_specify=True,
+        max_specified_count=staff_count,
+        specify_fee_by_role=_protectors_fee(),
+        specify_free_min_units=2,
+        specify_free_basis="quantity",
+    ))
+
 
 _add(OrderRule(
     "general",
@@ -326,8 +345,10 @@ _add(OrderRule(
 # 已建立訂單仍使用建立當下保存的規則快照，不受影響。
 
 for key, label, price, staff_count in [
-    ("basic_entertain_single", "娛樂陪｜單陪", 350, 1),
-    ("basic_entertain_double", "娛樂陪｜雙陪", 650, 2),
+    ("basic_entertain_single", "娛樂陪〈端遊〉｜單陪", 320, 1),
+    ("basic_entertain_double", "娛樂陪〈端遊〉｜雙陪", 640, 2),
+    ("basic_mobile_entertain_single", "娛樂陪〈手遊〉｜單陪", 320, 1),
+    ("basic_mobile_entertain_double", "娛樂陪〈手遊〉｜雙陪", 640, 2),
 ]:
     _add(OrderRule(
         "basic", key, label, "hourly", price, "H",
@@ -436,7 +457,7 @@ _add(OrderRule(
     "賽季3x3",
     "fixed",
     4000,
-    allowed_roles=PROTECTOR_ROLES,
+    allowed_roles=ALL_RECEIVER_ROLES,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -451,14 +472,14 @@ _add(OrderRule(
     },
 ))
 
-_add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=1, allow_specify=False))
+_add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False))
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin",
     "賽季3x3+造型",
     "fixed",
     6500,
-    allowed_roles=PROTECTOR_ROLES,
+    allowed_roles=ALL_RECEIVER_ROLES,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -471,7 +492,7 @@ _add(OrderRule(
     "賽季3x3包損耗",
     "fixed",
     4500,
-    allowed_roles=PROTECTOR_ROLES,
+    allowed_roles=ALL_RECEIVER_ROLES,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -484,7 +505,7 @@ _add(OrderRule(
     "賽季3x3+造型包損耗",
     "fixed",
     7000,
-    allowed_roles=PROTECTOR_ROLES,
+    allowed_roles=ALL_RECEIVER_ROLES,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
