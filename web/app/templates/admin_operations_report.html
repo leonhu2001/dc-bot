@@ -55,7 +55,7 @@
       </tbody></table>
     </div>
     <div class="ops-panel">
-      <h2>陪玩產值排行</h2>
+      <h2>陪玩分潤排行</h2>
       <table class="ops-table"><thead><tr><th>人員</th><th>筆數</th><th>分潤</th></tr></thead><tbody>
       {% for row in report.worker_rows %}<tr><td>{{ row.name }}</td><td>{{ row.jobs }}</td><td>{{ row.amount }}</td></tr>{% else %}<tr><td colspan="3">目前沒有資料</td></tr>{% endfor %}
       </tbody></table>
