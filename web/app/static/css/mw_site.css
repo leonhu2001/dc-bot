@@ -9587,18 +9587,18 @@ This prevents an incompatible order from flashing briefly.
         cover;
 
     background-position:
-        center;
+        center 38%;
 
     background-repeat:
         no-repeat;
 
     opacity:
-        .34;
+        .48;
 
     filter:
-        saturate(.78)
-        brightness(.58)
-        contrast(1.06);
+        saturate(.86)
+        brightness(.68)
+        contrast(1.04);
 
     transform:
         scale(1.018);
@@ -9631,16 +9631,16 @@ This prevents an incompatible order from flashing briefly.
     background:
         linear-gradient(
             90deg,
-            rgba(7,7,9,.94) 0%,
-            rgba(7,7,9,.88) 27%,
-            rgba(7,7,9,.69) 51%,
-            rgba(7,7,9,.51) 76%,
-            rgba(7,7,9,.61) 100%
+            rgba(7,7,9,.90) 0%,
+            rgba(7,7,9,.82) 27%,
+            rgba(7,7,9,.62) 51%,
+            rgba(7,7,9,.44) 76%,
+            rgba(7,7,9,.55) 100%
         ),
         linear-gradient(
             180deg,
-            rgba(7,7,9,.13),
-            rgba(7,7,9,.45)
+            rgba(7,7,9,.10),
+            rgba(7,7,9,.38)
         );
 }
 
@@ -9973,10 +9973,10 @@ This prevents an incompatible order from flashing briefly.
 
     .hero::before {
         background-position:
-            60% center;
+            60% 40%;
 
         opacity:
-            .27;
+            .36;
     }
 
 
@@ -9984,9 +9984,9 @@ This prevents an incompatible order from flashing briefly.
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.78) 0%,
-                rgba(7,7,9,.67) 50%,
-                rgba(7,7,9,.76) 100%
+                rgba(7,7,9,.70) 0%,
+                rgba(7,7,9,.58) 50%,
+                rgba(7,7,9,.68) 100%
             );
     }
 
@@ -10003,10 +10003,10 @@ This prevents an incompatible order from flashing briefly.
 
     .hero::before {
         background-position:
-            65% center;
+            65% 42%;
 
         opacity:
-            .22;
+            .30;
     }
 
 
@@ -10014,9 +10014,9 @@ This prevents an incompatible order from flashing briefly.
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.83),
-                rgba(7,7,9,.72) 47%,
-                rgba(7,7,9,.83)
+                rgba(7,7,9,.76),
+                rgba(7,7,9,.64) 47%,
+                rgba(7,7,9,.78)
             );
     }
 
@@ -10040,6 +10040,19 @@ This prevents an incompatible order from flashing briefly.
 
 }
 
+
+
+
+/* homepage hero tuning 20260930b */
+.hero-art-frame-mascot::before {
+    display:
+        none;
+}
+
+.hero-art-frame-mascot .art-corner {
+    display:
+        none !important;
+}
 
 /* END MOWAN_HOME_HERO_OG_20260930 */
 
