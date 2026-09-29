@@ -382,20 +382,22 @@ async def discord_avatar(
     if not discord_id.isdigit() or len(discord_id) > 25:
         url = default_avatar_url(discord_id)
     else:
-        url = session_avatar_url(request, discord_id, size)
+        known_staff = await run_in_threadpool(is_known_staff, discord_id)
 
-        if not url:
-            known_staff = await run_in_threadpool(is_known_staff, discord_id)
-            if known_staff:
-                url = await run_in_threadpool(
-                    resolve_staff_avatar_url,
-                    discord_id,
-                    size,
-                )
-            else:
+        if known_staff:
+            # Staff avatars follow the roster's Discord snapshot, including a
+            # server-specific avatar when one exists.
+            url = await run_in_threadpool(
+                resolve_staff_avatar_url,
+                discord_id,
+                size,
+            )
+        else:
+            url = session_avatar_url(request, discord_id, size)
+            if not url:
                 # Unknown IDs never trigger Discord Bot API calls.
                 url = default_avatar_url(discord_id)
 
     response = RedirectResponse(url, status_code=302)
-    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Cache-Control"] = "public, max-age=60"
     return response
