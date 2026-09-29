@@ -326,6 +326,7 @@ ORDER_LOG_CHANNEL_NAME = "🤖┃機器人日誌"
 LOTTERY_ANNOUNCE_CHANNEL_ID = 1482079302739693739
 BACKUP_KEEP_DAYS = 30
 ORDER_ID_PREFIX = "MO"
+CREDENTIAL_OWNER_USER_ID = 0  # 0 = 自動使用 Discord Bot 應用程式擁有者
 
 # 接單身分組 ID
 # 多身分組版：單一 ID 保留給舊邏輯相容，實際權限判斷使用 *_ROLE_IDS。
@@ -434,6 +435,7 @@ COMPLAINT_RECEIVE_CHANNEL_ID = _config_int("COMPLAINT_RECEIVE_CHANNEL_ID", COMPL
 DISPATCH_CHANNEL_ID = _config_int("DISPATCH_CHANNEL_ID", DISPATCH_CHANNEL_ID)
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
+CREDENTIAL_OWNER_USER_ID = _config_int("CREDENTIAL_OWNER_USER_ID", CREDENTIAL_OWNER_USER_ID)
 
 # 身分組
 VIP_VOICE_LOBBY_ROLE_ID = _config_int("VIP_VOICE_LOBBY_ROLE_ID", VIP_VOICE_LOBBY_ROLE_ID)
@@ -954,6 +956,21 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
                     print(f"[acceptance] closed order_id={order_id} source=discord_close")
             except Exception as exc:
                 print(f"[acceptance] 結單同步付款前接單狀態失敗 order_id={order_id}: {exc}")
+
+            try:
+                credential_ticket_channel = bot.get_channel(_to_int(ticket_channel_id, 0) or 0)
+                if not isinstance(credential_ticket_channel, discord.TextChannel):
+                    credential_ticket_channel = None
+                bot.loop.create_task(
+                    revoke_order_credential_messages(
+                        order_id,
+                        reason="closed",
+                        ticket_channel=credential_ticket_channel,
+                        notify_customer=True,
+                    )
+                )
+            except Exception as exc:
+                print(f"[credentials] 結單撤回排程失敗 order_id={order_id}: {exc}")
 
     except Exception as exc:
         print(f"[web-sync] 結單同步網站失敗 ticket_channel_id={ticket_channel_id}: {exc}")
@@ -4014,6 +4031,564 @@ async def redeem_order_point_benefit_on_payment(
 
     return f"點數福利已扣 {info['cost']} 點：{info['name']}（{before_points} → {after_points}）"
 
+
+def _order_requires_credentials(data: dict | None) -> bool:
+    if not isinstance(data, dict):
+        return False
+
+    rule_key = str(data.get("order_rule_key") or "").strip().lower()
+    category = str(data.get("category") or "").strip().lower()
+    return rule_key.startswith("farm_") or category == "farm"
+
+
+async def _credential_user_for_id(
+    guild: discord.Guild | None,
+    user_id: int,
+) -> discord.Member | discord.User | None:
+    if guild is not None:
+        member = guild.get_member(int(user_id))
+        if member is not None:
+            return member
+
+        try:
+            member = await fetch_member_safely(guild, int(user_id))
+        except Exception:
+            member = None
+
+        if member is not None:
+            return member
+
+    user = bot.get_user(int(user_id))
+    if user is not None:
+        return user
+
+    try:
+        return await bot.fetch_user(int(user_id))
+    except Exception:
+        return None
+
+
+def _credential_display_name(
+    guild: discord.Guild | None,
+    user: discord.Member | discord.User | None,
+    user_id: int | str,
+) -> str:
+    try:
+        numeric_id = int(user_id)
+    except (TypeError, ValueError):
+        numeric_id = 0
+
+    if guild is not None and numeric_id:
+        member = guild.get_member(numeric_id)
+        if member is not None:
+            return str(member.display_name)
+
+    if user is not None:
+        return str(
+            getattr(user, "display_name", None)
+            or getattr(user, "global_name", None)
+            or getattr(user, "name", None)
+            or user_id
+        )
+
+    return str(user_id)
+
+
+async def _resolve_credential_owner(
+    guild: discord.Guild | None,
+) -> discord.Member | discord.User | None:
+    if int(CREDENTIAL_OWNER_USER_ID or 0) > 0:
+        return await _credential_user_for_id(guild, int(CREDENTIAL_OWNER_USER_ID))
+
+    try:
+        app_info = await bot.application_info()
+    except Exception:
+        app_info = None
+
+    owner = getattr(app_info, "owner", None) if app_info is not None else None
+    if owner is not None:
+        owner_id = _to_int(getattr(owner, "id", None))
+        if owner_id is not None:
+            resolved = await _credential_user_for_id(guild, owner_id)
+            return resolved or owner
+
+    team = getattr(app_info, "team", None) if app_info is not None else None
+    team_owner_id = _to_int(getattr(team, "owner_id", None)) if team is not None else None
+    if team_owner_id is not None:
+        return await _credential_user_for_id(guild, team_owner_id)
+
+    return None
+
+
+async def revoke_order_credential_messages(
+    order_id: int,
+    *,
+    reason: str,
+    ticket_channel: discord.TextChannel | None = None,
+    notify_customer: bool = True,
+) -> dict:
+    from services.order_credentials import (
+        get_order_context,
+        list_active_deliveries,
+        mark_delivery_revoked,
+    )
+
+    deliveries = list_active_deliveries(int(order_id))
+    context = get_order_context(int(order_id)) or {}
+
+    deleted_count = 0
+    failed_count = 0
+    recipient_lines: list[str] = []
+
+    for delivery in deliveries:
+        recipient_id = _to_int(delivery.get("recipient_discord_id"))
+        message_id = _to_int(delivery.get("dm_message_id"))
+        recipient_type = str(delivery.get("recipient_type") or "recipient")
+        recipient_name = str(
+            delivery.get("recipient_display_name")
+            or delivery.get("recipient_discord_id")
+            or "未知"
+        )
+
+        label = "店長" if recipient_type == "owner" else "接單人員"
+        recipient_lines.append(f"・{label}：{recipient_name}")
+
+        if recipient_id is None or message_id is None:
+            mark_delivery_revoked(
+                int(delivery["id"]),
+                status="metadata_missing",
+                reason=reason,
+            )
+            deleted_count += 1
+            continue
+
+        user = await _credential_user_for_id(
+            ticket_channel.guild if ticket_channel is not None else bot.get_guild(GUILD_ID),
+            recipient_id,
+        )
+
+        if user is None:
+            failed_count += 1
+            continue
+
+        try:
+            dm_channel = getattr(user, "dm_channel", None)
+            if dm_channel is None:
+                dm_channel = await user.create_dm()
+
+            try:
+                message = await dm_channel.fetch_message(message_id)
+                await message.delete()
+                revoke_status = "deleted"
+            except discord.NotFound:
+                revoke_status = "already_missing"
+
+            mark_delivery_revoked(
+                int(delivery["id"]),
+                status=revoke_status,
+                reason=reason,
+            )
+            deleted_count += 1
+        except (discord.Forbidden, discord.HTTPException):
+            failed_count += 1
+        except Exception:
+            failed_count += 1
+
+    if notify_customer and deliveries:
+        customer_id = _to_int(context.get("customer_discord_id"))
+        order_no = str(
+            context.get("bot_order_no")
+            or f"WEB-{order_id}"
+        )
+        unique_recipient_lines = list(dict.fromkeys(recipient_lines))
+
+        if failed_count == 0:
+            body = (
+                f"✅ **帳號資料已銷毀**\\n"
+                f"訂單：**{order_no}**\\n\\n"
+                "系統已撤回所有由魔丸娛樂機器人發送的帳號密碼訊息。\\n"
+                "本次帳號與密碼內容從未寫入魔丸娛樂資料庫；"
+                "系統只保留不含帳密的授權與撤回紀錄。"
+            )
+        else:
+            body = (
+                f"⚠️ **帳號資料撤回未完全成功**\\n"
+                f"訂單：**{order_no}**\\n\\n"
+                f"已撤回 **{deleted_count}** 則，另有 **{failed_count}** 則 Discord 私訊目前無法確認撤回。\\n"
+                "魔丸娛樂系統本身未保存帳號或密碼內容。"
+            )
+
+        if unique_recipient_lines:
+            body += "\\n\\n原授權人員：\\n" + "\\n".join(unique_recipient_lines)
+
+        body += (
+            f"\\n\\n處理時間：{get_taipei_now_iso()}\\n"
+            "🔒 為了最高帳號安全性，服務完成後仍建議更換密碼。"
+        )
+
+        delivered_notice = False
+        if customer_id is not None:
+            customer_user = await _credential_user_for_id(
+                ticket_channel.guild if ticket_channel is not None else bot.get_guild(GUILD_ID),
+                customer_id,
+            )
+            if customer_user is not None:
+                try:
+                    await customer_user.send(body)
+                    delivered_notice = True
+                except Exception:
+                    delivered_notice = False
+
+        if not delivered_notice and ticket_channel is not None:
+            try:
+                mention = f"<@{customer_id}> " if customer_id is not None else ""
+                await ticket_channel.send(
+                    mention + body,
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+            except Exception:
+                pass
+
+    return {
+        "total": len(deliveries),
+        "deleted": deleted_count,
+        "failed": failed_count,
+    }
+
+
+async def ensure_order_credential_request(
+    *,
+    channel: discord.TextChannel,
+    customer_id: int,
+    data: dict,
+) -> discord.Message | None:
+    if not _order_requires_credentials(data):
+        return None
+
+    existing_message_id = _to_int(data.get("credential_request_message_id"))
+
+    if existing_message_id is not None:
+        try:
+            existing_message = await channel.fetch_message(existing_message_id)
+            await existing_message.edit(view=OrderCredentialEntryView())
+            return existing_message
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    embed = discord.Embed(
+        title="🔐 代肝／代解登入資料",
+        description=(
+            "此訂單需要登入您的遊戲帳號。\\n\\n"
+            "帳號與密碼**不會寫入魔丸娛樂資料庫**，只會在您送出時由機器人"
+            "直接私訊給目前接單人員與店長。\\n"
+            "結單或取消後，機器人會自動撤回這些帳密私訊；"
+            "系統只保留不含帳密內容的授權／撤回紀錄。"
+        ),
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(
+        name="誰會取得帳密？",
+        value="目前實際接單人員與店長。送出後會明確列出姓名。",
+        inline=False,
+    )
+    embed.add_field(
+        name="安全提醒",
+        value="服務完成後仍建議更換密碼；若接單人員異動，請重新提交登入資料。",
+        inline=False,
+    )
+
+    message = await channel.send(
+        content=f"<@{customer_id}> 請填寫本單登入資料。",
+        embed=embed,
+        view=OrderCredentialEntryView(),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+    data["credential_request_message_id"] = message.id
+    data["credential_request_created_at"] = get_taipei_now_iso()
+    remember_order_data(channel.id, data)
+    save_bot_data()
+    return message
+
+
+class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"):
+    account = discord.ui.TextInput(
+        label="登入帳號",
+        placeholder="請輸入此訂單使用的遊戲登入帳號",
+        required=True,
+        max_length=200,
+    )
+    password = discord.ui.TextInput(
+        label="登入密碼",
+        placeholder="請輸入此訂單使用的登入密碼",
+        required=True,
+        max_length=200,
+    )
+    login_note = discord.ui.TextInput(
+        label="登入方式／備註（選填）",
+        placeholder="例如 Steam、Garena、Google 登入，或其他登入注意事項",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=500,
+    )
+
+    def __init__(self, order_channel_id: int):
+        super().__init__()
+        self.order_channel_id = int(order_channel_id)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild is None or not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("無法確認此訂單票口。", ephemeral=True)
+            return
+
+        channel = interaction.channel
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(self.order_channel_id)
+
+        if not isinstance(data, dict):
+            await interaction.response.send_message("找不到這張訂單資料，請通知客服。", ephemeral=True)
+            return
+
+        customer_id = _to_int(data.get("customer_id"))
+        if customer_id is None or int(interaction.user.id) != customer_id:
+            await interaction.response.send_message("只有此訂單的老闆可以提交登入資料。", ephemeral=True)
+            return
+
+        if str(data.get("status") or "").lower() != "active":
+            await interaction.response.send_message("訂單尚未付款成立，或目前已不在進行中。", ephemeral=True)
+            return
+
+        if not _order_requires_credentials(data):
+            await interaction.response.send_message("這張訂單不需要提交登入資料。", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        from services.order_credentials import (
+            get_active_worker_ids,
+            get_order_context,
+            get_order_id_by_ticket_channel,
+            record_delivery,
+        )
+
+        order_id = _to_int(data.get("web_order_id"))
+        if order_id is None:
+            order_id = get_order_id_by_ticket_channel(self.order_channel_id)
+
+        if order_id is None:
+            await interaction.followup.send("找不到網站訂單資料，請通知客服。", ephemeral=True)
+            return
+
+        context = get_order_context(order_id) or {}
+        if str(context.get("status") or "").lower() != "active":
+            await interaction.followup.send("這張訂單目前不是進行中狀態。", ephemeral=True)
+            return
+
+        worker_ids = get_active_worker_ids(order_id)
+        if not worker_ids:
+            await interaction.followup.send("目前找不到正式接單人員，請通知客服確認接單狀態。", ephemeral=True)
+            return
+
+        owner_user = await _resolve_credential_owner(interaction.guild)
+        owner_id = _to_int(getattr(owner_user, "id", None))
+
+        if owner_user is None or owner_id is None:
+            await interaction.followup.send(
+                "目前無法確認店長 Discord 帳號，登入資料尚未送出，請通知客服。",
+                ephemeral=True,
+            )
+            return
+
+        # 重新提交時，先撤回上一輪私訊；帳密內容本身沒有資料庫副本。
+        await revoke_order_credential_messages(
+            order_id,
+            reason="resubmitted",
+            ticket_channel=channel,
+            notify_customer=False,
+        )
+
+        recipients: list[tuple[int, str, discord.Member | discord.User]] = []
+        seen_ids: set[int] = set()
+
+        for worker_id_text in worker_ids:
+            worker_id = _to_int(worker_id_text)
+            if worker_id is None or worker_id in seen_ids:
+                continue
+            worker_user = await _credential_user_for_id(interaction.guild, worker_id)
+            if worker_user is None:
+                await revoke_order_credential_messages(
+                    order_id,
+                    reason="delivery_failed",
+                    ticket_channel=channel,
+                    notify_customer=False,
+                )
+                await interaction.followup.send(
+                    f"無法私訊其中一位接單人員（ID {worker_id}），帳密尚未完成交付。請通知客服。",
+                    ephemeral=True,
+                )
+                return
+            seen_ids.add(worker_id)
+            recipients.append((worker_id, "worker", worker_user))
+
+        if owner_id not in seen_ids:
+            seen_ids.add(owner_id)
+            recipients.append((owner_id, "owner", owner_user))
+
+        order_no = str(
+            data.get("order_no")
+            or data.get("receipt_id")
+            or context.get("bot_order_no")
+            or f"WEB-{order_id}"
+        )
+        account_value = str(self.account.value or "").strip()
+        password_value = str(self.password.value or "")
+        note_value = str(self.login_note.value or "").strip()
+
+        delivered_display: list[str] = []
+
+        for recipient_id, recipient_type, recipient in recipients:
+            display_name = _credential_display_name(
+                interaction.guild,
+                recipient,
+                recipient_id,
+            )
+            label = "店長" if recipient_type == "owner" else "接單人員"
+
+            credential_embed = discord.Embed(
+                title="🔐 魔丸娛樂｜臨時帳號授權",
+                description=(
+                    "此登入資料僅限本訂單服務使用。\\n"
+                    "完成、取消或重新提交後，機器人會嘗試自動撤回本訊息。"
+                ),
+                color=discord.Color.orange(),
+            )
+            credential_embed.add_field(name="訂單", value=order_no, inline=False)
+            credential_embed.add_field(name="登入帳號", value=account_value[:1024], inline=False)
+            credential_embed.add_field(name="登入密碼", value=password_value[:1024], inline=False)
+            if note_value:
+                credential_embed.add_field(
+                    name="登入方式／備註",
+                    value=note_value[:1024],
+                    inline=False,
+                )
+            credential_embed.set_footer(text="請勿轉傳、截圖或用於本訂單以外用途")
+
+            try:
+                dm_message = await recipient.send(embed=credential_embed)
+            except Exception:
+                await revoke_order_credential_messages(
+                    order_id,
+                    reason="delivery_failed",
+                    ticket_channel=channel,
+                    notify_customer=False,
+                )
+                await interaction.followup.send(
+                    f"無法將登入資料交付給{label}「{display_name}」。"
+                    "已撤回本次其他已送出的帳密訊息，請通知客服。",
+                    ephemeral=True,
+                )
+                return
+
+            record_delivery(
+                order_id=order_id,
+                recipient_discord_id=recipient_id,
+                recipient_type=recipient_type,
+                recipient_display_name=display_name,
+                dm_channel_id=dm_message.channel.id,
+                dm_message_id=dm_message.id,
+            )
+            delivered_display.append(f"・{label}：{display_name}")
+
+        data["web_order_id"] = int(order_id)
+        data["credential_last_submitted_at"] = get_taipei_now_iso()
+        data["credential_delivery_count"] = len(recipients)
+        remember_order_data(self.order_channel_id, data)
+        save_bot_data()
+
+        receipt_text = (
+            f"🛡️ **帳號資料已安全交付**\\n"
+            f"訂單：**{order_no}**\\n\\n"
+            "目前取得本次帳號資料的人員：\\n"
+            + "\\n".join(delivered_display)
+            + "\\n\\n除上述人員外，機器人未將帳密送給其他店內成員。"
+            "\\n帳號與密碼內容未寫入魔丸娛樂資料庫；"
+            "結單或取消後機器人會自動撤回這些帳密私訊。"
+        )
+
+        customer_notice_sent = False
+        try:
+            await interaction.user.send(receipt_text)
+            customer_notice_sent = True
+        except Exception:
+            customer_notice_sent = False
+
+        if not customer_notice_sent:
+            try:
+                await channel.send(
+                    f"<@{customer_id}> {receipt_text}",
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+            except Exception:
+                pass
+
+        await interaction.followup.send(
+            "登入資料已交付完成。\\n\\n" + "\\n".join(delivered_display),
+            ephemeral=True,
+        )
+
+
+class OrderCredentialEntryView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="🔐 填寫／更新帳號資料",
+        style=discord.ButtonStyle.primary,
+        custom_id="order_credentials:submit",
+    )
+    async def submit_credentials(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("請在原訂單票口操作。", ephemeral=True)
+            return
+
+        data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id)
+        if not isinstance(data, dict):
+            await interaction.response.send_message("找不到這張訂單資料，請通知客服。", ephemeral=True)
+            return
+
+        customer_id = _to_int(data.get("customer_id"))
+        if customer_id is None or int(interaction.user.id) != customer_id:
+            await interaction.response.send_message("只有此訂單的老闆可以填寫登入資料。", ephemeral=True)
+            return
+
+        if str(data.get("status") or "").lower() != "active":
+            await interaction.response.send_message("這張訂單目前不是進行中狀態。", ephemeral=True)
+            return
+
+        if not _order_requires_credentials(data):
+            await interaction.response.send_message("這張訂單不需要登入資料。", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(
+            OrderCredentialModal(interaction.channel.id)
+        )
+
+
 async def finalize_accepted_pending_payment(
     *,
     interaction: discord.Interaction,
@@ -4354,6 +4929,7 @@ async def finalize_accepted_pending_payment(
                 web_order_id = None
 
         if web_order_id is not None:
+            data["web_order_id"] = int(web_order_id)
             from shared.order_acceptance import promote_acceptance_claims_to_assignments
             payout_base_amount = _to_int(data.get("payout_base_amount"), amount) or amount
             promoted_count = promote_acceptance_claims_to_assignments(
@@ -4487,7 +5063,23 @@ async def finalize_accepted_pending_payment(
         remember_order_data(channel_id, data)
         save_bot_data()
 
+        if _order_requires_credentials(data):
+            try:
+                await ensure_order_credential_request(
+                    channel=interaction.channel,
+                    customer_id=customer_id,
+                    data=data,
+                )
+            except Exception as exc:
+                print(
+                    f"[credentials] request panel failed channel_id={channel_id}: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
         response_text = f"已確認付款方式：{payment_method}，訂單正式成立。"
+        if _order_requires_credentials(data):
+            response_text += "\n🔐 請在票口的登入資料面板填寫代肝／代解帳號資料。"
         if data.get("receipt_id"):
             response_text += f"\n交易收據已產生：{data.get('receipt_id')}"
         if order_point_benefit_result:
@@ -11608,6 +12200,13 @@ async def on_ready():
     if restored_dispatch_views:
         print(f"Restored dispatch claim views: {restored_dispatch_views}")
 
+    if not getattr(bot, "_order_credential_view_registered", False):
+        try:
+            bot.add_view(OrderCredentialEntryView())
+            bot._order_credential_view_registered = True
+        except ValueError:
+            pass
+
     guild_for_voice = bot.get_guild(GUILD_ID)
     if guild_for_voice is not None:
         try:
@@ -12881,6 +13480,21 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
                     print(f"[acceptance] cancelled order_id={order_id} source=discord_cancel")
             except Exception as exc:
                 print(f"[acceptance] 取消訂單同步付款前接單狀態失敗 order_id={order_id}: {exc}")
+
+            try:
+                credential_ticket_channel = bot.get_channel(_to_int(ticket_channel_id, 0) or 0)
+                if not isinstance(credential_ticket_channel, discord.TextChannel):
+                    credential_ticket_channel = None
+                bot.loop.create_task(
+                    revoke_order_credential_messages(
+                        order_id,
+                        reason="cancelled",
+                        ticket_channel=credential_ticket_channel,
+                        notify_customer=True,
+                    )
+                )
+            except Exception as exc:
+                print(f"[credentials] 取消訂單撤回排程失敗 order_id={order_id}: {exc}")
 
     except Exception as exc:
         print(
