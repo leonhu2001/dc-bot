@@ -5535,6 +5535,21 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
         ORDER_CLAIMS.pop(dispatch_message_id, None)
         delete_claim_row_from_db(message_id=dispatch_message_id)
 
+    if _order_requires_credentials(data):
+        try:
+            from services.order_credentials import get_order_id_by_ticket_channel
+            credential_order_id = _to_int(data.get("web_order_id")) or get_order_id_by_ticket_channel(order_channel_id)
+            if credential_order_id is not None:
+                credential_ticket_channel = guild.get_channel(order_channel_id)
+                await revoke_order_credential_messages(
+                    credential_order_id,
+                    reason="cancelled",
+                    ticket_channel=credential_ticket_channel if isinstance(credential_ticket_channel, discord.TextChannel) else None,
+                    notify_customer=True,
+                )
+        except Exception as exc:
+            print(f"[credentials] 取消票口撤回失敗 channel_id={order_channel_id}: {exc}")
+
     if order_channel_id in SELF_SERVICE_ORDER_SELECTIONS:
         SELF_SERVICE_ORDER_SELECTIONS.pop(order_channel_id, None)
         delete_order_row_from_db(order_channel_id)
@@ -5810,6 +5825,21 @@ async def store_dispatch_claim_panel(
         dispatch_message_id=dispatch_message_id,
         note="由 DC bot 存單同步。",
     )
+
+    if _order_requires_credentials(data):
+        try:
+            from services.order_credentials import get_order_id_by_ticket_channel
+            credential_order_id = _to_int(data.get("web_order_id")) or get_order_id_by_ticket_channel(order_channel.id)
+            if credential_order_id is not None:
+                await revoke_order_credential_messages(
+                    credential_order_id,
+                    reason="stored",
+                    ticket_channel=order_channel,
+                    notify_customer=True,
+                )
+        except Exception as exc:
+            print(f"[credentials] 存單撤回失敗 channel_id={order_channel.id}: {exc}")
+
     remember_claim_data(dispatch_message_id, claim_data)
 
     companion_ids = sorted(claim_data.get("companion", set()))
@@ -5979,6 +6009,21 @@ async def resume_stored_order(
     data["stored_reason"] = None
     data["stored_expected_time"] = None
     data["stored_note"] = None
+
+    if resume_status == "active" and _order_requires_credentials(data):
+        try:
+            await ensure_order_credential_request(
+                channel=order_channel,
+                customer_id=_to_int(customer_id, 0) or 0,
+                data=data,
+            )
+            if customer_id is not None:
+                await order_channel.send(
+                    f"<@{customer_id}> 🔐 訂單已恢復。先前登入資料私訊已撤回，請重新提交本單登入資料。",
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+        except Exception as exc:
+            print(f"[credentials] 恢復訂單登入資料提示失敗 channel_id={order_channel.id}: {exc}")
 
     companion_ids = sorted(claim_data.get("companion", set()))
     booster_ids = sorted(claim_data.get("booster", set()))
@@ -13578,6 +13623,21 @@ async def delete_order(
         if dispatch_message_id is not None:
             ORDER_CLAIMS.pop(dispatch_message_id, None)
             delete_claim_row_from_db(message_id=dispatch_message_id)
+
+        if _order_requires_credentials(data):
+            try:
+                from services.order_credentials import get_order_id_by_ticket_channel
+                credential_order_id = _to_int(data.get("web_order_id")) or get_order_id_by_ticket_channel(channel_id)
+                if credential_order_id is not None:
+                    original_ticket_channel = interaction.guild.get_channel(channel_id) if interaction.guild is not None else None
+                    await revoke_order_credential_messages(
+                        credential_order_id,
+                        reason="deleted",
+                        ticket_channel=original_ticket_channel if isinstance(original_ticket_channel, discord.TextChannel) else None,
+                        notify_customer=True,
+                    )
+            except Exception as exc:
+                print(f"[credentials] 手動刪單撤回失敗 channel_id={channel_id}: {exc}")
 
         sync_web_order_deleted_from_bot(
             ticket_channel_id=channel_id,
