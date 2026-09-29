@@ -5573,6 +5573,20 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     if source_channel is None or not isinstance(source_channel, discord.TextChannel):
         return
 
+    if _order_requires_credentials(data):
+        try:
+            from services.order_credentials import get_order_id_by_ticket_channel
+            credential_order_id = _to_int(data.get("web_order_id")) or get_order_id_by_ticket_channel(order_channel_id)
+            if credential_order_id is not None:
+                await revoke_order_credential_messages(
+                    credential_order_id,
+                    reason="closed",
+                    ticket_channel=source_channel,
+                    notify_customer=True,
+                )
+        except Exception as exc:
+            print(f"[credentials] 結單撤回失敗 channel_id={order_channel_id}: {exc}")
+
     dispatch_channel = guild.get_channel(dispatch_channel_id)
 
     if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
