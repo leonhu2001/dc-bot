@@ -773,7 +773,8 @@ def promote_acceptance_claims_to_assignments(
                     worker_display_name=row["staff_display_name"] or worker_discord_id,
                     role_type="booster",
                     is_active=True,
-                    # 「指定」只保留接單席位，不等於「掛名」；只有掛名才有額外 5% 分潤。\n                    has_named_bonus=False,
+                    # 「指定」只保留接單席位，不等於「掛名」；只有掛名才有額外 5% 分潤。
+                    has_named_bonus=False,
                 )
                 db.add(assignment)
             else:
