@@ -10113,7 +10113,7 @@ This prevents an incompatible order from flashing briefly.
        much closer to the hero divider.
     */
     transform:
-        translateY(100px)
+        translateY(118px)
         scale(1.018) !important;
 
     transform-origin:
@@ -10269,12 +10269,12 @@ This prevents an incompatible order from flashing briefly.
         no-repeat;
 
     opacity:
-        .82;
+        .88;
 
     filter:
-        saturate(.86)
-        brightness(.72)
-        contrast(1.03);
+        saturate(.90)
+        brightness(.80)
+        contrast(1.02);
 
     transform:
         scale(1.015);
@@ -10300,15 +10300,15 @@ This prevents an incompatible order from flashing briefly.
     background:
         linear-gradient(
             90deg,
-            rgba(7,7,9,.72) 0%,
-            rgba(7,7,9,.52) 40%,
-            rgba(7,7,9,.42) 70%,
-            rgba(7,7,9,.55) 100%
+            rgba(7,7,9,.66) 0%,
+            rgba(7,7,9,.46) 40%,
+            rgba(7,7,9,.36) 70%,
+            rgba(7,7,9,.49) 100%
         ),
         linear-gradient(
             180deg,
-            rgba(7,7,9,.10),
-            rgba(7,7,9,.34)
+            rgba(7,7,9,.07),
+            rgba(7,7,9,.28)
         );
 
     pointer-events:
@@ -10390,7 +10390,7 @@ It was the source of the blurred text / noisy hero.
             center center;
 
         opacity:
-            .72;
+            .78;
     }
 
 }
@@ -10454,7 +10454,7 @@ It was the source of the blurred text / noisy hero.
             58% center;
 
         opacity:
-            .62;
+            .68;
     }
 
 
@@ -10462,8 +10462,8 @@ It was the source of the blurred text / noisy hero.
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.58),
-                rgba(7,7,9,.74)
+                rgba(7,7,9,.52),
+                rgba(7,7,9,.68)
             );
     }
 
