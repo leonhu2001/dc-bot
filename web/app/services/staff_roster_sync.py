@@ -881,6 +881,26 @@ def ensure_staff_roster_profiles(
 
             if staff_id in existing_ids:
 
+                # Existing public profiles keep their website-only fields,
+                # but the public name must always follow the latest Discord
+                # server nickname snapshot.
+                if (
+                    "display_name"
+                    in profile_cols
+                ):
+
+                    conn.execute(
+                        "UPDATE staff_profiles "
+                        "SET display_name = ? "
+                        "WHERE CAST(staff_discord_id AS TEXT) = ?",
+                        (
+                            item[
+                                "display_name"
+                            ],
+                            staff_id,
+                        ),
+                    )
+
                 continue
 
 
