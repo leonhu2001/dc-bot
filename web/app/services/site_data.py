@@ -1676,6 +1676,24 @@ def _profile_to_public(
         or ""
     )
 
+    card_image_url = str(
+        profile.get(
+            "card_image_url"
+        )
+        or ""
+    ).strip()
+
+    # Public hero backgrounds only accept HTTPS or local site paths.
+    if not (
+        card_image_url.startswith(
+            "https://"
+        )
+        or card_image_url.startswith(
+            "/"
+        )
+    ):
+        card_image_url = ""
+
     result = {
         "staff_id": staff_id,
         "display_name": (
@@ -1727,8 +1745,9 @@ def _profile_to_public(
                 )
             )
         ),
-        # Old promotional/card image is intentionally
-        # not exposed on the redesigned website.
+        "card_image_url": (
+            card_image_url
+        ),
         "avatar_url": (
             f"/discord-avatar/"
             f"{staff_id}"
