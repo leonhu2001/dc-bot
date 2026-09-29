@@ -3392,3 +3392,41 @@ html body.mw-r5-employee .mw-r5-page-header .mw-r5-kicker {
     opacity: 1 !important;
 }
 /* END MAWAN_R9_SIDEBAR_GOLD */
+
+
+/* ==========================================================
+   REVIEW ACTION BUTTONS - keep labels on one line
+   ========================================================== */
+
+.mw-review-table th:last-child,
+.mw-review-table td:last-child {
+    min-width:
+        190px !important;
+
+    width:
+        190px !important;
+}
+
+.mw-review-actions {
+    flex-wrap:
+        nowrap !important;
+
+    align-items:
+        flex-start !important;
+}
+
+.mw-review-actions form {
+    flex:
+        0 0 auto !important;
+}
+
+.mw-review-actions button {
+    width:
+        auto !important;
+
+    min-width:
+        max-content !important;
+
+    white-space:
+        nowrap !important;
+}
