@@ -9587,7 +9587,7 @@ This prevents an incompatible order from flashing briefly.
         cover;
 
     background-position:
-        center 46%;
+        center 28%;
 
     background-repeat:
         no-repeat;
@@ -9973,7 +9973,7 @@ This prevents an incompatible order from flashing briefly.
 
     .hero::before {
         background-position:
-            60% 48%;
+            60% 32%;
 
         opacity:
             .44;
@@ -10003,7 +10003,7 @@ This prevents an incompatible order from flashing briefly.
 
     .hero::before {
         background-position:
-            65% 50%;
+            65% 34%;
 
         opacity:
             .38;
@@ -10065,4 +10065,145 @@ This prevents an incompatible order from flashing briefly.
 }
 
 /* END MOWAN_HOME_HERO_OG_20260930 */
+
+/* BEGIN MOWAN_HOME_BG_FINAL_20260930 */
+
+
+/* ==========================================================
+   FINAL HERO BACKGROUND
+   Desktop:
+   - move OG artwork DOWN substantially
+   - make OG artwork more visible
+   - keep foreground headline readable
+   ========================================================== */
+
+.hero::before {
+    background-position:
+        center -10% !important;
+
+    opacity:
+        .72 !important;
+
+    filter:
+        saturate(1)
+        brightness(.92)
+        contrast(1.01) !important;
+}
+
+
+/*
+Keep the left headline readable while allowing the actual
+OG artwork / character / typography to remain visible.
+*/
+.hero::after {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(7,7,9,.78) 0%,
+            rgba(7,7,9,.67) 27%,
+            rgba(7,7,9,.43) 51%,
+            rgba(7,7,9,.25) 76%,
+            rgba(7,7,9,.36) 100%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(7,7,9,.04) 0%,
+            rgba(7,7,9,.18) 100%
+        ) !important;
+}
+
+
+/* ==========================================================
+   Preserve clean mascot visual
+   ========================================================== */
+
+.hero-art-frame-mascot::before {
+    display:
+        none !important;
+}
+
+.hero-art-frame-mascot .art-corner {
+    display:
+        none !important;
+}
+
+.hero-mascot-aura,
+.hero-mascot-aura::before,
+.hero-mascot-aura::after {
+    display:
+        none !important;
+}
+
+
+/* ==========================================================
+   TABLET
+   ========================================================== */
+
+@media (
+    max-width: 1000px
+) {
+
+    .hero::before {
+        background-position:
+            60% 18% !important;
+
+        opacity:
+            .58 !important;
+
+        filter:
+            saturate(.96)
+            brightness(.88)
+            contrast(1.01) !important;
+    }
+
+
+    .hero::after {
+        background:
+            linear-gradient(
+                180deg,
+                rgba(7,7,9,.53) 0%,
+                rgba(7,7,9,.40) 50%,
+                rgba(7,7,9,.51) 100%
+            ) !important;
+    }
+
+}
+
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media (
+    max-width: 720px
+) {
+
+    .hero::before {
+        background-position:
+            65% 20% !important;
+
+        opacity:
+            .48 !important;
+
+        filter:
+            saturate(.94)
+            brightness(.84)
+            contrast(1.01) !important;
+    }
+
+
+    .hero::after {
+        background:
+            linear-gradient(
+                180deg,
+                rgba(7,7,9,.61) 0%,
+                rgba(7,7,9,.47) 47%,
+                rgba(7,7,9,.62) 100%
+            ) !important;
+    }
+
+}
+
+
+/* END MOWAN_HOME_BG_FINAL_20260930 */
 
