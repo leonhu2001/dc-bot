@@ -1192,6 +1192,55 @@ STAFF_ROLE_FILTER_DEFS = (
 )
 
 
+STAFF_ROLE_LABEL_BY_KEY = dict(
+    STAFF_ROLE_FILTER_DEFS
+)
+
+COMPANION_ROLE_KEYS = {
+    "female_companion",
+    "male_companion",
+}
+
+
+def _staff_display_role_titles(
+    role_keys,
+) -> list[str]:
+    keys = [
+        str(key)
+        for key in (
+            role_keys
+            or []
+        )
+        if str(key).strip()
+    ]
+
+    higher_roles = [
+        key
+        for key in keys
+        if key not in COMPANION_ROLE_KEYS
+    ]
+
+    visible_keys = (
+        higher_roles
+        if higher_roles
+        else [
+            key
+            for key in keys
+            if key in COMPANION_ROLE_KEYS
+        ]
+    )
+
+    return [
+        normalize_public_text(
+            STAFF_ROLE_LABEL_BY_KEY.get(
+                key,
+                key,
+            )
+        )
+        for key in visible_keys
+    ]
+
+
 HOMEPAGE_STAFF_FILTER_KEYS = {
     "entertainment_female",
     "entertainment_male",
@@ -1694,6 +1743,17 @@ def _profile_to_public(
             result,
         )
     )
+
+    result["role_titles"] = (
+        _staff_display_role_titles(
+            result["role_keys"]
+        )
+    )
+
+    if result["role_titles"]:
+        result["role_title"] = "・".join(
+            result["role_titles"]
+        )
 
     result["role_group"] = (
         _staff_role_group(
