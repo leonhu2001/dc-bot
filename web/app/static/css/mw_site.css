@@ -10066,17 +10066,28 @@ This prevents an incompatible order from flashing briefly.
 
 /* END MOWAN_HOME_HERO_OG_20260930 */
 
-/* BEGIN MOWAN_HOME_HERO_FINAL_VISUAL_20260930 */
+/* BEGIN MOWAN_HOME_STAFF_FINAL_20260930 */
+
 
 /* ==========================================================
-   FINAL HOMEPAGE HERO VISUAL
-   Background: gothic rose cathedral hall
-   Mascot: final demon cat artwork
+   HOMEPAGE BACKGROUND
+   og-share.jpg returns as the homepage atmosphere.
+   Translate the whole layer downward directly instead of
+   relying on confusing background-position percentages.
    ========================================================== */
 
 .hero::before {
+    content:
+        "";
+
+    position:
+        absolute;
+
+    inset:
+        -140px 0 !important;
+
     background-image:
-        url("/static/img/home_hero_bg_gothic_hall.png?v=1") !important;
+        url("/static/img/og-share.jpg?v=20260930-final") !important;
 
     background-size:
         cover !important;
@@ -10088,62 +10099,239 @@ This prevents an incompatible order from flashing briefly.
         no-repeat !important;
 
     opacity:
-        .84 !important;
+        .72 !important;
 
     filter:
-        saturate(.96)
-        brightness(.82)
-        contrast(1.02) !important;
+        saturate(1)
+        brightness(.92)
+        contrast(1.01) !important;
+
+    /*
+       Positive Y = physically move the artwork DOWN.
+       This places the internal
+       "?????????"
+       much closer to the hero divider.
+    */
+    transform:
+        translateY(100px)
+        scale(1.018) !important;
+
+    transform-origin:
+        center center;
+
+    pointer-events:
+        none;
 }
 
+
+/* Keep headline readable */
 .hero::after {
     background:
         linear-gradient(
             90deg,
-            rgba(7,7,9,.84) 0%,
-            rgba(7,7,9,.74) 28%,
-            rgba(7,7,9,.51) 52%,
-            rgba(7,7,9,.34) 77%,
-            rgba(7,7,9,.42) 100%
+            rgba(7,7,9,.79) 0%,
+            rgba(7,7,9,.68) 27%,
+            rgba(7,7,9,.44) 51%,
+            rgba(7,7,9,.27) 76%,
+            rgba(7,7,9,.37) 100%
         ),
         linear-gradient(
             180deg,
-            rgba(7,7,9,.08) 0%,
-            rgba(7,7,9,.20) 100%
+            rgba(7,7,9,.04),
+            rgba(7,7,9,.18)
         ) !important;
 }
 
-/* ????????????? / ?? / ?????? */
-.hero-art-frame-mascot::before {
+
+/* ==========================================================
+   HOMEPAGE MASCOT
+   No outer frame, no gold corners, no circles.
+   The artwork itself becomes the visual card.
+   ========================================================== */
+
+.hero-art-frame-mascot {
+    min-height:
+        470px !important;
+
     display:
+        grid;
+
+    place-items:
+        center;
+
+    background:
+        transparent !important;
+
+    border:
+        0 !important;
+
+    box-shadow:
+        none !important;
+
+    -webkit-backdrop-filter:
+        none !important;
+
+    backdrop-filter:
         none !important;
 }
 
-.hero-art-frame-mascot .art-corner {
-    display:
-        none !important;
-}
 
+.hero-art-frame-mascot::before,
+.hero-art-frame-mascot::after,
+.hero-art-frame-mascot .art-corner,
 .hero-mascot-aura,
 .hero-mascot-aura::before,
-.hero-mascot-aura::after {
+.hero-mascot-aura::after,
+.hero-mascot-floor,
+.hero-mascot-vignette {
     display:
         none !important;
 }
 
-/* ??????? */
+
 .hero-mascot-image {
     width:
-        min(90%, 430px) !important;
+        min(
+            86%,
+            430px
+        ) !important;
+
+    height:
+        auto !important;
 
     max-height:
         430px !important;
 
+    display:
+        block;
+
     object-fit:
         contain !important;
 
+    border-radius:
+        28px;
+
+    transform:
+        none !important;
+
     filter:
-        drop-shadow(0 18px 40px rgba(0,0,0,.38));
+        drop-shadow(
+            0 24px 48px
+            rgba(0,0,0,.42)
+        ) !important;
+}
+
+
+/* ==========================================================
+   STAFF PROFILE / PERSONAL WALL
+   Gothic hall artwork becomes the common atmosphere.
+   Individual card is no longer blurred across the whole hero.
+   ========================================================== */
+
+.staff-detail-hero {
+    position:
+        relative;
+
+    isolation:
+        isolate;
+
+    overflow:
+        hidden;
+
+    background:
+        #08090b !important;
+}
+
+
+.staff-detail-hero::before {
+    content:
+        "";
+
+    position:
+        absolute;
+
+    z-index:
+        0;
+
+    inset:
+        0;
+
+    background-image:
+        url("/static/img/staff_profile_bg_gothic_hall.png?v=1");
+
+    background-size:
+        cover;
+
+    background-position:
+        center center;
+
+    background-repeat:
+        no-repeat;
+
+    opacity:
+        .82;
+
+    filter:
+        saturate(.86)
+        brightness(.72)
+        contrast(1.03);
+
+    transform:
+        scale(1.015);
+
+    pointer-events:
+        none;
+}
+
+
+.staff-detail-hero::after {
+    content:
+        "";
+
+    position:
+        absolute;
+
+    z-index:
+        1;
+
+    inset:
+        0;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(7,7,9,.72) 0%,
+            rgba(7,7,9,.52) 40%,
+            rgba(7,7,9,.42) 70%,
+            rgba(7,7,9,.55) 100%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(7,7,9,.10),
+            rgba(7,7,9,.34)
+        );
+
+    pointer-events:
+        none;
+}
+
+
+/*
+Disable the old full-width staff card background.
+It was the source of the blurred text / noisy hero.
+*/
+.staff-detail-card-backdrop {
+    display:
+        none !important;
+}
+
+
+.staff-detail-shell {
+    position:
+        relative;
+
+    z-index:
+        2 !important;
 }
 
 
@@ -10151,38 +10339,60 @@ This prevents an incompatible order from flashing briefly.
    TABLET
    ========================================================== */
 
-@media (max-width: 1000px) {
+@media (
+    max-width: 1000px
+) {
 
     .hero::before {
-        background-position:
-            center center !important;
+        inset:
+            -100px 0 !important;
+
+        transform:
+            translateY(65px)
+            scale(1.018) !important;
 
         opacity:
-            .78 !important;
-
-        filter:
-            saturate(.94)
-            brightness(.80)
-            contrast(1.02) !important;
+            .60 !important;
     }
+
 
     .hero::after {
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.58) 0%,
-                rgba(7,7,9,.45) 50%,
-                rgba(7,7,9,.57) 100%
+                rgba(7,7,9,.57),
+                rgba(7,7,9,.46) 50%,
+                rgba(7,7,9,.58)
             ) !important;
     }
 
+
+    .hero-art-frame-mascot {
+        min-height:
+            410px !important;
+    }
+
+
     .hero-mascot-image {
         width:
-            min(88%, 360px) !important;
+            min(
+                82%,
+                360px
+            ) !important;
 
         max-height:
             360px !important;
     }
+
+
+    .staff-detail-hero::before {
+        background-position:
+            center center;
+
+        opacity:
+            .72;
+    }
+
 }
 
 
@@ -10190,39 +10400,75 @@ This prevents an incompatible order from flashing briefly.
    MOBILE
    ========================================================== */
 
-@media (max-width: 720px) {
+@media (
+    max-width: 720px
+) {
 
     .hero::before {
-        background-position:
-            center center !important;
+        inset:
+            -80px 0 !important;
+
+        transform:
+            translateY(42px)
+            scale(1.018) !important;
 
         opacity:
-            .70 !important;
-
-        filter:
-            saturate(.92)
-            brightness(.76)
-            contrast(1.01) !important;
+            .48 !important;
     }
+
 
     .hero::after {
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.65) 0%,
-                rgba(7,7,9,.52) 47%,
-                rgba(7,7,9,.66) 100%
+                rgba(7,7,9,.65),
+                rgba(7,7,9,.52) 48%,
+                rgba(7,7,9,.67)
             ) !important;
     }
 
+
+    .hero-art-frame-mascot {
+        min-height:
+            340px !important;
+    }
+
+
     .hero-mascot-image {
         width:
-            min(86%, 300px) !important;
+            min(
+                84%,
+                300px
+            ) !important;
 
         max-height:
             300px !important;
+
+        border-radius:
+            22px;
     }
+
+
+    .staff-detail-hero::before {
+        background-position:
+            58% center;
+
+        opacity:
+            .62;
+    }
+
+
+    .staff-detail-hero::after {
+        background:
+            linear-gradient(
+                180deg,
+                rgba(7,7,9,.58),
+                rgba(7,7,9,.74)
+            );
+    }
+
 }
 
-/* END MOWAN_HOME_HERO_FINAL_VISUAL_20260930 */
+
+/* END MOWAN_HOME_STAFF_FINAL_20260930 */
 
