@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 router = APIRouter(tags=["discord-avatars"])
@@ -238,6 +238,432 @@ def get_setting(*names: str) -> str:
     return ""
 
 
+STAFF_CARD_CACHE_DIR = Path("/tmp/mowan-staff-cards")
+STAFF_CARD_MAX_BYTES = 12 * 1024 * 1024
+STAFF_CARD_HOSTS = {
+    "cdn.discordapp.com",
+    "media.discordapp.net",
+}
+STAFF_CARD_SUFFIXES = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+}
+
+
+def _staff_card_profile(discord_id: str) -> dict:
+    discord_id = str(discord_id or "").strip()
+    if not discord_id or not db_path().exists():
+        return {}
+
+    try:
+        with sqlite3.connect(db_path(), timeout=5) as conn:
+            conn.row_factory = sqlite3.Row
+            cols = table_columns(conn, "staff_profiles")
+            required = {
+                "staff_discord_id",
+                "card_image_url",
+            }
+            if not required.issubset(cols):
+                return {}
+
+            select_cols = [
+                "staff_discord_id",
+                "card_image_url",
+            ]
+            for optional in (
+                "forum_thread_id",
+                "is_public",
+            ):
+                if optional in cols:
+                    select_cols.append(optional)
+
+            row = conn.execute(
+                f"""
+                SELECT {", ".join(select_cols)}
+                FROM staff_profiles
+                WHERE CAST(staff_discord_id AS TEXT) = ?
+                LIMIT 1
+                """,
+                (discord_id,),
+            ).fetchone()
+
+            if not row:
+                return {}
+
+            data = dict(row)
+            if (
+                "is_public" in data
+                and int(data.get("is_public") or 0) != 1
+            ):
+                return {}
+
+            return data
+    except Exception:
+        return {}
+
+
+def _trusted_staff_card_url(url: str) -> str:
+    url = str(url or "").strip()
+    if not url:
+        return ""
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return ""
+
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in STAFF_CARD_HOSTS
+        or not str(parsed.path or "").startswith("/attachments/")
+    ):
+        return ""
+
+    return url
+
+
+def _staff_card_source_key(profile: dict) -> str:
+    stored_url = _trusted_staff_card_url(
+        str(profile.get("card_image_url") or "")
+    )
+    if stored_url:
+        try:
+            return "attachment:" + str(urlparse(stored_url).path or "")
+        except Exception:
+            pass
+
+    thread_id = str(profile.get("forum_thread_id") or "").strip()
+    if thread_id.isdigit():
+        return f"thread:{thread_id}"
+
+    return ""
+
+
+def _staff_card_cache_paths(
+    discord_id: str,
+) -> tuple[Path | None, Path]:
+    STAFF_CARD_CACHE_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    source_file = STAFF_CARD_CACHE_DIR / f"{discord_id}.source"
+    image_file = None
+
+    for suffix in STAFF_CARD_SUFFIXES:
+        candidate = STAFF_CARD_CACHE_DIR / f"{discord_id}{suffix}"
+        if candidate.exists() and candidate.is_file():
+            image_file = candidate
+            break
+
+    return image_file, source_file
+
+
+def _staff_card_cached_file(
+    discord_id: str,
+    source_key: str,
+) -> Path | None:
+    try:
+        image_file, source_file = _staff_card_cache_paths(discord_id)
+        if image_file is None or not source_file.exists():
+            return None
+
+        cached_key = source_file.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        ).strip()
+
+        if cached_key != source_key:
+            return None
+
+        return image_file
+    except Exception:
+        return None
+
+
+def _attachment_is_image(attachment: dict) -> bool:
+    content_type = str(attachment.get("content_type") or "").lower()
+    if content_type.startswith("image/"):
+        return True
+
+    filename = str(attachment.get("filename") or "").lower()
+    return any(
+        filename.endswith(suffix)
+        for suffix in STAFF_CARD_SUFFIXES
+    )
+
+
+def _discord_message_attachment_url(message: dict) -> str:
+    for attachment in message.get("attachments") or []:
+        if not isinstance(attachment, dict):
+            continue
+        if not _attachment_is_image(attachment):
+            continue
+
+        for field in ("url", "proxy_url"):
+            candidate = _trusted_staff_card_url(
+                str(attachment.get(field) or "")
+            )
+            if candidate:
+                return candidate
+
+    return ""
+
+
+def _discord_api_json(url: str, token: str):
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bot {token}",
+            "User-Agent": "MawanWeb/1.0",
+        },
+    )
+
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(
+            resp.read().decode("utf-8")
+        )
+
+
+def _fresh_staff_card_url_from_thread(thread_id: str) -> str:
+    thread_id = str(thread_id or "").strip()
+    if not thread_id.isdigit():
+        return ""
+
+    token = get_setting(
+        "DISCORD_BOT_TOKEN",
+        "DISCORD_TOKEN",
+        "BOT_TOKEN",
+        "TOKEN",
+    )
+    if not token:
+        return ""
+
+    starter_url = (
+        "https://discord.com/api/v10/"
+        f"channels/{thread_id}/messages/{thread_id}"
+    )
+
+    try:
+        starter = _discord_api_json(
+            starter_url,
+            token,
+        )
+        if isinstance(starter, dict):
+            url = _discord_message_attachment_url(starter)
+            if url:
+                return url
+    except Exception:
+        pass
+
+    history_url = (
+        "https://discord.com/api/v10/"
+        f"channels/{thread_id}/messages?limit=50"
+    )
+
+    try:
+        messages = _discord_api_json(
+            history_url,
+            token,
+        )
+    except Exception:
+        return ""
+
+    if not isinstance(messages, list):
+        return ""
+
+    for message in reversed(messages):
+        if not isinstance(message, dict):
+            continue
+        url = _discord_message_attachment_url(message)
+        if url:
+            return url
+
+    return ""
+
+
+def _staff_card_suffix(url: str, content_type: str) -> str:
+    try:
+        suffix = Path(
+            str(urlparse(url).path or "")
+        ).suffix.lower()
+    except Exception:
+        suffix = ""
+
+    if suffix in STAFF_CARD_SUFFIXES:
+        return suffix
+
+    content_type = str(content_type or "").lower()
+    mapping = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/gif": ".gif",
+        "image/webp": ".webp",
+    }
+    return mapping.get(
+        content_type.split(";", 1)[0].strip(),
+        ".jpg",
+    )
+
+
+def _download_staff_card(
+    discord_id: str,
+    url: str,
+    source_key: str,
+) -> Path | None:
+    url = _trusted_staff_card_url(url)
+    if not url:
+        return None
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "MawanWeb/1.0",
+            },
+        )
+
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content_type = str(
+                resp.headers.get("Content-Type")
+                or ""
+            ).lower()
+
+            if not content_type.startswith("image/"):
+                return None
+
+            data = resp.read(
+                STAFF_CARD_MAX_BYTES + 1
+            )
+
+        if (
+            not data
+            or len(data) > STAFF_CARD_MAX_BYTES
+        ):
+            return None
+
+        suffix = _staff_card_suffix(
+            url,
+            content_type,
+        )
+
+        STAFF_CARD_CACHE_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        for old_suffix in STAFF_CARD_SUFFIXES:
+            old_path = (
+                STAFF_CARD_CACHE_DIR
+                / f"{discord_id}{old_suffix}"
+            )
+            if old_path.exists():
+                try:
+                    old_path.unlink()
+                except OSError:
+                    pass
+
+        target = (
+            STAFF_CARD_CACHE_DIR
+            / f"{discord_id}{suffix}"
+        )
+        target.write_bytes(data)
+
+        (
+            STAFF_CARD_CACHE_DIR
+            / f"{discord_id}.source"
+        ).write_text(
+            source_key,
+            encoding="utf-8",
+        )
+
+        return target
+    except Exception:
+        return None
+
+
+def resolve_staff_card_file(
+    discord_id: str,
+) -> Path | None:
+    discord_id = str(discord_id or "").strip()
+    if not discord_id.isdigit():
+        return None
+
+    profile = _staff_card_profile(discord_id)
+    if not profile:
+        return None
+
+    source_key = _staff_card_source_key(profile)
+    if not source_key:
+        return None
+
+    cached = _staff_card_cached_file(
+        discord_id,
+        source_key,
+    )
+    if cached is not None:
+        return cached
+
+    stored_url = _trusted_staff_card_url(
+        str(profile.get("card_image_url") or "")
+    )
+    if stored_url:
+        downloaded = _download_staff_card(
+            discord_id,
+            stored_url,
+            source_key,
+        )
+        if downloaded is not None:
+            return downloaded
+
+    thread_id = str(
+        profile.get("forum_thread_id")
+        or ""
+    ).strip()
+
+    fresh_url = (
+        _fresh_staff_card_url_from_thread(
+            thread_id
+        )
+        if thread_id
+        else ""
+    )
+
+    if not fresh_url:
+        return None
+
+    downloaded = _download_staff_card(
+        discord_id,
+        fresh_url,
+        source_key,
+    )
+    if downloaded is not None:
+        try:
+            with sqlite3.connect(
+                db_path(),
+                timeout=5,
+            ) as conn:
+                conn.execute(
+                    """
+                    UPDATE staff_profiles
+                    SET card_image_url = ?
+                    WHERE CAST(staff_discord_id AS TEXT) = ?
+                    """,
+                    (
+                        fresh_url,
+                        discord_id,
+                    ),
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    return downloaded
+
+
 def guild_avatar_cdn_url(
     guild_id: str,
     discord_id: str,
@@ -400,4 +826,26 @@ async def discord_avatar(
 
     response = RedirectResponse(url, status_code=302)
     response.headers["Cache-Control"] = "public, max-age=60"
+    return response
+
+
+@router.get("/staff-card/{discord_id}")
+async def staff_card(
+    discord_id: str,
+):
+    discord_id = str(discord_id or "").strip()
+
+    if not discord_id.isdigit() or len(discord_id) > 25:
+        return Response(status_code=404)
+
+    path = await run_in_threadpool(
+        resolve_staff_card_file,
+        discord_id,
+    )
+
+    if path is None or not path.exists():
+        return Response(status_code=404)
+
+    response = FileResponse(path)
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return response
