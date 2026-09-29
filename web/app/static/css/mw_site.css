@@ -9193,7 +9193,7 @@ textarea {
         17px;
 
     opacity:
-        .48;
+        .58;
 }
 
 
@@ -9587,7 +9587,7 @@ This prevents an incompatible order from flashing briefly.
         cover;
 
     background-position:
-        center 38%;
+        center 46%;
 
     background-repeat:
         no-repeat;
@@ -9596,9 +9596,9 @@ This prevents an incompatible order from flashing briefly.
         .48;
 
     filter:
-        saturate(.86)
-        brightness(.68)
-        contrast(1.04);
+        saturate(.92)
+        brightness(.76)
+        contrast(1.02);
 
     transform:
         scale(1.018);
@@ -9631,16 +9631,16 @@ This prevents an incompatible order from flashing briefly.
     background:
         linear-gradient(
             90deg,
-            rgba(7,7,9,.90) 0%,
-            rgba(7,7,9,.82) 27%,
-            rgba(7,7,9,.62) 51%,
-            rgba(7,7,9,.44) 76%,
-            rgba(7,7,9,.55) 100%
+            rgba(7,7,9,.87) 0%,
+            rgba(7,7,9,.78) 27%,
+            rgba(7,7,9,.56) 51%,
+            rgba(7,7,9,.38) 76%,
+            rgba(7,7,9,.49) 100%
         ),
         linear-gradient(
             180deg,
-            rgba(7,7,9,.10),
-            rgba(7,7,9,.38)
+            rgba(7,7,9,.08),
+            rgba(7,7,9,.32)
         );
 }
 
@@ -9973,10 +9973,10 @@ This prevents an incompatible order from flashing briefly.
 
     .hero::before {
         background-position:
-            60% 40%;
+            60% 48%;
 
         opacity:
-            .36;
+            .44;
     }
 
 
@@ -9984,9 +9984,9 @@ This prevents an incompatible order from flashing briefly.
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.70) 0%,
-                rgba(7,7,9,.58) 50%,
-                rgba(7,7,9,.68) 100%
+                rgba(7,7,9,.64) 0%,
+                rgba(7,7,9,.52) 50%,
+                rgba(7,7,9,.63) 100%
             );
     }
 
@@ -10003,10 +10003,10 @@ This prevents an incompatible order from flashing briefly.
 
     .hero::before {
         background-position:
-            65% 42%;
+            65% 50%;
 
         opacity:
-            .30;
+            .38;
     }
 
 
@@ -10014,9 +10014,9 @@ This prevents an incompatible order from flashing briefly.
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.76),
-                rgba(7,7,9,.64) 47%,
-                rgba(7,7,9,.78)
+                rgba(7,7,9,.70),
+                rgba(7,7,9,.58) 47%,
+                rgba(7,7,9,.73)
             );
     }
 
@@ -10050,6 +10050,16 @@ This prevents an incompatible order from flashing briefly.
 }
 
 .hero-art-frame-mascot .art-corner {
+    display:
+        none !important;
+}
+
+
+
+/* homepage hero tuning 20260930c */
+.hero-mascot-aura,
+.hero-mascot-aura::before,
+.hero-mascot-aura::after {
     display:
         none !important;
 }
