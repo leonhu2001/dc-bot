@@ -4950,12 +4950,12 @@ textarea {
         center;
 
     opacity:
-        .58;
+        .76;
 
     filter:
-        blur(8px)
-        saturate(.78)
-        brightness(.52);
+        blur(6px)
+        saturate(.86)
+        brightness(.72);
 
     transform:
         scale(1.045);
@@ -4975,14 +4975,14 @@ textarea {
     background:
         linear-gradient(
             90deg,
-            rgba(7,7,9,.93) 0%,
-            rgba(7,7,9,.72) 43%,
-            rgba(7,7,9,.86) 100%
+            rgba(7,7,9,.78) 0%,
+            rgba(7,7,9,.52) 43%,
+            rgba(7,7,9,.68) 100%
         ),
         linear-gradient(
             180deg,
-            rgba(7,7,9,.46) 0%,
-            rgba(7,7,9,.68) 100%
+            rgba(7,7,9,.26) 0%,
+            rgba(7,7,9,.48) 100%
         );
 }
 
