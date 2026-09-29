@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 import requests
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from shared.db import SessionLocal
@@ -21,6 +21,62 @@ from web.app.services.role_catalog import (
 )
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
+
+
+def _discord_avatar_url(
+    guild_id: str,
+    discord_id: str,
+    guild_avatar_hash: str | None,
+    user_avatar_hash: str | None,
+    *,
+    size: int = 512,
+) -> str:
+    guild_id = str(guild_id or "").strip()
+    discord_id = str(discord_id or "").strip()
+    guild_avatar_hash = str(guild_avatar_hash or "").strip()
+    user_avatar_hash = str(user_avatar_hash or "").strip()
+
+    if guild_id and discord_id and guild_avatar_hash:
+        ext = "gif" if guild_avatar_hash.startswith("a_") else "png"
+        return (
+            "https://cdn.discordapp.com/guilds/"
+            f"{guild_id}/users/{discord_id}/avatars/"
+            f"{guild_avatar_hash}.{ext}?size={int(size)}"
+        )
+
+    if discord_id and user_avatar_hash:
+        ext = "gif" if user_avatar_hash.startswith("a_") else "png"
+        return (
+            "https://cdn.discordapp.com/avatars/"
+            f"{discord_id}/{user_avatar_hash}.{ext}?size={int(size)}"
+        )
+
+    return ""
+
+
+def _ensure_avatar_url_column(db: Session) -> bool:
+    try:
+        columns = {
+            str(row[1])
+            for row in db.execute(
+                text("PRAGMA table_info(web_staff_members)")
+            ).all()
+        }
+
+        if not columns:
+            return False
+
+        if "avatar_url" not in columns:
+            db.execute(
+                text(
+                    "ALTER TABLE web_staff_members "
+                    "ADD COLUMN avatar_url TEXT"
+                )
+            )
+
+        return True
+    except Exception:
+        return False
 
 WORKER_ROLE_IDS = {
     "1500234130871550004",
@@ -301,6 +357,8 @@ def sync_staff_members_from_discord(db=None) -> dict:
         str(member.discord_id): member
         for member in db.scalars(select(WebStaffMember)).all()
     }
+    avatar_url_supported = _ensure_avatar_url_column(db)
+    avatar_urls_by_member = {}
 
     for guild_member in members:
         user = guild_member.get("user") or {}
@@ -339,6 +397,13 @@ def sync_staff_members_from_discord(db=None) -> dict:
         member.display_name = guild_member.get("nick") or user.get("global_name") or user.get("username")
         member.global_name = user.get("global_name")
         member.avatar = user.get("avatar")
+        if avatar_url_supported:
+            avatar_urls_by_member[discord_id] = _discord_avatar_url(
+                str(guild_id),
+                discord_id,
+                guild_member.get("avatar"),
+                user.get("avatar"),
+            )
         member.roles_json = json.dumps(sorted(role_ids), ensure_ascii=False)
         member.is_customer_service = is_customer_service
         member.is_worker = is_worker
@@ -347,6 +412,24 @@ def sync_staff_members_from_discord(db=None) -> dict:
         member.last_synced_at = now
 
         written += 1
+
+    # Keep the cached website avatar URL aligned with the same live Discord
+    # member snapshot used for names and roles. This supports server-specific
+    # avatars first, then falls back to the account avatar.
+    if avatar_url_supported and avatar_urls_by_member:
+        db.flush()
+        for discord_id, avatar_url in avatar_urls_by_member.items():
+            db.execute(
+                text(
+                    "UPDATE web_staff_members "
+                    "SET avatar_url = :avatar_url "
+                    "WHERE CAST(discord_id AS TEXT) = :discord_id"
+                ),
+                {
+                    "avatar_url": avatar_url or None,
+                    "discord_id": discord_id,
+                },
+            )
 
     # Disable anyone who no longer has an eligible Discord role.
     # This also handles members who have left the Discord server.
