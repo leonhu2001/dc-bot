@@ -4894,6 +4894,15 @@ textarea {
 /* staff detail */
 
 .staff-detail-hero {
+    position:
+        relative;
+
+    overflow:
+        hidden;
+
+    isolation:
+        isolate;
+
     padding:
         80px 0;
 
@@ -4903,7 +4912,88 @@ textarea {
 }
 
 
+.staff-detail-card-backdrop {
+    position:
+        absolute;
+
+    z-index:
+        0;
+
+    inset:
+        0;
+
+    overflow:
+        hidden;
+
+    pointer-events:
+        none;
+
+    background:
+        #0b0b0d;
+}
+
+
+.staff-detail-card-backdrop img {
+    width:
+        100%;
+
+    height:
+        100%;
+
+    display:
+        block;
+
+    object-fit:
+        cover;
+
+    object-position:
+        center;
+
+    opacity:
+        .58;
+
+    filter:
+        blur(8px)
+        saturate(.78)
+        brightness(.52);
+
+    transform:
+        scale(1.045);
+}
+
+
+.staff-detail-card-backdrop::after {
+    content:
+        "";
+
+    position:
+        absolute;
+
+    inset:
+        0;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(7,7,9,.93) 0%,
+            rgba(7,7,9,.72) 43%,
+            rgba(7,7,9,.86) 100%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(7,7,9,.46) 0%,
+            rgba(7,7,9,.68) 100%
+        );
+}
+
+
 .staff-detail-shell {
+    position:
+        relative;
+
+    z-index:
+        1;
+
     width:
         min(
             var(--site-max),
