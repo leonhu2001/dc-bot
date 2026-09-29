@@ -10066,57 +10066,54 @@ This prevents an incompatible order from flashing briefly.
 
 /* END MOWAN_HOME_HERO_OG_20260930 */
 
-/* BEGIN MOWAN_HOME_BG_FINAL_20260930 */
-
+/* BEGIN MOWAN_HOME_HERO_FINAL_VISUAL_20260930 */
 
 /* ==========================================================
-   FINAL HERO BACKGROUND
-   Desktop:
-   - move OG artwork DOWN substantially
-   - make OG artwork more visible
-   - keep foreground headline readable
+   FINAL HOMEPAGE HERO VISUAL
+   Background: gothic rose cathedral hall
+   Mascot: final demon cat artwork
    ========================================================== */
 
 .hero::before {
+    background-image:
+        url("/static/img/home_hero_bg_gothic_hall.png?v=1") !important;
+
+    background-size:
+        cover !important;
+
     background-position:
-        center -10% !important;
+        center center !important;
+
+    background-repeat:
+        no-repeat !important;
 
     opacity:
-        .72 !important;
+        .84 !important;
 
     filter:
-        saturate(1)
-        brightness(.92)
-        contrast(1.01) !important;
+        saturate(.96)
+        brightness(.82)
+        contrast(1.02) !important;
 }
 
-
-/*
-Keep the left headline readable while allowing the actual
-OG artwork / character / typography to remain visible.
-*/
 .hero::after {
     background:
         linear-gradient(
             90deg,
-            rgba(7,7,9,.78) 0%,
-            rgba(7,7,9,.67) 27%,
-            rgba(7,7,9,.43) 51%,
-            rgba(7,7,9,.25) 76%,
-            rgba(7,7,9,.36) 100%
+            rgba(7,7,9,.84) 0%,
+            rgba(7,7,9,.74) 28%,
+            rgba(7,7,9,.51) 52%,
+            rgba(7,7,9,.34) 77%,
+            rgba(7,7,9,.42) 100%
         ),
         linear-gradient(
             180deg,
-            rgba(7,7,9,.04) 0%,
-            rgba(7,7,9,.18) 100%
+            rgba(7,7,9,.08) 0%,
+            rgba(7,7,9,.20) 100%
         ) !important;
 }
 
-
-/* ==========================================================
-   Preserve clean mascot visual
-   ========================================================== */
-
+/* ????????????? / ?? / ?????? */
 .hero-art-frame-mascot::before {
     display:
         none !important;
@@ -10134,39 +10131,58 @@ OG artwork / character / typography to remain visible.
         none !important;
 }
 
+/* ??????? */
+.hero-mascot-image {
+    width:
+        min(90%, 430px) !important;
+
+    max-height:
+        430px !important;
+
+    object-fit:
+        contain !important;
+
+    filter:
+        drop-shadow(0 18px 40px rgba(0,0,0,.38));
+}
+
 
 /* ==========================================================
    TABLET
    ========================================================== */
 
-@media (
-    max-width: 1000px
-) {
+@media (max-width: 1000px) {
 
     .hero::before {
         background-position:
-            60% 18% !important;
+            center center !important;
 
         opacity:
-            .58 !important;
+            .78 !important;
 
         filter:
-            saturate(.96)
-            brightness(.88)
-            contrast(1.01) !important;
+            saturate(.94)
+            brightness(.80)
+            contrast(1.02) !important;
     }
-
 
     .hero::after {
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.53) 0%,
-                rgba(7,7,9,.40) 50%,
-                rgba(7,7,9,.51) 100%
+                rgba(7,7,9,.58) 0%,
+                rgba(7,7,9,.45) 50%,
+                rgba(7,7,9,.57) 100%
             ) !important;
     }
 
+    .hero-mascot-image {
+        width:
+            min(88%, 360px) !important;
+
+        max-height:
+            360px !important;
+    }
 }
 
 
@@ -10174,36 +10190,39 @@ OG artwork / character / typography to remain visible.
    MOBILE
    ========================================================== */
 
-@media (
-    max-width: 720px
-) {
+@media (max-width: 720px) {
 
     .hero::before {
         background-position:
-            65% 20% !important;
+            center center !important;
 
         opacity:
-            .48 !important;
+            .70 !important;
 
         filter:
-            saturate(.94)
-            brightness(.84)
+            saturate(.92)
+            brightness(.76)
             contrast(1.01) !important;
     }
-
 
     .hero::after {
         background:
             linear-gradient(
                 180deg,
-                rgba(7,7,9,.61) 0%,
-                rgba(7,7,9,.47) 47%,
-                rgba(7,7,9,.62) 100%
+                rgba(7,7,9,.65) 0%,
+                rgba(7,7,9,.52) 47%,
+                rgba(7,7,9,.66) 100%
             ) !important;
     }
 
+    .hero-mascot-image {
+        width:
+            min(86%, 300px) !important;
+
+        max-height:
+            300px !important;
+    }
 }
 
-
-/* END MOWAN_HOME_BG_FINAL_20260930 */
+/* END MOWAN_HOME_HERO_FINAL_VISUAL_20260930 */
 
