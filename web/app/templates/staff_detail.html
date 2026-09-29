@@ -2,7 +2,22 @@
 
 {% block content %}
 
-<section class="staff-detail-hero">
+<section class="staff-detail-hero{% if profile.card_image_url %} has-card-backdrop{% endif %}">
+
+    {% if profile.card_image_url %}
+        <div
+            class="staff-detail-card-backdrop"
+            aria-hidden="true"
+        >
+            <img
+                src="{{ profile.card_image_url }}"
+                alt=""
+                loading="eager"
+                decoding="async"
+                onerror="this.parentElement.remove();"
+            >
+        </div>
+    {% endif %}
 
     <div class="staff-detail-shell">
 
