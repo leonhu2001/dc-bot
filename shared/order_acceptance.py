@@ -744,15 +744,6 @@ def promote_acceptance_claims_to_assignments(
         if order is None:
             raise ValueError("找不到這張網站訂單，無法轉正式接單。")
 
-        meta_row = db.execute(text("""
-            SELECT specified_staff_ids_json
-            FROM order_acceptance_meta
-            WHERE order_id = :order_id
-            LIMIT 1
-        """), {"order_id": int(order_id)}).mappings().first()
-
-        specified_staff_ids = set(_load_json_list(meta_row["specified_staff_ids_json"] if meta_row else None))
-
         claim_rows = db.execute(text("""
             SELECT
                 staff_discord_id,
