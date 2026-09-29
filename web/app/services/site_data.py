@@ -1676,22 +1676,44 @@ def _profile_to_public(
         or ""
     )
 
-    card_image_url = str(
+    raw_card_image_url = str(
         profile.get(
             "card_image_url"
         )
         or ""
     ).strip()
 
-    # Public hero backgrounds only accept HTTPS or local site paths.
-    if not (
-        card_image_url.startswith(
+    forum_thread_id = str(
+        profile.get(
+            "forum_thread_id"
+        )
+        or ""
+    ).strip()
+
+    discord_attachment = (
+        "https://cdn.discordapp.com/attachments/"
+        in raw_card_image_url
+        or "https://media.discordapp.net/attachments/"
+        in raw_card_image_url
+    )
+
+    if (
+        discord_attachment
+        or forum_thread_id.isdigit()
+    ):
+        card_image_url = (
+            f"/staff-card/{staff_id}"
+        )
+    elif (
+        raw_card_image_url.startswith(
             "https://"
         )
-        or card_image_url.startswith(
+        or raw_card_image_url.startswith(
             "/"
         )
     ):
+        card_image_url = raw_card_image_url
+    else:
         card_image_url = ""
 
     result = {
