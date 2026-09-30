@@ -11,7 +11,9 @@ from core.time_utils import get_taipei_now_iso
 from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
 from services.topup_notifications import (
     ensure_topup_notification_columns,
+    list_review_notifications_to_update,
     list_unnotified_pending_reviews,
+    mark_review_notification_updated,
     mark_review_notified,
 )
 from services.topups import (
@@ -248,6 +250,134 @@ async def _notify_pending_reviews(bot: discord.Client) -> None:
             )
 
 
+async def _sync_one_review_notification(bot: discord.Client, row: dict) -> None:
+    channel = bot.get_channel(TOPUP_REVIEW_CHANNEL_ID)
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(TOPUP_REVIEW_CHANNEL_ID)
+        except Exception:
+            channel = None
+
+    if channel is None or not hasattr(channel, "fetch_message"):
+        raise RuntimeError(f"找不到儲值審核通知頻道 {TOPUP_REVIEW_CHANNEL_ID}")
+
+    message_id = str(row.get("review_notification_message_id") or "").strip()
+    if not message_id:
+        mark_review_notification_updated(int(row["id"]))
+        return
+
+    try:
+        message = await channel.fetch_message(int(message_id))
+    except discord.NotFound:
+        # 通知已被人工刪除，不要讓 worker 每 4 秒重試同一筆。
+        mark_review_notification_updated(int(row["id"]))
+        return
+
+    customer_id = str(row.get("customer_discord_id") or "").strip()
+    customer_name = str(row.get("customer_display_name") or "").strip() or customer_id or "未知"
+    topup_no = str(row.get("topup_no") or f"TOPUP-{row.get('id')}")
+    amount = int(row.get("amount") or 0)
+    payment_method = str(row.get("payment_method") or "bank_transfer").strip()
+    payment_method_label = topup_payment_method_label(payment_method)
+    payment_reference_label = topup_payment_reference_label(payment_method)
+    payment_reference = str(
+        row.get("payment_reference")
+        or row.get("bank_last5")
+        or "—"
+    )
+    source = str(row.get("source") or "").strip()
+    source_label = {
+        "web": "網站",
+        "discord": "Discord",
+        "discord_staff": "客服指令",
+    }.get(source, source or "未知")
+    status = str(row.get("status") or "").strip()
+
+    approved_statuses = {"approved_pending_credit", "crediting", "completed"}
+    if status in approved_statuses:
+        reviewer_id = str(row.get("approved_by_discord_id") or "").strip()
+        reviewer_name = str(row.get("approved_by_display_name") or "").strip()
+        reviewer_display = reviewer_name or (f"Discord ID {reviewer_id}" if reviewer_id else "未知客服")
+        reviewer_value = reviewer_display
+        if reviewer_id:
+            reviewer_value += f"\n`{reviewer_id}`"
+
+        description = "此筆儲值已由客服審核通過。"
+        if status == "completed":
+            description += " 錢包與 VIP 入帳已完成。"
+        else:
+            description += " Bot 正在處理錢包與 VIP 入帳。"
+
+        embed = discord.Embed(
+            title="✅ 儲值已審核",
+            description=description,
+            color=discord.Color.green(),
+        )
+        content = f"✅ 儲值付款已審核｜審核人：{reviewer_display}"
+        embed.add_field(name="審核人員", value=reviewer_value, inline=True)
+        approved_at = str(row.get("approved_at") or "").strip()
+        if approved_at:
+            embed.add_field(name="審核時間", value=approved_at, inline=True)
+
+    elif status == "rejected":
+        reviewer_id = str(row.get("rejected_by_discord_id") or "").strip()
+        reviewer_display = f"Discord ID {reviewer_id}" if reviewer_id else "未知客服"
+        embed = discord.Embed(
+            title="❌ 儲值審核未通過",
+            description="此筆儲值已由客服駁回，不會進行入帳。",
+            color=discord.Color.red(),
+        )
+        content = f"❌ 儲值付款審核未通過｜處理人：{reviewer_display}"
+        embed.add_field(name="處理人員", value=reviewer_display, inline=True)
+        rejected_at = str(row.get("rejected_at") or "").strip()
+        if rejected_at:
+            embed.add_field(name="處理時間", value=rejected_at, inline=True)
+        reason = str(row.get("rejected_reason") or "").strip()
+        if reason:
+            embed.add_field(name="駁回原因", value=reason[:1000], inline=False)
+
+    else:
+        embed = discord.Embed(
+            title="⚪ 儲值審核已取消",
+            description="此筆儲值已取消，不再等待客服審核。",
+            color=discord.Color.light_grey(),
+        )
+        content = "⚪ 儲值付款審核已取消。"
+
+    embed.add_field(name="儲值單", value=f"`{topup_no}`", inline=False)
+    embed.add_field(name="老闆", value=f"{customer_name}\n`{customer_id}`", inline=True)
+    embed.add_field(name="儲值金額", value=f"{amount:,}T", inline=True)
+    embed.add_field(name="付款方式", value=payment_method_label, inline=True)
+    embed.add_field(name=payment_reference_label, value=payment_reference, inline=False)
+    embed.add_field(name="來源", value=source_label, inline=True)
+
+    note = str(row.get("payment_note") or "").strip()
+    if note:
+        embed.add_field(name="付款備註", value=note[:1000], inline=False)
+
+    await message.edit(
+        content=content,
+        embed=embed,
+        view=None,
+        allowed_mentions=discord.AllowedMentions.none(),
+    )
+    mark_review_notification_updated(int(row["id"]))
+    print(f"[topup] review notification updated: {topup_no} -> {status}", flush=True)
+
+
+async def _sync_review_notifications(bot: discord.Client) -> None:
+    rows = list_review_notifications_to_update(limit=20)
+    for row in rows:
+        try:
+            await _sync_one_review_notification(bot, row)
+        except Exception:
+            print(
+                f"[topup] review notification update failed id={row.get('id')}\n"
+                f"{traceback.format_exc()}",
+                flush=True,
+            )
+
+
 async def _process_one_topup(bot: discord.Client, row: dict) -> None:
     topup_id = int(row["id"])
     if not mark_topup_processing(topup_id):
@@ -414,6 +544,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
     while not bot.is_closed():
         try:
             await _notify_pending_reviews(bot)
+            await _sync_review_notifications(bot)
             rows = get_pending_credit_topups(limit=20)
             for row in rows:
                 await _process_one_topup(bot, row)
