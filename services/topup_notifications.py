@@ -38,6 +38,11 @@ def ensure_topup_notification_columns() -> None:
                 "ALTER TABLE topup_orders ADD COLUMN review_notification_message_id TEXT"
             )
 
+        if "review_notification_resolved_at" not in columns:
+            conn.execute(
+                "ALTER TABLE topup_orders ADD COLUMN review_notification_resolved_at TEXT"
+            )
+
         conn.commit()
 
 
@@ -75,5 +80,50 @@ def mark_review_notified(topup_id: int, message_id: str | int) -> None:
             WHERE id = ?
             """,
             (_now_iso(), str(message_id), int(topup_id)),
+        )
+        conn.commit()
+
+
+def list_review_notifications_to_update(limit: int = 20) -> list[dict[str, Any]]:
+    """列出已離開待審核狀態、但 Discord 通知尚未更新的儲值單。"""
+    ensure_topup_notification_columns()
+    path = _db_path()
+    safe_limit = max(1, min(int(limit or 20), 100))
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM topup_orders
+            WHERE review_notification_message_id IS NOT NULL
+              AND review_notification_resolved_at IS NULL
+              AND status IN (
+                  'approved_pending_credit',
+                  'crediting',
+                  'completed',
+                  'rejected',
+                  'cancelled'
+              )
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_review_notification_updated(topup_id: int) -> None:
+    ensure_topup_notification_columns()
+    path = _db_path()
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.execute(
+            """
+            UPDATE topup_orders
+            SET review_notification_resolved_at = ?
+            WHERE id = ?
+            """,
+            (_now_iso(), int(topup_id)),
         )
         conn.commit()
