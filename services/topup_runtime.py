@@ -302,22 +302,13 @@ async def _sync_one_review_notification(bot: discord.Client, row: dict) -> None:
         if reviewer_id:
             reviewer_value += f"\n`{reviewer_id}`"
 
-        description = "此筆儲值已由客服審核通過。"
-        if status == "completed":
-            description += " 錢包與 VIP 入帳已完成。"
-        else:
-            description += " Bot 正在處理錢包與 VIP 入帳。"
-
         embed = discord.Embed(
             title="✅ 儲值已審核",
-            description=description,
+            description="此筆儲值已由客服審核通過。",
             color=discord.Color.green(),
         )
         content = f"✅ 儲值付款已審核｜審核人：{reviewer_display}"
         embed.add_field(name="審核人員", value=reviewer_value, inline=True)
-        approved_at = str(row.get("approved_at") or "").strip()
-        if approved_at:
-            embed.add_field(name="審核時間", value=approved_at, inline=True)
 
     elif status == "rejected":
         reviewer_id = str(row.get("rejected_by_discord_id") or "").strip()
