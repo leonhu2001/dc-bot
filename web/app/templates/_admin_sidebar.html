@@ -67,6 +67,13 @@
         </a>
 
         <a
+            class="{% if _p.startswith('/admin/anomalies') %}active{% endif %}"
+            href="/admin/anomalies"
+        >
+            異常偵測
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
             href="/admin/accounting-reconciliation"
         >
