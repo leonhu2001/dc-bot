@@ -17459,7 +17459,10 @@ def _apply_web_order_wallet_amount_adjustment(
         build_wallet_payment_adjustment_plan,
         validate_wallet_net_before_adjustment,
     )
-    from services.wallet_service import adjust_wallet_balance
+    from services.wallet_service import (
+        adjust_wallet_balance,
+        find_wallet_transaction,
+    )
 
     plan = build_wallet_payment_adjustment_plan(
         old_amount=int(payload.get("old_customer_pay_amount") or 0),
@@ -17484,6 +17487,27 @@ def _apply_web_order_wallet_amount_adjustment(
         raise RuntimeError("wallet amount adjustment is missing order_id")
 
     reference = f"WEB-{order_id}:AMOUNT-ADJ:{event_id}"
+
+    existing = find_wallet_transaction(
+        customer_id=plan["customer_id"],
+        order_no=reference,
+        tx_type="payment_adjustment",
+        db_file=DB_FILE,
+    )
+    if existing is not None:
+        if int(existing.get("amount") or 0) != int(plan["amount"]):
+            raise RuntimeError(
+                "既有 payment_adjustment reference 金額不同，禁止覆寫。"
+            )
+
+        print(
+            "[amount-sync] wallet adjustment reuse "
+            f"event_id={event_id} order=WEB-{order_id} "
+            f"tx_id={existing.get('id')}",
+            flush=True,
+        )
+        return existing
+
     ticket_channel_id = _to_int(
         event.get("ticket_channel_id"),
         None,
@@ -17552,6 +17576,47 @@ def _apply_web_order_wallet_amount_adjustment(
     )
 
     return tx
+
+
+async def _process_web_wallet_reconciliation_event(event: dict) -> None:
+    event_id = int(event["event_id"])
+    retry_count = int(event.get("retry_count") or 0)
+
+    try:
+        try:
+            payload = json.loads(event.get("payload_json") or "{}")
+        except Exception:
+            payload = {}
+
+        tx = _apply_web_order_wallet_amount_adjustment(
+            event,
+            payload,
+        )
+        if tx is None:
+            raise RuntimeError(
+                "wallet reconciliation event did not produce an adjustment"
+            )
+
+        _web_sync_mark_event_done(event_id)
+        print(
+            "[wallet-reconciliation] "
+            f"event_id={event_id} order_id={event.get('order_id')} "
+            f"tx_id={tx.get('id')} done",
+            flush=True,
+        )
+
+    except Exception as exc:
+        _web_sync_mark_event_failed(
+            event_id,
+            str(exc),
+            retry_count,
+        )
+        print(
+            "[wallet-reconciliation] "
+            f"event_id={event_id} failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
 
 async def _process_web_order_amount_correction_event(event: dict) -> None:
@@ -17708,6 +17773,15 @@ async def process_one_web_sync_event(
         payload = json.loads(event.get("payload_json") or "{}")
     except Exception:
         payload = {}
+
+    if (
+        event_type == "order_updated"
+        and str(payload.get("sync_kind") or "") == "wallet_reconciliation"
+    ):
+        await _process_web_wallet_reconciliation_event(
+            event
+        )
+        return
 
     if (
         event_type == "order_updated"
