@@ -1,7 +1,9 @@
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
-from shared import order_acceptance
+from shared import order_acceptance, web_order_sync
+from shared.models import Base, WebOrder
 from shared.order_state import (
     ACCEPTED_PENDING_PAY,
     ACTIVE,
@@ -319,3 +321,51 @@ def test_resume_paid_stored_acceptance_order_returns_to_active(monkeypatch):
 
     assert status == ACTIVE
     assert meta_status == ACTIVE
+
+def test_dispatch_upsert_cannot_revive_closed_order(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+    TestSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+    monkeypatch.setattr(web_order_sync, "SessionLocal", TestSession)
+
+    with TestSession() as db:
+        order = WebOrder(
+            ticket_channel_id="12345",
+            dispatch_channel_id="67890",
+            dispatch_message_id="11111",
+            customer_discord_id="999",
+            customer_display_name="Customer",
+            category="steam",
+            item="Steam遊戲｜娛樂陪",
+            quantity=1,
+            amount=320,
+            payment_method="轉帳",
+            status=CLOSED,
+        )
+        db.add(order)
+        db.commit()
+        order_id = int(order.id)
+
+    with pytest.raises(OrderStateTransitionError):
+        web_order_sync.upsert_web_order_from_dispatch(
+            ticket_channel_id="12345",
+            dispatch_channel_id="67890",
+            dispatch_message_id="22222",
+            customer_discord_id="999",
+            customer_display_name="Customer",
+            category="steam",
+            item="Steam遊戲｜娛樂陪",
+            quantity=1,
+            amount=320,
+            payment_method="待付款",
+            status=WAITING_ACCEPTANCE,
+        )
+
+    with TestSession() as db:
+        current = db.get(WebOrder, order_id)
+
+        assert current is not None
+        assert current.status == CLOSED
+        assert current.dispatch_message_id == "11111"
+
