@@ -3373,6 +3373,12 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
     if not isinstance(ticket_channel, discord.TextChannel):
         raise ValueError(f"找不到票口頻道：{ticket_channel_id}")
 
+    await sync_acceptance_ticket_access_from_state(
+        guild,
+        ticket_channel_id,
+        state,
+    )
+
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
 
     if customer_display_name and customer_display_name != str(customer_id):
