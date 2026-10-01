@@ -226,3 +226,86 @@ def test_initial_candidates_do_not_notify_non_specified_when_all_slots_reserved(
     )
 
     assert selected == ["S1", "S2"]
+
+
+def test_plan_create_is_idempotent_without_reset(tmp_path, monkeypatch):
+    db_path = tmp_path / "web_dashboard.db"
+    fixed_now = datetime(2026, 10, 2, 12, 0, tzinfo=TAIPEI_TZ)
+    monkeypatch.setattr(smart_dispatch, "_now_taipei", lambda: fixed_now)
+
+    smart_dispatch.create_smart_dispatch_plan(
+        order_id=77,
+        dispatch_channel_id="100",
+        dispatch_message_id="200",
+        required_staff_count=1,
+        allowed_role_ids=["1"],
+        specified_staff_ids=[],
+        ranked_candidate_ids=["A", "B", "C"],
+        notified_candidate_ids=["A", "B", "C"],
+        db_file=db_path,
+    )
+
+    smart_dispatch.mark_smart_dispatch_stage(
+        77,
+        stage=1,
+        newly_notified_ids=["D"],
+        db_file=db_path,
+    )
+
+    smart_dispatch.create_smart_dispatch_plan(
+        order_id=77,
+        dispatch_channel_id="999",
+        dispatch_message_id="999",
+        required_staff_count=4,
+        allowed_role_ids=["2"],
+        specified_staff_ids=["S"],
+        ranked_candidate_ids=["S"],
+        notified_candidate_ids=["S"],
+        db_file=db_path,
+    )
+
+    plan = smart_dispatch.get_smart_dispatch_plan(
+        77,
+        db_file=db_path,
+    )
+
+    assert plan is not None
+    assert plan["stage"] == 1
+    assert plan["dispatch_channel_id"] == "100"
+    assert plan["notified_candidate_ids"] == ["A", "B", "C", "D"]
+
+
+def test_assignment_metrics_count_waiting_acceptance_claims(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+    _setup_assignment_db(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE order_acceptance_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                staff_discord_id TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1
+            );
+
+            INSERT INTO web_orders (id, status)
+            VALUES (10, 'waiting_acceptance');
+
+            INSERT INTO order_acceptance_claims (
+                order_id,
+                staff_discord_id,
+                is_active
+            )
+            VALUES (10, 'WAITING', 1);
+            """
+        )
+        conn.commit()
+
+    metrics = smart_dispatch.get_worker_assignment_metrics(
+        ["WAITING"],
+        db_file=db_path,
+        now_taipei=datetime(2026, 10, 2, 12, 0, tzinfo=TAIPEI_TZ),
+    )
+
+    assert metrics["WAITING"]["active_count"] == 1
