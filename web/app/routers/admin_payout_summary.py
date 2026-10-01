@@ -1229,10 +1229,23 @@ def build_operations_report(period: str | None) -> dict:
         )
 
         previous_orders: list[sqlite3.Row] = []
+        comparison_history_exists = False
         if previous_start_at and previous_end_at:
             previous_orders, _, _ = order_window(
                 previous_start_at,
                 previous_end_at,
+            )
+            history_row = conn.execute(
+                f"""
+                SELECT COUNT(*) AS total
+                FROM web_orders w
+                WHERE w.status = 'closed'
+                  AND {closed_expr} < ?
+                """,
+                [previous_end_at],
+            ).fetchone()
+            comparison_history_exists = bool(
+                int(history_row["total"] or 0)
             )
 
         worker_rows = conn.execute(
@@ -1518,6 +1531,7 @@ def build_operations_report(period: str | None) -> dict:
         "period_label": period_label,
         "previous_label": previous_label,
         "comparison": comparison,
+        "comparison_history_exists": comparison_history_exists,
         **current,
         "daily_labels": list(daily.keys()),
         "daily_values": list(daily.values()),
