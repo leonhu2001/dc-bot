@@ -525,8 +525,21 @@ def _check_wallet_paid_orders(
                 expected=expected_amount,
                 actual=actual_amount,
                 order_id=order_id,
-                repair_action="queue_wallet_order_reconciliation",
-                repair_label=repair_label,
+                repair_action=(
+                    "queue_wallet_order_reconciliation"
+                    if ticket_channel_id
+                    else None
+                ),
+                repair_label=(
+                    repair_label
+                    if ticket_channel_id
+                    else None
+                ),
+                repair_block_reason=(
+                    None
+                    if ticket_channel_id
+                    else "缺少 ticket_channel_id，不能安全建立差額流水。"
+                ),
             )
 
 
