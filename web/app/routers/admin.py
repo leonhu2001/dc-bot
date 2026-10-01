@@ -30,6 +30,9 @@ from web.app.services.order_service import (
     create_sync_event,
     list_admin_orders,
 )
+from web.app.services.order_financial_edit import (
+    preserve_order_financial_gaps,
+)
 from web.app.services.staff_service import (
     get_staff_display_name,
     get_staff_member_by_id,
@@ -3244,40 +3247,18 @@ async def admin_order_workspace_edit_r8(
             None,
         )
 
-        customer_pay_discount_gap = (
-            max(
-                0,
-                int(previous_amount_for_finance)
-                - int(previous_customer_pay_for_finance),
-            )
-            if previous_customer_pay_for_finance is not None
-            else 0
+        preserved_financials = preserve_order_financial_gaps(
+            previous_amount=int(previous_amount_for_finance),
+            previous_customer_pay_amount=previous_customer_pay_for_finance,
+            previous_payout_base_amount=previous_payout_base_for_finance,
+            new_amount=int(amount),
         )
-        payout_base_gap = (
-            max(
-                0,
-                int(previous_amount_for_finance)
-                - int(previous_payout_base_for_finance),
-            )
-            if previous_payout_base_for_finance is not None
-            else 0
-        )
-
-        new_customer_pay_amount = (
-            None
-            if previous_customer_pay_for_finance is None
-            else max(
-                0,
-                int(amount) - int(customer_pay_discount_gap),
-            )
-        )
-        new_payout_base_amount = (
-            int(amount)
-            if previous_payout_base_for_finance is None
-            else max(
-                0,
-                int(amount) - int(payout_base_gap),
-            )
+        new_customer_pay_amount = preserved_financials[
+            "customer_pay_amount"
+        ]
+        new_payout_base_amount = int(
+            preserved_financials["payout_base_amount"]
+            or 0
         )
 
         if not customer_service_discord_id:
