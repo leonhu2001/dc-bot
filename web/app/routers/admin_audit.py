@@ -26,6 +26,8 @@ ACTION_LABELS = {
     "set_manual_worker_payout": "調整人員分潤",
     "set_worker_payout_status": "更新人員分潤狀態",
     "set_customer_service_payout_status": "更新客服分潤狀態",
+    "accounting_recalculate_unpaid_payouts": "帳務修復｜重算未發放分潤",
+    "accounting_void_cancelled_payouts": "帳務修復｜取消單分潤 void",
 }
 
 
@@ -93,6 +95,8 @@ FIELD_LABELS = {
     "manual_final_payout": "手動最終分潤",
     "payout_status": "發放狀態",
     "paid_at": "發放時間",
+    "operator": "操作人員",
+    "payout_state": "分潤快照",
 
     "attention_reason": "注意事項",
     "internal_note": "內部備註",
@@ -119,6 +123,7 @@ ORDER_STATUS_LABELS = {
 PAYOUT_STATUS_LABELS = {
     "paid": "已發放",
     "unpaid": "未發放",
+    "void": "作廢",
 }
 
 
