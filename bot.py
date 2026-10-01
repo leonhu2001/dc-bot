@@ -135,6 +135,12 @@ from services.logging_service import (
     send_order_log,
 )
 
+from services.smart_dispatch import (
+    create_smart_dispatch_plan,
+    ensure_smart_dispatch_tables,
+    set_specified_dm_results,
+)
+
 from services.support_calls import (
     ensure_support_call_tables,
     close_support_calls_for_ticket,
@@ -218,6 +224,12 @@ from views.support_calls import (
     SupportCallActionView,
     refresh_existing_order_ticket_support_buttons,
     support_call_sla_loop,
+)
+
+from views.smart_dispatch import (
+    prepare_initial_smart_dispatch,
+    send_specified_staff_dispatch_dms,
+    smart_dispatch_escalation_loop,
 )
 
 from core.vip_levels import (
@@ -7550,7 +7562,15 @@ async def create_waiting_acceptance_order_from_self_service(
     if not rule.point_benefits_allowed:
         embed.add_field(name="點數福利", value="此分類不可使用點數福利", inline=False)
 
+    smart_dispatch = prepare_initial_smart_dispatch(
+        guild,
+        allowed_role_ids=allowed_role_ids_for_rule,
+        specified_staff_ids=specified_staff_ids,
+        required_staff_count=required_staff_count,
+    )
+
     dispatch_message = await dispatch_channel.send(
+        content=smart_dispatch["content"],
         embed=embed,
         view=DispatchClaimView(
             customer_id=customer_id,
@@ -7563,7 +7583,11 @@ async def create_waiting_acceptance_order_from_self_service(
             locked=False,
             status=WAITING_ACCEPTANCE,
         ),
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=True,
+            everyone=False,
+        ),
     )
 
     web_note_parts = []
@@ -7657,6 +7681,63 @@ async def create_waiting_acceptance_order_from_self_service(
         point_benefits_allowed=bool(rule.point_benefits_allowed),
         status=WAITING_ACCEPTANCE,
     )
+
+
+    try:
+        create_smart_dispatch_plan(
+            order_id=int(web_order.id),
+            dispatch_channel_id=dispatch_channel.id,
+            dispatch_message_id=dispatch_message.id,
+            required_staff_count=required_staff_count,
+            allowed_role_ids=allowed_role_ids_for_rule,
+            specified_staff_ids=specified_staff_ids,
+            ranked_candidate_ids=smart_dispatch["ranked_candidate_ids"],
+            notified_candidate_ids=smart_dispatch["initial_notified_ids"],
+        )
+    except Exception as exc:
+        print(
+            f"[smart-dispatch] plan create failed "
+            f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    if specified_staff_ids:
+        try:
+            dm_sent_ids, dm_failed_ids = await send_specified_staff_dispatch_dms(
+                guild,
+                specified_staff_ids=specified_staff_ids,
+                category_label=category_label,
+                item_label=rule.label,
+                required_staff_count=required_staff_count,
+                dispatch_jump_url=dispatch_message.jump_url,
+            )
+
+            try:
+                set_specified_dm_results(
+                    int(web_order.id),
+                    sent_ids=dm_sent_ids,
+                    failed_ids=dm_failed_ids,
+                )
+            except Exception as exc:
+                print(
+                    f"[smart-dispatch] DM result persist failed "
+                    f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+            if dm_failed_ids:
+                print(
+                    f"[smart-dispatch] specified DM unavailable "
+                    f"order_id={int(web_order.id)} "
+                    f"failed={','.join(dm_failed_ids)}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] specified DM failed "
+                f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     try:
         from shared.db import engine as _rule_snapshot_engine
@@ -12608,11 +12689,18 @@ async def on_ready():
 
     ensure_wallet_tables()
     ensure_support_call_tables()
+    ensure_smart_dispatch_tables()
 
     if not getattr(bot, "_support_call_sla_worker_started", False):
         bot._support_call_sla_worker_started = True
         bot.loop.create_task(support_call_sla_loop(bot))
         print("[support-call] SLA worker started", flush=True)
+
+
+    if not getattr(bot, "_smart_dispatch_worker_started", False):
+        bot._smart_dispatch_worker_started = True
+        bot.loop.create_task(smart_dispatch_escalation_loop(bot))
+        print("[smart-dispatch] escalation worker started", flush=True)
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0
