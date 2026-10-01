@@ -17437,11 +17437,105 @@ async def _process_web_order_created_event(
 
 
 
+def _apply_web_order_wallet_amount_adjustment(
+    event: dict,
+    payload: dict,
+) -> dict | None:
+    required_payload_keys = {
+        "old_customer_pay_amount",
+        "new_customer_pay_amount",
+        "old_payment_method",
+        "new_payment_method",
+        "old_customer_discord_id",
+        "new_customer_discord_id",
+    }
+
+    # Events created before this rollout did not include enough information to
+    # safely reconstruct wallet deltas. Leave them untouched.
+    if not required_payload_keys.issubset(payload.keys()):
+        return None
+
+    from services.order_wallet_reconciliation import (
+        build_wallet_payment_adjustment_plan,
+    )
+    from services.wallet_service import adjust_wallet_balance
+
+    plan = build_wallet_payment_adjustment_plan(
+        old_amount=int(payload.get("old_customer_pay_amount") or 0),
+        new_amount=int(payload.get("new_customer_pay_amount") or 0),
+        old_payment_method=payload.get("old_payment_method"),
+        new_payment_method=payload.get("new_payment_method"),
+        old_customer_id=payload.get("old_customer_discord_id"),
+        new_customer_id=payload.get("new_customer_discord_id"),
+    )
+
+    if plan is None:
+        return None
+
+    event_id = int(event["event_id"])
+    order_id = int(
+        event.get("order_id")
+        or event.get("web_order_id")
+        or payload.get("order_id")
+        or 0
+    )
+    if order_id <= 0:
+        raise RuntimeError("wallet amount adjustment is missing order_id")
+
+    reference = f"WEB-{order_id}:AMOUNT-ADJ:{event_id}"
+    ticket_channel_id = _to_int(
+        event.get("ticket_channel_id"),
+        None,
+    )
+
+    tx = adjust_wallet_balance(
+        customer_id=plan["customer_id"],
+        amount=int(plan["amount"]),
+        tx_type="payment_adjustment",
+        operator_discord_id=payload.get("admin_discord_id"),
+        operator_display_name=payload.get("admin_display_name"),
+        order_channel_id=ticket_channel_id,
+        order_no=reference,
+        note=(
+            f"後台訂單付款差額調整｜WEB-{order_id}｜"
+            f"{plan['old_payment_method'] or '未紀錄'} "
+            f"{plan['old_amount']}T → "
+            f"{plan['new_payment_method'] or '未紀錄'} "
+            f"{plan['new_amount']}T"
+        ),
+        allow_negative=False,
+        db_file=DB_FILE,
+    )
+
+    print(
+        "[amount-sync] wallet adjustment "
+        f"event_id={event_id} order=WEB-{order_id} "
+        f"customer={plan['customer_id']} "
+        f"delta={plan['amount']} tx_id={tx.get('id')}",
+        flush=True,
+    )
+
+    return tx
+
+
 async def _process_web_order_amount_correction_event(event: dict) -> None:
     event_id = int(event["event_id"])
     retry_count = int(event.get("retry_count") or 0)
 
     try:
+        payload = {}
+        try:
+            payload = json.loads(event.get("payload_json") or "{}")
+        except Exception:
+            payload = {}
+
+        # Wallet reconciliation must run even if the Discord-side order state
+        # has already been cleaned up. The event reference makes this idempotent.
+        _apply_web_order_wallet_amount_adjustment(
+            event,
+            payload,
+        )
+
         ticket_channel_id = _to_int(event.get("ticket_channel_id"), None)
         new_amount = max(0, int(event.get("amount") or 0))
 
