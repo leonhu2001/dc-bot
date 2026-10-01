@@ -546,3 +546,120 @@ def test_missing_customer_service_payout_remains_visible(tmp_path):
 
     assert "customer_service_payout_count" in _issue_codes(snapshot)
 
+def test_wallet_order_amount_mismatch_exposes_exact_repair_action(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            "ALTER TABLE web_orders ADD COLUMN ticket_channel_id TEXT"
+        )
+        conn.execute(
+            """
+            UPDATE web_orders
+            SET customer_pay_amount = 250,
+                amount = 250,
+                ticket_channel_id = 'ticket-1'
+            WHERE id = 1
+            """
+        )
+
+    with sqlite3.connect(root / "bot.db") as conn:
+        conn.execute(
+            """
+            UPDATE wallet_transactions
+            SET order_channel_id = 'ticket-1'
+            WHERE id = 2
+            """
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "wallet_order_amount_mismatch"
+    )
+
+    assert issue["order_id"] == 1
+    assert issue["repairable"] is True
+    assert issue["repair_action"] == "queue_wallet_order_reconciliation"
+    assert issue["repair_label"] == "補扣 50T"
+    assert issue["expected"] == -250
+    assert issue["actual"] == -200
+
+
+def test_legacy_tip_reference_is_warning_when_financial_linkage_matches(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "bot.db") as conn:
+        conn.execute(
+            """
+            INSERT INTO wallet_transactions(
+                id,
+                customer_discord_id,
+                amount,
+                balance_before,
+                balance_after,
+                type,
+                order_no,
+                created_at
+            )
+            VALUES(
+                3,
+                'customer-1',
+                -100,
+                800,
+                700,
+                'tip_payment',
+                'MO20260922002',
+                '2026-10-02T01:10:00+08:00'
+            )
+            """
+        )
+        conn.execute(
+            """
+            UPDATE customer_wallets
+            SET balance = 700
+            WHERE customer_discord_id = 'customer-1'
+            """
+        )
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            """
+            INSERT INTO worker_tips(
+                id,
+                receipt_id,
+                customer_discord_id,
+                worker_discord_id,
+                amount,
+                payment_method,
+                payment_status,
+                payout_status,
+                wallet_transaction_id
+            )
+            VALUES(
+                1,
+                'MO20260922002',
+                'customer-1',
+                'worker-1',
+                100,
+                '我的錢包',
+                'paid',
+                'unpaid',
+                3
+            )
+            """
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "tip_wallet_reference_mismatch"
+    )
+
+    assert issue["severity"] == "warning"
+    assert "舊格式" in issue["title"]
+
