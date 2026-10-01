@@ -635,6 +635,22 @@ def _all_payout_rows_unpaid_and_unpaid_at_clear(
     )
 
 
+def _payout_rows_are_historical_locked(
+    worker_payouts: list[dict[str, Any]],
+    cs_payouts: list[dict[str, Any]],
+) -> bool:
+    rows = [*worker_payouts, *cs_payouts]
+    if not rows:
+        return False
+
+    return any(
+        _normalize(row.get("payout_status")).lower()
+        in {"paid", "void"}
+        or row.get("paid_at") is not None
+        for row in rows
+    )
+
+
 def _payout_repair_block_reason(
     *,
     worker_ids: list[str],
@@ -864,6 +880,11 @@ def _check_payouts(
             or 0
         )
 
+        historical_locked = _payout_rows_are_historical_locked(
+            worker_payouts,
+            cs_payouts,
+        )
+
         repair_block_reason = _payout_repair_block_reason(
             worker_ids=worker_ids,
             payout_base=payout_base,
@@ -934,7 +955,10 @@ def _check_payouts(
                 )
 
             actual_amount = _as_float(actual_rows[0]["final_payout"])
-            if not _money_equal(expected_amount, actual_amount):
+            if (
+                not historical_locked
+                and not _money_equal(expected_amount, actual_amount)
+            ):
                 _issue(
                     issues,
                     category="payout",
@@ -951,7 +975,7 @@ def _check_payouts(
                 )
 
         for worker_id, actual_rows in actual_by_worker.items():
-            if worker_id not in expected_by_worker:
+            if worker_id not in expected_by_worker and not historical_locked:
                 _issue(
                     issues,
                     category="payout",
@@ -982,7 +1006,13 @@ def _check_payouts(
                 repair_action=repair_action,
                 repair_block_reason=repair_block_reason,
             )
-        elif not _money_equal(expected.customer_service_payout, cs_payouts[0]["payout_amount"]):
+        elif (
+            not historical_locked
+            and not _money_equal(
+                expected.customer_service_payout,
+                cs_payouts[0]["payout_amount"],
+            )
+        ):
             _issue(
                 issues,
                 category="payout",

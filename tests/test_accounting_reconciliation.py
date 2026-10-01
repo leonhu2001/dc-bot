@@ -463,7 +463,7 @@ def test_unpaid_stored_order_does_not_require_payout_rows(tmp_path):
 
     assert stored_order_issues == []
 
-def test_paid_payout_mismatch_is_not_auto_repairable(tmp_path):
+def test_paid_historical_payout_is_not_repriced_by_current_formula(tmp_path):
     root = _healthy_root(tmp_path)
 
     with sqlite3.connect(root / "web_dashboard.db") as conn:
@@ -479,15 +479,9 @@ def test_paid_payout_mismatch_is_not_auto_repairable(tmp_path):
 
     snapshot = build_accounting_reconciliation_snapshot(root)
 
-    issue = next(
-        item
-        for item in snapshot["issues"]
-        if item["code"] == "worker_payout_amount_mismatch"
-    )
+    codes = _issue_codes(snapshot)
 
-    assert issue["repairable"] is False
-    assert issue["repair_action"] is None
-    assert "paid" in str(issue["repair_block_reason"]).lower()
+    assert "worker_payout_amount_mismatch" not in codes
 
 
 def test_cancelled_unpaid_live_payout_is_void_repairable(tmp_path):
@@ -513,4 +507,42 @@ def test_cancelled_unpaid_live_payout_is_void_repairable(tmp_path):
     assert issue["order_id"] == 1
     assert issue["repairable"] is True
     assert issue["repair_action"] == "void_cancelled_payouts"
+
+def test_unpaid_payout_still_uses_current_formula_reconciliation(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            """
+            UPDATE worker_payouts
+            SET final_payout = 159,
+                payout_status = 'unpaid',
+                paid_at = NULL
+            WHERE order_id = 1
+            """
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "worker_payout_amount_mismatch"
+    )
+
+    assert issue["repairable"] is True
+    assert issue["repair_action"] == "recalculate_unpaid_payouts"
+
+
+def test_missing_customer_service_payout_remains_visible(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            "DELETE FROM customer_service_payouts WHERE order_id = 1"
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    assert "customer_service_payout_count" in _issue_codes(snapshot)
 
