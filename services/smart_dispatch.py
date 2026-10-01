@@ -316,14 +316,38 @@ def create_smart_dispatch_plan(
     specified_staff_ids: list[str] | tuple[str, ...],
     ranked_candidate_ids: list[str] | tuple[str, ...],
     notified_candidate_ids: list[str] | tuple[str, ...],
+    reset_existing: bool = False,
     db_file: str | Path | None = None,
 ) -> None:
     ensure_smart_dispatch_tables(db_file)
     now = _now_taipei().isoformat(timespec="seconds")
 
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
-        conn.execute(
+        if reset_existing:
+            conflict_sql = """
+            ON CONFLICT(order_id)
+            DO UPDATE SET
+                dispatch_channel_id = excluded.dispatch_channel_id,
+                dispatch_message_id = excluded.dispatch_message_id,
+                required_staff_count = excluded.required_staff_count,
+                allowed_role_ids_json = excluded.allowed_role_ids_json,
+                specified_staff_ids_json = excluded.specified_staff_ids_json,
+                ranked_candidate_ids_json = excluded.ranked_candidate_ids_json,
+                notified_candidate_ids_json = excluded.notified_candidate_ids_json,
+                specified_dm_sent_ids_json = '[]',
+                specified_dm_failed_ids_json = '[]',
+                stage = 0,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at,
+                completed_at = NULL,
+                completion_reason = NULL,
+                last_error = NULL
             """
+        else:
+            conflict_sql = "ON CONFLICT(order_id) DO NOTHING"
+
+        conn.execute(
+            f"""
             INSERT INTO smart_dispatch_notifications (
                 order_id,
                 dispatch_channel_id,
@@ -338,21 +362,7 @@ def create_smart_dispatch_plan(
                 updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-            ON CONFLICT(order_id)
-            DO UPDATE SET
-                dispatch_channel_id = excluded.dispatch_channel_id,
-                dispatch_message_id = excluded.dispatch_message_id,
-                required_staff_count = excluded.required_staff_count,
-                allowed_role_ids_json = excluded.allowed_role_ids_json,
-                specified_staff_ids_json = excluded.specified_staff_ids_json,
-                ranked_candidate_ids_json = excluded.ranked_candidate_ids_json,
-                notified_candidate_ids_json = excluded.notified_candidate_ids_json,
-                stage = 0,
-                created_at = excluded.created_at,
-                updated_at = excluded.updated_at,
-                completed_at = NULL,
-                completion_reason = NULL,
-                last_error = NULL
+            {conflict_sql}
             """,
             (
                 int(order_id),
@@ -382,6 +392,28 @@ def _row_to_plan(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     ):
         data[key.removesuffix("_json")] = _load_json_list(data.get(key))
     return data
+
+
+def get_smart_dispatch_plan(
+    order_id: int,
+    *,
+    db_file: str | Path | None = None,
+) -> dict[str, Any] | None:
+    ensure_smart_dispatch_tables(db_file)
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT *
+            FROM smart_dispatch_notifications
+            WHERE order_id = ?
+            LIMIT 1
+            """,
+            (int(order_id),),
+        ).fetchone()
+
+        return _row_to_plan(row) if row is not None else None
 
 
 def list_pending_smart_dispatch_plans(
