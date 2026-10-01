@@ -28,6 +28,7 @@ ACTION_LABELS = {
     "set_customer_service_payout_status": "更新客服分潤狀態",
     "accounting_recalculate_unpaid_payouts": "帳務修復｜重算未發放分潤",
     "accounting_void_cancelled_payouts": "帳務修復｜取消單分潤 void",
+    "accounting_queue_wallet_reconciliation": "帳務修復｜排入錢包差額修復",
 }
 
 
