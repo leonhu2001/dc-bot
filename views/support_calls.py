@@ -442,6 +442,58 @@ class SupportCallActionView(discord.ui.View):
         )
 
 
+
+def _message_has_component(
+    message: discord.Message,
+    custom_id: str,
+) -> bool:
+    for row in getattr(message, "components", []) or []:
+        for child in getattr(row, "children", []) or []:
+            if str(getattr(child, "custom_id", "") or "") == str(custom_id):
+                return True
+    return False
+
+
+async def refresh_existing_order_ticket_support_buttons(
+    guild: discord.Guild,
+    *,
+    category_id: int,
+    order_control_view_factory: Callable[[], discord.ui.View],
+) -> int:
+    category = guild.get_channel(int(category_id))
+    if not isinstance(category, discord.CategoryChannel):
+        return 0
+
+    refreshed = 0
+
+    for channel in list(category.text_channels):
+        topic = str(channel.topic or "")
+        if "order_customer_id=" not in topic:
+            continue
+
+        lowered_name = str(channel.name or "").lower()
+        if lowered_name.startswith(("已結單", "已取消")):
+            continue
+
+        try:
+            async for message in channel.history(limit=60):
+                if not _message_has_component(message, "order_control_select"):
+                    continue
+
+                if _message_has_component(message, "order_support_call"):
+                    break
+
+                await message.edit(
+                    view=order_control_view_factory(),
+                )
+                refreshed += 1
+                break
+        except (discord.Forbidden, discord.HTTPException):
+            continue
+
+    return refreshed
+
+
 async def support_call_sla_loop(bot: discord.Client) -> None:
     await bot.wait_until_ready()
 
