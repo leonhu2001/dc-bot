@@ -3036,25 +3036,25 @@ def _acceptance_staff_display_text(
     guild: discord.Guild | None,
     state,
 ) -> str | None:
-    names: list[str] = []
+    """Use clickable Discord mentions when possible, with a saved-name fallback."""
+    values: list[str] = []
 
     for claim in getattr(state, "claims", ()):
         user_id = _to_int(getattr(claim, "staff_discord_id", None))
         member = guild.get_member(user_id) if guild is not None and user_id is not None else None
 
         if member is not None:
-            display_name = _member_display_name(member)
+            display_value = member.mention
         else:
-            display_name = str(
+            display_value = str(
                 getattr(claim, "staff_display_name", None)
-                or user_id
                 or ""
             ).strip()
 
-        if display_name and display_name not in names:
-            names.append(display_name)
+        if display_value and display_value not in values:
+            values.append(display_value)
 
-    return "、".join(names) or None
+    return "、".join(values) or None
 
 
 def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
