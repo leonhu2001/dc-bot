@@ -18,6 +18,7 @@ from services.payment_reviews import ensure_payment_review_tables
 from services.wallet_service import ensure_wallet_tables
 from services.ticket_archives import ensure_ticket_archive_tables
 from services.support_calls import ensure_support_call_tables
+from services.smart_dispatch import ensure_smart_dispatch_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -414,6 +415,7 @@ async def startup_event():
     ensure_wallet_tables()
     ensure_ticket_archive_tables()
     ensure_support_call_tables()
+    ensure_smart_dispatch_tables()
 
 
 def get_current_user(request: Request) -> dict | None:
