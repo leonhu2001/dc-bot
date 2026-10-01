@@ -64,10 +64,20 @@ echo
 
 echo "=== 1. PRECHECK ==="
 
-if [ -n "$(git status --porcelain)" ]; then
+DIRTY_WORKTREE="$(
+    git status --porcelain --untracked-files=all \
+        | grep -vE '^\?\? data/deployed_version\.json$' \
+        || true
+)"
+
+if [ -n "$DIRTY_WORKTREE" ]; then
     echo "ERROR: VPS working tree is not clean."
-    git status --short
+    printf '%s\n' "$DIRTY_WORKTREE"
     exit 1
+fi
+
+if [ -e "$APP/data/deployed_version.json" ]; then
+    echo "PASS: ignored runtime marker data/deployed_version.json"
 fi
 
 mkdir -p "$BACKUP"
