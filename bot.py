@@ -4105,6 +4105,68 @@ async def repair_pending_acceptance_payment_panels_once(
     return repaired
 
 
+async def repair_pending_acceptance_ticket_access_once(
+    guild: discord.Guild,
+    *,
+    limit: int = 100,
+) -> int:
+    """Bot 啟動時把目前接單者的票口權限補齊。"""
+    import sqlite3
+
+    from shared.order_acceptance import get_acceptance_state
+
+    db_path = Path(__file__).parent / "web_dashboard.db"
+    conn = sqlite3.connect(db_path, timeout=15)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, ticket_channel_id
+            FROM web_orders
+            WHERE status IN ('waiting_acceptance', 'accepted_pending_pay')
+              AND ticket_channel_id IS NOT NULL
+              AND TRIM(ticket_channel_id) <> ''
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    restored = 0
+
+    for row in rows:
+        order_id = int(row["id"])
+        ticket_channel_id = _to_int(row["ticket_channel_id"])
+
+        if ticket_channel_id is None:
+            continue
+
+        try:
+            state = get_acceptance_state(order_id)
+            accepted_count = int(getattr(state, "accepted_count", 0) or 0)
+
+            if accepted_count <= 0:
+                continue
+
+            await sync_acceptance_ticket_access_from_state(
+                guild,
+                ticket_channel_id,
+                state,
+            )
+            restored += accepted_count
+        except Exception as exc:
+            print(
+                f"[ticket-access] startup repair failed "
+                f"order_id={order_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    return restored
+
+
 def _build_receiver_text_from_claim_data(claim_data: dict) -> str | None:
     receiver_ids = sorted(
         set(claim_data.get("companion", set()))
@@ -12551,6 +12613,23 @@ async def on_ready():
                 print(f"[acceptance-repair] restored payment panels: {repaired_payment_panels}", flush=True)
         except Exception as exc:
             print(f"[acceptance-repair] startup repair failed: {type(exc).__name__}: {exc}", flush=True)
+
+        try:
+            repaired_ticket_access = await repair_pending_acceptance_ticket_access_once(
+                guild_for_voice,
+            )
+            if repaired_ticket_access:
+                print(
+                    f"[ticket-access] restored accepted staff ticket access: "
+                    f"{repaired_ticket_access}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"[ticket-access] startup repair failed: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         await get_or_create_order_log_channel(guild_for_voice)
         if not BACKUP_TASK_STARTED:
