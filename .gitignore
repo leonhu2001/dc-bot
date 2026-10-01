@@ -82,3 +82,6 @@ bot_data.json
 *.before_*
 cogs.bak.*/
 views.bak.*/
+
+# Deployment runtime marker
+data/deployed_version.json
