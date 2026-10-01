@@ -85,3 +85,37 @@ def build_wallet_payment_adjustment_plan(
         "old_payment_method": old_method,
         "new_payment_method": new_method,
     }
+
+
+def expected_wallet_net_before_edit(
+    *,
+    old_amount: int,
+    old_payment_method: str | None,
+) -> int:
+    old_amount = max(0, int(old_amount or 0))
+    old_method = _normalize(old_payment_method)
+
+    if old_method == WALLET_PAYMENT_METHOD:
+        return -old_amount
+
+    return 0
+
+
+def validate_wallet_net_before_adjustment(
+    *,
+    old_amount: int,
+    old_payment_method: str | None,
+    actual_wallet_net: int,
+) -> None:
+    expected = expected_wallet_net_before_edit(
+        old_amount=old_amount,
+        old_payment_method=old_payment_method,
+    )
+    actual = int(actual_wallet_net or 0)
+
+    if actual != expected:
+        raise ValueError(
+            "修改前的錢包淨扣款已與訂單帳面不一致，"
+            f"應為 {expected}T、實際為 {actual}T；"
+            "禁止在既有差異上自動追加調整，請先人工對帳。"
+        )
