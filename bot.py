@@ -12067,6 +12067,22 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
         }
         sync_voice_control_panel_state_from_channel(channel)
 
+        try:
+            await sync_vip_whitelist_permissions(
+                channel,
+                owner_id,
+            )
+        except discord.Forbidden:
+            print(
+                f"Bot 權限不足，無法恢復 VIP 白名單權限："
+                f"owner={owner_id} channel={channel_id}"
+            )
+        except discord.HTTPException as exc:
+            print(
+                f"恢復 VIP 白名單權限失敗："
+                f"owner={owner_id} channel={channel_id}: {exc}"
+            )
+
         if panel_message_id:
             try:
                 bot.add_view(
@@ -12330,6 +12346,10 @@ async def on_voice_state_update(
 
                 if isinstance(existing_channel, discord.VoiceChannel):
                     TEMP_VIP_VOICE_CHANNEL_IDS.add(existing_channel.id)
+                    await sync_vip_whitelist_permissions(
+                        existing_channel,
+                        member.id,
+                    )
                     await grant_play_voice_room_chat_access(existing_channel, member)
                     await member.move_to(
                         existing_channel,
