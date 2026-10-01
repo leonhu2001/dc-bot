@@ -99,6 +99,7 @@ FIELD_LABELS = {
     "paid_at": "發放時間",
     "operator": "操作人員",
     "payout_state": "分潤快照",
+    "historical_discount_amount": "歷史折扣",
 
     "attention_reason": "注意事項",
     "internal_note": "內部備註",
