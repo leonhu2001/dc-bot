@@ -3032,6 +3032,31 @@ def _member_display_name(member: discord.Member) -> str:
     )
 
 
+def _acceptance_staff_display_text(
+    guild: discord.Guild | None,
+    state,
+) -> str | None:
+    names: list[str] = []
+
+    for claim in getattr(state, "claims", ()):
+        user_id = _to_int(getattr(claim, "staff_discord_id", None))
+        member = guild.get_member(user_id) if guild is not None and user_id is not None else None
+
+        if member is not None:
+            display_name = _member_display_name(member)
+        else:
+            display_name = str(
+                getattr(claim, "staff_display_name", None)
+                or user_id
+                or ""
+            ).strip()
+
+        if display_name and display_name not in names:
+            names.append(display_name)
+
+    return "、".join(names) or None
+
+
 def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
     receiver_ids: set[int] = set()
 
@@ -3213,6 +3238,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         raise ValueError(f"網站訂單缺少必要頻道或顧客資料：{order_id}")
 
     state = get_acceptance_state(int(order_id))
+    accepted_staff_display_text = _acceptance_staff_display_text(guild, state)
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
     ticket_channel = guild.get_channel(ticket_channel_id)
@@ -3224,6 +3250,11 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         raise ValueError(f"找不到票口頻道：{ticket_channel_id}")
 
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
+
+    if accepted_staff_display_text:
+        data["accepted_staff_display_text"] = accepted_staff_display_text
+    else:
+        data.pop("accepted_staff_display_text", None)
 
     # zYao 3C3B website order refresh safety v1
     if data.get("website_finance_settled"):
@@ -3427,6 +3458,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
                 quantity=quantity,
                 companion_preference=companion_preference,
                 amount=amount,
+                receiver_text=accepted_staff_display_text,
             )
 
             payment_message = await ticket_channel.send(
@@ -3472,6 +3504,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
                         payment_method="等待接單人數補滿",
                         companion_preference=companion_preference,
                         amount=amount,
+                        receiver_text=accepted_staff_display_text,
                         submitted=True,
                     )
                     disabled_embed.add_field(
@@ -3599,6 +3632,12 @@ async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Inte
     category_label = str(data.get("category_label") or view.category_label)
     item = str(data.get("item") or view.item)
     companion_preference = data.get("companion_preference") or view.companion_preference
+    accepted_staff_display_text = _acceptance_staff_display_text(guild, state)
+
+    if accepted_staff_display_text:
+        data["accepted_staff_display_text"] = accepted_staff_display_text
+    else:
+        data.pop("accepted_staff_display_text", None)
 
     if str(data.get("payment_method") or "") == "待付款":
         data.pop("payment_method", None)
@@ -3610,6 +3649,7 @@ async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Inte
         quantity=quantity,
         companion_preference=companion_preference,
         amount=amount,
+        receiver_text=accepted_staff_display_text,
     )
 
     payment_message = await ticket_channel.send(
@@ -3742,6 +3782,14 @@ async def restore_acceptance_payment_panel_for_order(
             data.pop("payment_method", None)
 
         selected_payment_method = str(data.get("payment_method") or "").strip() or None
+        accepted_staff_display_text = (
+            _acceptance_staff_display_text(guild, state)
+            if state is not None
+            else str(data.get("accepted_staff_display_text") or "").strip() or None
+        )
+
+        if accepted_staff_display_text:
+            data["accepted_staff_display_text"] = accepted_staff_display_text
 
         payment_embed = build_payment_method_embed(
             customer_id=customer_id,
@@ -3751,6 +3799,7 @@ async def restore_acceptance_payment_panel_for_order(
             payment_method=selected_payment_method,
             companion_preference=data.get("companion_preference"),
             amount=_to_int(data.get("amount"), amount) or amount,
+            receiver_text=accepted_staff_display_text,
         )
 
         payment_view = PaymentMethodView(
@@ -4718,6 +4767,7 @@ async def finalize_accepted_pending_payment(
             payment_method=str(payment_method),
             companion_preference=companion_preference,
             amount=amount,
+            receiver_text=str(data.get("accepted_staff_display_text") or "").strip() or None,
         )
         pending_embed.add_field(
             name="付款狀態",
@@ -5022,6 +5072,7 @@ async def finalize_accepted_pending_payment(
             payment_method=str(payment_method),
             companion_preference=companion_preference,
             amount=amount,
+            receiver_text=str(data.get("accepted_staff_display_text") or "").strip() or None,
             submitted=True,
             dispatch_url=dispatch_url,
         )
@@ -6357,6 +6408,7 @@ class PaymentMethodSelect(discord.ui.Select):
                 payment_method=selected_method,
                 companion_preference=companion_preference,
                 amount=amount or None,
+                receiver_text=str(data.get("accepted_staff_display_text") or "").strip() or None,
             )
 
             if selected_method == WALLET_PAYMENT_METHOD:

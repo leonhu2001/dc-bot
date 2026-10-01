@@ -29,6 +29,7 @@ def build_payment_method_embed(
     payment_method: str | None = None,
     companion_preference: str | None = None,
     amount: int | None = None,
+    receiver_text: str | None = None,
     submitted: bool = False,
     dispatch_url: str | None = None,
 ) -> discord.Embed:
@@ -40,8 +41,13 @@ def build_payment_method_embed(
         f"訂單項目：{item}\n"
         f"數量：{quantity} 單\n"
         f"訂單總價：{amount_text}\n"
-        f"付款方式：{payment_method or '尚未選擇'}\n"
     )
+
+    normalized_receiver_text = str(receiver_text or "").strip()
+    if normalized_receiver_text:
+        description += f"接單人員：{normalized_receiver_text}\n"
+
+    description += f"付款方式：{payment_method or '尚未選擇'}\n"
 
     if submitted and dispatch_url:
         description += "\n✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"

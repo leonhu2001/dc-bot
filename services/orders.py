@@ -668,6 +668,42 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
     return "｜".join(parts), payment_method
 
 
+def _resolve_guild_display_name_from_mention(
+    source_channel: discord.TextChannel,
+    mention_text: str | None,
+) -> str:
+    """Prefer the member's current server display name over a raw mention/id."""
+    text = str(mention_text or "").strip()
+
+    if not text:
+        return "未紀錄"
+
+    if not (text.startswith("<@") and text.endswith(">")):
+        return text
+
+    raw_id = text[2:-1]
+    if raw_id.startswith("!"):
+        raw_id = raw_id[1:]
+
+    try:
+        user_id = int(raw_id)
+    except (TypeError, ValueError):
+        return text
+
+    guild = getattr(source_channel, "guild", None)
+    member = guild.get_member(user_id) if guild is not None else None
+
+    if member is None:
+        return text
+
+    return str(
+        getattr(member, "display_name", None)
+        or getattr(member, "global_name", None)
+        or getattr(member, "name", None)
+        or text
+    )
+
+
 def build_self_service_order_embed(
     customer_mention: str,
     category_label: str,
@@ -692,6 +728,10 @@ def build_self_service_order_embed(
         color = discord.Color.green()
 
     ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
+    customer_text = _resolve_guild_display_name_from_mention(
+        source_channel,
+        customer_mention,
+    )
 
     embed = discord.Embed(
         title="魔丸娛樂｜接單面板",
@@ -700,7 +740,7 @@ def build_self_service_order_embed(
     )
 
     embed.add_field(name="狀態", value=status_text, inline=False)
-    embed.add_field(name="顧客", value=str(customer_mention or "未紀錄"), inline=True)
+    embed.add_field(name="顧客", value=customer_text, inline=True)
     embed.add_field(name="票口", value=str(ticket_text), inline=True)
     embed.add_field(name="訂單", value=f"{category_label}｜{item}", inline=False)
     embed.add_field(name="數量", value=f"{quantity} 單", inline=True)
