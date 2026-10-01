@@ -466,7 +466,13 @@ async def refresh_existing_order_ticket_support_buttons(
 
     refreshed = 0
 
-    for channel in list(category.text_channels):
+    channels = sorted(
+        category.text_channels,
+        key=lambda item: int(item.id),
+        reverse=True,
+    )[:120]
+
+    for channel in channels:
         topic = str(channel.topic or "")
         if "order_customer_id=" not in topic:
             continue
