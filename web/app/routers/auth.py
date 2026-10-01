@@ -15,13 +15,32 @@ DISCORD_AUTHORIZE_URL = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN_URL = f"{DISCORD_API_BASE}/oauth2/token"
 
 
+def _safe_return_path(value: str | None) -> str:
+    path = str(value or "").strip()
+
+    if (
+        not path
+        or not path.startswith("/")
+        or path.startswith("//")
+        or "\\" in path
+        or "://" in path
+    ):
+        return "/"
+
+    return path
+
+
 @router.get("/discord/login")
-async def discord_login(request: Request):
+async def discord_login(
+    request: Request,
+    next: str | None = None,
+):
     if not config.DISCORD_CLIENT_ID:
         raise HTTPException(status_code=500, detail="DISCORD_CLIENT_ID is not configured")
 
     state = secrets.token_urlsafe(32)
     request.session["oauth_state"] = state
+    request.session["oauth_next"] = _safe_return_path(next)
 
     params = {
         "client_id": config.DISCORD_CLIENT_ID,
@@ -150,7 +169,14 @@ async def discord_callback(
         "is_employee": is_employee,
     }
 
-    return RedirectResponse(url="/")
+    return RedirectResponse(
+        url=_safe_return_path(
+            request.session.pop(
+                "oauth_next",
+                "/",
+            )
+        )
+    )
 
 
 @router.get("/logout")
