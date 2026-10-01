@@ -17,11 +17,13 @@ from services.topups import ensure_topup_tables
 from services.payment_reviews import ensure_payment_review_tables
 from services.wallet_service import ensure_wallet_tables
 from services.ticket_archives import ensure_ticket_archive_tables
+from services.support_calls import ensure_support_call_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
 from web.app.routers.admin_audit import router as admin_audit_router
 from web.app.routers.admin_system import router as admin_system_router
+from web.app.routers.admin_support_calls import router as admin_support_calls_router
 from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
@@ -392,6 +394,7 @@ app.include_router(admin_router)
 app.include_router(admin_staff_router)
 app.include_router(admin_audit_router)
 app.include_router(admin_system_router)
+app.include_router(admin_support_calls_router)
 app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
 app.include_router(admin_payouts_router)
@@ -410,6 +413,7 @@ async def startup_event():
     ensure_payment_review_tables()
     ensure_wallet_tables()
     ensure_ticket_archive_tables()
+    ensure_support_call_tables()
 
 
 def get_current_user(request: Request) -> dict | None:
