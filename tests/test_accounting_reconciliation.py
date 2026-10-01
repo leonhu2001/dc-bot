@@ -146,6 +146,8 @@ def _create_web_db(path: Path) -> None:
                 customer_pay_amount INTEGER,
                 payout_base_amount INTEGER,
                 payment_method TEXT,
+                customer_service_discord_id TEXT,
+                customer_service_display_name TEXT,
                 status TEXT NOT NULL
             );
 
@@ -199,6 +201,8 @@ def _create_web_db(path: Path) -> None:
                 customer_pay_amount,
                 payout_base_amount,
                 payment_method,
+                customer_service_discord_id,
+                customer_service_display_name,
                 status
             )
             VALUES(
@@ -209,6 +213,8 @@ def _create_web_db(path: Path) -> None:
                 200,
                 200,
                 '我的錢包',
+                'cs-1',
+                '客服一號',
                 'closed'
             )
             """
@@ -386,6 +392,16 @@ def test_worker_payout_mismatch_is_detected(tmp_path):
 
     assert "worker_payout_amount_mismatch" in _issue_codes(snapshot)
 
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "worker_payout_amount_mismatch"
+    )
+    assert issue["order_id"] == 1
+    assert issue["repairable"] is True
+    assert issue["repair_action"] == "recalculate_unpaid_payouts"
+    assert snapshot["repairable_count"] >= 1
+
 
 def test_wallet_order_missing_payment_transaction_is_detected(tmp_path):
     root = _healthy_root(tmp_path)
@@ -418,6 +434,8 @@ def test_unpaid_stored_order_does_not_require_payout_rows(tmp_path):
                 customer_pay_amount,
                 payout_base_amount,
                 payment_method,
+                customer_service_discord_id,
+                customer_service_display_name,
                 status
             )
             VALUES(
@@ -428,6 +446,8 @@ def test_unpaid_stored_order_does_not_require_payout_rows(tmp_path):
                 300,
                 300,
                 '待付款',
+                NULL,
+                NULL,
                 'stored'
             )
             """
@@ -442,4 +462,55 @@ def test_unpaid_stored_order_does_not_require_payout_rows(tmp_path):
     ]
 
     assert stored_order_issues == []
+
+def test_paid_payout_mismatch_is_not_auto_repairable(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            """
+            UPDATE worker_payouts
+            SET final_payout = 159,
+                payout_status = 'paid',
+                paid_at = '2026-10-02 01:30:00'
+            WHERE order_id = 1
+            """
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "worker_payout_amount_mismatch"
+    )
+
+    assert issue["repairable"] is False
+    assert issue["repair_action"] is None
+    assert "paid" in str(issue["repair_block_reason"]).lower()
+
+
+def test_cancelled_unpaid_live_payout_is_void_repairable(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            """
+            UPDATE web_orders
+            SET status = 'cancelled'
+            WHERE id = 1
+            """
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "cancelled_order_has_live_payout"
+    )
+
+    assert issue["order_id"] == 1
+    assert issue["repairable"] is True
+    assert issue["repair_action"] == "void_cancelled_payouts"
 
