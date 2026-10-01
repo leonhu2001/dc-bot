@@ -922,7 +922,11 @@ def build_accounting_reconciliation_snapshot(
         else:
             referenced_tip_tx_ids = set()
 
-        if bot is not None and web is not None:
+        if (
+            bot is not None
+            and web is not None
+            and _table_exists(web, "worker_tips")
+        ):
             _check_orphan_tip_wallet_transactions(
                 tx_by_id,
                 referenced_tip_tx_ids,
