@@ -6330,6 +6330,7 @@ async def resume_stored_order(
 
     resume_status = "active"
     acceptance_state = None
+    acceptance_order_id = None
 
     try:
         from shared.order_acceptance import (
@@ -6337,7 +6338,6 @@ async def resume_stored_order(
             resume_acceptance_order,
         )
 
-        acceptance_order_id = None
         for candidate_message_id in [old_dispatch_message_id, *old_dispatch_message_ids]:
             parsed_candidate_id = _to_int(candidate_message_id)
             if parsed_candidate_id is None:
@@ -6423,7 +6423,71 @@ async def resume_stored_order(
         inline=False
     )
 
+    resume_smart_dispatch = None
+    resume_allowed_role_ids: list[str] = []
+    resume_specified_staff_ids = [
+        str(item)
+        for item in (
+            data.get("specified_staff_ids")
+            or claim_data.get("specified_staff_ids")
+            or []
+        )
+        if str(item).strip()
+    ]
+    resume_unresolved_specified_ids = list(
+        resume_specified_staff_ids
+    )
+
+    if (
+        resume_status == "waiting_acceptance"
+        and acceptance_state is not None
+        and acceptance_order_id is not None
+    ):
+        try:
+            from services.order_rules import get_allowed_role_ids
+
+            resume_rule = _get_rule_from_self_service_data(
+                data
+            )
+            resume_allowed_role_ids = get_allowed_role_ids(
+                resume_rule
+            )
+            accepted_ids = {
+                str(claim.staff_discord_id)
+                for claim in acceptance_state.claims
+            }
+            resume_unresolved_specified_ids = [
+                staff_id
+                for staff_id in resume_specified_staff_ids
+                if staff_id not in accepted_ids
+            ]
+            remaining_count = max(
+                1,
+                int(acceptance_state.required_staff_count or 1)
+                - int(acceptance_state.accepted_count or 0),
+            )
+
+            resume_smart_dispatch = prepare_initial_smart_dispatch(
+                guild,
+                allowed_role_ids=resume_allowed_role_ids,
+                specified_staff_ids=resume_unresolved_specified_ids,
+                required_staff_count=remaining_count,
+                excluded_staff_ids=accepted_ids,
+            )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] resume prepare failed "
+                f"order_id={acceptance_order_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
     new_message = await dispatch_channel.send(
+        content=(
+            resume_smart_dispatch["content"]
+            if resume_smart_dispatch is not None
+            else None
+        ),
         embed=embed,
         view=DispatchClaimView(
             customer_id=customer_id or 0,
@@ -6438,7 +6502,7 @@ async def resume_stored_order(
         ),
         allowed_mentions=discord.AllowedMentions(
             users=True,
-            roles=False,
+            roles=resume_smart_dispatch is not None,
             everyone=False
         )
     )
@@ -6468,6 +6532,58 @@ async def resume_stored_order(
     ORDER_CLAIMS[new_message.id] = claim_data
     data["dispatch_message_id"] = new_message.id
     data["dispatch_channel_id"] = dispatch_channel.id
+
+    if (
+        resume_smart_dispatch is not None
+        and acceptance_order_id is not None
+        and acceptance_state is not None
+    ):
+        try:
+            create_smart_dispatch_plan(
+                order_id=int(acceptance_order_id),
+                dispatch_channel_id=dispatch_channel.id,
+                dispatch_message_id=new_message.id,
+                required_staff_count=int(
+                    acceptance_state.required_staff_count
+                    or 1
+                ),
+                allowed_role_ids=resume_allowed_role_ids,
+                specified_staff_ids=resume_specified_staff_ids,
+                ranked_candidate_ids=resume_smart_dispatch[
+                    "ranked_candidate_ids"
+                ],
+                notified_candidate_ids=resume_smart_dispatch[
+                    "initial_notified_ids"
+                ],
+                reset_existing=True,
+            )
+
+            if resume_unresolved_specified_ids:
+                dm_sent_ids, dm_failed_ids = (
+                    await send_specified_staff_dispatch_dms(
+                        guild,
+                        specified_staff_ids=resume_unresolved_specified_ids,
+                        category_label=str(category_label),
+                        item_label=str(item),
+                        required_staff_count=int(
+                            acceptance_state.required_staff_count
+                            or 1
+                        ),
+                        dispatch_jump_url=new_message.jump_url,
+                    )
+                )
+                set_specified_dm_results(
+                    int(acceptance_order_id),
+                    sent_ids=dm_sent_ids,
+                    failed_ids=dm_failed_ids,
+                )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] resume lifecycle failed "
+                f"order_id={acceptance_order_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     remember_order_data(order_channel.id, data)
     sync_web_order_status_from_bot(
@@ -14535,6 +14651,87 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     companion_preference = data.get("companion_preference") or "不指定陪玩/打手"
     customer_mention = f"<@{customer_id}>" if customer_id is not None else "未紀錄"
 
+    resend_status = "active"
+    resend_order_id = _to_int(
+        data.get("web_order_id"),
+        None,
+    )
+    resend_acceptance_state = None
+    resend_smart_dispatch = None
+    resend_allowed_role_ids: list[str] = []
+    resend_specified_staff_ids = [
+        str(item)
+        for item in data.get("specified_staff_ids") or []
+        if str(item).strip()
+    ]
+    resend_unresolved_specified_ids = list(
+        resend_specified_staff_ids
+    )
+
+    if (
+        str(data.get("status") or "").lower()
+        == "waiting_acceptance"
+        and resend_order_id is not None
+    ):
+        try:
+            from shared.order_acceptance import (
+                WAITING_ACCEPTANCE,
+                get_acceptance_state,
+            )
+            from services.order_rules import get_allowed_role_ids
+
+            resend_acceptance_state = get_acceptance_state(
+                int(resend_order_id)
+            )
+
+            if (
+                str(resend_acceptance_state.status)
+                == WAITING_ACCEPTANCE
+            ):
+                resend_status = WAITING_ACCEPTANCE
+                resend_rule = _get_rule_from_self_service_data(
+                    data
+                )
+                resend_allowed_role_ids = get_allowed_role_ids(
+                    resend_rule
+                )
+                accepted_ids = {
+                    str(claim.staff_discord_id)
+                    for claim in resend_acceptance_state.claims
+                }
+                resend_unresolved_specified_ids = [
+                    staff_id
+                    for staff_id in resend_specified_staff_ids
+                    if staff_id not in accepted_ids
+                ]
+                remaining_count = max(
+                    1,
+                    int(
+                        resend_acceptance_state.required_staff_count
+                        or 1
+                    )
+                    - int(
+                        resend_acceptance_state.accepted_count
+                        or 0
+                    ),
+                )
+                resend_smart_dispatch = (
+                    prepare_initial_smart_dispatch(
+                        guild,
+                        allowed_role_ids=resend_allowed_role_ids,
+                        specified_staff_ids=resend_unresolved_specified_ids,
+                        required_staff_count=remaining_count,
+                        excluded_staff_ids=accepted_ids,
+                    )
+                )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] resend prepare failed "
+                f"order_id={resend_order_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
     embed = build_self_service_order_embed(
         customer_mention=customer_mention,
         category_label=str(category_label),
@@ -14559,20 +14756,29 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
         source_channel_id=source_channel_id,
         companion_preference=companion_preference,
         locked=False,
-        status="active",
+        status=resend_status,
     )
 
     dispatch_message = await dispatch_channel.send(
+        content=(
+            resend_smart_dispatch["content"]
+            if resend_smart_dispatch is not None
+            else None
+        ),
         embed=embed,
         view=view,
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=resend_smart_dispatch is not None,
+            everyone=False,
+        ),
     )
 
     claim_data = {
         "companion": set(),
         "booster": set(),
         "locked": False,
-        "status": "active",
+        "status": resend_status,
         "customer_id": customer_id,
         "category_label": str(category_label),
         "item": item,
@@ -14591,7 +14797,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     data["payment_method"] = payment_method
     data["companion_preference"] = companion_preference
     data["closed"] = False
-    data["status"] = "active"
+    data["status"] = resend_status
     data["closed_at"] = None
     data["stored_at"] = None
     data["stored_by"] = None
@@ -14600,6 +14806,58 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     data["stored_note"] = None
     data["dispatch_channel_id"] = dispatch_channel.id
     data["dispatch_message_id"] = dispatch_message.id
+
+    if (
+        resend_smart_dispatch is not None
+        and resend_order_id is not None
+        and resend_acceptance_state is not None
+    ):
+        try:
+            create_smart_dispatch_plan(
+                order_id=int(resend_order_id),
+                dispatch_channel_id=dispatch_channel.id,
+                dispatch_message_id=dispatch_message.id,
+                required_staff_count=int(
+                    resend_acceptance_state.required_staff_count
+                    or 1
+                ),
+                allowed_role_ids=resend_allowed_role_ids,
+                specified_staff_ids=resend_specified_staff_ids,
+                ranked_candidate_ids=resend_smart_dispatch[
+                    "ranked_candidate_ids"
+                ],
+                notified_candidate_ids=resend_smart_dispatch[
+                    "initial_notified_ids"
+                ],
+                reset_existing=True,
+            )
+
+            if resend_unresolved_specified_ids:
+                dm_sent_ids, dm_failed_ids = (
+                    await send_specified_staff_dispatch_dms(
+                        guild,
+                        specified_staff_ids=resend_unresolved_specified_ids,
+                        category_label=str(category_label),
+                        item_label=item,
+                        required_staff_count=int(
+                            resend_acceptance_state.required_staff_count
+                            or 1
+                        ),
+                        dispatch_jump_url=dispatch_message.jump_url,
+                    )
+                )
+                set_specified_dm_results(
+                    int(resend_order_id),
+                    sent_ids=dm_sent_ids,
+                    failed_ids=dm_failed_ids,
+                )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] resend lifecycle failed "
+                f"order_id={resend_order_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     remember_order_data(source_channel_id, data)
     remember_claim_data(dispatch_message.id, claim_data)
