@@ -67,6 +67,13 @@
         </a>
 
         <a
+            class="{% if _p.startswith('/admin/system') %}active{% endif %}"
+            href="/admin/system"
+        >
+            系統健康
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/audit') %}active{% endif %}"
             href="/admin/audit"
         >
