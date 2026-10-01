@@ -773,6 +773,15 @@ async def revoke_play_voice_room_chat_access(
     if isinstance(panel_data, dict) and int(panel_data.get("owner_id") or 0) == member.id:
         return
 
+    if isinstance(panel_data, dict) and str(panel_data.get("room_type") or "") == "vip":
+        owner_id = int(panel_data.get("owner_id") or 0)
+        if owner_id and int(member.id) in get_vip_room_whitelist_user_ids(owner_id):
+            try:
+                await grant_vip_whitelist_access(voice_channel, member)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            return
+
     if member in voice_channel.members:
         return
 
