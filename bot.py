@@ -12520,6 +12520,36 @@ async def on_voice_state_update(
 
         return
 
+async def register_core_persistent_views_once() -> None:
+    """Register core persistent component views before READY.
+
+    Persistent views must be available even while on_ready is doing network
+    restore work (VIP panels, extension loading, command sync, etc.).
+    """
+    if getattr(bot, "_core_persistent_views_registered", False):
+        return
+
+    bot.add_view(MainPanelView())
+    bot.add_view(OrderControlView())
+    bot.add_view(StaffOrderOperationView())
+    bot.add_view(RecruitControlView())
+    bot.add_view(ComplaintPanelView())
+    bot.add_view(FeedbackPanelView())
+    bot.add_view(ComplaintResolveView())
+
+    bot._core_persistent_views_registered = True
+    print("[persistent-views] core views registered", flush=True)
+
+
+async def _bot_setup_hook() -> None:
+    await register_core_persistent_views_once()
+
+
+# discord.py calls setup_hook before READY. Registering persistent views here
+# prevents old ticket controls from depending on slow/failing on_ready work.
+bot.setup_hook = _bot_setup_hook
+
+
 @bot.event
 async def on_ready():
     # zYao 3C3B2R3 persistent CS view v1
@@ -12578,13 +12608,9 @@ async def on_ready():
 
     ensure_web_sync_event_worker_started()
     global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
-    bot.add_view(MainPanelView())
-    bot.add_view(OrderControlView())
-    bot.add_view(StaffOrderOperationView())
-    bot.add_view(RecruitControlView())
-    bot.add_view(ComplaintPanelView())
-    bot.add_view(FeedbackPanelView())
-    bot.add_view(ComplaintResolveView())
+    # setup_hook normally registers these before READY; keep this as a safe
+    # reconnect/fallback path without duplicate registration.
+    await register_core_persistent_views_once()
 
     if not getattr(bot, "_staff_profile_views_registered", False):
         ensure_staff_profile_tables()
@@ -12706,12 +12732,21 @@ async def on_ready():
 
     try:
         guild = discord.Object(id=GUILD_ID)
-        synced = await bot.tree.sync(guild=guild)
-        print(f"Slash commands synced: {len(synced)}")
+        synced = await asyncio.wait_for(
+            bot.tree.sync(guild=guild),
+            timeout=30,
+        )
+        print(f"Slash commands synced: {len(synced)}", flush=True)
+    except asyncio.TimeoutError:
+        print(
+            "Sync timeout: Discord command sync exceeded 30 seconds; "
+            "persistent views remain available.",
+            flush=True,
+        )
     except Exception as e:
-        print(f"Sync error: {e}")
+        print(f"Sync error: {e}", flush=True)
 
-    print(f"Logged in as {bot.user}")
+    print(f"Logged in as {bot.user}", flush=True)
 
 
 # ========= Slash 指令 =========
