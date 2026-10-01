@@ -196,6 +196,34 @@ def get_worker_assignment_metrics(
                     "last_assigned_at": row["last_assigned_at"],
                 }
 
+            if (
+                has_orders
+                and _table_exists(conn, "order_acceptance_claims")
+            ):
+                waiting_rows = conn.execute(
+                    f"""
+                    SELECT
+                        c.staff_discord_id,
+                        COUNT(*) AS waiting_count
+                    FROM order_acceptance_claims c
+                    JOIN web_orders o ON o.id = c.order_id
+                    WHERE c.is_active = 1
+                      AND o.status = 'waiting_acceptance'
+                      AND c.staff_discord_id IN ({placeholders})
+                    GROUP BY c.staff_discord_id
+                    """,
+                    ids,
+                ).fetchall()
+
+                for row in waiting_rows:
+                    worker_id = str(row["staff_discord_id"])
+                    if worker_id not in result:
+                        continue
+                    result[worker_id]["active_count"] = (
+                        int(result[worker_id].get("active_count") or 0)
+                        + int(row["waiting_count"] or 0)
+                    )
+
     except sqlite3.Error:
         return result
 
