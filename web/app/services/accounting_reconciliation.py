@@ -620,7 +620,8 @@ def _check_payouts(
             bot_order_no,
             status,
             amount,
-            payout_base_amount
+            payout_base_amount,
+            payment_method
         FROM web_orders
         WHERE LOWER(COALESCE(status, '')) IN (
             'active',
@@ -639,6 +640,22 @@ def _check_payouts(
         status = _normalize(order["status"]).lower()
         reference = _normalize(order["bot_order_no"]) or f"WEB-{order_id}"
 
+        stored_from_status = ""
+        if status == "stored" and _table_exists(web, "order_state_history"):
+            history_row = web.execute(
+                """
+                SELECT from_status
+                FROM order_state_history
+                WHERE order_id = ?
+                  AND to_status = 'stored'
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (order_id,),
+            ).fetchone()
+            if history_row is not None:
+                stored_from_status = _normalize(history_row["from_status"]).lower()
+
         assignments = [
             dict(row)
             for row in web.execute(
@@ -652,6 +669,29 @@ def _check_payouts(
                 (order_id,),
             ).fetchall()
         ]
+
+        payment_method = _normalize(order["payment_method"]).lower()
+        stored_was_prepay = (
+            status == "stored"
+            and (
+                stored_from_status in {
+                    "pending_cs_dispatch",
+                    "waiting_acceptance",
+                    "accepted_pending_pay",
+                }
+                or (
+                    not assignments
+                    and payment_method in {
+                        "",
+                        "待付款",
+                        "未紀錄",
+                        "未记录",
+                        "pending",
+                        "unpaid",
+                    }
+                )
+            )
+        )
 
         worker_payouts = [
             dict(row)
@@ -716,6 +756,9 @@ def _check_payouts(
             continue
 
         if status not in OPEN_ACCOUNTING_ORDER_STATUSES:
+            continue
+
+        if stored_was_prepay:
             continue
 
         worker_ids = [
