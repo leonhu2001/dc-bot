@@ -65,6 +65,9 @@ def _issue(
     detail: str,
     expected: Any = None,
     actual: Any = None,
+    order_id: int | None = None,
+    repair_action: str | None = None,
+    repair_block_reason: str | None = None,
 ) -> None:
     issues.append(
         {
@@ -76,6 +79,14 @@ def _issue(
             "detail": str(detail),
             "expected": expected,
             "actual": actual,
+            "order_id": int(order_id) if order_id is not None else None,
+            "repair_action": str(repair_action) if repair_action else None,
+            "repairable": bool(repair_action),
+            "repair_block_reason": (
+                str(repair_block_reason)
+                if repair_block_reason
+                else None
+            ),
         }
     )
 
