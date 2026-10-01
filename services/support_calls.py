@@ -185,6 +185,35 @@ def cancel_support_call(
         conn.commit()
 
 
+def close_support_calls_for_ticket(
+    ticket_channel_id: str | int,
+    *,
+    reason: str,
+    db_file: str | Path | None = None,
+) -> int:
+    ensure_support_call_tables(db_file)
+    now = _now_iso()
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        cur = conn.execute(
+            """
+            UPDATE support_calls
+            SET status = 'cancelled',
+                cancel_reason = ?,
+                updated_at = ?
+            WHERE ticket_channel_id = ?
+              AND status IN ('open', 'claimed')
+            """,
+            (
+                str(reason or "ticket_closed")[:500],
+                now,
+                str(ticket_channel_id),
+            ),
+        )
+        conn.commit()
+        return int(cur.rowcount or 0)
+
+
 def get_support_call(
     call_id: int,
     *,
