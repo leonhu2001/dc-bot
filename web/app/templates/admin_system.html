@@ -118,7 +118,9 @@
             </p>
 
             <p class="muted-text">
-                {% if health.git.dirty %}
+                {% if health.git.dirty is none %}
+                    Working tree 無法確認
+                {% elif health.git.dirty %}
                     Working tree 有未提交變更
                 {% else %}
                     Working tree 乾淨
@@ -385,7 +387,9 @@
         <div>
             <span>Working Tree</span>
             <strong>
-                {% if health.git.dirty %}
+                {% if health.git.dirty is none %}
+                    無法確認
+                {% elif health.git.dirty %}
                     有未提交變更
                 {% else %}
                     乾淨
