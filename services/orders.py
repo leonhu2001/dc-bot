@@ -668,11 +668,11 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
     return "｜".join(parts), payment_method
 
 
-def _resolve_guild_display_name_from_mention(
+def _resolve_guild_member_mention(
     source_channel: discord.TextChannel,
     mention_text: str | None,
 ) -> str:
-    """Prefer the member's current server display name over a raw mention/id."""
+    """Prefer a clickable guild member mention; keep the original mention as fallback."""
     text = str(mention_text or "").strip()
 
     if not text:
@@ -696,12 +696,7 @@ def _resolve_guild_display_name_from_mention(
     if member is None:
         return text
 
-    return str(
-        getattr(member, "display_name", None)
-        or getattr(member, "global_name", None)
-        or getattr(member, "name", None)
-        or text
-    )
+    return member.mention
 
 
 def build_self_service_order_embed(
@@ -728,7 +723,7 @@ def build_self_service_order_embed(
         color = discord.Color.green()
 
     ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
-    customer_text = _resolve_guild_display_name_from_mention(
+    customer_text = _resolve_guild_member_mention(
         source_channel,
         customer_mention,
     )
