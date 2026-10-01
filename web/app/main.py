@@ -22,6 +22,7 @@ from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
 from web.app.routers.admin_audit import router as admin_audit_router
 from web.app.routers.admin_system import router as admin_system_router
+from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
 from web.app.routers.admin_payout_summary import router as admin_payout_summary_router
 from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
@@ -53,6 +54,7 @@ _MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/wallets",
     "/admin/audit",
     "/admin/system",
+    "/admin/accounting-reconciliation",
     # 客服可以查看分潤與匯出資料；只有下列會改發放狀態的端點限總管。
     "/admin/payouts/summary/mark-paid",
     "/admin/payouts/summary/mark-unpaid",
@@ -388,6 +390,7 @@ app.include_router(admin_router)
 app.include_router(admin_staff_router)
 app.include_router(admin_audit_router)
 app.include_router(admin_system_router)
+app.include_router(admin_accounting_reconciliation_router)
 app.include_router(admin_payouts_router)
 app.include_router(admin_payout_summary_router)
 app.include_router(admin_payout_exports_router)
