@@ -309,3 +309,52 @@ def test_assignment_metrics_count_waiting_acceptance_claims(tmp_path):
     )
 
     assert metrics["WAITING"]["active_count"] == 1
+
+
+def test_prepare_recovery_can_exclude_already_accepted_candidates():
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+
+    class Member:
+        def __init__(self, member_id, role_ids):
+            self.id = member_id
+            self.bot = False
+            self.roles = [Role(role_id) for role_id in role_ids]
+
+    class Guild:
+        def __init__(self):
+            self.members = [
+                Member(1, [100]),
+                Member(2, [100]),
+                Member(3, [100]),
+                Member(4, [100]),
+            ]
+
+        def get_member(self, member_id):
+            return next(
+                (
+                    member
+                    for member in self.members
+                    if member.id == member_id
+                ),
+                None,
+            )
+
+        def get_role(self, role_id):
+            return None
+
+    result = __import__(
+        "views.smart_dispatch",
+        fromlist=["prepare_initial_smart_dispatch"],
+    ).prepare_initial_smart_dispatch(
+        Guild(),
+        allowed_role_ids=["100"],
+        specified_staff_ids=[],
+        required_staff_count=1,
+        excluded_staff_ids=["1"],
+        db_file="/tmp/does-not-exist-smart-dispatch.db",
+    )
+
+    assert "1" not in result["ranked_candidate_ids"]
+    assert "1" not in result["initial_notified_ids"]
