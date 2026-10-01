@@ -498,6 +498,7 @@ def test_recognize_historical_discount_updates_web_snapshot_only(
         assert order is not None
         order.status = "closed"
         order.store_absorbed_amount = 0
+        order.historical_discount_amount = 0
         order.payout_base_amount = 1152
 
         _create_wallet_history(
@@ -535,7 +536,8 @@ def test_recognize_historical_discount_updates_web_snapshot_only(
 
         assert order is not None
         assert order.customer_pay_amount == 652
-        assert order.store_absorbed_amount == 500
+        assert order.store_absorbed_amount == 0
+        assert order.historical_discount_amount == 500
         assert order.payout_base_amount == 1152
         assert result["discount_amount"] == 500
         assert "錢包與既有分潤皆未修改" in result["message"]
