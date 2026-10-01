@@ -1,0 +1,150 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<style>
+.customer-orders-shell{width:min(1180px,calc(100% - 32px));margin:42px auto 90px}
+.customer-orders-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:24px}
+.customer-orders-head h1{margin:6px 0 0;font-size:clamp(32px,5vw,52px)}
+.customer-orders-head p{margin:10px 0 0;color:rgba(235,232,222,.62)}
+.customer-orders-actions{display:flex;gap:10px;flex-wrap:wrap}
+.customer-order-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0}
+.customer-order-stat{padding:20px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:rgba(255,255,255,.025)}
+.customer-order-stat small{display:block;color:rgba(235,232,222,.5);letter-spacing:.12em}
+.customer-order-stat strong{display:block;margin-top:8px;font-size:30px}
+.customer-order-section{margin-top:28px}
+.customer-order-section-head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:12px}
+.customer-order-list{display:grid;gap:12px}
+.customer-order-card{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(150px,.7fr) auto;gap:18px;align-items:center;padding:20px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:rgba(255,255,255,.025);color:inherit;text-decoration:none}
+.customer-order-card:hover{border-color:rgba(223,183,92,.42);background:rgba(223,183,92,.055)}
+.customer-order-main small,.customer-order-meta small{display:block;color:rgba(235,232,222,.48);font-size:11px}
+.customer-order-main strong{display:block;margin:6px 0;font-size:18px}
+.customer-order-main span,.customer-order-meta span{color:rgba(235,232,222,.64);font-size:13px}
+.customer-order-meta strong{display:block;margin-top:5px}
+.customer-order-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.customer-order-status{padding:6px 10px;border-radius:999px;border:1px solid rgba(223,183,92,.28);font-size:12px}
+.customer-order-status.is-open{color:#dfb75c;background:rgba(223,183,92,.08)}
+.customer-order-empty{padding:34px;border:1px dashed rgba(255,255,255,.12);border-radius:18px;text-align:center;color:rgba(235,232,222,.58)}
+@media(max-width:820px){.customer-orders-head{align-items:flex-start;flex-direction:column}.customer-order-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-order-card{grid-template-columns:1fr}.customer-order-side{align-items:flex-start}}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="customer-orders-shell">
+    <div class="customer-orders-head">
+        <div>
+            <div class="section-eyebrow">MY ORDERS</div>
+            <h1>我的訂單</h1>
+            <p>查看目前進度、付款審核、客服處理與歷史訂單。</p>
+        </div>
+
+        <div class="customer-orders-actions">
+            <a class="button button-secondary" href="/me">返回我的專區</a>
+            <a class="button button-primary" href="/order">再次點單</a>
+        </div>
+    </div>
+
+    <div class="customer-order-stats">
+        <article class="customer-order-stat">
+            <small>OPEN</small>
+            <strong>{{ portal.open_count }}</strong>
+            <span>目前進行中</span>
+        </article>
+        <article class="customer-order-stat">
+            <small>PAYMENT</small>
+            <strong>{{ portal.pending_payment_count }}</strong>
+            <span>等待付款 / 審核</span>
+        </article>
+        <article class="customer-order-stat">
+            <small>SUPPORT</small>
+            <strong>{{ portal.support_waiting_count }}</strong>
+            <span>客服鈴處理中</span>
+        </article>
+        <article class="customer-order-stat">
+            <small>ALL</small>
+            <strong>{{ portal.total_count }}</strong>
+            <span>全部訂單</span>
+        </article>
+    </div>
+
+    <section class="customer-order-section">
+        <div class="customer-order-section-head">
+            <div>
+                <div class="section-eyebrow">CURRENT</div>
+                <h2>目前訂單</h2>
+            </div>
+        </div>
+
+        {% if portal.open_orders %}
+            <div class="customer-order-list">
+                {% for order in portal.open_orders %}
+                    <a class="customer-order-card" href="/me/orders/{{ order.id }}">
+                        <div class="customer-order-main">
+                            <small>{{ order.order_no }}</small>
+                            <strong>{{ order.item }}</strong>
+                            <span>{{ order.category }} · {{ order.created_at }}</span>
+                        </div>
+                        <div class="customer-order-meta">
+                            <small>付款</small>
+                            <strong>
+                                {% if order.payment %}
+                                    {{ order.payment.status_label }}
+                                {% else %}
+                                    {{ order.payment_method }}
+                                {% endif %}
+                            </strong>
+                            {% if order.support and order.support.status in ['open','claimed'] %}
+                                <span>客服：{{ order.support.status_label }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="customer-order-side">
+                            <span class="customer-order-status is-open">{{ order.status_label }}</span>
+                            <strong>{{ order.amount_text }}</strong>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="customer-order-empty">目前沒有進行中的訂單。</div>
+        {% endif %}
+    </section>
+
+    <section class="customer-order-section">
+        <div class="customer-order-section-head">
+            <div>
+                <div class="section-eyebrow">HISTORY</div>
+                <h2>歷史訂單</h2>
+            </div>
+        </div>
+
+        {% if portal.history_orders %}
+            <div class="customer-order-list">
+                {% for order in portal.history_orders %}
+                    <a class="customer-order-card" href="/me/orders/{{ order.id }}">
+                        <div class="customer-order-main">
+                            <small>{{ order.order_no }}</small>
+                            <strong>{{ order.item }}</strong>
+                            <span>{{ order.category }} · {{ order.created_at }}</span>
+                        </div>
+                        <div class="customer-order-meta">
+                            <small>服務人員</small>
+                            <strong>
+                                {% if order.assignments %}
+                                    {{ order.assignments | map(attribute='worker_display_name') | join('、') }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </strong>
+                        </div>
+                        <div class="customer-order-side">
+                            <span class="customer-order-status">{{ order.status_label }}</span>
+                            <strong>{{ order.amount_text }}</strong>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="customer-order-empty">目前沒有歷史訂單。</div>
+        {% endif %}
+    </section>
+</section>
+{% endblock %}
