@@ -4,6 +4,10 @@ from sqlalchemy import select
 
 from shared.db import SessionLocal
 from shared.models import WebOrder
+from shared.order_state import (
+    normalize_order_status,
+    transition_order_state_in_connection,
+)
 
 
 
@@ -158,6 +162,7 @@ def update_web_order_status_by_ticket_channel(
     status: str,
     dispatch_message_id=None,
     note: str | None = None,
+    source: str = "discord_web_sync",
 ) -> bool:
     """Update dashboard order status from Discord bot lifecycle actions."""
     ticket_channel_id_text = _to_text_id(ticket_channel_id)
@@ -177,12 +182,20 @@ def update_web_order_status_by_ticket_channel(
         if order is None:
             return False
 
-        next_status = str(status or "active")
+        next_status = normalize_order_status(status or "active")
 
-        order.status = next_status
+        transition_order_state_in_connection(
+            db.connection(),
+            order_id=int(order.id),
+            target_status=next_status,
+            source=source,
+            reason=note or "Discord lifecycle 同步",
+        )
+        db.expire(order, ["status"])
 
-        if next_status in {"closed", "cancelled", "canceled"} and not getattr(order, "closed_at", None):
+        if next_status in {"closed", "cancelled"} and not getattr(order, "closed_at", None):
             order.closed_at = _web_order_closed_at_now()
+
         dispatch_message_id_text = _to_text_id(dispatch_message_id)
         if dispatch_message_id_text:
             order.dispatch_message_id = dispatch_message_id_text
