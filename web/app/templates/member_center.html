@@ -23,7 +23,7 @@
             <div class="member-profile-copy">
 
                 <div class="section-eyebrow">
-                    MEMBER CENTER
+                    MY PORTAL
                 </div>
 
                 <h1>
@@ -88,6 +88,17 @@
 
             <a
                 class="member-action-card"
+                href="/me/orders"
+            >
+                <small>ORDERS</small>
+                <strong>我的訂單</strong>
+                <span>
+                    查看目前進度、付款與歷史 →
+                </span>
+            </a>
+
+            <a
+                class="member-action-card"
                 href="/order"
             >
                 <small>ORDER</small>
@@ -126,6 +137,28 @@
 
 
     <div class="member-stat-grid">
+
+        <article class="member-stat-card">
+            <small>
+                ACTIVE ORDERS
+            </small>
+
+            <strong>
+                {{ portal.open_count }}
+            </strong>
+
+            <span>
+                目前進行中的訂單
+            </span>
+
+            <a
+                href="/me/orders"
+                class="button button-primary"
+                style="min-height:34px;padding:0 14px;margin-top:14px;border-radius:10px;font-size:12px;"
+            >
+                查看我的訂單
+            </a>
+        </article>
 
         <article class="member-stat-card">
             <small>
@@ -258,8 +291,8 @@
                     </h3>
                 </div>
 
-                <a href="/order">
-                    去點單 →
+                <a href="/me/orders">
+                    查看全部 →
                 </a>
             </div>
 
@@ -269,7 +302,11 @@
 
                     {% for order in member.recent_orders %}
 
-                        <article class="member-order-row">
+                        <a
+                            class="member-order-row"
+                            href="/me/orders/{{ order.id }}"
+                            style="color:inherit;text-decoration:none;"
+                        >
 
                             <div>
                                 <small>
@@ -297,7 +334,7 @@
                                 </strong>
                             </div>
 
-                        </article>
+                        </a>
 
                     {% endfor %}
 

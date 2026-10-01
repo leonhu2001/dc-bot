@@ -445,10 +445,10 @@ html {
                             </div>
 
                             <a href="/me">
-                                個人中心
+                                我的專區
                             </a>
 
-                            <a href="/me#orders">
+                            <a href="/me/orders">
                                 我的訂單
                             </a>
 
@@ -525,7 +525,8 @@ html {
             <a href="/#about">關於我們</a>
 
             {% if user %}
-                <a href="/me">個人中心</a>
+                <a href="/me">我的專區</a>
+                <a href="/me/orders">我的訂單</a>
 
                 {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
                     <a href="/employee">員工中心</a>
@@ -586,7 +587,8 @@ html {
                 </strong>
 
                 {% if user %}
-                    <a href="/me">個人中心</a>
+                    <a href="/me">我的專區</a>
+                    <a href="/me/orders">我的訂單</a>
                 {% else %}
                     <a href="/auth/discord/login">
                         Discord 登入

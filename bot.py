@@ -11714,6 +11714,15 @@ class OrderControlView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(OrderControlSelect())
         self.add_item(SupportCallButton())
+        self.add_item(
+            discord.ui.Button(
+                label="我的訂單",
+                emoji="📋",
+                style=discord.ButtonStyle.link,
+                url="https://mowanentertainment.com/me/orders",
+                row=1,
+            )
+        )
 
     @discord.ui.button(
         label="確認",
