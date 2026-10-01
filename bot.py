@@ -3674,7 +3674,7 @@ async def process_acceptance_sync_events_once() -> None:
     from sqlalchemy import select
 
     from shared.db import SessionLocal
-    from shared.models import SyncEvent, SyncEventStatus, SyncEventType
+    from shared.models import SyncEvent, SyncEventStatus, SyncEventType, WebOrder
 
     guild = bot.get_guild(GUILD_ID)
 
@@ -3712,6 +3712,41 @@ async def process_acceptance_sync_events_once() -> None:
 
             try:
                 await refresh_acceptance_dispatch_from_web_order(guild, int(event.order_id))
+
+                if event.event_type == SyncEventType.ORDER_UNCLAIMED.value:
+                    worker_id = _to_int(payload.get("worker_discord_id"))
+                    order = db.get(WebOrder, int(event.order_id))
+                    ticket_channel_id = (
+                        _to_int(order.ticket_channel_id)
+                        if order is not None
+                        else None
+                    )
+
+                    if worker_id is not None and ticket_channel_id is not None:
+                        member = guild.get_member(worker_id)
+
+                        if member is None:
+                            try:
+                                fetched_member = await guild.fetch_member(worker_id)
+                                member = (
+                                    fetched_member
+                                    if isinstance(fetched_member, discord.Member)
+                                    else None
+                                )
+                            except (
+                                discord.NotFound,
+                                discord.Forbidden,
+                                discord.HTTPException,
+                            ):
+                                member = None
+
+                        if member is not None:
+                            await revoke_order_ticket_access(
+                                guild,
+                                ticket_channel_id,
+                                member,
+                            )
+
                 event.status = SyncEventStatus.DONE.value
                 event.error_message = None
                 event.processed_at = datetime.utcnow()
