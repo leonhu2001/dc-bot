@@ -128,7 +128,12 @@ echo "=== 4. PYTHON COMPILE CHECK ==="
 echo "PASS: Python compile"
 echo
 
-echo "=== 5. OPTIONAL VPS TESTS ==="
+echo "=== 5. ENSURE DATABASE TABLES ==="
+runuser -u dc-bot-web -- env PYTHONPATH="$APP" \
+    "$APP/venv/bin/python" -c "from shared.db import create_all_tables; create_all_tables(); print('PASS: database tables ready')"
+echo
+
+echo "=== 6. OPTIONAL VPS TESTS ==="
 if /opt/dc-bot/venv/bin/python -c "import pytest" >/dev/null 2>&1; then
     /opt/dc-bot/venv/bin/python -m pytest -q
 else
@@ -136,7 +141,7 @@ else
 fi
 
 echo
-echo "=== 6. RESTART SERVICES ==="
+echo "=== 7. RESTART SERVICES ==="
 systemctl restart "$BOT_SERVICE"
 systemctl restart "$WEB_SERVICE"
 sleep 3
@@ -160,7 +165,7 @@ if [ "$WEB_STATE" != "active" ]; then
 fi
 
 echo
-echo "=== 7. HTTP SMOKE CHECK ==="
+echo "=== 8. HTTP SMOKE CHECK ==="
 curl --fail --silent --show-error \
     --retry 5 \
     --retry-delay 1 \
@@ -170,7 +175,7 @@ curl --fail --silent --show-error \
 echo
 echo
 
-echo "=== 8. WRITE DEPLOYMENT MARKER ==="
+echo "=== 9. WRITE DEPLOYMENT MARKER ==="
 SUBJECT="$(git log -1 --format=%s "$TARGET")"
 mkdir -p "$APP/data"
 
@@ -204,7 +209,7 @@ chmod 0644 "$APP/data/deployed_version.json"
 echo "PASS: deployment marker written"
 echo
 
-echo "=== 9. FINAL CHECK ==="
+echo "=== 10. FINAL CHECK ==="
 echo "HEAD: $(git rev-parse HEAD)"
 echo "Bot:  $(systemctl is-active "$BOT_SERVICE")"
 echo "Web:  $(systemctl is-active "$WEB_SERVICE")"

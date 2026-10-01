@@ -927,7 +927,6 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
                     )
                 else:
                     order_id = int(order.id)
-                    order.status = "closed"
 
                     if not getattr(order, "closed_at", None):
                         order.closed_at = datetime.utcnow() + timedelta(hours=8)
@@ -3858,16 +3857,21 @@ async def restore_acceptance_payment_panel_for_order(
         save_bot_data()
 
         if current_status != ACCEPTED_PENDING_PAY:
-            conn.execute(
-                """
-                UPDATE web_orders
-                SET status = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (ACCEPTED_PENDING_PAY, int(order_id)),
+            from shared.order_state import (
+                WAITING_ACCEPTANCE,
+                transition_order_state,
             )
-            conn.commit()
+
+            transition_order_state(
+                order_id=int(order_id),
+                target_status=ACCEPTED_PENDING_PAY,
+                source="payment_panel_repair",
+                reason=f"付款 panel 修復：{reason}",
+                expected_statuses={
+                    WAITING_ACCEPTANCE,
+                    ACCEPTED_PENDING_PAY,
+                },
+            )
 
         progress_text = ""
         if accepted_count is not None and required_count is not None:
@@ -15931,104 +15935,75 @@ def _web_cs_set_status(
     *,
     cs_user=None,
 ):
-    """更新官網訂單 bridge 狀態；客服確認時同時綁定對接客服。"""
-    import sqlite3
+    """更新官網訂單 bridge 狀態；所有 lifecycle 變更統一走中央狀態機。"""
+    from sqlalchemy import text
 
-    conn = sqlite3.connect(
-        _web_dashboard_db_path_for_bot(),
-        timeout=15,
-    )
+    from shared.db import engine
+    from shared.order_state import transition_order_state_in_connection
 
-    try:
-        conn.execute(
-            "BEGIN IMMEDIATE"
-        )
+    cs_id = ""
+    cs_name = ""
 
-        if cs_user is None:
-
-            conn.execute(
-                """
-                UPDATE web_orders
-                SET status = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (
-                    str(status),
-                    int(order_id),
-                ),
+    if cs_user is not None:
+        cs_id = str(
+            getattr(
+                cs_user,
+                "id",
+                "",
             )
+            or ""
+        ).strip()
 
-        else:
-
-            cs_id = str(
-                getattr(
-                    cs_user,
-                    "id",
-                    "",
-                )
-                or ""
-            ).strip()
-
-            cs_name = str(
-                getattr(
-                    cs_user,
-                    "display_name",
-                    None,
-                )
-                or getattr(
-                    cs_user,
-                    "global_name",
-                    None,
-                )
-                or getattr(
-                    cs_user,
-                    "name",
-                    None,
-                )
-                or cs_id
-            ).strip()
-
-            conn.execute(
-                """
-                UPDATE web_orders
-                SET status = ?,
-                    customer_service_discord_id = ?,
-                    customer_service_display_name = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (
-                    str(status),
-                    cs_id or None,
-                    cs_name or None,
-                    int(order_id),
-                ),
+        cs_name = str(
+            getattr(
+                cs_user,
+                "display_name",
+                None,
             )
+            or getattr(
+                cs_user,
+                "global_name",
+                None,
+            )
+            or getattr(
+                cs_user,
+                "name",
+                None,
+            )
+            or cs_id
+        ).strip()
 
-        conn.execute(
-            """
-            UPDATE order_acceptance_meta
-            SET status = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE order_id = ?
-            """,
-            (
-                str(status),
-                int(order_id),
+    with engine.begin() as conn:
+        transition_order_state_in_connection(
+            conn,
+            order_id=int(order_id),
+            target_status=str(status),
+            source=(
+                "website_cs_dispatch"
+                if cs_user is not None
+                else "website_cs_lifecycle"
             ),
+            reason=f"客服流程更新狀態為 {status}",
+            actor_discord_id=cs_id or None,
         )
 
-        conn.commit()
-
-    except Exception:
-
-        conn.rollback()
-        raise
-
-    finally:
-
-        conn.close()
+        if cs_user is not None:
+            conn.execute(
+                text(
+                    """
+                    UPDATE web_orders
+                    SET customer_service_discord_id = :cs_id,
+                        customer_service_display_name = :cs_name,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :order_id
+                    """
+                ),
+                {
+                    "cs_id": cs_id or None,
+                    "cs_name": cs_name or None,
+                    "order_id": int(order_id),
+                },
+            )
 
 
 async def _web_cs_ensure_review_panel(
@@ -16653,56 +16628,28 @@ class WebsiteOrderCsConfirmView(
 
         await interaction.response.defer(ephemeral=True)
 
-        conn = sqlite3.connect(
-            _web_dashboard_db_path_for_bot(),
-            timeout=15,
-        )
-
         try:
-            conn.execute("BEGIN IMMEDIATE")
-
-            cursor = conn.execute(
-                """
-                UPDATE web_orders
-                SET status = 'cancelled',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                  AND status = 'pending_cs_dispatch'
-                  AND (
-                      dispatch_message_id IS NULL
-                      OR TRIM(dispatch_message_id) = ''
-                  )
-                """,
-                (int(order_id),),
+            from shared.order_state import (
+                CANCELLED,
+                PENDING_CS_DISPATCH,
+                transition_order_state,
             )
 
-            if int(cursor.rowcount or 0) != 1:
-                conn.rollback()
-                await interaction.followup.send(
-                    "取消前訂單狀態已被其他操作更新，請重新確認目前狀態。",
-                    ephemeral=True,
-                )
-                return
-
-            try:
-                conn.execute(
-                    """
-                    UPDATE order_acceptance_meta
-                    SET status = 'cancelled',
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE order_id = ?
-                    """,
-                    (int(order_id),),
-                )
-            except sqlite3.OperationalError:
-                pass
-
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+            transition_order_state(
+                order_id=int(order_id),
+                target_status=CANCELLED,
+                source="website_pending_cancel",
+                reason="客服從待確認面板取消網站訂單",
+                actor_discord_id=getattr(interaction.user, "id", None),
+                expected_statuses={PENDING_CS_DISPATCH},
+                require_empty_dispatch_message=True,
+            )
+        except ValueError:
+            await interaction.followup.send(
+                "取消前訂單狀態已被其他操作更新，或已產生派單訊息，請重新確認目前狀態。",
+                ephemeral=True,
+            )
+            return
 
         SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
 

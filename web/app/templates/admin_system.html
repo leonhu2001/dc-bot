@@ -227,6 +227,17 @@
         </div>
 
         <div>
+            <span>訂單狀態不同步</span>
+            <strong>
+                {% if health.metrics.order_state_drift is not none %}
+                    {{ health.metrics.order_state_drift }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
             <span>負數錢包</span>
             <strong>
                 {% if health.metrics.negative_wallets is not none %}

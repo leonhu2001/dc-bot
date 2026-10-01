@@ -8,6 +8,9 @@ from shared.db import Base
 
 
 class OrderStatus(str, Enum):
+    PENDING_CS_DISPATCH = "pending_cs_dispatch"
+    WAITING_ACCEPTANCE = "waiting_acceptance"
+    ACCEPTED_PENDING_PAY = "accepted_pending_pay"
     ACTIVE = "active"
     STORED = "stored"
     CLOSED = "closed"
@@ -241,6 +244,21 @@ class SyncEvent(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class OrderStateHistory(Base):
+    __tablename__ = "order_state_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    from_status: Mapped[str] = mapped_column(String(30))
+    to_status: Mapped[str] = mapped_column(String(30))
+    source: Mapped[str] = mapped_column(String(80))
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_discord_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class AdminAuditLog(Base):

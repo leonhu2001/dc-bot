@@ -53,6 +53,10 @@ jobs:
         run: |
           python -m compileall -q             bot.py             cogs             core             services             shared             web/app
 
+      - name: Validate deploy shell
+        run: |
+          bash -n scripts/deploy_main.sh
+
       - name: Run test suite
         run: |
           python -m pytest -q
