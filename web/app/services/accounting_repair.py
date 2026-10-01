@@ -209,14 +209,9 @@ def _recognize_historical_discount(
     discount_amount = int(
         current_customer_pay - actual_customer_pay
     )
-    old_store_absorbed = int(
-        order.store_absorbed_amount
+    old_historical_discount = int(
+        getattr(order, "historical_discount_amount", None)
         or 0
-    )
-    amount_basis = int(order.amount or current_customer_pay or 0)
-    total_store_absorbed = max(
-        old_store_absorbed,
-        max(0, amount_basis - actual_customer_pay),
     )
 
     before = {
@@ -232,12 +227,12 @@ def _recognize_historical_discount(
             else None
         ),
         "customer_pay_amount": current_customer_pay,
-        "store_absorbed_amount": old_store_absorbed,
+        "historical_discount_amount": old_historical_discount,
         "wallet_net": actual_net,
     }
 
     order.customer_pay_amount = actual_customer_pay
-    order.store_absorbed_amount = total_store_absorbed
+    order.historical_discount_amount = discount_amount
     db.flush()
 
     after = {
@@ -253,7 +248,7 @@ def _recognize_historical_discount(
             else None
         ),
         "customer_pay_amount": actual_customer_pay,
-        "store_absorbed_amount": total_store_absorbed,
+        "historical_discount_amount": discount_amount,
         "wallet_net": actual_net,
         "recognized_discount_amount": discount_amount,
     }
