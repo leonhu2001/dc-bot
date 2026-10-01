@@ -277,44 +277,87 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                 age = plan_age_seconds(plan)
                 stage = int(plan.get("stage") or 0)
+                required_count = max(1, int(state.required_staff_count or 1))
+                accepted_ids = {
+                    str(claim.staff_discord_id)
+                    for claim in state.claims
+                }
+                specified_ids = {
+                    str(item)
+                    for item in (plan.get("specified_staff_ids") or [])
+                }
+                unresolved_specified = sorted(specified_ids - accepted_ids)
+                unrestricted_total = max(0, required_count - len(specified_ids))
+                accepted_unrestricted = sum(
+                    1
+                    for worker_id in accepted_ids
+                    if worker_id not in specified_ids
+                )
+                unrestricted_missing = max(
+                    0,
+                    unrestricted_total - accepted_unrestricted,
+                )
                 missing = max(
                     0,
-                    int(state.required_staff_count or 1) - int(state.accepted_count or 0),
+                    required_count - int(state.accepted_count or 0),
                 )
                 jump_url = (
                     f"https://discord.com/channels/{guild.id}/{channel_id}/{message_id}"
                 )
 
-                # 如果 Bot 曾離線到超過完整擴大時間，直接做最終全資格通知，
+                # 如果 Bot 曾離線到超過完整擴大時間，直接做最終通知，
                 # 避免重啟瞬間連發第二輪 + 第三輪兩則提醒。
                 if age >= FULL_EXPANSION_SECONDS and stage < 2:
-                    mentions = _role_mentions(
-                        guild,
-                        plan.get("allowed_role_ids") or [],
+                    role_mentions = (
+                        _role_mentions(
+                            guild,
+                            plan.get("allowed_role_ids") or [],
+                        )
+                        if unrestricted_missing > 0
+                        else []
                     )
 
-                    if mentions:
-                        try:
-                            await channel.send(
-                                "⚠️ **派單仍缺人**\n"
-                                f"WEB-{order_id} 目前仍缺 **{missing} 人**。\n"
-                                "已擴大通知全部符合資格身分組："
-                                + " ".join(mentions)
-                                + "\n"
-                                f"原派單：{jump_url}",
-                                allowed_mentions=discord.AllowedMentions(
-                                    users=False,
-                                    roles=True,
-                                    everyone=False,
-                                ),
+                    lines = [
+                        "⚠️ **派單仍缺人｜最終擴大通知**",
+                        f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
+                    ]
+
+                    if unresolved_specified:
+                        lines.append(
+                            "尚未接單的指定人員："
+                            + " ".join(
+                                f"<@{worker_id}>"
+                                for worker_id in unresolved_specified
                             )
-                        except (discord.Forbidden, discord.HTTPException) as exc:
-                            mark_smart_dispatch_stage(
-                                order_id,
-                                stage=stage,
-                                last_error=f"full_expansion: {type(exc).__name__}: {exc}",
-                            )
-                            continue
+                        )
+                        lines.append(
+                            "指定名額不可由其他人直接代接；若需更換指定，請由客服調整訂單。"
+                        )
+
+                    if role_mentions:
+                        lines.append(
+                            "剩餘非指定名額已擴大通知全部符合資格身分組："
+                            + " ".join(role_mentions)
+                        )
+
+                    lines.append(f"原派單：{jump_url}")
+
+                    try:
+                        await channel.send(
+                            "\n".join(lines),
+                            allowed_mentions=discord.AllowedMentions(
+                                users=True,
+                                roles=bool(role_mentions),
+                                everyone=False,
+                            ),
+                        )
+                    except (discord.Forbidden, discord.HTTPException) as exc:
+                        mark_smart_dispatch_stage(
+                            order_id,
+                            stage=stage,
+                            last_error=f"full_expansion: {type(exc).__name__}: {exc}",
+                        )
+                        continue
 
                     complete_smart_dispatch_plan(
                         order_id,
@@ -323,31 +366,56 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     continue
 
                 if age >= FIRST_EXPANSION_SECONDS and stage < 1:
-                    accepted_ids = {
-                        str(claim.staff_discord_id)
-                        for claim in state.claims
-                    }
+                    next_ids = []
 
-                    next_ids = [
-                        worker_id
-                        for worker_id in next_candidate_batch(
-                            plan.get("ranked_candidate_ids") or [],
-                            plan.get("notified_candidate_ids") or [],
-                            required_staff_count=int(
-                                plan.get("required_staff_count") or state.required_staff_count or 1
-                            ),
-                        )
-                        if worker_id not in accepted_ids
-                    ]
+                    if unrestricted_missing > 0:
+                        next_ids = [
+                            worker_id
+                            for worker_id in next_candidate_batch(
+                                plan.get("ranked_candidate_ids") or [],
+                                plan.get("notified_candidate_ids") or [],
+                                required_staff_count=unrestricted_missing,
+                            )
+                            if (
+                                worker_id not in accepted_ids
+                                and worker_id not in specified_ids
+                            )
+                        ]
 
-                    if next_ids:
+                    reminder_ids = list(dict.fromkeys([
+                        *unresolved_specified,
+                        *next_ids,
+                    ]))
+
+                    if reminder_ids:
+                        lines = [
+                            "🔔 **派單仍缺人｜第二輪通知**",
+                            f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
+                        ]
+
+                        if unresolved_specified:
+                            lines.append(
+                                "指定人員提醒："
+                                + " ".join(
+                                    f"<@{worker_id}>"
+                                    for worker_id in unresolved_specified
+                                )
+                            )
+
+                        if next_ids:
+                            lines.append(
+                                "剩餘名額通知："
+                                + " ".join(
+                                    f"<@{worker_id}>"
+                                    for worker_id in next_ids
+                                )
+                            )
+
+                        lines.append(f"原派單：{jump_url}")
+
                         try:
                             await channel.send(
-                                "🔔 **派單仍缺人｜第二輪通知**\n"
-                                f"WEB-{order_id} 目前仍缺 **{missing} 人**。\n"
-                                + " ".join(f"<@{worker_id}>" for worker_id in next_ids)
-                                + "\n"
-                                f"原派單：{jump_url}",
+                                "\n".join(lines),
                                 allowed_mentions=discord.AllowedMentions(
                                     users=True,
                                     roles=False,
