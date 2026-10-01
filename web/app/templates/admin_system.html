@@ -1,0 +1,416 @@
+{% extends "layout.html" %}
+
+{% block page_title %}系統健康中心{% endblock %}
+
+{% block content %}
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+
+        <div>
+            <h2>系統總覽</h2>
+            <p class="muted-text">
+                最後檢查：{{ health.checked_at }} ｜ Web PID：{{ health.process_pid }}
+            </p>
+        </div>
+
+        <div>
+            <span class="status-chip {% if health.overall == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
+                {{ health.overall_text }}
+            </span>
+
+            <a class="button secondary" href="/admin/system">
+                重新檢查
+            </a>
+        </div>
+
+    </div>
+
+
+    {% if health.alerts %}
+
+        <div class="admin-order-list compact-list">
+
+            {% for alert in health.alerts %}
+
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">
+                                {% if alert.severity == 'critical' %}
+                                    需要處理
+                                {% else %}
+                                    注意事項
+                                {% endif %}
+                            </p>
+
+                            <h3>{{ alert.message }}</h3>
+                        </div>
+
+                        <span class="status-chip {% if alert.severity == 'critical' %}is-unpaid{% else %}{% endif %}">
+                            {{ alert.severity }}
+                        </span>
+                    </div>
+                </article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="empty-state">
+            目前沒有偵測到系統異常。
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>服務狀態</h2>
+
+    <div class="payout-stat-grid">
+
+        {% for service_key, service in health.services.items() %}
+
+            <div class="payout-stat-card">
+                <span>
+                    {% if service_key == 'bot' %}
+                        Discord Bot
+                    {% else %}
+                        Web Dashboard
+                    {% endif %}
+                </span>
+
+                <strong>
+                    {{ service.status_text }}
+                </strong>
+
+                <p class="muted-text">
+                    {{ service.active_state }} / {{ service.sub_state }}
+                </p>
+
+                <p class="muted-text">
+                    運行時間：{{ service.uptime_text }}
+                </p>
+
+                <p class="muted-text">
+                    PID：{{ service.main_pid }} ｜ 重啟：{{ service.restarts }}
+                </p>
+            </div>
+
+        {% endfor %}
+
+
+        <div class="payout-stat-card">
+            <span>Git 部署版本</span>
+
+            <strong>
+                {{ health.git.commit }}
+            </strong>
+
+            <p class="muted-text">
+                Branch：{{ health.git.branch }}
+            </p>
+
+            <p class="muted-text">
+                {% if health.git.dirty %}
+                    Working tree 有未提交變更
+                {% else %}
+                    Working tree 乾淨
+                {% endif %}
+            </p>
+        </div>
+
+
+        <div class="payout-stat-card">
+            <span>資料庫完整性</span>
+
+            <strong>
+                {% if health.databases.bot.ok and health.databases.web.ok %}
+                    2 / 2 正常
+                {% else %}
+                    需要檢查
+                {% endif %}
+            </strong>
+
+            <p class="muted-text">
+                Bot：{{ health.databases.bot.integrity }}
+            </p>
+
+            <p class="muted-text">
+                Web：{{ health.databases.web.integrity }}
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>營運待處理與異常</h2>
+
+    <div class="order-meta compact-meta">
+
+        <div>
+            <span>待付款審核</span>
+            <strong>
+                {% if health.metrics.payment_pending is not none %}
+                    {{ health.metrics.payment_pending }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>儲值待審核</span>
+            <strong>
+                {% if health.metrics.topup_pending is not none %}
+                    {{ health.metrics.topup_pending }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>目前開放訂單</span>
+            <strong>
+                {% if health.metrics.open_orders is not none %}
+                    {{ health.metrics.open_orders }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>同步待處理</span>
+            <strong>
+                {% if health.metrics.sync_backlog is not none %}
+                    {{ health.metrics.sync_backlog }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>付款套用錯誤</span>
+            <strong>
+                {% if health.metrics.payment_apply_error is not none %}
+                    {{ health.metrics.payment_apply_error }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>同步失敗</span>
+            <strong>
+                {% if health.metrics.sync_failed is not none %}
+                    {{ health.metrics.sync_failed }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>負數錢包</span>
+            <strong>
+                {% if health.metrics.negative_wallets is not none %}
+                    {{ health.metrics.negative_wallets }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>重複錢包交易識別碼</span>
+            <strong>
+                {% if health.metrics.wallet_duplicate_refs is not none %}
+                    {{ health.metrics.wallet_duplicate_refs }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>資料庫狀態</h2>
+
+    <div class="admin-order-list compact-list">
+
+        {% for database in health.databases.values() %}
+
+            <article class="admin-order-card compact-order-card">
+
+                <div class="order-card-header">
+                    <div>
+                        <p class="order-no">{{ database.path }}</p>
+                        <h3>{{ database.label }}</h3>
+                    </div>
+
+                    <span class="status-chip {% if database.ok %}is-paid{% else %}is-unpaid{% endif %}">
+                        {% if database.ok %}正常{% else %}異常{% endif %}
+                    </span>
+                </div>
+
+                <div class="order-meta compact-meta">
+
+                    <div>
+                        <span>Quick Check</span>
+                        <strong>{{ database.integrity }}</strong>
+                    </div>
+
+                    <div>
+                        <span>大小</span>
+                        <strong>{{ database.size_text }}</strong>
+                    </div>
+
+                    <div>
+                        <span>最後異動</span>
+                        <strong>{{ database.modified_at }}</strong>
+                    </div>
+
+                    <div>
+                        <span>路徑形式</span>
+                        <strong>
+                            {% if database.is_symlink %}
+                                Symbolic Link
+                            {% else %}
+                                一般檔案
+                            {% endif %}
+                        </strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>備份狀態</h2>
+
+    <div class="admin-order-list compact-list">
+
+        {% for backup in health.backups.values() %}
+
+            <article class="admin-order-card compact-order-card">
+
+                <div class="order-card-header">
+                    <div>
+                        <p class="order-no">{{ backup.path }}</p>
+                        <h3>{{ backup.label }}</h3>
+                    </div>
+
+                    {% if backup.found %}
+                        <span class="status-chip {% if backup.fresh %}is-paid{% else %}is-unpaid{% endif %}">
+                            {% if backup.fresh %}近期備份{% else %}備份過舊{% endif %}
+                        </span>
+                    {% else %}
+                        <span class="status-chip is-unpaid">
+                            未找到
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="order-meta compact-meta">
+
+                    <div>
+                        <span>最後備份</span>
+                        <strong>{{ backup.modified_at }}</strong>
+                    </div>
+
+                    <div>
+                        <span>距今</span>
+                        <strong>{{ backup.age_text }}</strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>目前部署</h2>
+
+    <div class="order-meta compact-meta">
+
+        <div>
+            <span>Commit</span>
+            <strong>{{ health.git.commit }}</strong>
+        </div>
+
+        <div>
+            <span>Branch</span>
+            <strong>{{ health.git.branch }}</strong>
+        </div>
+
+        <div>
+            <span>Commit 時間</span>
+            <strong>{{ health.git.commit_time }}</strong>
+        </div>
+
+        <div>
+            <span>Working Tree</span>
+            <strong>
+                {% if health.git.dirty %}
+                    有未提交變更
+                {% else %}
+                    乾淨
+                {% endif %}
+            </strong>
+        </div>
+
+    </div>
+
+    <p class="muted-text">
+        {{ health.git.subject }}
+    </p>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>安全設計</h2>
+
+    <p class="muted-text">
+        此頁目前只讀取服務、資料庫、備份與部署狀態，不提供 systemd 重啟權限。
+        Dashboard 仍維持 dc-bot-web 低權限帳號與既有 systemd sandbox。
+    </p>
+
+</div>
+
+{% endblock %}
