@@ -200,7 +200,7 @@ def test_anomaly_snapshot_detects_cross_system_failures(tmp_path, monkeypatch):
         for item in snapshot["issues"]
         if item["code"] == "payment_apply_error"
     )
-    assert payment["action_url"] == "/admin/payment-reviews?status=apply_error"
+    assert payment["action_url"] == "/admin/payment-reviews"
 
 
 def test_anomaly_snapshot_merges_accounting_issues(tmp_path, monkeypatch):
