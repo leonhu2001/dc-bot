@@ -82,6 +82,7 @@ class WebOrder(Base):
     manual_discount_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cash_coupon_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     store_absorbed_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    historical_discount_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     payment_method: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     status: Mapped[str] = mapped_column(String(30), default=OrderStatus.ACTIVE.value)

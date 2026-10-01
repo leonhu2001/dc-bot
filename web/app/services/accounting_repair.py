@@ -27,11 +27,13 @@ from web.app.services.order_service import recalculate_order_payouts
 RECALCULATE_UNPAID_PAYOUTS = "recalculate_unpaid_payouts"
 VOID_CANCELLED_PAYOUTS = "void_cancelled_payouts"
 QUEUE_WALLET_ORDER_RECONCILIATION = "queue_wallet_order_reconciliation"
+RECOGNIZE_HISTORICAL_DISCOUNT = "recognize_historical_discount"
 
 ALLOWED_REPAIR_ACTIONS = {
     RECALCULATE_UNPAID_PAYOUTS,
     VOID_CANCELLED_PAYOUTS,
     QUEUE_WALLET_ORDER_RECONCILIATION,
+    RECOGNIZE_HISTORICAL_DISCOUNT,
 }
 
 
@@ -150,6 +152,144 @@ def _find_pending_wallet_reconciliation(
             return event
 
     return None
+
+
+def _recognize_historical_discount(
+    db: Session,
+    *,
+    order: WebOrder,
+    actor: dict | None,
+) -> dict[str, Any]:
+    status = _normalize(order.status).lower()
+    if status not in {"closed", "completed", "done"}:
+        raise ValueError(
+            "只有已結單的歷史訂單可以認列歷史折扣。"
+        )
+
+    if _normalize(order.payment_method) != "我的錢包":
+        raise ValueError(
+            "只有付款方式為「我的錢包」的訂單可以認列這個折扣。"
+        )
+
+    pending = _find_pending_wallet_reconciliation(
+        db,
+        int(order.id),
+    )
+    if pending is not None:
+        raise ValueError(
+            f"這張訂單已有待處理的錢包對帳事件 #{pending.id}，"
+            "請先等待或處理該事件。"
+        )
+
+    state = _load_wallet_order_state(order)
+    if int(state["payment_count"]) <= 0:
+        raise ValueError(
+            "找不到原始 payment 流水，不能用此功能認列折扣。"
+        )
+
+    actual_net = int(state["wallet_net"])
+    if actual_net >= 0:
+        raise ValueError(
+            "目前錢包淨扣款不是負數，無法安全認列為歷史折扣。"
+        )
+
+    actual_customer_pay = abs(actual_net)
+    current_customer_pay = int(
+        order.customer_pay_amount
+        if order.customer_pay_amount is not None
+        else order.amount
+        or 0
+    )
+
+    if actual_customer_pay >= current_customer_pay:
+        raise ValueError(
+            "實際扣款沒有低於目前顧客實付，這不是可認列的歷史折扣。"
+        )
+
+    discount_amount = int(
+        current_customer_pay - actual_customer_pay
+    )
+    old_historical_discount = int(
+        getattr(order, "historical_discount_amount", None)
+        or 0
+    )
+
+    before = {
+        "amount": int(order.amount or 0),
+        "original_amount": (
+            int(order.original_amount)
+            if order.original_amount is not None
+            else None
+        ),
+        "payout_base_amount": (
+            int(order.payout_base_amount)
+            if order.payout_base_amount is not None
+            else None
+        ),
+        "customer_pay_amount": current_customer_pay,
+        "historical_discount_amount": old_historical_discount,
+        "wallet_net": actual_net,
+    }
+
+    order.customer_pay_amount = actual_customer_pay
+    order.historical_discount_amount = discount_amount
+    db.flush()
+
+    after = {
+        "amount": int(order.amount or 0),
+        "original_amount": (
+            int(order.original_amount)
+            if order.original_amount is not None
+            else None
+        ),
+        "payout_base_amount": (
+            int(order.payout_base_amount)
+            if order.payout_base_amount is not None
+            else None
+        ),
+        "customer_pay_amount": actual_customer_pay,
+        "historical_discount_amount": discount_amount,
+        "wallet_net": actual_net,
+        "recognized_discount_amount": discount_amount,
+    }
+
+    actor_id, actor_name = _actor_values(actor)
+    db.add(
+        AdminAuditLog(
+            admin_discord_id=actor_id,
+            action="accounting_recognize_historical_discount",
+            target_type="order",
+            target_id=str(int(order.id)),
+            before_json=json.dumps(
+                {
+                    "operator": actor_name,
+                    **before,
+                },
+                ensure_ascii=False,
+            ),
+            after_json=json.dumps(
+                {
+                    "operator": actor_name,
+                    **after,
+                },
+                ensure_ascii=False,
+            ),
+            created_at=datetime.utcnow(),
+        )
+    )
+
+    return {
+        "order_id": int(order.id),
+        "action": RECOGNIZE_HISTORICAL_DISCOUNT,
+        "message": (
+            f"已認列歷史折扣 {discount_amount}T；"
+            f"顧客實付改為 {actual_customer_pay}T。"
+            "錢包與既有分潤皆未修改。"
+        ),
+        "discount_amount": discount_amount,
+        "before": before,
+        "after": after,
+    }
 
 
 def _queue_wallet_order_reconciliation(
@@ -518,6 +658,13 @@ def apply_accounting_repair_in_session(
 
     if normalized_action == QUEUE_WALLET_ORDER_RECONCILIATION:
         return _queue_wallet_order_reconciliation(
+            db,
+            order=order,
+            actor=actor,
+        )
+
+    if normalized_action == RECOGNIZE_HISTORICAL_DISCOUNT:
+        return _recognize_historical_discount(
             db,
             order=order,
             actor=actor,

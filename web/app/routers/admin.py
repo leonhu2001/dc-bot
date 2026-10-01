@@ -30,6 +30,9 @@ from web.app.services.order_service import (
     create_sync_event,
     list_admin_orders,
 )
+from web.app.services.order_financial_edit import (
+    preserve_order_financial_gaps,
+)
 from web.app.services.staff_service import (
     get_staff_display_name,
     get_staff_member_by_id,
@@ -3085,7 +3088,11 @@ async def admin_order_workspace_r8(
                     amount,
                     customer_pay_amount,
                     original_amount,
-                    payout_base_amount
+                    payout_base_amount,
+                    manual_discount_amount,
+                    cash_coupon_amount,
+                    store_absorbed_amount,
+                    historical_discount_amount
                 FROM web_orders
                 WHERE id = :order_id
                 LIMIT 1
@@ -3119,6 +3126,22 @@ async def admin_order_workspace_r8(
             financial.get("payout_base_amount"),
             None,
         )
+        order["manual_discount_amount"] = _mw4a2r6_safe_int(
+            financial.get("manual_discount_amount"),
+            0,
+        ) or 0
+        order["cash_coupon_amount"] = _mw4a2r6_safe_int(
+            financial.get("cash_coupon_amount"),
+            0,
+        ) or 0
+        order["store_absorbed_amount"] = _mw4a2r6_safe_int(
+            financial.get("store_absorbed_amount"),
+            0,
+        ) or 0
+        order["historical_discount_amount"] = _mw4a2r6_safe_int(
+            financial.get("historical_discount_amount"),
+            0,
+        ) or 0
 
         customer_service_members = _mw4a2r6_cs_members(db)
         worker_members = list_admin_worker_dropdown_members()
@@ -3231,6 +3254,33 @@ async def admin_order_workspace_edit_r8(
         before = _mw_r8_jsonable_row(before_row)
         payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
 
+        previous_amount_for_finance = _mw4a2r6_safe_int(
+            before.get("amount"),
+            0,
+        ) or 0
+        previous_customer_pay_for_finance = _mw4a2r6_safe_int(
+            before.get("customer_pay_amount"),
+            None,
+        )
+        previous_payout_base_for_finance = _mw4a2r6_safe_int(
+            before.get("payout_base_amount"),
+            None,
+        )
+
+        preserved_financials = preserve_order_financial_gaps(
+            previous_amount=int(previous_amount_for_finance),
+            previous_customer_pay_amount=previous_customer_pay_for_finance,
+            previous_payout_base_amount=previous_payout_base_for_finance,
+            new_amount=int(amount),
+        )
+        new_customer_pay_amount = preserved_financials[
+            "customer_pay_amount"
+        ]
+        new_payout_base_amount = int(
+            preserved_financials["payout_base_amount"]
+            or 0
+        )
+
         if not customer_service_discord_id:
             customer_service_discord_id = str(
                 before.get("customer_service_discord_id") or ""
@@ -3265,11 +3315,8 @@ async def admin_order_workspace_edit_r8(
                     item = :item,
                     quantity = :quantity,
                     amount = :amount,
-                    payout_base_amount = :amount,
-                    customer_pay_amount = CASE
-                        WHEN customer_pay_amount IS NULL THEN NULL
-                        ELSE :amount
-                    END,
+                    payout_base_amount = :payout_base_amount,
+                    customer_pay_amount = :customer_pay_amount,
                     payment_method = :payment_method,
                     status = :status,
                     closed_at = CASE
@@ -3303,6 +3350,12 @@ async def admin_order_workspace_edit_r8(
                 "item": item,
                 "quantity": int(quantity),
                 "amount": int(amount),
+                "payout_base_amount": int(new_payout_base_amount),
+                "customer_pay_amount": (
+                    int(new_customer_pay_amount)
+                    if new_customer_pay_amount is not None
+                    else None
+                ),
                 "payment_method": payment_method or None,
                 "status": status,
                 "closed_date": closed_date,
@@ -3336,20 +3389,18 @@ async def admin_order_workspace_edit_r8(
 
         db.flush()
 
-        previous_amount = _mw4a2r6_safe_int(
-            before.get("amount"),
-            0,
-        ) or 0
-        previous_customer_pay_amount = _mw4a2r6_safe_int(
-            before.get("customer_pay_amount"),
-            None,
-        )
+        previous_amount = int(previous_amount_for_finance)
+        previous_customer_pay_amount = previous_customer_pay_for_finance
         previous_effective_pay_amount = (
             int(previous_customer_pay_amount)
             if previous_customer_pay_amount is not None
             else int(previous_amount)
         )
-        new_effective_pay_amount = int(amount)
+        new_effective_pay_amount = (
+            int(new_customer_pay_amount)
+            if new_customer_pay_amount is not None
+            else int(amount)
+        )
 
         old_payment_method = str(
             before.get("payment_method")

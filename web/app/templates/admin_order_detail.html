@@ -882,11 +882,71 @@ body.mw-r5-admin
             <div class="cell">
 
                 <div class="label">
-                    顧客應付
+                    訂單金額
                 </div>
 
                 <div class="value">
-                    {{ order.amount }}T
+                    {{ order.raw_amount }}T
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    顧客實付
+                </div>
+
+                <div class="value">
+                    {{
+                        order.customer_pay_amount
+                        if order.customer_pay_amount is not none
+                        else order.raw_amount
+                    }}T
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    店家吸收
+                </div>
+
+                <div class="value">
+                    {{ order.store_absorbed_amount or 0 }}T
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    歷史折扣
+                </div>
+
+                <div class="value">
+                    {{ order.historical_discount_amount or 0 }}T
+                </div>
+
+            </div>
+
+
+            <div class="cell">
+
+                <div class="label">
+                    分潤基礎
+                </div>
+
+                <div class="value">
+                    {{
+                        order.payout_base_amount
+                        if order.payout_base_amount is not none
+                        else order.raw_amount
+                    }}T
                 </div>
 
             </div>

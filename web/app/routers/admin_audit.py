@@ -29,6 +29,7 @@ ACTION_LABELS = {
     "accounting_recalculate_unpaid_payouts": "帳務修復｜重算未發放分潤",
     "accounting_void_cancelled_payouts": "帳務修復｜取消單分潤 void",
     "accounting_queue_wallet_reconciliation": "帳務修復｜排入錢包差額修復",
+    "accounting_recognize_historical_discount": "帳務修復｜認列歷史折扣",
 }
 
 
@@ -98,6 +99,7 @@ FIELD_LABELS = {
     "paid_at": "發放時間",
     "operator": "操作人員",
     "payout_state": "分潤快照",
+    "historical_discount_amount": "歷史折扣",
 
     "attention_reason": "注意事項",
     "internal_note": "內部備註",
