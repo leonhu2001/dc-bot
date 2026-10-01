@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 
 from web.app.routers import admin_payout_summary as report_module
 
@@ -307,4 +308,33 @@ def test_operations_report_zero_previous_window_keeps_history_context(
 
     report_without_history = report_module.build_operations_report("month")
     assert report_without_history["comparison_history_exists"] is False
+
+def test_report_period_uses_full_calendar_day_for_comparison(monkeypatch):
+    class FixedDateTime(datetime):
+        @classmethod
+        def utcnow(cls):
+            # Taipei time becomes 2026-10-01 23:09.
+            return cls(2026, 10, 1, 15, 9, 0)
+
+    monkeypatch.setattr(
+        report_module,
+        "datetime",
+        FixedDateTime,
+    )
+
+    (
+        period,
+        start_at,
+        period_label,
+        previous_start_at,
+        previous_end_at,
+        previous_label,
+    ) = report_module._report_period("quarter")
+
+    assert period == "quarter"
+    assert start_at == "2026-10-01 00:00:00"
+    assert period_label == "本季度"
+    assert previous_start_at == "2026-07-01 00:00:00"
+    assert previous_end_at == "2026-07-02 00:00:00"
+    assert previous_label == "上季同期"
 
