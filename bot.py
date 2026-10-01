@@ -138,6 +138,7 @@ from services.logging_service import (
 from services.smart_dispatch import (
     create_smart_dispatch_plan,
     ensure_smart_dispatch_tables,
+    get_smart_dispatch_plan,
     set_specified_dm_results,
 )
 
@@ -15049,6 +15050,15 @@ def _web_order_created_details(bundle: dict) -> dict:
         )
     )
 
+
+    allowed_role_ids = (
+        _web_order_created_json_list(
+            acceptance.get(
+                "allowed_role_ids_json"
+            )
+        )
+    )
+
     if not specified_staff_ids:
         specified_staff_ids = (
             _web_order_created_json_list(
@@ -15224,6 +15234,7 @@ def _web_order_created_details(bundle: dict) -> dict:
         "extra_requirements": extra_requirements[:500],
         "request_key": request_key,
         "specified_staff_ids": specified_staff_ids,
+        "allowed_role_ids": allowed_role_ids,
         "required_staff_count": max(
             1,
             int(
@@ -15950,6 +15961,22 @@ async def _web_order_created_ensure_dispatch(
         bundle
     )
 
+    smart_dispatch = prepare_initial_smart_dispatch(
+        guild,
+        allowed_role_ids=list(
+            details.get("allowed_role_ids")
+            or []
+        ),
+        specified_staff_ids=list(
+            details.get("specified_staff_ids")
+            or []
+        ),
+        required_staff_count=int(
+            details.get("required_staff_count")
+            or 1
+        ),
+    )
+
     (
         dispatch_channel,
         dispatch_message,
@@ -15989,16 +16016,122 @@ async def _web_order_created_ensure_dispatch(
 
         dispatch_message = (
             await dispatch_channel.send(
+                content=smart_dispatch["content"],
                 embed=placeholder,
                 allowed_mentions=(
                     discord.AllowedMentions(
                         users=True,
-                        roles=False,
+                        roles=True,
                         everyone=False,
                     )
                 ),
             )
         )
+
+    existing_plan = get_smart_dispatch_plan(
+        int(order_id)
+    )
+
+    if existing_plan is None:
+        try:
+            if str(dispatch_message.content or "").strip() != str(
+                smart_dispatch["content"]
+            ).strip():
+                await dispatch_message.edit(
+                    content=smart_dispatch["content"],
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=True,
+                        everyone=False,
+                    ),
+                )
+        except discord.HTTPException as exc:
+            print(
+                f"[smart-dispatch] website content update failed "
+                f"order_id={order_id}: {exc}",
+                flush=True,
+            )
+
+        try:
+            create_smart_dispatch_plan(
+                order_id=int(order_id),
+                dispatch_channel_id=dispatch_channel.id,
+                dispatch_message_id=dispatch_message.id,
+                required_staff_count=int(
+                    details.get("required_staff_count")
+                    or 1
+                ),
+                allowed_role_ids=list(
+                    details.get("allowed_role_ids")
+                    or []
+                ),
+                specified_staff_ids=list(
+                    details.get("specified_staff_ids")
+                    or []
+                ),
+                ranked_candidate_ids=smart_dispatch[
+                    "ranked_candidate_ids"
+                ],
+                notified_candidate_ids=smart_dispatch[
+                    "initial_notified_ids"
+                ],
+            )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] website plan create failed "
+                f"order_id={order_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    plan = get_smart_dispatch_plan(
+        int(order_id)
+    )
+
+    specified_ids = list(
+        details.get("specified_staff_ids")
+        or []
+    )
+
+    if (
+        specified_ids
+        and plan is not None
+        and not plan.get("specified_dm_sent_ids")
+        and not plan.get("specified_dm_failed_ids")
+    ):
+        try:
+            dm_sent_ids, dm_failed_ids = (
+                await send_specified_staff_dispatch_dms(
+                    guild,
+                    specified_staff_ids=specified_ids,
+                    category_label=str(
+                        details.get("category_label")
+                        or order.get("category")
+                        or "未紀錄"
+                    ),
+                    item_label=str(
+                        details.get("item")
+                        or order.get("item")
+                        or "未紀錄"
+                    ),
+                    required_staff_count=int(
+                        details.get("required_staff_count")
+                        or 1
+                    ),
+                    dispatch_jump_url=dispatch_message.jump_url,
+                )
+            )
+
+            set_specified_dm_results(
+                int(order_id),
+                sent_ids=dm_sent_ids,
+                failed_ids=dm_failed_ids,
+            )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] website specified DM failed "
+                f"order_id={order_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     _web_order_created_update_links(
         order_id,
