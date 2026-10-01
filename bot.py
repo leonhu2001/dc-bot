@@ -137,6 +137,7 @@ from services.logging_service import (
 
 from services.support_calls import (
     ensure_support_call_tables,
+    close_support_calls_for_ticket,
 )
 
 from services.orders import (
@@ -887,6 +888,17 @@ async def create_private_channel(
 
 def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) -> None:
     """DC bot 結單後，把網站訂單狀態同步成 closed，並同步付款前接單 lifecycle。"""
+    try:
+        close_support_calls_for_ticket(
+            ticket_channel_id,
+            reason="order_closed",
+        )
+    except Exception as exc:
+        print(
+            f"[support-call] close cleanup failed "
+            f"ticket_channel_id={ticket_channel_id}: {exc}",
+            flush=True,
+        )
     try:
         from datetime import datetime, timedelta
 
@@ -13934,6 +13946,17 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
 
 def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
     """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled，並同步付款前接單 lifecycle。"""
+    try:
+        close_support_calls_for_ticket(
+            ticket_channel_id,
+            reason="order_cancelled",
+        )
+    except Exception as exc:
+        print(
+            f"[support-call] cancel cleanup failed "
+            f"ticket_channel_id={ticket_channel_id}: {exc}",
+            flush=True,
+        )
     try:
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
