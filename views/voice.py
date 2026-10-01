@@ -248,6 +248,95 @@ def get_vip_voice_allowed_roles(guild: discord.Guild) -> list[discord.Role]:
     ]
 
 
+def get_vip_room_whitelist_user_ids(owner_id: int) -> set[int]:
+    """從 bot.db 讀取指定 VIP 房白名單。"""
+    try:
+        from core.database import list_vip_voice_room_whitelist
+    except Exception:
+        return set()
+
+    return {
+        int(row.get("user_id") or 0)
+        for row in list_vip_voice_room_whitelist(int(owner_id))
+        if int(row.get("user_id") or 0)
+    }
+
+
+def build_vip_whitelist_overwrite() -> discord.PermissionOverwrite:
+    """白名單最小權限：可見、進語音、說話、在語音聊天室打字。"""
+    return discord.PermissionOverwrite(
+        view_channel=True,
+        connect=True,
+        speak=True,
+        stream=False,
+        use_voice_activation=True,
+        send_messages=True,
+        read_message_history=True,
+        attach_files=False,
+        add_reactions=False,
+        use_external_emojis=False,
+        use_external_stickers=False,
+        move_members=False,
+        manage_channels=False,
+        manage_messages=False,
+    )
+
+
+async def grant_vip_whitelist_access(
+    voice_channel: discord.VoiceChannel,
+    member: discord.Member,
+) -> None:
+    await voice_channel.set_permissions(
+        member,
+        overwrite=build_vip_whitelist_overwrite(),
+        reason="Grant VIP room whitelist access",
+    )
+
+
+async def revoke_vip_whitelist_access(
+    voice_channel: discord.VoiceChannel,
+    member: discord.Member,
+) -> None:
+    overwrite = voice_channel.overwrites_for(member)
+
+    for attr in (
+        "view_channel",
+        "connect",
+        "speak",
+        "stream",
+        "use_voice_activation",
+        "send_messages",
+        "read_message_history",
+        "attach_files",
+        "add_reactions",
+        "use_external_emojis",
+        "use_external_stickers",
+        "move_members",
+        "manage_channels",
+        "manage_messages",
+    ):
+        setattr(overwrite, attr, None)
+
+    await voice_channel.set_permissions(
+        member,
+        overwrite=overwrite if _overwrite_has_any_explicit_value(overwrite) else None,
+        reason="Revoke VIP room whitelist access",
+    )
+
+
+async def sync_vip_whitelist_permissions(
+    voice_channel: discord.VoiceChannel,
+    owner_id: int,
+) -> None:
+    """把 DB 白名單補回 Discord overwrite；Bot 重啟後仍有效。"""
+    for user_id in get_vip_room_whitelist_user_ids(int(owner_id)):
+        member = voice_channel.guild.get_member(int(user_id))
+        if member is None or member.bot:
+            continue
+
+        await grant_vip_whitelist_access(voice_channel, member)
+
+
 def build_play_lobby_overwrites(guild: discord.Guild) -> dict:
     """點我創建陪玩頻道：只有陪玩/打手身分組可見可加入。"""
     overwrites = {
@@ -389,7 +478,13 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
             move_members=is_receiver_voice_role(role),
         )
 
-    # Hidden VIP 房只允許店內人員、房主與 Bot 看見。
+    for user_id in get_vip_room_whitelist_user_ids(int(member.id)):
+        whitelist_member = guild.get_member(int(user_id))
+        if whitelist_member is None or whitelist_member.bot:
+            continue
+        overwrites[whitelist_member] = build_vip_whitelist_overwrite()
+
+    # Hidden VIP 房只允許店內人員、房主、白名單與 Bot 看見。
     # 不套用額外的「只看得到」角色，避免其他會員或其他 VIP 意外看到。
     if not hidden_owner:
         apply_voice_view_only_role_overwrites(guild, overwrites)
