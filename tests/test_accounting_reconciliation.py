@@ -403,3 +403,43 @@ def test_wallet_order_missing_payment_transaction_is_detected(tmp_path):
     snapshot = build_accounting_reconciliation_snapshot(root)
 
     assert "wallet_order_tx_missing" in _issue_codes(snapshot)
+
+def test_unpaid_stored_order_does_not_require_payout_rows(tmp_path):
+    root = _healthy_root(tmp_path)
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            """
+            INSERT INTO web_orders(
+                id,
+                bot_order_no,
+                customer_discord_id,
+                amount,
+                customer_pay_amount,
+                payout_base_amount,
+                payment_method,
+                status
+            )
+            VALUES(
+                2,
+                'MO20261002002',
+                'customer-2',
+                300,
+                300,
+                300,
+                '待付款',
+                'stored'
+            )
+            """
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+
+    stored_order_issues = [
+        issue
+        for issue in snapshot["issues"]
+        if issue["reference"] == "MO20261002002"
+    ]
+
+    assert stored_order_issues == []
+
