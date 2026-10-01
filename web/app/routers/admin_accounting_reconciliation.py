@@ -13,6 +13,7 @@ from web.app.services.accounting_reconciliation import (
 )
 from web.app.services.accounting_repair import (
     QUEUE_WALLET_ORDER_RECONCILIATION,
+    RECOGNIZE_HISTORICAL_DISCOUNT,
     RECALCULATE_UNPAID_PAYOUTS,
     VOID_CANCELLED_PAYOUTS,
     apply_accounting_repair,
@@ -32,6 +33,7 @@ def get_current_user(request: Request) -> dict | None:
 def repair_action_label(action: str | None) -> str:
     mapping = {
         QUEUE_WALLET_ORDER_RECONCILIATION: "排入錢包差額修復",
+        RECOGNIZE_HISTORICAL_DISCOUNT: "認列歷史折扣",
         RECALCULATE_UNPAID_PAYOUTS: "重算未發放分潤",
         VOID_CANCELLED_PAYOUTS: "取消單分潤標記 void",
     }
