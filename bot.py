@@ -3857,16 +3857,21 @@ async def restore_acceptance_payment_panel_for_order(
         save_bot_data()
 
         if current_status != ACCEPTED_PENDING_PAY:
-            conn.execute(
-                """
-                UPDATE web_orders
-                SET status = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (ACCEPTED_PENDING_PAY, int(order_id)),
+            from shared.order_state import (
+                WAITING_ACCEPTANCE,
+                transition_order_state,
             )
-            conn.commit()
+
+            transition_order_state(
+                order_id=int(order_id),
+                target_status=ACCEPTED_PENDING_PAY,
+                source="payment_panel_repair",
+                reason=f"付款 panel 修復：{reason}",
+                expected_statuses={
+                    WAITING_ACCEPTANCE,
+                    ACCEPTED_PENDING_PAY,
+                },
+            )
 
         progress_text = ""
         if accepted_count is not None and required_count is not None:
