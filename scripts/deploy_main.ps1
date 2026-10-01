@@ -48,7 +48,7 @@ Write-Host "Target: $Target" -ForegroundColor Cyan
 Write-Host "VPS:    $Vps" -ForegroundColor Cyan
 Write-Host ""
 
-$RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '\${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
+$RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
 
 ssh $Vps $RemoteCommand
 
