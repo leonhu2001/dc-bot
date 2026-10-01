@@ -197,6 +197,77 @@ def test_support_call_snapshot_calculates_sla(tmp_path, monkeypatch):
     assert snapshot["median_response_seconds"] == 300
 
 
+def test_resolved_support_call_duration_stops_at_resolved_at(tmp_path, monkeypatch):
+    db_path = tmp_path / "web_dashboard.db"
+    monkeypatch.setattr(support_calls, "_now", _fixed_now)
+    support_calls.ensure_support_call_tables(db_path)
+
+    import sqlite3
+
+    called = (_fixed_now() - timedelta(minutes=40)).isoformat(timespec="seconds")
+    claimed = (_fixed_now() - timedelta(minutes=35)).isoformat(timespec="seconds")
+    resolved = (_fixed_now() - timedelta(minutes=30)).isoformat(timespec="seconds")
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO support_calls (
+                ticket_channel_id,
+                customer_discord_id,
+                status,
+                called_at,
+                claimed_at,
+                resolved_at,
+                claimed_by_discord_id,
+                resolved_by_discord_id,
+                reminder_stage,
+                updated_at
+            )
+            VALUES (?, ?, 'resolved', ?, ?, ?, ?, ?, 0, ?)
+            """,
+            (
+                "150",
+                "250",
+                called,
+                claimed,
+                resolved,
+                "350",
+                "350",
+                resolved,
+            ),
+        )
+        conn.commit()
+
+    snapshot = support_calls.build_support_call_snapshot(
+        db_file=db_path,
+        days=30,
+    )
+
+    row = snapshot["rows"][0]
+
+    assert row["status_label"] == "已完成"
+    assert row["duration_label"] == "實際處理耗時"
+    assert row["age_seconds"] == 300
+    assert row["age_text"] == "5 分 0 秒"
+    assert row["response_seconds"] == 300
+
+
+def test_claimed_support_call_duration_starts_from_claim_time(tmp_path, monkeypatch):
+    row = {
+        "status": "claimed",
+        "called_at": (_fixed_now() - timedelta(minutes=20)).isoformat(timespec="seconds"),
+        "claimed_at": (_fixed_now() - timedelta(minutes=7)).isoformat(timespec="seconds"),
+    }
+
+    seconds, label = support_calls._stage_duration(
+        row,
+        now=_fixed_now(),
+    )
+
+    assert seconds == 420
+    assert label == "目前處理時間"
+
+
 def test_resolve_requires_claimed_state(tmp_path, monkeypatch):
     db_path = tmp_path / "web_dashboard.db"
     monkeypatch.setattr(support_calls, "_now", _fixed_now)

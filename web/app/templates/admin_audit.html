@@ -104,8 +104,12 @@
                             <span>操作人員</span>
 
                             <strong>
-                                {{ log.admin_discord_id }}
+                                {{ operator_names.get(log.admin_discord_id, log.admin_discord_id) }}
                             </strong>
+
+                            <span class="muted-text">
+                                Discord ID：{{ log.admin_discord_id }}
+                            </span>
                         </div>
 
 

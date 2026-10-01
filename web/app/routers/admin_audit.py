@@ -8,7 +8,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from shared.db import SessionLocal
-from shared.models import AdminAuditLog
+from shared.models import AdminAuditLog, WebUser
+from shared.staff_models import WebStaffMember
 
 
 router = APIRouter(tags=["admin-audit"])
@@ -222,6 +223,71 @@ def format_datetime(value) -> str:
         return str(value)
 
 
+def _preferred_operator_name(
+    *,
+    display_name: str | None = None,
+    global_name: str | None = None,
+    username: str | None = None,
+    discord_id: str | None = None,
+) -> str:
+    return str(
+        display_name
+        or global_name
+        or username
+        or discord_id
+        or "未知人員"
+    )
+
+
+def build_operator_name_map(db, discord_ids) -> dict[str, str]:
+    ids = {
+        str(item).strip()
+        for item in (discord_ids or [])
+        if str(item).strip()
+    }
+
+    if not ids:
+        return {}
+
+    result: dict[str, str] = {}
+
+    staff_rows = list(
+        db.scalars(
+            select(WebStaffMember)
+            .where(WebStaffMember.discord_id.in_(ids))
+        ).all()
+    )
+
+    for member in staff_rows:
+        discord_id = str(member.discord_id)
+        result[discord_id] = _preferred_operator_name(
+            display_name=member.display_name,
+            global_name=member.global_name,
+            username=member.username,
+            discord_id=discord_id,
+        )
+
+    missing_ids = ids - set(result)
+
+    if missing_ids:
+        user_rows = list(
+            db.scalars(
+                select(WebUser)
+                .where(WebUser.discord_id.in_(missing_ids))
+            ).all()
+        )
+
+        for member in user_rows:
+            discord_id = str(member.discord_id)
+            result[discord_id] = _preferred_operator_name(
+                global_name=member.global_name,
+                username=member.username,
+                discord_id=discord_id,
+            )
+
+    return result
+
+
 @router.get("/admin/audit")
 async def admin_audit_logs(
     request: Request,
@@ -276,6 +342,15 @@ async def admin_audit_logs(
             db.scalars(statement.limit(300)).all()
         )
 
+        operator_names = build_operator_name_map(
+            db,
+            {
+                str(log.admin_discord_id)
+                for log in logs
+                if str(log.admin_discord_id or "").strip()
+            },
+        )
+
         actions = [
             row[0]
             for row in db.execute(
@@ -302,5 +377,6 @@ async def admin_audit_logs(
             "label_target_type": label_target_type,
             "format_audit_json": format_audit_json,
             "format_datetime": format_datetime,
+            "operator_names": operator_names,
         },
     )

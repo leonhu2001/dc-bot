@@ -86,7 +86,7 @@
 
                         <span class="status-chip
                             {% if item.status == 'resolved' %}is-paid{% elif item.status == 'open' %}is-unpaid{% endif %}">
-                            {{ item.status }}
+                            {{ item.status_label }}
                         </span>
                     </div>
 
@@ -97,7 +97,7 @@
                         </div>
 
                         <div>
-                            <span>目前等待 / 處理時間</span>
+                            <span>{{ item.duration_label }}</span>
                             <strong>{{ item.age_text }}</strong>
                         </div>
 
@@ -122,6 +122,14 @@
                             <span>呼叫時間</span>
                             <strong>{{ item.called_at }}</strong>
                         </div>
+
+
+                        {% if item.status == 'resolved' %}
+                            <div>
+                                <span>完成時間</span>
+                                <strong>{{ item.resolved_at or '-' }}</strong>
+                            </div>
+                        {% endif %}
                     </div>
                 </article>
             {% endfor %}
