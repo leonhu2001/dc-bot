@@ -433,6 +433,50 @@ def _duration_text(seconds: int | None) -> str:
     return f"{hours} 小時 {minutes} 分"
 
 
+def _stage_duration(
+    row: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> tuple[int | None, str]:
+    status = str(row.get("status") or "").strip().lower()
+    called = _parse_datetime(row.get("called_at"))
+    claimed = _parse_datetime(row.get("claimed_at"))
+    resolved = _parse_datetime(row.get("resolved_at"))
+    updated = _parse_datetime(row.get("updated_at"))
+    current = now or _now()
+
+    if status == "open":
+        if called is None:
+            return None, "目前等待時間"
+        return max(0, int((current - called).total_seconds())), "目前等待時間"
+
+    if status == "claimed":
+        start = claimed or called
+        if start is None:
+            return None, "目前處理時間"
+        return max(0, int((current - start).total_seconds())), "目前處理時間"
+
+    if status == "resolved":
+        start = claimed or called
+        end = resolved or updated
+        if start is None or end is None:
+            return None, "實際處理耗時"
+        return max(0, int((end - start).total_seconds())), "實際處理耗時"
+
+    if status == "cancelled":
+        start = claimed or called
+        end = updated
+        if start is None or end is None:
+            return None, "結束前耗時"
+        return max(0, int((end - start).total_seconds())), "結束前耗時"
+
+    if called is None:
+        return None, "耗時"
+
+    end = resolved or updated or current
+    return max(0, int((end - called).total_seconds())), "耗時"
+
+
 def build_support_call_snapshot(
     *,
     db_file: str | Path | None = None,
@@ -490,15 +534,28 @@ def build_support_call_snapshot(
     )
 
     now = _now()
+    status_labels = {
+        "open": "等待接手",
+        "claimed": "處理中",
+        "resolved": "已完成",
+        "cancelled": "已結束",
+    }
+
     for row in rows:
-        called = _parse_datetime(row.get("called_at"))
-        age_seconds = (
-            max(0, int((now - called).total_seconds()))
-            if called is not None
-            else None
+        duration_seconds, duration_label = _stage_duration(
+            row,
+            now=now,
         )
-        row["age_seconds"] = age_seconds
-        row["age_text"] = _duration_text(age_seconds)
+        row["age_seconds"] = duration_seconds
+        row["age_text"] = _duration_text(duration_seconds)
+        row["duration_label"] = duration_label
+
+        status = str(row.get("status") or "").strip().lower()
+        row["status_label"] = status_labels.get(
+            status,
+            status or "未知",
+        )
+
         response = _response_seconds(row)
         row["response_seconds"] = response
         row["response_text"] = _duration_text(response)
