@@ -91,7 +91,7 @@ def test_choose_initial_candidates_keeps_specified_and_batch_size():
         required_staff_count=1,
     )
 
-    assert selected == ["S1", "A", "B"]
+    assert selected == ["S1"]
 
     selected_two = smart_dispatch.choose_initial_candidate_ids(
         ranked,
@@ -216,3 +216,13 @@ def test_assignment_metrics_do_not_treat_closed_order_as_active(tmp_path):
 
     assert metrics["A"]["active_count"] == 0
     assert metrics["B"]["active_count"] == 1
+
+
+def test_initial_candidates_do_not_notify_non_specified_when_all_slots_reserved():
+    selected = smart_dispatch.choose_initial_candidate_ids(
+        ["S1", "S2", "A", "B", "C"],
+        specified_staff_ids=["S1", "S2"],
+        required_staff_count=2,
+    )
+
+    assert selected == ["S1", "S2"]
