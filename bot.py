@@ -215,6 +215,7 @@ from views.support_calls import (
     configure_support_call_views,
     SupportCallButton,
     SupportCallActionView,
+    refresh_existing_order_ticket_support_buttons,
     support_call_sla_loop,
 )
 
@@ -12711,6 +12712,29 @@ async def on_ready():
                 f"{type(exc).__name__}: {exc}",
                 flush=True,
             )
+
+        if not getattr(bot, "_support_call_ticket_controls_refreshed", False):
+            try:
+                refreshed_support_buttons = (
+                    await refresh_existing_order_ticket_support_buttons(
+                        guild_for_voice,
+                        category_id=CUSTOMER_CATEGORY_ID,
+                        order_control_view_factory=OrderControlView,
+                    )
+                )
+                bot._support_call_ticket_controls_refreshed = True
+                if refreshed_support_buttons:
+                    print(
+                        f"[support-call] refreshed ticket controls: "
+                        f"{refreshed_support_buttons}",
+                        flush=True,
+                    )
+            except Exception as exc:
+                print(
+                    f"[support-call] ticket control refresh failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
 
         await get_or_create_order_log_channel(guild_for_voice)
         if not BACKUP_TASK_STARTED:
