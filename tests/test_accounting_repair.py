@@ -17,6 +17,7 @@ from services.wallet_service import adjust_wallet_balance
 from web.app.services import accounting_repair as accounting_repair_module
 from web.app.services.accounting_repair import (
     QUEUE_WALLET_ORDER_RECONCILIATION,
+    RECOGNIZE_HISTORICAL_DISCOUNT,
     RECALCULATE_UNPAID_PAYOUTS,
     VOID_CANCELLED_PAYOUTS,
     apply_accounting_repair_in_session,
@@ -478,6 +479,161 @@ def test_queue_wallet_reconciliation_can_queue_refund(
 
         assert result["delta"] == 26
         assert "退款 26T" in result["message"]
+    finally:
+        db.close()
+
+def test_recognize_historical_discount_updates_web_snapshot_only(
+    monkeypatch,
+    tmp_path,
+):
+    db = _make_session()
+    bot_db = tmp_path / "bot.db"
+
+    try:
+        _seed_wallet_order_for_repair(
+            db,
+            expected_pay_amount=1152,
+        )
+        order = db.get(WebOrder, 1)
+        assert order is not None
+        order.status = "closed"
+        order.store_absorbed_amount = 0
+        order.payout_base_amount = 1152
+
+        _create_wallet_history(
+            bot_db,
+            topup_amount=2000,
+            payment_amount=652,
+        )
+        before_balance = 1348
+
+        monkeypatch.setattr(
+            accounting_repair_module,
+            "_bot_db_path",
+            lambda: bot_db,
+        )
+
+        result = apply_accounting_repair_in_session(
+            db,
+            order_id=1,
+            action=RECOGNIZE_HISTORICAL_DISCOUNT,
+            actor={
+                "id": "manager-1",
+                "username": "Manager",
+            },
+        )
+        db.flush()
+
+        order = db.get(WebOrder, 1)
+        audit = db.scalar(
+            select(AdminAuditLog)
+            .where(
+                AdminAuditLog.action
+                == "accounting_recognize_historical_discount"
+            )
+        )
+
+        assert order is not None
+        assert order.customer_pay_amount == 652
+        assert order.store_absorbed_amount == 500
+        assert order.payout_base_amount == 1152
+        assert result["discount_amount"] == 500
+        assert "錢包與既有分潤皆未修改" in result["message"]
+        assert audit is not None
+
+        from services.wallet_service import get_wallet_balance
+
+        assert get_wallet_balance("customer-1", bot_db) == before_balance
+
+        worker = db.scalar(
+            select(WorkerPayout)
+            .where(WorkerPayout.order_id == 1)
+        )
+        cs = db.scalar(
+            select(CustomerServicePayout)
+            .where(CustomerServicePayout.order_id == 1)
+        )
+
+        assert worker is not None
+        assert worker.final_payout == 159
+        assert cs is not None
+        assert cs.payout_amount == 9
+    finally:
+        db.close()
+
+
+def test_recognize_historical_discount_requires_closed_order(
+    monkeypatch,
+    tmp_path,
+):
+    db = _make_session()
+    bot_db = tmp_path / "bot.db"
+
+    try:
+        _seed_wallet_order_for_repair(
+            db,
+            expected_pay_amount=1152,
+        )
+        order = db.get(WebOrder, 1)
+        assert order is not None
+        order.status = "active"
+
+        _create_wallet_history(
+            bot_db,
+            topup_amount=2000,
+            payment_amount=652,
+        )
+        monkeypatch.setattr(
+            accounting_repair_module,
+            "_bot_db_path",
+            lambda: bot_db,
+        )
+
+        with pytest.raises(ValueError, match="只有已結單"):
+            apply_accounting_repair_in_session(
+                db,
+                order_id=1,
+                action=RECOGNIZE_HISTORICAL_DISCOUNT,
+                actor={"id": "manager-1"},
+            )
+    finally:
+        db.close()
+
+
+def test_recognize_historical_discount_rejects_overpayment(
+    monkeypatch,
+    tmp_path,
+):
+    db = _make_session()
+    bot_db = tmp_path / "bot.db"
+
+    try:
+        _seed_wallet_order_for_repair(
+            db,
+            expected_pay_amount=1274,
+        )
+        order = db.get(WebOrder, 1)
+        assert order is not None
+        order.status = "closed"
+
+        _create_wallet_history(
+            bot_db,
+            topup_amount=2000,
+            payment_amount=1300,
+        )
+        monkeypatch.setattr(
+            accounting_repair_module,
+            "_bot_db_path",
+            lambda: bot_db,
+        )
+
+        with pytest.raises(ValueError, match="沒有低於"):
+            apply_accounting_repair_in_session(
+                db,
+                order_id=1,
+                action=RECOGNIZE_HISTORICAL_DISCOUNT,
+                actor={"id": "manager-1"},
+            )
     finally:
         db.close()
 
