@@ -477,16 +477,42 @@ def _check_wallet_paid_orders(
             continue
 
         tx = txs[0]
-        actual_amount = _as_int(tx["amount"])
+        adjustment_txs = (
+            tx_by_ticket.get(
+                (
+                    customer_id,
+                    ticket_channel_id,
+                    "payment_adjustment",
+                ),
+                [],
+            )
+            if ticket_channel_id
+            else []
+        )
+
+        actual_amount = _as_int(tx["amount"]) + sum(
+            _as_int(item.get("amount"))
+            for item in adjustment_txs
+        )
+
         if actual_amount != expected_amount:
+            adjustment_total = sum(
+                _as_int(item.get("amount"))
+                for item in adjustment_txs
+            )
             _issue(
                 issues,
                 category="order_payment",
                 code="wallet_order_amount_mismatch",
                 severity="critical",
                 reference=reference,
-                title="訂單金額與錢包扣款不一致",
-                detail="payment 流水金額與 customer_pay_amount 不一致。",
+                title="訂單金額與錢包淨扣款不一致",
+                detail=(
+                    "payment 與 payment_adjustment 淨額 "
+                    "和 customer_pay_amount 不一致。"
+                    f" 基礎付款 {_as_int(tx['amount'])}T，"
+                    f"差額流水 {adjustment_total}T。"
+                ),
                 expected=expected_amount,
                 actual=actual_amount,
             )

@@ -3340,9 +3340,36 @@ async def admin_order_workspace_edit_r8(
             before.get("amount"),
             0,
         ) or 0
+        previous_customer_pay_amount = _mw4a2r6_safe_int(
+            before.get("customer_pay_amount"),
+            None,
+        )
+        previous_effective_pay_amount = (
+            int(previous_customer_pay_amount)
+            if previous_customer_pay_amount is not None
+            else int(previous_amount)
+        )
+        new_effective_pay_amount = int(amount)
 
-        # Always enqueue a reconciliation. This also repairs orders whose web
-        # amount was corrected before this sync feature was deployed.
+        old_payment_method = str(
+            before.get("payment_method")
+            or ""
+        ).strip()
+        old_customer_discord_id = str(
+            before.get("customer_discord_id")
+            or ""
+        ).strip()
+        admin_display_name = str(
+            user.get("global_name")
+            or user.get("username")
+            or user.get("name")
+            or user.get("id")
+            or ""
+        ).strip()
+
+        # Always enqueue a reconciliation. Besides Discord/VIP synchronization,
+        # this event is the single idempotent bridge used to reconcile wallet
+        # payment deltas after an admin changes a wallet-paid order.
         create_sync_event(
             db,
             event_type=SyncEventType.ORDER_UPDATED,
@@ -3353,7 +3380,14 @@ async def admin_order_workspace_edit_r8(
                 "sync_kind": "order_amount_correction",
                 "old_amount": int(previous_amount),
                 "new_amount": int(amount),
+                "old_customer_pay_amount": int(previous_effective_pay_amount),
+                "new_customer_pay_amount": int(new_effective_pay_amount),
+                "old_payment_method": old_payment_method,
+                "new_payment_method": payment_method,
+                "old_customer_discord_id": old_customer_discord_id,
+                "new_customer_discord_id": customer_discord_id,
                 "admin_discord_id": str(user.get("id") or ""),
+                "admin_display_name": admin_display_name,
             },
         )
 
