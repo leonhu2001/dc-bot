@@ -129,7 +129,8 @@ echo "PASS: Python compile"
 echo
 
 echo "=== 5. ENSURE DATABASE TABLES ==="
-/opt/dc-bot/venv/bin/python -c "from shared.db import create_all_tables; create_all_tables(); print('PASS: database tables ready')"
+runuser -u dc-bot-web -- env PYTHONPATH="$APP" \
+    "$APP/venv/bin/python" -c "from shared.db import create_all_tables; create_all_tables(); print('PASS: database tables ready')"
 echo
 
 echo "=== 6. OPTIONAL VPS TESTS ==="
