@@ -17457,6 +17457,7 @@ def _apply_web_order_wallet_amount_adjustment(
 
     from services.order_wallet_reconciliation import (
         build_wallet_payment_adjustment_plan,
+        validate_wallet_net_before_adjustment,
     )
     from services.wallet_service import adjust_wallet_balance
 
@@ -17486,6 +17487,41 @@ def _apply_web_order_wallet_amount_adjustment(
     ticket_channel_id = _to_int(
         event.get("ticket_channel_id"),
         None,
+    )
+
+    if ticket_channel_id is None:
+        raise RuntimeError(
+            "錢包訂單金額調整缺少 ticket_channel_id，禁止自動補扣 / 退款。"
+        )
+
+    import sqlite3
+
+    net_customer_id = str(
+        payload.get("old_customer_discord_id")
+        if str(payload.get("old_payment_method") or "").strip() == WALLET_PAYMENT_METHOD
+        else plan["customer_id"]
+    ).strip()
+
+    with sqlite3.connect(DB_FILE, timeout=15) as conn:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(amount), 0)
+            FROM wallet_transactions
+            WHERE customer_discord_id = ?
+              AND order_channel_id = ?
+              AND type IN ('payment', 'payment_adjustment')
+            """,
+            (
+                net_customer_id,
+                str(ticket_channel_id),
+            ),
+        ).fetchone()
+        actual_wallet_net = int(row[0] or 0) if row else 0
+
+    validate_wallet_net_before_adjustment(
+        old_amount=int(payload.get("old_customer_pay_amount") or 0),
+        old_payment_method=payload.get("old_payment_method"),
+        actual_wallet_net=actual_wallet_net,
     )
 
     tx = adjust_wallet_balance(
