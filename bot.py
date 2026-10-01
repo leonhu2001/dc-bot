@@ -12146,17 +12146,46 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
             )
 
         if panel_message_id:
+            control_view = VoiceRoomControlView(
+                voice_channel_id=channel_id,
+                owner_id=owner_id,
+                room_type="vip",
+            )
+
             try:
                 bot.add_view(
-                    VoiceRoomControlView(
-                        voice_channel_id=channel_id,
-                        owner_id=owner_id,
-                        room_type="vip",
-                    ),
+                    control_view,
                     message_id=panel_message_id,
                 )
             except ValueError:
                 pass
+
+            # Persistent view registration only restores callbacks; it does not
+            # change the buttons already rendered on an old Discord message.
+            # Edit the existing panel so pre-existing VIP rooms immediately get
+            # newly-added controls such as the whitelist button after deploy.
+            try:
+                panel_message = await channel.fetch_message(panel_message_id)
+                await panel_message.edit(
+                    view=control_view,
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+            except discord.NotFound:
+                pass
+            except discord.Forbidden:
+                print(
+                    f"Bot 權限不足，無法更新既有 VIP Panel："
+                    f"owner={owner_id} channel={channel_id}"
+                )
+            except discord.HTTPException as exc:
+                print(
+                    f"更新既有 VIP Panel 失敗："
+                    f"owner={owner_id} channel={channel_id}: {exc}"
+                )
 
         restored += 1
 
