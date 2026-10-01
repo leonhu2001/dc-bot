@@ -3088,7 +3088,10 @@ async def admin_order_workspace_r8(
                     amount,
                     customer_pay_amount,
                     original_amount,
-                    payout_base_amount
+                    payout_base_amount,
+                    manual_discount_amount,
+                    cash_coupon_amount,
+                    store_absorbed_amount
                 FROM web_orders
                 WHERE id = :order_id
                 LIMIT 1
@@ -3122,6 +3125,18 @@ async def admin_order_workspace_r8(
             financial.get("payout_base_amount"),
             None,
         )
+        order["manual_discount_amount"] = _mw4a2r6_safe_int(
+            financial.get("manual_discount_amount"),
+            0,
+        ) or 0
+        order["cash_coupon_amount"] = _mw4a2r6_safe_int(
+            financial.get("cash_coupon_amount"),
+            0,
+        ) or 0
+        order["store_absorbed_amount"] = _mw4a2r6_safe_int(
+            financial.get("store_absorbed_amount"),
+            0,
+        ) or 0
 
         customer_service_members = _mw4a2r6_cs_members(db)
         worker_members = list_admin_worker_dropdown_members()
