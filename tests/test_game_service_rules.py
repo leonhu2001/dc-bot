@@ -86,15 +86,16 @@ def test_entertainment_uses_universal_companions_plus_same_game_ranks():
     }
 
 
-def test_steam_accepts_all_five_legacy_roles_and_all_registered_game_roles():
+def test_steam_accepts_companion_roles_only():
     steam = ORDER_RULES["steam_play"]
     allowed_ids = set(get_allowed_role_ids(steam))
 
-    assert set(steam.allowed_roles) == set(ROLE_IDS)
-    assert set(steam.allowed_game_roles) == set(GAME_ROLE_BY_KEY)
-    assert len(GAME_ROLE_BY_KEY) == 12
-    assert allowed_ids == set(ALL_ROLE_IDS.values())
-    assert len(allowed_ids) == 14
+    assert set(steam.allowed_roles) == {"male_companion", "female_companion"}
+    assert steam.allowed_game_roles == ()
+    assert allowed_ids == {
+        ROLE_IDS["male_companion"],
+        ROLE_IDS["female_companion"],
+    }
 
 
 def test_apex_roles_can_login_employee_website_before_apex_orders_exist():
