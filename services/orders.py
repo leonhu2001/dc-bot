@@ -672,7 +672,7 @@ def _resolve_guild_member_mention(
     source_channel: discord.TextChannel,
     mention_text: str | None,
 ) -> str:
-    """Prefer a clickable guild member mention; keep the original mention as fallback."""
+    """Prefer a clickable guild mention; fall back to the saved display name."""
     text = str(mention_text or "").strip()
 
     if not text:
@@ -693,10 +693,31 @@ def _resolve_guild_member_mention(
     guild = getattr(source_channel, "guild", None)
     member = guild.get_member(user_id) if guild is not None else None
 
-    if member is None:
-        return text
+    if member is not None:
+        return member.mention
 
-    return member.mention
+    source_channel_id = getattr(source_channel, "id", None)
+
+    try:
+        source_data = (
+            _ORDER_SELECTIONS.get(int(source_channel_id), {})
+            if source_channel_id is not None
+            else {}
+        )
+    except (TypeError, ValueError):
+        source_data = {}
+
+    if isinstance(source_data, dict):
+        fallback_name = str(
+            source_data.get("customer_display_name")
+            or source_data.get("customer_name")
+            or ""
+        ).strip()
+
+        if fallback_name and fallback_name != str(user_id):
+            return fallback_name
+
+    return "未知顧客"
 
 
 def build_self_service_order_embed(
