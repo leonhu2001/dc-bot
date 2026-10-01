@@ -1,0 +1,205 @@
+{% extends "layout.html" %}
+
+{% block page_title %}客戶 360°{% endblock %}
+
+{% block content %}
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <p class="order-no">CUSTOMER 360°</p>
+            <h2>{{ customer.identity.display_name }}</h2>
+            <p class="muted-text">
+                Discord ID：{{ customer.customer_id }}
+                {% if customer.identity.username %} ｜ @{{ customer.identity.username }}{% endif %}
+            </p>
+        </div>
+        <div>
+            <a class="button secondary" href="/admin/search?q={{ customer.customer_id }}">重新搜尋</a>
+            <a class="button secondary" href="/admin/wallets/{{ customer.customer_id }}">完整錢包</a>
+        </div>
+    </div>
+
+    <div class="payout-stat-grid">
+        <div class="payout-stat-card">
+            <span>錢包餘額</span>
+            <strong>{{ customer.wallet.balance_text }}</strong>
+            <p class="muted-text">最近更新：{{ customer.wallet.updated_at }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>VIP 等級</span>
+            <strong>{{ customer.vip.level }}</strong>
+            <p class="muted-text">累積 {{ customer.vip.total_spent_text }} ｜ {{ customer.vip.points }} 點</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>訂單</span>
+            <strong>{{ customer.counts.orders }}</strong>
+            <p class="muted-text">目前可查到的訂單紀錄</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>客服 / 票口</span>
+            <strong>{{ customer.counts.support_calls }} / {{ customer.counts.tickets }}</strong>
+            <p class="muted-text">客服鈴 / 已封存票口</p>
+        </div>
+    </div>
+</div>
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>訂單紀錄</h2>
+            <p class="muted-text">最近 {{ customer.counts.orders }} 筆。</p>
+        </div>
+    </div>
+    {% if customer.orders %}
+        <div class="admin-order-list compact-list">
+            {% for order in customer.orders[:30] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">{{ order.order_no }}</p>
+                            <h3>{{ order.category }}｜{{ order.item }}</h3>
+                        </div>
+                        <span class="status-chip">{{ order.status_label }}</span>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>金額</span><strong>{{ order.amount_text }}</strong></div>
+                        <div><span>付款</span><strong>{{ order.payment_method or '-' }}</strong></div>
+                        <div><span>Ticket ID</span><strong>{{ order.ticket_channel_id or '-' }}</strong></div>
+                        <div><span>建立時間</span><strong>{{ order.created_at_text }}</strong></div>
+                    </div>
+                    <a class="button secondary" href="/admin/order-workspace/{{ order.id }}">開啟訂單</a>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}<div class="empty-state">沒有訂單紀錄。</div>{% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>付款審核</h2>
+    {% if customer.payments %}
+        <div class="admin-order-list compact-list">
+            {% for item in customer.payments[:20] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div><p class="order-no">{{ item.review_no }}</p><h3>{{ item.payment_method }}｜{{ item.amount_text }}</h3></div>
+                        <span class="status-chip">{{ item.status_label }}</span>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>來源</span><strong>{{ item.source_type }} #{{ item.source_id }}</strong></div>
+                        <div><span>Ticket</span><strong>{{ item.ticket_channel_id or '-' }}</strong></div>
+                        <div><span>建立</span><strong>{{ item.created_at_text }}</strong></div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}<div class="empty-state">沒有付款審核紀錄。</div>{% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>儲值 / VIP</h2>
+    <div class="order-meta compact-meta">
+        <div><span>VIP 等級</span><strong>{{ customer.vip.level }}</strong></div>
+        <div><span>累積消費</span><strong>{{ customer.vip.total_spent_text }}</strong></div>
+        <div><span>點數</span><strong>{{ customer.vip.points }}</strong></div>
+        <div><span>已完成數量</span><strong>{{ customer.vip.completed_orders }}</strong></div>
+    </div>
+    {% if customer.topups %}
+        <div class="admin-order-list compact-list" style="margin-top:14px;">
+            {% for item in customer.topups[:20] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div><p class="order-no">{{ item.topup_no }}</p><h3>{{ item.amount_text }}</h3></div>
+                        <span class="status-chip">{{ item.status_label }}</span>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>付款方式</span><strong>{{ item.payment_method }}</strong></div>
+                        <div><span>實際入帳</span><strong>{{ item.credited_amount_text }}</strong></div>
+                        <div><span>建立</span><strong>{{ item.created_at_text }}</strong></div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>錢包流水</h2>
+    {% if customer.wallet.transactions %}
+        <div class="admin-order-list compact-list">
+            {% for tx in customer.wallet.transactions[:20] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div><p class="order-no">#{{ tx.id }}</p><h3>{{ tx.type }}｜{{ tx.amount_text }}</h3></div>
+                        <span>{{ tx.created_at_text }}</span>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>訂單</span><strong>{{ tx.order_no or '-' }}</strong></div>
+                        <div><span>操作人</span><strong>{{ tx.operator_display_name or tx.operator_discord_id or '-' }}</strong></div>
+                        <div style="grid-column: span 2;"><span>備註</span><strong>{{ tx.note or '-' }}</strong></div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}<div class="empty-state">沒有錢包流水。</div>{% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>評價</h2>
+    {% if customer.reviews %}
+        <div class="admin-order-list compact-list">
+            {% for item in customer.reviews[:20] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div><p class="order-no">評價 #{{ item.id }}</p><h3>{{ item.staff_display_name or item.staff_discord_id }}</h3></div>
+                        <strong>{{ item.rating }} / 5</strong>
+                    </div>
+                    <p class="muted-text">{{ item.comment or '未填寫文字評價' }}</p>
+                    <p class="muted-text">{{ item.created_at_text }}</p>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}<div class="empty-state">沒有評價紀錄。</div>{% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>客服鈴</h2>
+    {% if customer.support_calls %}
+        <div class="admin-order-list compact-list">
+            {% for item in customer.support_calls[:20] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div><p class="order-no">客服鈴 #{{ item.id }}</p><h3>Ticket {{ item.ticket_channel_id }}</h3></div>
+                        <span class="status-chip">{{ item.status_label }}</span>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>呼叫</span><strong>{{ item.called_at_text }}</strong></div>
+                        <div><span>接手客服</span><strong>{{ item.claimed_by_display_name or item.claimed_by_discord_id or '-' }}</strong></div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}<div class="empty-state">沒有客服鈴紀錄。</div>{% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>票口紀錄</h2>
+    {% if customer.tickets %}
+        <div class="admin-order-list compact-list">
+            {% for item in customer.tickets[:20] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div><p class="order-no">{{ item.order_no or '未綁訂單' }}</p><h3>{{ item.ticket_channel_name or item.ticket_channel_id }}</h3></div>
+                        <a class="button secondary" href="/admin/tickets/{{ item.id }}">查看聊天紀錄</a>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>Ticket ID</span><strong>{{ item.ticket_channel_id }}</strong></div>
+                        <div><span>訊息數</span><strong>{{ item.message_count }}</strong></div>
+                        <div><span>客服</span><strong>{{ item.customer_service_display_name or item.customer_service_discord_id or '-' }}</strong></div>
+                        <div><span>關閉時間</span><strong>{{ item.closed_at_text }}</strong></div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}<div class="empty-state">沒有已封存票口。</div>{% endif %}
+</div>
+{% endblock %}
