@@ -226,7 +226,7 @@ def inspect_git(root: Path | None = None) -> dict[str, Any]:
             "branch": "-",
             "commit_time": "-",
             "subject": "無法取得版本資訊",
-            "dirty": False,
+            "dirty": None,
         }
 
     branch = _run_command(
@@ -258,7 +258,7 @@ def inspect_git(root: Path | None = None) -> dict[str, Any]:
         "branch": branch["stdout"] if branch["ok"] else "-",
         "commit_time": commit_time,
         "subject": subject,
-        "dirty": bool(dirty["ok"] and dirty["stdout"]),
+        "dirty": bool(dirty["stdout"]) if dirty["ok"] else None,
     }
 
 
