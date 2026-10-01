@@ -403,15 +403,7 @@ def _check_wallet_paid_orders(
 
     rows = web.execute(
         """
-        SELECT
-            id,
-            bot_order_no,
-            ticket_channel_id,
-            customer_discord_id,
-            amount,
-            customer_pay_amount,
-            payment_method,
-            status
+        SELECT *
         FROM web_orders
         WHERE payment_method = '我的錢包'
           AND LOWER(COALESCE(status, '')) IN ('active', 'stored', 'closed')
@@ -424,7 +416,9 @@ def _check_wallet_paid_orders(
         order_id = _as_int(order["id"])
         order_no = _normalize(order["bot_order_no"])
         customer_id = _normalize(order["customer_discord_id"])
-        ticket_channel_id = _normalize(order["ticket_channel_id"])
+        ticket_channel_id = _normalize(
+            order.get("ticket_channel_id")
+        )
         expected_amount = -_as_int(
             order["customer_pay_amount"]
             if order["customer_pay_amount"] is not None
