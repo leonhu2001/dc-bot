@@ -58,6 +58,7 @@ CATEGORY_LABELS = {
     "sync": "Discord 同步",
     "topup": "儲值流程",
     "accounting": "帳務對帳",
+    "support": "客服鈴",
 }
 
 
@@ -645,6 +646,92 @@ def _check_topups(
             )
 
 
+def _check_support_calls(
+    web: sqlite3.Connection,
+    issues: list[dict[str, Any]],
+    *,
+    now: datetime,
+) -> None:
+    if not _table_exists(web, "support_calls"):
+        return
+
+    rows = web.execute(
+        """
+        SELECT
+            id,
+            ticket_channel_id,
+            customer_discord_id,
+            status,
+            called_at,
+            claimed_at,
+            updated_at
+        FROM support_calls
+        WHERE status IN ('open', 'claimed')
+        ORDER BY id DESC
+        LIMIT 300
+        """
+    ).fetchall()
+
+    for row in rows:
+        data = dict(row)
+        status = str(data.get("status") or "").strip().lower()
+        call_id = int(data.get("id") or 0)
+        reference = f"客服鈴 #{call_id}"
+        age = _age_minutes(
+            data.get("called_at") or data.get("updated_at"),
+            now=now,
+        )
+
+        if status == "open" and age is not None and age >= 15:
+            _issue(
+                issues,
+                category="support",
+                code="support_call_unclaimed_15m",
+                severity="critical",
+                reference=reference,
+                title="客服鈴超過 15 分鐘仍未接手",
+                detail=(
+                    f"票口 {data.get('ticket_channel_id') or '-'} 的客服需求"
+                    f"已等待 {_format_age(age)}。"
+                ),
+                age_minutes=age,
+                action_url="/admin/support-calls",
+                action_label="查看客服鈴",
+            )
+        elif status == "open" and age is not None and age >= 5:
+            _issue(
+                issues,
+                category="support",
+                code="support_call_unclaimed_5m",
+                severity="warning",
+                reference=reference,
+                title="客服鈴超過 5 分鐘仍未接手",
+                detail=(
+                    f"票口 {data.get('ticket_channel_id') or '-'} 的客服需求"
+                    f"已等待 {_format_age(age)}。"
+                ),
+                age_minutes=age,
+                action_url="/admin/support-calls",
+                action_label="查看客服鈴",
+            )
+        elif status == "claimed" and age is not None and age >= 120:
+            _issue(
+                issues,
+                category="support",
+                code="support_call_claimed_long",
+                severity="warning",
+                reference=reference,
+                title="客服鈴已接手但長時間未完成",
+                detail=(
+                    f"票口 {data.get('ticket_channel_id') or '-'} 的客服需求"
+                    f"自呼叫起已 {_format_age(age)}，請確認是否忘記完成處理。"
+                ),
+                age_minutes=age,
+                action_url="/admin/support-calls",
+                action_label="查看客服鈴",
+            )
+
+
 def _append_accounting_issues(
     issues: list[dict[str, Any]],
     accounting: dict[str, Any],
@@ -710,6 +797,7 @@ def build_anomaly_snapshot(
             _check_orders(web, issues, now=now)
             _check_payment_reviews(web, issues, now=now)
             _check_sync_events(web, issues, now=now)
+            _check_support_calls(web, issues, now=now)
         finally:
             web.close()
 

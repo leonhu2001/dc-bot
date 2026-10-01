@@ -263,3 +263,64 @@ def test_empty_sources_return_ok(tmp_path, monkeypatch):
     assert snapshot["status"] == "ok"
     assert snapshot["issue_count"] == 0
     assert snapshot["issues"] == []
+
+
+def test_anomaly_snapshot_surfaces_overdue_support_call(tmp_path, monkeypatch):
+    web_path = tmp_path / "web_dashboard.db"
+    bot_path = tmp_path / "bot.db"
+    _create_web_db(web_path)
+    _create_bot_db(bot_path)
+
+    with sqlite3.connect(web_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE support_calls (
+                id INTEGER PRIMARY KEY,
+                ticket_channel_id TEXT,
+                customer_discord_id TEXT,
+                status TEXT,
+                called_at TEXT,
+                claimed_at TEXT,
+                updated_at TEXT
+            );
+
+            INSERT INTO support_calls (
+                id,
+                ticket_channel_id,
+                customer_discord_id,
+                status,
+                called_at,
+                updated_at
+            )
+            VALUES (
+                1,
+                '555',
+                '777',
+                'open',
+                '2026-10-02T03:30:00+08:00',
+                '2026-10-02T03:30:00+08:00'
+            );
+            """
+        )
+        conn.commit()
+
+    monkeypatch.setattr(
+        anomaly_detection,
+        "build_accounting_reconciliation_snapshot",
+        _empty_accounting,
+    )
+
+    snapshot = anomaly_detection.build_anomaly_snapshot(
+        tmp_path,
+        now=datetime(2026, 10, 2, 4, 0, tzinfo=TAIPEI_TZ),
+    )
+
+    issue = next(
+        item
+        for item in snapshot["issues"]
+        if item["code"] == "support_call_unclaimed_15m"
+    )
+
+    assert issue["severity"] == "critical"
+    assert issue["category"] == "support"
+    assert issue["action_url"] == "/admin/support-calls"

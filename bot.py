@@ -135,6 +135,11 @@ from services.logging_service import (
     send_order_log,
 )
 
+from services.support_calls import (
+    ensure_support_call_tables,
+    close_support_calls_for_ticket,
+)
+
 from services.orders import (
     _to_int,
     configure_order_helpers,
@@ -205,6 +210,14 @@ from views.support import (
     ComplaintPanelView,
     ComplaintResolveView,
     FeedbackPanelView,
+)
+
+from views.support_calls import (
+    configure_support_call_views,
+    SupportCallButton,
+    SupportCallActionView,
+    refresh_existing_order_ticket_support_buttons,
+    support_call_sla_loop,
 )
 
 from core.vip_levels import (
@@ -702,6 +715,13 @@ configure_support_views(
 )
 
 
+configure_support_call_views(
+    customer_service_role_id=CUSTOMER_ROLE_ID,
+    manager_role_id=MANAGER_ROLE_ID,
+    send_order_log_callback=send_order_log,
+)
+
+
 def get_order_customer_id_from_channel(channel: discord.TextChannel) -> int | None:
     """
     優先從頻道 topic 讀取點單顧客 ID。
@@ -868,6 +888,17 @@ async def create_private_channel(
 
 def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) -> None:
     """DC bot 結單後，把網站訂單狀態同步成 closed，並同步付款前接單 lifecycle。"""
+    try:
+        close_support_calls_for_ticket(
+            ticket_channel_id,
+            reason="order_closed",
+        )
+    except Exception as exc:
+        print(
+            f"[support-call] close cleanup failed "
+            f"ticket_channel_id={ticket_channel_id}: {exc}",
+            flush=True,
+        )
     try:
         from datetime import datetime, timedelta
 
@@ -11484,6 +11515,7 @@ class OrderControlView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(OrderControlSelect())
+        self.add_item(SupportCallButton())
 
     @discord.ui.button(
         label="確認",
@@ -12536,6 +12568,7 @@ async def register_core_persistent_views_once() -> None:
     bot.add_view(ComplaintPanelView())
     bot.add_view(FeedbackPanelView())
     bot.add_view(ComplaintResolveView())
+    bot.add_view(SupportCallActionView())
 
     bot._core_persistent_views_registered = True
     print("[persistent-views] core views registered", flush=True)
@@ -12574,6 +12607,12 @@ async def on_ready():
         bot._reward_redeem_view_registered = True
 
     ensure_wallet_tables()
+    ensure_support_call_tables()
+
+    if not getattr(bot, "_support_call_sla_worker_started", False):
+        bot._support_call_sla_worker_started = True
+        bot.loop.create_task(support_call_sla_loop(bot))
+        print("[support-call] SLA worker started", flush=True)
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0
@@ -12685,6 +12724,29 @@ async def on_ready():
                 f"{type(exc).__name__}: {exc}",
                 flush=True,
             )
+
+        if not getattr(bot, "_support_call_ticket_controls_refreshed", False):
+            try:
+                refreshed_support_buttons = (
+                    await refresh_existing_order_ticket_support_buttons(
+                        guild_for_voice,
+                        category_id=CUSTOMER_CATEGORY_ID,
+                        order_control_view_factory=OrderControlView,
+                    )
+                )
+                bot._support_call_ticket_controls_refreshed = True
+                if refreshed_support_buttons:
+                    print(
+                        f"[support-call] refreshed ticket controls: "
+                        f"{refreshed_support_buttons}",
+                        flush=True,
+                    )
+            except Exception as exc:
+                print(
+                    f"[support-call] ticket control refresh failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
 
         await get_or_create_order_log_channel(guild_for_voice)
         if not BACKUP_TASK_STARTED:
@@ -13884,6 +13946,17 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
 
 def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
     """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled，並同步付款前接單 lifecycle。"""
+    try:
+        close_support_calls_for_ticket(
+            ticket_channel_id,
+            reason="order_cancelled",
+        )
+    except Exception as exc:
+        print(
+            f"[support-call] cancel cleanup failed "
+            f"ticket_channel_id={ticket_channel_id}: {exc}",
+            flush=True,
+        )
     try:
         from shared.web_order_sync import update_web_order_status_by_ticket_channel
 
