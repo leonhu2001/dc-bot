@@ -87,13 +87,26 @@ def upsert_web_order_from_dispatch(
                 .limit(1)
             )
 
-        if order is None:
+        created_new = order is None
+        next_status = normalize_order_status(status or "active")
+
+        if created_new:
             order = WebOrder(
                 ticket_channel_id=ticket_channel_id_text,
                 category=str(category or "未紀錄"),
                 item=str(item or "未紀錄"),
+                status=next_status,
             )
             db.add(order)
+        else:
+            transition_order_state_in_connection(
+                db.connection(),
+                order_id=int(order.id),
+                target_status=next_status,
+                source="dispatch_upsert",
+                reason="Discord 派單建立／更新同步",
+            )
+            db.expire(order, ["status"])
 
         order.bot_order_no = bot_order_no
         order.ticket_channel_id = ticket_channel_id_text
@@ -133,9 +146,7 @@ def upsert_web_order_from_dispatch(
             order.store_absorbed_amount = _to_int(store_absorbed_amount, 0)
 
         order.payment_method = payment_method or "未紀錄"
-        next_status = str(status or "active")
-        order.status = next_status
-        if next_status in {"closed", "cancelled", "canceled"} and not getattr(order, "closed_at", None):
+        if next_status in {"closed", "cancelled"} and not getattr(order, "closed_at", None):
             order.closed_at = _web_order_closed_at_now()
         order.customer_service_discord_id = _to_text_id(customer_service_discord_id)
         order.customer_service_display_name = customer_service_display_name
