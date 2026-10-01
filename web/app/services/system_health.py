@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -211,6 +212,32 @@ def inspect_service(service_name: str) -> dict[str, Any]:
     }
 
 
+def _read_deployment_marker(root: Path) -> dict[str, Any] | None:
+    marker_path = root / "data" / "deployed_version.json"
+
+    try:
+        payload = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    commit = str(payload.get("commit") or "").strip()
+    if not commit:
+        return None
+
+    return {
+        "available": True,
+        "commit": commit[:12],
+        "branch": str(payload.get("branch") or "main"),
+        "commit_time": str(payload.get("deployed_at") or "-"),
+        "subject": str(payload.get("subject") or "-"),
+        "dirty": None,
+        "source": "deployment_marker",
+    }
+
+
 def inspect_git(root: Path | None = None) -> dict[str, Any]:
     root = root or repository_root()
 
@@ -220,6 +247,10 @@ def inspect_git(root: Path | None = None) -> dict[str, Any]:
         timeout=2.0,
     )
     if not commit["ok"]:
+        marker = _read_deployment_marker(root)
+        if marker is not None:
+            return marker
+
         return {
             "available": False,
             "commit": "-",
@@ -227,6 +258,7 @@ def inspect_git(root: Path | None = None) -> dict[str, Any]:
             "commit_time": "-",
             "subject": "無法取得版本資訊",
             "dirty": None,
+            "source": "unavailable",
         }
 
     branch = _run_command(
@@ -259,6 +291,7 @@ def inspect_git(root: Path | None = None) -> dict[str, Any]:
         "commit_time": commit_time,
         "subject": subject,
         "dirty": bool(dirty["stdout"]) if dirty["ok"] else None,
+        "source": "git",
     }
 
 
