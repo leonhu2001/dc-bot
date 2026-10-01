@@ -1,0 +1,213 @@
+{% extends "layout.html" %}
+
+{% block page_title %}帳務對帳中心{% endblock %}
+
+{% block content %}
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>帳務總覽</h2>
+            <p class="muted-text">
+                只讀對帳：錢包流水、儲值、訂單扣款、雞腿與分潤。
+            </p>
+        </div>
+
+        <div>
+            <span class="status-chip {% if reconciliation.status == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
+                {{ reconciliation.status_text }}
+            </span>
+
+            <a class="button secondary" href="/admin/accounting-reconciliation">
+                重新檢查
+            </a>
+        </div>
+    </div>
+
+    <div class="payout-stat-grid">
+
+        <div class="payout-stat-card">
+            <span>全部異常</span>
+            <strong>{{ reconciliation.issue_count }}</strong>
+            <p class="muted-text">所有可客觀驗證的對帳差異</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>Critical</span>
+            <strong>{{ reconciliation.critical_count }}</strong>
+            <p class="muted-text">可能影響金額或帳本完整性</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>Warning</span>
+            <strong>{{ reconciliation.warning_count }}</strong>
+            <p class="muted-text">資料可疑，但不一定代表金額錯誤</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>錢包</span>
+            <strong>{{ reconciliation.category_counts.get('wallet', 0) }}</strong>
+            <p class="muted-text">流水公式、鏈結與目前餘額</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>儲值</span>
+            <strong>{{ reconciliation.category_counts.get('topup', 0) }}</strong>
+            <p class="muted-text">本金、回饋與 wallet transaction</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>訂單扣款</span>
+            <strong>{{ reconciliation.category_counts.get('order_payment', 0) }}</strong>
+            <p class="muted-text">我的錢包訂單與 payment 流水</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>雞腿</span>
+            <strong>{{ reconciliation.category_counts.get('tip', 0) }}</strong>
+            <p class="muted-text">worker_tip 與 tip_payment 流水</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>分潤</span>
+            <strong>{{ reconciliation.category_counts.get('payout', 0) }}</strong>
+            <p class="muted-text">Assignment、打手與客服應得</p>
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>對帳異常明細</h2>
+            <p class="muted-text">
+                此頁不會自動修改任何金額。先確認歷史資料，再決定哪些異常可以安全修復。
+            </p>
+        </div>
+    </div>
+
+    {% if reconciliation.issues %}
+
+        <div class="admin-order-list compact-list">
+
+            {% for issue in reconciliation.issues %}
+
+                <article class="admin-order-card compact-order-card">
+
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">
+                                {{ issue.reference }}
+                            </p>
+                            <h3>{{ issue.title }}</h3>
+                        </div>
+
+                        <span class="status-chip {% if issue.severity == 'critical' %}is-unpaid{% endif %}">
+                            {{ issue.severity }}
+                        </span>
+                    </div>
+
+                    <div class="order-meta compact-meta">
+
+                        <div>
+                            <span>類型</span>
+                            <strong>{{ issue.category }}</strong>
+                        </div>
+
+                        <div>
+                            <span>代碼</span>
+                            <strong>{{ issue.code }}</strong>
+                        </div>
+
+                        <div>
+                            <span>預期</span>
+                            <strong>
+                                {% if issue.expected is not none %}
+                                    {{ issue.expected }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>實際</span>
+                            <strong>
+                                {% if issue.actual is not none %}
+                                    {{ issue.actual }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    <p class="muted-text">
+                        {{ issue.detail }}
+                    </p>
+
+                </article>
+
+            {% endfor %}
+
+        </div>
+
+        {% if reconciliation.truncated %}
+            <div class="empty-state">
+                異常筆數超過顯示上限，目前只顯示前 200 筆。
+            </div>
+        {% endif %}
+
+    {% else %}
+
+        <div class="empty-state">
+            目前沒有偵測到可驗證的帳務差異。
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <h2>對帳規則</h2>
+
+    <div class="order-meta compact-meta">
+
+        <div>
+            <span>錢包流水</span>
+            <strong>before + amount = after</strong>
+        </div>
+
+        <div>
+            <span>錢包鏈</span>
+            <strong>上一筆 after = 下一筆 before</strong>
+        </div>
+
+        <div>
+            <span>儲值</span>
+            <strong>本金 + 回饋 = 實得</strong>
+        </div>
+
+        <div>
+            <span>分潤</span>
+            <strong>依目前 assignment / override 重算</strong>
+        </div>
+
+    </div>
+
+    <p class="muted-text">
+        VIP 累積與會員點數目前不做「自動重算覆蓋」，因為系統包含手動補登、
+        降階進度重置、儲值只計 VIP 不給點數等合法例外；後續會先建立可追溯 ledger 再納入。
+    </p>
+
+</div>
+
+{% endblock %}
