@@ -54,8 +54,22 @@ WEB_DB_CHECKS = (
         FROM web_orders o
         JOIN order_acceptance_meta m
           ON m.order_id = o.id
-        WHERE LOWER(TRIM(COALESCE(o.status, '')))
-           != LOWER(TRIM(COALESCE(m.status, '')))
+        WHERE CASE LOWER(TRIM(COALESCE(o.status, '')))
+                WHEN 'created' THEN 'pending_cs_dispatch'
+                WHEN 'paid' THEN 'active'
+                WHEN 'completed' THEN 'closed'
+                WHEN 'done' THEN 'closed'
+                WHEN 'canceled' THEN 'cancelled'
+                ELSE LOWER(TRIM(COALESCE(o.status, '')))
+             END
+           != CASE LOWER(TRIM(COALESCE(m.status, '')))
+                WHEN 'created' THEN 'pending_cs_dispatch'
+                WHEN 'paid' THEN 'active'
+                WHEN 'completed' THEN 'closed'
+                WHEN 'done' THEN 'closed'
+                WHEN 'canceled' THEN 'cancelled'
+                ELSE LOWER(TRIM(COALESCE(m.status, '')))
+             END
         """,
     ),
 )
