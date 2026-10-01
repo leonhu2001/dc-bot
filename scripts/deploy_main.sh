@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP="\${APP_DIR:-/opt/dc-bot}"
-BOT_SERVICE="\${BOT_SERVICE:-dc-bot.service}"
-WEB_SERVICE="\${WEB_SERVICE:-dc-bot-dashboard.service}"
-TARGET="\${1:-}"
+APP="${APP_DIR:-/opt/dc-bot}"
+BOT_SERVICE="${BOT_SERVICE:-dc-bot.service}"
+WEB_SERVICE="${WEB_SERVICE:-dc-bot-dashboard.service}"
+TARGET="${1:-}"
 
 if [ -z "$TARGET" ]; then
     echo "Usage: $0 <target-commit>"
@@ -87,7 +87,7 @@ echo
 echo "=== 2. FETCH TARGET ==="
 git fetch origin main
 
-if ! git cat-file -e "\${TARGET}^{commit}" 2>/dev/null; then
+if ! git cat-file -e "${TARGET}^{commit}" 2>/dev/null; then
     echo "ERROR: target commit does not exist."
     exit 1
 fi
