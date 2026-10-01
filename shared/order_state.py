@@ -238,6 +238,7 @@ def transition_order_state_in_connection(
     actor_discord_id: str | int | None = None,
     expected_statuses: Iterable[str] | None = None,
     sync_acceptance_meta: bool = True,
+    require_empty_dispatch_message: bool = False,
 ) -> OrderStateTransitionResult:
     row = conn.execute(
         text(
@@ -291,6 +292,13 @@ def transition_order_state_in_connection(
             acceptance_meta_synced=acceptance_synced,
         )
 
+    guard_sql = ""
+    if require_empty_dispatch_message:
+        guard_sql = (
+            " AND (dispatch_message_id IS NULL "
+            "OR TRIM(dispatch_message_id) = '')"
+        )
+
     result = conn.execute(
         text(
             """
@@ -300,6 +308,7 @@ def transition_order_state_in_connection(
             WHERE id = :order_id
               AND status = :raw_current
             """
+            + guard_sql
         ),
         {
             "target_status": target,
@@ -363,6 +372,7 @@ def transition_order_state(
     actor_discord_id: str | int | None = None,
     expected_statuses: Iterable[str] | None = None,
     sync_acceptance_meta: bool = True,
+    require_empty_dispatch_message: bool = False,
 ) -> OrderStateTransitionResult:
     from shared.db import engine
 
@@ -376,6 +386,7 @@ def transition_order_state(
             actor_discord_id=actor_discord_id,
             expected_statuses=expected_statuses,
             sync_acceptance_meta=sync_acceptance_meta,
+            require_empty_dispatch_message=require_empty_dispatch_message,
         )
 
 
