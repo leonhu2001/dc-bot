@@ -97,6 +97,7 @@ def _load_wallet_state(
 ) -> tuple[
     dict[int, dict[str, Any]],
     dict[tuple[str, str, str], list[dict[str, Any]]],
+    dict[tuple[str, str, str], list[dict[str, Any]]],
 ]:
     if not _table_exists(bot, "wallet_transactions"):
         _issue(
@@ -108,7 +109,7 @@ def _load_wallet_state(
             title="錢包流水表不存在",
             detail="找不到 wallet_transactions，無法執行錢包對帳。",
         )
-        return {}, {}
+        return {}, {}, {}
 
     wallet_rows: dict[str, int] = {}
     if _table_exists(bot, "customer_wallets"):
@@ -124,6 +125,7 @@ def _load_wallet_state(
 
     tx_by_id: dict[int, dict[str, Any]] = {}
     tx_by_reference: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    tx_by_ticket: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     tx_by_customer: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
     rows = bot.execute(
@@ -149,12 +151,16 @@ def _load_wallet_state(
         customer_id = _normalize(tx["customer_discord_id"])
         tx_type = _normalize(tx["type"])
         order_no = _normalize(tx["order_no"])
+        order_channel_id = _normalize(tx["order_channel_id"])
 
         tx_by_id[tx_id] = tx
         tx_by_customer[customer_id].append(tx)
 
         if order_no:
             tx_by_reference[(customer_id, order_no, tx_type)].append(tx)
+
+        if order_channel_id:
+            tx_by_ticket[(customer_id, order_channel_id, tx_type)].append(tx)
 
         before = _as_int(tx["balance_before"])
         amount = _as_int(tx["amount"])
@@ -250,7 +256,7 @@ def _load_wallet_state(
             actual=len(reference_rows),
         )
 
-    return tx_by_id, dict(tx_by_reference)
+    return tx_by_id, dict(tx_by_reference), dict(tx_by_ticket)
 
 
 def _check_topups(
@@ -389,6 +395,7 @@ def _check_topups(
 def _check_wallet_paid_orders(
     web: sqlite3.Connection,
     tx_by_reference: dict[tuple[str, str, str], list[dict[str, Any]]],
+    tx_by_ticket: dict[tuple[str, str, str], list[dict[str, Any]]],
     issues: list[dict[str, Any]],
 ) -> None:
     if not _table_exists(web, "web_orders"):
@@ -396,14 +403,7 @@ def _check_wallet_paid_orders(
 
     rows = web.execute(
         """
-        SELECT
-            id,
-            bot_order_no,
-            customer_discord_id,
-            amount,
-            customer_pay_amount,
-            payment_method,
-            status
+        SELECT *
         FROM web_orders
         WHERE payment_method = '我的錢包'
           AND LOWER(COALESCE(status, '')) IN ('active', 'stored', 'closed')
@@ -416,6 +416,9 @@ def _check_wallet_paid_orders(
         order_id = _as_int(order["id"])
         order_no = _normalize(order["bot_order_no"])
         customer_id = _normalize(order["customer_discord_id"])
+        ticket_channel_id = _normalize(
+            order.get("ticket_channel_id")
+        )
         expected_amount = -_as_int(
             order["customer_pay_amount"]
             if order["customer_pay_amount"] is not None
@@ -423,7 +426,7 @@ def _check_wallet_paid_orders(
         )
         reference = order_no or f"WEB-{order_id}"
 
-        if not order_no or not customer_id:
+        if not customer_id:
             _issue(
                 issues,
                 category="order_payment",
@@ -431,11 +434,31 @@ def _check_wallet_paid_orders(
                 severity="warning",
                 reference=f"WEB-{order_id}",
                 title="錢包訂單缺少可對帳識別碼",
-                detail="找不到 bot_order_no 或 customer_discord_id，無法比對錢包流水。",
+                detail="找不到 customer_discord_id，無法比對錢包流水。",
             )
             continue
 
-        txs = tx_by_reference.get((customer_id, order_no, "payment"), [])
+        txs = (
+            tx_by_reference.get((customer_id, order_no, "payment"), [])
+            if order_no
+            else []
+        )
+
+        if not txs and ticket_channel_id:
+            ticket_txs = tx_by_ticket.get(
+                (customer_id, ticket_channel_id, "payment"),
+                [],
+            )
+            amount_matches = [
+                tx
+                for tx in ticket_txs
+                if _as_int(tx.get("amount")) == expected_amount
+            ]
+            if len(amount_matches) == 1:
+                txs = amount_matches
+            elif len(ticket_txs) == 1:
+                txs = ticket_txs
+
         if not txs:
             _issue(
                 issues,
@@ -444,7 +467,10 @@ def _check_wallet_paid_orders(
                 severity="critical",
                 reference=reference,
                 title="錢包付款訂單缺少扣款流水",
-                detail="訂單標記為「我的錢包」付款，但找不到 payment 流水。",
+                detail=(
+                    "訂單標記為「我的錢包」付款，但用訂單編號與票口 ID "
+                    "都找不到可對應的 payment 流水。"
+                ),
                 expected=expected_amount,
                 actual=None,
             )
@@ -672,8 +698,6 @@ def _check_payouts(
             customer_service_display_name
         FROM web_orders
         WHERE LOWER(COALESCE(status, '')) IN (
-            'active',
-            'stored',
             'closed',
             'cancelled',
             'canceled'
@@ -1053,13 +1077,22 @@ def build_accounting_reconciliation_snapshot(
 
         tx_by_id: dict[int, dict[str, Any]] = {}
         tx_by_reference: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+        tx_by_ticket: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
 
         if bot is not None:
-            tx_by_id, tx_by_reference = _load_wallet_state(bot, issues)
+            tx_by_id, tx_by_reference, tx_by_ticket = _load_wallet_state(
+                bot,
+                issues,
+            )
             _check_topups(bot, tx_by_id, issues)
 
         if web is not None:
-            _check_wallet_paid_orders(web, tx_by_reference, issues)
+            _check_wallet_paid_orders(
+                web,
+                tx_by_reference,
+                tx_by_ticket,
+                issues,
+            )
             referenced_tip_tx_ids = _check_worker_tips(web, tx_by_id, issues)
             _check_payouts(web, issues)
         else:
