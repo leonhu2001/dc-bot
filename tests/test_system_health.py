@@ -126,3 +126,40 @@ def test_inspect_service_fails_closed_when_systemctl_unavailable(monkeypatch):
     assert snapshot["available"] is False
     assert snapshot["ok"] is False
     assert snapshot["status_text"] == "無法取得"
+
+def test_inspect_git_uses_deployment_marker_when_git_is_unavailable(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "deployed_version.json").write_text(
+        """
+{
+  "commit": "1234567890abcdef1234567890abcdef12345678",
+  "branch": "main",
+  "deployed_at": "2026-10-02T00:30:00+08:00",
+  "subject": "Test deploy marker",
+  "status": "success"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        system_health,
+        "_run_command",
+        lambda *args, **kwargs: {
+            "ok": False,
+            "returncode": 128,
+            "stdout": "",
+            "error": "git unavailable",
+        },
+    )
+
+    snapshot = system_health.inspect_git(tmp_path)
+
+    assert snapshot["available"] is True
+    assert snapshot["commit"] == "1234567890ab"
+    assert snapshot["branch"] == "main"
+    assert snapshot["subject"] == "Test deploy marker"
+    assert snapshot["source"] == "deployment_marker"
+    assert snapshot["dirty"] is None
+
