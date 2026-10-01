@@ -70,6 +70,7 @@ def prepare_initial_smart_dispatch(
     allowed_role_ids: list[str],
     specified_staff_ids: list[str],
     required_staff_count: int,
+    excluded_staff_ids: Iterable[str | int] = (),
     db_file: str | Path | None = None,
 ) -> dict:
     candidate_ids = get_eligible_dispatch_candidate_ids(
@@ -77,6 +78,19 @@ def prepare_initial_smart_dispatch(
         allowed_role_ids=allowed_role_ids,
         specified_staff_ids=specified_staff_ids,
     )
+
+    excluded = {
+        str(item)
+        for item in excluded_staff_ids
+        if str(item).strip()
+    }
+
+    if excluded:
+        candidate_ids = [
+            worker_id
+            for worker_id in candidate_ids
+            if worker_id not in excluded
+        ]
 
     ranked_ids = rank_dispatch_candidates(
         candidate_ids,
