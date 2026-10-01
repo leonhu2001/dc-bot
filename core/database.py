@@ -824,6 +824,21 @@ def init_database() -> None:
         )
         """)
         cur.execute("""
+        CREATE TABLE IF NOT EXISTS vip_voice_room_whitelist (
+            owner_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            added_by INTEGER,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (owner_id, user_id)
+        )
+        """)
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_vip_voice_room_whitelist_user
+            ON vip_voice_room_whitelist(user_id, owner_id)
+            """
+        )
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS bot_migrations (
             migration_key TEXT PRIMARY KEY,
             applied_at TEXT NOT NULL
@@ -1056,6 +1071,87 @@ def list_hidden_vip_users() -> list[dict]:
         return []
 
 
+def add_vip_voice_room_whitelist_user(
+    owner_id: int,
+    user_id: int,
+    *,
+    added_by: int | None = None,
+) -> bool:
+    """加入 VIP 房白名單；同一房主 / 使用者組合不重複。"""
+    _ensure_database_ready()
+    now = get_taipei_now_iso()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO vip_voice_room_whitelist (
+                    owner_id,
+                    user_id,
+                    added_by,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    int(owner_id),
+                    int(user_id),
+                    int(added_by) if added_by is not None else None,
+                    now,
+                ),
+            )
+            conn.commit()
+            return bool(cur.rowcount)
+    except sqlite3.Error as e:
+        print(f"新增 VIP 房白名單失敗：{e}")
+        return False
+
+
+def remove_vip_voice_room_whitelist_user(
+    owner_id: int,
+    user_id: int,
+) -> bool:
+    """從指定 VIP 房白名單移除使用者。"""
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            cur = conn.execute(
+                """
+                DELETE FROM vip_voice_room_whitelist
+                WHERE owner_id=? AND user_id=?
+                """,
+                (int(owner_id), int(user_id)),
+            )
+            conn.commit()
+            return bool(cur.rowcount)
+    except sqlite3.Error as e:
+        print(f"移除 VIP 房白名單失敗：{e}")
+        return False
+
+
+def list_vip_voice_room_whitelist(owner_id: int) -> list[dict]:
+    """列出指定 VIP 房目前白名單。"""
+    _ensure_database_ready()
+
+    try:
+        with sqlite3.connect(_require_db_file()) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT owner_id, user_id, added_by, created_at
+                FROM vip_voice_room_whitelist
+                WHERE owner_id=?
+                ORDER BY created_at, user_id
+                """,
+                (int(owner_id),),
+            ).fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as e:
+        print(f"讀取 VIP 房白名單失敗：{e}")
+        return []
+
+
 def upsert_vip_voice_room(
     owner_id: int,
     channel_id: int,
@@ -1174,6 +1270,24 @@ def delete_vip_voice_room_record(
 
     try:
         with sqlite3.connect(_require_db_file()) as conn:
+            owners_to_delete: set[int] = set()
+
+            if owner_id is not None:
+                owners_to_delete.add(int(owner_id))
+
+            if channel_id is not None:
+                rows = conn.execute(
+                    "SELECT owner_id FROM vip_voice_rooms WHERE channel_id=?",
+                    (int(channel_id),),
+                ).fetchall()
+                owners_to_delete.update(int(row[0]) for row in rows)
+
+            for whitelist_owner_id in owners_to_delete:
+                conn.execute(
+                    "DELETE FROM vip_voice_room_whitelist WHERE owner_id=?",
+                    (int(whitelist_owner_id),),
+                )
+
             if owner_id is not None and channel_id is not None:
                 conn.execute(
                     "DELETE FROM vip_voice_rooms WHERE owner_id=? OR channel_id=?",
