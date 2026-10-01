@@ -47,6 +47,17 @@ WEB_DB_CHECKS = (
         )
         """,
     ),
+    (
+        "order_state_drift",
+        """
+        SELECT COUNT(*)
+        FROM web_orders o
+        JOIN order_acceptance_meta m
+          ON m.order_id = o.id
+        WHERE LOWER(TRIM(COALESCE(o.status, '')))
+           != LOWER(TRIM(COALESCE(m.status, '')))
+        """,
+    ),
 )
 
 BOT_DB_CHECKS = (
@@ -497,6 +508,7 @@ def build_system_health_snapshot(root: Path | None = None) -> dict[str, Any]:
         "sync_failed": databases["web"]["metrics"].get("sync_failed"),
         "sync_backlog": databases["web"]["metrics"].get("sync_backlog"),
         "open_orders": databases["web"]["metrics"].get("open_orders"),
+        "order_state_drift": databases["web"]["metrics"].get("order_state_drift"),
         "topup_pending": databases["bot"]["metrics"].get("topup_pending"),
         "negative_wallets": databases["bot"]["metrics"].get("negative_wallets"),
         "wallet_duplicate_refs": databases["bot"]["metrics"].get("wallet_duplicate_refs"),
@@ -542,6 +554,7 @@ def build_system_health_snapshot(root: Path | None = None) -> dict[str, Any]:
         "sync_failed": "同步失敗",
         "negative_wallets": "負數錢包",
         "wallet_duplicate_refs": "重複錢包交易識別碼",
+        "order_state_drift": "訂單狀態不同步",
     }
     for key, label in alert_metric_labels.items():
         value = metrics.get(key)
