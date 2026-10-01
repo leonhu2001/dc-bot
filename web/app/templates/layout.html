@@ -224,6 +224,21 @@
 
 </header>
 
+{% if mw_admin_area %}
+<div style="margin:0 0 18px 0;">
+    <form method="get" action="/admin/search" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+        <input
+            class="input"
+            type="text"
+            name="q"
+            value="{% if _p.startswith('/admin/search') %}{{ request.query_params.get('q', '') }}{% endif %}"
+            placeholder="全域搜尋：Discord ID、暱稱、訂單號、付款單、儲值單、Ticket ID"
+            autocomplete="off"
+        >
+        <button class="button" type="submit">搜尋</button>
+    </form>
+</div>
+{% endif %}
 
 
         <section class="mw-r5-content">

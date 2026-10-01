@@ -17,6 +17,14 @@
             營運總覽
         </a>
 
+
+        <a
+            class="{% if _p.startswith('/admin/search') %}active{% endif %}"
+            href="/admin/search"
+        >
+            全域搜尋
+        </a>
+
         <a
             class="{% if _p.startswith('/admin/staff') and not _p.startswith('/admin/staff_profiles') %}active{% endif %}"
             href="/admin/staff"

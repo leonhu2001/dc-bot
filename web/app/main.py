@@ -24,6 +24,7 @@ from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
 from web.app.routers.admin_audit import router as admin_audit_router
 from web.app.routers.admin_system import router as admin_system_router
+from web.app.routers.admin_global_search import router as admin_global_search_router
 from web.app.routers.admin_support_calls import router as admin_support_calls_router
 from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
@@ -395,6 +396,7 @@ app.include_router(admin_router)
 app.include_router(admin_staff_router)
 app.include_router(admin_audit_router)
 app.include_router(admin_system_router)
+app.include_router(admin_global_search_router)
 app.include_router(admin_support_calls_router)
 app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
