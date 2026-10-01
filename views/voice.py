@@ -1382,12 +1382,187 @@ def update_voice_control_embed_status(message: discord.Message | None, voice_cha
     embed.description = inject_voice_control_status_line(embed.description or "", voice_channel_id)
     return embed
 
+def build_vip_whitelist_summary(owner_id: int) -> str:
+    user_ids = sorted(get_vip_room_whitelist_user_ids(int(owner_id)))
+
+    if not user_ids:
+        current = "目前白名單：無"
+    else:
+        current = "目前白名單：" + "、".join(
+            f"<@{user_id}>"
+            for user_id in user_ids[:20]
+        )
+        if len(user_ids) > 20:
+            current += f" 等 {len(user_ids)} 人"
+
+    return (
+        "白名單成員只會取得：**看見房間、進入語音、說話、在語音聊天室打字**。\n"
+        "不會取得管理頻道、移動成員、上傳檔案或其他管理權限。\n\n"
+        + current
+    )
+
+
+class VipWhitelistUserSelect(discord.ui.UserSelect):
+    def __init__(
+        self,
+        *,
+        voice_channel_id: int,
+        owner_id: int,
+        mode: str,
+        row: int,
+    ):
+        normalized_mode = "remove" if str(mode) == "remove" else "add"
+        super().__init__(
+            placeholder=(
+                "選擇要移出白名單的成員"
+                if normalized_mode == "remove"
+                else "選擇要加入白名單的成員"
+            ),
+            min_values=1,
+            max_values=5,
+            custom_id=f"vip_room_whitelist_{normalized_mode}",
+            row=row,
+        )
+        self.voice_channel_id = int(voice_channel_id)
+        self.owner_id = int(owner_id)
+        self.mode = normalized_mode
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "只有 VIP 房主可以管理白名單。",
+                ephemeral=True,
+            )
+            return
+
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "這個功能只能在伺服器內使用。",
+                ephemeral=True,
+            )
+            return
+
+        voice_channel = guild.get_channel(self.voice_channel_id)
+        if not isinstance(voice_channel, discord.VoiceChannel):
+            await interaction.response.send_message(
+                "找不到對應的 VIP 語音房。",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            from core.database import (
+                add_vip_voice_room_whitelist_user,
+                remove_vip_voice_room_whitelist_user,
+            )
+        except Exception as exc:
+            await interaction.response.send_message(
+                f"白名單資料庫尚未就緒：{type(exc).__name__}",
+                ephemeral=True,
+            )
+            return
+
+        changed_names: list[str] = []
+        failed_names: list[str] = []
+
+        for selected in self.values:
+            user_id = int(selected.id)
+
+            if user_id == self.owner_id:
+                continue
+
+            member = guild.get_member(user_id)
+            if member is None or member.bot:
+                continue
+
+            try:
+                if self.mode == "add":
+                    add_vip_voice_room_whitelist_user(
+                        self.owner_id,
+                        user_id,
+                        added_by=interaction.user.id,
+                    )
+                    await grant_vip_whitelist_access(
+                        voice_channel,
+                        member,
+                    )
+                else:
+                    remove_vip_voice_room_whitelist_user(
+                        self.owner_id,
+                        user_id,
+                    )
+                    await revoke_vip_whitelist_access(
+                        voice_channel,
+                        member,
+                    )
+
+                changed_names.append(member.mention)
+            except (discord.Forbidden, discord.HTTPException):
+                failed_names.append(member.mention)
+
+        action_text = "已加入" if self.mode == "add" else "已移除"
+        lines = [build_vip_whitelist_summary(self.owner_id)]
+
+        if changed_names:
+            lines.append(f"\n✅ {action_text}：" + "、".join(changed_names))
+
+        if failed_names:
+            lines.append("\n⚠️ Discord 權限同步失敗：" + "、".join(failed_names))
+
+        if not changed_names and not failed_names:
+            lines.append("\n沒有可變更的成員。")
+
+        await interaction.response.edit_message(
+            content="".join(lines),
+            view=VipRoomWhitelistManageView(
+                voice_channel_id=self.voice_channel_id,
+                owner_id=self.owner_id,
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
+        )
+
+
+class VipRoomWhitelistManageView(discord.ui.View):
+    def __init__(self, *, voice_channel_id: int, owner_id: int):
+        super().__init__(timeout=120)
+        self.add_item(
+            VipWhitelistUserSelect(
+                voice_channel_id=voice_channel_id,
+                owner_id=owner_id,
+                mode="add",
+                row=0,
+            )
+        )
+        self.add_item(
+            VipWhitelistUserSelect(
+                voice_channel_id=voice_channel_id,
+                owner_id=owner_id,
+                mode="remove",
+                row=1,
+            )
+        )
+
+
 class VoiceRoomControlView(discord.ui.View):
     def __init__(self, voice_channel_id: int, owner_id: int, room_type: str):
         super().__init__(timeout=None)
         self.voice_channel_id = int(voice_channel_id)
         self.owner_id = int(owner_id)
         self.room_type = room_type
+
+        if str(self.room_type or "") != "vip":
+            for child in list(self.children):
+                if (
+                    isinstance(child, discord.ui.Button)
+                    and str(child.custom_id or "") == "vip_room_whitelist_manage"
+                ):
+                    self.remove_item(child)
+
         self.refresh_state_buttons()
 
     def refresh_state_buttons(self) -> None:
@@ -1569,6 +1744,39 @@ class VoiceRoomControlView(discord.ui.View):
                 voice_channel_id=self.voice_channel_id,
                 owner_id=self.owner_id,
             )
+        )
+
+
+
+    @discord.ui.button(
+        label="🤍 白名單",
+        style=discord.ButtonStyle.secondary,
+        custom_id="vip_room_whitelist_manage",
+        row=2,
+    )
+    async def whitelist_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self.reject_if_not_owner(interaction):
+            return
+
+        if str(self.room_type or "") != "vip":
+            await interaction.response.send_message(
+                "只有 VIP 房可以使用白名單。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            build_vip_whitelist_summary(self.owner_id),
+            view=VipRoomWhitelistManageView(
+                voice_channel_id=self.voice_channel_id,
+                owner_id=self.owner_id,
+            ),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
         )
 
 
