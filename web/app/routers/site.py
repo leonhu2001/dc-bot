@@ -7,6 +7,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from web.app.config import config
+
 from web.app.services.discord_service import (
     get_dashboard_access,
     get_member_role_ids,
@@ -43,6 +45,11 @@ from web.app.services.checkout_preview import (
 )
 
 from web.app.services.checkout_preview import build_staff_order_filter
+
+from web.app.services.customer_portal import (
+    build_customer_portal_snapshot,
+    get_customer_order,
+)
 
 router = APIRouter(
     tags=["site"]
@@ -285,13 +292,20 @@ async def member_center(
             status_code=303,
         )
 
-    member = get_member_summary(
-        str(
-            user.get(
-                "id"
-            )
-            or ""
+    customer_id = str(
+        user.get(
+            "id"
         )
+        or ""
+    )
+
+    member = get_member_summary(
+        customer_id
+    )
+
+    portal = build_customer_portal_snapshot(
+        customer_id,
+        guild_id=config.DISCORD_GUILD_ID,
     )
 
     return templates.TemplateResponse(
@@ -299,9 +313,98 @@ async def member_center(
         name="member_center.html",
         context=_site_context(
             request,
-            title="會員中心｜魔丸娛樂",
+            title="我的專區｜魔丸娛樂",
             page_name="member",
             member=member,
+            portal=portal,
+        ),
+    )
+
+
+@router.get("/me/orders")
+async def member_orders(
+    request: Request,
+):
+    user = get_current_user(
+        request
+    )
+
+    if not user:
+        return RedirectResponse(
+            url="/auth/discord/login",
+            status_code=303,
+        )
+
+    customer_id = str(
+        user.get(
+            "id"
+        )
+        or ""
+    )
+
+    portal = build_customer_portal_snapshot(
+        customer_id,
+        guild_id=config.DISCORD_GUILD_ID,
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="member_orders.html",
+        context=_site_context(
+            request,
+            title="我的訂單｜魔丸娛樂",
+            page_name="member_orders",
+            portal=portal,
+        ),
+    )
+
+
+@router.get("/me/orders/{order_id}")
+async def member_order_detail(
+    request: Request,
+    order_id: int,
+):
+    user = get_current_user(
+        request
+    )
+
+    if not user:
+        return RedirectResponse(
+            url="/auth/discord/login",
+            status_code=303,
+        )
+
+    order = get_customer_order(
+        str(
+            user.get(
+                "id"
+            )
+            or ""
+        ),
+        int(order_id),
+        guild_id=config.DISCORD_GUILD_ID,
+    )
+
+    if order is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="no_access.html",
+            context={
+                "title": "找不到訂單",
+                "message": "這筆訂單不存在，或不屬於目前登入的 Discord 帳號。",
+                "user": user,
+            },
+            status_code=404,
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="member_order_detail.html",
+        context=_site_context(
+            request,
+            title=f"{order['order_no']}｜我的訂單",
+            page_name="member_orders",
+            order=order,
         ),
     )
 
