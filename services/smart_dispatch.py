@@ -231,7 +231,11 @@ def rank_dispatch_candidates(
         last = _parse_naive_utc(item.get("last_assigned_at"))
 
         # Never-assigned / longest-waiting staff sort first.
-        last_key = last.timestamp() if last is not None else 0.0
+        last_key = (
+            last.replace(tzinfo=timezone.utc).timestamp()
+            if last is not None
+            else 0.0
+        )
 
         return (
             0 if worker_id in specified else 1,
@@ -263,13 +267,25 @@ def choose_initial_candidate_ids(
     ]
 
     result = list(dict.fromkeys(specified_ordered))
-    limit = max(notification_batch_size(required_staff_count), len(result))
+    unrestricted_slots = max(
+        0,
+        int(required_staff_count or 1) - len(result),
+    )
+
+    if unrestricted_slots <= 0:
+        return result
+
+    general_limit = notification_batch_size(unrestricted_slots)
+    general_added = 0
 
     for worker_id in ranked:
         if worker_id in result:
             continue
+
         result.append(worker_id)
-        if len(result) >= limit:
+        general_added += 1
+
+        if general_added >= general_limit:
             break
 
     return result
