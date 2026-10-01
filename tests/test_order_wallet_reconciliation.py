@@ -2,6 +2,8 @@ import pytest
 
 from services.order_wallet_reconciliation import (
     build_wallet_payment_adjustment_plan,
+    expected_wallet_net_before_edit,
+    validate_wallet_net_before_adjustment,
 )
 
 
@@ -90,3 +92,38 @@ def test_non_wallet_edit_needs_no_wallet_adjustment():
     )
 
     assert plan is None
+
+
+def test_expected_wallet_net_before_edit_uses_old_wallet_amount():
+    assert (
+        expected_wallet_net_before_edit(
+            old_amount=652,
+            old_payment_method="我的錢包",
+        )
+        == -652
+    )
+
+    assert (
+        expected_wallet_net_before_edit(
+            old_amount=652,
+            old_payment_method="轉帳",
+        )
+        == 0
+    )
+
+
+def test_existing_wallet_drift_blocks_auto_adjustment():
+    with pytest.raises(ValueError, match="禁止在既有差異上自動追加調整"):
+        validate_wallet_net_before_adjustment(
+            old_amount=1152,
+            old_payment_method="我的錢包",
+            actual_wallet_net=-652,
+        )
+
+
+def test_balanced_wallet_state_allows_auto_adjustment():
+    validate_wallet_net_before_adjustment(
+        old_amount=1152,
+        old_payment_method="我的錢包",
+        actual_wallet_net=-1152,
+    )
