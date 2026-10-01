@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from web.app.services.accounting_reconciliation import build_accounting_reconciliation_snapshot
+
 TAIPEI_TZ = timezone(timedelta(hours=8))
 
 BOT_SERVICE_NAME = "dc-bot.service"
@@ -516,6 +518,11 @@ def build_system_health_snapshot(root: Path | None = None) -> dict[str, Any]:
         ),
     }
 
+    accounting = build_accounting_reconciliation_snapshot(
+        root,
+        detail_limit=0,
+    )
+
     metrics = {
         "payment_pending": databases["web"]["metrics"].get("payment_pending"),
         "payment_apply_error": databases["web"]["metrics"].get("payment_apply_error"),
@@ -526,6 +533,8 @@ def build_system_health_snapshot(root: Path | None = None) -> dict[str, Any]:
         "topup_pending": databases["bot"]["metrics"].get("topup_pending"),
         "negative_wallets": databases["bot"]["metrics"].get("negative_wallets"),
         "wallet_duplicate_refs": databases["bot"]["metrics"].get("wallet_duplicate_refs"),
+        "accounting_issues": accounting.get("issue_count"),
+        "accounting_critical": accounting.get("critical_count"),
     }
 
     backups = inspect_backups(root)
@@ -580,6 +589,24 @@ def build_system_health_snapshot(root: Path | None = None) -> dict[str, Any]:
                 }
             )
 
+    accounting_issue_count = accounting.get("issue_count")
+    accounting_critical_count = accounting.get("critical_count")
+    if isinstance(accounting_issue_count, int) and accounting_issue_count > 0:
+        alerts.append(
+            {
+                "severity": (
+                    "critical"
+                    if isinstance(accounting_critical_count, int)
+                    and accounting_critical_count > 0
+                    else "warning"
+                ),
+                "message": (
+                    f"帳務對帳偵測到 {accounting_issue_count} 筆差異"
+                    f"（Critical {int(accounting_critical_count or 0)} 筆）。"
+                ),
+            }
+        )
+
     for backup in backups.values():
         if not backup["found"]:
             alerts.append(
@@ -615,6 +642,7 @@ def build_system_health_snapshot(root: Path | None = None) -> dict[str, Any]:
         "databases": databases,
         "metrics": metrics,
         "backups": backups,
+        "accounting": accounting,
         "git": inspect_git(root),
         "alerts": alerts,
         "root": str(root),
