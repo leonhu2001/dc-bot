@@ -70,7 +70,7 @@
         <div class="payout-stat-card">
             <span>可安全修復</span>
             <strong>{{ reconciliation.repairable_count }}</strong>
-            <p class="muted-text">只包含未發放分潤類型</p>
+            <p class="muted-text">未發放分潤與可驗證的錢包差額</p>
         </div>
 
         <div class="payout-stat-card">
@@ -180,20 +180,35 @@
                         {{ issue.detail }}
                     </p>
 
-                    {% if issue.repairable and issue.order_id and issue.repair_action %}
-                        <form
-                            method="post"
-                            action="/admin/accounting-reconciliation/repair"
-                            onsubmit="return confirm('確定要執行「{{ repair_action_label(issue.repair_action) }}」嗎？此功能只允許未發放分潤資料。');"
-                        >
-                            <input type="hidden" name="order_id" value="{{ issue.order_id }}">
-                            <input type="hidden" name="action" value="{{ issue.repair_action }}">
+                    {% if issue.order_id %}
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <a
+                                class="button secondary"
+                                href="/admin/order-workspace/{{ issue.order_id }}"
+                            >
+                                開啟訂單工作區
+                            </a>
 
-                            <button type="submit" class="button">
-                                {{ repair_action_label(issue.repair_action) }}
-                            </button>
-                        </form>
-                    {% elif issue.repair_block_reason %}
+                            {% if issue.repairable and issue.repair_action %}
+                                {% set action_label = issue.repair_label or repair_action_label(issue.repair_action) %}
+                                <form
+                                    method="post"
+                                    action="/admin/accounting-reconciliation/repair"
+                                    onsubmit="return confirm('確定要執行「{{ action_label }}」嗎？系統會在真正執行前再次驗證最新資料。');"
+                                    style="margin:0;"
+                                >
+                                    <input type="hidden" name="order_id" value="{{ issue.order_id }}">
+                                    <input type="hidden" name="action" value="{{ issue.repair_action }}">
+
+                                    <button type="submit" class="button">
+                                        {{ action_label }}
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    {% if issue.repair_block_reason %}
                         <p class="muted-text">
                             🔒 不提供自動修復：{{ issue.repair_block_reason }}
                         </p>
@@ -251,13 +266,14 @@
     </div>
 
     <p class="muted-text">
-        自動修復目前只開放兩種：未發放分潤重算，以及取消訂單殘留的未發放分潤標記 void。
-        只要偵測到 paid、paid_at、未知 payout 狀態、缺客服、缺有效接單人員或分潤基礎金額異常，
-        系統就會拒絕自動修復。
+        自動修復目前只開放：未發放分潤重算、取消訂單殘留的未發放分潤標記 void，
+        以及「我的錢包」訂單已能客觀算出差額時排入補扣 / 退款事件。
+        每次執行前都會重新讀取最新資料；只要條件已改變、已有待處理事件、餘額不足，
+        或修改前帳本本身就對不起來，系統就會拒絕執行。
     </p>
 
     <p class="muted-text">
-        錢包、儲值、雞腿、已發放分潤、VIP 累積與會員點數目前都只做偵測，不會自動修改。
+        儲值、雞腿、已發放分潤、VIP 累積與會員點數目前都只做偵測，不會自動改寫歷史資料。
     </p>
 
 </div>
