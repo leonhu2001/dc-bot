@@ -9,10 +9,14 @@ from shared.models import (
     AdminAuditLog,
     CustomerServicePayout,
     OrderAssignment,
+    SyncEvent,
     WebOrder,
     WorkerPayout,
 )
+from services.wallet_service import adjust_wallet_balance
+from web.app.services import accounting_repair as accounting_repair_module
 from web.app.services.accounting_repair import (
+    QUEUE_WALLET_ORDER_RECONCILIATION,
     RECALCULATE_UNPAID_PAYOUTS,
     VOID_CANCELLED_PAYOUTS,
     apply_accounting_repair_in_session,
@@ -291,3 +295,189 @@ def test_void_cancelled_blocks_paid_payout():
         assert worker.payout_status == "paid"
     finally:
         db.close()
+
+def _seed_wallet_order_for_repair(
+    db,
+    *,
+    expected_pay_amount: int,
+):
+    _seed_order(db)
+    order = db.get(WebOrder, 1)
+    assert order is not None
+    order.ticket_channel_id = "ticket-1"
+    order.payment_method = "我的錢包"
+    order.amount = int(expected_pay_amount)
+    order.customer_pay_amount = int(expected_pay_amount)
+    order.payout_base_amount = int(expected_pay_amount)
+    db.flush()
+    return order
+
+
+def _create_wallet_history(
+    path,
+    *,
+    topup_amount: int,
+    payment_amount: int,
+):
+    adjust_wallet_balance(
+        customer_id="customer-1",
+        amount=int(topup_amount),
+        tx_type="topup",
+        order_no="TOPUP-TEST",
+        db_file=path,
+    )
+    adjust_wallet_balance(
+        customer_id="customer-1",
+        amount=-int(payment_amount),
+        tx_type="payment",
+        order_channel_id="ticket-1",
+        order_no="MO20261002001",
+        db_file=path,
+    )
+
+
+def test_queue_wallet_reconciliation_creates_one_pending_event_and_audit(
+    monkeypatch,
+    tmp_path,
+):
+    db = _make_session()
+    bot_db = tmp_path / "bot.db"
+
+    try:
+        _seed_wallet_order_for_repair(
+            db,
+            expected_pay_amount=1152,
+        )
+        _create_wallet_history(
+            bot_db,
+            topup_amount=2000,
+            payment_amount=652,
+        )
+        monkeypatch.setattr(
+            accounting_repair_module,
+            "_bot_db_path",
+            lambda: bot_db,
+        )
+
+        result = apply_accounting_repair_in_session(
+            db,
+            order_id=1,
+            action=QUEUE_WALLET_ORDER_RECONCILIATION,
+            actor={
+                "id": "manager-1",
+                "username": "Manager",
+            },
+        )
+        db.flush()
+
+        events = list(
+            db.scalars(
+                select(SyncEvent)
+                .where(SyncEvent.order_id == 1)
+            ).all()
+        )
+        audit = db.scalar(
+            select(AdminAuditLog)
+            .where(
+                AdminAuditLog.action
+                == "accounting_queue_wallet_reconciliation"
+            )
+        )
+
+        assert result["delta"] == -500
+        assert "補扣 500T" in result["message"]
+        assert len(events) == 1
+        assert events[0].status == "pending"
+        assert '"sync_kind": "wallet_reconciliation"' in str(
+            events[0].payload_json
+        )
+        assert '"old_customer_pay_amount": 652' in str(
+            events[0].payload_json
+        )
+        assert '"new_customer_pay_amount": 1152' in str(
+            events[0].payload_json
+        )
+        assert audit is not None
+
+        with pytest.raises(ValueError, match="已有待處理"):
+            apply_accounting_repair_in_session(
+                db,
+                order_id=1,
+                action=QUEUE_WALLET_ORDER_RECONCILIATION,
+                actor={"id": "manager-1"},
+            )
+    finally:
+        db.close()
+
+
+def test_queue_wallet_reconciliation_blocks_insufficient_balance(
+    monkeypatch,
+    tmp_path,
+):
+    db = _make_session()
+    bot_db = tmp_path / "bot.db"
+
+    try:
+        _seed_wallet_order_for_repair(
+            db,
+            expected_pay_amount=1152,
+        )
+        _create_wallet_history(
+            bot_db,
+            topup_amount=700,
+            payment_amount=652,
+        )
+        monkeypatch.setattr(
+            accounting_repair_module,
+            "_bot_db_path",
+            lambda: bot_db,
+        )
+
+        with pytest.raises(ValueError, match="不足以補扣 500T"):
+            apply_accounting_repair_in_session(
+                db,
+                order_id=1,
+                action=QUEUE_WALLET_ORDER_RECONCILIATION,
+                actor={"id": "manager-1"},
+            )
+
+        assert db.scalar(select(SyncEvent)) is None
+    finally:
+        db.close()
+
+
+def test_queue_wallet_reconciliation_can_queue_refund(
+    monkeypatch,
+    tmp_path,
+):
+    db = _make_session()
+    bot_db = tmp_path / "bot.db"
+
+    try:
+        _seed_wallet_order_for_repair(
+            db,
+            expected_pay_amount=1274,
+        )
+        _create_wallet_history(
+            bot_db,
+            topup_amount=2000,
+            payment_amount=1300,
+        )
+        monkeypatch.setattr(
+            accounting_repair_module,
+            "_bot_db_path",
+            lambda: bot_db,
+        )
+
+        result = apply_accounting_repair_in_session(
+            db,
+            order_id=1,
+            action=QUEUE_WALLET_ORDER_RECONCILIATION,
+            actor={"id": "manager-1"},
+        )
+
+        assert result["delta"] == 26
+        assert "退款 26T" in result["message"]
+    finally:
+        db.close()
+

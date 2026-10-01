@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -13,6 +15,9 @@ from shared.models import (
     CustomerServicePayout,
     OrderAssignment,
     PayoutStatus,
+    SyncEvent,
+    SyncEventStatus,
+    SyncEventType,
     WebOrder,
     WorkerPayout,
 )
@@ -21,15 +26,263 @@ from web.app.services.order_service import recalculate_order_payouts
 
 RECALCULATE_UNPAID_PAYOUTS = "recalculate_unpaid_payouts"
 VOID_CANCELLED_PAYOUTS = "void_cancelled_payouts"
+QUEUE_WALLET_ORDER_RECONCILIATION = "queue_wallet_order_reconciliation"
 
 ALLOWED_REPAIR_ACTIONS = {
     RECALCULATE_UNPAID_PAYOUTS,
     VOID_CANCELLED_PAYOUTS,
+    QUEUE_WALLET_ORDER_RECONCILIATION,
 }
 
 
 def _normalize(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _bot_db_path() -> Path:
+    return Path(__file__).resolve().parents[3] / "bot.db"
+
+
+def _actor_payload(actor: dict | None) -> dict[str, str]:
+    actor_id, actor_name = _actor_values(actor)
+    return {
+        "admin_discord_id": actor_id,
+        "admin_display_name": actor_name,
+    }
+
+
+def _load_wallet_order_state(
+    order: WebOrder,
+) -> dict[str, int]:
+    customer_id = _normalize(order.customer_discord_id)
+    ticket_channel_id = _normalize(order.ticket_channel_id)
+
+    if not customer_id:
+        raise ValueError("這張訂單缺少顧客 Discord ID，不能自動對帳。")
+
+    if not ticket_channel_id:
+        raise ValueError("這張訂單缺少 ticket_channel_id，不能自動對帳。")
+
+    path = _bot_db_path()
+    if not path.exists():
+        raise ValueError("找不到 bot.db，無法讀取錢包流水。")
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+
+        table_row = conn.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type='table' AND name='wallet_transactions'
+            """
+        ).fetchone()
+        if table_row is None:
+            raise ValueError("wallet_transactions 不存在，無法執行錢包對帳。")
+
+        row = conn.execute(
+            """
+            SELECT
+                COALESCE(SUM(
+                    CASE
+                        WHEN type IN ('payment', 'payment_adjustment')
+                        THEN amount
+                        ELSE 0
+                    END
+                ), 0) AS wallet_net,
+                COALESCE(SUM(
+                    CASE WHEN type = 'payment' THEN 1 ELSE 0 END
+                ), 0) AS payment_count
+            FROM wallet_transactions
+            WHERE customer_discord_id = ?
+              AND order_channel_id = ?
+            """,
+            (
+                customer_id,
+                ticket_channel_id,
+            ),
+        ).fetchone()
+
+        wallet_row = conn.execute(
+            """
+            SELECT balance
+            FROM customer_wallets
+            WHERE customer_discord_id = ?
+            LIMIT 1
+            """,
+            (customer_id,),
+        ).fetchone()
+
+    return {
+        "wallet_net": int(row["wallet_net"] or 0) if row else 0,
+        "payment_count": int(row["payment_count"] or 0) if row else 0,
+        "wallet_balance": int(wallet_row["balance"] or 0) if wallet_row else 0,
+    }
+
+
+def _find_pending_wallet_reconciliation(
+    db: Session,
+    order_id: int,
+) -> SyncEvent | None:
+    events = list(
+        db.scalars(
+            select(SyncEvent)
+            .where(SyncEvent.order_id == int(order_id))
+            .where(
+                SyncEvent.status.in_(
+                    [
+                        SyncEventStatus.PENDING.value,
+                        SyncEventStatus.PROCESSING.value,
+                    ]
+                )
+            )
+            .order_by(SyncEvent.id.desc())
+        ).all()
+    )
+
+    for event in events:
+        try:
+            payload = json.loads(event.payload_json or "{}")
+        except Exception:
+            payload = {}
+
+        if str(payload.get("sync_kind") or "") == "wallet_reconciliation":
+            return event
+
+    return None
+
+
+def _queue_wallet_order_reconciliation(
+    db: Session,
+    *,
+    order: WebOrder,
+    actor: dict | None,
+) -> dict[str, Any]:
+    if _normalize(order.payment_method) != "我的錢包":
+        raise ValueError("只有付款方式為「我的錢包」的訂單可以執行這個修復。")
+
+    expected_pay_amount = int(
+        order.customer_pay_amount
+        if order.customer_pay_amount is not None
+        else order.amount
+        or 0
+    )
+    expected_net = -max(0, expected_pay_amount)
+
+    state = _load_wallet_order_state(order)
+    actual_net = int(state["wallet_net"])
+    payment_count = int(state["payment_count"])
+    wallet_balance = int(state["wallet_balance"])
+
+    if payment_count <= 0:
+        raise ValueError(
+            "找不到原始 payment 流水；這不是單純金額差額，需人工確認。"
+        )
+
+    if actual_net == expected_net:
+        raise ValueError("這張訂單的錢包淨扣款目前已經一致，不需要修復。")
+
+    if actual_net > 0:
+        raise ValueError(
+            "目前錢包淨額為正數，無法安全推導歷史付款基準，需人工確認。"
+        )
+
+    pending = _find_pending_wallet_reconciliation(
+        db,
+        int(order.id),
+    )
+    if pending is not None:
+        raise ValueError(
+            f"這張訂單已有待處理的錢包對帳事件 #{pending.id}，請等待 Bot 處理。"
+        )
+
+    delta = int(expected_net - actual_net)
+    if delta < 0 and wallet_balance < abs(delta):
+        raise ValueError(
+            f"顧客目前錢包餘額 {wallet_balance}T，不足以補扣 {abs(delta)}T。"
+        )
+
+    old_effective_pay_amount = abs(actual_net)
+    actor_payload = _actor_payload(actor)
+
+    event = SyncEvent(
+        event_type=SyncEventType.ORDER_UPDATED.value,
+        status=SyncEventStatus.PENDING.value,
+        order_id=int(order.id),
+        payload_json=json.dumps(
+            {
+                "order_id": int(order.id),
+                "source": "accounting_reconciliation",
+                "sync_kind": "wallet_reconciliation",
+                "old_amount": old_effective_pay_amount,
+                "new_amount": expected_pay_amount,
+                "old_customer_pay_amount": old_effective_pay_amount,
+                "new_customer_pay_amount": expected_pay_amount,
+                "old_payment_method": "我的錢包",
+                "new_payment_method": "我的錢包",
+                "old_customer_discord_id": _normalize(order.customer_discord_id),
+                "new_customer_discord_id": _normalize(order.customer_discord_id),
+                **actor_payload,
+            },
+            ensure_ascii=False,
+        ),
+    )
+    db.add(event)
+    db.flush()
+
+    actor_id, actor_name = _actor_values(actor)
+    db.add(
+        AdminAuditLog(
+            admin_discord_id=actor_id,
+            action="accounting_queue_wallet_reconciliation",
+            target_type="order",
+            target_id=str(int(order.id)),
+            before_json=json.dumps(
+                {
+                    "operator": actor_name,
+                    "wallet_net": actual_net,
+                    "expected_wallet_net": expected_net,
+                    "wallet_balance": wallet_balance,
+                },
+                ensure_ascii=False,
+            ),
+            after_json=json.dumps(
+                {
+                    "operator": actor_name,
+                    "queued_event_id": int(event.id),
+                    "delta": delta,
+                    "target_wallet_net": expected_net,
+                },
+                ensure_ascii=False,
+            ),
+            created_at=datetime.utcnow(),
+        )
+    )
+
+    if delta < 0:
+        action_text = f"補扣 {abs(delta)}T"
+    else:
+        action_text = f"退款 {delta}T"
+
+    return {
+        "order_id": int(order.id),
+        "action": QUEUE_WALLET_ORDER_RECONCILIATION,
+        "message": (
+            f"已排入{action_text}事件 #{event.id}。"
+            "Bot 會先再次驗證修改前淨扣款，再以冪等流水執行。"
+        ),
+        "event_id": int(event.id),
+        "delta": delta,
+        "before": {
+            "wallet_net": actual_net,
+            "expected_wallet_net": expected_net,
+            "wallet_balance": wallet_balance,
+        },
+        "after": {
+            "queued_event_id": int(event.id),
+            "target_wallet_net": expected_net,
+        },
+    }
 
 
 def _serialize_payout_state(db: Session, order_id: int) -> dict[str, Any]:
@@ -262,6 +515,13 @@ def apply_accounting_repair_in_session(
         raise ValueError("找不到這張訂單。")
 
     before = _serialize_payout_state(db, int(order_id))
+
+    if normalized_action == QUEUE_WALLET_ORDER_RECONCILIATION:
+        return _queue_wallet_order_reconciliation(
+            db,
+            order=order,
+            actor=actor,
+        )
 
     if normalized_action == RECALCULATE_UNPAID_PAYOUTS:
         _validate_recalculate_unpaid_payouts(db, order)

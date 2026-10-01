@@ -67,6 +67,7 @@ def _issue(
     actual: Any = None,
     order_id: int | None = None,
     repair_action: str | None = None,
+    repair_label: str | None = None,
     repair_block_reason: str | None = None,
 ) -> None:
     issues.append(
@@ -81,6 +82,7 @@ def _issue(
             "actual": actual,
             "order_id": int(order_id) if order_id is not None else None,
             "repair_action": str(repair_action) if repair_action else None,
+            "repair_label": str(repair_label) if repair_label else None,
             "repairable": bool(repair_action),
             "repair_block_reason": (
                 str(repair_block_reason)
@@ -500,6 +502,12 @@ def _check_wallet_paid_orders(
                 _as_int(item.get("amount"))
                 for item in adjustment_txs
             )
+            delta = int(expected_amount - actual_amount)
+            if delta < 0:
+                repair_label = f"補扣 {abs(delta)}T"
+            else:
+                repair_label = f"退款 {delta}T"
+
             _issue(
                 issues,
                 category="order_payment",
@@ -511,10 +519,27 @@ def _check_wallet_paid_orders(
                     "payment 與 payment_adjustment 淨額 "
                     "和 customer_pay_amount 不一致。"
                     f" 基礎付款 {_as_int(tx['amount'])}T，"
-                    f"差額流水 {adjustment_total}T。"
+                    f"差額流水 {adjustment_total}T，"
+                    f"待調整 {delta}T。"
                 ),
                 expected=expected_amount,
                 actual=actual_amount,
+                order_id=order_id,
+                repair_action=(
+                    "queue_wallet_order_reconciliation"
+                    if ticket_channel_id
+                    else None
+                ),
+                repair_label=(
+                    repair_label
+                    if ticket_channel_id
+                    else None
+                ),
+                repair_block_reason=(
+                    None
+                    if ticket_channel_id
+                    else "缺少 ticket_channel_id，不能安全建立差額流水。"
+                ),
             )
 
 
@@ -601,10 +626,13 @@ def _check_worker_tips(
                     issues,
                     category="tip",
                     code="tip_wallet_reference_mismatch",
-                    severity="critical",
+                    severity="warning",
                     reference=reference,
-                    title="雞腿錢包 reference 不一致",
-                    detail="tip_payment 的 order_no 尾碼沒有指向這筆 TIP。",
+                    title="雞腿錢包 reference 使用舊格式",
+                    detail=(
+                        "wallet_transaction_id、顧客、類型與金額仍會各自驗證；"
+                        "此筆只有 tip_payment.order_no 沒有目前的 :TIP-ID 尾碼。"
+                    ),
                     expected=tip_id,
                     actual=actual_tip_id or tx_order_no,
                 )
