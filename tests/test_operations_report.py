@@ -250,9 +250,61 @@ def test_operations_report_profitability_and_period_comparison(tmp_path, monkeyp
     assert service["retained_rate"] == 26.7
 
     assert report["previous_label"] == "上月同期"
+    assert report["comparison_history_exists"] is True
     assert report["comparison"]["revenue"]["rate"] == 50.0
     assert report["comparison"]["payroll"]["rate"] == 69.2
     assert report["comparison"]["retained"]["rate"] == 14.3
     assert report["comparison"]["avg_order"]["rate"] == -25.0
     assert report["comparison"]["order_count"]["rate"] == 100.0
     assert report["comparison"]["customer_count"]["rate"] == 0.0
+
+
+def test_operations_report_zero_previous_window_keeps_history_context(
+    tmp_path,
+    monkeypatch,
+):
+    db_file = tmp_path / "report.db"
+    _create_report_db(db_file)
+
+    monkeypatch.setattr(
+        report_module,
+        "db_path",
+        lambda: str(db_file),
+    )
+
+    monkeypatch.setattr(
+        report_module,
+        "_report_period",
+        lambda period: (
+            "month",
+            "2026-09-01 00:00:00",
+            "本月",
+            "2026-08-15 00:00:00",
+            "2026-08-20 00:00:00",
+            "上月同期",
+        ),
+    )
+
+    report = report_module.build_operations_report("month")
+
+    assert report["comparison_history_exists"] is True
+    assert report["comparison"]["revenue"]["previous"] == 0.0
+    assert report["comparison"]["revenue"]["delta"] == 1500.0
+    assert report["comparison"]["revenue"]["rate"] is None
+
+    monkeypatch.setattr(
+        report_module,
+        "_report_period",
+        lambda period: (
+            "month",
+            "2026-09-01 00:00:00",
+            "本月",
+            "2026-07-01 00:00:00",
+            "2026-07-02 00:00:00",
+            "上月同期",
+        ),
+    )
+
+    report_without_history = report_module.build_operations_report("month")
+    assert report_without_history["comparison_history_exists"] is False
+
