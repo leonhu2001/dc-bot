@@ -1039,11 +1039,23 @@ def _report_period(
         previous_label = "上季同期"
         period_label = "本季度"
 
-    # Compare the same elapsed length instead of a full previous period,
-    # so a month-to-date report is not compared with an entire prior month.
+    # Compare the same calendar-day span instead of the exact current
+    # clock time. Legacy orders can be closed at 23:59:59 for their close
+    # date, so an exact-time cutoff (for example 23:09) would incorrectly
+    # exclude valid orders from that comparison day.
+    current_day_end = now.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    ) + timedelta(days=1)
+    elapsed_days = max(
+        1,
+        (current_day_end - start).days,
+    )
     previous_end = min(
         start,
-        previous_start + (now - start),
+        previous_start + timedelta(days=elapsed_days),
     )
 
     return (
