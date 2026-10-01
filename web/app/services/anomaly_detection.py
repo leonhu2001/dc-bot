@@ -447,7 +447,7 @@ def _check_payment_reviews(
                     f" {str(data.get('apply_error') or '沒有錯誤訊息')[:240]}"
                 ),
                 age_minutes=age,
-                action_url="/admin/payment-reviews?status=apply_error",
+                action_url="/admin/payment-reviews",
                 action_label="處理付款",
             )
         elif status == "approved_pending_apply" and age is not None and age >= 10:
@@ -460,7 +460,7 @@ def _check_payment_reviews(
                 title="付款已核准但尚未套用",
                 detail="核准後超過 10 分鐘仍未完成套用，可能是 Bot runtime 卡住。",
                 age_minutes=age,
-                action_url="/admin/payment-reviews?status=approved_pending_apply",
+                action_url="/admin/payment-reviews",
                 action_label="查看付款",
             )
         elif status == "pending_review" and age is not None and age >= 30:
