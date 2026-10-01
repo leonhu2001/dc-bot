@@ -730,8 +730,8 @@ def _check_payouts(
         ]
         payout_base = _as_int(
             order["payout_base_amount"]
-            if order["payout_base_amount"] is not None
-            else order["amount"]
+            or order["amount"]
+            or 0
         )
 
         expected = calculate_order_payout(
