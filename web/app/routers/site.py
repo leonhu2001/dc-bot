@@ -288,7 +288,7 @@ async def member_center(
 
     if not user:
         return RedirectResponse(
-            url="/auth/discord/login",
+            url="/auth/discord/login?next=/me",
             status_code=303,
         )
 
@@ -331,7 +331,7 @@ async def member_orders(
 
     if not user:
         return RedirectResponse(
-            url="/auth/discord/login",
+            url="/auth/discord/login?next=/me/orders",
             status_code=303,
         )
 
@@ -370,7 +370,7 @@ async def member_order_detail(
 
     if not user:
         return RedirectResponse(
-            url="/auth/discord/login",
+            url=f"/auth/discord/login?next=/me/orders/{int(order_id)}",
             status_code=303,
         )
 
