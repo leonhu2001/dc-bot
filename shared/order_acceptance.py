@@ -8,10 +8,14 @@ from typing import Any
 from sqlalchemy import text
 
 from shared.db import engine
-
-
-WAITING_ACCEPTANCE = "waiting_acceptance"
-ACCEPTED_PENDING_PAY = "accepted_pending_pay"
+from shared.order_state import (
+    ACCEPTED_PENDING_PAY,
+    ACTIVE,
+    STORED,
+    WAITING_ACCEPTANCE,
+    latest_transition_into_state,
+    transition_order_state_in_connection,
+)
 
 PREPAY_ACCEPTANCE_STATUSES = {
     WAITING_ACCEPTANCE,
@@ -476,26 +480,17 @@ def claim_acceptance_order(
         active_rows_after = _active_claim_rows(conn, int(order_id))
         next_status = ACCEPTED_PENDING_PAY if len(active_rows_after) >= required_staff_count else WAITING_ACCEPTANCE
 
-        conn.execute(text("""
-            UPDATE web_orders
-            SET status = :status,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :order_id
-        """), {
-            "status": next_status,
-            "order_id": int(order_id),
-        })
-
-        conn.execute(text("""
-            UPDATE order_acceptance_meta
-            SET status = :status,
-                updated_at = :updated_at
-            WHERE order_id = :order_id
-        """), {
-            "status": next_status,
-            "updated_at": now,
-            "order_id": int(order_id),
-        })
+        transition_order_state_in_connection(
+            conn,
+            order_id=int(order_id),
+            target_status=next_status,
+            source=f"acceptance_claim:{source or 'unknown'}",
+            reason=(
+                f"付款前接單進度 {len(active_rows_after)}/{required_staff_count}"
+            ),
+            actor_discord_id=staff_discord_id,
+            expected_statuses=PREPAY_ACCEPTANCE_STATUSES,
+        )
 
     return get_acceptance_state(int(order_id))
 
@@ -538,26 +533,15 @@ def unclaim_acceptance_order(
             "staff_discord_id": staff_discord_id,
         })
 
-        conn.execute(text("""
-            UPDATE web_orders
-            SET status = :status,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :order_id
-        """), {
-            "status": WAITING_ACCEPTANCE,
-            "order_id": int(order_id),
-        })
-
-        conn.execute(text("""
-            UPDATE order_acceptance_meta
-            SET status = :status,
-                updated_at = :updated_at
-            WHERE order_id = :order_id
-        """), {
-            "status": WAITING_ACCEPTANCE,
-            "updated_at": now,
-            "order_id": int(order_id),
-        })
+        transition_order_state_in_connection(
+            conn,
+            order_id=int(order_id),
+            target_status=WAITING_ACCEPTANCE,
+            source=f"acceptance_unclaim:{source or 'unknown'}",
+            reason="付款前接單人員取消接單",
+            actor_discord_id=staff_discord_id,
+            expected_statuses=PREPAY_ACCEPTANCE_STATUSES,
+        )
 
     return get_acceptance_state(int(order_id))
 
@@ -587,28 +571,14 @@ def _set_acceptance_lifecycle_status(
     now = _now_text()
 
     _get_meta(conn, int(order_id))
-    _get_order_status(conn, int(order_id))
 
-    conn.execute(text("""
-        UPDATE web_orders
-        SET status = :status,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = :order_id
-    """), {
-        "status": str(status),
-        "order_id": int(order_id),
-    })
-
-    conn.execute(text("""
-        UPDATE order_acceptance_meta
-        SET status = :status,
-            updated_at = :updated_at
-        WHERE order_id = :order_id
-    """), {
-        "status": str(status),
-        "updated_at": now,
-        "order_id": int(order_id),
-    })
+    transition_order_state_in_connection(
+        conn,
+        order_id=int(order_id),
+        target_status=str(status),
+        source=f"acceptance_lifecycle:{source or 'lifecycle'}",
+        reason=f"付款前接單 lifecycle -> {status}",
+    )
 
     if deactivate_claims:
         conn.execute(text("""
@@ -645,11 +615,40 @@ def resume_acceptance_order(order_id: int, *, source: str = "resume") -> Accepta
 
     with engine.begin() as conn:
         meta = _get_meta(conn, int(order_id))
-        _get_order_status(conn, int(order_id))
-        rows = _active_claim_rows(conn, int(order_id))
+        current_status = _get_order_status(conn, int(order_id))
+        if str(current_status or "").strip().lower() != STORED:
+            raise ValueError("只有 stored 訂單可以執行恢復。")
 
+        rows = _active_claim_rows(conn, int(order_id))
         required_staff_count = _to_int(meta.get("required_staff_count"), 1)
-        next_status = ACCEPTED_PENDING_PAY if len(rows) >= required_staff_count else WAITING_ACCEPTANCE
+
+        stored_transition = latest_transition_into_state(
+            conn,
+            order_id=int(order_id),
+            target_status=STORED,
+        )
+
+        previous_status = str(
+            (stored_transition or {}).get("from_status")
+            or ""
+        ).strip().lower()
+
+        active_assignment = conn.execute(text("""
+            SELECT 1
+            FROM order_assignments
+            WHERE order_id = :order_id
+              AND is_active = 1
+            LIMIT 1
+        """), {"order_id": int(order_id)}).first()
+
+        if previous_status == ACTIVE or active_assignment is not None:
+            next_status = ACTIVE
+        else:
+            next_status = (
+                ACCEPTED_PENDING_PAY
+                if len(rows) >= required_staff_count
+                else WAITING_ACCEPTANCE
+            )
 
         _set_acceptance_lifecycle_status(
             conn,
@@ -795,7 +794,19 @@ def promote_acceptance_claims_to_assignments(
             else customer_amount
         )
 
-        order.status = "active"
+        transition_order_state_in_connection(
+            db.connection(),
+            order_id=int(order_id),
+            target_status=ACTIVE,
+            source="payment_finalize",
+            reason="付款成立，付款前接單轉正式進行中",
+            expected_statuses={
+                ACCEPTED_PENDING_PAY,
+                ACTIVE,
+            },
+        )
+        db.expire(order, ["status"])
+
         if payment_method:
             order.payment_method = str(payment_method)
 
@@ -814,16 +825,6 @@ def promote_acceptance_claims_to_assignments(
 
         if bot_order_no:
             order.bot_order_no = str(bot_order_no)
-
-        db.execute(text("""
-            UPDATE order_acceptance_meta
-            SET status = 'active',
-                updated_at = :updated_at
-            WHERE order_id = :order_id
-        """), {
-            "updated_at": _now_text(),
-            "order_id": int(order_id),
-        })
 
         db.flush()
         recalculate_order_payouts(db, int(order_id))
