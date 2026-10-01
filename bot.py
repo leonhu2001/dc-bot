@@ -5367,9 +5367,21 @@ async def maybe_handle_prepay_acceptance_claim(
         )
         return True
 
+    ticket_access_ok = await grant_order_ticket_access(
+        interaction.guild,
+        view.source_channel_id,
+        interaction.user,
+    )
+
     claim_data = view.get_claim_data(interaction.message.id)
     _apply_acceptance_state_to_claim_data(claim_data, state)
     remember_claim_data(interaction.message.id, claim_data)
+
+    if not ticket_access_ok:
+        await interaction.followup.send(
+            "已接單，但票口權限同步失敗，請通知客服檢查票口權限。",
+            ephemeral=True,
+        )
 
     try:
         await send_order_log(
@@ -5450,9 +5462,21 @@ async def maybe_handle_prepay_acceptance_unclaim(
         )
         return True
 
+    ticket_access_ok = await revoke_order_ticket_access(
+        interaction.guild,
+        view.source_channel_id,
+        interaction.user,
+    )
+
     claim_data = view.get_claim_data(interaction.message.id)
     _apply_acceptance_state_to_claim_data(claim_data, state)
     remember_claim_data(interaction.message.id, claim_data)
+
+    if not ticket_access_ok:
+        await interaction.followup.send(
+            "已取消接單，但票口權限同步失敗，請通知客服檢查票口權限。",
+            ephemeral=True,
+        )
 
     try:
         await send_order_log(
