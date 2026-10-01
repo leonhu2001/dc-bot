@@ -1,0 +1,205 @@
+{% extends "layout.html" %}
+
+{% block page_title %}異常偵測中心{% endblock %}
+
+{% block content %}
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>跨系統異常總覽</h2>
+            <p class="muted-text">
+                最後檢查：{{ snapshot.checked_at }} ｜ 只讀偵測，不會自動修改資料。
+            </p>
+        </div>
+
+        <div>
+            <span class="status-chip {% if snapshot.status == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
+                {{ snapshot.status_text }}
+            </span>
+
+            <a class="button secondary" href="/admin/anomalies">
+                重新檢查
+            </a>
+        </div>
+    </div>
+
+    <div class="order-meta compact-meta">
+        <div>
+            <span>全部異常</span>
+            <strong>{{ snapshot.issue_count }}</strong>
+        </div>
+
+        <div>
+            <span>Critical</span>
+            <strong>{{ snapshot.critical_count }}</strong>
+        </div>
+
+        <div>
+            <span>Warning</span>
+            <strong>{{ snapshot.warning_count }}</strong>
+        </div>
+
+        {% for key, label in snapshot.category_labels.items() %}
+        <div>
+            <span>{{ label }}</span>
+            <strong>{{ snapshot.category_counts.get(key, 0) }}</strong>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>篩選</h2>
+            <p class="muted-text">
+                Critical 代表流程明確異常；Warning 代表等待過久或需要人工確認。
+            </p>
+        </div>
+    </div>
+
+    <form method="get" action="/admin/anomalies">
+        <div class="order-meta compact-meta">
+            <div>
+                <span>嚴重程度</span>
+                <select name="severity">
+                    <option value="">全部</option>
+                    <option value="critical" {% if severity_filter == 'critical' %}selected{% endif %}>Critical</option>
+                    <option value="warning" {% if severity_filter == 'warning' %}selected{% endif %}>Warning</option>
+                </select>
+            </div>
+
+            <div>
+                <span>類別</span>
+                <select name="category">
+                    <option value="">全部</option>
+                    {% for key, label in snapshot.category_labels.items() %}
+                        <option value="{{ key }}" {% if category_filter == key %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="button" type="submit">套用篩選</button>
+            <a class="button secondary" href="/admin/anomalies">清除</a>
+            <a class="button secondary" href="/admin/system">系統健康</a>
+            <a class="button secondary" href="/admin/accounting-reconciliation">帳務對帳</a>
+        </div>
+    </form>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>異常明細</h2>
+            <p class="muted-text">
+                目前顯示 {{ issues|length }} 筆
+                {% if snapshot.truncated %}
+                    ｜ 結果過多，已限制顯示 {{ snapshot.visible_count }} 筆
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    {% if issues %}
+
+        <div class="admin-order-list compact-list">
+
+            {% for issue in issues %}
+
+                <article class="admin-order-card compact-order-card">
+
+                    <div class="order-card-header">
+
+                        <div>
+                            <p class="order-no">
+                                {{ issue.reference }} ｜ {{ issue.category_label }}
+                            </p>
+                            <h3>{{ issue.title }}</h3>
+                        </div>
+
+                        <span class="status-chip {% if issue.severity == 'critical' %}is-unpaid{% endif %}">
+                            {{ issue.severity }}
+                        </span>
+
+                    </div>
+
+                    <p class="muted-text">
+                        {{ issue.detail }}
+                    </p>
+
+                    <div class="order-meta compact-meta">
+
+                        <div>
+                            <span>異常代碼</span>
+                            <strong>{{ issue.code }}</strong>
+                        </div>
+
+                        <div>
+                            <span>距最後更新</span>
+                            <strong>{{ issue.age_text }}</strong>
+                        </div>
+
+                        <div>
+                            <span>來源</span>
+                            <strong>{{ issue.source }}</strong>
+                        </div>
+
+                        {% if issue.order_id %}
+                        <div>
+                            <span>Web Order ID</span>
+                            <strong>{{ issue.order_id }}</strong>
+                        </div>
+                        {% endif %}
+
+                    </div>
+
+                    {% if issue.action_url %}
+                        <div style="margin-top: 12px;">
+                            <a class="button secondary" href="{{ issue.action_url }}">
+                                {{ issue.action_label or '前往處理' }}
+                            </a>
+                        </div>
+                    {% endif %}
+
+                </article>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="empty-state">
+            {% if snapshot.issue_count == 0 %}
+                目前沒有偵測到跨系統異常。
+            {% else %}
+                目前的篩選條件沒有符合項目。
+            {% endif %}
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+<div class="panel compact-panel">
+    <h2>目前偵測範圍</h2>
+    <p class="muted-text">
+        訂單狀態漂移、必要 Discord 參照缺失、長時間未更新訂單、付款審核套用失敗或逾時、
+        Discord/Web 同步事件失敗或卡住、儲值審核與入帳逾時，以及第 4 階段的帳務對帳異常。
+    </p>
+</div>
+
+{% endblock %}
