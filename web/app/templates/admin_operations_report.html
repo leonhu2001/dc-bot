@@ -18,6 +18,16 @@
 @media(prefers-reduced-motion:reduce){.ops-card,.ops-panel{opacity:1;transform:none;transition:none}.ops-card:hover,.ops-panel:hover{box-shadow:none}.ops-share-fill{width:var(--share);transition:none}}
 </style>
 
+{% macro comparison_text(change) -%}
+  {% if not report.comparison_history_exists -%}
+    {{ report.previous_label }} 無資料
+  {%- elif change.rate is not none -%}
+    {{ report.previous_label }} {% if change.rate > 0 %}+{% endif %}{{ change.rate }}%
+  {%- else -%}
+    {{ report.previous_label }} {{ change.previous|int }} · 較同期 {% if change.delta > 0 %}+{% endif %}{{ change.delta|int }}
+  {%- endif %}
+{%- endmacro %}
+
 <div class="ops-report">
   <div class="ops-head">
     <div><div class="ops-kicker">OPERATIONS & FINANCE</div><h1>營運財務報表</h1><div class="muted">{{ report.period_label }} · 已結單資料</div></div>
@@ -37,17 +47,17 @@
     <div class="ops-card">
       <span>營收</span>
       <strong data-count="{{ report.revenue }}">{{ report.revenue }}</strong>
-      <small>{{ report.order_count }} 筆已結單{% if report.comparison and report.comparison.order_count %} · 筆數 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.order_count.rate is not none %}{% if report.comparison.order_count.rate > 0 %}+{% endif %}{{ report.comparison.order_count.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}{% if report.comparison and report.comparison.revenue %}<br>營收 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.revenue.rate is not none %}{% if report.comparison.revenue.rate > 0 %}+{% endif %}{{ report.comparison.revenue.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+      <small>{{ report.order_count }} 筆已結單{% if report.comparison and report.comparison.order_count %} · 筆數 <span class="ops-change">{{ comparison_text(report.comparison.order_count) }}</span>{% endif %}{% if report.comparison and report.comparison.revenue %}<br>營收 <span class="ops-change">{{ comparison_text(report.comparison.revenue) }}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>人員薪資成本</span>
       <strong data-count="{{ report.payroll }}">{{ report.payroll }}</strong>
-      <small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }} · <span class="ops-rate-caption">成本率 {{ report.payroll_rate }}%</span>{% if report.comparison and report.comparison.payroll %}<br>成本 <span class="ops-change">{{ report.previous_label }} {% if report.comparison.payroll.rate is not none %}{% if report.comparison.payroll.rate > 0 %}+{% endif %}{{ report.comparison.payroll.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+      <small>陪玩 {{ report.worker_cost }} · 客服 {{ report.service_cost }} · <span class="ops-rate-caption">成本率 {{ report.payroll_rate }}%</span>{% if report.comparison and report.comparison.payroll %}<br>成本 <span class="ops-change">{{ comparison_text(report.comparison.payroll) }}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>店家實留</span>
       <strong data-count="{{ report.retained }}">{{ report.retained }}</strong>
-      <small>營收扣除陪玩與客服分潤{% if report.comparison and report.comparison.retained %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.retained.rate is not none %}{% if report.comparison.retained.rate > 0 %}+{% endif %}{{ report.comparison.retained.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+      <small>營收扣除陪玩與客服分潤{% if report.comparison and report.comparison.retained %} · <span class="ops-change">{{ comparison_text(report.comparison.retained) }}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>店家實留率</span>
@@ -57,12 +67,12 @@
     <div class="ops-card">
       <span>平均客單</span>
       <strong data-count="{{ report.avg_order }}">{{ report.avg_order }}</strong>
-      <small>每筆已結單平均營收{% if report.comparison and report.comparison.avg_order %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.avg_order.rate is not none %}{% if report.comparison.avg_order.rate > 0 %}+{% endif %}{{ report.comparison.avg_order.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+      <small>每筆已結單平均營收{% if report.comparison and report.comparison.avg_order %} · <span class="ops-change">{{ comparison_text(report.comparison.avg_order) }}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>付費客戶</span>
       <strong data-count="{{ report.customer_count }}">{{ report.customer_count }}</strong>
-      <small>期間內不重複 Discord 客戶{% if report.comparison and report.comparison.customer_count %} · <span class="ops-change">{{ report.previous_label }} {% if report.comparison.customer_count.rate is not none %}{% if report.comparison.customer_count.rate > 0 %}+{% endif %}{{ report.comparison.customer_count.rate }}%{% else %}無可比資料{% endif %}</span>{% endif %}</small>
+      <small>期間內不重複 Discord 客戶{% if report.comparison and report.comparison.customer_count %} · <span class="ops-change">{{ comparison_text(report.comparison.customer_count) }}</span>{% endif %}</small>
     </div>
     <div class="ops-card">
       <span>回購客戶</span>
