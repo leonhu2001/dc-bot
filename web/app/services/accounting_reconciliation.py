@@ -599,6 +599,41 @@ def _check_orphan_tip_wallet_transactions(
         )
 
 
+def _all_payout_rows_unpaid_and_unpaid_at_clear(
+    rows: list[dict[str, Any]],
+) -> bool:
+    return all(
+        _normalize(row.get("payout_status")).lower() == "unpaid"
+        and row.get("paid_at") is None
+        for row in rows
+    )
+
+
+def _payout_repair_block_reason(
+    *,
+    worker_ids: list[str],
+    payout_base: int,
+    customer_service_discord_id: str,
+    worker_payouts: list[dict[str, Any]],
+    cs_payouts: list[dict[str, Any]],
+) -> str | None:
+    if not worker_ids:
+        return "沒有有效接單人員，不能自動重算分潤。"
+
+    if int(payout_base or 0) <= 0:
+        return "分潤計算基礎金額不是正數，需人工確認。"
+
+    cs_id = _normalize(customer_service_discord_id)
+    if not cs_id or cs_id == "demo_customer_service":
+        return "缺少真實客服 Discord ID，不能自動建立客服分潤。"
+
+    all_rows = [*worker_payouts, *cs_payouts]
+    if not _all_payout_rows_unpaid_and_unpaid_at_clear(all_rows):
+        return "已有 paid、void、未知狀態或 paid_at 資料，禁止自動重算。"
+
+    return None
+
+
 def _check_payouts(
     web: sqlite3.Connection,
     issues: list[dict[str, Any]],
@@ -632,7 +667,9 @@ def _check_payouts(
             status,
             amount,
             payout_base_amount,
-            payment_method
+            payment_method,
+            customer_service_discord_id,
+            customer_service_display_name
         FROM web_orders
         WHERE LOWER(COALESCE(status, '')) IN (
             'active',
@@ -750,6 +787,10 @@ def _check_payouts(
                 if _normalize(row["payout_status"]).lower() != "void"
             ]
             if non_void_workers or non_void_cs:
+                live_rows = [*non_void_workers, *non_void_cs]
+                can_void = _all_payout_rows_unpaid_and_unpaid_at_clear(
+                    live_rows
+                )
                 _issue(
                     issues,
                     category="payout",
@@ -763,6 +804,17 @@ def _check_payouts(
                     ),
                     expected=0,
                     actual=len(non_void_workers) + len(non_void_cs),
+                    order_id=order_id,
+                    repair_action=(
+                        "void_cancelled_payouts"
+                        if can_void
+                        else None
+                    ),
+                    repair_block_reason=(
+                        None
+                        if can_void
+                        else "存在已發放、非 unpaid 或已有 paid_at 的分潤，需人工確認。"
+                    ),
                 )
             continue
 
@@ -786,6 +838,21 @@ def _check_payouts(
             order["payout_base_amount"]
             or order["amount"]
             or 0
+        )
+
+        repair_block_reason = _payout_repair_block_reason(
+            worker_ids=worker_ids,
+            payout_base=payout_base,
+            customer_service_discord_id=_normalize(
+                order["customer_service_discord_id"]
+            ),
+            worker_payouts=worker_payouts,
+            cs_payouts=cs_payouts,
+        )
+        repair_action = (
+            "recalculate_unpaid_payouts"
+            if repair_block_reason is None
+            else None
         )
 
         expected = calculate_order_payout(
@@ -820,6 +887,9 @@ def _check_payouts(
                     detail=f"worker {worker_id} 有有效 assignment，但沒有 worker_payout。",
                     expected=expected_amount,
                     actual=None,
+                    order_id=order_id,
+                    repair_action=repair_action,
+                    repair_block_reason=repair_block_reason,
                 )
                 continue
 
@@ -834,6 +904,9 @@ def _check_payouts(
                     detail=f"worker {worker_id} 在同一訂單共有 {len(actual_rows)} 筆 worker_payout。",
                     expected=1,
                     actual=len(actual_rows),
+                    order_id=order_id,
+                    repair_action=repair_action,
+                    repair_block_reason=repair_block_reason,
                 )
 
             actual_amount = _as_float(actual_rows[0]["final_payout"])
@@ -848,6 +921,9 @@ def _check_payouts(
                     detail=f"worker {worker_id} 的分潤與目前 assignment / 規則重算結果不同。",
                     expected=expected_amount,
                     actual=actual_amount,
+                    order_id=order_id,
+                    repair_action=repair_action,
+                    repair_block_reason=repair_block_reason,
                 )
 
         for worker_id, actual_rows in actual_by_worker.items():
@@ -862,6 +938,9 @@ def _check_payouts(
                     detail=f"worker {worker_id} 有 worker_payout，但不在目前有效接單名單。",
                     expected=None,
                     actual=sum(_as_float(row["final_payout"]) for row in actual_rows),
+                    order_id=order_id,
+                    repair_action=repair_action,
+                    repair_block_reason=repair_block_reason,
                 )
 
         if len(cs_payouts) != 1:
@@ -875,6 +954,9 @@ def _check_payouts(
                 detail="有效訂單理論上應有且只有一筆 customer_service_payout。",
                 expected=1,
                 actual=len(cs_payouts),
+                order_id=order_id,
+                repair_action=repair_action,
+                repair_block_reason=repair_block_reason,
             )
         elif not _money_equal(expected.customer_service_payout, cs_payouts[0]["payout_amount"]):
             _issue(
@@ -887,6 +969,9 @@ def _check_payouts(
                 detail="客服分潤與 payout_base_amount 重算結果不同。",
                 expected=expected.customer_service_payout,
                 actual=_as_float(cs_payouts[0]["payout_amount"]),
+                order_id=order_id,
+                repair_action=repair_action,
+                repair_block_reason=repair_block_reason,
             )
 
         for payout in worker_payouts:
@@ -900,6 +985,8 @@ def _check_payouts(
                     reference=reference,
                     title="打手分潤已付款但缺少付款時間",
                     detail=f"worker payout #{payout['id']} status=paid，但 paid_at 為空。",
+                    order_id=order_id,
+                    repair_block_reason="已發放分潤不能由對帳中心自動補付款時間。",
                 )
 
         for payout in cs_payouts:
@@ -913,6 +1000,8 @@ def _check_payouts(
                     reference=reference,
                     title="客服分潤已付款但缺少付款時間",
                     detail=f"customer service payout #{payout['id']} status=paid，但 paid_at 為空。",
+                    order_id=order_id,
+                    repair_block_reason="已發放分潤不能由對帳中心自動補付款時間。",
                 )
 
 
@@ -1021,10 +1110,17 @@ def build_accounting_reconciliation_snapshot(
         status = "ok"
         status_text = "帳務一致"
 
+    repairable_count = sum(
+        1
+        for item in issues
+        if item.get("repairable")
+    )
+
     return {
         "status": status,
         "status_text": status_text,
         "issue_count": len(issues),
+        "repairable_count": repairable_count,
         "critical_count": critical_count,
         "warning_count": warning_count,
         "category_counts": dict(category_counts),
