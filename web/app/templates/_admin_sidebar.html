@@ -67,6 +67,13 @@
         </a>
 
         <a
+            class="{% if _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
+            href="/admin/accounting-reconciliation"
+        >
+            帳務對帳
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/system') %}active{% endif %}"
             href="/admin/system"
         >
