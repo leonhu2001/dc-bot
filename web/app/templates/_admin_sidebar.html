@@ -67,6 +67,13 @@
         </a>
 
         <a
+            class="{% if _p.startswith('/admin/support-calls') %}active{% endif %}"
+            href="/admin/support-calls"
+        >
+            客服鈴 / SLA
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/anomalies') %}active{% endif %}"
             href="/admin/anomalies"
         >
