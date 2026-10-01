@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from web.app.config import config
@@ -45,8 +45,43 @@ def get_db_session() -> Generator[Session, None, None]:
         db.close()
 
 
+def ensure_sqlite_additive_columns(bind=engine) -> None:
+    if getattr(bind.dialect, "name", "") != "sqlite":
+        return
+
+    with bind.begin() as conn:
+        tables = {
+            str(row[0])
+            for row in conn.execute(
+                text(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table'"
+                )
+            ).fetchall()
+        }
+
+        if "web_orders" not in tables:
+            return
+
+        columns = {
+            str(row[1])
+            for row in conn.execute(
+                text("PRAGMA table_info(web_orders)")
+            ).fetchall()
+        }
+
+        if "historical_discount_amount" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE web_orders "
+                    "ADD COLUMN historical_discount_amount INTEGER"
+                )
+            )
+
+
 def create_all_tables() -> None:
     import shared.models  # noqa: F401
     import shared.staff_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    ensure_sqlite_additive_columns(engine)
