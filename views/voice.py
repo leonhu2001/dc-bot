@@ -849,6 +849,11 @@ async def apply_voice_lock_state(
     guild = voice_channel.guild
     overwrites = dict(voice_channel.overwrites)
     normalized_room_type = str(room_type or "public")
+    vip_whitelist_ids = (
+        get_vip_room_whitelist_user_ids(int(owner.id))
+        if normalized_room_type == "vip"
+        else set()
+    )
 
     targets = get_room_targets_for_control(guild, normalized_room_type)
 
@@ -888,8 +893,13 @@ async def apply_voice_lock_state(
 
         is_owner = target.id == owner.id
         is_bot = guild.me is not None and target.id == guild.me.id
+        is_whitelisted = int(target.id) in vip_whitelist_ids
 
         if is_owner or is_bot:
+            continue
+
+        if is_whitelisted:
+            overwrites[target] = build_vip_whitelist_overwrite()
             continue
 
         if locked:
@@ -954,6 +964,11 @@ async def apply_voice_hidden_state(
     guild = voice_channel.guild
     overwrites = dict(voice_channel.overwrites)
     normalized_room_type = str(room_type or "public")
+    vip_whitelist_ids = (
+        get_vip_room_whitelist_user_ids(int(owner.id))
+        if normalized_room_type == "vip"
+        else set()
+    )
 
     # VIP 房沿用較嚴格的店內名單（不含員工家屬）；
     # 陪玩 / 公共房則沿用完整店內語音名單。
@@ -1003,6 +1018,13 @@ async def apply_voice_hidden_state(
 
         overwrites[role] = overwrite
 
+    if normalized_room_type == "vip":
+        for user_id in vip_whitelist_ids:
+            whitelist_member = guild.get_member(int(user_id))
+            if whitelist_member is None or whitelist_member.bot:
+                continue
+            overwrites[whitelist_member] = build_vip_whitelist_overwrite()
+
     # 隱藏時，清掉所有非店內角色 / 個人的可見例外，避免曾被拉進房的人仍看得到。
     # 顯示時則交回 @everyone 的顯示權限，不額外保留「被隱藏」的 deny。
     for target, overwrite in list(overwrites.items()):
@@ -1025,6 +1047,11 @@ async def apply_voice_hidden_state(
             int(role.id) in staff_role_ids
             for role in getattr(target, "roles", [])
         )
+        is_whitelisted = int(target.id) in vip_whitelist_ids
+
+        if is_whitelisted:
+            overwrites[target] = build_vip_whitelist_overwrite()
+            continue
 
         if is_owner or is_bot or is_staff_member:
             overwrite.view_channel = True
