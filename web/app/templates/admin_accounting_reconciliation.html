@@ -4,6 +4,28 @@
 
 {% block content %}
 
+{% if repair_message %}
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>
+                {% if repair_status == 'success' %}
+                    修復完成
+                {% else %}
+                    修復未執行
+                {% endif %}
+            </h2>
+            <p class="muted-text">{{ repair_message }}</p>
+        </div>
+        <div>
+            <span class="status-chip {% if repair_status == 'success' %}is-paid{% else %}is-unpaid{% endif %}">
+                {% if repair_status == 'success' %}SUCCESS{% else %}BLOCKED{% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="panel compact-panel">
 
     <div class="section-title-row">
@@ -43,6 +65,12 @@
             <span>Warning</span>
             <strong>{{ reconciliation.warning_count }}</strong>
             <p class="muted-text">資料可疑，但不一定代表金額錯誤</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>可安全修復</span>
+            <strong>{{ reconciliation.repairable_count }}</strong>
+            <p class="muted-text">只包含未發放分潤類型</p>
         </div>
 
         <div class="payout-stat-card">
@@ -152,6 +180,25 @@
                         {{ issue.detail }}
                     </p>
 
+                    {% if issue.repairable and issue.order_id and issue.repair_action %}
+                        <form
+                            method="post"
+                            action="/admin/accounting-reconciliation/repair"
+                            onsubmit="return confirm('確定要執行「{{ repair_action_label(issue.repair_action) }}」嗎？此功能只允許未發放分潤資料。');"
+                        >
+                            <input type="hidden" name="order_id" value="{{ issue.order_id }}">
+                            <input type="hidden" name="action" value="{{ issue.repair_action }}">
+
+                            <button type="submit" class="button">
+                                {{ repair_action_label(issue.repair_action) }}
+                            </button>
+                        </form>
+                    {% elif issue.repair_block_reason %}
+                        <p class="muted-text">
+                            🔒 不提供自動修復：{{ issue.repair_block_reason }}
+                        </p>
+                    {% endif %}
+
                 </article>
 
             {% endfor %}
@@ -204,8 +251,13 @@
     </div>
 
     <p class="muted-text">
-        VIP 累積與會員點數目前不做「自動重算覆蓋」，因為系統包含手動補登、
-        降階進度重置、儲值只計 VIP 不給點數等合法例外；後續會先建立可追溯 ledger 再納入。
+        自動修復目前只開放兩種：未發放分潤重算，以及取消訂單殘留的未發放分潤標記 void。
+        只要偵測到 paid、paid_at、未知 payout 狀態、缺客服、缺有效接單人員或分潤基礎金額異常，
+        系統就會拒絕自動修復。
+    </p>
+
+    <p class="muted-text">
+        錢包、儲值、雞腿、已發放分潤、VIP 累積與會員點數目前都只做偵測，不會自動修改。
     </p>
 
 </div>
