@@ -454,6 +454,21 @@ def _message_has_component(
     return False
 
 
+def _message_has_link(
+    message: discord.Message,
+    url: str,
+) -> bool:
+    expected = str(url or "").rstrip("/")
+
+    for row in getattr(message, "components", []) or []:
+        for child in getattr(row, "children", []) or []:
+            child_url = str(getattr(child, "url", "") or "").rstrip("/")
+            if child_url == expected:
+                return True
+
+    return False
+
+
 async def refresh_existing_order_ticket_support_buttons(
     guild: discord.Guild,
     *,
@@ -486,7 +501,16 @@ async def refresh_existing_order_ticket_support_buttons(
                 if not _message_has_component(message, "order_control_select"):
                     continue
 
-                if _message_has_component(message, "order_support_call"):
+                has_support_call = _message_has_component(
+                    message,
+                    "order_support_call",
+                )
+                has_customer_orders = _message_has_link(
+                    message,
+                    "https://mowanentertainment.com/me/orders",
+                )
+
+                if has_support_call and has_customer_orders:
                     break
 
                 await message.edit(
