@@ -3091,7 +3091,8 @@ async def admin_order_workspace_r8(
                     payout_base_amount,
                     manual_discount_amount,
                     cash_coupon_amount,
-                    store_absorbed_amount
+                    store_absorbed_amount,
+                    historical_discount_amount
                 FROM web_orders
                 WHERE id = :order_id
                 LIMIT 1
@@ -3135,6 +3136,10 @@ async def admin_order_workspace_r8(
         ) or 0
         order["store_absorbed_amount"] = _mw4a2r6_safe_int(
             financial.get("store_absorbed_amount"),
+            0,
+        ) or 0
+        order["historical_discount_amount"] = _mw4a2r6_safe_int(
+            financial.get("historical_discount_amount"),
             0,
         ) or 0
 
