@@ -240,6 +240,7 @@ from views.voice import (
     sync_voice_control_panel_state_from_channel,
     grant_play_voice_room_chat_access,
     revoke_play_voice_room_chat_access,
+    sync_vip_whitelist_permissions,
 )
 
 from views.panels import (
@@ -3031,6 +3032,126 @@ def _member_display_name(member: discord.Member) -> str:
     )
 
 
+def _ticket_overwrite_has_values(overwrite: discord.PermissionOverwrite) -> bool:
+    values = getattr(overwrite, "_values", None)
+    if isinstance(values, dict):
+        return bool(values)
+
+    return any(
+        getattr(overwrite, attr, None) is not None
+        for attr in (
+            "view_channel",
+            "send_messages",
+            "read_message_history",
+            "attach_files",
+            "embed_links",
+        )
+    )
+
+
+async def grant_order_ticket_access(
+    guild: discord.Guild,
+    ticket_channel_id: int,
+    member: discord.Member,
+) -> bool:
+    """接單成功後給接單者票口可見 / 文字互動權限。"""
+    channel = guild.get_channel(int(ticket_channel_id))
+    if not isinstance(channel, discord.TextChannel):
+        return False
+
+    overwrite = channel.overwrites_for(member)
+    overwrite.view_channel = True
+    overwrite.send_messages = True
+    overwrite.read_message_history = True
+    overwrite.attach_files = True
+    overwrite.embed_links = True
+
+    try:
+        await channel.set_permissions(
+            member,
+            overwrite=overwrite,
+            reason="Grant accepted staff ticket access",
+        )
+        return True
+    except discord.Forbidden:
+        print(
+            f"[ticket-access] Bot 權限不足，無法開放票口 "
+            f"channel={ticket_channel_id} member={member.id}"
+        )
+    except discord.HTTPException as exc:
+        print(
+            f"[ticket-access] 開放票口失敗 "
+            f"channel={ticket_channel_id} member={member.id}: {exc}"
+        )
+
+    return False
+
+
+async def revoke_order_ticket_access(
+    guild: discord.Guild,
+    ticket_channel_id: int,
+    member: discord.Member,
+) -> bool:
+    """取消接單後只清掉接單流程寫入的票口權限，恢復角色繼承。"""
+    channel = guild.get_channel(int(ticket_channel_id))
+    if not isinstance(channel, discord.TextChannel):
+        return False
+
+    overwrite = channel.overwrites_for(member)
+    overwrite.view_channel = None
+    overwrite.send_messages = None
+    overwrite.read_message_history = None
+    overwrite.attach_files = None
+    overwrite.embed_links = None
+
+    try:
+        await channel.set_permissions(
+            member,
+            overwrite=overwrite if _ticket_overwrite_has_values(overwrite) else None,
+            reason="Revoke unclaimed staff ticket access",
+        )
+        return True
+    except discord.Forbidden:
+        print(
+            f"[ticket-access] Bot 權限不足，無法收回票口 "
+            f"channel={ticket_channel_id} member={member.id}"
+        )
+    except discord.HTTPException as exc:
+        print(
+            f"[ticket-access] 收回票口失敗 "
+            f"channel={ticket_channel_id} member={member.id}: {exc}"
+        )
+
+    return False
+
+
+async def sync_acceptance_ticket_access_from_state(
+    guild: discord.Guild,
+    ticket_channel_id: int,
+    state,
+) -> None:
+    """刷新接單狀態時，確保所有目前接單者都能看到票口。"""
+    for claim in getattr(state, "claims", ()):
+        user_id = _to_int(getattr(claim, "staff_discord_id", None))
+        if user_id is None:
+            continue
+
+        member = guild.get_member(user_id)
+        if member is None:
+            try:
+                fetched = await guild.fetch_member(user_id)
+                member = fetched if isinstance(fetched, discord.Member) else None
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                member = None
+
+        if member is not None:
+            await grant_order_ticket_access(
+                guild,
+                int(ticket_channel_id),
+                member,
+            )
+
+
 def _acceptance_staff_display_text(
     guild: discord.Guild | None,
     state,
@@ -3251,6 +3372,12 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
     if not isinstance(ticket_channel, discord.TextChannel):
         raise ValueError(f"找不到票口頻道：{ticket_channel_id}")
+
+    await sync_acceptance_ticket_access_from_state(
+        guild,
+        ticket_channel_id,
+        state,
+    )
 
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
 
@@ -3547,7 +3674,7 @@ async def process_acceptance_sync_events_once() -> None:
     from sqlalchemy import select
 
     from shared.db import SessionLocal
-    from shared.models import SyncEvent, SyncEventStatus, SyncEventType
+    from shared.models import SyncEvent, SyncEventStatus, SyncEventType, WebOrder
 
     guild = bot.get_guild(GUILD_ID)
 
@@ -3585,6 +3712,41 @@ async def process_acceptance_sync_events_once() -> None:
 
             try:
                 await refresh_acceptance_dispatch_from_web_order(guild, int(event.order_id))
+
+                if event.event_type == SyncEventType.ORDER_UNCLAIMED.value:
+                    worker_id = _to_int(payload.get("worker_discord_id"))
+                    order = db.get(WebOrder, int(event.order_id))
+                    ticket_channel_id = (
+                        _to_int(order.ticket_channel_id)
+                        if order is not None
+                        else None
+                    )
+
+                    if worker_id is not None and ticket_channel_id is not None:
+                        member = guild.get_member(worker_id)
+
+                        if member is None:
+                            try:
+                                fetched_member = await guild.fetch_member(worker_id)
+                                member = (
+                                    fetched_member
+                                    if isinstance(fetched_member, discord.Member)
+                                    else None
+                                )
+                            except (
+                                discord.NotFound,
+                                discord.Forbidden,
+                                discord.HTTPException,
+                            ):
+                                member = None
+
+                        if member is not None:
+                            await revoke_order_ticket_access(
+                                guild,
+                                ticket_channel_id,
+                                member,
+                            )
+
                 event.status = SyncEventStatus.DONE.value
                 event.error_message = None
                 event.processed_at = datetime.utcnow()
@@ -3941,6 +4103,68 @@ async def repair_pending_acceptance_payment_panels_once(
             print(f"[acceptance-repair] failed order_id={row['id']}: {type(exc).__name__}: {exc}", flush=True)
 
     return repaired
+
+
+async def repair_pending_acceptance_ticket_access_once(
+    guild: discord.Guild,
+    *,
+    limit: int = 100,
+) -> int:
+    """Bot 啟動時把目前接單者的票口權限補齊。"""
+    import sqlite3
+
+    from shared.order_acceptance import get_acceptance_state
+
+    db_path = Path(__file__).parent / "web_dashboard.db"
+    conn = sqlite3.connect(db_path, timeout=15)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, ticket_channel_id
+            FROM web_orders
+            WHERE status IN ('waiting_acceptance', 'accepted_pending_pay')
+              AND ticket_channel_id IS NOT NULL
+              AND TRIM(ticket_channel_id) <> ''
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    restored = 0
+
+    for row in rows:
+        order_id = int(row["id"])
+        ticket_channel_id = _to_int(row["ticket_channel_id"])
+
+        if ticket_channel_id is None:
+            continue
+
+        try:
+            state = get_acceptance_state(order_id)
+            accepted_count = int(getattr(state, "accepted_count", 0) or 0)
+
+            if accepted_count <= 0:
+                continue
+
+            await sync_acceptance_ticket_access_from_state(
+                guild,
+                ticket_channel_id,
+                state,
+            )
+            restored += accepted_count
+        except Exception as exc:
+            print(
+                f"[ticket-access] startup repair failed "
+                f"order_id={order_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    return restored
 
 
 def _build_receiver_text_from_claim_data(claim_data: dict) -> str | None:
@@ -5240,9 +5464,21 @@ async def maybe_handle_prepay_acceptance_claim(
         )
         return True
 
+    ticket_access_ok = await grant_order_ticket_access(
+        interaction.guild,
+        view.source_channel_id,
+        interaction.user,
+    )
+
     claim_data = view.get_claim_data(interaction.message.id)
     _apply_acceptance_state_to_claim_data(claim_data, state)
     remember_claim_data(interaction.message.id, claim_data)
+
+    if not ticket_access_ok:
+        await interaction.followup.send(
+            "已接單，但票口權限同步失敗，請通知客服檢查票口權限。",
+            ephemeral=True,
+        )
 
     try:
         await send_order_log(
@@ -5323,9 +5559,21 @@ async def maybe_handle_prepay_acceptance_unclaim(
         )
         return True
 
+    ticket_access_ok = await revoke_order_ticket_access(
+        interaction.guild,
+        view.source_channel_id,
+        interaction.user,
+    )
+
     claim_data = view.get_claim_data(interaction.message.id)
     _apply_acceptance_state_to_claim_data(claim_data, state)
     remember_claim_data(interaction.message.id, claim_data)
+
+    if not ticket_access_ok:
+        await interaction.followup.send(
+            "已取消接單，但票口權限同步失敗，請通知客服檢查票口權限。",
+            ephemeral=True,
+        )
 
     try:
         await send_order_log(
@@ -11881,6 +12129,22 @@ async def restore_persistent_vip_voice_rooms(guild: discord.Guild) -> int:
         }
         sync_voice_control_panel_state_from_channel(channel)
 
+        try:
+            await sync_vip_whitelist_permissions(
+                channel,
+                owner_id,
+            )
+        except discord.Forbidden:
+            print(
+                f"Bot 權限不足，無法恢復 VIP 白名單權限："
+                f"owner={owner_id} channel={channel_id}"
+            )
+        except discord.HTTPException as exc:
+            print(
+                f"恢復 VIP 白名單權限失敗："
+                f"owner={owner_id} channel={channel_id}: {exc}"
+            )
+
         if panel_message_id:
             try:
                 bot.add_view(
@@ -12144,6 +12408,10 @@ async def on_voice_state_update(
 
                 if isinstance(existing_channel, discord.VoiceChannel):
                     TEMP_VIP_VOICE_CHANNEL_IDS.add(existing_channel.id)
+                    await sync_vip_whitelist_permissions(
+                        existing_channel,
+                        member.id,
+                    )
                     await grant_play_voice_room_chat_access(existing_channel, member)
                     await member.move_to(
                         existing_channel,
@@ -12345,6 +12613,23 @@ async def on_ready():
                 print(f"[acceptance-repair] restored payment panels: {repaired_payment_panels}", flush=True)
         except Exception as exc:
             print(f"[acceptance-repair] startup repair failed: {type(exc).__name__}: {exc}", flush=True)
+
+        try:
+            repaired_ticket_access = await repair_pending_acceptance_ticket_access_once(
+                guild_for_voice,
+            )
+            if repaired_ticket_access:
+                print(
+                    f"[ticket-access] restored accepted staff ticket access: "
+                    f"{repaired_ticket_access}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"[ticket-access] startup repair failed: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
         await get_or_create_order_log_channel(guild_for_voice)
         if not BACKUP_TASK_STARTED:
