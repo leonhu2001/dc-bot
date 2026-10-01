@@ -540,6 +540,10 @@ async def support_call_sla_loop(bot: discord.Client) -> None:
                 channel_id = int(str(call.get("ticket_channel_id") or "0"))
                 channel = bot.get_channel(channel_id)
                 if not isinstance(channel, discord.TextChannel):
+                    cancel_support_call(
+                        int(call["id"]),
+                        "ticket_channel_missing",
+                    )
                     continue
 
                 mentions = _support_role_mentions(
