@@ -259,6 +259,69 @@
             </strong>
         </div>
 
+        <div>
+            <span>帳務對帳異常</span>
+            <strong>
+                {% if health.metrics.accounting_issues is not none %}
+                    {{ health.metrics.accounting_issues }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+        <div>
+            <span>帳務 Critical</span>
+            <strong>
+                {% if health.metrics.accounting_critical is not none %}
+                    {{ health.metrics.accounting_critical }}
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+        </div>
+
+    </div>
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>帳務對帳</h2>
+            <p class="muted-text">
+                錢包流水、儲值、我的錢包訂單、雞腿與分潤一致性。
+            </p>
+        </div>
+
+        <div>
+            <span class="status-chip {% if health.accounting.status == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
+                {{ health.accounting.status_text }}
+            </span>
+
+            <a class="button secondary" href="/admin/accounting-reconciliation">
+                查看明細
+            </a>
+        </div>
+    </div>
+
+    <div class="order-meta compact-meta">
+        <div>
+            <span>全部異常</span>
+            <strong>{{ health.accounting.issue_count }}</strong>
+        </div>
+
+        <div>
+            <span>Critical</span>
+            <strong>{{ health.accounting.critical_count }}</strong>
+        </div>
+
+        <div>
+            <span>Warning</span>
+            <strong>{{ health.accounting.warning_count }}</strong>
+        </div>
     </div>
 
 </div>
