@@ -3092,6 +3092,10 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         dispatch_channel_id = _to_int(order.dispatch_channel_id, DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
         ticket_channel_id = _to_int(order.ticket_channel_id)
         customer_id = _to_int(order.customer_discord_id)
+        customer_display_name = str(
+            getattr(order, "customer_display_name", None)
+            or ""
+        ).strip()
         category_raw = str(order.category or "未紀錄")
         category_label = ORDER_CATEGORY_LABELS.get(category_raw, category_raw)
         item = str(order.item or "未紀錄")
@@ -3250,6 +3254,9 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         raise ValueError(f"找不到票口頻道：{ticket_channel_id}")
 
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
+
+    if customer_display_name and customer_display_name != str(customer_id):
+        data["customer_display_name"] = customer_display_name
 
     if accepted_staff_display_text:
         data["accepted_staff_display_text"] = accepted_staff_display_text
@@ -4713,8 +4720,10 @@ async def finalize_accepted_pending_payment(
         customer_member_for_review = guild.get_member(customer_id)
         customer_display_name = (
             getattr(customer_member_for_review, "display_name", None)
+            or getattr(customer_member_for_review, "global_name", None)
             or getattr(customer_member_for_review, "name", None)
-            or str(customer_id)
+            or str(data.get("customer_display_name") or "").strip()
+            or "未知顧客"
         )
 
         try:
@@ -7193,6 +7202,9 @@ async def create_waiting_acceptance_order_from_self_service(
             customer_member = await guild.fetch_member(customer_id)
         except Exception:
             customer_member = None
+
+    if customer_member is not None:
+        data["customer_display_name"] = _member_display_name(customer_member)
 
     companion_preference = data.get("companion_preference") or "不指定陪玩/打手"
     staff_order_note = str(data.get("staff_order_note") or data.get("staff_note") or "").strip()
@@ -16829,6 +16841,12 @@ def _r13_seed_website_order_into_self_service(
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel.id, {})
 
     data["customer_id"] = int(customer_id)
+    seeded_customer_display_name = str(
+        order.get("customer_display_name")
+        or ""
+    ).strip()
+    if seeded_customer_display_name and seeded_customer_display_name != str(customer_id):
+        data["customer_display_name"] = seeded_customer_display_name
     data["category"] = category_key
     data["category_label"] = ORDER_CATEGORY_LABELS.get(category_key, category_label or category_key)
     data["item_group"] = str(item_group)
