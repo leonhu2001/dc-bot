@@ -217,3 +217,38 @@ def test_resolve_requires_claimed_state(tmp_path, monkeypatch):
 
     assert changed is False
     assert latest["status"] == "open"
+
+
+def test_close_support_calls_for_ticket_retires_active_calls(tmp_path, monkeypatch):
+    db_path = tmp_path / "web_dashboard.db"
+    monkeypatch.setattr(support_calls, "_now", _fixed_now)
+
+    call, _ = support_calls.create_or_get_active_support_call(
+        ticket_channel_id="104",
+        customer_discord_id="204",
+        customer_display_name="Boss",
+        db_file=db_path,
+    )
+
+    closed = support_calls.close_support_calls_for_ticket(
+        "104",
+        reason="order_closed",
+        db_file=db_path,
+    )
+
+    assert closed == 1
+
+    latest = support_calls.get_support_call(
+        call["id"],
+        db_file=db_path,
+    )
+
+    assert latest is not None
+    assert latest["status"] == "cancelled"
+    assert latest["cancel_reason"] == "order_closed"
+
+    active = support_calls.list_active_support_calls(
+        db_file=db_path,
+    )
+
+    assert active == []
