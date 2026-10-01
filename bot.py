@@ -240,6 +240,7 @@ from views.voice import (
     sync_voice_control_panel_state_from_channel,
     grant_play_voice_room_chat_access,
     revoke_play_voice_room_chat_access,
+    sync_vip_whitelist_permissions,
 )
 
 from views.panels import (
