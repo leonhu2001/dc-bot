@@ -82,4 +82,15 @@ class WebConfig:
     )
 
 
+    WEB_RECENT_AUTH_SECONDS = max(
+        300,
+        int(
+            os.getenv(
+                "WEB_RECENT_AUTH_SECONDS",
+                "1800",
+            )
+        ),
+    )
+
+
 config = WebConfig()
