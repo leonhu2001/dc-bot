@@ -23,6 +23,8 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 DEPLOYED_AT="$(date --iso-8601=seconds)"
 BACKUP="$APP/_archive/deploy_$STAMP"
 SOURCE_UPDATED=0
+DEPENDENCIES_UPDATED=0
+DEPENDENCY_SYNC_NEEDED=0
 
 rollback() {
     local rc=$?
@@ -38,7 +40,17 @@ rollback() {
     if [ "$SOURCE_UPDATED" -eq 1 ]; then
         echo "Rolling source back to: $OLD_HEAD"
         git reset --hard "$OLD_HEAD"
+    fi
 
+    if [ "$DEPENDENCIES_UPDATED" -eq 1 ] && [ -s "$BACKUP/venv-freeze.txt" ]; then
+        echo "Restoring previous Python dependencies..."
+        "$APP/venv/bin/python" -m pip install \
+            --disable-pip-version-check \
+            -r "$BACKUP/venv-freeze.txt" \
+            || echo "WARN: dependency rollback failed; manual venv repair may be required."
+    fi
+
+    if [ "$SOURCE_UPDATED" -eq 1 ]; then
         systemctl restart "$BOT_SERVICE"
         systemctl restart "$WEB_SERVICE"
         sleep 3
@@ -91,6 +103,9 @@ for db_name in bot.db web_dashboard.db; do
     fi
 done
 
+"$APP/venv/bin/python" -m pip freeze > "$BACKUP/venv-freeze.txt"
+echo "PASS: Python dependency snapshot"
+
 echo "Backup: $BACKUP"
 echo
 
@@ -111,6 +126,16 @@ if ! git merge-base --is-ancestor "$TARGET" "$ORIGIN_MAIN"; then
 fi
 
 echo "origin/main: $ORIGIN_MAIN"
+
+if ! git diff --quiet "$OLD_HEAD" "$TARGET" -- \
+    requirements.txt \
+    web/requirements-web.txt; then
+    DEPENDENCY_SYNC_NEEDED=1
+    echo "Dependency files changed: sync required"
+else
+    echo "Dependency files unchanged: sync skipped"
+fi
+
 echo
 
 echo "=== 3. UPDATE SOURCE ==="
@@ -126,7 +151,24 @@ fi
 echo "PASS: source updated"
 echo
 
-echo "=== 4. PYTHON COMPILE CHECK ==="
+echo "=== 4. SYNC PYTHON DEPENDENCIES ==="
+if [ "$DEPENDENCY_SYNC_NEEDED" -eq 1 ]; then
+    DEPENDENCIES_UPDATED=1
+
+    "$APP/venv/bin/python" -m pip install \
+        --disable-pip-version-check \
+        --upgrade \
+        -r requirements.txt \
+        -r web/requirements-web.txt
+
+    "$APP/venv/bin/python" -m pip check
+    echo "PASS: Python dependencies synchronized"
+else
+    echo "SKIP: dependency files unchanged"
+fi
+echo
+
+echo "=== 5. PYTHON COMPILE CHECK ==="
 /opt/dc-bot/venv/bin/python -m compileall -q \
     bot.py \
     cogs \
@@ -138,12 +180,12 @@ echo "=== 4. PYTHON COMPILE CHECK ==="
 echo "PASS: Python compile"
 echo
 
-echo "=== 5. ENSURE DATABASE TABLES ==="
+echo "=== 6. ENSURE DATABASE TABLES ==="
 runuser -u dc-bot-web -- env PYTHONPATH="$APP" \
     "$APP/venv/bin/python" -c "from shared.db import create_all_tables; create_all_tables(); print('PASS: database tables ready')"
 echo
 
-echo "=== 6. OPTIONAL VPS TESTS ==="
+echo "=== 7. OPTIONAL VPS TESTS ==="
 if /opt/dc-bot/venv/bin/python -c "import pytest" >/dev/null 2>&1; then
     /opt/dc-bot/venv/bin/python -m pytest -q
 else
@@ -151,7 +193,7 @@ else
 fi
 
 echo
-echo "=== 7. RESTART SERVICES ==="
+echo "=== 8. RESTART SERVICES ==="
 systemctl restart "$BOT_SERVICE"
 systemctl restart "$WEB_SERVICE"
 sleep 3
@@ -175,7 +217,7 @@ if [ "$WEB_STATE" != "active" ]; then
 fi
 
 echo
-echo "=== 8. HTTP SMOKE CHECK ==="
+echo "=== 9. HTTP SMOKE CHECK ==="
 curl --fail --silent --show-error \
     --retry 5 \
     --retry-delay 1 \
@@ -185,7 +227,7 @@ curl --fail --silent --show-error \
 echo
 echo
 
-echo "=== 9. WRITE DEPLOYMENT MARKER ==="
+echo "=== 10. WRITE DEPLOYMENT MARKER ==="
 SUBJECT="$(git log -1 --format=%s "$TARGET")"
 mkdir -p "$APP/data"
 
@@ -219,7 +261,7 @@ chmod 0644 "$APP/data/deployed_version.json"
 echo "PASS: deployment marker written"
 echo
 
-echo "=== 10. FINAL CHECK ==="
+echo "=== 11. FINAL CHECK ==="
 echo "HEAD: $(git rev-parse HEAD)"
 echo "Bot:  $(systemctl is-active "$BOT_SERVICE")"
 echo "Web:  $(systemctl is-active "$WEB_SERVICE")"
