@@ -60,6 +60,13 @@ COMPANION_ROLES: tuple[RoleKey, ...] = (
 
 ALL_RECEIVER_ROLES: tuple[RoleKey, ...] = PROTECTOR_ROLES + COMPANION_ROLES
 
+DELTA_DESKTOP_GAME_ROLE = ("delta_desktop",)
+DELTA_MOBILE_GAME_ROLE = ("delta_mobile",)
+STEAM_GAME_ROLE = ("steam_game",)
+VALORANT_GAME_ROLE = ("valorant_game",)
+LOL_GAME_ROLE = ("lol_game",)
+APEX_GAME_ROLE = ("apex_game",)
+
 
 CATEGORY_LABELS: dict[str, str] = {
     "basic": "三角洲 基礎單",
@@ -114,6 +121,8 @@ class OrderRule:
 
     # 遊戲階級與舊服務職位分開保存；只有商品規則明確列出時才可接。
     allowed_game_roles: tuple[str, ...] = ()
+    # 必須同時持有其中至少一個遊戲身分組；與 allowed_* 是 AND 關係。
+    required_game_roles: tuple[str, ...] = ()
     specify_fee_by_game_role: dict[str, int] = field(default_factory=dict)
 
 
@@ -546,6 +555,7 @@ _add(OrderRule(
     "steam", "steam_play", "Steam遊戲｜娛樂陪", "hourly", 320, "H",
     allowed_roles=COMPANION_ROLES,
     allowed_game_roles=(),
+    required_game_roles=STEAM_GAME_ROLE,
     required_staff_count="player_count",
     player_count_enabled=True,
     max_player_count=4,
@@ -568,6 +578,7 @@ _add(OrderRule(
 _add(OrderRule(
     "valorant", "valorant_entertain", "特戰英豪｜娛樂陪", "hourly", 350, "H",
     allowed_roles=ALL_RECEIVER_ROLES,
+    required_game_roles=VALORANT_GAME_ROLE,
     required_staff_count="player_count",
     player_count_enabled=True,
     max_player_count=4,
@@ -584,6 +595,7 @@ _add(OrderRule(
 _add(OrderRule(
     "valorant", "valorant_tech", "特戰英豪｜技術陪", "game", 200, "局",
     allowed_roles=PROTECTOR_ROLES,
+    required_game_roles=VALORANT_GAME_ROLE,
     required_staff_count="player_count",
     player_count_enabled=True,
     max_player_count=4,
@@ -604,6 +616,7 @@ _add(OrderRule(
 _add(OrderRule(
     "valorant", "valorant_top_tech", "特戰英豪｜頂級技術陪", "game", 350, "局",
     allowed_roles=("top_protector",),
+    required_game_roles=VALORANT_GAME_ROLE,
     required_staff_count="player_count",
     player_count_enabled=True,
     max_player_count=4,
@@ -634,11 +647,13 @@ def _add_game_service_rule(
     unit_label: str,
     allowed_service_roles: tuple[RoleKey, ...] = (),
     allowed_game_roles: tuple[str, ...] = (),
+    required_game_roles: tuple[str, ...] = (),
 ) -> None:
     _add(OrderRule(
         category, key, label, pricing_type, price, unit_label,
         allowed_roles=allowed_service_roles,
         allowed_game_roles=allowed_game_roles,
+        required_game_roles=required_game_roles,
         required_staff_count="player_count",
         player_count_enabled=True,
         min_player_count=1,
@@ -663,24 +678,24 @@ def _add_game_service_rule(
     ))
 
 
-_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
-_add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=VALORANT_GAME_ROLES)
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"))
-_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("valorant_radiant",))
-_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_radiant",))
+_add_game_service_rule(category="valorant", key="valorant_entertain_ng", label="特戰英豪｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_entertain_ranked", label="特戰英豪｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ng", label="特戰英豪｜超凡陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_ascendant_ranked", label="特戰英豪｜超凡陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("valorant_ascendant", "valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_immortal_ng", label="特戰英豪｜神話陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_immortal_ranked", label="特戰英豪｜神話陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("valorant_immortal", "valorant_radiant"), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_radiant_ng", label="特戰英豪｜輻能陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
+_add_game_service_rule(category="valorant", key="valorant_radiant_ranked", label="特戰英豪｜輻能陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("valorant_radiant",), required_game_roles=VALORANT_GAME_ROLE)
 
-_add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
-_add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
-_add_game_service_rule(category="lol", key="lol_entertain_ranked", label="英雄聯盟｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, allowed_game_roles=LOL_GAME_ROLES)
-_add_game_service_rule(category="lol", key="lol_master_ng", label="英雄聯盟｜大師陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_master_ranked", label="英雄聯盟｜大師陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"))
-_add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",))
-_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_elite",))
+_add_game_service_rule(category="lol", key="lol_entertain_aram", label="英雄聯盟｜娛樂陪｜ARAM", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_entertain_ng", label="英雄聯盟｜娛樂陪｜NG", pricing_type="hourly", price=300, unit_label="H", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_entertain_ranked", label="英雄聯盟｜娛樂陪｜積分", pricing_type="game", price=250, unit_label="局", allowed_service_roles=COMPANION_ROLES, required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_master_ng", label="英雄聯盟｜大師陪｜NG", pricing_type="hourly", price=340, unit_label="H", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_master_ranked", label="英雄聯盟｜大師陪｜積分", pricing_type="game", price=300, unit_label="局", allowed_game_roles=("lol_master", "lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_grandmaster_ng", label="英雄聯盟｜宗師陪｜NG", pricing_type="hourly", price=360, unit_label="H", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_grandmaster_ranked", label="英雄聯盟｜宗師陪｜積分", pricing_type="game", price=350, unit_label="局", allowed_game_roles=("lol_grandmaster", "lol_elite"), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_elite_ng", label="英雄聯盟｜菁英陪｜NG", pricing_type="hourly", price=400, unit_label="H", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
+_add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯盟｜菁英陪｜積分", pricing_type="game", price=400, unit_label="局", allowed_game_roles=("lol_elite",), required_game_roles=LOL_GAME_ROLE)
 
 
 # ========= APEX Legends 陪玩 =========
@@ -706,6 +721,7 @@ def _add_apex_service_rule(
         "H",
         allowed_roles=allowed_service_roles,
         allowed_game_roles=allowed_game_roles,
+        required_game_roles=APEX_GAME_ROLE,
         required_staff_count="player_count",
         min_quantity=1,
         max_quantity=24,
@@ -874,6 +890,48 @@ def get_allowed_role_ids(rule: OrderRule) -> list[str]:
     ]
 
 
+def get_required_game_role_keys(rule: OrderRule) -> tuple[str, ...]:
+    return _unique_role_keys_by_id(tuple(rule.required_game_roles))
+
+
+def get_required_game_role_ids(rule: OrderRule) -> list[str]:
+    return [
+        str(ALL_ROLE_IDS[key])
+        for key in get_required_game_role_keys(rule)
+        if key in ALL_ROLE_IDS
+    ]
+
+
+def role_ids_match_requirements(
+    member_role_ids,
+    allowed_role_ids,
+    required_game_role_ids=(),
+) -> bool:
+    member_roles = {
+        str(role_id).strip()
+        for role_id in (member_role_ids or [])
+        if str(role_id).strip()
+    }
+    allowed = {
+        str(role_id).strip()
+        for role_id in (allowed_role_ids or [])
+        if str(role_id).strip()
+    }
+    required_games = {
+        str(role_id).strip()
+        for role_id in (required_game_role_ids or [])
+        if str(role_id).strip()
+    }
+
+    if allowed and not (member_roles & allowed):
+        return False
+
+    if required_games and not (member_roles & required_games):
+        return False
+
+    return True
+
+
 def get_allowed_role_labels(rule: OrderRule) -> list[str]:
     return [
         str(ALL_ROLE_LABELS.get(key, key))
@@ -887,7 +945,14 @@ def role_labels(roles: tuple[str, ...], game_roles: tuple[str, ...] = ()) -> str
 
 
 def rule_role_labels(rule: OrderRule) -> str:
-    return role_labels(rule.allowed_roles, rule.allowed_game_roles)
+    qualification = role_labels(rule.allowed_roles, rule.allowed_game_roles)
+    required_games = " / ".join(
+        str(ALL_ROLE_LABELS.get(key, key))
+        for key in get_required_game_role_keys(rule)
+    )
+    if qualification and required_games:
+        return f"{qualification} + {required_games}"
+    return qualification or required_games
 
 
 def validate_rules() -> None:
@@ -907,6 +972,16 @@ def validate_rules() -> None:
 
         if not rule.allowed_roles and not rule.allowed_game_roles:
             raise RuntimeError(f"{key}: no allowed roles")
+
+        unknown_required_games = [
+            role_key
+            for role_key in rule.required_game_roles
+            if role_key not in ALL_ROLE_IDS
+        ]
+        if unknown_required_games:
+            raise RuntimeError(
+                f"{key}: unknown required game roles {unknown_required_games}"
+            )
 
         if rule.min_protector_count > 0 and rule.min_protector_count > get_required_staff_count(rule, rule.max_player_count or 1):
             raise RuntimeError(f"{key}: min protector count exceeds required staff count")
@@ -932,6 +1007,9 @@ __all__ = [
     "get_allowed_role_ids",
     "get_allowed_role_keys",
     "get_allowed_role_labels",
+    "get_required_game_role_ids",
+    "get_required_game_role_keys",
+    "role_ids_match_requirements",
     "get_required_staff_count",
     "get_rule",
     "get_rules_by_category",
@@ -967,6 +1045,7 @@ def build_order_rule_snapshot(
     player_count: int | None = None,
     required_staff_count: int | None = None,
     allowed_role_ids: list[str] | tuple[str, ...] | set[str] | None = None,
+    required_game_role_ids: list[str] | tuple[str, ...] | set[str] | None = None,
     specified_staff_ids: list[str] | tuple[str, ...] | set[str] | None = None,
 ) -> dict:
     """保存建立訂單當下的規則快照，避免之後改價/改人數影響既有訂單。"""
@@ -987,7 +1066,16 @@ def build_order_rule_snapshot(
             "min_protector_count": getattr(rule, "min_protector_count", 0),
             "allowed_role_keys": list(getattr(rule, "allowed_roles", []) or []),
             "allowed_game_role_keys": list(getattr(rule, "allowed_game_roles", []) or []),
+            "required_game_role_keys": list(getattr(rule, "required_game_roles", []) or []),
             "allowed_role_ids": [str(item) for item in (allowed_role_ids or [])],
+            "required_game_role_ids": [
+                str(item)
+                for item in (
+                    required_game_role_ids
+                    if required_game_role_ids is not None
+                    else get_required_game_role_ids(rule)
+                )
+            ],
             "specified_staff_ids": [str(item) for item in (specified_staff_ids or [])],
             "point_benefits_allowed": bool(getattr(rule, "point_benefits_allowed", True)),
         },
