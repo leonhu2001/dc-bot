@@ -512,6 +512,19 @@ async def startup_event():
     ensure_web_support_tables()
     ensure_marketing_tables()
 
+    if config.AI_SUPPORT_API_KEY:
+        print(
+            "[support-ai] external AI enabled "
+            f"model={config.AI_SUPPORT_MODEL}",
+            flush=True,
+        )
+    else:
+        print(
+            "[support-ai] external AI not configured; "
+            "using safe FAQ fallback",
+            flush=True,
+        )
+
 
 def get_current_user(request: Request) -> dict | None:
     return request.session.get("user")
