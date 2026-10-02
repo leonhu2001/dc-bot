@@ -1,0 +1,265 @@
+{% extends "layout.html" %}
+
+{% block page_title %}AI 營運分析{% endblock %}
+
+{% block content %}
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>AI 營運分析</h2>
+            <p class="muted-text">
+                AI 只會看到系統預先整理好的聚合數據，不會直接查資料庫，也不能修改訂單、付款、退款、錢包或薪資。
+            </p>
+        </div>
+
+        <div>
+            <a class="button secondary" href="/admin/ai-operations?period=month">本月</a>
+            <a class="button secondary" href="/admin/ai-operations?period=quarter">本季</a>
+            <a class="button secondary" href="/admin/ai-operations?period=year">本年</a>
+            <a class="button secondary" href="/admin/ai-operations?period=all">全部</a>
+        </div>
+    </div>
+
+    {% set report = snapshot.financial_orders %}
+    {% set anomalies = snapshot.anomalies %}
+    {% set support = snapshot.customer_service %}
+
+    <div class="payout-stat-grid">
+        <div class="payout-stat-card">
+            <span>{{ report.period_label }}營收</span>
+            <strong>{{ "{:,}".format(report.revenue) }}</strong>
+            <p class="muted-text">
+                {{ report.order_count }} 筆完成訂單
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>留存</span>
+            <strong>{{ "{:,}".format(report.retained) }}</strong>
+            <p class="muted-text">
+                留存率 {{ report.retained_rate }}%
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>取消率</span>
+            <strong>{{ report.cancellation_rate }}%</strong>
+            <p class="muted-text">
+                {{ report.cancelled_orders }} / {{ report.created_orders }} 筆
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>異常中心</span>
+            <strong>{{ anomalies.issue_count }}</strong>
+            <p class="muted-text">
+                Critical {{ anomalies.critical_count }} ｜ Warning {{ anomalies.warning_count }}
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>客服 5 分鐘內接手率</span>
+            <strong>
+                {% if support.within_5_rate is not none %}
+                    {{ support.within_5_rate }}%
+                {% else %}
+                    -
+                {% endif %}
+            </strong>
+            <p class="muted-text">
+                樣本 {{ support.response_count }} 筆
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>回購營收占比</span>
+            <strong>{{ report.repeat_customer_revenue_share }}%</strong>
+            <p class="muted-text">
+                回購 {{ report.repeat_customer_orders }} 筆
+            </p>
+        </div>
+    </div>
+</div>
+
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>問 AI</h2>
+            <p class="muted-text">
+                可以問「今天取消率為什麼高？」、「哪個商品最近變差？」、「什麼時段最容易等不到人？」等營運問題。
+            </p>
+        </div>
+    </div>
+
+    <form method="post" action="/admin/ai-operations/analyze" class="admin-add-worker-form">
+        <input type="hidden" name="period" value="{{ period }}">
+
+        <label>
+            <span>想分析什麼？</span>
+            <textarea
+                class="input"
+                name="question"
+                rows="4"
+                maxlength="1200"
+                placeholder="例如：請幫我分析本季營運有什麼異常，優先看取消率、商品變化和客服 SLA。"
+            >{{ question or "" }}</textarea>
+        </label>
+
+        <button class="button" type="submit">產生 AI 分析</button>
+    </form>
+</div>
+
+
+{% if analysis %}
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>分析結果</h2>
+            <p class="muted-text">
+                {% if used_external_ai %}
+                    外部 AI 已成功分析本次白名單聚合資料。
+                {% else %}
+                    外部 AI 本次未成功，以下為系統本地指標摘要。
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div style="white-space:pre-wrap;line-height:1.85;">{{ analysis }}</div>
+</div>
+{% endif %}
+
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>最近 14 天取消率</h2>
+            <p class="muted-text">
+                以訂單建立日計算，讓 AI 能判斷今天是否真的偏高，而不是只看整月平均。
+            </p>
+        </div>
+    </div>
+
+    {% if snapshot.recent_order_signals.daily %}
+        <div class="admin-order-list compact-list">
+            {% for item in snapshot.recent_order_signals.daily|reverse %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">{{ item.day }}</p>
+                            <h3>{{ item.created_orders }} 筆建單</h3>
+                        </div>
+                        <span class="status-chip {% if item.cancellation_rate >= 20 %}is-unpaid{% elif item.cancellation_rate <= 5 %}is-paid{% endif %}">
+                            取消率 {{ item.cancellation_rate }}%
+                        </span>
+                    </div>
+                    <p class="muted-text" style="margin-bottom:0;">
+                        取消 {{ item.cancelled_orders }} 筆
+                    </p>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">目前沒有最近 14 天的訂單資料。</div>
+    {% endif %}
+</div>
+
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>商品近況</h2>
+            <p class="muted-text">
+                最近 14 天與前 14 天比較，只提供訂單數與取消率，不把客人資料送給 AI。
+            </p>
+        </div>
+    </div>
+
+    {% if snapshot.recent_order_signals.service_change_14d %}
+        <div class="admin-order-list compact-list">
+            {% for item in snapshot.recent_order_signals.service_change_14d %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">商品趨勢</p>
+                            <h3>{{ item.label }}</h3>
+                        </div>
+                    </div>
+
+                    <div class="order-meta compact-meta">
+                        <div>
+                            <span>最近 14 天</span>
+                            <strong>{{ item.current_14d_orders }} 筆</strong>
+                        </div>
+                        <div>
+                            <span>最近取消率</span>
+                            <strong>{{ item.current_14d_cancellation_rate }}%</strong>
+                        </div>
+                        <div>
+                            <span>前 14 天</span>
+                            <strong>{{ item.previous_14d_orders }} 筆</strong>
+                        </div>
+                        <div>
+                            <span>前期取消率</span>
+                            <strong>{{ item.previous_14d_cancellation_rate }}%</strong>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">目前沒有足夠的商品比較資料。</div>
+    {% endif %}
+</div>
+
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>接單時段訊號</h2>
+            <p class="muted-text">
+                最近 30 天，以訂單進入接單流程到第一位人員接單的時間做聚合；這是人力壓力訊號，不等同於完整人力缺口判定。
+            </p>
+        </div>
+    </div>
+
+    {% if snapshot.recent_order_signals.acceptance_by_hour_30d %}
+        <div class="admin-order-list compact-list">
+            {% for item in snapshot.recent_order_signals.acceptance_by_hour_30d %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">{{ "%02d:00" % item.hour }}</p>
+                            <h3>{{ item.orders }} 筆進入接單</h3>
+                        </div>
+                        <span class="status-chip">
+                            {% if item.avg_first_claim_minutes is not none %}
+                                平均 {{ item.avg_first_claim_minutes }} 分
+                            {% else %}
+                                無接單時間樣本
+                            {% endif %}
+                        </span>
+                    </div>
+                    <p class="muted-text" style="margin-bottom:0;">
+                        從未有人接單的紀錄：{{ item.no_claim_orders }} 筆
+                    </p>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">目前沒有足夠的接單時段資料。</div>
+    {% endif %}
+</div>
+
+
+<div class="panel compact-panel">
+    <h2>AI 可看到什麼</h2>
+    <p class="muted-text">
+        只包含營收、成本、留存、訂單量、取消率、商品聚合、客服 SLA、異常數、行銷漏斗與接單時段等白名單統計。
+        不包含客人 Discord ID、員工 Discord ID、帳號密碼、付款證明、錢包流水、訂單備註或完整聊天內容。
+    </p>
+</div>
+
+{% endblock %}
