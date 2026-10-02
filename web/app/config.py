@@ -114,5 +114,17 @@ class WebConfig:
         ),
     )
 
+    AI_OPERATIONS_MODEL = os.getenv(
+        "AI_OPERATIONS_MODEL",
+        AI_SUPPORT_MODEL,
+    ).strip()
+    AI_OPERATIONS_TIMEOUT_SECONDS = max(
+        5,
+        min(
+            45,
+            int(os.getenv("AI_OPERATIONS_TIMEOUT_SECONDS", "20")),
+        ),
+    )
+
 
 config = WebConfig()
