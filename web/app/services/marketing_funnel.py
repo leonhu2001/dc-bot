@@ -43,6 +43,7 @@ def ensure_marketing_tables(
                 session_id TEXT NOT NULL,
                 customer_discord_id TEXT,
                 event_name TEXT NOT NULL,
+                event_key TEXT,
                 path TEXT NOT NULL,
                 source TEXT,
                 medium TEXT,
@@ -62,8 +63,32 @@ def ensure_marketing_tables(
 
             CREATE INDEX IF NOT EXISTS idx_marketing_events_session
             ON marketing_events(session_id);
+
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_marketing_events_unique_key
+            ON marketing_events(event_name, event_key)
+            WHERE event_key IS NOT NULL;
             """
         )
+        columns = {
+            str(row[1])
+            for row in conn.execute(
+                "PRAGMA table_info(marketing_events)"
+            ).fetchall()
+        }
+
+        if "event_key" not in columns:
+            conn.execute(
+                "ALTER TABLE marketing_events ADD COLUMN event_key TEXT"
+            )
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_marketing_events_unique_key
+                ON marketing_events(event_name, event_key)
+                WHERE event_key IS NOT NULL
+                """
+            )
+
         conn.commit()
 
 
@@ -270,6 +295,7 @@ def record_marketing_event(
     path: str,
     customer_discord_id: str | int | None = None,
     properties: dict[str, Any] | None = None,
+    event_key: str | None = None,
     db_file: str | Path | None = None,
 ) -> int:
     event_name = _clean(event_name, 80)
@@ -285,10 +311,11 @@ def record_marketing_event(
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
         cur = conn.execute(
             """
-            INSERT INTO marketing_events (
+            INSERT OR IGNORE INTO marketing_events (
                 session_id,
                 customer_discord_id,
                 event_name,
+                event_key,
                 path,
                 source,
                 medium,
@@ -299,12 +326,13 @@ def record_marketing_event(
                 properties_json,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session_id,
                 _clean(customer_discord_id, 64) or None,
                 event_name,
+                _clean(event_key, 180) or None,
                 _clean(path, 300) or "/",
                 attribution["source"] or None,
                 attribution["medium"] or None,
