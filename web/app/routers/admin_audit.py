@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from shared.db import SessionLocal
 from shared.models import AdminAuditLog, WebUser
@@ -31,6 +32,22 @@ ACTION_LABELS = {
     "accounting_void_cancelled_payouts": "帳務修復｜取消單分潤 void",
     "accounting_queue_wallet_reconciliation": "帳務修復｜排入錢包差額修復",
     "accounting_recognize_historical_discount": "帳務修復｜認列歷史折扣",
+    "cancel_order": "取消訂單",
+    "sync_staff_members": "同步人員名單",
+    "update_order_internal_note": "更新客服內部備註",
+    "update_order_attention": "更新訂單注意標記",
+    "approve_payment_review": "核准付款",
+    "reject_payment_review": "駁回付款",
+    "retry_payment_review_apply": "重新套用付款結果",
+    "approve_topup": "核准儲值",
+    "reject_topup": "駁回儲值",
+    "bulk_mark_payouts_paid": "批次標記薪資已發放",
+    "bulk_mark_payouts_unpaid": "批次改回薪資未發放",
+    "set_person_payout_status": "更新單一人員薪資狀態",
+    "update_staff_profile": "編輯成員個人牆",
+    "toggle_staff_profile_public": "切換成員個人牆公開狀態",
+    "toggle_review_hidden": "切換評價隱藏狀態",
+    "toggle_review_public": "切換評價公開狀態",
 }
 
 
@@ -41,6 +58,13 @@ TARGET_TYPE_LABELS = {
     "worker_payout": "人員分潤",
     "worker_payout_override": "人員分潤調整",
     "customer_service_payout": "客服分潤",
+    "payment_review": "付款審核",
+    "topup_order": "儲值單",
+    "payout_summary": "薪資批次",
+    "payout_person": "人員薪資",
+    "staff_profile": "成員個人牆",
+    "staff_directory": "人員名單",
+    "order_review": "評價",
 }
 
 
@@ -105,6 +129,37 @@ FIELD_LABELS = {
     "attention_reason": "注意事項",
     "internal_note": "內部備註",
     "extra_requirements": "額外需求",
+    "review_no": "付款單號",
+    "source_type": "付款來源",
+    "source_id": "來源 ID",
+    "approved_at": "核准時間",
+    "approved_by_discord_id": "核准人員 ID",
+    "approved_by_display_name": "核准人員",
+    "rejected_at": "駁回時間",
+    "rejected_by_discord_id": "駁回人員 ID",
+    "rejected_by_display_name": "駁回人員",
+    "rejected_reason": "駁回原因",
+    "apply_error": "套用錯誤",
+    "topup_no": "儲值單號",
+    "credited_amount": "實際入帳",
+    "vip_level_before": "原 VIP",
+    "vip_level_after": "新 VIP",
+    "rebate_amount": "回饋金額",
+    "total_amount": "總金額",
+    "count": "筆數",
+    "rows": "受影響明細",
+    "person_id": "人員 ID",
+    "person_name": "人員名稱",
+    "display_name": "顯示名稱",
+    "profile_type": "個人牆類型",
+    "role_title": "階級 / 職位",
+    "main_games": "主要遊戲",
+    "service_tags": "服務項目",
+    "bio": "個人介紹",
+    "card_image_url": "名片圖片",
+    "is_public": "是否公開",
+    "is_hidden": "是否隱藏",
+    "_actor_display_name": "操作人員名稱",
 }
 
 
@@ -128,6 +183,25 @@ PAYOUT_STATUS_LABELS = {
     "paid": "已發放",
     "unpaid": "未發放",
     "void": "作廢",
+}
+
+
+MONEY_ACTIONS = {
+    "set_manual_worker_payout",
+    "set_worker_payout_status",
+    "set_customer_service_payout_status",
+    "approve_payment_review",
+    "reject_payment_review",
+    "retry_payment_review_apply",
+    "approve_topup",
+    "reject_topup",
+    "bulk_mark_payouts_paid",
+    "bulk_mark_payouts_unpaid",
+    "set_person_payout_status",
+    "accounting_recalculate_unpaid_payouts",
+    "accounting_void_cancelled_payouts",
+    "accounting_queue_wallet_reconciliation",
+    "accounting_recognize_historical_discount",
 }
 
 
@@ -293,6 +367,12 @@ async def admin_audit_logs(
     request: Request,
     action: str | None = None,
     admin_id: str | None = None,
+    target_type: str | None = None,
+    target_id: str | None = None,
+    q: str | None = None,
+    money_only: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ):
     user = get_current_user(request)
 
@@ -338,6 +418,53 @@ async def admin_audit_logs(
                 AdminAuditLog.admin_discord_id == admin_id
             )
 
+        if target_type:
+            statement = statement.where(
+                AdminAuditLog.target_type == target_type
+            )
+
+        if target_id:
+            statement = statement.where(
+                AdminAuditLog.target_id == target_id
+            )
+
+        keyword = str(q or "").strip()
+        if keyword:
+            like = f"%{keyword}%"
+            statement = statement.where(
+                or_(
+                    AdminAuditLog.action.like(like),
+                    AdminAuditLog.target_type.like(like),
+                    AdminAuditLog.target_id.like(like),
+                    AdminAuditLog.admin_discord_id.like(like),
+                    AdminAuditLog.before_json.like(like),
+                    AdminAuditLog.after_json.like(like),
+                )
+            )
+
+        if str(money_only or "").strip() in {"1", "true", "on", "yes"}:
+            statement = statement.where(
+                AdminAuditLog.action.in_(MONEY_ACTIONS)
+            )
+
+        try:
+            if date_from:
+                statement = statement.where(
+                    AdminAuditLog.created_at >= datetime.fromisoformat(date_from)
+                )
+        except ValueError:
+            pass
+
+        try:
+            if date_to:
+                end_value = datetime.fromisoformat(date_to)
+                end_value = end_value.replace(hour=23, minute=59, second=59)
+                statement = statement.where(
+                    AdminAuditLog.created_at <= end_value
+                )
+        except ValueError:
+            pass
+
         logs = list(
             db.scalars(statement.limit(300)).all()
         )
@@ -360,6 +487,15 @@ async def admin_audit_logs(
             ).all()
         ]
 
+        target_types = [
+            row[0]
+            for row in db.execute(
+                select(AdminAuditLog.target_type)
+                .distinct()
+                .order_by(AdminAuditLog.target_type.asc())
+            ).all()
+        ]
+
     finally:
         db.close()
 
@@ -373,6 +509,13 @@ async def admin_audit_logs(
             "actions": actions,
             "selected_action": action or "",
             "admin_id": admin_id or "",
+            "target_types": target_types,
+            "selected_target_type": target_type or "",
+            "target_id": target_id or "",
+            "q": q or "",
+            "money_only": str(money_only or "") in {"1", "true", "on", "yes"},
+            "date_from": date_from or "",
+            "date_to": date_to or "",
             "label_action": label_action,
             "label_target_type": label_target_type,
             "format_audit_json": format_audit_json,
