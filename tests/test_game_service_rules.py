@@ -334,6 +334,17 @@ def test_all_new_game_orders_have_exact_receiver_roles():
         ) == (expected_game_key,)
 
 
+def test_general_teaching_and_sweet_orders_are_cross_game():
+    for rule_key in (
+        "basic_teaching_one",
+        "basic_sweet_single",
+        "basic_sweet_double",
+    ):
+        rule = ORDER_RULES[rule_key]
+        assert get_required_game_role_keys(rule) == ()
+        assert get_required_game_role_ids(rule) == []
+
+
 def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_entertain_single"].price == 320
     assert ORDER_RULES["basic_entertain_double"].price == 600
