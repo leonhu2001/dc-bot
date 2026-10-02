@@ -48,6 +48,8 @@ ACTION_LABELS = {
     "toggle_staff_profile_public": "切換成員個人牆公開狀態",
     "toggle_review_hidden": "切換評價隱藏狀態",
     "toggle_review_public": "切換評價公開狀態",
+    "admin_claim_prepay_acceptance": "人工補登付款前接單",
+    "admin_unclaim_prepay_acceptance": "人工移除付款前接單",
 }
 
 
@@ -65,6 +67,7 @@ TARGET_TYPE_LABELS = {
     "staff_profile": "成員個人牆",
     "staff_directory": "人員名單",
     "order_review": "評價",
+    "order_acceptance": "付款前接單",
 }
 
 
@@ -160,6 +163,10 @@ FIELD_LABELS = {
     "is_public": "是否公開",
     "is_hidden": "是否隱藏",
     "_actor_display_name": "操作人員名稱",
+    "accepted_count": "已接人數",
+    "required_staff_count": "需求人數",
+    "staff_ids": "接單人員 ID",
+    "removed_staff_discord_id": "移除人員 Discord ID",
 }
 
 
