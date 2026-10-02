@@ -14,6 +14,7 @@ from services.payment_reviews import (
     PAYMENT_REVIEW_PENDING,
     PAYMENT_REVIEW_REJECTED,
     approve_payment_review,
+    get_payment_review,
     list_payment_reviews,
     reject_payment_review,
     retry_payment_review_apply,
@@ -21,17 +22,47 @@ from services.payment_reviews import (
 )
 from services.topups import (
     approve_topup_order,
+    get_topup_order,
     list_topups_for_admin,
     reject_topup_order,
     topup_payment_method_label,
     topup_status_label,
 )
 from web.app.routers.admin_staff import require_admin
+from web.app.services.audit_trail import write_audit_event
 
 router = APIRouter(tags=["payment_reviews"])
 DISCORD_GUILD_ID = 1129474191226306672
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def _audit_transition(
+    user: dict,
+    *,
+    action: str,
+    target_type: str,
+    target_id: int | str,
+    before: dict | None,
+    after: dict | None,
+    reason: str | None = None,
+) -> None:
+    try:
+        write_audit_event(
+            admin_user=user,
+            action=action,
+            target_type=target_type,
+            target_id=str(target_id),
+            before=before,
+            after=after,
+            reason=reason,
+        )
+    except Exception as exc:
+        print(
+            f"[audit-trail] {action} failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
 
 def _display_name(user: dict) -> str:
@@ -192,10 +223,19 @@ async def admin_payment_review_approve(request: Request, review_id: int):
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        approve_payment_review(
+        before = get_payment_review(review_id)
+        after = approve_payment_review(
             review_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+        )
+        _audit_transition(
+            user,
+            action="approve_payment_review",
+            target_type="payment_review",
+            target_id=review_id,
+            before=before,
+            after=after,
         )
     except ValueError as exc:
         return _redirect("error", exc, status="pending")
@@ -214,7 +254,17 @@ async def admin_payment_review_retry(request: Request, review_id: int):
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        retry_payment_review_apply(review_id)
+        before = get_payment_review(review_id)
+        after = retry_payment_review_apply(review_id)
+        _audit_transition(
+            user,
+            action="retry_payment_review_apply",
+            target_type="payment_review",
+            target_id=review_id,
+            before=before,
+            after=after,
+            reason="客服重新排入付款套用",
+        )
     except ValueError as exc:
         return _redirect("error", exc, status="pending")
 
@@ -236,10 +286,20 @@ async def admin_payment_review_reject(
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        reject_payment_review(
+        before = get_payment_review(review_id)
+        after = reject_payment_review(
             review_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+            reason=reason,
+        )
+        _audit_transition(
+            user,
+            action="reject_payment_review",
+            target_type="payment_review",
+            target_id=review_id,
+            before=before,
+            after=after,
             reason=reason,
         )
     except ValueError as exc:
@@ -259,10 +319,19 @@ async def admin_payment_review_topup_approve(request: Request, topup_id: int):
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        approve_topup_order(
+        before = get_topup_order(topup_id)
+        after = approve_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+        )
+        _audit_transition(
+            user,
+            action="approve_topup",
+            target_type="topup_order",
+            target_id=topup_id,
+            before=before,
+            after=after,
         )
     except ValueError as exc:
         return _redirect("error", exc, status="pending")
@@ -285,9 +354,19 @@ async def admin_payment_review_topup_reject(
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        reject_topup_order(
+        before = get_topup_order(topup_id)
+        after = reject_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
+            reason=reason,
+        )
+        _audit_transition(
+            user,
+            action="reject_topup",
+            target_type="topup_order",
+            target_id=topup_id,
+            before=before,
+            after=after,
             reason=reason,
         )
     except ValueError as exc:
