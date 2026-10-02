@@ -3,10 +3,10 @@ import csv
 import io
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
@@ -43,6 +43,15 @@ from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
+from web.app.services.web_security import (
+    csrf_token_from_request_parts,
+    csrf_tokens_match,
+    ensure_csrf_token,
+    has_recent_auth,
+    is_sensitive_path,
+    requires_csrf,
+    should_no_store,
+)
 
 APP_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -314,7 +323,23 @@ async def security_and_refresh_access(request: Request, call_next):
         )
 
     if not _csrf_source_allowed(request):
-        return PlainTextResponse("CSRF validation failed", status_code=403)
+        return PlainTextResponse("CSRF source validation failed", status_code=403)
+
+    expected_csrf = ensure_csrf_token(request.session)
+
+    if requires_csrf(request.method):
+        body = await request.body()
+        supplied_csrf = csrf_token_from_request_parts(
+            header_token=request.headers.get("x-csrf-token"),
+            body=body,
+            content_type=request.headers.get("content-type"),
+        )
+
+        if not csrf_tokens_match(expected_csrf, supplied_csrf):
+            return PlainTextResponse(
+                "CSRF token validation failed",
+                status_code=403,
+            )
 
     if _is_admin_path(request.url.path):
         user = request.session.get("user")
@@ -355,6 +380,39 @@ async def security_and_refresh_access(request: Request, call_next):
                     status_code=403,
                 )
 
+            if (
+                refreshed_user.get("is_admin")
+                and is_sensitive_path(request.url.path)
+                and not has_recent_auth(
+                    request.session,
+                    max_age_seconds=config.WEB_RECENT_AUTH_SECONDS,
+                )
+            ):
+                if request.method.upper() == "GET":
+                    next_path = request.url.path
+                    if request.url.query:
+                        next_path += "?" + request.url.query
+                else:
+                    next_path = "/admin"
+                    referer = str(request.headers.get("referer") or "").strip()
+                    if referer:
+                        try:
+                            parsed_referer = urlsplit(referer)
+                            if parsed_referer.path.startswith("/admin"):
+                                next_path = parsed_referer.path
+                                if parsed_referer.query:
+                                    next_path += "?" + parsed_referer.query
+                        except Exception:
+                            pass
+
+                return RedirectResponse(
+                    url=(
+                        "/auth/discord/login?reauth=1&next="
+                        + quote(next_path, safe="")
+                    ),
+                    status_code=303,
+                )
+
     response = await call_next(request)
     response = await _sanitize_csv_response(response)
 
@@ -366,6 +424,21 @@ async def security_and_refresh_access(request: Request, call_next):
         "max-age=31536000",
     )
     response.headers.setdefault("Content-Security-Policy", _CONTENT_SECURITY_POLICY)
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=()",
+    )
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
+
+    if should_no_store(
+        request.url.path,
+        authenticated=bool(request.session.get("user")),
+    ):
+        response.headers["Cache-Control"] = "no-store, private, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
     return response
 
 
