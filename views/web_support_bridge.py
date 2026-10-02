@@ -180,7 +180,7 @@ class WebSupportClaimButton(discord.ui.Button):
                 int(session["id"]),
                 sender_type=SENDER_SYSTEM,
                 sender_display_name="系統",
-                body=f"真人客服 {staff_name} 已接手，接下來將由真人回覆。",
+                body=f"{staff_name} 已接手，接下來將由真人回覆。",
             )
 
         latest = get_session(int(session["id"])) or session
@@ -246,7 +246,7 @@ class WebSupportResolveButton(discord.ui.Button):
                 sender_type=SENDER_SYSTEM,
                 sender_display_name="系統",
                 body=(
-                    f"真人客服 {staff_name} 已結束本次服務。"
+                    f"{staff_name} 已結束本次服務。"
                     "如果還有其他問題，可以重新開啟一段客服對話。"
                 ),
             )
