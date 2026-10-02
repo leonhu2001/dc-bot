@@ -20,6 +20,9 @@ from fastapi.templating import (
 
 
 
+from web.app.services.audit_trail import write_audit_event
+
+
 # MAWAN_PORTAL_DESIGN_SYSTEM_R3 REVIEW TEMPLATE
 
 _mw_review_templates = Jinja2Templates(
@@ -323,7 +326,25 @@ async def toggle_hidden(
 
     conn = _connect()
 
+    before = None
+    after = None
+
     try:
+
+        row = conn.execute(
+            """
+            SELECT id, order_id, ticket_channel_id, receipt_id,
+                   staff_discord_id, staff_display_name,
+                   customer_discord_id, customer_display_name,
+                   is_hidden, is_public
+            FROM order_reviews
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (review_id,),
+        ).fetchone()
+
+        before = dict(row) if row is not None else None
 
         conn.execute(
             """
@@ -352,9 +373,39 @@ async def toggle_hidden(
 
         conn.commit()
 
+        row = conn.execute(
+            """
+            SELECT id, order_id, ticket_channel_id, receipt_id,
+                   staff_discord_id, staff_display_name,
+                   customer_discord_id, customer_display_name,
+                   is_hidden, is_public
+            FROM order_reviews
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (review_id,),
+        ).fetchone()
+        after = dict(row) if row is not None else None
+
     finally:
 
         conn.close()
+
+    try:
+        write_audit_event(
+            admin_user=user,
+            action="toggle_review_hidden",
+            target_type="order_review",
+            target_id=review_id,
+            before=before,
+            after=after,
+        )
+    except Exception as audit_exc:
+        print(
+            f"[audit-trail] toggle_review_hidden failed: "
+            f"{type(audit_exc).__name__}: {audit_exc}",
+            flush=True,
+        )
 
     return RedirectResponse(
         url="/admin/reviews/",
@@ -385,7 +436,25 @@ async def toggle_public(
 
     conn = _connect()
 
+    before = None
+    after = None
+
     try:
+
+        row = conn.execute(
+            """
+            SELECT id, order_id, ticket_channel_id, receipt_id,
+                   staff_discord_id, staff_display_name,
+                   customer_discord_id, customer_display_name,
+                   is_hidden, is_public
+            FROM order_reviews
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (review_id,),
+        ).fetchone()
+
+        before = dict(row) if row is not None else None
 
         conn.execute(
             """
@@ -414,9 +483,39 @@ async def toggle_public(
 
         conn.commit()
 
+        row = conn.execute(
+            """
+            SELECT id, order_id, ticket_channel_id, receipt_id,
+                   staff_discord_id, staff_display_name,
+                   customer_discord_id, customer_display_name,
+                   is_hidden, is_public
+            FROM order_reviews
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (review_id,),
+        ).fetchone()
+        after = dict(row) if row is not None else None
+
     finally:
 
         conn.close()
+
+    try:
+        write_audit_event(
+            admin_user=user,
+            action="toggle_review_public",
+            target_type="order_review",
+            target_id=review_id,
+            before=before,
+            after=after,
+        )
+    except Exception as audit_exc:
+        print(
+            f"[audit-trail] toggle_review_public failed: "
+            f"{type(audit_exc).__name__}: {audit_exc}",
+            flush=True,
+        )
 
     return RedirectResponse(
         url="/admin/reviews/",
