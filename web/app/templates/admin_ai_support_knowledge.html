@@ -1,0 +1,209 @@
+{% extends "layout.html" %}
+
+{% block page_title %}AI 客服知識庫{% endblock %}
+
+{% block content %}
+
+{% if notice %}
+<div class="panel compact-panel">
+    <p class="muted-text" style="margin:0;">
+        {% if notice == 'approved' %}
+            已核准並加入 AI 客服知識庫。
+        {% elif notice == 'rejected' %}
+            已略過這筆待學習內容。
+        {% elif notice == 'added' %}
+            已手動新增知識。
+        {% elif notice == 'archived' %}
+            已停用這筆知識。
+        {% elif notice == 'missing' %}
+            問題與答案都不能空白。
+        {% elif notice == 'already-reviewed' %}
+            這筆內容已經被處理過。
+        {% elif notice == 'already-archived' %}
+            這筆知識已經停用或不存在。
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>AI 學習總覽</h2>
+            <p class="muted-text">
+                真人客服回答只會先進待審核區；總管核准後，AI 才能引用。
+                不會自動訓練模型，也不會自動把聊天內容變成知識。
+            </p>
+        </div>
+    </div>
+
+    <div class="payout-stat-grid">
+        <div class="payout-stat-card">
+            <span>待審核</span>
+            <strong>{{ snapshot.pending_count }}</strong>
+            <p class="muted-text">真人客服產生的候選答案</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>有效知識</span>
+            <strong>{{ snapshot.active_count }}</strong>
+            <p class="muted-text">目前 AI 可以引用</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>已核准候選</span>
+            <strong>{{ snapshot.approved_count }}</strong>
+            <p class="muted-text">歷史累計</p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>已略過</span>
+            <strong>{{ snapshot.rejected_count }}</strong>
+            <p class="muted-text">不會進入 AI 知識庫</p>
+        </div>
+    </div>
+</div>
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>手動新增官方答案</h2>
+            <p class="muted-text">
+                適合放固定規則、常見問法與不常變動的客服答案。價格仍建議讓 AI 引導至「立即下單」查看。
+            </p>
+        </div>
+    </div>
+
+    <form method="post" action="/admin/ai-support-knowledge/manual" class="admin-add-worker-form">
+        <label>
+            <span>常見問題</span>
+            <textarea class="input" name="question" rows="3" maxlength="2400" required
+                placeholder="例如：第一次來該選陪玩還是護航？"></textarea>
+        </label>
+
+        <label>
+            <span>核准答案</span>
+            <textarea class="input" name="answer" rows="5" maxlength="4000" required
+                placeholder="輸入希望 AI 之後引用的正式回答。"></textarea>
+        </label>
+
+        <button class="button" type="submit">加入知識庫</button>
+    </form>
+</div>
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>待學習問題</h2>
+            <p class="muted-text">
+                來源是網站轉真人後，客人的最近一則問題與客服在 Discord Thread 的回答。
+                核准前可以先修正問題與答案。
+            </p>
+        </div>
+    </div>
+
+    {% if snapshot.pending %}
+        <div class="admin-order-list compact-list">
+            {% for item in snapshot.pending %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">
+                                待學習 #{{ item.id }} ｜ 網站客服 #{{ item.session_id }}
+                            </p>
+                            <h3>{{ item.staff_display_name or item.staff_discord_id or '客服' }} 的回答</h3>
+                        </div>
+                        <span class="status-chip is-unpaid">待總管審核</span>
+                    </div>
+
+                    <form method="post"
+                          action="/admin/ai-support-knowledge/candidates/{{ item.id }}/approve"
+                          class="admin-add-worker-form">
+                        <label>
+                            <span>客人問題</span>
+                            <textarea class="input" name="question" rows="3" maxlength="2400" required>{{ item.question }}</textarea>
+                        </label>
+
+                        <label>
+                            <span>準備加入知識庫的答案</span>
+                            <textarea class="input" name="answer" rows="5" maxlength="4000" required>{{ item.answer }}</textarea>
+                        </label>
+
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button class="button" type="submit">核准加入知識庫</button>
+                        </div>
+                    </form>
+
+                    <form method="post"
+                          action="/admin/ai-support-knowledge/candidates/{{ item.id }}/reject"
+                          style="margin-top:10px;">
+                        <button class="button secondary" type="submit">略過，不學這筆</button>
+                    </form>
+
+                    <p class="muted-text" style="margin-bottom:0;">
+                        建立：{{ item.created_at }} ｜ 最近更新：{{ item.updated_at }}
+                    </p>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            目前沒有待審核的真人客服答案。
+        </div>
+    {% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>目前有效知識</h2>
+            <p class="muted-text">
+                AI 每次只從這裡挑最多 5 筆與客人問題最相關的內容，不會整庫全部送給外部 API。
+            </p>
+        </div>
+    </div>
+
+    {% if snapshot.knowledge %}
+        <div class="admin-order-list compact-list">
+            {% for item in snapshot.knowledge %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">
+                                知識 #{{ item.id }} ｜ {{ item.source_type }}
+                            </p>
+                            <h3>{{ item.question }}</h3>
+                        </div>
+                        <span class="status-chip is-paid">AI 可引用</span>
+                    </div>
+
+                    <p style="white-space:pre-wrap;">{{ item.answer }}</p>
+
+                    <p class="muted-text">
+                        建立者：{{ item.created_by_display_name or item.created_by_discord_id or '-' }}
+                        ｜ 建立：{{ item.created_at }}
+                    </p>
+
+                    <form method="post"
+                          action="/admin/ai-support-knowledge/{{ item.id }}/archive">
+                        <button class="button secondary" type="submit">停用這筆知識</button>
+                    </form>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            目前還沒有已核准的 AI 客服知識。
+        </div>
+    {% endif %}
+</div>
+
+<div class="panel compact-panel">
+    <h2>安全規則</h2>
+    <p class="muted-text">
+        此知識庫只影響 AI 的文字回答；不會授予 AI 退款、錢包、付款審核、訂單修改或後台寫入權限。
+        如內容包含個資、付款證明、帳號密碼或單一客人的特殊處理，請直接略過，不要核准成通用知識。
+    </p>
+</div>
+
+{% endblock %}
