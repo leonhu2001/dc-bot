@@ -8,6 +8,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from web.app.services.audit_trail import (
+    audit_snapshot,
+    write_sqlite_audit_log,
+)
 
 
 router = APIRouter(prefix="/admin/staff_profiles", tags=["admin-staff-profiles"])
@@ -727,7 +731,7 @@ async def update_staff_profile_page(
     conn = _connect()
     try:
         row = conn.execute(
-            "SELECT staff_discord_id FROM staff_profiles WHERE staff_discord_id = ?",
+            "SELECT * FROM staff_profiles WHERE staff_discord_id = ?",
             (str(staff_discord_id),),
         ).fetchone()
 
@@ -758,7 +762,23 @@ async def update_staff_profile_page(
                 str(staff_discord_id),
             ),
         )
+        after_row = conn.execute(
+            "SELECT * FROM staff_profiles WHERE staff_discord_id = ?",
+            (str(staff_discord_id),),
+        ).fetchone()
         conn.commit()
+
+        user = request.session.get("user") or {}
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or "unknown"),
+            action="update_staff_profile",
+            target_type="staff_profile",
+            target_id=str(staff_discord_id),
+            before=audit_snapshot(row),
+            after=audit_snapshot(after_row),
+            reason="後台編輯人員個人牆",
+            db_file=_db_path(),
+        )
     finally:
         conn.close()
 
@@ -784,6 +804,10 @@ async def toggle_staff_profile_public(
 
         if row is not None:
             next_value = 0 if int(row["is_public"] or 0) == 1 else 1
+            before = {
+                "staff_discord_id": str(staff_discord_id),
+                "is_public": int(row["is_public"] or 0),
+            }
             conn.execute(
                 """
                 UPDATE staff_profiles
@@ -794,6 +818,20 @@ async def toggle_staff_profile_public(
                 (next_value, str(staff_discord_id)),
             )
             conn.commit()
+
+            user = request.session.get("user") or {}
+            write_sqlite_audit_log(
+                admin_discord_id=str(user.get("id") or "unknown"),
+                action="toggle_staff_profile_public",
+                target_type="staff_profile",
+                target_id=str(staff_discord_id),
+                before=before,
+                after={
+                    "staff_discord_id": str(staff_discord_id),
+                    "is_public": next_value,
+                },
+                db_file=_db_path(),
+            )
     finally:
         conn.close()
 
