@@ -218,7 +218,8 @@ def adjust_wallet_balance(
         )
         tx_id = int(cur.lastrowid)
         conn.commit()
-        return {
+
+        transaction = {
             "id": tx_id,
             "customer_discord_id": str(customer_id),
             "amount": amount,
@@ -226,6 +227,53 @@ def adjust_wallet_balance(
             "balance_after": after,
             "type": normalized_type,
             "order_no": normalized_order_no,
+            "order_channel_id": (
+                str(order_channel_id)
+                if order_channel_id is not None
+                else None
+            ),
             "note": note,
             "created_at": now_text,
         }
+
+    if operator_discord_id:
+        try:
+            from web.app.services.audit_trail import write_sqlite_audit_log
+
+            write_sqlite_audit_log(
+                admin_discord_id=str(operator_discord_id),
+                action="wallet_adjustment",
+                target_type="customer_wallet",
+                target_id=str(customer_id),
+                before={
+                    "customer_discord_id": str(customer_id),
+                    "balance": before,
+                },
+                after={
+                    "customer_discord_id": str(customer_id),
+                    "balance": after,
+                    "amount": amount,
+                    "transaction_id": tx_id,
+                    "transaction_type": normalized_type,
+                    "order_no": normalized_order_no,
+                    "order_channel_id": (
+                        str(order_channel_id)
+                        if order_channel_id is not None
+                        else None
+                    ),
+                    "note": str(note or "").strip() or None,
+                    "operator_display_name": (
+                        str(operator_display_name or "").strip() or None
+                    ),
+                },
+                reason=str(note or "").strip() or None,
+            )
+        except Exception as exc:
+            # Audit must never roll back an already committed wallet transaction.
+            print(
+                f"[audit] wallet log failed tx_id={tx_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    return transaction
