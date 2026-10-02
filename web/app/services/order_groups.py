@@ -264,6 +264,7 @@ GROUP_SPECS = [
         "key": "steam",
         "category": "steam",
         "label": "Steam 陪玩",
+        "description": "需男陪／女陪 + Steam 身分組。",
         "variants": [
             ("steam_play", "Steam 陪玩"),
         ],
