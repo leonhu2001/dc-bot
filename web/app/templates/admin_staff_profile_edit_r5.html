@@ -16,6 +16,7 @@
 <header class="mw-r5-page-header"><div class="mw-r5-kicker">STAFF PROFILE MANAGEMENT</div><h1>編輯個人牆</h1><p>修改成員對外顯示的個人牆資料。這些欄位不會影響訂單、接單資格或薪資計算。</p></header>
 <div class="profile-edit-wrap">
 <form class="profile-edit-card" method="post" action="/admin/staff_profiles/edit/{{ profile.staff_id }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 <div class="profile-edit-meta">Discord ID：{{ profile.staff_id }}<br>最後更新：{{ profile.updated_at or "—" }}<br>儲存後回到個人牆管理頁，可取得 Discord Panel 同步指令。</div>
 <div class="profile-edit-grid">
 <div class="profile-field"><label>顯示名稱</label><input class="profile-input" name="display_name" value="{{ profile.display_name }}" maxlength="80"></div>
