@@ -19,6 +19,7 @@ from services.wallet_service import ensure_wallet_tables
 from services.ticket_archives import ensure_ticket_archive_tables
 from services.support_calls import ensure_support_call_tables
 from services.smart_dispatch import ensure_smart_dispatch_tables
+from services.web_support_chat import ensure_web_support_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -34,6 +35,7 @@ from web.app.routers.admin_payout_summary import router as admin_payout_summary_
 from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
 from web.app.routers.auth import router as auth_router
 from web.app.routers.site import router as site_router
+from web.app.routers.web_support import router as web_support_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
 from web.app.routers.order_history import router as order_history_router
@@ -135,6 +137,11 @@ def _rate_limit_spec(request: Request) -> tuple[str, int, int] | None:
 
     if path.startswith("/auth/"):
         return ("auth", 30, 60)
+
+    if path.startswith("/api/support-chat"):
+        if request.method.upper() in _UNSAFE_METHODS:
+            return ("support-chat-write", 30, 60)
+        return ("support-chat-read", 120, 60)
 
     if path.startswith("/discord-avatar/"):
         return ("avatar", 120, 60)
@@ -469,6 +476,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 app.include_router(auth_router)
 app.include_router(site_router)
+app.include_router(web_support_router)
 app.include_router(topups_router)
 app.include_router(payment_reviews_router)
 app.include_router(ticket_archives_router)
@@ -501,6 +509,7 @@ async def startup_event():
     ensure_ticket_archive_tables()
     ensure_support_call_tables()
     ensure_smart_dispatch_tables()
+    ensure_web_support_tables()
     ensure_marketing_tables()
 
 

@@ -176,6 +176,14 @@ def csrf_token_from_request_parts(
 
 
 def should_no_store(path: str, *, authenticated: bool) -> bool:
+    normalized = str(path or "")
+
+    if (
+        normalized == "/api/support-chat"
+        or normalized.startswith("/api/support-chat/")
+    ):
+        return True
+
     if not authenticated:
         return False
 
@@ -187,7 +195,6 @@ def should_no_store(path: str, *, authenticated: bool) -> bool:
         "/dispatch",
         "/my",
     )
-    normalized = str(path or "")
     return any(
         normalized == prefix
         or normalized.startswith(prefix + "/")
