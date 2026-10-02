@@ -835,6 +835,15 @@ def promote_acceptance_claims_to_assignments(
                 record_attributed_order_event,
             )
 
+            marketing_db_file = None
+            try:
+                marketing_db_file = str(
+                    db.get_bind().url.database
+                    or ""
+                ).strip() or None
+            except Exception:
+                marketing_db_file = None
+
             record_attributed_order_event(
                 order_id=int(order_id),
                 event_name="payment_completed",
@@ -842,6 +851,7 @@ def promote_acceptance_claims_to_assignments(
                     getattr(order, "customer_discord_id", "")
                     or ""
                 ),
+                db_file=marketing_db_file,
                 properties={
                     "payment_method": str(
                         payment_method
