@@ -15,6 +15,7 @@ from web.app.routers.admin_staff_profiles import (
     _is_admin,
     _staff_profile_sync_command,
 )
+from web.app.services.web_security import ensure_csrf_token
 
 
 router = APIRouter(prefix="/admin/staff_profiles", tags=["admin-staff-profiles-ui"])
@@ -69,6 +70,7 @@ async def staff_profiles_index_ui(request: Request):
 
     profiles = _fetch_profiles()
     recent_stats = _fetch_recent_profile_stats()
+    csrf_token = ensure_csrf_token(request.session)
     rows = [_profile_view(row, recent_stats) for row in profiles]
 
     stats = {
@@ -85,6 +87,7 @@ async def staff_profiles_index_ui(request: Request):
             "title": "個人牆管理",
             "rows": rows,
             "stats": stats,
+            "csrf_token": csrf_token,
         },
     )
 
@@ -97,6 +100,8 @@ async def edit_staff_profile_ui(request: Request, staff_discord_id: str):
     row = _fetch_profile(staff_discord_id)
     if row is None:
         return RedirectResponse(url="/admin/staff_profiles/", status_code=303)
+
+    csrf_token = ensure_csrf_token(request.session)
 
     profile = {
         "staff_id": str(row["staff_discord_id"] or ""),
@@ -116,5 +121,6 @@ async def edit_staff_profile_ui(request: Request, staff_discord_id: str):
         context={
             "title": "編輯個人牆",
             "profile": profile,
+            "csrf_token": csrf_token,
         },
     )
