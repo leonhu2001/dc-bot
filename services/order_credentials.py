@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from shared.db import engine
 
@@ -23,6 +23,7 @@ def ensure_order_credential_tables() -> None:
             CREATE TABLE IF NOT EXISTS order_credential_deliveries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 order_id INTEGER NOT NULL,
+                submitted_by_discord_id TEXT,
                 recipient_discord_id TEXT NOT NULL,
                 recipient_type TEXT NOT NULL,
                 recipient_display_name TEXT,
@@ -42,6 +43,25 @@ def ensure_order_credential_tables() -> None:
             CREATE INDEX IF NOT EXISTS idx_order_credential_delivery_recipient
             ON order_credential_deliveries(recipient_discord_id)
         """))
+
+
+    columns = {
+        str(column.get("name"))
+        for column in inspect(engine).get_columns(
+            "order_credential_deliveries"
+        )
+    }
+
+    if "submitted_by_discord_id" not in columns:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE order_credential_deliveries
+                    ADD COLUMN submitted_by_discord_id TEXT
+                    """
+                )
+            )
 
 
 def get_order_id_by_ticket_channel(ticket_channel_id: int | str | None) -> int | None:
@@ -107,6 +127,7 @@ def get_active_worker_ids(order_id: int) -> list[str]:
 def record_delivery(
     *,
     order_id: int,
+    submitted_by_discord_id: int | str | None,
     recipient_discord_id: int | str,
     recipient_type: str,
     recipient_display_name: str | None,
@@ -119,6 +140,7 @@ def record_delivery(
         result = conn.execute(text("""
             INSERT INTO order_credential_deliveries (
                 order_id,
+                submitted_by_discord_id,
                 recipient_discord_id,
                 recipient_type,
                 recipient_display_name,
@@ -128,6 +150,7 @@ def record_delivery(
             )
             VALUES (
                 :order_id,
+                :submitted_by_discord_id,
                 :recipient_discord_id,
                 :recipient_type,
                 :recipient_display_name,
@@ -137,6 +160,11 @@ def record_delivery(
             )
         """), {
             "order_id": int(order_id),
+            "submitted_by_discord_id": (
+                str(submitted_by_discord_id)
+                if submitted_by_discord_id is not None
+                else None
+            ),
             "recipient_discord_id": str(recipient_discord_id),
             "recipient_type": str(recipient_type),
             "recipient_display_name": recipient_display_name,
@@ -157,6 +185,7 @@ def list_active_deliveries(order_id: int) -> list[dict[str, Any]]:
             SELECT
                 id,
                 order_id,
+                submitted_by_discord_id,
                 recipient_discord_id,
                 recipient_type,
                 recipient_display_name,
@@ -206,6 +235,7 @@ def list_delivery_history(order_id: int) -> list[dict[str, Any]]:
             SELECT
                 id,
                 order_id,
+                submitted_by_discord_id,
                 recipient_discord_id,
                 recipient_type,
                 recipient_display_name,

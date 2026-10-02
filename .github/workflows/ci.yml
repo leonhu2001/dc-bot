@@ -53,6 +53,11 @@ jobs:
         run: |
           python -m compileall -q             bot.py             cogs             core             services             shared             web/app
 
+      - name: Audit Python dependencies
+        run: |
+          python -m pip_audit -r requirements.txt
+          python -m pip_audit -r web/requirements-web.txt
+
       - name: Validate deploy shell
         run: |
           bash -n scripts/deploy_main.sh

@@ -7,6 +7,16 @@
         content="width=device-width, initial-scale=1"
     >
 
+
+    <meta
+        name="csrf-token"
+        content="{{ request.session.get('csrf_token', '') }}"
+    >
+
+    <script
+        src="/static/js/csrf.js?v=1"
+    ></script>
+
     <meta
         name="theme-color"
         content="#09090b"

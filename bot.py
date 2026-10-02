@@ -4826,6 +4826,7 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
 
             record_delivery(
                 order_id=order_id,
+                submitted_by_discord_id=customer_id,
                 recipient_discord_id=recipient_id,
                 recipient_type=recipient_type,
                 recipient_display_name=display_name,
