@@ -195,6 +195,42 @@ def test_marketing_events_roll_up_into_funnel_sources_and_campaigns(tmp_path):
     assert snapshot["campaigns"][0]["orders"] == 1
 
 
+def test_order_conversion_event_is_deduplicated_by_event_key(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+    session = {}
+
+    ensure_marketing_session(session)
+    capture_first_touch(
+        session,
+        query_params=QueryParams(
+            {
+                "utm_source": "google",
+                "utm_campaign": "delta",
+            }
+        ),
+        referrer=None,
+    )
+
+    for _ in range(2):
+        record_marketing_event(
+            session=session,
+            event_name="order_created",
+            event_key="order:42",
+            path="/order/create",
+            customer_discord_id="100",
+            properties={"order_id": 42},
+            db_file=db_path,
+        )
+
+    snapshot = build_marketing_snapshot(
+        days=30,
+        db_file=db_path,
+    )
+
+    assert snapshot["event_map"]["order_created"]["events"] == 1
+    assert snapshot["sources"][0]["orders"] == 1
+
+
 def test_marketing_event_properties_are_bounded_and_unknown_event_rejected(tmp_path):
     db_path = tmp_path / "web_dashboard.db"
     session = {}
