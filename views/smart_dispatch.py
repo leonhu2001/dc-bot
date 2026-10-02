@@ -181,6 +181,8 @@ async def send_specified_staff_dispatch_dms(
     item_label: str,
     required_staff_count: int,
     dispatch_jump_url: str,
+    allowed_role_ids: Iterable[str | int] = (),
+    required_game_role_ids: Iterable[str | int] = (),
 ) -> tuple[list[str], list[str]]:
     sent: list[str] = []
     failed: list[str] = []
@@ -202,6 +204,19 @@ async def send_specified_staff_dispatch_dms(
                 member = None
 
         if member is None:
+            failed.append(staff_id)
+            continue
+
+        member_role_ids = {
+            str(role.id)
+            for role in getattr(member, "roles", [])
+            if getattr(role, "id", None) is not None
+        }
+        if not role_ids_match_requirements(
+            member_role_ids,
+            allowed_role_ids,
+            required_game_role_ids,
+        ):
             failed.append(staff_id)
             continue
 
