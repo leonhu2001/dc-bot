@@ -6600,6 +6600,8 @@ async def resume_stored_order(
                             or 1
                         ),
                         dispatch_jump_url=new_message.jump_url,
+                        allowed_role_ids=resume_allowed_role_ids,
+                        required_game_role_ids=resume_required_game_role_ids,
                     )
                 )
                 set_specified_dm_results(
@@ -7876,6 +7878,8 @@ async def create_waiting_acceptance_order_from_self_service(
                 item_label=rule.label,
                 required_staff_count=required_staff_count,
                 dispatch_jump_url=dispatch_message.jump_url,
+                allowed_role_ids=allowed_role_ids_for_rule,
+                required_game_role_ids=required_game_role_ids_for_rule,
             )
 
             try:
@@ -14925,6 +14929,8 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
                             or 1
                         ),
                         dispatch_jump_url=dispatch_message.jump_url,
+                        allowed_role_ids=resend_allowed_role_ids,
+                        required_game_role_ids=resend_required_game_role_ids,
                     )
                 )
                 set_specified_dm_results(
@@ -16491,6 +16497,14 @@ async def _web_order_created_ensure_dispatch(
                         or 1
                     ),
                     dispatch_jump_url=dispatch_message.jump_url,
+                    allowed_role_ids=list(
+                        details.get("allowed_role_ids")
+                        or []
+                    ),
+                    required_game_role_ids=list(
+                        details.get("required_game_role_ids")
+                        or []
+                    ),
                 )
             )
 
