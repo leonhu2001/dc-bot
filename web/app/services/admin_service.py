@@ -15,6 +15,7 @@ from shared.models import (
     WorkerPayoutOverride,
 )
 from web.app.services.order_service import create_sync_event, recalculate_order_payouts
+from web.app.services.audit_trail import sanitize_audit_payload
 
 
 def get_admin_display_name(user: dict) -> str:
@@ -42,8 +43,22 @@ def write_admin_audit_log(
             action=action,
             target_type=target_type,
             target_id=target_id,
-            before_json=json.dumps(before, ensure_ascii=False) if before is not None else None,
-            after_json=json.dumps(after, ensure_ascii=False) if after is not None else None,
+            before_json=(
+                json.dumps(
+                    sanitize_audit_payload(before),
+                    ensure_ascii=False,
+                )
+                if before is not None
+                else None
+            ),
+            after_json=(
+                json.dumps(
+                    sanitize_audit_payload(after),
+                    ensure_ascii=False,
+                )
+                if after is not None
+                else None
+            ),
         )
     )
 
