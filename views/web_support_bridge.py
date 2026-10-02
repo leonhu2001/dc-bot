@@ -341,6 +341,12 @@ async def web_support_bridge_loop(bot: discord.Client) -> None:
                                 f"{mention}\n⚠️ 網站客服通知已建立，但 Thread 建立失敗。"
                             ).strip(),
                         )
+                        set_discord_bridge(
+                            int(session["id"]),
+                            channel_id=channel.id,
+                            thread_id="0",
+                            notification_message_id=notification.id,
+                        )
                         continue
 
                 set_discord_bridge(
