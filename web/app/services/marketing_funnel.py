@@ -463,11 +463,12 @@ def build_marketing_snapshot(
                 COALESCE(NULLIF(source, ''), 'direct') AS source,
                 COALESCE(NULLIF(medium, ''), '-') AS medium,
                 COUNT(DISTINCT session_id) AS sessions,
-                SUM(CASE WHEN event_name='order_created' THEN 1 ELSE 0 END) AS orders
+                SUM(CASE WHEN event_name='order_created' THEN 1 ELSE 0 END) AS orders,
+                SUM(CASE WHEN event_name='payment_completed' THEN 1 ELSE 0 END) AS payments
             FROM marketing_events
             WHERE created_at >= ?
             GROUP BY 1, 2
-            ORDER BY orders DESC, sessions DESC
+            ORDER BY payments DESC, orders DESC, sessions DESC
             LIMIT 20
             """,
             (cutoff,),
@@ -478,12 +479,13 @@ def build_marketing_snapshot(
             SELECT
                 campaign,
                 COUNT(DISTINCT session_id) AS sessions,
-                SUM(CASE WHEN event_name='order_created' THEN 1 ELSE 0 END) AS orders
+                SUM(CASE WHEN event_name='order_created' THEN 1 ELSE 0 END) AS orders,
+                SUM(CASE WHEN event_name='payment_completed' THEN 1 ELSE 0 END) AS payments
             FROM marketing_events
             WHERE created_at >= ?
               AND COALESCE(campaign, '') <> ''
             GROUP BY campaign
-            ORDER BY orders DESC, sessions DESC
+            ORDER BY payments DESC, orders DESC, sessions DESC
             LIMIT 20
             """,
             (cutoff,),
