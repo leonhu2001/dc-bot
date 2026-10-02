@@ -24,7 +24,7 @@
     const labels = {
         customer: "你",
         ai: "魔丸客服助理",
-        staff: "真人客服",
+        staff: "客服",
         system: "系統",
     };
 
@@ -42,10 +42,10 @@
         } else if (status === "human") {
             const name = String(session?.claimed_by || "").trim();
             statusBox.textContent = name
-                ? `真人客服 ${name} 處理中`
-                : "真人客服處理中";
+                ? `${name} 處理中`
+                : "客服處理中";
         } else if (status === "closed") {
-            statusBox.textContent = "本次真人客服已結束，可重新開始對話";
+            statusBox.textContent = "本次客服已結束，可重新開始對話";
         } else {
             statusBox.textContent = "AI 客服在線 · 需要時可轉真人";
         }
@@ -56,7 +56,9 @@
             humanButton.textContent = status === "waiting_human"
                 ? "等待真人客服中"
                 : status === "human"
-                    ? "真人客服已接手"
+                    ? (String(session?.claimed_by || "").trim()
+                        ? `${String(session.claimed_by).trim()} 已接手`
+                        : "客服已接手")
                     : "轉接真人客服";
         }
     }
