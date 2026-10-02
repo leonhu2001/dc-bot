@@ -301,6 +301,68 @@ def correct_customer_reward_amount(
         "reset_preserved": bool(reset_active),
     }
 
+
+def sync_reward_counted_order_amount(
+    order_data: dict[str, Any],
+    new_amount: int,
+) -> dict[str, Any] | None:
+    """Keep a previously-counted order and customer reward totals aligned.
+
+    This is the shared, side-effect-limited core used by the web->bot amount
+    correction worker and Golden Flow tests. It mutates the provided order_data
+    in place, just like the bot runtime state, and delegates VIP/point math to
+    correct_customer_reward_amount().
+    """
+    if not isinstance(order_data, dict):
+        raise ValueError("order_data 必須是 dict。")
+
+    new_amount = max(0, int(new_amount or 0))
+    old_order_amount = max(
+        0,
+        int(_to_int(order_data.get("amount"), 0) or 0),
+    )
+
+    reward_result = None
+
+    if (
+        bool(order_data.get("reward_counted"))
+        and not bool(order_data.get("reward_excluded"))
+    ):
+        customer_id = _to_int(
+            order_data.get("customer_id"),
+            None,
+        )
+
+        if customer_id is None:
+            raise ValueError(
+                "reward-counted order is missing customer_id"
+            )
+
+        old_reward_amount = _to_int(
+            order_data.get("reward_amount"),
+            old_order_amount,
+        )
+        old_reward_amount = max(
+            0,
+            int(
+                old_order_amount
+                if old_reward_amount is None
+                else old_reward_amount
+            ),
+        )
+
+        reward_result = correct_customer_reward_amount(
+            int(customer_id),
+            old_reward_amount,
+            new_amount,
+        )
+        order_data["reward_amount"] = new_amount
+
+    order_data["amount"] = new_amount
+    order_data["total_amount"] = new_amount
+
+    return reward_result
+
 def get_customer_reward_data(user_id: int) -> dict:
     data = _CUSTOMER_REWARDS.setdefault(
         user_id,

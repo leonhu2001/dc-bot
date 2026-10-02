@@ -82,6 +82,7 @@ from services.rewards import (
     calculate_reward_points,
     get_current_reward_points,
     correct_customer_reward_amount,
+    sync_reward_counted_order_amount,
     get_customer_reward_data,
     build_member_info_embed,
     get_customer_notes,
@@ -18223,44 +18224,12 @@ async def _process_web_order_amount_correction_event(event: dict) -> None:
             )
             return
 
-        old_order_amount = max(
-            0,
-            int(_to_int(order_data.get("amount"), 0) or 0),
+        reward_result = sync_reward_counted_order_amount(
+            order_data,
+            new_amount,
         )
-        reward_result = None
-
-        if (
-            bool(order_data.get("reward_counted"))
-            and not bool(order_data.get("reward_excluded"))
-        ):
-            customer_id = _to_int(order_data.get("customer_id"), None)
-
-            if customer_id is None:
-                raise RuntimeError("reward-counted order is missing customer_id")
-
-            old_reward_amount = _to_int(
-                order_data.get("reward_amount"),
-                old_order_amount,
-            )
-            old_reward_amount = max(
-                0,
-                int(
-                    old_order_amount
-                    if old_reward_amount is None
-                    else old_reward_amount
-                ),
-            )
-
-            reward_result = correct_customer_reward_amount(
-                int(customer_id),
-                old_reward_amount,
-                new_amount,
-            )
-            order_data["reward_amount"] = new_amount
 
         # Keep bot.db / monthly VIP spend / statistics aligned with the web order.
-        order_data["amount"] = new_amount
-        order_data["total_amount"] = new_amount
         remember_order_data(int(ticket_channel_id), order_data)
 
         if (
