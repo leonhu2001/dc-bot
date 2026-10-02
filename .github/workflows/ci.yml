@@ -62,6 +62,10 @@ jobs:
         run: |
           bash -n scripts/deploy_main.sh
 
-      - name: Run test suite
+      - name: Run Golden Flows
         run: |
-          python -m pytest -q
+          python -m pytest -q tests/golden
+
+      - name: Run regression suite
+        run: |
+          python -m pytest -q tests --ignore=tests/golden
