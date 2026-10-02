@@ -3589,6 +3589,8 @@ async def admin_order_workspace_add_worker_r8(
             except Exception:
                 staff_role_ids = []
 
+            before_state = get_acceptance_state(int(order_id))
+
             # claim_acceptance_order 使用獨立交易；先結束這個唯讀 Session 的 transaction，
             # 避免 SQLite 在同一時間持有讀鎖。
             db.rollback()
@@ -3615,6 +3617,37 @@ async def admin_order_workspace_add_worker_r8(
                     "accepted_count": state.accepted_count,
                     "required_staff_count": state.required_staff_count,
                     "status": state.status,
+                },
+            )
+
+            write_admin_audit_log(
+                db,
+                admin_user=user,
+                action="admin_claim_prepay_acceptance",
+                target_type="order_acceptance",
+                target_id=f"{order_id}:{worker_discord_id}",
+                before={
+                    "order_id": int(order_id),
+                    "accepted_count": before_state.accepted_count,
+                    "required_staff_count": before_state.required_staff_count,
+                    "status": before_state.status,
+                    "staff_ids": [
+                        str(claim.staff_discord_id)
+                        for claim in before_state.claims
+                    ],
+                },
+                after={
+                    "order_id": int(order_id),
+                    "worker_discord_id": str(worker_discord_id),
+                    "worker_display_name": worker_display_name,
+                    "accepted_count": state.accepted_count,
+                    "required_staff_count": state.required_staff_count,
+                    "status": state.status,
+                    "staff_ids": [
+                        str(claim.staff_discord_id)
+                        for claim in state.claims
+                    ],
+                    "reason": str(reason or "客服後台補登接單").strip(),
                 },
             )
             db.commit()
@@ -3671,6 +3704,7 @@ async def admin_order_workspace_remove_acceptance_r8(
     db = SessionLocal()
 
     try:
+        before_state = get_acceptance_state(int(order_id))
         state = unclaim_acceptance_order(
             order_id=int(order_id),
             staff_discord_id=str(staff_discord_id),
@@ -3690,6 +3724,35 @@ async def admin_order_workspace_remove_acceptance_r8(
                 "accepted_count": state.accepted_count,
                 "required_staff_count": state.required_staff_count,
                 "status": state.status,
+            },
+        )
+
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="admin_unclaim_prepay_acceptance",
+            target_type="order_acceptance",
+            target_id=f"{order_id}:{staff_discord_id}",
+            before={
+                "order_id": int(order_id),
+                "accepted_count": before_state.accepted_count,
+                "required_staff_count": before_state.required_staff_count,
+                "status": before_state.status,
+                "staff_ids": [
+                    str(claim.staff_discord_id)
+                    for claim in before_state.claims
+                ],
+            },
+            after={
+                "order_id": int(order_id),
+                "removed_staff_discord_id": str(staff_discord_id),
+                "accepted_count": state.accepted_count,
+                "required_staff_count": state.required_staff_count,
+                "status": state.status,
+                "staff_ids": [
+                    str(claim.staff_discord_id)
+                    for claim in state.claims
+                ],
             },
         )
         db.commit()
