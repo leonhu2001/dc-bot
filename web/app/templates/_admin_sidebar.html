@@ -81,6 +81,15 @@
             客服鈴 / SLA
         </a>
 
+        {% if user and user.is_manager %}
+            <a
+                class="{% if _p.startswith('/admin/ai-support-knowledge') %}active{% endif %}"
+                href="/admin/ai-support-knowledge"
+            >
+                AI 客服知識庫
+            </a>
+        {% endif %}
+
         <a
             class="{% if _p.startswith('/admin/anomalies') %}active{% endif %}"
             href="/admin/anomalies"
