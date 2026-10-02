@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import text
 
+from services.order_rules import role_ids_match_requirements
 from shared.db import engine
 from shared.order_state import (
     ACCEPTED_PENDING_PAY,
@@ -99,6 +100,7 @@ def ensure_acceptance_tables() -> None:
                 required_staff_count INTEGER NOT NULL DEFAULT 1,
                 min_protector_count INTEGER NOT NULL DEFAULT 0,
                 allowed_role_ids_json TEXT,
+                required_game_role_ids_json TEXT,
                 specified_staff_ids_json TEXT,
                 point_benefits_allowed INTEGER NOT NULL DEFAULT 1,
                 rule_version INTEGER,
@@ -135,6 +137,7 @@ def ensure_acceptance_tables() -> None:
             ON order_acceptance_claims(staff_discord_id)
         """))
         for column_name, ddl in (
+            ("required_game_role_ids_json", "TEXT"),
             ("rule_version", "INTEGER"),
             ("rule_snapshot_json", "TEXT"),
             ("price_snapshot_json", "TEXT"),
@@ -149,6 +152,46 @@ def ensure_acceptance_tables() -> None:
                     f"ALTER TABLE order_acceptance_meta ADD COLUMN {column_name} {ddl}"
                 )
 
+        # Existing waiting orders predate the AND-game column. Backfill from the
+        # current direct rule definitions so they cannot bypass the new gate.
+        try:
+            from services.order_rules import get_required_game_role_ids, get_rule
+
+            rows = conn.execute(text("""
+                SELECT order_id, order_rule_key, required_game_role_ids_json
+                FROM order_acceptance_meta
+            """)).mappings().all()
+
+            for row in rows:
+                current = _load_json_list(row.get("required_game_role_ids_json"))
+                if current:
+                    continue
+
+                rule_key = str(row.get("order_rule_key") or "").strip()
+                if not rule_key:
+                    continue
+
+                try:
+                    required_ids = get_required_game_role_ids(get_rule(rule_key))
+                except KeyError:
+                    continue
+
+                if not required_ids:
+                    continue
+
+                conn.execute(text("""
+                    UPDATE order_acceptance_meta
+                    SET required_game_role_ids_json = :required_game_role_ids_json
+                    WHERE order_id = :order_id
+                """), {
+                    "order_id": int(row["order_id"]),
+                    "required_game_role_ids_json": _json_list(required_ids),
+                })
+        except Exception:
+            # Schema creation must remain available even if an old rule key is
+            # no longer present in the current catalog.
+            pass
+
 
 
 def create_or_update_acceptance_meta(
@@ -158,6 +201,7 @@ def create_or_update_acceptance_meta(
     required_staff_count: int = 1,
     min_protector_count: int = 0,
     allowed_role_ids: list[str] | tuple[str, ...] | set[str] | None = None,
+    required_game_role_ids: list[str] | tuple[str, ...] | set[str] | None = None,
     specified_staff_ids: list[str] | tuple[str, ...] | set[str] | None = None,
     point_benefits_allowed: bool = True,
     status: str = WAITING_ACCEPTANCE,
@@ -183,6 +227,7 @@ def create_or_update_acceptance_meta(
                 required_staff_count,
                 min_protector_count,
                 allowed_role_ids_json,
+                required_game_role_ids_json,
                 specified_staff_ids_json,
                 point_benefits_allowed,
                 status,
@@ -195,6 +240,7 @@ def create_or_update_acceptance_meta(
                 :required_staff_count,
                 :min_protector_count,
                 :allowed_role_ids_json,
+                :required_game_role_ids_json,
                 :specified_staff_ids_json,
                 :point_benefits_allowed,
                 :status,
@@ -207,6 +253,7 @@ def create_or_update_acceptance_meta(
                 required_staff_count = excluded.required_staff_count,
                 min_protector_count = excluded.min_protector_count,
                 allowed_role_ids_json = excluded.allowed_role_ids_json,
+                required_game_role_ids_json = excluded.required_game_role_ids_json,
                 specified_staff_ids_json = excluded.specified_staff_ids_json,
                 point_benefits_allowed = excluded.point_benefits_allowed,
                 status = excluded.status,
@@ -217,6 +264,7 @@ def create_or_update_acceptance_meta(
             "required_staff_count": int(required_staff_count),
             "min_protector_count": int(min_protector_count),
             "allowed_role_ids_json": _json_list(allowed_role_ids),
+            "required_game_role_ids_json": _json_list(required_game_role_ids),
             "specified_staff_ids_json": _json_list(specified_staff_ids),
             "point_benefits_allowed": 1 if point_benefits_allowed else 0,
             "status": str(status or WAITING_ACCEPTANCE),
@@ -233,6 +281,7 @@ def _get_meta(conn, order_id: int) -> dict[str, Any]:
             required_staff_count,
             min_protector_count,
             allowed_role_ids_json,
+            required_game_role_ids_json,
             specified_staff_ids_json,
             point_benefits_allowed,
             status
@@ -379,10 +428,17 @@ def claim_acceptance_order(
         min_protector_count = _to_int(meta.get("min_protector_count"), 0)
         order_rule_key = str(meta.get("order_rule_key") or "")
         allowed_role_ids = set(_load_json_list(meta.get("allowed_role_ids_json")))
+        required_game_role_ids = set(
+            _load_json_list(meta.get("required_game_role_ids_json"))
+        )
         specified_staff_ids = _load_json_list(meta.get("specified_staff_ids_json"))
 
-        if allowed_role_ids and not (staff_role_ids_set & allowed_role_ids):
-            raise ValueError("你的職位不符合這張單的可接條件。")
+        if not role_ids_match_requirements(
+            staff_role_ids_set,
+            allowed_role_ids,
+            required_game_role_ids,
+        ):
+            raise ValueError("你的遊戲身分組或職位／階級不符合這張單的可接條件。")
 
         active_rows = _active_claim_rows(conn, int(order_id))
 
