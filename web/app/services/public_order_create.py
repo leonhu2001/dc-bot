@@ -17,6 +17,7 @@ from services.order_rules import (
     ORDER_RULES,
     ROLE_IDS,
     get_allowed_role_ids,
+    get_required_game_role_ids,
 )
 from shared.models import (
     SyncEvent,
@@ -997,6 +998,12 @@ def _write_acceptance_meta(
         rule
     )
 
+    required_game_role_ids = (
+        get_required_game_role_ids(
+            rule
+        )
+    )
+
 
     now = (
         datetime.utcnow()
@@ -1015,6 +1022,7 @@ def _write_acceptance_meta(
                 required_staff_count,
                 min_protector_count,
                 allowed_role_ids_json,
+                required_game_role_ids_json,
                 specified_staff_ids_json,
                 point_benefits_allowed,
                 rule_version,
@@ -1030,6 +1038,7 @@ def _write_acceptance_meta(
                 :required_staff_count,
                 :min_protector_count,
                 :allowed_role_ids_json,
+                :required_game_role_ids_json,
                 :specified_staff_ids_json,
                 :point_benefits_allowed,
                 :rule_version,
@@ -1052,6 +1061,9 @@ def _write_acceptance_meta(
 
                 allowed_role_ids_json =
                     excluded.allowed_role_ids_json,
+
+                required_game_role_ids_json =
+                    excluded.required_game_role_ids_json,
 
                 specified_staff_ids_json =
                     excluded.specified_staff_ids_json,
@@ -1099,6 +1111,11 @@ def _write_acceptance_meta(
             "allowed_role_ids_json":
                 _json_text(
                     allowed_role_ids
+                ),
+
+            "required_game_role_ids_json":
+                _json_text(
+                    required_game_role_ids
                 ),
 
             "specified_staff_ids_json":
