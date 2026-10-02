@@ -53,6 +53,8 @@ def ensure_web_support_tables(db_file: str | Path | None = None) -> None:
                 claimed_by_discord_id TEXT,
                 claimed_by_display_name TEXT,
                 closed_at TEXT,
+                closed_by TEXT,
+                discord_close_notified INTEGER NOT NULL DEFAULT 0,
                 discord_channel_id TEXT,
                 discord_thread_id TEXT,
                 discord_notification_message_id TEXT,
@@ -85,16 +87,33 @@ def ensure_web_support_tables(db_file: str | Path | None = None) -> None:
             """
         )
 
-        columns = {
+        message_columns = {
             str(row[1])
             for row in conn.execute(
                 "PRAGMA table_info(web_support_messages)"
             ).fetchall()
         }
-        if "delivered_to_discord" not in columns:
+        if "delivered_to_discord" not in message_columns:
             conn.execute(
                 "ALTER TABLE web_support_messages "
                 "ADD COLUMN delivered_to_discord INTEGER NOT NULL DEFAULT 0"
+            )
+
+        session_columns = {
+            str(row[1])
+            for row in conn.execute(
+                "PRAGMA table_info(web_support_sessions)"
+            ).fetchall()
+        }
+        if "closed_by" not in session_columns:
+            conn.execute(
+                "ALTER TABLE web_support_sessions "
+                "ADD COLUMN closed_by TEXT"
+            )
+        if "discord_close_notified" not in session_columns:
+            conn.execute(
+                "ALTER TABLE web_support_sessions "
+                "ADD COLUMN discord_close_notified INTEGER NOT NULL DEFAULT 0"
             )
 
         conn.commit()
@@ -371,10 +390,12 @@ def claim_session(
 def close_session(
     session_id: int,
     *,
+    closed_by: str = "staff",
     db_file: str | Path | None = None,
 ) -> bool:
     ensure_web_support_tables(db_file)
     now = _now()
+    actor = str(closed_by or "staff").strip()[:80] or "staff"
 
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
         cur = conn.execute(
@@ -383,11 +404,12 @@ def close_session(
             SET status = 'closed',
                 ai_enabled = 0,
                 closed_at = COALESCE(closed_at, ?),
+                closed_by = COALESCE(closed_by, ?),
                 updated_at = ?
             WHERE id = ?
               AND status != 'closed'
             """,
-            (now, now, int(session_id)),
+            (now, actor, now, int(session_id)),
         )
         conn.commit()
         return cur.rowcount > 0
@@ -591,5 +613,52 @@ def mark_message_delivered_to_discord(
                 str(discord_message_id) if discord_message_id else None,
                 int(message_id),
             ),
+        )
+        conn.commit()
+
+
+def list_customer_closed_bridged_sessions(
+    *,
+    limit: int = 100,
+    db_file: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    ensure_web_support_tables(db_file)
+    safe_limit = max(1, min(int(limit or 100), 500))
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM web_support_sessions
+            WHERE status = 'closed'
+              AND closed_by = 'customer'
+              AND discord_close_notified = 0
+              AND discord_thread_id IS NOT NULL
+              AND discord_thread_id != ''
+            ORDER BY closed_at ASC, id ASC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_customer_close_notified(
+    session_id: int,
+    *,
+    db_file: str | Path | None = None,
+) -> None:
+    ensure_web_support_tables(db_file)
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.execute(
+            """
+            UPDATE web_support_sessions
+            SET discord_close_notified = 1,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (_now(), int(session_id)),
         )
         conn.commit()
