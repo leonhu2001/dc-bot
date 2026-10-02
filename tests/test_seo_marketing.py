@@ -7,6 +7,7 @@ from web.app.services.marketing_funnel import (
     capture_first_touch,
     ensure_marketing_session,
     export_marketing_session,
+    record_attributed_order_event,
     record_marketing_event,
     restore_marketing_session,
 )
@@ -168,7 +169,6 @@ def test_marketing_events_roll_up_into_funnel_sources_and_campaigns(tmp_path):
         "view_item",
         "quote",
         "checkout",
-        "order_created",
     ):
         record_marketing_event(
             session=session,
@@ -181,18 +181,44 @@ def test_marketing_events_roll_up_into_funnel_sources_and_campaigns(tmp_path):
             db_file=db_path,
         )
 
+    record_marketing_event(
+        session=session,
+        event_name="order_created",
+        event_key="order:77",
+        path="/order/create",
+        customer_discord_id="100",
+        properties={
+            "order_id": 77,
+            "rule_key": "basic_entertain_single",
+        },
+        db_file=db_path,
+    )
+
+    assert record_attributed_order_event(
+        order_id=77,
+        event_name="payment_completed",
+        customer_discord_id="100",
+        properties={
+            "payment_method": "轉帳",
+            "customer_pay_amount": 500,
+        },
+        db_file=db_path,
+    ) is True
+
     snapshot = build_marketing_snapshot(
         days=30,
         db_file=db_path,
     )
 
-    assert [item["sessions"] for item in snapshot["funnel"]] == [1, 1, 1, 1, 1]
+    assert [item["sessions"] for item in snapshot["funnel"]] == [1, 1, 1, 1, 1, 1]
     assert snapshot["sources"][0]["source"] == "streamer_a"
     assert snapshot["sources"][0]["medium"] == "creator"
     assert snapshot["sources"][0]["sessions"] == 1
     assert snapshot["sources"][0]["orders"] == 1
+    assert snapshot["sources"][0]["payments"] == 1
     assert snapshot["campaigns"][0]["campaign"] == "delta_launch"
     assert snapshot["campaigns"][0]["orders"] == 1
+    assert snapshot["campaigns"][0]["payments"] == 1
 
 
 def test_order_conversion_event_is_deduplicated_by_event_key(tmp_path):
