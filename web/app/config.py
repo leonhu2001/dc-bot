@@ -104,7 +104,7 @@ class WebConfig:
     )
     AI_SUPPORT_MODEL = os.getenv(
         "AI_SUPPORT_MODEL",
-        "gpt-5.6-luna",
+        "gpt-6-luna",
     ).strip()
     AI_SUPPORT_TIMEOUT_SECONDS = max(
         3,
