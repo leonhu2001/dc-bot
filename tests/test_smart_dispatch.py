@@ -7,6 +7,149 @@ from services import smart_dispatch
 TAIPEI_TZ = timezone(timedelta(hours=8))
 
 
+def test_delta_platform_classifier_defaults_delta_to_desktop():
+    assert (
+        smart_dispatch.get_delta_dispatch_platform_role_id(
+            category_key="basic",
+            rule_key="basic_tech_secret_single",
+            item_label="技術陪〈端遊〉｜機密單陪",
+        )
+        == smart_dispatch.DELTA_DESKTOP_ROLE_ID
+    )
+
+    assert (
+        smart_dispatch.get_delta_dispatch_platform_role_id(
+            category_key="fun",
+            rule_key="fun_lovebirds",
+            item_label="比翼雙飛",
+        )
+        == smart_dispatch.DELTA_DESKTOP_ROLE_ID
+    )
+
+    # Legacy Delta labels without an explicit 端遊 marker still default desktop.
+    assert (
+        smart_dispatch.get_delta_dispatch_platform_role_id(
+            category_key="三角洲 基礎單",
+            rule_key="basic_exbar_tech",
+            item_label="絕巴技術陪",
+        )
+        == smart_dispatch.DELTA_DESKTOP_ROLE_ID
+    )
+
+
+def test_delta_platform_classifier_detects_mobile_and_ignores_other_games():
+    assert (
+        smart_dispatch.get_delta_dispatch_platform_role_id(
+            category_key="basic",
+            rule_key="basic_mobile_tech_secret_single",
+            item_label="技術陪〈手遊〉｜機密單陪",
+        )
+        == smart_dispatch.DELTA_MOBILE_ROLE_ID
+    )
+
+    assert (
+        smart_dispatch.get_delta_dispatch_platform_role_id(
+            category_key="valorant",
+            rule_key="valorant_entertain_ng",
+            item_label="特戰英豪｜娛樂陪｜NG",
+        )
+        is None
+    )
+
+    assert (
+        smart_dispatch.get_delta_dispatch_platform_role_id(
+            category_key="general",
+            rule_key="basic_teaching_one",
+            item_label="教學單｜1對1",
+        )
+        is None
+    )
+
+
+def test_delta_platform_filter_intersects_existing_order_roles():
+    from views.smart_dispatch import get_eligible_dispatch_candidate_ids
+
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+
+    class Member:
+        def __init__(self, member_id, role_ids):
+            self.id = member_id
+            self.bot = False
+            self.roles = [Role(role_id) for role_id in role_ids]
+
+    class Guild:
+        def __init__(self):
+            self.members = [
+                Member(1, [100, int(smart_dispatch.DELTA_DESKTOP_ROLE_ID)]),
+                Member(2, [100, int(smart_dispatch.DELTA_MOBILE_ROLE_ID)]),
+                Member(3, [
+                    100,
+                    int(smart_dispatch.DELTA_DESKTOP_ROLE_ID),
+                    int(smart_dispatch.DELTA_MOBILE_ROLE_ID),
+                ]),
+                Member(4, [int(smart_dispatch.DELTA_MOBILE_ROLE_ID)]),
+            ]
+
+        def get_member(self, member_id):
+            return next(
+                (member for member in self.members if member.id == member_id),
+                None,
+            )
+
+    guild = Guild()
+
+    desktop = get_eligible_dispatch_candidate_ids(
+        guild,
+        allowed_role_ids=["100"],
+        required_platform_role_id=smart_dispatch.DELTA_DESKTOP_ROLE_ID,
+    )
+    mobile = get_eligible_dispatch_candidate_ids(
+        guild,
+        allowed_role_ids=["100"],
+        required_platform_role_id=smart_dispatch.DELTA_MOBILE_ROLE_ID,
+    )
+
+    assert desktop == ["1", "3"]
+    assert mobile == ["2", "3"]
+
+
+def test_explicit_specified_staff_remains_manual_platform_override():
+    from views.smart_dispatch import get_eligible_dispatch_candidate_ids
+
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+
+    class Member:
+        def __init__(self, member_id, role_ids):
+            self.id = member_id
+            self.bot = False
+            self.roles = [Role(role_id) for role_id in role_ids]
+
+    class Guild:
+        def __init__(self):
+            self.members = [
+                Member(1, [100, int(smart_dispatch.DELTA_DESKTOP_ROLE_ID)]),
+            ]
+
+        def get_member(self, member_id):
+            return next(
+                (member for member in self.members if member.id == member_id),
+                None,
+            )
+
+    result = get_eligible_dispatch_candidate_ids(
+        Guild(),
+        allowed_role_ids=["100"],
+        specified_staff_ids=["1"],
+        required_platform_role_id=smart_dispatch.DELTA_MOBILE_ROLE_ID,
+    )
+
+    assert result == ["1"]
+
+
 def _setup_assignment_db(path):
     with sqlite3.connect(path) as conn:
         conn.executescript(
@@ -125,6 +268,7 @@ def test_smart_dispatch_plan_persists_and_advances(tmp_path, monkeypatch):
         required_staff_count=2,
         allowed_role_ids=["1", "2"],
         specified_staff_ids=["9"],
+        required_platform_role_id=smart_dispatch.DELTA_MOBILE_ROLE_ID,
         ranked_candidate_ids=["9", "8", "7", "6"],
         notified_candidate_ids=["9", "8", "7"],
         db_file=db_path,
@@ -137,6 +281,10 @@ def test_smart_dispatch_plan_persists_and_advances(tmp_path, monkeypatch):
     assert len(plans) == 1
     assert plans[0]["order_id"] == 10
     assert plans[0]["specified_staff_ids"] == ["9"]
+    assert (
+        plans[0]["required_platform_role_id"]
+        == smart_dispatch.DELTA_MOBILE_ROLE_ID
+    )
     assert plans[0]["notified_candidate_ids"] == ["9", "8", "7"]
 
     smart_dispatch.mark_smart_dispatch_stage(
@@ -358,3 +506,45 @@ def test_prepare_recovery_can_exclude_already_accepted_candidates():
 
     assert "1" not in result["ranked_candidate_ids"]
     assert "1" not in result["initial_notified_ids"]
+
+
+def test_smart_dispatch_table_migrates_platform_role_column(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE smart_dispatch_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL UNIQUE,
+                dispatch_channel_id TEXT NOT NULL,
+                dispatch_message_id TEXT NOT NULL,
+                required_staff_count INTEGER NOT NULL DEFAULT 1,
+                allowed_role_ids_json TEXT NOT NULL DEFAULT '[]',
+                specified_staff_ids_json TEXT NOT NULL DEFAULT '[]',
+                ranked_candidate_ids_json TEXT NOT NULL DEFAULT '[]',
+                notified_candidate_ids_json TEXT NOT NULL DEFAULT '[]',
+                specified_dm_sent_ids_json TEXT NOT NULL DEFAULT '[]',
+                specified_dm_failed_ids_json TEXT NOT NULL DEFAULT '[]',
+                stage INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT,
+                completion_reason TEXT,
+                last_error TEXT
+            )
+            """
+        )
+        conn.commit()
+
+    smart_dispatch.ensure_smart_dispatch_tables(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(smart_dispatch_notifications)"
+            ).fetchall()
+        }
+
+    assert "required_platform_role_id" in columns
