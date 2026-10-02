@@ -16,6 +16,7 @@
         method="get"
         action="/admin/audit"
         class="admin-add-worker-form"
+        style="grid-template-columns:repeat(2,minmax(0,1fr));"
     >
 
         <select class="input" name="action">
@@ -44,6 +45,54 @@
             value="{{ admin_id }}"
             placeholder="操作人員 Discord ID"
         >
+
+        <select class="input" name="target_type">
+            <option value="">全部對象</option>
+            {% for target_type in target_types %}
+                <option
+                    value="{{ target_type }}"
+                    {% if selected_target_type == target_type %}selected{% endif %}
+                >
+                    {{ label_target_type(target_type) }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <input
+            class="input"
+            type="text"
+            name="target_id"
+            value="{{ target_id }}"
+            placeholder="對象 ID（訂單 / 付款 / 儲值 / 人員）"
+        >
+
+        <input
+            class="input"
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="搜尋 before / after / 原因 / 編號"
+        >
+
+        <label class="input" style="display:flex;align-items:center;gap:10px;">
+            <input
+                type="checkbox"
+                name="money_only"
+                value="1"
+                {% if money_only %}checked{% endif %}
+            >
+            只看金錢 / 帳務操作
+        </label>
+
+        <label>
+            <span class="muted-text">起始日期</span>
+            <input class="input" type="date" name="date_from" value="{{ date_from }}">
+        </label>
+
+        <label>
+            <span class="muted-text">結束日期</span>
+            <input class="input" type="date" name="date_to" value="{{ date_to }}">
+        </label>
 
         <button class="button" type="submit">
             篩選
