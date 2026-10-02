@@ -401,10 +401,10 @@ def create_smart_dispatch_plan(
     dispatch_message_id: str | int,
     required_staff_count: int,
     allowed_role_ids: list[str] | tuple[str, ...],
-    required_role_id: str | int | None = None,
     specified_staff_ids: list[str] | tuple[str, ...],
     ranked_candidate_ids: list[str] | tuple[str, ...],
     notified_candidate_ids: list[str] | tuple[str, ...],
+    required_role_id: str | int | None = None,
     reset_existing: bool = False,
     db_file: str | Path | None = None,
 ) -> None:
