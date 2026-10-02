@@ -19,11 +19,26 @@ from services.smart_dispatch import (
 )
 
 
+def _member_has_required_role(
+    member,
+    required_role_id: str | int | None,
+) -> bool:
+    required = str(required_role_id or "").strip()
+    if not required:
+        return True
+
+    return any(
+        str(getattr(role, "id", "") or "") == required
+        for role in getattr(member, "roles", []) or []
+    )
+
+
 def get_eligible_dispatch_candidate_ids(
     guild: discord.Guild,
     *,
     allowed_role_ids: Iterable[str | int],
     specified_staff_ids: Iterable[str | int] = (),
+    required_role_id: str | int | None = None,
 ) -> list[str]:
     allowed = {
         str(role_id)
@@ -43,7 +58,13 @@ def get_eligible_dispatch_candidate_ids(
             if getattr(role, "id", None) is not None
         }
 
-        if member_roles & allowed:
+        if (
+            member_roles & allowed
+            and _member_has_required_role(
+                member,
+                required_role_id,
+            )
+        ):
             result.append(str(member.id))
 
     # 指定人員在建立訂單前已由訂單規則驗證過；
@@ -58,7 +79,14 @@ def get_eligible_dispatch_candidate_ids(
         except (TypeError, ValueError):
             member = None
 
-        if member is not None and not getattr(member, "bot", False):
+        if (
+            member is not None
+            and not getattr(member, "bot", False)
+            and _member_has_required_role(
+                member,
+                required_role_id,
+            )
+        ):
             result.append(staff_id_text)
 
     return result
@@ -70,6 +98,7 @@ def prepare_initial_smart_dispatch(
     allowed_role_ids: list[str],
     specified_staff_ids: list[str],
     required_staff_count: int,
+    required_role_id: str | int | None = None,
     excluded_staff_ids: Iterable[str | int] = (),
     db_file: str | Path | None = None,
 ) -> dict:
@@ -77,6 +106,7 @@ def prepare_initial_smart_dispatch(
         guild,
         allowed_role_ids=allowed_role_ids,
         specified_staff_ids=specified_staff_ids,
+        required_role_id=required_role_id,
     )
 
     excluded = {
@@ -142,24 +172,30 @@ def prepare_initial_smart_dispatch(
             "請查看下方派單內容並按鈕接單。"
         )
     else:
-        role_mentions = []
-        for role_id in allowed_role_ids:
-            try:
-                role = guild.get_role(int(role_id))
-            except (TypeError, ValueError):
-                role = None
-            if role is not None and role.mention not in role_mentions:
-                role_mentions.append(role.mention)
-
-        if role_mentions:
+        if required_role_id:
             lines.append(
-                "⚠️ 目前沒有可做個人優先排序的成員，改為通知符合資格身分組："
-                + " ".join(role_mentions)
+                "⚠️ 目前找不到同時符合接單職位與平台身分的可通知人員，"
+                "請客服確認端遊 / 手遊身分組設定。"
             )
         else:
-            lines.append(
-                "⚠️ 目前找不到可通知的符合資格人員，請客服確認人力與身分組設定。"
-            )
+            role_mentions = []
+            for role_id in allowed_role_ids:
+                try:
+                    role = guild.get_role(int(role_id))
+                except (TypeError, ValueError):
+                    role = None
+                if role is not None and role.mention not in role_mentions:
+                    role_mentions.append(role.mention)
+
+            if role_mentions:
+                lines.append(
+                    "⚠️ 目前沒有可做個人優先排序的成員，改為通知符合資格身分組："
+                    + " ".join(role_mentions)
+                )
+            else:
+                lines.append(
+                    "⚠️ 目前找不到可通知的符合資格人員，請客服確認人力與身分組設定。"
+                )
 
     return {
         "ranked_candidate_ids": ranked_ids,
@@ -176,6 +212,7 @@ async def send_specified_staff_dispatch_dms(
     item_label: str,
     required_staff_count: int,
     dispatch_jump_url: str,
+    required_role_id: str | int | None = None,
 ) -> tuple[list[str], list[str]]:
     sent: list[str] = []
     failed: list[str] = []
@@ -197,6 +234,13 @@ async def send_specified_staff_dispatch_dms(
                 member = None
 
         if member is None:
+            failed.append(staff_id)
+            continue
+
+        if not _member_has_required_role(
+            member,
+            required_role_id,
+        ):
             failed.append(staff_id)
             continue
 
@@ -300,7 +344,25 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     str(item)
                     for item in (plan.get("specified_staff_ids") or [])
                 }
-                unresolved_specified = sorted(specified_ids - accepted_ids)
+                required_role_id = str(
+                    plan.get("required_role_id") or ""
+                ).strip()
+
+                unresolved_specified = sorted(
+                    worker_id
+                    for worker_id in (specified_ids - accepted_ids)
+                    if (
+                        not required_role_id
+                        or (
+                            (member := guild.get_member(int(worker_id)))
+                            is not None
+                            and _member_has_required_role(
+                                member,
+                                required_role_id,
+                            )
+                        )
+                    )
+                )
                 unrestricted_total = max(0, required_count - len(specified_ids))
                 accepted_unrestricted = sum(
                     1
@@ -322,12 +384,29 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                 # 如果 Bot 曾離線到超過完整擴大時間，直接做最終通知，
                 # 避免重啟瞬間連發第二輪 + 第三輪兩則提醒。
                 if age >= FULL_EXPANSION_SECONDS and stage < 2:
+                    constrained_user_mentions: list[str] = []
+
+                    if required_role_id and unrestricted_missing > 0:
+                        constrained_user_mentions = [
+                            worker_id
+                            for worker_id in (
+                                plan.get("ranked_candidate_ids") or []
+                            )
+                            if (
+                                worker_id not in accepted_ids
+                                and worker_id not in specified_ids
+                            )
+                        ]
+
                     role_mentions = (
                         _role_mentions(
                             guild,
                             plan.get("allowed_role_ids") or [],
                         )
-                        if unrestricted_missing > 0
+                        if (
+                            unrestricted_missing > 0
+                            and not required_role_id
+                        )
                         else []
                     )
 
@@ -346,6 +425,15 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         )
                         lines.append(
                             "指定名額不可由其他人直接代接；若需更換指定，請由客服調整訂單。"
+                        )
+
+                    if constrained_user_mentions:
+                        lines.append(
+                            "剩餘非指定名額已擴大通知所有符合職位 + 平台資格人員："
+                            + " ".join(
+                                f"<@{worker_id}>"
+                                for worker_id in constrained_user_mentions
+                            )
                         )
 
                     if role_mentions:
