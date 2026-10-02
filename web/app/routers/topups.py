@@ -23,6 +23,7 @@ from services.topups import (
 )
 from web.app.routers.admin_staff import require_admin
 from web.app.services.site_data import get_member_summary
+from web.app.services.audit_trail import write_audit_event
 
 router = APIRouter(tags=["topups"])
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
@@ -227,11 +228,27 @@ async def admin_topup_approve(request: Request, topup_id: int):
     if not user:
         return RedirectResponse("/admin", status_code=303)
     try:
-        approve_topup_order(
+        before = get_topup_order(topup_id)
+        after = approve_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
         )
+        try:
+            write_audit_event(
+                admin_user=user,
+                action="approve_topup",
+                target_type="topup_order",
+                target_id=topup_id,
+                before=before,
+                after=after,
+            )
+        except Exception as audit_exc:
+            print(
+                f"[audit-trail] approve_topup failed: "
+                f"{type(audit_exc).__name__}: {audit_exc}",
+                flush=True,
+            )
     except ValueError as exc:
         return _redirect_message("/admin/topups", "error", exc)
     return _redirect_message(
@@ -251,11 +268,28 @@ async def admin_topup_reject(
     if not user:
         return RedirectResponse("/admin", status_code=303)
     try:
-        reject_topup_order(
+        before = get_topup_order(topup_id)
+        after = reject_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
             reason=reason,
         )
+        try:
+            write_audit_event(
+                admin_user=user,
+                action="reject_topup",
+                target_type="topup_order",
+                target_id=topup_id,
+                before=before,
+                after=after,
+                reason=reason,
+            )
+        except Exception as audit_exc:
+            print(
+                f"[audit-trail] reject_topup failed: "
+                f"{type(audit_exc).__name__}: {audit_exc}",
+                flush=True,
+            )
     except ValueError as exc:
         return _redirect_message("/admin/topups", "error", exc)
     return _redirect_message("/admin/topups", "ok", "儲值單已駁回")
