@@ -21,6 +21,7 @@ from web.app.services.role_catalog import (
     receiver_labels_from_roles,
 )
 from web.app.services.staff_service import sync_staff_members_from_discord
+from web.app.services.admin_service import write_admin_audit_log
 
 
 router = APIRouter(tags=["admin-staff"])
@@ -252,6 +253,19 @@ async def run_admin_staff_sync(request: Request):
 
     try:
         result = sync_staff_members_from_discord(db)
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="sync_staff_members",
+            target_type="staff_directory",
+            target_id="discord_sync",
+            after={
+                "total_seen": result.get("total_seen", result.get("scanned")),
+                "synced_count": result.get("synced_count", result.get("written")),
+                "disabled_count": result.get("disabled_count"),
+                "message": result.get("message"),
+            },
+        )
         db.commit()
         query = {"message": build_sync_message(result)}
     except Exception as exc:
