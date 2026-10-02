@@ -90,6 +90,15 @@
             </a>
         {% endif %}
 
+        {% if user and user.is_manager %}
+            <a
+                class="{% if _p.startswith('/admin/ai-operations') %}active{% endif %}"
+                href="/admin/ai-operations"
+            >
+                AI 營運分析
+            </a>
+        {% endif %}
+
         <a
             class="{% if _p.startswith('/admin/anomalies') %}active{% endif %}"
             href="/admin/anomalies"
