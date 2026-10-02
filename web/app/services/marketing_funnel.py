@@ -20,6 +20,7 @@ ALLOWED_EVENTS = {
     "quote",
     "checkout",
     "order_created",
+    "payment_completed",
     "login_click",
 }
 
@@ -349,6 +350,89 @@ def record_marketing_event(
         return int(cur.lastrowid)
 
 
+def record_attributed_order_event(
+    *,
+    order_id: int,
+    event_name: str,
+    customer_discord_id: str | int | None = None,
+    properties: dict[str, Any] | None = None,
+    db_file: str | Path | None = None,
+) -> bool:
+    event_name = _clean(event_name, 80)
+
+    if event_name not in ALLOWED_EVENTS:
+        raise ValueError("unsupported marketing event")
+
+    ensure_marketing_tables(db_file)
+    path = _db_path(db_file)
+    order_key = f"order:{int(order_id)}"
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+
+        source_row = conn.execute(
+            """
+            SELECT *
+            FROM marketing_events
+            WHERE event_name = 'order_created'
+              AND event_key = ?
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (order_key,),
+        ).fetchone()
+
+        if source_row is None:
+            return False
+
+        cur = conn.execute(
+            """
+            INSERT OR IGNORE INTO marketing_events (
+                session_id,
+                customer_discord_id,
+                event_name,
+                event_key,
+                path,
+                source,
+                medium,
+                campaign,
+                content,
+                term,
+                referrer,
+                properties_json,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(source_row["session_id"]),
+                _clean(
+                    customer_discord_id
+                    or source_row["customer_discord_id"],
+                    64,
+                )
+                or None,
+                event_name,
+                order_key,
+                f"/order/{int(order_id)}",
+                source_row["source"],
+                source_row["medium"],
+                source_row["campaign"],
+                source_row["content"],
+                source_row["term"],
+                source_row["referrer"],
+                json.dumps(
+                    _safe_properties(properties),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            ),
+        )
+        conn.commit()
+        return int(cur.rowcount or 0) > 0
+
+
 def build_marketing_snapshot(
     *,
     days: int = 30,
@@ -420,6 +504,7 @@ def build_marketing_snapshot(
         ("quote", "取得價格"),
         ("checkout", "進入 Checkout"),
         ("order_created", "成功建單"),
+        ("payment_completed", "完成付款"),
     ):
         data = event_map.get(name, {"events": 0, "sessions": 0})
         funnel.append(
