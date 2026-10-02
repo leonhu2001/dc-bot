@@ -33,6 +33,25 @@ def _member_has_required_role(
     )
 
 
+def _guild_member_has_required_role(
+    guild: discord.Guild,
+    worker_id: str | int,
+    required_role_id: str | int | None,
+) -> bool:
+    try:
+        member = guild.get_member(int(str(worker_id)))
+    except (TypeError, ValueError):
+        member = None
+
+    return (
+        member is not None
+        and _member_has_required_role(
+            member,
+            required_role_id,
+        )
+    )
+
+
 def get_eligible_dispatch_candidate_ids(
     guild: discord.Guild,
     *,
@@ -353,13 +372,10 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     for worker_id in (specified_ids - accepted_ids)
                     if (
                         not required_role_id
-                        or (
-                            (member := guild.get_member(int(worker_id)))
-                            is not None
-                            and _member_has_required_role(
-                                member,
-                                required_role_id,
-                            )
+                        or _guild_member_has_required_role(
+                            guild,
+                            worker_id,
+                            required_role_id,
                         )
                     )
                 )
