@@ -68,6 +68,7 @@ def ensure_web_support_tables(db_file: str | Path | None = None) -> None:
                 body TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 discord_message_id TEXT,
+                delivered_to_discord INTEGER NOT NULL DEFAULT 0,
                 metadata_json TEXT,
                 FOREIGN KEY(session_id) REFERENCES web_support_sessions(id)
             );
@@ -76,6 +77,19 @@ def ensure_web_support_tables(db_file: str | Path | None = None) -> None:
                 ON web_support_messages(session_id, id);
             """
         )
+
+        columns = {
+            str(row[1])
+            for row in conn.execute(
+                "PRAGMA table_info(web_support_messages)"
+            ).fetchall()
+        }
+        if "delivered_to_discord" not in columns:
+            conn.execute(
+                "ALTER TABLE web_support_messages "
+                "ADD COLUMN delivered_to_discord INTEGER NOT NULL DEFAULT 0"
+            )
+
         conn.commit()
 
 
@@ -221,9 +235,10 @@ def add_message(
                 body,
                 created_at,
                 discord_message_id,
+                delivered_to_discord,
                 metadata_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 int(session_id),
@@ -233,6 +248,7 @@ def add_message(
                 text,
                 now,
                 str(discord_message_id or "").strip() or None,
+                1 if discord_message_id else 0,
                 json.dumps(metadata or {}, ensure_ascii=False),
             ),
         )
@@ -493,3 +509,78 @@ def recent_customer_text(
             (int(session_id), max(1, min(int(limit or 8), 30))),
         ).fetchall()
         return [dict(row) for row in reversed(rows)]
+
+
+def list_bridged_active_sessions(
+    *,
+    limit: int = 100,
+    db_file: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    ensure_web_support_tables(db_file)
+    safe_limit = max(1, min(int(limit or 100), 500))
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM web_support_sessions
+            WHERE status IN ('waiting_human', 'human')
+              AND discord_thread_id IS NOT NULL
+              AND discord_thread_id != ''
+            ORDER BY updated_at ASC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def list_undelivered_customer_messages(
+    session_id: int,
+    *,
+    limit: int = 100,
+    db_file: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    ensure_web_support_tables(db_file)
+    safe_limit = max(1, min(int(limit or 100), 500))
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM web_support_messages
+            WHERE session_id = ?
+              AND sender_type = 'customer'
+              AND delivered_to_discord = 0
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (int(session_id), safe_limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def mark_message_delivered_to_discord(
+    message_id: int,
+    *,
+    discord_message_id: str | int | None = None,
+    db_file: str | Path | None = None,
+) -> None:
+    ensure_web_support_tables(db_file)
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.execute(
+            """
+            UPDATE web_support_messages
+            SET delivered_to_discord = 1,
+                discord_message_id = COALESCE(?, discord_message_id)
+            WHERE id = ?
+            """,
+            (
+                str(discord_message_id) if discord_message_id else None,
+                int(message_id),
+            ),
+        )
+        conn.commit()
