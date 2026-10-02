@@ -141,6 +141,7 @@ def _record_site_funnel(
     event_name: str,
     *,
     properties: dict | None = None,
+    event_key: str | None = None,
 ) -> None:
     try:
         user = get_current_user(request)
@@ -155,6 +156,7 @@ def _record_site_funnel(
             path=request.url.path,
             customer_discord_id=customer_id,
             properties=properties,
+            event_key=event_key,
         )
     except Exception as exc:
         print(
@@ -1617,6 +1619,7 @@ async def public_order_create(
         _record_site_funnel(
             request,
             "order_created",
+            event_key=f"order:{order_id}",
             properties={
                 "order_id": order_id,
                 "rule_key": order_payload.get("rule_key"),
