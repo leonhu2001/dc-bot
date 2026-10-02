@@ -344,6 +344,7 @@
                                 <div class="profile-actions">
                                     <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}">編輯</a>
                                     <form method="post" action="/admin/staff_profiles/toggle_public">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <input type="hidden" name="staff_discord_id" value="{{ row.staff_id }}">
                                         <button class="profile-button" type="submit">
                                             {% if row.is_public %}設為隱藏{% else %}設為公開{% endif %}
