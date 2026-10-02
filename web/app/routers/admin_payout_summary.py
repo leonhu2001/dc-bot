@@ -10,6 +10,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
+from web.app.services.audit_trail import write_audit_event
+
 try:
     from web.app.config import config
 except Exception:
@@ -443,6 +445,141 @@ def build_summary_bulk_redirect(month: str | None, status: str | None, role: str
         query["role"] = role
 
     return "/admin/payouts/summary?" + urlencode(query)
+
+
+def _payout_audit_snapshot(
+    month: str | None,
+    role: str | None,
+    *,
+    person_id: str | None = None,
+) -> dict:
+    ensure_worker_tip_table()
+    month = normalize_summary_month(month)
+    role_text = str(role or "all").strip().lower()
+    person_id = str(person_id or "").strip()
+
+    include_worker = role_text in {
+        "all", "", "worker", "護航 / 陪玩",
+        "mixed", "mix", "both", "hybrid", "混合", "混合身分",
+        "客服 / 護航", "護航 / 客服", "總控 / 客服 / 護航",
+    }
+    include_cs = role_text in {
+        "all", "", "customer_service", "customer-service", "cs", "客服",
+        "mixed", "mix", "both", "hybrid", "混合", "混合身分",
+        "客服 / 護航", "護航 / 客服", "總控 / 客服 / 護航",
+    }
+
+    if not include_worker and not include_cs:
+        include_worker = True
+        include_cs = True
+
+    conn = sqlite3.connect(summary_db_path())
+    conn.row_factory = sqlite3.Row
+    rows: list[dict] = []
+
+    try:
+        date_filter = ""
+        date_params: list[str] = []
+        if month:
+            date_filter = (
+                " AND substr(COALESCE(NULLIF(w.closed_at, ''), "
+                "NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
+            )
+            date_params.append(month)
+
+        if include_worker:
+            person_filter = ""
+            person_params: list[str] = []
+            if person_id:
+                person_filter = " AND p.worker_discord_id = ?"
+                person_params.append(person_id)
+
+            worker_rows = conn.execute(
+                f"""
+                SELECT
+                    'worker_payout' AS kind,
+                    p.id,
+                    p.order_id,
+                    p.worker_discord_id AS person_id,
+                    p.worker_display_name AS person_name,
+                    p.final_payout AS amount,
+                    p.payout_status AS status
+                FROM worker_payouts p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE w.status = 'closed'
+                  {person_filter}
+                  {date_filter}
+                ORDER BY p.id DESC
+                LIMIT 500
+                """,
+                [*person_params, *date_params],
+            ).fetchall()
+            rows.extend(dict(row) for row in worker_rows)
+
+            tip_rows = conn.execute(
+                f"""
+                SELECT
+                    'worker_tip' AS kind,
+                    p.id,
+                    p.order_id,
+                    p.worker_discord_id AS person_id,
+                    p.worker_display_name AS person_name,
+                    p.amount AS amount,
+                    p.payout_status AS status
+                FROM worker_tips p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE w.status = 'closed'
+                  AND p.payment_status = 'paid'
+                  {person_filter}
+                  {date_filter}
+                ORDER BY p.id DESC
+                LIMIT 500
+                """,
+                [*person_params, *date_params],
+            ).fetchall()
+            rows.extend(dict(row) for row in tip_rows)
+
+        if include_cs:
+            person_filter = ""
+            person_params = []
+            if person_id:
+                person_filter = " AND p.customer_service_discord_id = ?"
+                person_params.append(person_id)
+
+            cs_rows = conn.execute(
+                f"""
+                SELECT
+                    'customer_service_payout' AS kind,
+                    p.id,
+                    p.order_id,
+                    p.customer_service_discord_id AS person_id,
+                    p.customer_service_display_name AS person_name,
+                    p.payout_amount AS amount,
+                    p.payout_status AS status
+                FROM customer_service_payouts p
+                JOIN web_orders w ON w.id = p.order_id
+                WHERE w.status = 'closed'
+                  AND COALESCE(p.customer_service_discord_id, '') <> ''
+                  AND COALESCE(p.customer_service_discord_id, '') <> 'demo_customer_service'
+                  {person_filter}
+                  {date_filter}
+                ORDER BY p.id DESC
+                LIMIT 500
+                """,
+                [*person_params, *date_params],
+            ).fetchall()
+            rows.extend(dict(row) for row in cs_rows)
+    finally:
+        conn.close()
+
+    return {
+        "month": month,
+        "role": str(role or "all"),
+        "person_id": person_id or None,
+        "count": len(rows),
+        "total_amount": sum(int(row.get("amount") or 0) for row in rows),
+        "rows": rows,
+    }
 
 
 def update_summary_payout_status(month: str | None, role: str | None, target_status: str) -> None:
@@ -914,7 +1051,20 @@ async def mark_summary_payouts_paid(request: Request):
     month = str(form.get("month") or "").strip()
     role = str(form.get("role") or "all").strip()
 
+    before = _payout_audit_snapshot(month, role)
     update_summary_payout_status(month, role, "paid")
+    after = _payout_audit_snapshot(month, role)
+
+    write_audit_event(
+        admin_user=user,
+        action="bulk_mark_payouts_paid",
+        target_type="payout_summary",
+        target_id=f"{month or 'all'}:{role or 'all'}",
+        before=before,
+        after=after,
+        reason="薪資總表批次標記已發放",
+        db_file=summary_db_path(),
+    )
 
     return RedirectResponse(url=build_summary_bulk_redirect(month, "paid", role), status_code=303)
 
@@ -930,7 +1080,20 @@ async def mark_summary_payouts_unpaid(request: Request):
     month = str(form.get("month") or "").strip()
     role = str(form.get("role") or "all").strip()
 
+    before = _payout_audit_snapshot(month, role)
     update_summary_payout_status(month, role, "unpaid")
+    after = _payout_audit_snapshot(month, role)
+
+    write_audit_event(
+        admin_user=user,
+        action="bulk_mark_payouts_unpaid",
+        target_type="payout_summary",
+        target_id=f"{month or 'all'}:{role or 'all'}",
+        before=before,
+        after=after,
+        reason="薪資總表批次改回未發放",
+        db_file=summary_db_path(),
+    )
 
     return RedirectResponse(url=build_summary_bulk_redirect(month, "unpaid", role), status_code=303)
 
@@ -950,7 +1113,28 @@ async def update_summary_person_status(request: Request):
     person_id = str(form.get("person_id") or "").strip()
     target_status = str(form.get("target_status") or "unpaid").strip()
 
+    before = _payout_audit_snapshot(
+        month,
+        person_role,
+        person_id=person_id,
+    )
     update_summary_person_payout_status(month, person_role, person_id, target_status)
+    after = _payout_audit_snapshot(
+        month,
+        person_role,
+        person_id=person_id,
+    )
+
+    write_audit_event(
+        admin_user=user,
+        action="set_person_payout_status",
+        target_type="payout_person",
+        target_id=person_id,
+        before=before,
+        after=after,
+        reason=f"薪資總表單一人員改為 {target_status}",
+        db_file=summary_db_path(),
+    )
 
     from urllib.parse import urlencode
 
