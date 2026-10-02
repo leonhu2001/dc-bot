@@ -240,6 +240,12 @@ def adjust_wallet_balance(
         try:
             from web.app.services.audit_trail import write_sqlite_audit_log
 
+            audit_db_file = (
+                Path(db_file).with_name("web_dashboard.db")
+                if db_file is not None
+                else None
+            )
+
             write_sqlite_audit_log(
                 admin_discord_id=str(operator_discord_id),
                 action="wallet_adjustment",
@@ -267,6 +273,7 @@ def adjust_wallet_balance(
                     ),
                 },
                 reason=str(note or "").strip() or None,
+                db_file=audit_db_file,
             )
         except Exception as exc:
             # Audit must never roll back an already committed wallet transaction.
