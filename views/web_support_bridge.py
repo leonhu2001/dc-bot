@@ -118,7 +118,7 @@ def build_web_support_embed(session: dict[str, Any]) -> discord.Embed:
     if customer_id:
         embed.add_field(
             name="客戶 360°",
-            value=f"https://mowanentertainment.com/admin/customers/{customer_id}",
+            value=f"https://mowanentertainment.com/admin/search/customer/{customer_id}",
             inline=False,
         )
 
