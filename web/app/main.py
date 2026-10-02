@@ -25,6 +25,7 @@ from web.app.routers.admin_staff import router as admin_staff_router
 from web.app.routers.admin_audit import router as admin_audit_router
 from web.app.routers.admin_system import router as admin_system_router
 from web.app.routers.admin_global_search import router as admin_global_search_router
+from web.app.routers.marketing import router as marketing_router
 from web.app.routers.admin_support_calls import router as admin_support_calls_router
 from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
@@ -43,6 +44,7 @@ from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
+from web.app.services.marketing_funnel import ensure_marketing_tables
 from web.app.services.web_security import (
     csrf_token_from_request_parts,
     csrf_tokens_match,
@@ -70,6 +72,7 @@ _MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/system",
     "/admin/anomalies",
     "/admin/accounting-reconciliation",
+    "/admin/marketing",
     # 客服可以查看分潤與匯出資料；只有下列會改發放狀態的端點限總管。
     "/admin/payouts/summary/mark-paid",
     "/admin/payouts/summary/mark-unpaid",
@@ -476,6 +479,7 @@ app.include_router(admin_staff_router)
 app.include_router(admin_audit_router)
 app.include_router(admin_system_router)
 app.include_router(admin_global_search_router)
+app.include_router(marketing_router)
 app.include_router(admin_support_calls_router)
 app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
@@ -497,6 +501,7 @@ async def startup_event():
     ensure_ticket_archive_tables()
     ensure_support_call_tables()
     ensure_smart_dispatch_tables()
+    ensure_marketing_tables()
 
 
 def get_current_user(request: Request) -> dict | None:

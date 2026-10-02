@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from pathlib import Path
 
@@ -51,6 +51,20 @@ from web.app.services.customer_portal import (
     get_customer_order,
 )
 
+
+from web.app.services.marketing_funnel import (
+    capture_first_touch,
+    ensure_marketing_session,
+    record_marketing_event,
+)
+
+from web.app.services.seo import (
+    build_robots_txt,
+    build_seo,
+    build_sitemap_xml,
+    delta_force_schema,
+)
+
 router = APIRouter(
     tags=["site"]
 )
@@ -79,17 +93,77 @@ def _site_context(
     request: Request,
     **extra,
 ) -> dict:
+    user = get_current_user(
+        request
+    )
+
+    ensure_marketing_session(
+        request.session
+    )
+    capture_first_touch(
+        request.session,
+        query_params=request.query_params,
+        referrer=request.headers.get("referer"),
+    )
+
     context = {
-        "user": get_current_user(
-            request
-        ),
+        "user": user,
     }
 
     context.update(
         extra
     )
 
+    if "seo" not in context:
+        path = request.url.path
+        noindex = (
+            path.startswith("/me")
+            or path.startswith("/auth")
+        )
+        context["seo"] = build_seo(
+            path=path,
+            title=str(
+                context.get("title")
+                or "魔丸娛樂"
+            ),
+            description=str(
+                context.get("seo_description")
+                or "魔丸娛樂提供遊戲陪玩、護航、娛樂開黑與多種遊戲服務。"
+            ),
+            noindex=noindex,
+        )
+
     return context
+
+
+def _record_site_funnel(
+    request: Request,
+    event_name: str,
+    *,
+    properties: dict | None = None,
+    event_key: str | None = None,
+) -> None:
+    try:
+        user = get_current_user(request)
+        customer_id = (
+            str(user.get("id") or "")
+            if user
+            else None
+        )
+        record_marketing_event(
+            session=request.session,
+            event_name=event_name,
+            path=request.url.path,
+            customer_discord_id=customer_id,
+            properties=properties,
+            event_key=event_key,
+        )
+    except Exception as exc:
+        print(
+            f"[marketing] {event_name} skipped: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
 
 def _refresh_staff_access(
@@ -265,7 +339,8 @@ async def home(
         name="home.html",
         context=_site_context(
             request,
-            title="魔丸娛樂｜首頁",
+            title="魔丸娛樂｜遊戲陪玩、護航與娛樂開黑",
+            seo_description="魔丸娛樂提供三角洲、特戰英豪、英雄聯盟、APEX 等遊戲陪玩、護航與娛樂開黑服務。",
             page_name="home",
             popular_services=(
                 get_popular_order_groups(
@@ -543,7 +618,8 @@ async def public_order(
         name="order_catalog.html",
         context=_site_context(
             request,
-            title="點單｜魔丸娛樂",
+            title="遊戲陪玩與護航價目｜魔丸娛樂",
+            seo_description="查看魔丸娛樂三角洲、特戰英豪、英雄聯盟、APEX 等陪玩、護航、技術陪與娛樂陪方案。",
             page_name="order",
             categories=categories,
             category_filter=category_filter,
@@ -658,6 +734,17 @@ async def public_order_quote(
         or ""
     )
 
+    _record_site_funnel(
+        request,
+        "quote",
+        properties={
+            "rule_key": payload.get("rule_key"),
+            "quantity": payload.get("quantity") or 1,
+            "player_count": payload.get("player_count") or 1,
+            "total_amount": quote.get("total_amount"),
+        },
+    )
+
 
     return JSONResponse(
         {
@@ -759,6 +846,16 @@ async def public_checkout_options(
             status_code=422,
         )
 
+
+    _record_site_funnel(
+        request,
+        "checkout",
+        properties={
+            "rule_key": payload.get("rule_key"),
+            "quantity": payload.get("quantity") or 1,
+            "player_count": payload.get("player_count") or 1,
+        },
+    )
 
     return JSONResponse(
         {
@@ -888,6 +985,91 @@ async def public_checkout_preview(
 # === PHASE 3C-3A FORMAL ORDER CREATE ===
 
 SERVICE_TERMS_VERSION = "2026-09-02-v1"
+
+
+@router.get("/robots.txt")
+async def public_robots():
+    return PlainTextResponse(
+        build_robots_txt(),
+        media_type="text/plain",
+    )
+
+
+@router.get("/sitemap.xml")
+async def public_sitemap():
+    return Response(
+        content=build_sitemap_xml(),
+        media_type="application/xml",
+    )
+
+
+@router.get("/games/delta-force")
+async def delta_force_landing(
+    request: Request,
+):
+    all_groups = get_grouped_order_catalog(
+        "all"
+    )
+
+    groups = [
+        group
+        for group in all_groups
+        if (
+            str(group.get("category") or "")
+            in {"basic", "fun", "farm"}
+            or str(group.get("key") or "")
+            == "teaching"
+        )
+    ][:9]
+
+    faq_items = [
+        {
+            "question": "三角洲娛樂陪和技術陪差在哪？",
+            "answer": "娛樂陪偏聊天、氣氛與輕鬆遊玩；技術陪則依機密、絕密與陪玩人數選擇方案，更偏向技術配合。",
+        },
+        {
+            "question": "三角洲手遊也可以點嗎？",
+            "answer": "可以。官網目前同時提供三角洲端遊與手遊的娛樂陪、技術陪方案。",
+        },
+        {
+            "question": "可以指定陪玩或護航嗎？",
+            "answer": "支援指定的商品可以在下單流程選擇指定人員；實際資格與指定費會由伺服器重新驗證。",
+        },
+        {
+            "question": "價格會在送單前確認嗎？",
+            "answer": "會。官網先依商品、數量、人數、指定與點數福利重新驗價，確認後才建立正式訂單。",
+        },
+        {
+            "question": "付款是在官網完成嗎？",
+            "answer": "目前官網負責建立訂單，付款方式與付款流程統一在 Discord 訂單流程中處理。",
+        },
+        {
+            "question": "沒有人接單怎麼辦？",
+            "answer": "訂單建立後會進入魔丸的派單與智慧通知流程；需要協助時也可以在票口使用客服鈴呼叫真人客服。",
+        },
+    ]
+
+    seo = build_seo(
+        path="/games/delta-force",
+        title="三角洲陪玩、護航與技術陪｜魔丸娛樂",
+        description="魔丸娛樂三角洲行動陪玩服務：端遊／手遊娛樂陪、機密與絕密技術陪、趣味玩法、代解與護航方案。",
+        schemas=delta_force_schema(
+            faq_items=faq_items,
+        ),
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="game_delta_force.html",
+        context=_site_context(
+            request,
+            title=seo["title"],
+            seo=seo,
+            page_name="game_delta_force",
+            groups=groups,
+            faq_items=faq_items,
+        ),
+    )
 
 
 @router.get("/service-rules")
@@ -1433,6 +1615,18 @@ async def public_order_create(
 
 
         db.commit()
+
+        _record_site_funnel(
+            request,
+            "order_created",
+            event_key=f"order:{order_id}",
+            properties={
+                "order_id": order_id,
+                "rule_key": order_payload.get("rule_key"),
+                "customer_pay_amount": customer_pay_amount,
+                "status": order_status,
+            },
+        )
 
 
         return JSONResponse(

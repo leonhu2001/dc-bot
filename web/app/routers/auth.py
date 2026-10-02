@@ -7,6 +7,10 @@ from fastapi.responses import RedirectResponse
 
 from web.app.config import config
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
+from web.app.services.marketing_funnel import (
+    export_marketing_session,
+    restore_marketing_session,
+)
 from web.app.services.web_security import (
     mark_authenticated_now,
     rotate_csrf_token,
@@ -167,9 +171,17 @@ async def discord_callback(
         )
     )
 
+    marketing_state = export_marketing_session(
+        request.session
+    )
+
     # Rotate the signed session payload after OAuth succeeds. This prevents
     # carrying pre-auth session state into an authenticated session.
     request.session.clear()
+    restore_marketing_session(
+        request.session,
+        marketing_state,
+    )
 
     request.session["user"] = {
         "id": discord_id,

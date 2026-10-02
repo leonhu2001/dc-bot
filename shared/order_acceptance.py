@@ -830,6 +830,46 @@ def promote_acceptance_claims_to_assignments(
         recalculate_order_payouts(db, int(order_id))
         db.commit()
 
+        try:
+            from web.app.services.marketing_funnel import (
+                record_attributed_order_event,
+            )
+
+            marketing_db_file = None
+            try:
+                marketing_db_file = str(
+                    db.get_bind().url.database
+                    or ""
+                ).strip() or None
+            except Exception:
+                marketing_db_file = None
+
+            record_attributed_order_event(
+                order_id=int(order_id),
+                event_name="payment_completed",
+                customer_discord_id=str(
+                    getattr(order, "customer_discord_id", "")
+                    or ""
+                ),
+                db_file=marketing_db_file,
+                properties={
+                    "payment_method": str(
+                        payment_method
+                        or getattr(order, "payment_method", "")
+                        or ""
+                    ),
+                    "customer_pay_amount": customer_amount,
+                },
+            )
+        except Exception as exc:
+            # Marketing telemetry must never turn an already-committed payment
+            # finalization into a business failure.
+            print(
+                f"[marketing] payment_completed skipped "
+                f"order={order_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         return len(claim_rows)
     except Exception:
         db.rollback()
