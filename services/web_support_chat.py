@@ -17,6 +17,8 @@ SENDER_AI = "ai"
 SENDER_STAFF = "staff"
 SENDER_SYSTEM = "system"
 
+_SCHEMA_READY: set[str] = set()
+
 
 def _db_path(db_file: str | Path | None = None) -> Path:
     if db_file is not None:
@@ -30,6 +32,11 @@ def _now() -> str:
 
 def ensure_web_support_tables(db_file: str | Path | None = None) -> None:
     path = _db_path(db_file)
+    key = str(path.resolve())
+
+    if key in _SCHEMA_READY:
+        return
+
     with sqlite3.connect(path, timeout=15) as conn:
         conn.executescript(
             """
@@ -91,6 +98,8 @@ def ensure_web_support_tables(db_file: str | Path | None = None) -> None:
             )
 
         conn.commit()
+
+    _SCHEMA_READY.add(key)
 
 
 def _row(row: sqlite3.Row | None) -> dict[str, Any] | None:
