@@ -45,6 +45,11 @@
         href="/static/css/mw_site.css?v=16"
     >
 
+    <link
+        rel="stylesheet"
+        href="/static/css/support_chat.css?v=1"
+    >
+
     {% block head %}{% endblock %}
 
 
@@ -677,6 +682,72 @@ html {
 
 </footer>
 
+    <button
+        class="mw-support-launcher"
+        type="button"
+        aria-label="開啟客服"
+        aria-expanded="false"
+        data-mw-support-launcher
+    >💬</button>
+
+    <section
+        class="mw-support-panel"
+        aria-label="魔丸網站客服"
+        data-mw-support-panel
+    >
+        <header class="mw-support-head">
+            <div class="mw-support-head-copy">
+                <strong>魔丸客服</strong>
+                <span>AI 先協助，需要時轉真人</span>
+            </div>
+            <button
+                class="mw-support-close"
+                type="button"
+                aria-label="關閉客服"
+                data-mw-support-close
+            >×</button>
+        </header>
+
+        <div
+            class="mw-support-status"
+            data-mw-support-status
+        >客服連線中</div>
+
+        <div
+            class="mw-support-messages"
+            aria-live="polite"
+            data-mw-support-messages
+        ></div>
+
+        <div class="mw-support-actions">
+            <button
+                class="mw-support-human"
+                type="button"
+                data-mw-support-human
+            >轉接真人客服</button>
+        </div>
+
+        <form
+            class="mw-support-form"
+            data-mw-support-form
+        >
+            <textarea
+                class="mw-support-input"
+                rows="1"
+                maxlength="2000"
+                placeholder="輸入你的問題…"
+                aria-label="客服訊息"
+                data-mw-support-input
+            ></textarea>
+            <button
+                class="mw-support-send"
+                type="submit"
+                aria-label="送出"
+                data-mw-support-send
+            >➤</button>
+        </form>
+    </section>
+
 
     <script
         src="/static/js/mw_site.js?v=1"
@@ -686,6 +757,12 @@ html {
 
     <script
         src="/static/js/marketing_funnel.js?v=1"
+        defer
+    ></script>
+
+
+    <script
+        src="/static/js/support_chat.js?v=1"
         defer
     ></script>
 
