@@ -85,3 +85,11 @@ def create_all_tables() -> None:
 
     Base.metadata.create_all(bind=engine)
     ensure_sqlite_additive_columns(engine)
+
+    # order_acceptance_meta / claims are maintained outside SQLAlchemy's
+    # declarative metadata. Run their additive schema migration as part of the
+    # canonical database initializer so deploys and fresh restores are complete
+    # before either service starts serving traffic.
+    from shared.order_acceptance import ensure_acceptance_tables
+
+    ensure_acceptance_tables()
