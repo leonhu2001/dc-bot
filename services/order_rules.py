@@ -282,11 +282,12 @@ for key, label, price in [
     ("basic_exbar_gamble_tianyuan", "絕巴四幻神賭單｜天圓地方", 8888),
     ("basic_exbar_gamble_rangefinder", "絕巴四幻神賭單｜測距儀", 12888),
 ]:
-    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 _add(OrderRule(
     "basic", "basic_exbar_tech", "絕巴技術陪", "hourly", 1000, "H",
     allowed_roles=PROTECTOR_ROLES,
+    required_game_roles=DELTA_DESKTOP_GAME_ROLE,
     required_staff_count=2,
     allow_specify=True,
     max_specified_count=2,
@@ -307,6 +308,7 @@ for key, label, price, staff_count in [
     _add(OrderRule(
         "basic", key, label, "hourly", price, "H",
         allowed_roles=PROTECTOR_ROLES,
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
         required_staff_count=staff_count,
         allow_specify=True,
         max_specified_count=staff_count,
@@ -325,6 +327,7 @@ for key, label, price, staff_count in [
     _add(OrderRule(
         "basic", key, label, "hourly", price, "H",
         allowed_roles=PROTECTOR_ROLES,
+        required_game_roles=DELTA_MOBILE_GAME_ROLE,
         required_staff_count=staff_count,
         allow_specify=True,
         max_specified_count=staff_count,
@@ -355,15 +358,16 @@ _add(OrderRule(
 # 舊雙導師規則不再加入 ORDER_RULES；
 # 已建立訂單仍使用建立當下保存的規則快照，不受影響。
 
-for key, label, price, staff_count in [
-    ("basic_entertain_single", "娛樂陪〈端遊〉｜單陪", 320, 1),
-    ("basic_entertain_double", "娛樂陪〈端遊〉｜雙陪", 600, 2),
-    ("basic_mobile_entertain_single", "娛樂陪〈手遊〉｜單陪", 320, 1),
-    ("basic_mobile_entertain_double", "娛樂陪〈手遊〉｜雙陪", 600, 2),
+for key, label, price, staff_count, required_game_roles in [
+    ("basic_entertain_single", "娛樂陪〈端遊〉｜單陪", 320, 1, DELTA_DESKTOP_GAME_ROLE),
+    ("basic_entertain_double", "娛樂陪〈端遊〉｜雙陪", 600, 2, DELTA_DESKTOP_GAME_ROLE),
+    ("basic_mobile_entertain_single", "娛樂陪〈手遊〉｜單陪", 320, 1, DELTA_MOBILE_GAME_ROLE),
+    ("basic_mobile_entertain_double", "娛樂陪〈手遊〉｜雙陪", 600, 2, DELTA_MOBILE_GAME_ROLE),
 ]:
     _add(OrderRule(
         "basic", key, label, "hourly", price, "H",
-        allowed_roles=ALL_RECEIVER_ROLES,
+        allowed_roles=COMPANION_ROLES,
+        required_game_roles=required_game_roles,
         required_staff_count=staff_count,
         allow_specify=True,
         max_specified_count=staff_count,
@@ -416,15 +420,15 @@ for key, label, price in [
     ("basic_trial_500", "體驗單｜777w", 450),
     ("basic_trial_1000", "體驗單｜1688w", 900),
 ]:
-    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+    _add(OrderRule("basic", key, label, "fixed", price, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 
 # ========= 趣味單 =========
 
-_add(OrderRule("fun", "fun_lovebirds", "比翼雙飛", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
-_add(OrderRule("fun", "fun_read_no_reply", "已讀亂回", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
-_add(OrderRule("fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
-_add(OrderRule("fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_lovebirds", "比翼雙飛", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_read_no_reply", "已讀亂回", "fixed", 2000, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_protector_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_rich_enough", "豪到你了嗎", "fixed", 2000, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
+_add(OrderRule("fun", "fun_eat_yourself", "想吃自己打", "fixed", 3000, allowed_roles=PROTECTOR_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=2, min_quantity=1, max_quantity=1, allow_specify=False))
 
 # 魔丸娛樂嘎拉給木
 # 固定 1 單 / 2 位 / 只允許女陪或女護
@@ -446,6 +450,7 @@ for key, label, price in [
             "female_companion",
             "female_protector",
         ),
+        required_game_roles=DELTA_DESKTOP_GAME_ROLE,
         required_staff_count=2,
         min_quantity=1,
         max_quantity=1,
@@ -469,6 +474,7 @@ _add(OrderRule(
     "fixed",
     4000,
     allowed_roles=ALL_RECEIVER_ROLES,
+    required_game_roles=DELTA_DESKTOP_GAME_ROLE,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -483,7 +489,7 @@ _add(OrderRule(
     },
 ))
 
-_add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, allow_specify=False))
+_add(OrderRule("farm", "farm_season_3x3_skin", "賽季3x3｜造型", "fixed", 3000, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=1, allow_specify=False))
 _add(OrderRule(
     "farm",
     "farm_season_3x3_dc_skin",
@@ -491,6 +497,7 @@ _add(OrderRule(
     "fixed",
     6500,
     allowed_roles=ALL_RECEIVER_ROLES,
+    required_game_roles=DELTA_DESKTOP_GAME_ROLE,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -504,6 +511,7 @@ _add(OrderRule(
     "fixed",
     4500,
     allowed_roles=ALL_RECEIVER_ROLES,
+    required_game_roles=DELTA_DESKTOP_GAME_ROLE,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -517,6 +525,7 @@ _add(OrderRule(
     "fixed",
     7000,
     allowed_roles=ALL_RECEIVER_ROLES,
+    required_game_roles=DELTA_DESKTOP_GAME_ROLE,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=1,
@@ -531,19 +540,20 @@ _add(OrderRule(
     600,
     "個",
     allowed_roles=PROTECTOR_ROLES,
+    required_game_roles=DELTA_DESKTOP_GAME_ROLE,
     required_staff_count=1,
     min_quantity=1,
     max_quantity=7,
     allow_specify=False,
 ))
 
-_add(OrderRule("farm", "farm_department_task", "部門任務", "manual", 0, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False, note="客服填價格"))
+_add(OrderRule("farm", "farm_department_task", "部門任務", "manual", 0, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False, note="客服填價格"))
 
 for key, label, price in [
     ("farm_halfcoin_120m", "哈夫幣代洗｜120M", 1250),
     ("farm_halfcoin_360m", "哈夫幣代洗｜360M", 3400),
 ]:
-    _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=ALL_RECEIVER_ROLES, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
+    _add(OrderRule("farm", key, label, "fixed", price, allowed_roles=ALL_RECEIVER_ROLES, required_game_roles=DELTA_DESKTOP_GAME_ROLE, required_staff_count=1, min_quantity=1, max_quantity=1, allow_specify=False))
 
 
 
