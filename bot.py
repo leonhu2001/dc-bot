@@ -149,6 +149,8 @@ from services.support_calls import (
     close_support_calls_for_ticket,
 )
 
+from services.web_support_chat import ensure_web_support_tables
+
 from services.orders import (
     _to_int,
     configure_order_helpers,
@@ -233,6 +235,13 @@ from views.smart_dispatch import (
     prepare_initial_smart_dispatch,
     send_specified_staff_dispatch_dms,
     smart_dispatch_escalation_loop,
+)
+
+from views.web_support_bridge import (
+    WebSupportActionView,
+    configure_web_support_bridge,
+    handle_web_support_thread_message,
+    web_support_bridge_loop,
 )
 
 from core.vip_levels import (
@@ -386,6 +395,9 @@ FEEDBACK_PANEL_CHANNEL_ID = 1504345505633927178
 # 客訴送出頻道 ID
 COMPLAINT_RECEIVE_CHANNEL_ID = 1502040302649872394
 
+# 網站真人客服通知頻道；預設沿用客訴/客服接收頻道，可由 config.json 覆蓋。
+WEB_SUPPORT_CHANNEL_ID = COMPLAINT_RECEIVE_CHANNEL_ID
+
 # 派單頻道 ID
 DISPATCH_CHANNEL_ID = 1483868763446186036
 
@@ -461,6 +473,7 @@ EXAM_NOTICE_CHANNEL_ID = _config_int("EXAM_NOTICE_CHANNEL_ID", EXAM_NOTICE_CHANN
 COMPLAINT_PANEL_CHANNEL_ID = _config_int("COMPLAINT_PANEL_CHANNEL_ID", COMPLAINT_PANEL_CHANNEL_ID)
 FEEDBACK_PANEL_CHANNEL_ID = _config_int("FEEDBACK_PANEL_CHANNEL_ID", FEEDBACK_PANEL_CHANNEL_ID)
 COMPLAINT_RECEIVE_CHANNEL_ID = _config_int("COMPLAINT_RECEIVE_CHANNEL_ID", COMPLAINT_RECEIVE_CHANNEL_ID)
+WEB_SUPPORT_CHANNEL_ID = _config_int("WEB_SUPPORT_CHANNEL_ID", COMPLAINT_RECEIVE_CHANNEL_ID)
 DISPATCH_CHANNEL_ID = _config_int("DISPATCH_CHANNEL_ID", DISPATCH_CHANNEL_ID)
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
@@ -734,6 +747,12 @@ configure_support_call_views(
     customer_service_role_id=CUSTOMER_ROLE_ID,
     manager_role_id=MANAGER_ROLE_ID,
     send_order_log_callback=send_order_log,
+)
+
+
+configure_web_support_bridge(
+    channel_id=WEB_SUPPORT_CHANNEL_ID,
+    customer_service_role_id=CUSTOMER_ROLE_ID,
 )
 
 
@@ -12803,6 +12822,14 @@ async def register_core_persistent_views_once() -> None:
     bot.add_view(FeedbackPanelView())
     bot.add_view(ComplaintResolveView())
     bot.add_view(SupportCallActionView())
+    bot.add_view(WebSupportActionView())
+
+    if not getattr(bot, "_web_support_listener_registered", False):
+        bot.add_listener(
+            handle_web_support_thread_message,
+            "on_message",
+        )
+        bot._web_support_listener_registered = True
 
     bot._core_persistent_views_registered = True
     print("[persistent-views] core views registered", flush=True)
@@ -12843,11 +12870,17 @@ async def on_ready():
     ensure_wallet_tables()
     ensure_support_call_tables()
     ensure_smart_dispatch_tables()
+    ensure_web_support_tables()
 
     if not getattr(bot, "_support_call_sla_worker_started", False):
         bot._support_call_sla_worker_started = True
         bot.loop.create_task(support_call_sla_loop(bot))
         print("[support-call] SLA worker started", flush=True)
+
+    if not getattr(bot, "_web_support_bridge_worker_started", False):
+        bot._web_support_bridge_worker_started = True
+        bot.loop.create_task(web_support_bridge_loop(bot))
+        print("[web-support] Discord bridge worker started", flush=True)
 
 
     if not getattr(bot, "_smart_dispatch_worker_started", False):
