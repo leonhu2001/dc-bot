@@ -30,6 +30,7 @@ from web.app.routers.admin_global_search import router as admin_global_search_ro
 from web.app.routers.marketing import router as marketing_router
 from web.app.routers.admin_support_calls import router as admin_support_calls_router
 from web.app.routers.admin_ai_support_knowledge import router as admin_ai_support_knowledge_router
+from web.app.routers.admin_ai_operations import router as admin_ai_operations_router
 from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
@@ -78,6 +79,7 @@ _MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/accounting-reconciliation",
     "/admin/marketing",
     "/admin/ai-support-knowledge",
+    "/admin/ai-operations",
     # 客服可以查看分潤與匯出資料；只有下列會改發放狀態的端點限總管。
     "/admin/payouts/summary/mark-paid",
     "/admin/payouts/summary/mark-unpaid",
@@ -145,6 +147,12 @@ def _rate_limit_spec(request: Request) -> tuple[str, int, int] | None:
         if request.method.upper() in _UNSAFE_METHODS:
             return ("support-chat-write", 30, 60)
         return ("support-chat-read", 120, 60)
+
+    if (
+        path.startswith("/admin/ai-operations")
+        and request.method.upper() in _UNSAFE_METHODS
+    ):
+        return ("ai-operations-write", 12, 60)
 
     if path.startswith("/discord-avatar/"):
         return ("avatar", 120, 60)
@@ -493,6 +501,7 @@ app.include_router(admin_global_search_router)
 app.include_router(marketing_router)
 app.include_router(admin_support_calls_router)
 app.include_router(admin_ai_support_knowledge_router)
+app.include_router(admin_ai_operations_router)
 app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
 app.include_router(admin_payouts_router)
