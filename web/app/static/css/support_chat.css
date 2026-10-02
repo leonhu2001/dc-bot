@@ -42,6 +42,29 @@
 }
 .mw-support-head-copy strong{display:block;color:#f7f2e7;font-size:15px}
 .mw-support-head-copy span{display:block;margin-top:3px;color:rgba(235,232,222,.52);font-size:11px}
+.mw-support-head-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.mw-support-end{
+    min-height:30px;
+    padding:0 10px;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:9px;
+    background:rgba(255,255,255,.035);
+    color:rgba(235,232,222,.72);
+    font-size:11px;
+    cursor:pointer;
+}
+.mw-support-end:hover{
+    border-color:rgba(223,183,92,.34);
+    color:#dfb75c;
+}
+.mw-support-end:disabled{
+    opacity:.45;
+    cursor:not-allowed;
+}
 .mw-support-close{
     border:0;
     background:transparent;
