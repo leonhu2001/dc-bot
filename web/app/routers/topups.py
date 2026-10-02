@@ -22,6 +22,10 @@ from services.topups import (
     topup_status_label,
 )
 from web.app.routers.admin_staff import require_admin
+from web.app.services.audit_trail import (
+    audit_snapshot,
+    write_sqlite_audit_log,
+)
 from web.app.services.site_data import get_member_summary
 
 router = APIRouter(tags=["topups"])
@@ -227,10 +231,19 @@ async def admin_topup_approve(request: Request, topup_id: int):
     if not user:
         return RedirectResponse("/admin", status_code=303)
     try:
-        approve_topup_order(
+        before = get_topup_order(topup_id)
+        after = approve_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+        )
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="approve_topup",
+            target_type="topup",
+            target_id=str(topup_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
         )
     except ValueError as exc:
         return _redirect_message("/admin/topups", "error", exc)
@@ -251,9 +264,19 @@ async def admin_topup_reject(
     if not user:
         return RedirectResponse("/admin", status_code=303)
     try:
-        reject_topup_order(
+        before = get_topup_order(topup_id)
+        after = reject_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
+            reason=reason,
+        )
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="reject_topup",
+            target_type="topup",
+            target_id=str(topup_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
             reason=reason,
         )
     except ValueError as exc:

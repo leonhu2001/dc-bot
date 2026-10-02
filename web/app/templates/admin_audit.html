@@ -45,6 +45,27 @@
             placeholder="操作人員 Discord ID"
         >
 
+        <input
+            class="input"
+            type="text"
+            name="target"
+            value="{{ target }}"
+            placeholder="操作對象 ID / 類型"
+        >
+
+        <label
+            class="input"
+            style="display:flex;align-items:center;gap:8px;min-height:42px;"
+        >
+            <input
+                type="checkbox"
+                name="money_only"
+                value="1"
+                {% if money_only %}checked{% endif %}
+            >
+            只看金錢操作
+        </label>
+
         <button class="button" type="submit">
             篩選
         </button>
@@ -148,10 +169,20 @@
 
                     {% if log.before_json or log.after_json %}
 
+                        <div
+                            class="order-meta compact-meta"
+                            style="margin-top:12px;"
+                        >
+                            <div style="grid-column:1 / -1;">
+                                <span>變更摘要</span>
+                                <pre style="white-space:pre-wrap;margin:6px 0 0;">{{ format_audit_changes(log.before_json, log.after_json) }}</pre>
+                            </div>
+                        </div>
+
                         <details class="audit-details">
 
                             <summary>
-                                查看修改內容
+                                查看完整修改前 / 修改後
                             </summary>
 
                             <div class="audit-json-grid">
