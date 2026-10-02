@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from html import escape
 from typing import Any
 
@@ -124,7 +123,6 @@ def delta_force_schema(
 
 
 def build_sitemap_xml() -> str:
-    today = date.today().isoformat()
     rows = []
 
     for path in PUBLIC_SITEMAP_PATHS:
@@ -132,7 +130,6 @@ def build_sitemap_xml() -> str:
         rows.append(
             "  <url>"
             f"<loc>{escape(absolute_url(path))}</loc>"
-            f"<lastmod>{today}</lastmod>"
             "<changefreq>weekly</changefreq>"
             f"<priority>{priority}</priority>"
             "</url>"
