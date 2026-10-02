@@ -324,6 +324,12 @@ async def staff_profiles_index(request: Request):
 
     profiles = _fetch_profiles()
     recent_stats = _fetch_recent_profile_stats()
+    csrf_token = _esc(
+        request.session.get(
+            "csrf_token",
+            "",
+        )
+    )
 
     rows_html = []
 
@@ -379,6 +385,7 @@ async def staff_profiles_index(request: Request):
             <td class="actions">
                 <a class="edit-link" href="/admin/staff_profiles/edit/{staff_id}">編輯</a>
                 <form method="post" action="/admin/staff_profiles/toggle_public">
+                    <input type="hidden" name="csrf_token" value="{csrf_token}">
                     <input type="hidden" name="staff_discord_id" value="{staff_id}">
                     <button type="submit">{toggle_label}</button>
                 </form>
@@ -542,7 +549,10 @@ def _fetch_profile(staff_discord_id: str) -> sqlite3.Row | None:
         conn.close()
 
 
-def _profile_edit_page_html(row: sqlite3.Row) -> str:
+def _profile_edit_page_html(
+    row: sqlite3.Row,
+    csrf_token: str,
+) -> str:
     staff_id = _esc(row["staff_discord_id"])
     display_name = _esc(row["display_name"] or "")
     profile_type = _esc(row["profile_type"] or "")
@@ -648,6 +658,7 @@ def _profile_edit_page_html(row: sqlite3.Row) -> str:
         </div>
 
         <form class="card" method="post" action="/admin/staff_profiles/edit/{staff_id}">
+            <input type="hidden" name="csrf_token" value="{_esc(csrf_token)}">
             <div class="row">
                 <div>
                     <label>顯示名稱</label>
@@ -708,7 +719,12 @@ async def edit_staff_profile_page(request: Request, staff_discord_id: str):
             status_code=404,
         )
 
-    return HTMLResponse(_profile_edit_page_html(row))
+    return HTMLResponse(
+        _profile_edit_page_html(
+            row,
+            str(request.session.get("csrf_token") or ""),
+        )
+    )
 
 
 @router.post("/edit/{staff_discord_id}")
