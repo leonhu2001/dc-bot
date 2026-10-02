@@ -10,56 +10,6 @@ TAIPEI_TZ = timezone(timedelta(hours=8))
 FIRST_EXPANSION_SECONDS = 180
 FULL_EXPANSION_SECONDS = 360
 
-DELTA_DESKTOP_ROLE_ID = "1555453406041088131"
-DELTA_MOBILE_ROLE_ID = "1555453449066254417"
-DELTA_CATEGORY_KEYS = {"basic", "fun", "farm"}
-DELTA_NON_PLATFORM_RULE_KEYS = {
-    "basic_teaching_one",
-    "basic_sweet_single",
-    "basic_sweet_double",
-}
-
-
-def get_delta_dispatch_platform_role_id(
-    *,
-    category_key: str | None = None,
-    rule_key: str | None = None,
-    item_label: str | None = None,
-) -> str | None:
-    """Return the extra Discord platform role required by Delta smart dispatch.
-
-    Delta mobile orders are opt-in only: a mobile marker in the rule key or
-    label selects the mobile role. Every other Delta order defaults to desktop,
-    including legacy items whose labels do not explicitly contain "端遊".
-    Non-Delta orders return None and keep the existing smart-dispatch behavior.
-    """
-    category = str(category_key or "").strip().lower()
-    rule = str(rule_key or "").strip().lower()
-    item = str(item_label or "").strip()
-
-    is_delta = (
-        category in DELTA_CATEGORY_KEYS
-        or "三角洲" in str(category_key or "")
-        or rule.startswith("fun_")
-        or rule.startswith("farm_")
-        or (
-            rule.startswith("basic_")
-            and rule not in DELTA_NON_PLATFORM_RULE_KEYS
-        )
-    )
-
-    if not is_delta:
-        return None
-
-    if (
-        "手遊" in item
-        or "mobile" in rule
-    ):
-        return DELTA_MOBILE_ROLE_ID
-
-    return DELTA_DESKTOP_ROLE_ID
-
-
 def _db_path(db_file: str | Path | None = None) -> Path:
     if db_file is not None:
         return Path(db_file)
@@ -106,7 +56,7 @@ def ensure_smart_dispatch_tables(db_file: str | Path | None = None) -> None:
                 dispatch_message_id TEXT NOT NULL,
                 required_staff_count INTEGER NOT NULL DEFAULT 1,
                 allowed_role_ids_json TEXT NOT NULL DEFAULT '[]',
-                required_platform_role_id TEXT,
+                required_game_role_ids_json TEXT NOT NULL DEFAULT '[]',
                 specified_staff_ids_json TEXT NOT NULL DEFAULT '[]',
                 ranked_candidate_ids_json TEXT NOT NULL DEFAULT '[]',
                 notified_candidate_ids_json TEXT NOT NULL DEFAULT '[]',
@@ -131,13 +81,70 @@ def ensure_smart_dispatch_tables(db_file: str | Path | None = None) -> None:
             ).fetchall()
         }
 
-        if "required_platform_role_id" not in columns:
+        if "required_game_role_ids_json" not in columns:
             conn.execute(
                 """
                 ALTER TABLE smart_dispatch_notifications
-                ADD COLUMN required_platform_role_id TEXT
+                ADD COLUMN required_game_role_ids_json TEXT NOT NULL DEFAULT '[]'
                 """
             )
+            columns.add("required_game_role_ids_json")
+
+        # One-time compatibility migration for plans created by the old
+        # Delta-only platform override.
+        if "required_platform_role_id" in columns:
+            legacy_rows = conn.execute(
+                """
+                SELECT order_id, required_platform_role_id, required_game_role_ids_json
+                FROM smart_dispatch_notifications
+                WHERE required_platform_role_id IS NOT NULL
+                  AND TRIM(required_platform_role_id) != ''
+                """
+            ).fetchall()
+            for order_id, legacy_role_id, current_json in legacy_rows:
+                if _load_json_list(current_json):
+                    continue
+                conn.execute(
+                    """
+                    UPDATE smart_dispatch_notifications
+                    SET required_game_role_ids_json = ?
+                    WHERE order_id = ?
+                    """,
+                    (_json_list([legacy_role_id]), int(order_id)),
+                )
+
+        # Backfill pending plans from the direct rule definitions.
+        try:
+            from services.order_rules import get_required_game_role_ids, get_rule
+
+            rows = conn.execute(
+                """
+                SELECT s.order_id, s.required_game_role_ids_json, w.order_rule_key
+                FROM smart_dispatch_notifications s
+                LEFT JOIN web_orders w ON w.id = s.order_id
+                """
+            ).fetchall()
+            for order_id, current_json, rule_key in rows:
+                if _load_json_list(current_json):
+                    continue
+                key = str(rule_key or "").strip()
+                if not key:
+                    continue
+                try:
+                    required_ids = get_required_game_role_ids(get_rule(key))
+                except KeyError:
+                    continue
+                if required_ids:
+                    conn.execute(
+                        """
+                        UPDATE smart_dispatch_notifications
+                        SET required_game_role_ids_json = ?
+                        WHERE order_id = ?
+                        """,
+                        (_json_list(required_ids), int(order_id)),
+                    )
+        except Exception:
+            pass
 
         conn.commit()
 
@@ -407,9 +414,9 @@ def create_smart_dispatch_plan(
     required_staff_count: int,
     allowed_role_ids: list[str] | tuple[str, ...],
     specified_staff_ids: list[str] | tuple[str, ...],
-    required_platform_role_id: str | int | None = None,
     ranked_candidate_ids: list[str] | tuple[str, ...],
     notified_candidate_ids: list[str] | tuple[str, ...],
+    required_game_role_ids: list[str] | tuple[str, ...] = (),
     reset_existing: bool = False,
     db_file: str | Path | None = None,
 ) -> None:
@@ -425,7 +432,7 @@ def create_smart_dispatch_plan(
                 dispatch_message_id = excluded.dispatch_message_id,
                 required_staff_count = excluded.required_staff_count,
                 allowed_role_ids_json = excluded.allowed_role_ids_json,
-                required_platform_role_id = excluded.required_platform_role_id,
+                required_game_role_ids_json = excluded.required_game_role_ids_json,
                 specified_staff_ids_json = excluded.specified_staff_ids_json,
                 ranked_candidate_ids_json = excluded.ranked_candidate_ids_json,
                 notified_candidate_ids_json = excluded.notified_candidate_ids_json,
@@ -449,7 +456,7 @@ def create_smart_dispatch_plan(
                 dispatch_message_id,
                 required_staff_count,
                 allowed_role_ids_json,
-                required_platform_role_id,
+                required_game_role_ids_json,
                 specified_staff_ids_json,
                 ranked_candidate_ids_json,
                 notified_candidate_ids_json,
@@ -466,12 +473,7 @@ def create_smart_dispatch_plan(
                 str(dispatch_message_id),
                 max(1, int(required_staff_count or 1)),
                 _json_list(allowed_role_ids),
-                (
-                    str(required_platform_role_id)
-                    if required_platform_role_id is not None
-                    and str(required_platform_role_id).strip()
-                    else None
-                ),
+                _json_list(required_game_role_ids),
                 _json_list(specified_staff_ids),
                 _json_list(ranked_candidate_ids),
                 _json_list(notified_candidate_ids),
@@ -486,6 +488,7 @@ def _row_to_plan(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     data = dict(row)
     for key in (
         "allowed_role_ids_json",
+        "required_game_role_ids_json",
         "specified_staff_ids_json",
         "ranked_candidate_ids_json",
         "notified_candidate_ids_json",

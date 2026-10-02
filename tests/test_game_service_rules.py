@@ -7,6 +7,9 @@ from services.order_rules import (
     calculate_price,
     get_allowed_role_ids,
     get_allowed_role_keys,
+    get_required_game_role_ids,
+    get_required_game_role_keys,
+    role_ids_match_requirements,
 )
 from web.app.services.checkout_preview import (
     list_point_options,
@@ -67,35 +70,49 @@ def test_game_rank_orders_do_not_inherit_delta_protector_roles():
     )
 
 
-def test_entertainment_uses_universal_companions_plus_same_game_ranks():
-    valorant = ORDER_RULES["valorant_entertain_ng"]
-    lol = ORDER_RULES["lol_entertain_ng"]
-
-    assert set(valorant.allowed_roles) == {"male_companion", "female_companion"}
-    assert set(lol.allowed_roles) == {"male_companion", "female_companion"}
-
-    assert set(valorant.allowed_game_roles) == {
-        "valorant_ascendant",
-        "valorant_immortal",
-        "valorant_radiant",
-    }
-    assert set(lol.allowed_game_roles) == {
-        "lol_master",
-        "lol_grandmaster",
-        "lol_elite",
+def test_entertainment_requires_companion_plus_matching_game_identity():
+    expected = {
+        "valorant_entertain_ng": ("valorant_game", "1555629001102598224"),
+        "lol_entertain_ng": ("lol_game", "1555629055553048627"),
+        "apex_entertain_platinum": ("apex_game", "1555628951336910968"),
+        "steam_play": ("steam_game", "1555629210922516590"),
+        "basic_entertain_single": ("delta_desktop", "1555453406041088131"),
+        "basic_mobile_entertain_single": ("delta_mobile", "1555453449066254417"),
     }
 
+    for rule_key, (game_key, game_role_id) in expected.items():
+        rule = ORDER_RULES[rule_key]
+        assert set(rule.allowed_roles) == {"male_companion", "female_companion"}
+        assert rule.allowed_game_roles == ()
+        assert get_required_game_role_keys(rule) == (game_key,)
+        assert get_required_game_role_ids(rule) == [game_role_id]
 
-def test_steam_accepts_companion_roles_only():
-    steam = ORDER_RULES["steam_play"]
-    allowed_ids = set(get_allowed_role_ids(steam))
+        companion_id = ROLE_IDS["male_companion"]
+        assert role_ids_match_requirements(
+            [companion_id],
+            get_allowed_role_ids(rule),
+            get_required_game_role_ids(rule),
+        ) is False
+        assert role_ids_match_requirements(
+            [companion_id, game_role_id],
+            get_allowed_role_ids(rule),
+            get_required_game_role_ids(rule),
+        ) is True
 
-    assert set(steam.allowed_roles) == {"male_companion", "female_companion"}
-    assert steam.allowed_game_roles == ()
-    assert allowed_ids == {
-        ROLE_IDS["male_companion"],
-        ROLE_IDS["female_companion"],
+
+def test_broad_game_identity_roles_are_registered():
+    expected = {
+        "delta_desktop": ("delta_force", "1555453406041088131"),
+        "delta_mobile": ("delta_force", "1555453449066254417"),
+        "lol_game": ("lol", "1555629055553048627"),
+        "valorant_game": ("valorant", "1555629001102598224"),
+        "steam_game": ("steam", "1555629210922516590"),
+        "apex_game": ("apex", "1555628951336910968"),
     }
+    for key, (game, role_id) in expected.items():
+        role = GAME_ROLE_BY_KEY[key]
+        assert role.game == game
+        assert role.role_id == role_id
 
 
 def test_apex_roles_can_login_employee_website_before_apex_orders_exist():
@@ -230,16 +247,10 @@ def test_all_new_game_orders_have_exact_receiver_roles():
         "valorant_entertain_ng": (
             "male_companion",
             "female_companion",
-            "valorant_ascendant",
-            "valorant_immortal",
-            "valorant_radiant",
         ),
         "valorant_entertain_ranked": (
             "male_companion",
             "female_companion",
-            "valorant_ascendant",
-            "valorant_immortal",
-            "valorant_radiant",
         ),
         "valorant_ascendant_ng": (
             "valorant_ascendant",
@@ -268,23 +279,14 @@ def test_all_new_game_orders_have_exact_receiver_roles():
         "lol_entertain_aram": (
             "male_companion",
             "female_companion",
-            "lol_master",
-            "lol_grandmaster",
-            "lol_elite",
         ),
         "lol_entertain_ng": (
             "male_companion",
             "female_companion",
-            "lol_master",
-            "lol_grandmaster",
-            "lol_elite",
         ),
         "lol_entertain_ranked": (
             "male_companion",
             "female_companion",
-            "lol_master",
-            "lol_grandmaster",
-            "lol_elite",
         ),
         "lol_master_ng": (
             "lol_master",
@@ -322,6 +324,15 @@ def test_all_new_game_orders_have_exact_receiver_roles():
             for role_key in actual_keys
         ), rule_key
 
+        expected_game_key = (
+            "valorant_game"
+            if rule_key.startswith("valorant_")
+            else "lol_game"
+        )
+        assert get_required_game_role_keys(
+            ORDER_RULES[rule_key]
+        ) == (expected_game_key,)
+
 
 def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_entertain_single"].price == 320
@@ -344,7 +355,7 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_mobile_tech_topsecret_double"].price == 840
 
 
-def test_delta_platform_labels_survive_runtime_overrides():
+def test_delta_platform_labels_are_direct_catalog_rules():
     expected = {
         "basic_tech_secret_single": "技術陪〈端遊〉｜機密單陪",
         "basic_tech_secret_double": "技術陪〈端遊〉｜機密雙陪",
@@ -364,6 +375,12 @@ def test_delta_platform_labels_survive_runtime_overrides():
         assert rule.label == label, key
         assert rule.min_quantity == 1, key
         assert rule.max_quantity == 24, key
+        expected_game = (
+            "delta_mobile"
+            if "mobile" in key
+            else "delta_desktop"
+        )
+        assert get_required_game_role_keys(rule) == (expected_game,), key
 
 
 def test_all_season_3x3_variants_allow_all_five_store_roles():
