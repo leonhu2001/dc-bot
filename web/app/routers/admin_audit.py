@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from shared.db import SessionLocal
 from shared.models import AdminAuditLog, WebUser
@@ -31,6 +31,17 @@ ACTION_LABELS = {
     "accounting_void_cancelled_payouts": "帳務修復｜取消單分潤 void",
     "accounting_queue_wallet_reconciliation": "帳務修復｜排入錢包差額修復",
     "accounting_recognize_historical_discount": "帳務修復｜認列歷史折扣",
+    "approve_payment_review": "核准付款審核",
+    "reject_payment_review": "駁回付款審核",
+    "retry_payment_review_apply": "重試付款套用",
+    "approve_topup": "核准儲值",
+    "reject_topup": "駁回儲值",
+    "wallet_adjustment": "錢包異動",
+    "sync_staff_members_from_discord": "同步 Discord 人員",
+    "update_staff_profile": "編輯人員個人牆",
+    "toggle_staff_profile_public": "切換個人牆公開狀態",
+    "bulk_set_payout_status": "批次更新薪資狀態",
+    "set_person_payout_status": "更新單一人員薪資狀態",
 }
 
 
@@ -41,6 +52,13 @@ TARGET_TYPE_LABELS = {
     "worker_payout": "人員分潤",
     "worker_payout_override": "人員分潤調整",
     "customer_service_payout": "客服分潤",
+    "payment_review": "付款審核",
+    "topup": "儲值單",
+    "customer_wallet": "顧客錢包",
+    "staff_directory": "人員名錄",
+    "staff_profile": "人員個人牆",
+    "payout_batch": "薪資批次",
+    "payout_person": "人員薪資",
 }
 
 
@@ -105,6 +123,22 @@ FIELD_LABELS = {
     "attention_reason": "注意事項",
     "internal_note": "內部備註",
     "extra_requirements": "額外需求",
+    "balance": "錢包餘額",
+    "transaction_id": "錢包交易 ID",
+    "transaction_type": "錢包交易類型",
+    "order_no": "訂單編號",
+    "order_channel_id": "訂單票口 ID",
+    "review_no": "付款審核單號",
+    "topup_no": "儲值單號",
+    "rejected_reason": "駁回原因",
+    "approved_by_discord_id": "核准人員 Discord ID",
+    "approved_by_display_name": "核准人員",
+    "rejected_by_discord_id": "駁回人員 Discord ID",
+    "rejected_by_display_name": "駁回人員",
+    "target_status": "目標狀態",
+    "transaction_type": "交易類型",
+    "sync_result": "同步結果",
+    "is_public": "是否公開",
 }
 
 
@@ -213,6 +247,45 @@ def format_audit_json(value: str | None) -> str:
     return "\n".join(lines) if lines else "無資料"
 
 
+def format_audit_changes(
+    before_json: str | None,
+    after_json: str | None,
+) -> str:
+    try:
+        before = json.loads(before_json) if before_json else {}
+    except Exception:
+        before = {}
+
+    try:
+        after = json.loads(after_json) if after_json else {}
+    except Exception:
+        after = {}
+
+    if not isinstance(before, dict):
+        before = {}
+    if not isinstance(after, dict):
+        after = {}
+
+    keys = sorted(set(before) | set(after))
+    lines = []
+
+    for key in keys:
+        old = before.get(key)
+        new = after.get(key)
+
+        if old == new:
+            continue
+
+        lines.append(
+            f"{label_field(str(key))}："
+            f"{format_audit_value(str(key), old)}"
+            f" → "
+            f"{format_audit_value(str(key), new)}"
+        )
+
+    return "\n".join(lines) if lines else "沒有欄位變更"
+
+
 def format_datetime(value) -> str:
     if not value:
         return "-"
@@ -293,6 +366,8 @@ async def admin_audit_logs(
     request: Request,
     action: str | None = None,
     admin_id: str | None = None,
+    target: str | None = None,
+    money_only: str | None = None,
 ):
     user = get_current_user(request)
 
@@ -338,6 +413,39 @@ async def admin_audit_logs(
                 AdminAuditLog.admin_discord_id == admin_id
             )
 
+        if target:
+            target_text = str(target).strip()
+            statement = statement.where(
+                or_(
+                    AdminAuditLog.target_id.contains(target_text),
+                    AdminAuditLog.target_type.contains(target_text),
+                )
+            )
+
+        money_actions = {
+            "order_workspace_edit",
+            "set_manual_worker_payout",
+            "set_worker_payout_status",
+            "set_customer_service_payout_status",
+            "accounting_recalculate_unpaid_payouts",
+            "accounting_void_cancelled_payouts",
+            "accounting_queue_wallet_reconciliation",
+            "accounting_recognize_historical_discount",
+            "approve_payment_review",
+            "reject_payment_review",
+            "retry_payment_review_apply",
+            "approve_topup",
+            "reject_topup",
+            "wallet_adjustment",
+            "bulk_set_payout_status",
+            "set_person_payout_status",
+        }
+
+        if str(money_only or "").strip() in {"1", "true", "yes", "on"}:
+            statement = statement.where(
+                AdminAuditLog.action.in_(money_actions)
+            )
+
         logs = list(
             db.scalars(statement.limit(300)).all()
         )
@@ -373,9 +481,12 @@ async def admin_audit_logs(
             "actions": actions,
             "selected_action": action or "",
             "admin_id": admin_id or "",
+            "target": target or "",
+            "money_only": str(money_only or "").strip() in {"1", "true", "yes", "on"},
             "label_action": label_action,
             "label_target_type": label_target_type,
             "format_audit_json": format_audit_json,
+            "format_audit_changes": format_audit_changes,
             "format_datetime": format_datetime,
             "operator_names": operator_names,
         },
