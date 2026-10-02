@@ -16,6 +16,7 @@ from services.web_support_chat import (
     add_message,
     bind_session_identity,
     create_session,
+    close_session,
     get_session_by_token,
     list_messages,
     recent_customer_text,
@@ -240,6 +241,48 @@ async def send_message(
             _public_message(customer_message),
             _public_message(ai_message),
         ],
+    }
+
+
+@router.post("/close")
+async def close_support_chat(request: Request):
+    session = _get_existing_session(request)
+    session_id = int(session["id"])
+    status = str(session.get("status") or STATUS_AI)
+
+    if status != STATUS_CLOSED:
+        closed = close_session(
+            session_id,
+            closed_by="customer",
+        )
+        if closed:
+            final_message = add_message(
+                session_id,
+                sender_type=SENDER_SYSTEM,
+                body=(
+                    "你已結束本次客服對話。"
+                    "下次重新開啟客服時，會建立一段新的對話。"
+                ),
+                sender_display_name="系統",
+                metadata={"closed_by": "customer"},
+            )
+        else:
+            final_message = None
+    else:
+        final_message = None
+
+    updated = get_session_by_token(
+        str(request.session.get("web_support_token") or "")
+    ) or session
+
+    return {
+        "ok": True,
+        "session": _public_session(updated),
+        "messages": (
+            [_public_message(final_message)]
+            if final_message is not None
+            else []
+        ),
     }
 
 
