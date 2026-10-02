@@ -100,8 +100,11 @@
 
         try {
             const response = await fetch("/api/support-chat/bootstrap", {
+                method: "POST",
                 credentials: "same-origin",
                 cache: "no-store",
+                headers: {"Content-Type": "application/json"},
+                body: "{}",
             });
             if (!response.ok) throw new Error("bootstrap failed");
             const data = await response.json();
