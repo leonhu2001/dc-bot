@@ -14,6 +14,7 @@ from services.payment_reviews import (
     PAYMENT_REVIEW_PENDING,
     PAYMENT_REVIEW_REJECTED,
     approve_payment_review,
+    get_payment_review,
     list_payment_reviews,
     reject_payment_review,
     retry_payment_review_apply,
@@ -21,12 +22,17 @@ from services.payment_reviews import (
 )
 from services.topups import (
     approve_topup_order,
+    get_topup_order,
     list_topups_for_admin,
     reject_topup_order,
     topup_payment_method_label,
     topup_status_label,
 )
 from web.app.routers.admin_staff import require_admin
+from web.app.services.audit_trail import (
+    audit_snapshot,
+    write_sqlite_audit_log,
+)
 
 router = APIRouter(tags=["payment_reviews"])
 DISCORD_GUILD_ID = 1129474191226306672
@@ -192,10 +198,19 @@ async def admin_payment_review_approve(request: Request, review_id: int):
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        approve_payment_review(
+        before = get_payment_review(review_id)
+        after = approve_payment_review(
             review_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+        )
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="approve_payment_review",
+            target_type="payment_review",
+            target_id=str(review_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
         )
     except ValueError as exc:
         return _redirect("error", exc, status="pending")
@@ -214,7 +229,16 @@ async def admin_payment_review_retry(request: Request, review_id: int):
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        retry_payment_review_apply(review_id)
+        before = get_payment_review(review_id)
+        after = retry_payment_review_apply(review_id)
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="retry_payment_review_apply",
+            target_type="payment_review",
+            target_id=str(review_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
+        )
     except ValueError as exc:
         return _redirect("error", exc, status="pending")
 
@@ -236,10 +260,20 @@ async def admin_payment_review_reject(
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        reject_payment_review(
+        before = get_payment_review(review_id)
+        after = reject_payment_review(
             review_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+            reason=reason,
+        )
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="reject_payment_review",
+            target_type="payment_review",
+            target_id=str(review_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
             reason=reason,
         )
     except ValueError as exc:
@@ -259,10 +293,19 @@ async def admin_payment_review_topup_approve(request: Request, topup_id: int):
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        approve_topup_order(
+        before = get_topup_order(topup_id)
+        after = approve_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
             operator_display_name=_display_name(user),
+        )
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="approve_topup",
+            target_type="topup",
+            target_id=str(topup_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
         )
     except ValueError as exc:
         return _redirect("error", exc, status="pending")
@@ -285,9 +328,19 @@ async def admin_payment_review_topup_reject(
         return RedirectResponse("/admin", status_code=303)
 
     try:
-        reject_topup_order(
+        before = get_topup_order(topup_id)
+        after = reject_topup_order(
             topup_id,
             operator_discord_id=str(user.get("id") or ""),
+            reason=reason,
+        )
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="reject_topup",
+            target_type="topup",
+            target_id=str(topup_id),
+            before=audit_snapshot(before),
+            after=audit_snapshot(after),
             reason=reason,
         )
     except ValueError as exc:
