@@ -100,7 +100,7 @@ GROUP_SPECS = [
         "key": "teaching",
         "category": "general",
         "label": "教學單",
-        "description": "1 對 1 教學；僅頂護、菁英、頂獵、輻能可接。",
+        "description": "跨遊戲通用，不要求特定遊戲身分組；僅頂護、菁英、頂獵、輻能可接。",
         "variants": [
             ("basic_teaching_one", "1 對 1 教學"),
         ],
@@ -135,6 +135,7 @@ GROUP_SPECS = [
         "category": "general",
         "label": "甜蜜單",
         "selector_label": "陪玩人數",
+        "description": "跨遊戲通用，不要求特定遊戲身分組；男陪、女陪可接。",
         "variants": [
             ("basic_sweet_single", "單陪"),
             ("basic_sweet_double", "雙陪"),
