@@ -275,6 +275,53 @@ def _extract_chat_completions_text(data: Any) -> str:
     ).strip()
 
 
+def _provider_error_summary(data: Any) -> str:
+    if not isinstance(data, dict):
+        return "unknown_error"
+
+    error = data.get("error")
+    if not isinstance(error, dict):
+        return "unknown_error"
+
+    code = str(error.get("code") or error.get("type") or "").strip()
+    message = str(error.get("message") or "").strip()
+    message = re.sub(r"\s+", " ", message)[:240]
+
+    if code and message:
+        return f"{code}: {message}"
+    return code or message or "unknown_error"
+
+
+def _response_usage(data: Any) -> tuple[int, int, int]:
+    if not isinstance(data, dict):
+        return 0, 0, 0
+
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return 0, 0, 0
+
+    def _int(value: Any) -> int:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    input_tokens = _int(
+        usage.get("input_tokens")
+        or usage.get("prompt_tokens")
+    )
+    output_tokens = _int(
+        usage.get("output_tokens")
+        or usage.get("completion_tokens")
+    )
+    total_tokens = _int(usage.get("total_tokens"))
+
+    if not total_tokens:
+        total_tokens = input_tokens + output_tokens
+
+    return input_tokens, output_tokens, total_tokens
+
+
 async def generate_ai_response(
     message: str,
     *,
@@ -332,10 +379,16 @@ async def generate_ai_response(
                 },
                 data=json.dumps(payload, ensure_ascii=False),
             ) as response:
-                if response.status < 200 or response.status >= 300:
-                    return local_faq_response(message), False
-
                 data = await response.json(content_type=None)
+
+                if response.status < 200 or response.status >= 300:
+                    print(
+                        "[support-ai] external response failed "
+                        f"model={model} status={response.status} "
+                        f"error={_provider_error_summary(data)}",
+                        flush=True,
+                    )
+                    return local_faq_response(message), False
 
         reply = (
             _extract_responses_text(data)
@@ -344,10 +397,28 @@ async def generate_ai_response(
         )
 
         if not reply:
+            print(
+                "[support-ai] external response empty "
+                f"model={model}",
+                flush=True,
+            )
             return local_faq_response(message), False
+
+        input_tokens, output_tokens, total_tokens = _response_usage(data)
+        print(
+            "[support-ai] external response ok "
+            f"model={model} input_tokens={input_tokens} "
+            f"output_tokens={output_tokens} total_tokens={total_tokens}",
+            flush=True,
+        )
 
         return reply[:3000], True
 
-    except Exception:
+    except Exception as exc:
+        print(
+            "[support-ai] external request exception "
+            f"model={model} error={type(exc).__name__}",
+            flush=True,
+        )
         return local_faq_response(message), False
 
