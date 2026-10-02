@@ -7,6 +7,10 @@ from fastapi.responses import RedirectResponse
 
 from web.app.config import config
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
+from web.app.services.web_security import (
+    mark_authenticated_now,
+    rotate_csrf_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,6 +38,7 @@ def _safe_return_path(value: str | None) -> str:
 async def discord_login(
     request: Request,
     next: str | None = None,
+    reauth: int = 0,
 ):
     if not config.DISCORD_CLIENT_ID:
         raise HTTPException(status_code=500, detail="DISCORD_CLIENT_ID is not configured")
@@ -41,13 +46,14 @@ async def discord_login(
     state = secrets.token_urlsafe(32)
     request.session["oauth_state"] = state
     request.session["oauth_next"] = _safe_return_path(next)
+    request.session["oauth_reauth"] = bool(int(reauth or 0))
 
     params = {
         "client_id": config.DISCORD_CLIENT_ID,
         "redirect_uri": config.DISCORD_REDIRECT_URI,
         "response_type": "code",
         "scope": "identify",
-        "prompt": "none",
+        "prompt": "consent" if bool(int(reauth or 0)) else "none",
         "state": state,
     }
 
@@ -154,6 +160,17 @@ async def discord_callback(
         or is_companion
     )
 
+    next_path = _safe_return_path(
+        request.session.get(
+            "oauth_next",
+            "/",
+        )
+    )
+
+    # Rotate the signed session payload after OAuth succeeds. This prevents
+    # carrying pre-auth session state into an authenticated session.
+    request.session.clear()
+
     request.session["user"] = {
         "id": discord_id,
         "username": username,
@@ -169,13 +186,11 @@ async def discord_callback(
         "is_employee": is_employee,
     }
 
+    mark_authenticated_now(request.session)
+    rotate_csrf_token(request.session)
+
     return RedirectResponse(
-        url=_safe_return_path(
-            request.session.pop(
-                "oauth_next",
-                "/",
-            )
-        )
+        url=next_path
     )
 
 
