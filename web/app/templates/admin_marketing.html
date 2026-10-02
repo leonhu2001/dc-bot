@@ -44,11 +44,12 @@
                             <p class="order-no">{{ row.medium }}</p>
                             <h3>{{ row.source }}</h3>
                         </div>
-                        <strong>{{ row.orders }} 單</strong>
+                        <strong>{{ row.payments }} 筆付款</strong>
                     </div>
                     <div class="order-meta compact-meta">
                         <div><span>訪客 Session</span><strong>{{ row.sessions }}</strong></div>
                         <div><span>成功建單</span><strong>{{ row.orders }}</strong></div>
+                        <div><span>完成付款</span><strong>{{ row.payments }}</strong></div>
                     </div>
                 </article>
             {% endfor %}
@@ -72,11 +73,12 @@
                 <article class="admin-order-card compact-order-card">
                     <div class="order-card-header">
                         <div><p class="order-no">CAMPAIGN</p><h3>{{ row.campaign }}</h3></div>
-                        <strong>{{ row.orders }} 單</strong>
+                        <strong>{{ row.payments }} 筆付款</strong>
                     </div>
                     <div class="order-meta compact-meta">
                         <div><span>訪客 Session</span><strong>{{ row.sessions }}</strong></div>
                         <div><span>成功建單</span><strong>{{ row.orders }}</strong></div>
+                        <div><span>完成付款</span><strong>{{ row.payments }}</strong></div>
                     </div>
                 </article>
             {% endfor %}
