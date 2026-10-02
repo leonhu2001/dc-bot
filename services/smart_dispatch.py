@@ -10,6 +10,41 @@ TAIPEI_TZ = timezone(timedelta(hours=8))
 FIRST_EXPANSION_SECONDS = 180
 FULL_EXPANSION_SECONDS = 360
 
+DELTA_FORCE_PC_ROLE_ID = "1555430924605202493"
+DELTA_FORCE_MOBILE_ROLE_ID = "1555430985732989049"
+DELTA_FORCE_CATEGORY_KEYS = {"basic", "fun", "farm"}
+
+
+def delta_force_platform_role_id(
+    *,
+    category_key: str | None,
+    rule_key: str | None,
+    item_label: str | None,
+) -> str | None:
+    category = str(category_key or "").strip().lower()
+    item = str(item_label or "").strip()
+    rule = str(rule_key or "").strip().lower()
+
+    is_delta = (
+        category in DELTA_FORCE_CATEGORY_KEYS
+        or "三角洲" in str(category_key or "")
+    )
+    if not is_delta:
+        return None
+
+    is_mobile = (
+        rule.startswith("basic_mobile_")
+        or "〈手遊〉" in item
+        or "<手遊>" in item
+        or "＜手遊＞" in item
+    )
+
+    return (
+        DELTA_FORCE_MOBILE_ROLE_ID
+        if is_mobile
+        else DELTA_FORCE_PC_ROLE_ID
+    )
+
 
 def _db_path(db_file: str | Path | None = None) -> Path:
     if db_file is not None:
@@ -57,6 +92,7 @@ def ensure_smart_dispatch_tables(db_file: str | Path | None = None) -> None:
                 dispatch_message_id TEXT NOT NULL,
                 required_staff_count INTEGER NOT NULL DEFAULT 1,
                 allowed_role_ids_json TEXT NOT NULL DEFAULT '[]',
+                required_role_id TEXT,
                 specified_staff_ids_json TEXT NOT NULL DEFAULT '[]',
                 ranked_candidate_ids_json TEXT NOT NULL DEFAULT '[]',
                 notified_candidate_ids_json TEXT NOT NULL DEFAULT '[]',
@@ -74,6 +110,18 @@ def ensure_smart_dispatch_tables(db_file: str | Path | None = None) -> None:
                 ON smart_dispatch_notifications(completed_at, stage, created_at);
             """
         )
+        columns = {
+            str(row[1])
+            for row in conn.execute(
+                "PRAGMA table_info(smart_dispatch_notifications)"
+            ).fetchall()
+        }
+        if "required_role_id" not in columns:
+            conn.execute(
+                "ALTER TABLE smart_dispatch_notifications "
+                "ADD COLUMN required_role_id TEXT"
+            )
+
         conn.commit()
 
 
@@ -295,9 +343,21 @@ def choose_initial_candidate_ids(
     ]
 
     result = list(dict.fromkeys(specified_ordered))
+    reserved_specified_count = min(
+        max(1, int(required_staff_count or 1)),
+        len(
+            list(
+                dict.fromkeys(
+                    str(item)
+                    for item in (specified_staff_ids or [])
+                    if str(item).strip()
+                )
+            )
+        ),
+    )
     unrestricted_slots = max(
         0,
-        int(required_staff_count or 1) - len(result),
+        int(required_staff_count or 1) - reserved_specified_count,
     )
 
     if unrestricted_slots <= 0:
@@ -341,6 +401,7 @@ def create_smart_dispatch_plan(
     dispatch_message_id: str | int,
     required_staff_count: int,
     allowed_role_ids: list[str] | tuple[str, ...],
+    required_role_id: str | int | None = None,
     specified_staff_ids: list[str] | tuple[str, ...],
     ranked_candidate_ids: list[str] | tuple[str, ...],
     notified_candidate_ids: list[str] | tuple[str, ...],
@@ -359,6 +420,7 @@ def create_smart_dispatch_plan(
                 dispatch_message_id = excluded.dispatch_message_id,
                 required_staff_count = excluded.required_staff_count,
                 allowed_role_ids_json = excluded.allowed_role_ids_json,
+                required_role_id = excluded.required_role_id,
                 specified_staff_ids_json = excluded.specified_staff_ids_json,
                 ranked_candidate_ids_json = excluded.ranked_candidate_ids_json,
                 notified_candidate_ids_json = excluded.notified_candidate_ids_json,
@@ -382,6 +444,7 @@ def create_smart_dispatch_plan(
                 dispatch_message_id,
                 required_staff_count,
                 allowed_role_ids_json,
+                required_role_id,
                 specified_staff_ids_json,
                 ranked_candidate_ids_json,
                 notified_candidate_ids_json,
@@ -389,7 +452,7 @@ def create_smart_dispatch_plan(
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             {conflict_sql}
             """,
             (
@@ -398,6 +461,7 @@ def create_smart_dispatch_plan(
                 str(dispatch_message_id),
                 max(1, int(required_staff_count or 1)),
                 _json_list(allowed_role_ids),
+                str(required_role_id) if required_role_id is not None else None,
                 _json_list(specified_staff_ids),
                 _json_list(ranked_candidate_ids),
                 _json_list(notified_candidate_ids),
