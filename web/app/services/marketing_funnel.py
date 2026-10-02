@@ -64,10 +64,6 @@ def ensure_marketing_tables(
             CREATE INDEX IF NOT EXISTS idx_marketing_events_session
             ON marketing_events(session_id);
 
-
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_marketing_events_unique_key
-            ON marketing_events(event_name, event_key)
-            WHERE event_key IS NOT NULL;
             """
         )
         columns = {
@@ -81,13 +77,14 @@ def ensure_marketing_tables(
             conn.execute(
                 "ALTER TABLE marketing_events ADD COLUMN event_key TEXT"
             )
-            conn.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_marketing_events_unique_key
-                ON marketing_events(event_name, event_key)
-                WHERE event_key IS NOT NULL
-                """
-            )
+
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_marketing_events_unique_key
+            ON marketing_events(event_name, event_key)
+            WHERE event_key IS NOT NULL
+            """
+        )
 
         conn.commit()
 
