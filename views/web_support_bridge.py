@@ -6,6 +6,7 @@ from typing import Any
 import discord
 
 from core.permissions import is_customer_staff
+from services.ai_support_knowledge import capture_learning_candidate
 from services.web_support_chat import (
     STATUS_HUMAN,
     STATUS_WAITING_HUMAN,
@@ -485,10 +486,10 @@ async def handle_web_support_thread_message(message: discord.Message) -> None:
                 int(session["id"]),
                 sender_type=SENDER_SYSTEM,
                 sender_display_name="系統",
-                body=f"真人客服 {staff_name} 已接手，接下來將由真人回覆。",
+                body=f"{staff_name} 已接手，接下來將由真人回覆。",
             )
 
-    add_message(
+    staff_message = add_message(
         int(session["id"]),
         sender_type=SENDER_STAFF,
         sender_discord_id=str(message.author.id),
@@ -496,3 +497,15 @@ async def handle_web_support_thread_message(message: discord.Message) -> None:
         body=text,
         discord_message_id=str(message.id),
     )
+
+    try:
+        capture_learning_candidate(
+            session_id=int(session["id"]),
+            answer_message_id=int(staff_message["id"]),
+        )
+    except Exception as exc:
+        print(
+            "[support-ai-learning] candidate capture failed "
+            f"{type(exc).__name__}",
+            flush=True,
+        )

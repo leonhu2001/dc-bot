@@ -6,6 +6,7 @@ from typing import Any
 
 import aiohttp
 
+from services.ai_support_knowledge import find_relevant_knowledge
 from web.app.config import config
 
 HUMAN_REQUEST_PATTERNS = (
@@ -152,7 +153,7 @@ def _catalog_context() -> str:
     return "\n".join(lines)[:6000]
 
 
-def _official_knowledge() -> str:
+def _official_knowledge(message: str = "") -> str:
     catalog = _catalog_context()
 
     rules = (
@@ -173,10 +174,28 @@ def _official_knowledge() -> str:
             + catalog
         )
 
+    relevant = find_relevant_knowledge(message, limit=5)
+    if relevant:
+        learned_lines = []
+        for item in relevant:
+            question = str(item.get("question") or "").strip()
+            answer = str(item.get("answer") or "").strip()
+            if not question or not answer:
+                continue
+            learned_lines.append(
+                f"- 問：{question[:800]}\n  核准答案：{answer[:1400]}"
+            )
+
+        if learned_lines:
+            rules += (
+                "\n\n總管已核准的客服知識（只在與本題相關時使用）：\n"
+                + "\n".join(learned_lines)
+            )
+
     return rules
 
 
-def _system_prompt() -> str:
+def _system_prompt(message: str = "") -> str:
     return (
         "你是魔丸娛樂網站客服助理。請使用繁體中文，回答簡潔、自然、友善。"
         "只根據下方官方客服知識與對話內容回答；不知道就直接說不確定，不要自行捏造價格、規則、"
@@ -186,7 +205,7 @@ def _system_prompt() -> str:
         "如果問題涉及退款、付款異常、客訴、帳密、隱私、人工改金額、錢包調帳或需要人工判斷，"
         "請只告知需要轉真人客服，不要做財務承諾，也不要要求對方提供敏感資料。"
         "\n\n"
-        + _official_knowledge()
+        + _official_knowledge(message)
     )
 
 
@@ -349,7 +368,7 @@ async def generate_ai_response(
     if is_responses_api:
         payload = {
             "model": model,
-            "instructions": _system_prompt(),
+            "instructions": _system_prompt(message),
             "input": input_items,
             "max_output_tokens": 500,
             "store": False,
@@ -358,7 +377,7 @@ async def generate_ai_response(
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": _system_prompt()},
+                {"role": "system", "content": _system_prompt(message)},
                 *input_items,
             ],
             "temperature": 0.2,
