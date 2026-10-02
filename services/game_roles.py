@@ -24,6 +24,18 @@ class GameRole:
 GAME_ROLES: tuple[GameRole, ...] = (
     # Delta Force
     GameRole(
+        key="delta_desktop",
+        game="delta_force",
+        role_id="1555453406041088131",
+        label="三角洲<端遊>",
+    ),
+    GameRole(
+        key="delta_mobile",
+        game="delta_force",
+        role_id="1555453449066254417",
+        label="三角洲<手遊>",
+    ),
+    GameRole(
         key="delta_top_protector",
         game="delta_force",
         role_id="1500234130871550004",
@@ -42,7 +54,21 @@ GAME_ROLES: tuple[GameRole, ...] = (
         label="魔丸♜男護",
     ),
 
+    # Steam
+    GameRole(
+        key="steam_game",
+        game="steam",
+        role_id="1555629210922516590",
+        label="Steam",
+    ),
+
     # League of Legends
+    GameRole(
+        key="lol_game",
+        game="lol",
+        role_id="1555629055553048627",
+        label="英雄聯盟",
+    ),
     GameRole(
         key="lol_elite",
         game="lol",
@@ -64,6 +90,12 @@ GAME_ROLES: tuple[GameRole, ...] = (
 
     # APEX Legends
     GameRole(
+        key="apex_game",
+        game="apex",
+        role_id="1555628951336910968",
+        label="APEX",
+    ),
+    GameRole(
         key="apex_predator",
         game="apex",
         role_id="1545364166834135100",
@@ -83,6 +115,12 @@ GAME_ROLES: tuple[GameRole, ...] = (
     ),
 
     # 特戰英豪
+    GameRole(
+        key="valorant_game",
+        game="valorant",
+        role_id="1555629001102598224",
+        label="特戰英豪",
+    ),
     GameRole(
         key="valorant_radiant",
         game="valorant",
