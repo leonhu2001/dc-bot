@@ -66,10 +66,23 @@ def _public_session(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _session_matches_identity(
+    request: Request,
+    session: dict[str, Any],
+) -> bool:
+    current_id, _ = _identity(request)
+    stored_id = str(session.get("customer_discord_id") or "").strip() or None
+
+    if stored_id is None:
+        return True
+
+    return current_id is not None and str(current_id) == stored_id
+
+
 def _get_existing_session(request: Request) -> dict[str, Any]:
     token = str(request.session.get("web_support_token") or "").strip()
     session = get_session_by_token(token) if token else None
-    if session is None:
+    if session is None or not _session_matches_identity(request, session):
         raise HTTPException(status_code=404, detail="客服對話尚未建立")
     return session
 
@@ -79,7 +92,11 @@ def _get_or_create_session(request: Request) -> dict[str, Any]:
     token = str(request.session.get("web_support_token") or "").strip()
     session = get_session_by_token(token) if token else None
 
-    if session is None or str(session.get("status") or "") == STATUS_CLOSED:
+    if (
+        session is None
+        or str(session.get("status") or "") == STATUS_CLOSED
+        or not _session_matches_identity(request, session)
+    ):
         session = create_session(
             customer_discord_id=discord_id,
             customer_display_name=display_name,
