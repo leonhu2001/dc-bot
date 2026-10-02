@@ -21,6 +21,7 @@ from web.app.services.role_catalog import (
     receiver_labels_from_roles,
 )
 from web.app.services.staff_service import sync_staff_members_from_discord
+from web.app.services.admin_service import write_admin_audit_log
 
 
 router = APIRouter(tags=["admin-staff"])
@@ -50,6 +51,25 @@ def get_member_receiver_labels(member: WebStaffMember) -> list[str]:
         role_ids = []
 
     return receiver_labels_from_roles(role_ids)
+
+
+def _staff_directory_snapshot(db) -> dict:
+    members = list(
+        db.scalars(
+            select(WebStaffMember)
+        ).all()
+    )
+
+    return {
+        "total": len(members),
+        "active": sum(1 for item in members if bool(item.is_active)),
+        "manager": sum(1 for item in members if bool(item.is_manager)),
+        "customer_service": sum(
+            1 for item in members if bool(item.is_customer_service)
+        ),
+        "worker": sum(1 for item in members if bool(item.is_worker)),
+        "companion": sum(1 for item in members if bool(item.is_companion)),
+    }
 
 
 def prepare_member_labels(members: list[WebStaffMember]) -> list[WebStaffMember]:
@@ -251,7 +271,23 @@ async def run_admin_staff_sync(request: Request):
     db = SessionLocal()
 
     try:
+        before = _staff_directory_snapshot(db)
         result = sync_staff_members_from_discord(db)
+        after = _staff_directory_snapshot(db)
+
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="sync_staff_members_from_discord",
+            target_type="staff_directory",
+            target_id="discord",
+            before=before,
+            after={
+                **after,
+                "sync_result": result,
+            },
+        )
+
         db.commit()
         query = {"message": build_sync_message(result)}
     except Exception as exc:
