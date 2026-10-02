@@ -152,6 +152,78 @@ def capture_first_touch(
     return attribution
 
 
+def export_marketing_session(
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    session_id = str(
+        session.get(MARKETING_SESSION_KEY)
+        or ""
+    ).strip()
+
+    attribution = session.get(
+        MARKETING_ATTRIBUTION_KEY
+    )
+
+    result: dict[str, Any] = {}
+
+    if len(session_id) >= 16:
+        result[MARKETING_SESSION_KEY] = session_id
+
+    if isinstance(attribution, dict) and attribution:
+        result[MARKETING_ATTRIBUTION_KEY] = {
+            key: _clean(
+                attribution.get(key),
+                500 if key == "referrer" else 180,
+            )
+            for key in (
+                "source",
+                "medium",
+                "campaign",
+                "content",
+                "term",
+                "referrer",
+            )
+        }
+
+    return result
+
+
+def restore_marketing_session(
+    session: dict[str, Any],
+    preserved: dict[str, Any] | None,
+) -> None:
+    if not isinstance(preserved, dict):
+        return
+
+    session_id = str(
+        preserved.get(MARKETING_SESSION_KEY)
+        or ""
+    ).strip()
+
+    if len(session_id) >= 16:
+        session[MARKETING_SESSION_KEY] = session_id
+
+    attribution = preserved.get(
+        MARKETING_ATTRIBUTION_KEY
+    )
+
+    if isinstance(attribution, dict) and attribution:
+        session[MARKETING_ATTRIBUTION_KEY] = {
+            key: _clean(
+                attribution.get(key),
+                500 if key == "referrer" else 180,
+            )
+            for key in (
+                "source",
+                "medium",
+                "campaign",
+                "content",
+                "term",
+                "referrer",
+            )
+        }
+
+
 def get_attribution(session: dict[str, Any]) -> dict[str, str]:
     data = session.get(MARKETING_ATTRIBUTION_KEY)
     if not isinstance(data, dict):
