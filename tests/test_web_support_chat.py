@@ -5,6 +5,8 @@ from web.app.services.ai_support import (
     _extract_chat_completions_text,
     _extract_responses_text,
     _history_input,
+    _provider_error_summary,
+    _response_usage,
     detect_handoff_reason,
     local_faq_response,
 )
@@ -178,3 +180,28 @@ def test_ai_history_only_keeps_customer_and_reply_context():
         {"role": "assistant", "content": "客服補充"},
         {"role": "user", "content": "怎麼下單"},
     ]
+
+
+def test_provider_error_summary_does_not_need_raw_response_text():
+    payload = {
+        "error": {
+            "code": "model_not_found",
+            "message": "The requested model does not exist.",
+        }
+    }
+
+    assert _provider_error_summary(payload) == (
+        "model_not_found: The requested model does not exist."
+    )
+
+
+def test_response_usage_supports_responses_api_shape():
+    payload = {
+        "usage": {
+            "input_tokens": 123,
+            "output_tokens": 45,
+            "total_tokens": 168,
+        }
+    }
+
+    assert _response_usage(payload) == (123, 45, 168)
