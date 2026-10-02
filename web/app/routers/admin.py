@@ -24,6 +24,7 @@ from web.app.services.admin_service import (
     set_manual_worker_payout,
     set_worker_payout_status,
     toggle_named_bonus_for_assignment,
+    write_admin_audit_log,
 )
 from web.app.services.order_service import (
     create_demo_orders_if_empty,
@@ -1445,6 +1446,7 @@ async def admin_dashboard(
 async def admin_cancel_order(
     order_id: int,
     request: Request,
+    reason: str | None = Form(default=None),
 ):
     user = require_admin_user(request)
 
@@ -1455,17 +1457,42 @@ async def admin_cancel_order(
 
     try:
         row = db.execute(
-            text("SELECT id FROM web_orders WHERE id = :order_id"),
+            text(
+                """
+                SELECT id, bot_order_no, status, customer_discord_id,
+                       customer_display_name, amount, customer_pay_amount,
+                       payment_method, ticket_channel_id
+                FROM web_orders
+                WHERE id = :order_id
+                """
+            ),
             {"order_id": order_id},
-        ).fetchone()
+        ).mappings().first()
 
         if row is None:
             return redirect_to_admin(error="找不到這筆訂單。")
+
+        before = dict(row)
 
         db.execute(
             text("UPDATE web_orders SET status = 'cancelled' WHERE id = :order_id"),
             {"order_id": order_id},
         )
+
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="cancel_order",
+            target_type="web_order",
+            target_id=str(order_id),
+            before=before,
+            after={
+                **before,
+                "status": "cancelled",
+                "reason": str(reason or "客服後台取消").strip(),
+            },
+        )
+
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -1487,6 +1514,19 @@ async def admin_sync_staff(request: Request):
 
     try:
         result = sync_staff_members_from_discord(db)
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="sync_staff_members",
+            target_type="staff_directory",
+            target_id="discord_sync",
+            after={
+                "total_seen": result.get("total_seen", result.get("scanned")),
+                "synced_count": result.get("synced_count", result.get("written")),
+                "disabled_count": result.get("disabled_count"),
+                "message": result.get("message"),
+            },
+        )
         db.commit()
     except Exception as e:
         db.rollback()
@@ -3913,6 +3953,18 @@ async def admin_order_internal_note_r6(
             db
         )
 
+        before_meta = db.execute(
+            text(
+                """
+                SELECT internal_note
+                FROM web_admin_order_meta
+                WHERE order_id = :order_id
+                LIMIT 1
+                """
+            ),
+            {"order_id": int(order_id)},
+        ).mappings().first()
+
 
         db.execute(
             text(
@@ -3978,6 +4030,24 @@ async def admin_order_internal_note_r6(
             },
         )
 
+
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="update_order_internal_note",
+            target_type="web_order",
+            target_id=str(order_id),
+            before={
+                "internal_note": (
+                    before_meta.get("internal_note")
+                    if before_meta
+                    else ""
+                ),
+            },
+            after={
+                "internal_note": internal_note,
+            },
+        )
 
         db.commit()
 
@@ -4117,6 +4187,18 @@ async def admin_order_attention_r6(
             db
         )
 
+        before_meta = db.execute(
+            text(
+                """
+                SELECT needs_attention, attention_reason
+                FROM web_admin_order_meta
+                WHERE order_id = :order_id
+                LIMIT 1
+                """
+            ),
+            {"order_id": int(order_id)},
+        ).mappings().first()
+
 
         db.execute(
             text(
@@ -4190,6 +4272,30 @@ async def admin_order_attention_r6(
             },
         )
 
+
+        write_admin_audit_log(
+            db,
+            admin_user=user,
+            action="update_order_attention",
+            target_type="web_order",
+            target_id=str(order_id),
+            before={
+                "needs_attention": (
+                    bool(before_meta.get("needs_attention"))
+                    if before_meta
+                    else False
+                ),
+                "attention_reason": (
+                    before_meta.get("attention_reason")
+                    if before_meta
+                    else ""
+                ),
+            },
+            after={
+                "needs_attention": bool(enabled_value),
+                "attention_reason": attention_reason,
+            },
+        )
 
         db.commit()
 
