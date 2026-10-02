@@ -88,6 +88,16 @@
             異常偵測
         </a>
 
+
+        {% if user and user.is_manager %}
+            <a
+                class="{% if _p.startswith('/admin/marketing') %}active{% endif %}"
+                href="/admin/marketing"
+            >
+                行銷漏斗
+            </a>
+        {% endif %}
+
         <a
             class="{% if _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
             href="/admin/accounting-reconciliation"
