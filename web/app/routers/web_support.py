@@ -66,6 +66,14 @@ def _public_session(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _get_existing_session(request: Request) -> dict[str, Any]:
+    token = str(request.session.get("web_support_token") or "").strip()
+    session = get_session_by_token(token) if token else None
+    if session is None:
+        raise HTTPException(status_code=404, detail="客服對話尚未建立")
+    return session
+
+
 def _get_or_create_session(request: Request) -> dict[str, Any]:
     discord_id, display_name = _identity(request)
     token = str(request.session.get("web_support_token") or "").strip()
@@ -88,7 +96,7 @@ def _get_or_create_session(request: Request) -> dict[str, Any]:
     return session
 
 
-@router.get("/bootstrap")
+@router.post("/bootstrap")
 async def bootstrap_chat(request: Request):
     session = _get_or_create_session(request)
     messages = list_messages(int(session["id"]), limit=200)
@@ -119,7 +127,7 @@ async def poll_messages(
     request: Request,
     after_id: int = 0,
 ):
-    session = _get_or_create_session(request)
+    session = _get_existing_session(request)
     messages = list_messages(
         int(session["id"]),
         after_id=max(0, int(after_id or 0)),
