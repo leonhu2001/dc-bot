@@ -101,7 +101,7 @@ def test_oauth_return_path_rejects_open_redirects():
     for unsafe in (
         "https://evil.example/",
         "//evil.example/",
-        "\\evil.example\share",
+        r"\\evil.example\share",
         "javascript:alert(1)",
         "",
     ):
@@ -164,6 +164,7 @@ def _setup_customer_db(path: Path) -> None:
                     'MO-OWNER-B',
                     '222',
                     'B',
+                    '英雄聯盟',
                     '陪玩',
                     1,
                     600,
