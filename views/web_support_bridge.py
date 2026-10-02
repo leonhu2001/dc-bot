@@ -18,6 +18,10 @@ from services.web_support_chat import (
     get_session_by_notification_message,
     get_session_by_thread_id,
     list_pending_handoffs,
+    list_bridged_active_sessions,
+    list_messages,
+    list_undelivered_customer_messages,
+    mark_message_delivered_to_discord,
     recent_customer_text,
     set_discord_bridge,
 )
@@ -351,6 +355,80 @@ async def web_support_bridge_loop(bot: discord.Client) -> None:
                     "客服直接在這裡輸入訊息即可同步給客人；"
                     "第一則真人回覆會自動視為接手。"
                 )
+
+                history = list_messages(
+                    int(session["id"]),
+                    limit=12,
+                )
+                transcript_lines: list[str] = []
+                for item in history:
+                    sender = str(item.get("sender_type") or "")
+                    body = str(item.get("body") or "").strip()
+                    if not body:
+                        continue
+                    label = {
+                        "customer": "客人",
+                        "ai": "AI",
+                        "system": "系統",
+                        "staff": "客服",
+                    }.get(sender, sender or "訊息")
+                    transcript_lines.append(
+                        f"**{label}：** {body[:500]}"
+                    )
+
+                if transcript_lines:
+                    transcript = "\n".join(transcript_lines)
+                    await thread.send(
+                        "### 轉接前對話\n"
+                        + transcript[:1800]
+                    )
+
+                for item in history:
+                    if str(item.get("sender_type") or "") == "customer":
+                        mark_message_delivered_to_discord(
+                            int(item["id"])
+                        )
+
+            for session in list_bridged_active_sessions(limit=100):
+                thread_id = str(session.get("discord_thread_id") or "").strip()
+                if not thread_id:
+                    continue
+
+                thread = channel.guild.get_thread(int(thread_id))
+                if thread is None:
+                    try:
+                        fetched = await bot.fetch_channel(int(thread_id))
+                        thread = fetched if isinstance(fetched, discord.Thread) else None
+                    except (
+                        discord.NotFound,
+                        discord.Forbidden,
+                        discord.HTTPException,
+                    ):
+                        thread = None
+
+                if thread is None:
+                    continue
+
+                for item in list_undelivered_customer_messages(
+                    int(session["id"]),
+                    limit=50,
+                ):
+                    body = str(item.get("body") or "").strip()
+                    if not body:
+                        mark_message_delivered_to_discord(int(item["id"]))
+                        continue
+
+                    customer_name = str(
+                        session.get("customer_display_name")
+                        or "網站訪客"
+                    ).strip()
+                    sent = await thread.send(
+                        f"🌐 **{customer_name}：** {body[:1700]}"
+                    )
+                    mark_message_delivered_to_discord(
+                        int(item["id"]),
+                        discord_message_id=sent.id,
+                    )
 
         except Exception as exc:
             print(
