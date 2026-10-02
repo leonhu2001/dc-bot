@@ -24,12 +24,17 @@ def get_eligible_dispatch_candidate_ids(
     *,
     allowed_role_ids: Iterable[str | int],
     specified_staff_ids: Iterable[str | int] = (),
+    required_platform_role_id: str | int | None = None,
 ) -> list[str]:
     allowed = {
         str(role_id)
         for role_id in allowed_role_ids
         if str(role_id).strip()
     }
+    required_platform_role = str(
+        required_platform_role_id
+        or ""
+    ).strip()
 
     result: list[str] = []
 
@@ -43,7 +48,13 @@ def get_eligible_dispatch_candidate_ids(
             if getattr(role, "id", None) is not None
         }
 
-        if member_roles & allowed:
+        if (
+            member_roles & allowed
+            and (
+                not required_platform_role
+                or required_platform_role in member_roles
+            )
+        ):
             result.append(str(member.id))
 
     # 指定人員在建立訂單前已由訂單規則驗證過；
@@ -70,6 +81,7 @@ def prepare_initial_smart_dispatch(
     allowed_role_ids: list[str],
     specified_staff_ids: list[str],
     required_staff_count: int,
+    required_platform_role_id: str | int | None = None,
     excluded_staff_ids: Iterable[str | int] = (),
     db_file: str | Path | None = None,
 ) -> dict:
@@ -77,6 +89,7 @@ def prepare_initial_smart_dispatch(
         guild,
         allowed_role_ids=allowed_role_ids,
         specified_staff_ids=specified_staff_ids,
+        required_platform_role_id=required_platform_role_id,
     )
 
     excluded = {
@@ -143,7 +156,12 @@ def prepare_initial_smart_dispatch(
         )
     else:
         role_mentions = []
-        for role_id in allowed_role_ids:
+        fallback_role_ids = (
+            [required_platform_role_id]
+            if required_platform_role_id
+            else list(allowed_role_ids)
+        )
+        for role_id in fallback_role_ids:
             try:
                 role = guild.get_role(int(role_id))
             except (TypeError, ValueError):
@@ -164,6 +182,11 @@ def prepare_initial_smart_dispatch(
     return {
         "ranked_candidate_ids": ranked_ids,
         "initial_notified_ids": initial_ids,
+        "required_platform_role_id": (
+            str(required_platform_role_id)
+            if required_platform_role_id
+            else None
+        ),
         "content": "\n".join(lines),
     }
 
@@ -322,10 +345,15 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                 # 如果 Bot 曾離線到超過完整擴大時間，直接做最終通知，
                 # 避免重啟瞬間連發第二輪 + 第三輪兩則提醒。
                 if age >= FULL_EXPANSION_SECONDS and stage < 2:
+                    final_role_ids = (
+                        [plan.get("required_platform_role_id")]
+                        if plan.get("required_platform_role_id")
+                        else (plan.get("allowed_role_ids") or [])
+                    )
                     role_mentions = (
                         _role_mentions(
                             guild,
-                            plan.get("allowed_role_ids") or [],
+                            final_role_ids,
                         )
                         if unrestricted_missing > 0
                         else []
@@ -350,7 +378,11 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                     if role_mentions:
                         lines.append(
-                            "剩餘非指定名額已擴大通知全部符合資格身分組："
+                            (
+                                "剩餘非指定名額已擴大通知對應三角洲平台身分組："
+                                if plan.get("required_platform_role_id")
+                                else "剩餘非指定名額已擴大通知全部符合資格身分組："
+                            )
                             + " ".join(role_mentions)
                         )
 
