@@ -9,6 +9,8 @@ from pathlib import Path
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from web.app.services.audit_trail import write_audit_event
+
 
 router = APIRouter(prefix="/admin/staff_profiles", tags=["admin-staff-profiles"])
 
@@ -722,12 +724,13 @@ async def update_staff_profile_page(
     if not _is_admin(request):
         return RedirectResponse(url="/login", status_code=303)
 
+    user = request.session.get("user") or {}
     _ensure_tables()
 
     conn = _connect()
     try:
         row = conn.execute(
-            "SELECT staff_discord_id FROM staff_profiles WHERE staff_discord_id = ?",
+            "SELECT * FROM staff_profiles WHERE staff_discord_id = ?",
             (str(staff_discord_id),),
         ).fetchone()
 
@@ -759,8 +762,31 @@ async def update_staff_profile_page(
             ),
         )
         conn.commit()
+        after_row = conn.execute(
+            "SELECT * FROM staff_profiles WHERE staff_discord_id = ?",
+            (str(staff_discord_id),),
+        ).fetchone()
+        before_snapshot = dict(row)
+        after_snapshot = dict(after_row) if after_row is not None else None
     finally:
         conn.close()
+
+    try:
+        write_audit_event(
+            admin_user=user,
+            action="update_staff_profile",
+            target_type="staff_profile",
+            target_id=str(staff_discord_id),
+            before=before_snapshot,
+            after=after_snapshot,
+            db_file=_db_path(),
+        )
+    except Exception as audit_exc:
+        print(
+            f"[audit-trail] update_staff_profile failed: "
+            f"{type(audit_exc).__name__}: {audit_exc}",
+            flush=True,
+        )
 
     return RedirectResponse(url="/admin/staff_profiles/", status_code=303)
 
@@ -773,14 +799,18 @@ async def toggle_staff_profile_public(
     if not _is_admin(request):
         return RedirectResponse(url="/login", status_code=303)
 
+    user = request.session.get("user") or {}
     _ensure_tables()
 
     conn = _connect()
     try:
         row = conn.execute(
-            "SELECT is_public FROM staff_profiles WHERE staff_discord_id = ?",
+            "SELECT * FROM staff_profiles WHERE staff_discord_id = ?",
             (str(staff_discord_id),),
         ).fetchone()
+
+        before_snapshot = dict(row) if row is not None else None
+        after_snapshot = None
 
         if row is not None:
             next_value = 0 if int(row["is_public"] or 0) == 1 else 1
@@ -794,7 +824,30 @@ async def toggle_staff_profile_public(
                 (next_value, str(staff_discord_id)),
             )
             conn.commit()
+            after_row = conn.execute(
+                "SELECT * FROM staff_profiles WHERE staff_discord_id = ?",
+                (str(staff_discord_id),),
+            ).fetchone()
+            after_snapshot = dict(after_row) if after_row is not None else None
     finally:
         conn.close()
+
+    if before_snapshot is not None:
+        try:
+            write_audit_event(
+                admin_user=user,
+                action="toggle_staff_profile_public",
+                target_type="staff_profile",
+                target_id=str(staff_discord_id),
+                before=before_snapshot,
+                after=after_snapshot,
+                db_file=_db_path(),
+            )
+        except Exception as audit_exc:
+            print(
+                f"[audit-trail] toggle_staff_profile_public failed: "
+                f"{type(audit_exc).__name__}: {audit_exc}",
+                flush=True,
+            )
 
     return RedirectResponse(url="/admin/staff_profiles/", status_code=303)
