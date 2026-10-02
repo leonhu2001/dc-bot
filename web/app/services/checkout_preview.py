@@ -21,8 +21,12 @@ from services.order_rules import (
     ORDER_RULES,
     ROLE_IDS,
     calculate_price,
+    get_allowed_role_ids,
     get_allowed_role_keys,
+    get_required_game_role_ids,
+    get_required_game_role_keys,
     get_required_staff_count,
+    role_ids_match_requirements,
 )
 
 from web.app.services.public_checkout import (
@@ -704,6 +708,13 @@ def _choose_role_key(
     rule,
     role_ids: set[str],
 ) -> str | None:
+
+    if not role_ids_match_requirements(
+        role_ids,
+        get_allowed_role_ids(rule),
+        get_required_game_role_ids(rule),
+    ):
+        return None
 
     matched = [
         role_key
@@ -2696,10 +2707,18 @@ def eligible_rule_keys_for_role_keys(
             continue
 
 
+        allowed_keys = set(
+            get_allowed_role_keys(rule)
+        )
+        required_game_keys = set(
+            get_required_game_role_keys(rule)
+        )
+
         if (
-            role_set
-            & set(
-                get_allowed_role_keys(rule)
+            role_set & allowed_keys
+            and (
+                not required_game_keys
+                or role_set & required_game_keys
             )
         ):
 
@@ -3071,6 +3090,11 @@ def build_staff_order_filter(
                 "allowed_roles":
                     list(
                         get_allowed_role_keys(rule)
+                    ),
+
+                "required_game_roles":
+                    list(
+                        get_required_game_role_keys(rule)
                     ),
 
                 "allow_specify":
