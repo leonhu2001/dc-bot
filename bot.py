@@ -139,7 +139,6 @@ from services.logging_service import (
 from services.smart_dispatch import (
     create_smart_dispatch_plan,
     ensure_smart_dispatch_tables,
-    get_delta_dispatch_platform_role_id,
     get_smart_dispatch_plan,
     set_specified_dm_results,
 )
@@ -6447,7 +6446,7 @@ async def resume_stored_order(
 
     resume_smart_dispatch = None
     resume_allowed_role_ids: list[str] = []
-    resume_required_platform_role_id: str | None = None
+    resume_required_game_role_ids: list[str] = []
     resume_specified_staff_ids = [
         str(item)
         for item in (
@@ -6467,7 +6466,10 @@ async def resume_stored_order(
         and acceptance_order_id is not None
     ):
         try:
-            from services.order_rules import get_allowed_role_ids
+            from services.order_rules import (
+                get_allowed_role_ids,
+                get_required_game_role_ids,
+            )
 
             resume_rule = _get_rule_from_self_service_data(
                 data
@@ -6475,12 +6477,8 @@ async def resume_stored_order(
             resume_allowed_role_ids = get_allowed_role_ids(
                 resume_rule
             )
-            resume_required_platform_role_id = (
-                get_delta_dispatch_platform_role_id(
-                    category_key=resume_rule.category,
-                    rule_key=resume_rule.key,
-                    item_label=resume_rule.label,
-                )
+            resume_required_game_role_ids = get_required_game_role_ids(
+                resume_rule
             )
             accepted_ids = {
                 str(claim.staff_discord_id)
@@ -6502,9 +6500,7 @@ async def resume_stored_order(
                 allowed_role_ids=resume_allowed_role_ids,
                 specified_staff_ids=resume_unresolved_specified_ids,
                 required_staff_count=remaining_count,
-                required_platform_role_id=(
-                    resume_required_platform_role_id
-                ),
+                required_game_role_ids=resume_required_game_role_ids,
                 excluded_staff_ids=accepted_ids,
             )
         except Exception as exc:
@@ -6582,9 +6578,7 @@ async def resume_stored_order(
                 ),
                 allowed_role_ids=resume_allowed_role_ids,
                 specified_staff_ids=resume_specified_staff_ids,
-                required_platform_role_id=(
-                    resume_required_platform_role_id
-                ),
+                required_game_role_ids=resume_required_game_role_ids,
                 ranked_candidate_ids=resume_smart_dispatch[
                     "ranked_candidate_ids"
                 ],
@@ -6991,13 +6985,26 @@ def _is_specify_preference(value: str | None) -> bool:
 
 
 def _role_key_for_member(rule, member: discord.Member):
-    from services.order_rules import ALL_ROLE_IDS, get_allowed_role_keys
+    from services.order_rules import (
+        ALL_ROLE_IDS,
+        get_allowed_role_ids,
+        get_allowed_role_keys,
+        get_required_game_role_ids,
+        role_ids_match_requirements,
+    )
 
     member_role_ids = {
         str(role.id)
         for role in getattr(member, "roles", [])
         if getattr(role, "id", None) is not None
     }
+
+    if not role_ids_match_requirements(
+        member_role_ids,
+        get_allowed_role_ids(rule),
+        get_required_game_role_ids(rule),
+    ):
+        return None
 
     matched = [
         role_key
@@ -7537,6 +7544,7 @@ async def create_waiting_acceptance_order_from_self_service(
     from services.order_rules import (
         calculate_price,
         get_allowed_role_ids,
+        get_required_game_role_ids,
         get_required_staff_count,
         build_order_rule_snapshot,
         rule_role_labels,
@@ -7567,6 +7575,7 @@ async def create_waiting_acceptance_order_from_self_service(
     amount = int(price_adjustment["customer_pay_amount"] or 0)
     payout_base_amount = int(price_adjustment["payout_base_amount"] or amount)
     allowed_role_ids_for_rule = get_allowed_role_ids(rule)
+    required_game_role_ids_for_rule = get_required_game_role_ids(rule)
 
     rule_snapshot = build_order_rule_snapshot(
         rule,
@@ -7574,6 +7583,7 @@ async def create_waiting_acceptance_order_from_self_service(
         player_count=player_count,
         required_staff_count=required_staff_count,
         allowed_role_ids=allowed_role_ids_for_rule,
+        required_game_role_ids=required_game_role_ids_for_rule,
         specified_staff_ids=specified_staff_ids,
     )
 
@@ -7715,20 +7725,12 @@ async def create_waiting_acceptance_order_from_self_service(
     if not rule.point_benefits_allowed:
         embed.add_field(name="點數福利", value="此分類不可使用點數福利", inline=False)
 
-    required_platform_role_id = (
-        get_delta_dispatch_platform_role_id(
-            category_key=rule.category,
-            rule_key=rule.key,
-            item_label=rule.label,
-        )
-    )
-
     smart_dispatch = prepare_initial_smart_dispatch(
         guild,
         allowed_role_ids=allowed_role_ids_for_rule,
         specified_staff_ids=specified_staff_ids,
         required_staff_count=required_staff_count,
-        required_platform_role_id=required_platform_role_id,
+        required_game_role_ids=required_game_role_ids_for_rule,
     )
 
     dispatch_message = await dispatch_channel.send(
@@ -7839,6 +7841,7 @@ async def create_waiting_acceptance_order_from_self_service(
         required_staff_count=required_staff_count,
         min_protector_count=int(rule.min_protector_count or 0),
         allowed_role_ids=allowed_role_ids_for_rule,
+        required_game_role_ids=required_game_role_ids_for_rule,
         specified_staff_ids=specified_staff_ids,
         point_benefits_allowed=bool(rule.point_benefits_allowed),
         status=WAITING_ACCEPTANCE,
@@ -7853,7 +7856,7 @@ async def create_waiting_acceptance_order_from_self_service(
             required_staff_count=required_staff_count,
             allowed_role_ids=allowed_role_ids_for_rule,
             specified_staff_ids=specified_staff_ids,
-            required_platform_role_id=required_platform_role_id,
+            required_game_role_ids=required_game_role_ids_for_rule,
             ranked_candidate_ids=smart_dispatch["ranked_candidate_ids"],
             notified_candidate_ids=smart_dispatch["initial_notified_ids"],
         )
@@ -14728,7 +14731,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     resend_acceptance_state = None
     resend_smart_dispatch = None
     resend_allowed_role_ids: list[str] = []
-    resend_required_platform_role_id: str | None = None
+    resend_required_game_role_ids: list[str] = []
     resend_specified_staff_ids = [
         str(item)
         for item in data.get("specified_staff_ids") or []
@@ -14748,7 +14751,10 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
                 WAITING_ACCEPTANCE,
                 get_acceptance_state,
             )
-            from services.order_rules import get_allowed_role_ids
+            from services.order_rules import (
+                get_allowed_role_ids,
+                get_required_game_role_ids,
+            )
 
             resend_acceptance_state = get_acceptance_state(
                 int(resend_order_id)
@@ -14765,12 +14771,8 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
                 resend_allowed_role_ids = get_allowed_role_ids(
                     resend_rule
                 )
-                resend_required_platform_role_id = (
-                    get_delta_dispatch_platform_role_id(
-                        category_key=resend_rule.category,
-                        rule_key=resend_rule.key,
-                        item_label=resend_rule.label,
-                    )
+                resend_required_game_role_ids = get_required_game_role_ids(
+                    resend_rule
                 )
                 accepted_ids = {
                     str(claim.staff_discord_id)
@@ -14798,9 +14800,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
                         allowed_role_ids=resend_allowed_role_ids,
                         specified_staff_ids=resend_unresolved_specified_ids,
                         required_staff_count=remaining_count,
-                        required_platform_role_id=(
-                            resend_required_platform_role_id
-                        ),
+                        required_game_role_ids=resend_required_game_role_ids,
                         excluded_staff_ids=accepted_ids,
                     )
                 )
@@ -14903,9 +14903,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
                 ),
                 allowed_role_ids=resend_allowed_role_ids,
                 specified_staff_ids=resend_specified_staff_ids,
-                required_platform_role_id=(
-                    resend_required_platform_role_id
-                ),
+                required_game_role_ids=resend_required_game_role_ids,
                 ranked_candidate_ids=resend_smart_dispatch[
                     "ranked_candidate_ids"
                 ],
@@ -15400,6 +15398,23 @@ def _web_order_created_details(bundle: dict) -> dict:
         )
     )
 
+    required_game_role_ids = (
+        _web_order_created_json_list(
+            acceptance.get(
+                "required_game_role_ids_json"
+            )
+        )
+    )
+
+    if not required_game_role_ids:
+        required_game_role_ids = (
+            _web_order_created_json_list(
+                rule_snapshot.get(
+                    "required_game_role_ids"
+                )
+            )
+        )
+
     if not specified_staff_ids:
         specified_staff_ids = (
             _web_order_created_json_list(
@@ -15584,6 +15599,7 @@ def _web_order_created_details(bundle: dict) -> dict:
         "request_key": request_key,
         "specified_staff_ids": specified_staff_ids,
         "allowed_role_ids": allowed_role_ids,
+        "required_game_role_ids": required_game_role_ids,
         "required_staff_count": max(
             1,
             int(
@@ -16310,14 +16326,6 @@ async def _web_order_created_ensure_dispatch(
         bundle
     )
 
-    required_platform_role_id = (
-        get_delta_dispatch_platform_role_id(
-            category_key=details.get("category_key"),
-            rule_key=details.get("rule_key"),
-            item_label=details.get("item"),
-        )
-    )
-
     smart_dispatch = prepare_initial_smart_dispatch(
         guild,
         allowed_role_ids=list(
@@ -16332,7 +16340,10 @@ async def _web_order_created_ensure_dispatch(
             details.get("required_staff_count")
             or 1
         ),
-        required_platform_role_id=required_platform_role_id,
+        required_game_role_ids=list(
+            details.get("required_game_role_ids")
+            or []
+        ),
     )
 
     (
@@ -16427,7 +16438,10 @@ async def _web_order_created_ensure_dispatch(
                     details.get("specified_staff_ids")
                     or []
                 ),
-                required_platform_role_id=required_platform_role_id,
+                required_game_role_ids=list(
+                    details.get("required_game_role_ids")
+                    or []
+                ),
                 ranked_candidate_ids=smart_dispatch[
                     "ranked_candidate_ids"
                 ],
