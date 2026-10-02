@@ -371,7 +371,10 @@ for key, label, price, staff_count, required_game_roles in [
         required_staff_count=staff_count,
         allow_specify=True,
         max_specified_count=staff_count,
-        specify_fee_by_role=_all_receiver_fee(100),
+        specify_fee_by_role={
+            role: 100
+            for role in COMPANION_ROLES
+        },
         specify_free_min_units=2,
         specify_free_basis="quantity",
         service_bonus_buy=5,
@@ -587,7 +590,7 @@ _add(OrderRule(
 
 _add(OrderRule(
     "valorant", "valorant_entertain", "特戰英豪｜娛樂陪", "hourly", 350, "H",
-    allowed_roles=ALL_RECEIVER_ROLES,
+    allowed_roles=COMPANION_ROLES,
     required_game_roles=VALORANT_GAME_ROLE,
     required_staff_count="player_count",
     player_count_enabled=True,
