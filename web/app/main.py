@@ -136,6 +136,12 @@ def _rate_limit_spec(request: Request) -> tuple[str, int, int] | None:
     if path.startswith("/discord-avatar/"):
         return ("avatar", 120, 60)
 
+    if (
+        request.method.upper() in _UNSAFE_METHODS
+        and is_sensitive_path(path)
+    ):
+        return ("sensitive-write", 20, 60)
+
     if request.method.upper() in _UNSAFE_METHODS and _is_admin_path(path):
         return ("admin-write", 60, 60)
 
