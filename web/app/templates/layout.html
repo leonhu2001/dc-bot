@@ -10,6 +10,17 @@
         content="width=device-width,initial-scale=1"
     >
 
+
+    <meta
+        name="csrf-token"
+        content="{{ request.session.get('csrf_token', '') }}"
+    >
+
+    <script
+        src="/static/js/csrf.js?v=1"
+        defer
+    ></script>
+
     <title>
         {{ title or "魔丸娛樂" }}
     </title>
