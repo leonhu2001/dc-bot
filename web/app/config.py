@@ -94,9 +94,18 @@ class WebConfig:
 
     # Website support AI is optional. When unset, the chat widget and human
     # handoff still work and a conservative local FAQ responder is used.
-    AI_SUPPORT_API_URL = os.getenv("AI_SUPPORT_API_URL", "").strip()
-    AI_SUPPORT_API_KEY = os.getenv("AI_SUPPORT_API_KEY", "").strip()
-    AI_SUPPORT_MODEL = os.getenv("AI_SUPPORT_MODEL", "").strip()
+    AI_SUPPORT_API_URL = os.getenv(
+        "AI_SUPPORT_API_URL",
+        "https://api.openai.com/v1/responses",
+    ).strip()
+    AI_SUPPORT_API_KEY = (
+        os.getenv("AI_SUPPORT_API_KEY", "").strip()
+        or os.getenv("OPENAI_API_KEY", "").strip()
+    )
+    AI_SUPPORT_MODEL = os.getenv(
+        "AI_SUPPORT_MODEL",
+        "gpt-6-luna",
+    ).strip()
     AI_SUPPORT_TIMEOUT_SECONDS = max(
         3,
         min(
