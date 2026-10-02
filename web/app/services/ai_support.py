@@ -106,16 +106,173 @@ def local_faq_response(message: str) -> str:
     )
 
 
+def _catalog_context() -> str:
+    try:
+        from services.orders import (
+            ORDER_CATEGORY_LABELS,
+            SELF_SERVICE_ORDER_CATALOG,
+        )
+    except Exception:
+        return ""
+
+    lines: list[str] = []
+
+    for category_key, products in SELF_SERVICE_ORDER_CATALOG.items():
+        category_label = str(
+            ORDER_CATEGORY_LABELS.get(category_key)
+            or category_key
+        ).strip()
+
+        product_lines: list[str] = []
+
+        for product in products:
+            product_label = str(product.get("label") or "").strip()
+            if not product_label:
+                continue
+
+            detail_labels = [
+                str(item.get("label") or "").strip()
+                for item in (product.get("details") or [])
+                if str(item.get("label") or "").strip()
+            ]
+
+            if detail_labels:
+                product_lines.append(
+                    f"{product_label}（{'、'.join(detail_labels[:12])}）"
+                )
+            else:
+                product_lines.append(product_label)
+
+        if product_lines:
+            lines.append(
+                f"- {category_label}："
+                + "、".join(product_lines[:24])
+            )
+
+    return "\n".join(lines)[:6000]
+
+
+def _official_knowledge() -> str:
+    catalog = _catalog_context()
+
+    rules = (
+        "官方客服知識：\n"
+        "- 所有訂單應透過官方網站或官方客服建立，禁止私單、跳單與私下交易。\n"
+        "- 最新價格、活動價格、實際可下單規格一律以網站「立即下單」頁當下顯示為準。\n"
+        "- 客服時間為 AM 10:00－AM 02:00。\n"
+        "- 陪玩單以陪伴、互動及娛樂體驗為主，不包卡；技術表現不是一般陪玩單的客訴依據。\n"
+        "- 護航單、趣味單與其他服務的細節規則，以網站「下單須知」及實際訂單內容為準。\n"
+        "- 對訂單有疑慮，應於服務完成後 72 小時內聯絡客服。\n"
+        "- 退款、付款異常、客訴、帳密、隱私、人工改金額、錢包調帳都必須轉真人處理。\n"
+        "- 不可要求客人把帳號密碼、付款證明敏感內容直接提供給 AI。"
+    )
+
+    if catalog:
+        rules += (
+            "\n\n目前網站可選服務分類與品項名稱（不代表即時價格或庫存）：\n"
+            + catalog
+        )
+
+    return rules
+
+
 def _system_prompt() -> str:
     return (
-        "你是魔丸娛樂網站客服助理。請使用繁體中文，回答簡潔、友善、不要自行捏造價格或規則。"
-        "價格一律以網站即時下單頁為準。"
-        "你可以回答：一般服務內容、下單方式、VIP/點數、付款方式、接單流程、網站操作。"
-        "你不可以處理或要求使用者提供：退款核准、人工改金額、錢包調帳、付款證明內容、"
-        "訂單帳號密碼、其他顧客資料、後台資料。"
-        "如果問題涉及退款、付款異常、客訴、帳密、隱私或需要人工判斷，"
-        "請明確告知需要轉真人客服，且不要做任何財務承諾。"
+        "你是魔丸娛樂網站客服助理。請使用繁體中文，回答簡潔、自然、友善。"
+        "只根據下方官方客服知識與對話內容回答；不知道就直接說不確定，不要自行捏造價格、規則、"
+        "折扣、可接人力、完成時間或退款結果。"
+        "若客人詢問最新價格，請引導至網站「立即下單」查看即時價格。"
+        "你可以回答一般服務內容、下單方式、VIP/點數、付款方式、接單流程、網站操作。"
+        "如果問題涉及退款、付款異常、客訴、帳密、隱私、人工改金額、錢包調帳或需要人工判斷，"
+        "請只告知需要轉真人客服，不要做財務承諾，也不要要求對方提供敏感資料。"
+        "\n\n"
+        + _official_knowledge()
     )
+
+
+def _history_input(
+    message: str,
+    history: list[dict[str, Any]] | None,
+) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+
+    for item in (history or [])[-8:]:
+        sender = str(item.get("sender_type") or "")
+        body = str(item.get("body") or "").strip()
+        if not body:
+            continue
+
+        if sender == "customer":
+            role = "user"
+        elif sender in {"ai", "staff"}:
+            role = "assistant"
+        else:
+            continue
+
+        items.append(
+            {
+                "role": role,
+                "content": body[:2000],
+            }
+        )
+
+    current = str(message or "").strip()[:2000]
+    if not items or items[-1].get("content") != current:
+        items.append(
+            {
+                "role": "user",
+                "content": current,
+            }
+        )
+
+    return items
+
+
+def _extract_responses_text(data: Any) -> str:
+    if not isinstance(data, dict):
+        return ""
+
+    direct = str(data.get("output_text") or "").strip()
+    if direct:
+        return direct
+
+    chunks: list[str] = []
+
+    for item in data.get("output") or []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type") or "") != "message":
+            continue
+
+        for content in item.get("content") or []:
+            if not isinstance(content, dict):
+                continue
+            if str(content.get("type") or "") != "output_text":
+                continue
+
+            text = str(content.get("text") or "").strip()
+            if text:
+                chunks.append(text)
+
+    return "\n".join(chunks).strip()
+
+
+def _extract_chat_completions_text(data: Any) -> str:
+    if not isinstance(data, dict):
+        return ""
+
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+
+    return str(
+        first.get("message", {}).get("content")
+        or ""
+    ).strip()
 
 
 async def generate_ai_response(
@@ -126,9 +283,10 @@ async def generate_ai_response(
     """
     Returns (reply, used_external_ai).
 
-    Provider contract is intentionally OpenAI-compatible but fully configurable
-    through AI_SUPPORT_API_URL / API_KEY / MODEL. If unavailable or malformed,
-    fall back to the conservative local FAQ responder.
+    The default integration uses OpenAI's Responses API. A custom
+    OpenAI-compatible Chat Completions endpoint can still be supplied through
+    AI_SUPPORT_API_URL. If the provider is unavailable or unconfigured, the
+    conservative local FAQ responder remains available.
     """
     api_url = str(config.AI_SUPPORT_API_URL or "").strip()
     api_key = str(config.AI_SUPPORT_API_KEY or "").strip()
@@ -137,32 +295,28 @@ async def generate_ai_response(
     if not api_url or not api_key or not model:
         return local_faq_response(message), False
 
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": _system_prompt()},
-    ]
+    input_items = _history_input(message, history)
 
-    for item in (history or [])[-8:]:
-        sender = str(item.get("sender_type") or "")
-        body = str(item.get("body") or "").strip()
-        if not body:
-            continue
-        if sender == "customer":
-            role = "user"
-        elif sender in {"ai", "staff"}:
-            role = "assistant"
-        else:
-            continue
-        messages.append({"role": role, "content": body[:2000]})
+    is_responses_api = api_url.rstrip("/").endswith("/responses")
 
-    if not messages or messages[-1].get("content") != str(message).strip():
-        messages.append({"role": "user", "content": str(message).strip()[:2000]})
-
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": 0.2,
-        "max_tokens": 500,
-    }
+    if is_responses_api:
+        payload = {
+            "model": model,
+            "instructions": _system_prompt(),
+            "input": input_items,
+            "max_output_tokens": 500,
+            "store": False,
+        }
+    else:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": _system_prompt()},
+                *input_items,
+            ],
+            "temperature": 0.2,
+            "max_tokens": 500,
+        }
 
     timeout = aiohttp.ClientTimeout(
         total=int(config.AI_SUPPORT_TIMEOUT_SECONDS or 12)
@@ -183,16 +337,11 @@ async def generate_ai_response(
 
                 data = await response.json(content_type=None)
 
-        choices = data.get("choices") if isinstance(data, dict) else None
-        if not isinstance(choices, list) or not choices:
-            return local_faq_response(message), False
-
-        content = (
-            choices[0].get("message", {}).get("content")
-            if isinstance(choices[0], dict)
-            else None
+        reply = (
+            _extract_responses_text(data)
+            if is_responses_api
+            else _extract_chat_completions_text(data)
         )
-        reply = str(content or "").strip()
 
         if not reply:
             return local_faq_response(message), False
@@ -201,3 +350,4 @@ async def generate_ai_response(
 
     except Exception:
         return local_faq_response(message), False
+

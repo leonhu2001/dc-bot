@@ -2,6 +2,9 @@ import sqlite3
 
 from services import web_support_chat
 from web.app.services.ai_support import (
+    _extract_chat_completions_text,
+    _extract_responses_text,
+    _history_input,
     detect_handoff_reason,
     local_faq_response,
 )
@@ -125,3 +128,53 @@ def test_local_faq_does_not_invent_prices():
     reply = local_faq_response("這個多少錢")
     assert "立即下單" in reply
     assert "為準" in reply
+
+
+def test_responses_api_output_parser():
+    payload = {
+        "output": [
+            {
+                "type": "message",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": "您好，這是 AI 回覆。",
+                    }
+                ],
+            }
+        ]
+    }
+
+    assert _extract_responses_text(payload) == "您好，這是 AI 回覆。"
+
+
+def test_chat_completions_output_parser_kept_for_custom_provider():
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": "相容模式回覆",
+                }
+            }
+        ]
+    }
+
+    assert _extract_chat_completions_text(payload) == "相容模式回覆"
+
+
+def test_ai_history_only_keeps_customer_and_reply_context():
+    history = [
+        {"sender_type": "system", "body": "不要送進 AI"},
+        {"sender_type": "customer", "body": "有 VIP 嗎"},
+        {"sender_type": "ai", "body": "有會員制度"},
+        {"sender_type": "staff", "body": "客服補充"},
+    ]
+
+    items = _history_input("怎麼下單", history)
+
+    assert items == [
+        {"role": "user", "content": "有 VIP 嗎"},
+        {"role": "assistant", "content": "有會員制度"},
+        {"role": "assistant", "content": "客服補充"},
+        {"role": "user", "content": "怎麼下單"},
+    ]
