@@ -795,3 +795,177 @@ html body.mw-r5-admin *::-webkit-scrollbar-thumb {
         grid-template-columns: 1fr !important;
     }
 }
+
+
+/* Dashboard / operational list normalization */
+html body.mw-r5-admin .mw-r5-nav a:last-child,
+html body.mw-r5-layout .mw-r5-nav a:last-child {
+    margin-top: 12px !important;
+    border-top-color: rgba(255,255,255,.055) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .queues {
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .panel-head,
+html body.mw-r5-admin .mw-r5-legacy-body .orders-top {
+    min-height: 52px !important;
+    padding: 10px 14px !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    background: var(--admin-panel-3) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .panel-head strong,
+html body.mw-r5-admin .mw-r5-legacy-body .orders-top h2 {
+    color: var(--admin-text) !important;
+    font-size: 14px !important;
+    font-weight: 750 !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .count {
+    min-width: 24px !important;
+    min-height: 22px !important;
+    color: var(--admin-gold-soft) !important;
+    border-color: rgba(214,176,90,.25) !important;
+    background: rgba(214,176,90,.06) !important;
+    font-size: 10.5px !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .queue-row {
+    min-height: 62px !important;
+    padding: 10px 13px !important;
+    border-bottom: 1px solid var(--admin-border-soft) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .queue-row:hover {
+    background: rgba(255,255,255,.018) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .queue-no,
+html body.mw-r5-admin .mw-r5-legacy-body .order-no {
+    color: var(--admin-gold-soft) !important;
+    font-size: 11px !important;
+    font-weight: 750 !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .queue-main strong,
+html body.mw-r5-admin .mw-r5-legacy-body .primary,
+html body.mw-r5-admin .mw-r5-legacy-body .money {
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .queue-main small,
+html body.mw-r5-admin .mw-r5-legacy-body .secondary,
+html body.mw-r5-admin .mw-r5-legacy-body .orders-top small {
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .orders-panel {
+    overflow: hidden !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    background: var(--admin-panel) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .filters {
+    gap: 8px !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .order-head {
+    min-height: 40px !important;
+    padding: 0 13px !important;
+    color: var(--admin-muted) !important;
+    background: #0f1317 !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: .025em !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .order-row {
+    min-height: 66px !important;
+    padding: 9px 13px !important;
+    border-bottom: 1px solid var(--admin-border-soft) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .order-row:hover {
+    background: rgba(255,255,255,.018) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .workspace {
+    border-color: var(--admin-border) !important;
+    background: rgba(255,255,255,.025) !important;
+}
+
+html body.mw-r5-admin .mw-admin-inline-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    margin: 0 0 12px !important;
+}
+
+/* Staff detail rows */
+html body.mw-r5-admin .mw-r5-legacy-body .sh .row {
+    padding: 11px 12px !important;
+    border-bottom: 1px solid var(--admin-border-soft) !important;
+    color: var(--admin-text-soft) !important;
+    font-size: 12px !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .sh .item {
+    padding: 11px 12px !important;
+    border-bottom: 1px solid var(--admin-border-soft) !important;
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .sh .g {
+    color: var(--admin-gold-soft) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .sh .m {
+    color: var(--admin-muted) !important;
+}
+
+/* Keep destructive / warning semantics readable when legacy classes exist. */
+html body.mw-r5-layout :is(.danger,.destructive,.badge.cancelled),
+html body.mw-r5-admin :is(.danger,.destructive,.badge.cancelled) {
+    color: #efa6a6 !important;
+}
+
+html body.mw-r5-layout :is(.success,.badge.active),
+html body.mw-r5-admin :is(.success,.badge.active) {
+    color: #a9dfbb !important;
+}
+
+/* Prevent old parchment/light-theme payout rules from bleeding into backoffice. */
+html body.mw-r5-layout .staff-summary-page,
+html body.mw-r5-layout .history-ledger-page {
+    color: var(--admin-text) !important;
+    background: transparent !important;
+}
+
+html body.mw-r5-layout :is(.staff-summary-ledger-head,.history-ledger-head) {
+    color: var(--admin-text) !important;
+    background: var(--admin-panel-3) !important;
+    border-color: var(--admin-border) !important;
+}
+
+html body.mw-r5-layout :is(.staff-money,.staff-count-main,.staff-count-sub) {
+    color: var(--admin-text-soft) !important;
+    text-shadow: none !important;
+}
+
+/* Tighter, consistent desktop canvas. */
+@media (min-width: 1500px) {
+    html body.mw-r5-layout .mw-r5-main-host,
+    html body.mw-r5-admin .mw-r5-main-host {
+        padding-left: 38px !important;
+        padding-right: 38px !important;
+    }
+}
