@@ -1504,11 +1504,28 @@ async def bulk_update_order_history(request: Request):
             submitted_closed_at = history_normalize_date(form.get(f"closed_date_{order_id}"))
 
             original_row = conn.execute(
-                "SELECT closed_at FROM web_orders WHERE id = ?",
+                "SELECT status, closed_at FROM web_orders WHERE id = ?",
                 (order_id,),
             ).fetchone()
 
-            original_closed_at = history_normalize_date(original_row[0]) if original_row else ""
+            original_status = (
+                history_safe_status(original_row[0])
+                if original_row
+                else status
+            )
+
+            # 歷史頁不能繞過正式取消流程。已結單／已取消是終態；
+            # 若要取消其他狀態，請到訂單工作區選擇取消原因。
+            if original_status in {"closed", "cancelled"}:
+                status = original_status
+            elif status == "cancelled":
+                status = original_status
+
+            original_closed_at = (
+                history_normalize_date(original_row[1])
+                if original_row
+                else ""
+            )
             should_update_closed_at = bool(
                 submitted_closed_at and submitted_closed_at != original_closed_at
             )
