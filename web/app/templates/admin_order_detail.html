@@ -1238,7 +1238,7 @@ body.mw-r5-admin
                 {% for history in customer_history %}
 
                     <a
-                        href="/admin/order-workspace/{{ history.id }}"
+                        href="/admin/order-workspace/{{ history.id }}?return_to=/admin/order-workspace/{{ order.id }}"
                     >
 
                         <strong>
