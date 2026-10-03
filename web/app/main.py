@@ -35,6 +35,7 @@ from web.app.routers.admin_ai_operations import router as admin_ai_operations_ro
 from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
 from web.app.routers.admin_order_rules import router as admin_order_rules_router
+from web.app.routers.admin_centers import router as admin_centers_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
 from web.app.routers.admin_payout_summary import router as admin_payout_summary_router
 from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
@@ -508,6 +509,7 @@ app.include_router(admin_ai_operations_router)
 app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
 app.include_router(admin_order_rules_router)
+app.include_router(admin_centers_router)
 app.include_router(admin_payouts_router)
 app.include_router(admin_payout_summary_router)
 app.include_router(admin_payout_exports_router)
