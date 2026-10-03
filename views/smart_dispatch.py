@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
 import discord
 
+SMART_DISPATCH_ALERT_CHANNEL_ID = 1555881625844191322
+REPEAT_REMINDER_SECONDS = 600
+
 from services.order_rules import role_ids_match_requirements
 from services.smart_dispatch import (
     FIRST_EXPANSION_SECONDS,
-    FULL_EXPANSION_SECONDS,
-    choose_initial_candidate_ids,
+        choose_initial_candidate_ids,
     complete_smart_dispatch_plan,
     list_pending_smart_dispatch_plans,
     mark_smart_dispatch_stage,
@@ -308,8 +311,8 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     continue
 
                 try:
-                    channel_id = int(str(plan.get("dispatch_channel_id") or "0"))
-                    message_id = int(str(plan.get("dispatch_message_id") or "0"))
+                    dispatch_channel_id = int(str(plan.get("dispatch_channel_id") or "0"))
+                    dispatch_message_id = int(str(plan.get("dispatch_message_id") or "0"))
                 except (TypeError, ValueError):
                     complete_smart_dispatch_plan(
                         order_id,
@@ -317,11 +320,12 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                channel = guild.get_channel(channel_id)
-                if not isinstance(channel, discord.TextChannel):
-                    complete_smart_dispatch_plan(
+                alert_channel = guild.get_channel(SMART_DISPATCH_ALERT_CHANNEL_ID)
+                if not isinstance(alert_channel, discord.TextChannel):
+                    mark_smart_dispatch_stage(
                         order_id,
-                        reason="dispatch_channel_missing",
+                        stage=int(plan.get("stage") or 0),
+                        last_error="smart_dispatch_alert_channel_missing",
                     )
                     continue
 
@@ -363,110 +367,8 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     required_count - int(state.accepted_count or 0),
                 )
                 jump_url = (
-                    f"https://discord.com/channels/{guild.id}/{channel_id}/{message_id}"
+                    f"https://discord.com/channels/{guild.id}/{dispatch_channel_id}/{dispatch_message_id}"
                 )
-
-                # 如果 Bot 曾離線到超過完整擴大時間，直接做最終通知，
-                # 避免重啟瞬間連發第二輪 + 第三輪兩則提醒。
-                if age >= FULL_EXPANSION_SECONDS and stage < 2:
-                    has_game_gate = bool(
-                        plan.get("required_game_role_ids") or []
-                    )
-                    role_mentions = (
-                        _role_mentions(
-                            guild,
-                            plan.get("allowed_role_ids") or [],
-                        )
-                        if unrestricted_missing > 0 and not has_game_gate
-                        else []
-                    )
-                    final_user_ids = (
-                        [
-                            worker_id
-                            for worker_id in (plan.get("ranked_candidate_ids") or [])
-                            if (
-                                worker_id in currently_eligible_ids
-                                and worker_id not in accepted_ids
-                                and worker_id not in specified_ids
-                            )
-                        ]
-                        if unrestricted_missing > 0 and has_game_gate
-                        else []
-                    )
-
-                    lines = [
-                        "⚠️ **派單仍缺人｜最終擴大通知**",
-                        f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
-                    ]
-
-                    if unresolved_specified:
-                        lines.append(
-                            "尚未接單的指定人員："
-                            + " ".join(
-                                f"<@{worker_id}>"
-                                for worker_id in unresolved_specified
-                            )
-                        )
-                        lines.append(
-                            "指定名額不可由其他人直接代接；若需更換指定，請由客服調整訂單。"
-                        )
-
-                    if final_user_ids:
-                        lines.append(
-                            "剩餘非指定名額通知全部目前符合資格人員："
-                            + " ".join(
-                                f"<@{worker_id}>"
-                                for worker_id in final_user_ids
-                            )
-                        )
-                    elif role_mentions:
-                        lines.append(
-                            "剩餘非指定名額已擴大通知全部符合資格身分組："
-                            + " ".join(role_mentions)
-                        )
-
-                    support_mention = (
-                        _customer_service_role_mention(
-                            bot,
-                            guild,
-                        )
-                    )
-                    if support_mention:
-                        lines.append(
-                            "🚨 **客服介入提醒**｜"
-                            f"{support_mention} "
-                            "智慧派單已完成全量擴大，"
-                            f"目前仍缺 **{missing} 人**，"
-                            "請客服確認人力、指定名額或是否需要存單／取消。"
-                        )
-
-                    lines.append(f"原派單：{jump_url}")
-
-                    try:
-                        await channel.send(
-                            "\n".join(lines),
-                            allowed_mentions=discord.AllowedMentions(
-                                users=True,
-                                roles=bool(
-                                    role_mentions
-                                    or support_mention
-                                ),
-                                everyone=False,
-                            ),
-                        )
-                    except (discord.Forbidden, discord.HTTPException) as exc:
-                        mark_smart_dispatch_stage(
-                            order_id,
-                            stage=stage,
-                            last_error=f"full_expansion: {type(exc).__name__}: {exc}",
-                        )
-                        continue
-
-                    complete_smart_dispatch_plan(
-                        order_id,
-                        reason="full_expansion_sent",
-                    )
-                    continue
 
                 if age >= FIRST_EXPANSION_SECONDS and stage < 1:
                     next_ids = []
@@ -515,10 +417,10 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                                 )
                             )
 
-                        lines.append(f"原派單：{jump_url}")
+                        lines.append(f"前往原派單：{jump_url}")
 
                         try:
-                            await channel.send(
+                            await alert_channel.send(
                                 "\n".join(lines),
                                 allowed_mentions=discord.AllowedMentions(
                                     users=True,
@@ -539,6 +441,70 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         stage=1,
                         newly_notified_ids=next_ids,
                     )
+                    continue
+
+                if stage >= 1:
+                    updated_text = str(plan.get("updated_at") or "").strip()
+                    try:
+                        updated = datetime.fromisoformat(updated_text.replace("Z", "+00:00"))
+                    except ValueError:
+                        updated = None
+
+                    if updated is not None:
+                        if updated.tzinfo is None:
+                            updated = updated.replace(tzinfo=timezone.utc)
+                        seconds_since_update = max(
+                            0,
+                            int((datetime.now(timezone.utc) - updated.astimezone(timezone.utc)).total_seconds()),
+                        )
+                    else:
+                        seconds_since_update = REPEAT_REMINDER_SECONDS
+
+                    if seconds_since_update < REPEAT_REMINDER_SECONDS:
+                        continue
+
+                    repeat_ids = list(dict.fromkeys([
+                        *unresolved_specified,
+                        *[
+                            worker_id
+                            for worker_id in (plan.get("ranked_candidate_ids") or [])
+                            if (
+                                worker_id in currently_eligible_ids
+                                and worker_id not in accepted_ids
+                                and worker_id not in specified_ids
+                            )
+                        ],
+                    ]))
+
+                    if repeat_ids:
+                        lines = [
+                            "📣 **派單仍缺人｜10 分鐘提醒**",
+                            f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
+                            " ".join(f"<@{worker_id}>" for worker_id in repeat_ids),
+                            f"前往原派單：{jump_url}",
+                        ]
+
+                        try:
+                            await alert_channel.send(
+                                "\n".join(lines),
+                                allowed_mentions=discord.AllowedMentions(
+                                    users=True,
+                                    roles=False,
+                                    everyone=False,
+                                ),
+                            )
+                        except (discord.Forbidden, discord.HTTPException) as exc:
+                            mark_smart_dispatch_stage(
+                                order_id,
+                                stage=stage,
+                                last_error=f"repeat_reminder: {type(exc).__name__}: {exc}",
+                            )
+                            continue
+
+                    mark_smart_dispatch_stage(
+                        order_id,
+                        stage=1,
+                    )
 
         except Exception as exc:
             print(
@@ -548,3 +514,4 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
             )
 
         await asyncio.sleep(60)
+
