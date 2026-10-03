@@ -67,6 +67,50 @@ def test_specified_staff_cannot_bypass_game_requirement():
     assert result == ["2"]
 
 
+
+
+def test_sweet_order_gender_rules_filter_smart_dispatch_candidates():
+    from services.order_rules import ROLE_IDS
+    from views.smart_dispatch import get_eligible_dispatch_candidate_ids
+
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+
+    class Member:
+        def __init__(self, member_id, role_ids):
+            self.id = member_id
+            self.bot = False
+            self.roles = [Role(role_id) for role_id in role_ids]
+
+    female = ROLE_IDS["female_companion"]
+    male = ROLE_IDS["male_companion"]
+
+    class Guild:
+        members = [
+            Member(1, [female]),
+            Member(2, [male]),
+            Member(3, [female, male]),
+            Member(4, []),
+        ]
+
+    female_only = get_eligible_dispatch_candidate_ids(
+        Guild(),
+        allowed_role_ids=[female],
+    )
+    male_only = get_eligible_dispatch_candidate_ids(
+        Guild(),
+        allowed_role_ids=[male],
+    )
+    unrestricted_double = get_eligible_dispatch_candidate_ids(
+        Guild(),
+        allowed_role_ids=[female, male],
+    )
+
+    assert female_only == ["1", "3"]
+    assert male_only == ["2", "3"]
+    assert unrestricted_double == ["1", "2", "3"]
+
 def _setup_assignment_db(path):
     with sqlite3.connect(path) as conn:
         conn.executescript(
