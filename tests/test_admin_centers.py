@@ -12,6 +12,7 @@ def _make_web_db(path):
                 username TEXT,
                 display_name TEXT,
                 global_name TEXT,
+                roles_json TEXT,
                 is_active INTEGER,
                 is_customer_service INTEGER,
                 is_worker INTEGER,
@@ -68,7 +69,7 @@ def _make_web_db(path):
         conn.execute(
             """
             INSERT INTO web_staff_members
-            VALUES ('1','u1','雞腿',NULL,1,0,1,0)
+            VALUES ('1','u1','雞腿',NULL,'["1500234130871550004"]',1,0,1,0)
             """
         )
         conn.execute(
@@ -164,3 +165,20 @@ def test_customer_center_does_not_expose_wallets_without_manager_access(tmp_path
     assert customers["stats"]["wallet_count"] == 0
     assert customers["stats"]["wallet_total"] == 0
     assert customers["rows"][0]["wallet_balance"] == 0
+
+
+def test_staff_center_filters_replace_legacy_staff_list(tmp_path, monkeypatch):
+    web_db = tmp_path / "web_dashboard.db"
+    _make_web_db(web_db)
+    monkeypatch.setattr(admin_centers, "WEB_DB", web_db)
+
+    active = admin_centers._staff_snapshot(status="active")
+    assert len(active["rows"]) == 1
+
+    inactive = admin_centers._staff_snapshot(status="inactive")
+    assert inactive["rows"] == []
+
+    by_role = admin_centers._staff_snapshot(
+        role="1500234130871550004",
+    )
+    assert [row["discord_id"] for row in by_role["rows"]] == ["1"]
