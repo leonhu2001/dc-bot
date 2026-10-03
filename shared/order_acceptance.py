@@ -717,17 +717,43 @@ def resume_acceptance_order(order_id: int, *, source: str = "resume") -> Accepta
     return get_acceptance_state(int(order_id))
 
 
-def cancel_acceptance_order(order_id: int, *, source: str = "cancelled") -> AcceptanceState:
+def cancel_acceptance_order(
+    order_id: int,
+    *,
+    source: str = "cancelled",
+    cancellation_reason_code: str | None = None,
+    cancellation_reason_text: str | None = None,
+    actor_discord_id: str | int | None = None,
+) -> AcceptanceState:
     ensure_acceptance_tables()
 
     with engine.begin() as conn:
-        _set_acceptance_lifecycle_status(
+        meta = _get_meta(conn, int(order_id))
+        _ = meta
+        transition_order_state_in_connection(
             conn,
             order_id=int(order_id),
-            status="cancelled",
-            deactivate_claims=True,
-            source=source,
+            target_status="cancelled",
+            source=f"acceptance_lifecycle:{source or 'cancelled'}",
+            reason=cancellation_reason_text or "付款前接單訂單取消",
+            actor_discord_id=actor_discord_id,
+            cancellation_reason_code=cancellation_reason_code,
+            cancellation_reason_text=cancellation_reason_text,
         )
+
+        now = _now_text()
+        conn.execute(text("""
+            UPDATE order_acceptance_claims
+            SET is_active = 0,
+                source = :source,
+                unclaimed_at = COALESCE(unclaimed_at, :unclaimed_at)
+            WHERE order_id = :order_id
+              AND is_active = 1
+        """), {
+            "source": str(source or "cancelled"),
+            "unclaimed_at": now,
+            "order_id": int(order_id),
+        })
 
     return get_acceptance_state(int(order_id))
 
