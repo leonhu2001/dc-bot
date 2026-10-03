@@ -100,10 +100,10 @@
         {% endif %}
 
         <a
-            class="{% if _p.startswith('/admin/anomalies') %}active{% endif %}"
+            class="{% if _p.startswith('/admin/anomalies') or _p.startswith('/admin/system') or _p.startswith('/admin/audit') %}active{% endif %}"
             href="/admin/anomalies"
         >
-            異常偵測
+            系統維運
         </a>
 
 
@@ -117,24 +117,17 @@
         {% endif %}
 
         <a
+            class="{% if _p.startswith('/admin/order-rules') %}active{% endif %}"
+            href="/admin/order-rules"
+        >
+            商品與規則
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
             href="/admin/accounting-reconciliation"
         >
             帳務對帳
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/system') %}active{% endif %}"
-            href="/admin/system"
-        >
-            系統健康
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/audit') %}active{% endif %}"
-            href="/admin/audit"
-        >
-            操作紀錄
         </a>
 
         <a href="/">

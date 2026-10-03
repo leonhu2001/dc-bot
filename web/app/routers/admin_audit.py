@@ -42,6 +42,10 @@ ACTION_LABELS = {
     "toggle_staff_profile_public": "切換個人牆公開狀態",
     "bulk_set_payout_status": "批次更新薪資狀態",
     "set_person_payout_status": "更新單一人員薪資狀態",
+    "retry_sync_event": "重新排入同步事件",
+    "publish_order_rule": "發布商品規則",
+    "rollback_order_rule": "回復商品規則版本",
+    "reset_order_rule": "恢復商品規則預設",
 }
 
 
@@ -59,6 +63,8 @@ TARGET_TYPE_LABELS = {
     "staff_profile": "人員個人牆",
     "payout_batch": "薪資批次",
     "payout_person": "人員薪資",
+    "sync_event": "同步事件",
+    "order_rule": "商品規則",
 }
 
 

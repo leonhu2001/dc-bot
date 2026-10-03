@@ -19,6 +19,8 @@ _SENSITIVE_PATH_PREFIXES = (
     "/admin/payment-reviews",
     "/admin/topups",
     "/admin/accounting-reconciliation",
+    "/admin/order-rules",
+    "/admin/anomalies",
     "/admin/payouts/summary",
     "/admin/audit",
     "/admin/system",

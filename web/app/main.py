@@ -21,6 +21,7 @@ from services.support_calls import ensure_support_call_tables
 from services.smart_dispatch import ensure_smart_dispatch_tables
 from services.web_support_chat import ensure_web_support_tables
 from services.ai_support_knowledge import ensure_ai_support_knowledge_tables
+from services.order_rule_store import ensure_order_rule_store
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -33,6 +34,7 @@ from web.app.routers.admin_ai_support_knowledge import router as admin_ai_suppor
 from web.app.routers.admin_ai_operations import router as admin_ai_operations_router
 from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
+from web.app.routers.admin_order_rules import router as admin_order_rules_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
 from web.app.routers.admin_payout_summary import router as admin_payout_summary_router
 from web.app.routers.admin_payout_exports import router as admin_payout_exports_router
@@ -80,6 +82,7 @@ _MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/marketing",
     "/admin/ai-support-knowledge",
     "/admin/ai-operations",
+    "/admin/order-rules",
     # 客服可以查看分潤與匯出資料；只有下列會改發放狀態的端點限總管。
     "/admin/payouts/summary/mark-paid",
     "/admin/payouts/summary/mark-unpaid",
@@ -504,6 +507,7 @@ app.include_router(admin_ai_support_knowledge_router)
 app.include_router(admin_ai_operations_router)
 app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
+app.include_router(admin_order_rules_router)
 app.include_router(admin_payouts_router)
 app.include_router(admin_payout_summary_router)
 app.include_router(admin_payout_exports_router)
@@ -525,6 +529,7 @@ async def startup_event():
     ensure_web_support_tables()
     ensure_ai_support_knowledge_tables()
     ensure_marketing_tables()
+    ensure_order_rule_store()
 
     if config.AI_SUPPORT_API_KEY:
         print(
