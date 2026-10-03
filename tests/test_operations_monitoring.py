@@ -70,6 +70,17 @@ def _setup_db(path):
                 actor_discord_id TEXT,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE order_state_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                from_status TEXT NOT NULL,
+                to_status TEXT NOT NULL,
+                source TEXT NOT NULL,
+                reason TEXT,
+                actor_discord_id TEXT,
+                created_at TEXT NOT NULL
+            );
             """
         )
 
@@ -83,6 +94,10 @@ def test_smart_dispatch_snapshot_measures_fill_and_problem_plans(tmp_path):
     claim1 = (
         plan1.astimezone(timezone.utc)
         + timedelta(minutes=2)
+    ).replace(tzinfo=None)
+    fill1 = (
+        plan1.astimezone(timezone.utc)
+        + timedelta(minutes=3)
     ).replace(tzinfo=None)
     plan2 = now - timedelta(minutes=5)
 
@@ -140,6 +155,18 @@ def test_smart_dispatch_snapshot_measures_fill_and_problem_plans(tmp_path):
             """,
             (claim1.isoformat(),),
         )
+        conn.execute(
+            """
+            INSERT INTO order_state_history (
+                order_id, from_status, to_status, source, created_at
+            )
+            VALUES (
+                1, 'waiting_acceptance', 'accepted_pending_pay',
+                'test', ?
+            )
+            """,
+            (fill1.isoformat(),),
+        )
         conn.commit()
 
     snapshot = build_smart_dispatch_snapshot(
@@ -151,7 +178,7 @@ def test_smart_dispatch_snapshot_measures_fill_and_problem_plans(tmp_path):
     assert snapshot["filled"] == 1
     assert snapshot["fill_rate"] == 50.0
     assert snapshot["avg_first_claim_seconds"] == 120
-    assert snapshot["avg_fill_seconds"] == 120
+    assert snapshot["avg_fill_seconds"] == 180
     assert snapshot["no_candidate"] == 1
     assert snapshot["full_expansion"] == 1
     assert any(row["order_id"] == 2 for row in snapshot["problem_plans"])

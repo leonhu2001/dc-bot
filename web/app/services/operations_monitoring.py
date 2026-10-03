@@ -215,6 +215,7 @@ def build_smart_dispatch_snapshot(
         order_ids = [int(row["order_id"]) for row in plans]
         placeholders = ",".join("?" for _ in order_ids)
         claims_by_order: dict[int, list[datetime]] = defaultdict(list)
+        filled_at_by_order: dict[int, datetime] = {}
 
         if _table_exists(conn, "order_acceptance_claims"):
             claim_rows = conn.execute(
@@ -234,6 +235,27 @@ def build_smart_dispatch_snapshot(
                 if claimed_at is not None:
                     claims_by_order[int(claim["order_id"])].append(
                         claimed_at
+                    )
+
+        if _table_exists(conn, "order_state_history"):
+            fill_rows = conn.execute(
+                f"""
+                SELECT order_id, MIN(created_at) AS filled_at
+                FROM order_state_history
+                WHERE order_id IN ({placeholders})
+                  AND to_status = 'accepted_pending_pay'
+                GROUP BY order_id
+                """,
+                order_ids,
+            ).fetchall()
+            for fill_row in fill_rows:
+                filled_at = _parse_time(
+                    fill_row["filled_at"],
+                    naive_tz=UTC,
+                )
+                if filled_at is not None:
+                    filled_at_by_order[int(fill_row["order_id"])] = (
+                        filled_at
                     )
 
         staff_roles = _active_staff_role_sets(conn)
@@ -266,10 +288,15 @@ def build_smart_dispatch_snapshot(
             if claims
             else None
         )
+        canonical_fill_at = filled_at_by_order.get(order_id)
         fill_seconds = (
-            _seconds_between(created, claims[required - 1])
-            if len(claims) >= required
-            else None
+            _seconds_between(created, canonical_fill_at)
+            if canonical_fill_at is not None
+            else (
+                _seconds_between(created, claims[required - 1])
+                if len(claims) >= required
+                else None
+            )
         )
 
         if first_claim_seconds is not None:
@@ -514,7 +541,11 @@ def build_cancellation_snapshot(
     for row in rows:
         created = _parse_time(
             row["created_at"],
-            naive_tz=TAIPEI_TZ,
+            naive_tz=(
+                UTC
+                if str(row["source"] or "") == "legacy_backfill"
+                else TAIPEI_TZ
+            ),
         )
         if created is None or created.astimezone(TAIPEI_TZ) < cutoff:
             continue

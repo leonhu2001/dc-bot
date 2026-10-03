@@ -980,10 +980,15 @@ document.addEventListener(
 
                                     <td class="history-status-cell">
                                         <select class="history-status-select" name="status_{{ order.id }}">
-                                            <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
-                                            <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
-                                            <option value="closed" {% if order.status == "closed" %}selected{% endif %}>已結單</option>
-                                            <option value="cancelled" {% if order.status == "cancelled" %}selected{% endif %}>取消</option>
+                                            {% if order.status == "cancelled" %}
+                                                <option value="cancelled" selected>已取消</option>
+                                            {% elif order.status == "closed" %}
+                                                <option value="closed" selected>已結單</option>
+                                            {% else %}
+                                                <option value="active" {% if order.status == "active" %}selected{% endif %}>進行中</option>
+                                                <option value="stored" {% if order.status == "stored" %}selected{% endif %}>存單</option>
+                                                <option value="closed">已結單</option>
+                                            {% endif %}
                                         </select>
                                     </td>
 
