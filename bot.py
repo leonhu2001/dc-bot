@@ -9005,7 +9005,7 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
     if category == "steam":
         return False, "Steam遊戲目前不可使用點數福利。"
 
-    if category in {"fun", "title"}:
+    if category in {"fun", "delta_desktop_fun", "title"}:
         return False, "趣味單 / 高難度稱號不可使用點數福利。"
 
     if rule_key.startswith("basic_trial_") or rule_label.startswith("體驗單"):
