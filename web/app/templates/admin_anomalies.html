@@ -31,7 +31,7 @@
             <span class="status-chip {% if health.overall == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
                 {{ health.overall_text }}
             </span>
-            <a class="button secondary" href="/admin/anomalies">重新檢查</a>
+            <a class="button secondary" href="/admin/anomalies?days={{ operations.days }}">重新檢查</a>
         </div>
     </div>
 
@@ -161,6 +161,7 @@
     </div>
 
     <form method="get" action="/admin/anomalies" style="margin-top:14px;">
+        <input type="hidden" name="days" value="{{ operations.days }}">
         <div class="order-meta compact-meta">
             <div>
                 <span>嚴重程度</span>
