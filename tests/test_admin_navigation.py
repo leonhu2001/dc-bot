@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from jinja2 import Environment, FileSystemLoader
+
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "web" / "app" / "templates"
@@ -71,3 +73,11 @@ def test_known_drilldown_pages_keep_explicit_return_paths():
     for filename, marker in expectations.items():
         text = (TEMPLATES / filename).read_text(encoding="utf-8")
         assert marker in text, f"{filename} is missing return navigation"
+
+
+def test_admin_templates_compile_with_jinja():
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES)))
+
+    env.get_template("_admin_sidebar.html")
+    for path in sorted(TEMPLATES.glob("admin*.html")):
+        env.get_template(path.name)
