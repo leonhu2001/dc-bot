@@ -546,7 +546,7 @@ async def public_order(
             "trial",
         }
         excluded_categories = {
-            "fun",
+            "delta_desktop_fun",
             "farm",
         }
 
@@ -569,6 +569,10 @@ async def public_order(
                     or ""
                 )
                 not in excluded_group_keys
+                and not str(
+                    group.get("key")
+                    or ""
+                ).endswith(("_sweet", "_teaching"))
                 and "娛樂陪"
                 not in str(
                     group.get(
@@ -606,7 +610,7 @@ async def public_order(
                 )
                 or ""
             )
-            == "teaching"
+            .endswith("_teaching")
         ]
         category_filter = "all"
 
@@ -1016,9 +1020,12 @@ async def delta_force_landing(
         for group in all_groups
         if (
             str(group.get("category") or "")
-            in {"basic", "fun", "farm"}
-            or str(group.get("key") or "")
-            == "teaching"
+            in {
+                "delta_desktop_basic",
+                "delta_mobile_basic",
+                "delta_desktop_fun",
+                "farm",
+            }
         )
     ][:9]
 
