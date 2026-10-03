@@ -975,6 +975,7 @@
 
                                         {% if user and user.is_manager %}
                                             <form method="post" action="/admin/payouts/summary/person-status">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                                 <input type="hidden" name="month" value="{{ month }}">
                                                 <input type="hidden" name="current_role" value="{{ role }}">
                                                 <input type="hidden" name="person_role" value="{{ row.role }}">
@@ -983,6 +984,7 @@
                                             </form>
 
                                             <form method="post" action="/admin/payouts/summary/person-status">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                                 <input type="hidden" name="month" value="{{ month }}">
                                                 <input type="hidden" name="current_role" value="{{ role }}">
                                                 <input type="hidden" name="person_role" value="{{ row.role }}">
