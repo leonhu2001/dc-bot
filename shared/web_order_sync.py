@@ -174,6 +174,9 @@ def update_web_order_status_by_ticket_channel(
     dispatch_message_id=None,
     note: str | None = None,
     source: str = "discord_web_sync",
+    actor_discord_id: str | int | None = None,
+    cancellation_reason_code: str | None = None,
+    cancellation_reason_text: str | None = None,
 ) -> bool:
     """Update dashboard order status from Discord bot lifecycle actions."""
     ticket_channel_id_text = _to_text_id(ticket_channel_id)
@@ -201,6 +204,9 @@ def update_web_order_status_by_ticket_channel(
             target_status=next_status,
             source=source,
             reason=note or "Discord lifecycle 同步",
+            actor_discord_id=actor_discord_id,
+            cancellation_reason_code=cancellation_reason_code,
+            cancellation_reason_text=cancellation_reason_text,
         )
         db.expire(order, ["status"])
 
