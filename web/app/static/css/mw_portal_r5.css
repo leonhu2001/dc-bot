@@ -4520,3 +4520,146 @@ body.mw-r5-admin .empty-state {
         transition: none;
     }
 }
+
+
+/* Payout summary detail/action rows */
+.staff-summary-head-actions,
+.staff-summary-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.staff-summary-actions {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+.staff-summary-actions form {
+    display: inline-flex;
+    margin: 0;
+}
+
+.staff-summary-button {
+    min-width: 62px;
+}
+
+.staff-summary-button.danger {
+    color: #efa6a6;
+    border-color: rgba(223, 123, 123, .30);
+    background: rgba(223, 123, 123, .07);
+}
+
+.staff-summary-detail-row[hidden] {
+    display: none;
+}
+
+.staff-summary-detail {
+    padding: 14px 18px;
+    border-top: 1px solid var(--r5-line);
+    background: var(--r5-panel-3);
+}
+
+.staff-summary-detail h3 {
+    margin: 0 0 12px;
+    color: var(--r5-text);
+    font-size: 15px;
+}
+
+.staff-detail-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.staff-detail-table th,
+.staff-detail-table td {
+    padding: 9px 10px;
+    font-size: 12px;
+}
+
+.staff-detail-table th {
+    color: var(--r5-muted);
+    text-align: left;
+}
+
+.staff-ledger-stamp {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 7px;
+    border-radius: 7px;
+    font-size: 10.5px;
+    font-weight: 750;
+}
+
+.staff-ledger-stamp.paid {
+    color: #a9dfbb;
+    background: rgba(123, 199, 154, .08);
+}
+
+.staff-ledger-stamp.unpaid {
+    color: #efa6a6;
+    background: rgba(223, 123, 123, .08);
+}
+
+.staff-summary-empty {
+    padding: 24px;
+    color: var(--r5-muted);
+    text-align: center;
+}
+
+.staff-summary-table {
+    table-layout: fixed;
+}
+
+.staff-summary-table th:nth-child(1),
+.staff-summary-table td:nth-child(1) {
+    width: 29%;
+}
+
+.staff-summary-table th:nth-child(2),
+.staff-summary-table td:nth-child(2) {
+    width: 10%;
+    text-align: right;
+}
+
+.staff-summary-table th:nth-child(5),
+.staff-summary-table td:nth-child(5) {
+    width: 12%;
+    text-align: center;
+}
+
+.staff-summary-table th:nth-child(6),
+.staff-summary-table td:nth-child(6) {
+    width: 11%;
+    text-align: center;
+}
+
+.staff-summary-table th:nth-child(7),
+.staff-summary-table td:nth-child(7) {
+    width: 18%;
+}
+
+.staff-money {
+    display: block;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.staff-count-main,
+.staff-count-sub {
+    display: block;
+}
+
+.staff-detail-table th:nth-child(1),
+.staff-detail-table td:nth-child(1) { width: 15%; }
+.staff-detail-table th:nth-child(2),
+.staff-detail-table td:nth-child(2) { width: 14%; }
+.staff-detail-table th:nth-child(3),
+.staff-detail-table td:nth-child(3) { width: 28%; }
+.staff-detail-table th:nth-child(4),
+.staff-detail-table td:nth-child(4) {
+    width: 10%;
+    text-align: center;
+}
