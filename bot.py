@@ -6646,6 +6646,7 @@ async def resume_stored_order(
 
             resume_smart_dispatch = prepare_initial_smart_dispatch(
                 guild,
+                customer_id=customer_id,
                 allowed_role_ids=resume_allowed_role_ids,
                 specified_staff_ids=resume_unresolved_specified_ids,
                 required_staff_count=remaining_count,
@@ -7884,6 +7885,7 @@ async def create_waiting_acceptance_order_from_self_service(
 
     smart_dispatch = prepare_initial_smart_dispatch(
         guild,
+        customer_id=customer_id,
         allowed_role_ids=allowed_role_ids_for_rule,
         specified_staff_ids=specified_staff_ids,
         required_staff_count=required_staff_count,
@@ -15001,6 +15003,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
                 resend_smart_dispatch = (
                     prepare_initial_smart_dispatch(
                         guild,
+                        customer_id=customer_id,
                         allowed_role_ids=resend_allowed_role_ids,
                         specified_staff_ids=resend_unresolved_specified_ids,
                         required_staff_count=remaining_count,
@@ -16537,9 +16540,16 @@ async def _web_order_created_ensure_dispatch(
     details = _web_order_created_details(
         bundle
     )
+    customer_id = _to_int(
+        order.get(
+            "customer_discord_id"
+        ),
+        None,
+    )
 
     smart_dispatch = prepare_initial_smart_dispatch(
         guild,
+        customer_id=customer_id,
         allowed_role_ids=list(
             details.get("allowed_role_ids")
             or []
@@ -16570,13 +16580,6 @@ async def _web_order_created_ensure_dispatch(
     )
 
     if dispatch_message is None:
-        customer_id = _to_int(
-            order.get(
-                "customer_discord_id"
-            ),
-            None,
-        )
-
         placeholder = discord.Embed(
             title="網站訂單｜等待接單",
             description=(

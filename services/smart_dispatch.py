@@ -302,10 +302,119 @@ def get_worker_assignment_metrics(
     return result
 
 
+def get_completed_favorite_worker_ids(
+    customer_id: str | int | None,
+    candidate_ids: list[str] | tuple[str, ...],
+    *,
+    db_file: str | Path | None = None,
+) -> list[str]:
+    """Return eligible workers who are both favorited and completed a past order.
+
+    This is the data signal used by the Diamond+ familiar-worker benefit.
+    Missing legacy tables/columns fail closed and simply return no priority
+    candidates, so dispatch can safely continue with the normal ranking.
+    """
+    customer_key = str(customer_id or "").strip()
+    ids = list(dict.fromkeys(
+        str(item)
+        for item in candidate_ids
+        if str(item).strip()
+    ))
+
+    if not customer_key or not ids:
+        return []
+
+    path = _db_path(db_file)
+    if not path.exists():
+        return []
+
+    try:
+        with sqlite3.connect(path, timeout=15) as conn:
+            required_tables = {
+                "web_orders",
+                "order_assignments",
+                "staff_favorites",
+            }
+            if not all(_table_exists(conn, name) for name in required_tables):
+                return []
+
+            order_columns = {
+                str(row[1])
+                for row in conn.execute("PRAGMA table_info(web_orders)").fetchall()
+            }
+            assignment_columns = {
+                str(row[1])
+                for row in conn.execute("PRAGMA table_info(order_assignments)").fetchall()
+            }
+            favorite_columns = {
+                str(row[1])
+                for row in conn.execute("PRAGMA table_info(staff_favorites)").fetchall()
+            }
+
+            if not {
+                "id",
+                "status",
+                "customer_discord_id",
+            }.issubset(order_columns):
+                return []
+
+            if not {
+                "order_id",
+                "worker_discord_id",
+            }.issubset(assignment_columns):
+                return []
+
+            if not {
+                "customer_discord_id",
+                "staff_discord_id",
+            }.issubset(favorite_columns):
+                return []
+
+            placeholders = ",".join("?" for _ in ids)
+            active_condition = (
+                "AND COALESCE(oa.is_active, 1) = 1"
+                if "is_active" in assignment_columns
+                else ""
+            )
+
+            rows = conn.execute(
+                f"""
+                SELECT DISTINCT CAST(oa.worker_discord_id AS TEXT) AS worker_id
+                FROM web_orders wo
+                JOIN order_assignments oa
+                  ON oa.order_id = wo.id
+                JOIN staff_favorites sf
+                  ON CAST(sf.staff_discord_id AS TEXT)
+                   = CAST(oa.worker_discord_id AS TEXT)
+                WHERE CAST(wo.customer_discord_id AS TEXT) = ?
+                  AND wo.status = 'closed'
+                  AND CAST(sf.customer_discord_id AS TEXT) = ?
+                  AND CAST(oa.worker_discord_id AS TEXT) IN ({placeholders})
+                  {active_condition}
+                """,
+                [customer_key, customer_key, *ids],
+            ).fetchall()
+
+            matched = {
+                str(row[0])
+                for row in rows
+                if str(row[0] or "").strip()
+            }
+    except sqlite3.Error:
+        return []
+
+    return [
+        worker_id
+        for worker_id in ids
+        if worker_id in matched
+    ]
+
+
 def rank_dispatch_candidates(
     candidate_ids: list[str] | tuple[str, ...],
     *,
     specified_staff_ids: list[str] | tuple[str, ...] | None = None,
+    priority_staff_ids: list[str] | tuple[str, ...] | None = None,
     db_file: str | Path | None = None,
     now_taipei: datetime | None = None,
 ) -> list[str]:
@@ -317,6 +426,11 @@ def rank_dispatch_candidates(
     specified = {
         str(item)
         for item in (specified_staff_ids or [])
+        if str(item).strip()
+    }
+    priority = {
+        str(item)
+        for item in (priority_staff_ids or [])
         if str(item).strip()
     }
 
@@ -339,6 +453,7 @@ def rank_dispatch_candidates(
 
         return (
             0 if worker_id in specified else 1,
+            0 if worker_id in priority else 1,
             int(item.get("active_count") or 0),
             int(item.get("today_count") or 0),
             last_key,
@@ -357,6 +472,7 @@ def choose_initial_candidate_ids(
     ranked_candidate_ids: list[str] | tuple[str, ...],
     *,
     specified_staff_ids: list[str] | tuple[str, ...] | None,
+    priority_staff_ids: list[str] | tuple[str, ...] | None = None,
     required_staff_count: int,
 ) -> list[str]:
     ranked = list(dict.fromkeys(str(item) for item in ranked_candidate_ids))
@@ -373,6 +489,43 @@ def choose_initial_candidate_ids(
     )
 
     if unrestricted_slots <= 0:
+        return result
+
+    priority = {
+        str(item)
+        for item in (priority_staff_ids or [])
+        if str(item).strip()
+    }
+    priority_ordered = [
+        worker_id
+        for worker_id in ranked
+        if worker_id in priority and worker_id not in result
+    ]
+
+    if priority_ordered:
+        # Diamond+ familiar-worker benefit: if enough familiar+favorite staff
+        # exist, the first wave is exclusive to them. If there are fewer than
+        # the required open slots, add only enough general staff to keep the
+        # order fillable without waiting for the next expansion.
+        priority_limit = notification_batch_size(unrestricted_slots)
+        priority_added = priority_ordered[:priority_limit]
+        result.extend(priority_added)
+
+        general_needed = max(
+            0,
+            unrestricted_slots - len(priority_added),
+        )
+        if general_needed <= 0:
+            return result
+
+        for worker_id in ranked:
+            if worker_id in result:
+                continue
+            result.append(worker_id)
+            general_needed -= 1
+            if general_needed <= 0:
+                break
+
         return result
 
     general_limit = notification_batch_size(unrestricted_slots)

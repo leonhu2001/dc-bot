@@ -152,8 +152,30 @@ body.mw-r5-employee * {
     height:
         100vh;
 
+    height:
+        100dvh;
+
+    overflow-x:
+        hidden;
+
+    overflow-y:
+        auto;
+
+    overscroll-behavior:
+        contain;
+
+    scrollbar-gutter:
+        stable;
+
+    scrollbar-width:
+        thin;
+
+    scrollbar-color:
+        rgba(223, 183, 92, .28)
+        transparent;
+
     padding:
-        20px 12px;
+        20px 12px 28px;
 
     border-right:
         1px solid
@@ -1002,6 +1024,12 @@ body.mw-r5-employee
             100%;
 
         height:
+            auto;
+
+        overflow:
+            visible;
+
+        scrollbar-gutter:
             auto;
 
         border-right:
