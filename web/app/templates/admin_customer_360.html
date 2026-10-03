@@ -14,17 +14,20 @@
             </p>
         </div>
         <div>
-            <a class="button secondary" href="/admin/search?q={{ customer.customer_id }}">重新搜尋</a>
+            {% if user and user.is_manager %}
             <a class="button secondary" href="/admin/wallets/{{ customer.customer_id }}?return_to=/admin/search/customer/{{ customer.customer_id }}">錢包流水</a>
+            {% endif %}
         </div>
     </div>
 
     <div class="payout-stat-grid">
+        {% if user and user.is_manager %}
         <div class="payout-stat-card">
             <span>錢包餘額</span>
             <strong>{{ customer.wallet.balance_text }}</strong>
             <p class="muted-text">最近更新：{{ customer.wallet.updated_at }}</p>
         </div>
+        {% endif %}
         <div class="payout-stat-card">
             <span>VIP 等級</span>
             <strong>{{ customer.vip.level }}</strong>
@@ -122,6 +125,7 @@
     {% endif %}
 </div>
 
+{% if user and user.is_manager %}
 <div class="panel compact-panel">
     <h2>錢包流水</h2>
     {% if customer.wallet.transactions %}
@@ -142,6 +146,8 @@
         </div>
     {% else %}<div class="empty-state">沒有錢包流水。</div>{% endif %}
 </div>
+{% endif %}
+
 
 <div class="panel compact-panel">
     <h2>評價</h2>
