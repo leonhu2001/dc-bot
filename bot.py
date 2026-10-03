@@ -1588,9 +1588,57 @@ class ConfirmCloseOrderView(discord.ui.View):
 
 # ========= 下單操作按鈕 =========
 
+CANCEL_REASON_OPTIONS = [
+    ("customer_changed_mind", "客人取消／改變需求"),
+    ("schedule_conflict", "時間無法配合"),
+    ("no_staff", "缺少可接人員"),
+    ("payment_issue", "未付款／付款問題"),
+    ("price_issue", "價格／預算問題"),
+    ("duplicate_order", "重複／誤下單"),
+    ("service_unavailable", "服務無法提供"),
+    ("internal_correction", "店內修正"),
+    ("other", "其他"),
+]
+
+
+class OrderCancellationReasonSelect(discord.ui.Select):
+    def __init__(self):
+        super().__init__(
+            placeholder="先選擇取消原因",
+            min_values=1,
+            max_values=1,
+            options=[
+                discord.SelectOption(label=label, value=code)
+                for code, label in CANCEL_REASON_OPTIONS
+            ],
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        parent = self.view
+        if parent is None:
+            await interaction.response.send_message(
+                "取消原因面板已失效，請重新操作。",
+                ephemeral=True,
+            )
+            return
+
+        setattr(parent, "cancellation_reason_code", self.values[0])
+        selected_label = dict(CANCEL_REASON_OPTIONS).get(
+            self.values[0],
+            self.values[0],
+        )
+        await interaction.response.send_message(
+            f"已選擇取消原因：{selected_label}",
+            ephemeral=True,
+        )
+
+
 class ConfirmCancelOrderView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
+        self.cancellation_reason_code = "unspecified"
+        self.add_item(OrderCancellationReasonSelect())
 
     @discord.ui.button(
         label="是，取消訂單",
@@ -1606,6 +1654,13 @@ class ConfirmCancelOrderView(discord.ui.View):
             await interaction.response.send_message("只有客服可以取消訂單。", ephemeral=True)
             return
 
+        if self.cancellation_reason_code == "unspecified":
+            await interaction.response.send_message(
+                "請先從下拉選單選擇取消原因。",
+                ephemeral=True,
+            )
+            return
+
         channel = interaction.channel
 
         # MAWAN_R13_CANCEL_SYNC
@@ -1616,12 +1671,16 @@ class ConfirmCancelOrderView(discord.ui.View):
                 channel.id,
                 dispatch_message_id=dispatch_message_id,
                 note="由 DC bot 客服取消訂單同步。",
+                actor_discord_id=interaction.user.id,
+                cancellation_reason_code=self.cancellation_reason_code,
             )
 
         if interaction.guild is not None and isinstance(channel, discord.TextChannel):
             await delete_dispatch_claim_panel_for_order(
                 guild=interaction.guild,
                 order_channel_id=channel.id,
+                actor_discord_id=interaction.user.id,
+                cancellation_reason_code=self.cancellation_reason_code,
             )
 
         await interaction.response.send_message(
@@ -5876,7 +5935,14 @@ class DispatchClaimView(discord.ui.View):
         await self.claim_order(interaction, "booster")
 
 
-async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_channel_id: int):
+async def delete_dispatch_claim_panel_for_order(
+    guild: discord.Guild,
+    order_channel_id: int,
+    *,
+    actor_discord_id: str | int | None = None,
+    cancellation_reason_code: str | None = None,
+    cancellation_reason_text: str | None = None,
+):
     """取消票口時，一併刪除派單頻道對應的接單面板，並清除保存資料。"""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
     dispatch_message_id = _to_int(data.get("dispatch_message_id"))
@@ -5891,7 +5957,13 @@ async def delete_dispatch_claim_panel_for_order(guild: discord.Guild, order_chan
 
             acceptance_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
             if acceptance_order_id is not None:
-                cancel_acceptance_order(acceptance_order_id, source="discord_cancel")
+                cancel_acceptance_order(
+                    acceptance_order_id,
+                    source="discord_cancel",
+                    actor_discord_id=actor_discord_id,
+                    cancellation_reason_code=cancellation_reason_code,
+                    cancellation_reason_text=cancellation_reason_text,
+                )
                 print(f"[acceptance] cancelled order_id={acceptance_order_id} dispatch_message_id={dispatch_message_id}")
         except Exception as exc:
             print(f"[acceptance] 取消訂單同步付款前接單狀態失敗 dispatch_message_id={dispatch_message_id}: {exc}")
@@ -14225,7 +14297,15 @@ def build_order_maintenance_result_embed(title: str, description: str, data: dic
 
 
 
-def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=None, note: str | None = None) -> None:
+def sync_web_order_cancelled_from_bot(
+    ticket_channel_id,
+    dispatch_message_id=None,
+    note: str | None = None,
+    *,
+    actor_discord_id: str | int | None = None,
+    cancellation_reason_code: str | None = None,
+    cancellation_reason_text: str | None = None,
+) -> None:
     """DC bot 刪除/取消訂單後，把網站訂單狀態同步成 cancelled，並同步付款前接單 lifecycle。"""
     try:
         close_support_calls_for_ticket(
@@ -14246,6 +14326,9 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
             status="cancelled",
             dispatch_message_id=dispatch_message_id,
             note=note or "由 DC bot 刪除/取消訂單同步。",
+            actor_discord_id=actor_discord_id,
+            cancellation_reason_code=cancellation_reason_code,
+            cancellation_reason_text=cancellation_reason_text,
         )
         print(
             f"[web-sync] cancel order "
@@ -14306,7 +14389,13 @@ def sync_web_order_cancelled_from_bot(ticket_channel_id, dispatch_message_id=Non
                 from shared.order_acceptance import cancel_acceptance_order, has_acceptance_meta
 
                 if has_acceptance_meta(order_id):
-                    cancel_acceptance_order(order_id, source="discord_cancel")
+                    cancel_acceptance_order(
+                        order_id,
+                        source="discord_cancel",
+                        actor_discord_id=actor_discord_id,
+                        cancellation_reason_code=cancellation_reason_code,
+                        cancellation_reason_text=cancellation_reason_text,
+                    )
                     print(f"[acceptance] cancelled order_id={order_id} source=discord_cancel")
             except Exception as exc:
                 print(f"[acceptance] 取消訂單同步付款前接單狀態失敗 order_id={order_id}: {exc}")
@@ -18835,6 +18924,8 @@ class StoredOrderCancelConfirmView(discord.ui.View):
     def __init__(self, order_channel_id: int):
         super().__init__(timeout=60)
         self.order_channel_id = order_channel_id
+        self.cancellation_reason_code = "unspecified"
+        self.add_item(OrderCancellationReasonSelect())
 
     @discord.ui.button(label="確認取消存單", style=discord.ButtonStyle.danger)
     async def confirm_cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -18845,10 +18936,22 @@ class StoredOrderCancelConfirmView(discord.ui.View):
             await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
             return
 
+        if self.cancellation_reason_code == "unspecified":
+            await interaction.response.send_message(
+                "請先從下拉選單選擇取消原因。",
+                ephemeral=True,
+            )
+            return
+
         channel = interaction.guild.get_channel(self.order_channel_id)
         await interaction.response.defer(ephemeral=True)
 
-        await delete_dispatch_claim_panel_for_order(interaction.guild, self.order_channel_id)
+        await delete_dispatch_claim_panel_for_order(
+            interaction.guild,
+            self.order_channel_id,
+            actor_discord_id=interaction.user.id,
+            cancellation_reason_code=self.cancellation_reason_code,
+        )
 
         if isinstance(channel, discord.TextChannel):
             try:

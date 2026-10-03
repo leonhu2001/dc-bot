@@ -156,6 +156,167 @@
 
 <div class="panel compact-panel">
 
+    <div class="section-title-row">
+        <div>
+            <h2>智慧派單成效</h2>
+            <p class="muted-text">
+                近 {{ days }} 天｜直接用實際派單計畫與接單紀錄統計，不把通知數當成接單成功。
+            </p>
+        </div>
+
+        <div>
+            <a class="button secondary" href="/admin/system?days=7">7 天</a>
+            <a class="button secondary" href="/admin/system?days=30">30 天</a>
+            <a class="button secondary" href="/admin/system?days=90">90 天</a>
+        </div>
+    </div>
+
+    <div class="order-meta compact-meta">
+        <div><span>派單數</span><strong>{{ operations.smart_dispatch.total }}</strong></div>
+        <div><span>已接滿</span><strong>{{ operations.smart_dispatch.filled }}</strong></div>
+        <div><span>接滿率</span><strong>{{ operations.smart_dispatch.fill_rate }}%</strong></div>
+        <div><span>平均首次接單</span><strong>{{ operations.smart_dispatch.avg_first_claim_text }}</strong></div>
+        <div><span>平均接滿</span><strong>{{ operations.smart_dispatch.avg_fill_text }}</strong></div>
+        <div><span>目前未接滿</span><strong>{{ operations.smart_dispatch.pending }}</strong></div>
+        <div><span>無候選人</span><strong>{{ operations.smart_dispatch.no_candidate }}</strong></div>
+        <div><span>擴大到全員</span><strong>{{ operations.smart_dispatch.full_expansion }}</strong></div>
+        <div><span>派單錯誤</span><strong>{{ operations.smart_dispatch.errors }}</strong></div>
+        <div><span>指定 DM 失敗</span><strong>{{ operations.smart_dispatch.specified_dm_failed }}</strong></div>
+    </div>
+
+    {% if operations.smart_dispatch.groups %}
+        <div class="admin-order-list compact-list">
+            {% for row in operations.smart_dispatch.groups %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">{{ row.category }}{% if row.rule_key %} ｜ {{ row.rule_key }}{% endif %}</p>
+                            <h3>{{ row.item }}</h3>
+                        </div>
+                        <span class="status-chip {% if row.fill_rate >= 80 %}is-paid{% elif row.fill_rate < 50 %}is-unpaid{% endif %}">
+                            接滿率 {{ row.fill_rate }}%
+                        </span>
+                    </div>
+                    <div class="order-meta compact-meta">
+                        <div><span>派單</span><strong>{{ row.total }}</strong></div>
+                        <div><span>目前符合資格人力</span><strong>{% if row.eligible_staff is none %}—{% else %}{{ row.eligible_staff }}{% endif %}</strong></div>
+                        <div><span>平均首次接單</span><strong>{{ row.avg_first_claim_text }}</strong></div>
+                        <div><span>平均接滿</span><strong>{{ row.avg_fill_text }}</strong></div>
+                        <div><span>無候選</span><strong>{{ row.no_candidate }}</strong></div>
+                        <div><span>全員擴大</span><strong>{{ row.full_expansion }}</strong></div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">這個期間還沒有智慧派單資料。</div>
+    {% endif %}
+
+    {% if operations.smart_dispatch.problem_plans %}
+        <p class="muted-text">最近需要注意的派單：</p>
+        <div class="admin-order-list compact-list">
+            {% for row in operations.smart_dispatch.problem_plans[:8] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">WEB-{{ row.order_id }} ｜ {{ row.created_at }}</p>
+                            <h3>{{ row.category }}｜{{ row.item }}</h3>
+                        </div>
+                        <a class="button secondary" href="/admin/order-workspace/{{ row.order_id }}">查看訂單</a>
+                    </div>
+                    <p class="muted-text">
+                        候選 {{ row.candidate_count }}｜已通知 {{ row.notified_count }}｜Stage {{ row.stage }}
+                        {% if row.completion_reason %}｜{{ row.completion_reason }}{% endif %}
+                        {% if row.last_error %}｜錯誤：{{ row.last_error }}{% endif %}
+                    </p>
+                </article>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+</div>
+
+
+<div class="panel compact-panel">
+
+    <div class="section-title-row">
+        <div>
+            <h2>取消／失單分析</h2>
+            <p class="muted-text">
+                近 {{ days }} 天｜取消率以「這段期間建立的訂單」為分母；原因與金額依實際取消事件統計。
+            </p>
+        </div>
+        {% if operations.cancellations.unclassified %}
+            <span class="status-chip is-unpaid">
+                未分類 {{ operations.cancellations.unclassified }}
+            </span>
+        {% endif %}
+    </div>
+
+    <div class="order-meta compact-meta">
+        <div><span>建立訂單</span><strong>{{ operations.cancellations.orders_created }}</strong></div>
+        <div><span>取消訂單</span><strong>{{ operations.cancellations.cancelled_orders }}</strong></div>
+        <div><span>取消率</span><strong>{{ operations.cancellations.cancellation_rate }}%</strong></div>
+        <div><span>取消訂單金額</span><strong>{{ operations.cancellations.lost_value }}T</strong></div>
+        <div><span>未分類原因</span><strong>{{ operations.cancellations.unclassified }}</strong></div>
+    </div>
+
+    {% if operations.cancellations.reasons %}
+        <div class="admin-order-list compact-list">
+            {% for row in operations.cancellations.reasons %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">{{ row.code }}</p>
+                            <h3>{{ row.label }}</h3>
+                        </div>
+                        <strong>{{ row.count }} 單</strong>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">這個期間還沒有可分析的取消紀錄。</div>
+    {% endif %}
+
+    {% if operations.cancellations.categories %}
+        <p class="muted-text">取消較多的遊戲／類別：</p>
+        <div class="order-meta compact-meta">
+            {% for row in operations.cancellations.categories[:8] %}
+                <div>
+                    <span>{{ row.category }}</span>
+                    <strong>{{ row.count }} 單 / {{ row.lost_value }}T</strong>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if operations.cancellations.recent %}
+        <p class="muted-text">最近取消：</p>
+        <div class="admin-order-list compact-list">
+            {% for row in operations.cancellations.recent[:8] %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <p class="order-no">{{ row.order_no }} ｜ {{ row.created_at }}</p>
+                            <h3>{{ row.reason_label }}｜{{ row.category }}｜{{ row.item }}</h3>
+                        </div>
+                        <a class="button secondary" href="/admin/order-workspace/{{ row.order_id }}">補充／查看</a>
+                    </div>
+                    <p class="muted-text">
+                        {{ row.amount }}T
+                        {% if row.reason_text %}｜{{ row.reason_text }}{% endif %}
+                    </p>
+                </article>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+</div>
+
+
+<div class="panel compact-panel">
+
     <h2>營運待處理與異常</h2>
 
     <div class="order-meta compact-meta">

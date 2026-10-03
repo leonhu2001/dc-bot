@@ -91,5 +91,7 @@ def create_all_tables() -> None:
     # canonical database initializer so deploys and fresh restores are complete
     # before either service starts serving traffic.
     from shared.order_acceptance import ensure_acceptance_tables
+    from shared.order_state import ensure_order_cancellation_table
 
     ensure_acceptance_tables()
+    ensure_order_cancellation_table(engine)

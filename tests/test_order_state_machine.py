@@ -9,6 +9,7 @@ from shared.order_state import (
     ACTIVE,
     CANCELLED,
     CLOSED,
+    CANCELLATION_REASON_LABELS,
     PENDING_CS_DISPATCH,
     STORED,
     WAITING_ACCEPTANCE,
@@ -369,3 +370,72 @@ def test_dispatch_upsert_cannot_revive_closed_order(monkeypatch):
         assert current.status == CLOSED
         assert current.dispatch_message_id == "11111"
 
+
+
+
+def test_cancellation_transition_records_structured_reason_and_preserves_it():
+    engine = create_engine("sqlite:///:memory:")
+    _create_order_tables(engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO web_orders(id, status, updated_at)
+                VALUES(1, :status, CURRENT_TIMESTAMP)
+                """
+            ),
+            {"status": ACTIVE},
+        )
+
+        transition_order_state_in_connection(
+            conn,
+            order_id=1,
+            target_status=CANCELLED,
+            source="test_cancel",
+            reason="臨時缺少符合資格人員",
+            actor_discord_id="manager-1",
+            cancellation_reason_code="no_staff",
+            cancellation_reason_text="晚班無可接人員",
+        )
+
+        cancellation = conn.execute(
+            text(
+                """
+                SELECT
+                    reason_code,
+                    reason_text,
+                    source,
+                    actor_discord_id
+                FROM order_cancellations
+                WHERE order_id = 1
+                """
+            )
+        ).mappings().one()
+
+        assert cancellation["reason_code"] == "no_staff"
+        assert cancellation["reason_text"] == "晚班無可接人員"
+        assert cancellation["source"] == "test_cancel"
+        assert cancellation["actor_discord_id"] == "manager-1"
+
+        transition_order_state_in_connection(
+            conn,
+            order_id=1,
+            target_status=CANCELLED,
+            source="duplicate_cleanup",
+            reason="cleanup",
+        )
+
+        preserved = conn.execute(
+            text(
+                """
+                SELECT reason_code, reason_text
+                FROM order_cancellations
+                WHERE order_id = 1
+                """
+            )
+        ).mappings().one()
+
+    assert CANCELLATION_REASON_LABELS["no_staff"] == "缺少可接人員"
+    assert preserved["reason_code"] == "no_staff"
+    assert preserved["reason_text"] == "晚班無可接人員"
