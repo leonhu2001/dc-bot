@@ -25,6 +25,9 @@
 {% elif _p == '/admin/wallets' or _p == '/admin/wallets/' or _p.startswith('/admin/reviews') %}
     {% set _back.href = '/admin/customer-center' %}
     {% set _back.label = '返回客戶中心' %}
+{% elif _p.startswith('/admin/payouts/report') %}
+    {% set _back.href = '/admin/payouts/summary' %}
+    {% set _back.label = '返回薪資結算' %}
 {% elif _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') or _p.startswith('/admin/payout') or _p.startswith('/admin/accounting-reconciliation') %}
     {% set _back.href = '/admin/finance-center' %}
     {% set _back.label = '返回財務中心' %}
