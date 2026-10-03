@@ -514,7 +514,11 @@ def build_cancellation_snapshot(
     for row in rows:
         created = _parse_time(
             row["created_at"],
-            naive_tz=TAIPEI_TZ,
+            naive_tz=(
+                UTC
+                if str(row["source"] or "") == "legacy_backfill"
+                else TAIPEI_TZ
+            ),
         )
         if created is None or created.astimezone(TAIPEI_TZ) < cutoff:
             continue
