@@ -38,6 +38,7 @@
     {% endif %}
 
     <form method="post" action="/me/wallet/topup/{{ topup.id }}/submit" style="display:grid;gap:12px">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       {% if topup.payment_method == 'bank_transfer' %}
       <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="銀行帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
       {% elif topup.payment_method == 'jkopay' %}
@@ -49,6 +50,7 @@
       <button class="discord-login" type="submit" style="justify-content:center">我已完成付款</button>
     </form>
     <form method="post" action="/me/wallet/topup/{{ topup.id }}/cancel" style="margin-top:10px">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       <button type="submit" class="discord-login" style="justify-content:center;opacity:.72">取消儲值單</button>
     </form>
   </section>
