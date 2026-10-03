@@ -1,69 +1,117 @@
 {% extends "layout.html" %}
 
-{% block page_title %}異常偵測中心{% endblock %}
+{% block page_title %}系統維運{% endblock %}
 
 {% block content %}
 
+{% if repair_message %}
 <div class="panel compact-panel">
-
     <div class="section-title-row">
         <div>
-            <h2>跨系統異常總覽</h2>
+            <h2>{% if repair_status == 'success' %}修復完成{% else %}修復未執行{% endif %}</h2>
+            <p class="muted-text">{{ repair_message }}</p>
+        </div>
+        <span class="status-chip {% if repair_status == 'success' %}is-paid{% else %}is-unpaid{% endif %}">
+            {% if repair_status == 'success' %}SUCCESS{% else %}BLOCKED{% endif %}
+        </span>
+    </div>
+</div>
+{% endif %}
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>系統狀態</h2>
             <p class="muted-text">
-                最後檢查：{{ snapshot.checked_at }} ｜ 只讀偵測，不會自動修改資料。
+                異常、服務狀態、資料庫與近期操作都集中在這裡。
+                最後檢查：{{ health.checked_at }}
             </p>
         </div>
-
         <div>
-            <span class="status-chip {% if snapshot.status == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
-                {{ snapshot.status_text }}
+            <span class="status-chip {% if health.overall == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
+                {{ health.overall_text }}
             </span>
-
-            <a class="button secondary" href="/admin/anomalies">
-                重新檢查
-            </a>
+            <a class="button secondary" href="/admin/anomalies">重新檢查</a>
         </div>
     </div>
 
-    <div class="order-meta compact-meta">
-        <div>
-            <span>全部異常</span>
-            <strong>{{ snapshot.issue_count }}</strong>
+    <div class="payout-stat-grid">
+        <div class="payout-stat-card">
+            <span>Discord Bot</span>
+            <strong>{{ health.services.bot.status_text }}</strong>
+            <p class="muted-text">{{ health.services.bot.uptime_text }} ｜ restart {{ health.services.bot.restarts }}</p>
         </div>
+        <div class="payout-stat-card">
+            <span>Web</span>
+            <strong>{{ health.services.web.status_text }}</strong>
+            <p class="muted-text">{{ health.services.web.uptime_text }} ｜ restart {{ health.services.web.restarts }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>Bot DB</span>
+            <strong>{{ health.databases.bot.integrity }}</strong>
+            <p class="muted-text">{{ health.databases.bot.size_text }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>Web DB</span>
+            <strong>{{ health.databases.web.integrity }}</strong>
+            <p class="muted-text">{{ health.databases.web.size_text }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>Bot 備份</span>
+            <strong>{% if health.backups.bot.fresh %}正常{% else %}注意{% endif %}</strong>
+            <p class="muted-text">{{ health.backups.bot.age_text }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>Web 備份</span>
+            <strong>{% if health.backups.web_dashboard.fresh %}正常{% else %}注意{% endif %}</strong>
+            <p class="muted-text">{{ health.backups.web_dashboard.age_text }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>目前版本</span>
+            <strong>{{ health.git.commit }}</strong>
+            <p class="muted-text">{{ health.git.branch }} ｜ {{ health.git.subject }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>可安全修復</span>
+            <strong>{{ snapshot.repairable_count }}</strong>
+            <p class="muted-text">只顯示具備防重複 / 再驗證保護的動作</p>
+        </div>
+    </div>
 
-        <div>
-            <span>Critical</span>
-            <strong>{{ snapshot.critical_count }}</strong>
-        </div>
-
-        <div>
-            <span>Warning</span>
-            <strong>{{ snapshot.warning_count }}</strong>
-        </div>
-
-        {% for key, label in snapshot.category_labels.items() %}
-        <div>
-            <span>{{ label }}</span>
-            <strong>{{ snapshot.category_counts.get(key, 0) }}</strong>
-        </div>
+    {% if health.alerts %}
+    <div style="margin-top:14px;">
+        {% for alert in health.alerts %}
+        <p class="muted-text" style="margin:6px 0;">
+            {% if alert.severity == 'critical' %}🔴{% else %}🟠{% endif %}
+            {{ alert.message }}
+        </p>
         {% endfor %}
     </div>
-
+    {% endif %}
 </div>
 
 
 <div class="panel compact-panel">
-
     <div class="section-title-row">
         <div>
-            <h2>篩選</h2>
+            <h2>異常與修復</h2>
             <p class="muted-text">
-                Critical 代表流程明確異常；Warning 代表等待過久或需要人工確認。
+                Critical 是明確異常；Warning 是逾時或需確認。能安全自動處理的項目會直接顯示修復按鈕。
             </p>
         </div>
+        <span class="status-chip {% if snapshot.status == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
+            {{ snapshot.status_text }}
+        </span>
     </div>
 
-    <form method="get" action="/admin/anomalies">
+    <div class="order-meta compact-meta">
+        <div><span>全部異常</span><strong>{{ snapshot.issue_count }}</strong></div>
+        <div><span>Critical</span><strong>{{ snapshot.critical_count }}</strong></div>
+        <div><span>Warning</span><strong>{{ snapshot.warning_count }}</strong></div>
+        <div><span>可安全修復</span><strong>{{ snapshot.repairable_count }}</strong></div>
+    </div>
+
+    <form method="get" action="/admin/anomalies" style="margin-top:14px;">
         <div class="order-meta compact-meta">
             <div>
                 <span>嚴重程度</span>
@@ -73,133 +121,138 @@
                     <option value="warning" {% if severity_filter == 'warning' %}selected{% endif %}>Warning</option>
                 </select>
             </div>
-
             <div>
                 <span>類別</span>
                 <select name="category">
                     <option value="">全部</option>
                     {% for key, label in snapshot.category_labels.items() %}
-                        <option value="{{ key }}" {% if category_filter == key %}selected{% endif %}>
-                            {{ label }}
-                        </option>
+                    <option value="{{ key }}" {% if category_filter == key %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
         </div>
-
-        <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="button" type="submit">套用篩選</button>
+        <div style="margin-top:10px;">
+            <button class="button secondary" type="submit">套用篩選</button>
             <a class="button secondary" href="/admin/anomalies">清除</a>
-            <a class="button secondary" href="/admin/system">系統健康</a>
-            <a class="button secondary" href="/admin/accounting-reconciliation">帳務對帳</a>
         </div>
     </form>
-
 </div>
 
 
 <div class="panel compact-panel">
-
     <div class="section-title-row">
         <div>
             <h2>異常明細</h2>
             <p class="muted-text">
-                目前顯示 {{ issues|length }} 筆
-                {% if snapshot.truncated %}
-                    ｜ 結果過多，已限制顯示 {{ snapshot.visible_count }} 筆
-                {% endif %}
+                目前顯示 {{ issues|length }} 筆。修復送出前會再次驗證最新狀態，不會盲目補寫資料。
             </p>
         </div>
     </div>
 
     {% if issues %}
+    <div class="admin-order-list compact-list">
+        {% for issue in issues %}
+        <article class="admin-order-card compact-order-card">
+            <div class="order-card-header">
+                <div>
+                    <p class="order-no">{{ issue.reference }} ｜ {{ issue.category_label }}</p>
+                    <h3>{{ issue.title }}</h3>
+                </div>
+                <span class="status-chip {% if issue.severity == 'critical' %}is-unpaid{% endif %}">
+                    {{ issue.severity }}
+                </span>
+            </div>
 
-        <div class="admin-order-list compact-list">
+            <p class="muted-text">{{ issue.detail }}</p>
 
-            {% for issue in issues %}
+            <div class="order-meta compact-meta">
+                <div><span>異常代碼</span><strong>{{ issue.code }}</strong></div>
+                <div><span>距最後更新</span><strong>{{ issue.age_text }}</strong></div>
+                <div><span>來源</span><strong>{{ issue.source }}</strong></div>
+                {% if issue.order_id %}
+                <div><span>Web Order ID</span><strong>{{ issue.order_id }}</strong></div>
+                {% endif %}
+            </div>
 
-                <article class="admin-order-card compact-order-card">
-
-                    <div class="order-card-header">
-
-                        <div>
-                            <p class="order-no">
-                                {{ issue.reference }} ｜ {{ issue.category_label }}
-                            </p>
-                            <h3>{{ issue.title }}</h3>
-                        </div>
-
-                        <span class="status-chip {% if issue.severity == 'critical' %}is-unpaid{% endif %}">
-                            {{ issue.severity }}
-                        </span>
-
-                    </div>
-
-                    <p class="muted-text">
-                        {{ issue.detail }}
-                    </p>
-
-                    <div class="order-meta compact-meta">
-
-                        <div>
-                            <span>異常代碼</span>
-                            <strong>{{ issue.code }}</strong>
-                        </div>
-
-                        <div>
-                            <span>距最後更新</span>
-                            <strong>{{ issue.age_text }}</strong>
-                        </div>
-
-                        <div>
-                            <span>來源</span>
-                            <strong>{{ issue.source }}</strong>
-                        </div>
-
-                        {% if issue.order_id %}
-                        <div>
-                            <span>Web Order ID</span>
-                            <strong>{{ issue.order_id }}</strong>
-                        </div>
-                        {% endif %}
-
-                    </div>
-
-                    {% if issue.action_url %}
-                        <div style="margin-top: 12px;">
-                            <a class="button secondary" href="{{ issue.action_url }}">
-                                {{ issue.action_label or '前往處理' }}
-                            </a>
-                        </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+                {% if issue.repairable and issue.repair_action %}
+                <form
+                    method="post"
+                    action="/admin/anomalies/repair"
+                    onsubmit="return confirm('確定執行「{{ issue.repair_label or '安全修復' }}」嗎？系統會在執行前再次驗證最新資料。');"
+                    style="margin:0;"
+                >
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <input type="hidden" name="action" value="{{ issue.repair_action }}">
+                    {% if issue.repair_target_id is not none %}
+                    <input type="hidden" name="target_id" value="{{ issue.repair_target_id }}">
                     {% endif %}
+                    {% if issue.order_id %}
+                    <input type="hidden" name="order_id" value="{{ issue.order_id }}">
+                    {% endif %}
+                    <button class="button" type="submit">
+                        {{ issue.repair_label or '安全修復' }}
+                    </button>
+                </form>
+                {% endif %}
 
-                </article>
+                {% if issue.action_url %}
+                <a class="button secondary" href="{{ issue.action_url }}">
+                    {{ issue.action_label or '查看資料' }}
+                </a>
+                {% endif %}
+            </div>
 
-            {% endfor %}
-
-        </div>
-
-    {% else %}
-
-        <div class="empty-state">
-            {% if snapshot.issue_count == 0 %}
-                目前沒有偵測到跨系統異常。
-            {% else %}
-                目前的篩選條件沒有符合項目。
+            {% if issue.repair_block_reason %}
+            <p class="muted-text" style="margin-top:10px;">🔒 {{ issue.repair_block_reason }}</p>
+            {% elif not issue.repairable %}
+            <p class="muted-text" style="margin-top:10px;">需要人工判斷，系統不會自動改資料。</p>
             {% endif %}
-        </div>
-
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        {% if snapshot.issue_count == 0 %}
+            目前沒有偵測到跨系統異常。
+        {% else %}
+            目前的篩選條件沒有符合項目。
+        {% endif %}
+    </div>
     {% endif %}
-
 </div>
 
 
 <div class="panel compact-panel">
-    <h2>目前偵測範圍</h2>
-    <p class="muted-text">
-        訂單狀態漂移、必要 Discord 參照缺失、長時間未更新訂單、付款審核套用失敗或逾時、
-        Discord/Web 同步事件失敗或卡住、儲值審核與入帳逾時，以及第 4 階段的帳務對帳異常。
-    </p>
+    <div class="section-title-row">
+        <div>
+            <h2>近期操作</h2>
+            <p class="muted-text">原本「操作紀錄」最常用的近期紀錄直接放在系統維運底下。</p>
+        </div>
+        <a class="button secondary" href="/admin/audit">完整紀錄</a>
+    </div>
+
+    {% if audit_logs %}
+    <div class="admin-order-list compact-list">
+        {% for row in audit_logs %}
+        <article class="admin-order-card compact-order-card">
+            <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div>
+                    <strong>{{ row.action }}</strong>
+                    <p class="muted-text">
+                        {{ row.target_type }}{% if row.target_id %} ｜ {{ row.target_id }}{% endif %}
+                    </p>
+                </div>
+                <div class="muted-text">
+                    {{ row.admin_discord_id }} ｜ {{ row.created_at }}
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">目前沒有操作紀錄。</div>
+    {% endif %}
 </div>
 
 {% endblock %}
