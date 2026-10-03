@@ -1278,3 +1278,207 @@ html body.mw-r5-layout .staff-status-badge.partial {
 html body.mw-r5-layout .staff-summary-total-card::after {
     display: none !important;
 }
+
+
+/* Ticket archive detail */
+html body.mw-r5-layout .td-page {
+    gap: 14px !important;
+}
+
+html body.mw-r5-layout .td-card {
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    background: var(--admin-panel) !important;
+    box-shadow: none !important;
+}
+
+html body.mw-r5-layout .td-top {
+    padding: 15px !important;
+    align-items: center !important;
+}
+
+html body.mw-r5-layout .td-k {
+    color: var(--admin-gold) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: .13em !important;
+}
+
+html body.mw-r5-layout .td-top h2 {
+    margin: 3px 0 4px !important;
+    color: var(--admin-text) !important;
+    font-size: 19px !important;
+    font-weight: 800 !important;
+    letter-spacing: -.01em !important;
+}
+
+html body.mw-r5-layout .td-sub {
+    color: var(--admin-muted) !important;
+    font-size: 12px !important;
+}
+
+html body.mw-r5-layout .td-meta {
+    gap: 9px !important;
+}
+
+html body.mw-r5-layout .td-meta > div {
+    padding: 12px !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 11px !important;
+    background: var(--admin-panel-3) !important;
+}
+
+html body.mw-r5-layout .td-meta span {
+    color: var(--admin-muted) !important;
+    font-size: 10.5px !important;
+}
+
+html body.mw-r5-layout .td-meta b {
+    color: var(--admin-text-soft) !important;
+    font-size: 12px !important;
+}
+
+html body.mw-r5-layout .chat {
+    padding: 14px 12px !important;
+}
+
+html body.mw-r5-layout .msg {
+    margin: 9px 0 !important;
+}
+
+html body.mw-r5-layout .bubble {
+    padding: 10px 12px !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 12px !important;
+    color: var(--admin-text-soft) !important;
+    background: rgba(255,255,255,.025) !important;
+}
+
+html body.mw-r5-layout .customer .bubble {
+    border-color: rgba(214,176,90,.22) !important;
+    background: rgba(214,176,90,.065) !important;
+}
+
+html body.mw-r5-layout .cs .bubble {
+    border-color: rgba(131,169,214,.20) !important;
+    background: rgba(131,169,214,.055) !important;
+}
+
+html body.mw-r5-layout .bot .bubble {
+    color: var(--admin-muted) !important;
+    background: rgba(255,255,255,.016) !important;
+}
+
+html body.mw-r5-layout .who b {
+    color: var(--admin-text) !important;
+    font-size: 12px !important;
+}
+
+html body.mw-r5-layout .who small {
+    color: var(--admin-muted-2) !important;
+    font-size: 10px !important;
+}
+
+html body.mw-r5-layout .content {
+    color: var(--admin-text-soft) !important;
+    font-size: 13px !important;
+}
+
+/* Operations & finance report */
+html body.mw-r5-layout .ops-report {
+    gap: 14px !important;
+}
+
+html body.mw-r5-layout .ops-head {
+    min-height: 46px !important;
+    padding: 10px 12px !important;
+    align-items: center !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 11px !important;
+    background: rgba(18,22,27,.65) !important;
+}
+
+html body.mw-r5-layout .ops-period {
+    color: var(--admin-muted) !important;
+    font-size: 12px !important;
+    font-weight: 650 !important;
+}
+
+html body.mw-r5-layout :is(.ops-card,.ops-panel) {
+    padding: 14px !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 12px !important;
+    color: var(--admin-text) !important;
+    background: var(--admin-panel) !important;
+    box-shadow: none !important;
+}
+
+html body.mw-r5-layout :is(.ops-card,.ops-panel):hover {
+    border-color: rgba(214,176,90,.24) !important;
+    box-shadow: none !important;
+}
+
+html body.mw-r5-layout .ops-card > span {
+    margin-bottom: 7px !important;
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+    opacity: 1 !important;
+}
+
+html body.mw-r5-layout .ops-card strong {
+    color: var(--admin-gold-soft) !important;
+    font-size: 25px !important;
+    font-weight: 800 !important;
+    letter-spacing: -.02em !important;
+}
+
+html body.mw-r5-layout .ops-card small,
+html body.mw-r5-layout :is(.ops-note,.ops-insight-sub,.ops-share-meta) {
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+    opacity: 1 !important;
+}
+
+html body.mw-r5-layout .ops-panel h2 {
+    margin: 0 0 12px !important;
+    color: var(--admin-text) !important;
+    font-size: 15px !important;
+}
+
+html body.mw-r5-layout .ops-insight-value {
+    color: var(--admin-gold-soft) !important;
+    font-size: 25px !important;
+    font-weight: 800 !important;
+}
+
+html body.mw-r5-layout .ops-share-head {
+    color: var(--admin-text-soft) !important;
+    font-size: 12px !important;
+}
+
+html body.mw-r5-layout .ops-share-track {
+    background: rgba(255,255,255,.065) !important;
+}
+
+html body.mw-r5-layout .ops-share-fill {
+    background: var(--admin-gold) !important;
+}
+
+html body.mw-r5-layout .ops-table th {
+    color: var(--admin-muted) !important;
+    background: var(--admin-panel-3) !important;
+    font-size: 11px !important;
+}
+
+html body.mw-r5-layout .ops-table td {
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+}
+
+html body.mw-r5-layout .ops-tooltip {
+    border-color: rgba(214,176,90,.25) !important;
+    border-radius: 9px !important;
+    color: var(--admin-text-soft) !important;
+    background: rgba(15,19,23,.97) !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,.24) !important;
+}
