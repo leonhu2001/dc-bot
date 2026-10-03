@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from web.app.services.operations_monitoring import build_operations_monitoring_snapshot
 from web.app.services.system_health import build_system_health_snapshot
 
 
@@ -20,7 +21,10 @@ def get_current_user(request: Request) -> dict | None:
 
 
 @router.get("/admin/system")
-async def admin_system_health(request: Request):
+async def admin_system_health(
+    request: Request,
+    days: int = Query(default=30, ge=1, le=365),
+):
     user = get_current_user(request)
 
     if not user:
@@ -48,6 +52,10 @@ async def admin_system_health(request: Request):
         )
 
     health = await run_in_threadpool(build_system_health_snapshot)
+    operations = await run_in_threadpool(
+        build_operations_monitoring_snapshot,
+        days=days,
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -56,5 +64,7 @@ async def admin_system_health(request: Request):
             "title": "系統健康中心",
             "user": user,
             "health": health,
+            "operations": operations,
+            "days": operations["days"],
         },
     )
