@@ -209,10 +209,14 @@ def record_order_cancellation_in_connection(
                     THEN excluded.reason_code
                     ELSE order_cancellations.reason_code
                 END,
-                reason_text = COALESCE(
-                    excluded.reason_text,
-                    order_cancellations.reason_text
-                ),
+                reason_text = CASE
+                    WHEN excluded.reason_code != 'unspecified'
+                    THEN COALESCE(
+                        excluded.reason_text,
+                        order_cancellations.reason_text
+                    )
+                    ELSE order_cancellations.reason_text
+                END,
                 source = CASE
                     WHEN excluded.reason_code != 'unspecified'
                     THEN excluded.source
