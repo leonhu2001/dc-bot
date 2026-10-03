@@ -1,0 +1,797 @@
+/* MOWAN ADMIN UI THEME
+   Single visual layer for the customer-service backoffice.
+   Loaded after legacy/page-local styles so old and new pages share one system. */
+
+:root {
+    --admin-bg: #0a0c0f;
+    --admin-bg-soft: #0d1014;
+    --admin-panel: #12161b;
+    --admin-panel-2: #171c22;
+    --admin-panel-3: #0f1317;
+    --admin-border: #272e36;
+    --admin-border-soft: rgba(255,255,255,.075);
+    --admin-border-strong: rgba(214,176,90,.30);
+    --admin-text: #f3f1ea;
+    --admin-text-soft: #c8c4bb;
+    --admin-muted: #9299a3;
+    --admin-muted-2: #747c86;
+    --admin-gold: #d6b05a;
+    --admin-gold-soft: #efd38f;
+    --admin-green: #7bc79a;
+    --admin-red: #df7b7b;
+    --admin-blue: #83a9d6;
+    --admin-orange: #d69a62;
+    --admin-radius: 14px;
+    --admin-radius-sm: 10px;
+    --admin-sidebar: 208px;
+    --admin-font: Inter, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
+
+    /* Backward-compatible R5 tokens. */
+    --r5-bg: var(--admin-bg);
+    --r5-panel: var(--admin-panel);
+    --r5-line: var(--admin-border-soft);
+    --r5-gold: var(--admin-gold);
+    --r5-gold-soft: var(--admin-gold-soft);
+    --r5-text: var(--admin-text);
+    --r5-muted: var(--admin-muted);
+    --r5-side: var(--admin-sidebar);
+    --r5-font: var(--admin-font);
+}
+
+html {
+    color-scheme: dark;
+}
+
+html body.mw-r5-layout,
+html body.mw-r5-admin {
+    margin: 0 !important;
+    min-height: 100vh !important;
+    color: var(--admin-text) !important;
+    background:
+        radial-gradient(circle at 72% -12%, rgba(214,176,90,.065), transparent 30%),
+        linear-gradient(180deg, #0b0d10 0%, var(--admin-bg) 35%, #090b0d 100%) !important;
+    font-family: var(--admin-font) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 1.58 !important;
+    letter-spacing: .005em;
+}
+
+html body.mw-r5-layout *,
+html body.mw-r5-admin * {
+    box-sizing: border-box;
+    font-family: var(--admin-font) !important;
+}
+
+html body.mw-r5-layout a,
+html body.mw-r5-admin a {
+    text-underline-offset: 3px;
+}
+
+html body.mw-r5-layout .mw-r5-shell,
+html body.mw-r5-admin .mw-r5-shell {
+    grid-template-columns: var(--admin-sidebar) minmax(0, 1fr) !important;
+    background: transparent !important;
+}
+
+/* Sidebar */
+html body.mw-r5-layout .mw-r5-sidebar,
+html body.mw-r5-admin .mw-r5-sidebar {
+    padding: 22px 14px 28px !important;
+    border-right: 1px solid var(--admin-border) !important;
+    background: rgba(8,10,12,.94) !important;
+    backdrop-filter: blur(12px);
+}
+
+html body.mw-r5-layout .mw-r5-brand,
+html body.mw-r5-admin .mw-r5-brand {
+    padding: 1px 10px 22px !important;
+}
+
+html body.mw-r5-layout .mw-r5-brand small,
+html body.mw-r5-admin .mw-r5-brand small {
+    color: var(--admin-gold) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: .16em !important;
+}
+
+html body.mw-r5-layout .mw-r5-brand strong,
+html body.mw-r5-admin .mw-r5-brand strong {
+    margin-top: 6px !important;
+    color: var(--admin-text) !important;
+    font-size: 19px !important;
+    font-weight: 800 !important;
+    letter-spacing: -.02em;
+}
+
+html body.mw-r5-layout .mw-r5-nav,
+html body.mw-r5-admin .mw-r5-nav {
+    gap: 4px !important;
+}
+
+html body.mw-r5-layout .mw-r5-nav a,
+html body.mw-r5-admin .mw-r5-nav a {
+    min-height: 40px !important;
+    padding: 0 11px !important;
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    color: var(--admin-muted) !important;
+    background: transparent !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    letter-spacing: .01em;
+}
+
+html body.mw-r5-layout .mw-r5-nav a:hover,
+html body.mw-r5-layout .mw-r5-nav a.active,
+html body.mw-r5-admin .mw-r5-nav a:hover,
+html body.mw-r5-admin .mw-r5-nav a.active {
+    color: var(--admin-gold-soft) !important;
+    border-color: rgba(214,176,90,.22) !important;
+    background: rgba(214,176,90,.075) !important;
+}
+
+/* Main shell and page header */
+html body.mw-r5-layout .mw-r5-main-host,
+html body.mw-r5-admin .mw-r5-main-host {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 28px 32px 52px !important;
+    background: transparent !important;
+}
+
+html body.mw-r5-layout .mw-r5-page-header,
+html body.mw-r5-admin .mw-r5-page-header {
+    min-height: 0 !important;
+    margin: 0 0 18px !important;
+    padding: 0 0 17px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--admin-border-soft) !important;
+    background: transparent !important;
+}
+
+html body.mw-r5-layout .mw-r5-kicker,
+html body.mw-r5-admin .mw-r5-kicker,
+html body.mw-r5-layout .mw-r5-page-header .eyebrow,
+html body.mw-r5-admin .mw-r5-page-header .eyebrow {
+    margin: 0 !important;
+    color: var(--admin-gold) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: .15em !important;
+    line-height: 1.3 !important;
+}
+
+html body.mw-r5-layout .mw-r5-page-header h1,
+html body.mw-r5-layout .mw-r5-page-title,
+html body.mw-r5-admin .mw-r5-page-header h1,
+html body.mw-r5-admin .mw-r5-page-title {
+    margin: 7px 0 0 !important;
+    color: var(--admin-text) !important;
+    font-size: clamp(27px, 2.6vw, 32px) !important;
+    font-weight: 800 !important;
+    line-height: 1.16 !important;
+    letter-spacing: -.025em !important;
+}
+
+html body.mw-r5-layout .mw-r5-page-header p,
+html body.mw-r5-admin .mw-r5-page-header p {
+    max-width: 860px !important;
+    margin: 7px 0 0 !important;
+    color: var(--admin-muted) !important;
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+}
+
+html body.mw-r5-layout .mw-r5-content,
+html body.mw-r5-admin .mw-r5-content {
+    gap: 16px !important;
+}
+
+/* Page-level back navigation */
+html body.mw-r5-layout .mw-admin-backbar,
+html body.mw-r5-admin .mw-admin-backbar {
+    margin: -2px 0 14px !important;
+}
+
+html body.mw-r5-layout .mw-admin-backbar .button,
+html body.mw-r5-admin .mw-admin-backbar .button {
+    min-height: 34px !important;
+    padding: 0 11px !important;
+    color: var(--admin-text-soft) !important;
+    background: transparent !important;
+    border-color: var(--admin-border) !important;
+}
+
+/* Global search */
+html body.mw-r5-layout .mw-admin-searchbar,
+html body.mw-r5-admin .mw-admin-searchbar {
+    margin: 0 0 18px !important;
+    padding: 10px !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 12px !important;
+    background: rgba(18,22,27,.72) !important;
+}
+
+html body.mw-r5-layout .mw-admin-searchbar form,
+html body.mw-r5-admin .mw-admin-searchbar form {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) auto !important;
+    gap: 9px !important;
+    margin: 0 !important;
+}
+
+/* Typography */
+html body.mw-r5-layout h2,
+html body.mw-r5-admin h2,
+html body.mw-r5-layout .section-title,
+html body.mw-r5-admin .section-title {
+    color: var(--admin-text) !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+    letter-spacing: -.015em !important;
+}
+
+html body.mw-r5-layout h3,
+html body.mw-r5-admin h3 {
+    color: var(--admin-text) !important;
+    font-size: 15px !important;
+    font-weight: 750 !important;
+    line-height: 1.38 !important;
+}
+
+html body.mw-r5-layout :is(p, li, td, label),
+html body.mw-r5-admin :is(p, li, td, label) {
+    font-size: 13.5px !important;
+}
+
+html body.mw-r5-layout small,
+html body.mw-r5-admin small,
+html body.mw-r5-layout .muted-text,
+html body.mw-r5-admin .muted-text {
+    color: var(--admin-muted) !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+}
+
+html body.mw-r5-layout code,
+html body.mw-r5-admin code {
+    color: var(--admin-gold-soft) !important;
+    background: rgba(214,176,90,.055) !important;
+}
+
+/* Surface system */
+html body.mw-r5-layout :is(
+    .panel,.card,.metric,.stat,.member,.admin-order-card,
+    .dispatch-panel,.dispatch-order-card,.dispatch-my-card,
+    .my-payout-card,.my-payout-total-card,.history-ledger-panel,
+    .history-ledger-filter,.history-ledger-stat,.staff-summary-filter,
+    .staff-summary-ledger-panel,.staff-summary-total-card,.center-stat,
+    .center-review,.profile-stat,.profile-panel,.profile-edit-card,
+    .wallet-detail-panel,.wallet-detail-command,.wallet-detail-stat
+),
+html body.mw-r5-admin :is(
+    .panel,.card,.metric,.stat,.member,.admin-order-card,
+    .center-stat,.center-review,.profile-stat,.profile-panel,
+    .profile-edit-card
+) {
+    color: var(--admin-text) !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    background: linear-gradient(180deg, rgba(255,255,255,.012), transparent 45%), var(--admin-panel) !important;
+    box-shadow: 0 1px 0 rgba(255,255,255,.018) inset !important;
+}
+
+html body.mw-r5-layout .compact-panel,
+html body.mw-r5-admin .compact-panel {
+    padding: 16px !important;
+}
+
+html body.mw-r5-layout .section-title-row,
+html body.mw-r5-admin .section-title-row {
+    gap: 14px !important;
+    align-items: flex-start !important;
+    margin-bottom: 13px !important;
+}
+
+html body.mw-r5-layout .section-title-row h2,
+html body.mw-r5-admin .section-title-row h2 {
+    margin: 0 !important;
+}
+
+html body.mw-r5-layout .section-title-row p,
+html body.mw-r5-admin .section-title-row p {
+    margin: 4px 0 0 !important;
+}
+
+/* Metric cards */
+html body.mw-r5-layout :is(.payout-stat-grid,.center-stats,.stats,.staff-summary-total-grid,.profile-stats),
+html body.mw-r5-admin :is(.center-stats,.stats,.profile-stats) {
+    gap: 10px !important;
+}
+
+html body.mw-r5-layout :is(.payout-stat-card,.center-stat,.stat,.staff-summary-total-card,.profile-stat),
+html body.mw-r5-admin :is(.center-stat,.stat,.profile-stat) {
+    min-height: 92px !important;
+    padding: 14px 15px !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 12px !important;
+    background: var(--admin-panel) !important;
+    color: var(--admin-text) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+html body.mw-r5-layout :is(.payout-stat-card,.center-stat,.stat,.staff-summary-total-card,.profile-stat) > span,
+html body.mw-r5-admin :is(.center-stat,.stat,.profile-stat) > span {
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: .01em !important;
+    text-shadow: none !important;
+}
+
+html body.mw-r5-layout :is(.payout-stat-card,.center-stat,.stat,.staff-summary-total-card,.profile-stat) > strong,
+html body.mw-r5-admin :is(.center-stat,.stat,.profile-stat) > strong {
+    display: block !important;
+    margin-top: 7px !important;
+    color: var(--admin-gold-soft) !important;
+    font-size: 27px !important;
+    font-weight: 800 !important;
+    line-height: 1.05 !important;
+    letter-spacing: -.02em !important;
+    text-shadow: none !important;
+    filter: none !important;
+    -webkit-text-stroke: 0 !important;
+}
+
+html body.mw-r5-layout .staff-summary-total-card::after {
+    opacity: .14 !important;
+}
+
+/* Buttons */
+html body.mw-r5-layout :is(button,.button,.btn,.profile-button,.mw-r8-btn),
+html body.mw-r5-admin :is(button,.button,.btn,.profile-button,.mw-r8-btn) {
+    min-height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 0 13px !important;
+    border: 1px solid rgba(214,176,90,.25) !important;
+    border-radius: 9px !important;
+    color: var(--admin-gold-soft) !important;
+    background: rgba(214,176,90,.075) !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    letter-spacing: .005em !important;
+    text-decoration: none !important;
+    text-shadow: none !important;
+    cursor: pointer !important;
+}
+
+html body.mw-r5-layout :is(button,.button,.btn,.profile-button,.mw-r8-btn):hover,
+html body.mw-r5-admin :is(button,.button,.btn,.profile-button,.mw-r8-btn):hover {
+    color: #f6dfaa !important;
+    border-color: rgba(214,176,90,.42) !important;
+    background: rgba(214,176,90,.115) !important;
+}
+
+html body.mw-r5-layout :is(.button.secondary,.btn.secondary),
+html body.mw-r5-admin :is(.button.secondary,.btn.secondary) {
+    color: var(--admin-text-soft) !important;
+    border-color: var(--admin-border) !important;
+    background: rgba(255,255,255,.025) !important;
+}
+
+html body.mw-r5-layout :is(.button.secondary,.btn.secondary):hover,
+html body.mw-r5-admin :is(.button.secondary,.btn.secondary):hover {
+    color: var(--admin-text) !important;
+    border-color: #3a424d !important;
+    background: rgba(255,255,255,.045) !important;
+}
+
+html body.mw-r5-layout button:disabled,
+html body.mw-r5-admin button:disabled {
+    opacity: .45 !important;
+    cursor: not-allowed !important;
+}
+
+/* Forms */
+html body.mw-r5-layout :is(input,select,textarea,.input,.select),
+html body.mw-r5-admin :is(input,select,textarea,.input,.select) {
+    min-height: 39px !important;
+    padding: 0 11px !important;
+    border: 1px solid var(--admin-border) !important;
+    border-radius: 9px !important;
+    outline: none !important;
+    color: var(--admin-text) !important;
+    background: var(--admin-panel-3) !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+
+html body.mw-r5-layout textarea,
+html body.mw-r5-admin textarea {
+    min-height: 100px !important;
+    padding: 10px 11px !important;
+    line-height: 1.55 !important;
+}
+
+html body.mw-r5-layout :is(input,select,textarea,.input,.select):focus,
+html body.mw-r5-admin :is(input,select,textarea,.input,.select):focus {
+    border-color: rgba(214,176,90,.48) !important;
+    box-shadow: 0 0 0 3px rgba(214,176,90,.08) !important;
+}
+
+html body.mw-r5-layout ::placeholder,
+html body.mw-r5-admin ::placeholder {
+    color: #666e78 !important;
+    opacity: 1 !important;
+}
+
+html body.mw-r5-layout label > span,
+html body.mw-r5-admin label > span,
+html body.mw-r5-layout .field label,
+html body.mw-r5-admin .field label {
+    color: var(--admin-muted) !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+}
+
+/* Tables / rows */
+html body.mw-r5-layout table,
+html body.mw-r5-admin table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    color: var(--admin-text-soft) !important;
+}
+
+html body.mw-r5-layout th,
+html body.mw-r5-admin th {
+    padding: 10px 12px !important;
+    color: var(--admin-muted) !important;
+    background: var(--admin-panel-3) !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    font-size: 11.5px !important;
+    font-weight: 750 !important;
+    letter-spacing: .025em !important;
+    text-transform: none !important;
+}
+
+html body.mw-r5-layout td,
+html body.mw-r5-admin td {
+    padding: 11px 12px !important;
+    color: var(--admin-text-soft) !important;
+    border-bottom-color: var(--admin-border-soft) !important;
+    font-size: 13px !important;
+    vertical-align: middle !important;
+}
+
+html body.mw-r5-layout tbody tr:hover,
+html body.mw-r5-admin tbody tr:hover {
+    background: rgba(255,255,255,.018) !important;
+}
+
+/* Status and notices */
+html body.mw-r5-layout .status-chip,
+html body.mw-r5-admin .status-chip,
+html body.mw-r5-layout :is(.tag,.badge,.pill,.profile-tag,.profile-status),
+html body.mw-r5-admin :is(.tag,.badge,.pill,.profile-tag,.profile-status) {
+    border-radius: 999px !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    font-size: 10.5px !important;
+    font-weight: 750 !important;
+}
+
+html body.mw-r5-layout .status-chip.is-paid,
+html body.mw-r5-admin .status-chip.is-paid,
+html body.mw-r5-layout :is(.profile-status.public,.profile-status.ready),
+html body.mw-r5-admin :is(.profile-status.public,.profile-status.ready) {
+    color: #a8dfba !important;
+    border-color: rgba(123,199,154,.26) !important;
+    background: rgba(123,199,154,.075) !important;
+}
+
+html body.mw-r5-layout .status-chip.is-unpaid,
+html body.mw-r5-admin .status-chip.is-unpaid,
+html body.mw-r5-layout :is(.profile-status.hidden,.profile-status.missing),
+html body.mw-r5-admin :is(.profile-status.hidden,.profile-status.missing) {
+    color: #efa6a6 !important;
+    border-color: rgba(223,123,123,.27) !important;
+    background: rgba(223,123,123,.07) !important;
+}
+
+html body.mw-r5-layout :is(.notice,.alert),
+html body.mw-r5-admin :is(.notice,.alert) {
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    font-size: 12.5px !important;
+}
+
+html body.mw-r5-layout .notice.success,
+html body.mw-r5-admin .notice.success {
+    color: #a9dfbb !important;
+    border-color: rgba(123,199,154,.27) !important;
+    background: rgba(123,199,154,.065) !important;
+}
+
+html body.mw-r5-layout .notice.error,
+html body.mw-r5-admin .notice.error {
+    color: #efa6a6 !important;
+    border-color: rgba(223,123,123,.27) !important;
+    background: rgba(223,123,123,.065) !important;
+}
+
+/* Lists and meta grids */
+html body.mw-r5-layout :is(.admin-order-card,.compact-order-card,.center-row),
+html body.mw-r5-admin :is(.admin-order-card,.compact-order-card,.center-row) {
+    border-color: var(--admin-border-soft) !important;
+    border-radius: 12px !important;
+    background: rgba(255,255,255,.012) !important;
+}
+
+html body.mw-r5-layout :is(.admin-order-card,.compact-order-card,.center-row):hover,
+html body.mw-r5-admin :is(.admin-order-card,.compact-order-card,.center-row):hover {
+    border-color: rgba(214,176,90,.24) !important;
+    background: rgba(214,176,90,.028) !important;
+}
+
+html body.mw-r5-layout :is(.order-meta,.compact-meta) > div,
+html body.mw-r5-admin :is(.order-meta,.compact-meta) > div {
+    border-color: var(--admin-border-soft) !important;
+    background: var(--admin-panel-3) !important;
+}
+
+html body.mw-r5-layout :is(.order-meta,.compact-meta) span,
+html body.mw-r5-admin :is(.order-meta,.compact-meta) span {
+    color: var(--admin-muted) !important;
+    font-size: 10.5px !important;
+}
+
+html body.mw-r5-layout :is(.order-meta,.compact-meta) strong,
+html body.mw-r5-admin :is(.order-meta,.compact-meta) strong {
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+}
+
+/* Center pages */
+html body.mw-r5-layout .center-grid {
+    gap: 16px !important;
+}
+
+html body.mw-r5-layout .center-row {
+    gap: 12px !important;
+    padding: 12px 13px !important;
+}
+
+html body.mw-r5-layout .center-row small {
+    color: var(--admin-muted) !important;
+}
+
+html body.mw-r5-layout .center-cell span {
+    color: var(--admin-muted) !important;
+    font-size: 10.5px !important;
+}
+
+html body.mw-r5-layout .center-cell b {
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+}
+
+/* Legacy standalone workspaces */
+html body.mw-r5-admin .mw-r5-legacy-body > :is(.shell,.sh,.page) {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body :is(.sidebar,.sb) {
+    display: none !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body :is(.main,main) {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body > .page > .top {
+    min-height: 0 !important;
+    margin: 0 0 12px !important;
+    padding: 10px 12px !important;
+    align-items: center !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: 11px !important;
+    background: rgba(18,22,27,.65) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body > .page > .top .eyebrow {
+    display: none !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body > .page > .top .subtitle {
+    margin: 0 !important;
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+}
+
+/* Order detail's old data cells */
+html body.mw-r5-admin .mw-r5-legacy-body .card-head {
+    min-height: 48px !important;
+    padding: 0 14px !important;
+    color: var(--admin-text) !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    background: var(--admin-panel-3) !important;
+    font-size: 13.5px !important;
+    font-weight: 750 !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .grid {
+    gap: 1px !important;
+    background: var(--admin-border-soft) !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .cell {
+    min-height: 78px !important;
+    padding: 12px 13px !important;
+    background: #0f1317 !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .cell .label {
+    color: var(--admin-muted) !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-admin .mw-r5-legacy-body .cell .value {
+    margin-top: 6px !important;
+    color: var(--admin-text-soft) !important;
+    font-size: 12.5px !important;
+    line-height: 1.55 !important;
+}
+
+/* Staff / profile legacy compatibility */
+html body.mw-r5-admin :is(.profile-toolbar-note,.profile-muted,.profile-bio,.profile-panel-meta,.profile-edit-meta,.profile-no-image) {
+    color: var(--admin-muted) !important;
+}
+
+html body.mw-r5-admin :is(.profile-panel-head,.profile-edit-actions) {
+    border-color: var(--admin-border-soft) !important;
+}
+
+html body.mw-r5-admin :is(.profile-wall details,.profile-preview,.profile-edit-meta) {
+    border-color: var(--admin-border-soft) !important;
+    background: var(--admin-panel-3) !important;
+}
+
+/* Wallet */
+html body.mw-r5-layout :is(.wallet-code,.order-no),
+html body.mw-r5-admin :is(.wallet-code,.order-no) {
+    color: var(--admin-gold) !important;
+}
+
+/* Empty states */
+html body.mw-r5-layout :is(.empty-state,.empty,.profile-empty),
+html body.mw-r5-admin :is(.empty-state,.empty,.profile-empty) {
+    color: var(--admin-muted) !important;
+}
+
+/* Scrollbars */
+html body.mw-r5-layout *,
+html body.mw-r5-admin * {
+    scrollbar-width: thin;
+    scrollbar-color: #39414b transparent;
+}
+
+html body.mw-r5-layout *::-webkit-scrollbar,
+html body.mw-r5-admin *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+
+html body.mw-r5-layout *::-webkit-scrollbar-thumb,
+html body.mw-r5-admin *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #343b45;
+    background-clip: padding-box;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    :root {
+        --admin-sidebar: 190px;
+    }
+
+    html body.mw-r5-layout .mw-r5-main-host,
+    html body.mw-r5-admin .mw-r5-main-host {
+        padding: 24px 24px 44px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    html body.mw-r5-layout .mw-r5-shell,
+    html body.mw-r5-admin .mw-r5-shell {
+        display: block !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-sidebar,
+    html body.mw-r5-admin .mw-r5-sidebar {
+        position: relative !important;
+        width: 100% !important;
+        height: auto !important;
+        padding: 14px !important;
+        border-right: 0 !important;
+        border-bottom: 1px solid var(--admin-border) !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-brand,
+    html body.mw-r5-admin .mw-r5-brand {
+        padding: 0 4px 12px !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-nav,
+    html body.mw-r5-admin .mw-r5-nav {
+        display: flex !important;
+        gap: 6px !important;
+        overflow-x: auto !important;
+        padding-bottom: 3px !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-nav a,
+    html body.mw-r5-admin .mw-r5-nav a {
+        min-width: max-content !important;
+        min-height: 36px !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-main-host,
+    html body.mw-r5-admin .mw-r5-main-host {
+        padding: 20px 14px 38px !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-page-header,
+    html body.mw-r5-admin .mw-r5-page-header {
+        margin-bottom: 14px !important;
+        padding-bottom: 14px !important;
+    }
+
+    html body.mw-r5-layout .mw-r5-page-header h1,
+    html body.mw-r5-admin .mw-r5-page-header h1 {
+        font-size: 26px !important;
+    }
+
+    html body.mw-r5-layout .mw-admin-searchbar form,
+    html body.mw-r5-admin .mw-admin-searchbar form {
+        grid-template-columns: 1fr !important;
+    }
+
+    html body.mw-r5-layout :is(.payout-stat-grid,.center-stats,.stats,.staff-summary-total-grid,.profile-stats),
+    html body.mw-r5-admin :is(.center-stats,.stats,.profile-stats) {
+        grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    }
+
+    html body.mw-r5-layout .section-title-row,
+    html body.mw-r5-admin .section-title-row {
+        flex-direction: column !important;
+    }
+}
+
+@media (max-width: 480px) {
+    html body.mw-r5-layout :is(.payout-stat-grid,.center-stats,.stats,.staff-summary-total-grid,.profile-stats),
+    html body.mw-r5-admin :is(.center-stats,.stats,.profile-stats) {
+        grid-template-columns: 1fr !important;
+    }
+}
