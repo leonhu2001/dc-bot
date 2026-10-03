@@ -146,3 +146,27 @@ def test_system_maintenance_contains_operations_monitoring():
     assert "營運監控" in page
     assert "智慧派單填滿率" in page
     assert "取消率" in page
+
+
+def test_nested_drilldowns_preserve_return_destination():
+    order_page = (TEMPLATES / "admin_order_detail.html").read_text(
+        encoding="utf-8"
+    )
+    wallet_page = (TEMPLATES / "admin_wallet_detail.html").read_text(
+        encoding="utf-8"
+    )
+    customer_360 = (TEMPLATES / "admin_customer_360.html").read_text(
+        encoding="utf-8"
+    )
+    routers = ROOT / "web" / "app" / "routers"
+    admin_source = (routers / "admin.py").read_text(encoding="utf-8")
+    search_source = (routers / "admin_global_search.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "request.query_params.get('return_to', '') | urlencode" in order_page
+    assert 'name="return_to"' in wallet_page
+    assert "request: Request | None = None" in admin_source
+    assert 'params["return_to"] = return_to' in admin_source
+    assert "child_return_param" in customer_360
+    assert "child_return_param" in search_source
