@@ -130,6 +130,7 @@
                         method="post"
                         action="/staff/{{ profile.staff_id }}/favorite"
                     >
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button
                             class="button button-secondary"
                             type="submit"

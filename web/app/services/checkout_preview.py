@@ -1249,7 +1249,8 @@ def point_item_status(
 
 
     if category in {
-        "fun",
+        "fun",  # 歷史訂單
+        "delta_desktop_fun",
         "title",
     }:
 

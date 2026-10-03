@@ -895,6 +895,7 @@ document.addEventListener(
     </section>
 
     <form id="historyBulkForm" method="post" action="/admin/orders/history/bulk-update">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <input type="hidden" name="page" value="{{ page }}">
 
         {% if orders %}

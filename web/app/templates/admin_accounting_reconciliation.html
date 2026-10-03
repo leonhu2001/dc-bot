@@ -197,6 +197,7 @@
                                     onsubmit="return confirm('確定要執行「{{ action_label }}」嗎？系統會在真正執行前再次驗證最新資料。');"
                                     style="margin:0;"
                                 >
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                     <input type="hidden" name="order_id" value="{{ issue.order_id }}">
                                     <input type="hidden" name="action" value="{{ issue.repair_action }}">
 
@@ -219,6 +220,7 @@
                                     onsubmit="return confirm('確定要把這筆少扣差額認列為歷史折扣 {{ discount_amount }}T 嗎？此動作不會扣顧客錢包，也不會重算已發分潤。');"
                                     style="margin:0;"
                                 >
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                     <input type="hidden" name="order_id" value="{{ issue.order_id }}">
                                     <input type="hidden" name="action" value="recognize_historical_discount">
 

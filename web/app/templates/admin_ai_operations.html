@@ -94,6 +94,7 @@
     </div>
 
     <form method="post" action="/admin/ai-operations/analyze" class="admin-add-worker-form">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <input type="hidden" name="period" value="{{ period }}">
 
         <label>

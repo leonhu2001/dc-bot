@@ -1158,6 +1158,7 @@ h1 {
             method="post"
             action="/admin/staff/sync"
         >
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
             <button
                 class="

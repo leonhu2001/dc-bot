@@ -244,6 +244,7 @@
                                     method="post"
                                     action="/admin/reviews/{{ row.id }}/toggle-hidden"
                                 >
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
                                     <button type="submit">
                                         切換隱藏
@@ -256,6 +257,7 @@
                                     method="post"
                                     action="/admin/reviews/{{ row.id }}/toggle-public"
                                 >
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
                                     <button type="submit">
                                         切換評價公開

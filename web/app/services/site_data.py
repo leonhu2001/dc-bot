@@ -2693,38 +2693,41 @@ from services.order_rules import (
 
 
 PUBLIC_ORDER_CATEGORY_ORDER = [
-    "basic",
-    "fun",
+    "delta_desktop_basic",
+    "delta_mobile_basic",
+    "delta_desktop_fun",
     "farm",
-    "general",
-    "title",
     "steam",
     "valorant",
     "lol",
+    "apex",
 ]
 
 
 PUBLIC_ORDER_CATEGORY_DESCRIPTIONS = {
-    "basic":
-        "三角洲主要服務，從娛樂陪玩到技術需求。",
+    "delta_desktop_basic":
+        "三角洲端遊主要服務，包含娛樂陪、技術陪、甜蜜單與教學單。",
 
-    "fun":
-        "魔丸限定趣味玩法與特色企劃。",
+    "delta_mobile_basic":
+        "三角洲手遊服務，包含娛樂陪、技術陪、甜蜜單與教學單。",
+
+    "delta_desktop_fun":
+        "三角洲端遊限定趣味玩法與特色企劃。",
 
     "farm":
-        "代解、代肝與指定進度服務。",
-
-    "general":
-        "跨遊戲通用服務，目前包含甜蜜單與 1 對 1 教學。",
-
-    "title":
-        "高難度挑戰與稱號相關方案。",
+        "三角洲代解、代肝與指定進度服務，端遊或手遊身分組皆可接。",
 
     "steam":
-        "Steam 遊戲陪玩服務。",
+        "Steam 遊戲陪玩與甜蜜單服務。",
 
     "valorant":
-        "Valorant 陪玩與開黑服務。",
+        "特戰英豪陪玩、甜蜜單與教學服務。",
+
+    "lol":
+        "英雄聯盟陪玩、甜蜜單與教學服務。",
+
+    "apex":
+        "APEX 陪玩、甜蜜單與教學服務。",
 }
 
 

@@ -75,6 +75,7 @@
     </div>
 
     <form method="post" action="/admin/ai-support-knowledge/manual" class="admin-add-worker-form">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
         <label>
             <span>常見問題</span>
             <textarea class="input" name="question" rows="3" maxlength="2400" required
@@ -119,6 +120,7 @@
                     <form method="post"
                           action="/admin/ai-support-knowledge/candidates/{{ item.id }}/approve"
                           class="admin-add-worker-form">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <label>
                             <span>客人問題</span>
                             <textarea class="input" name="question" rows="3" maxlength="2400" required>{{ item.question }}</textarea>
@@ -137,6 +139,7 @@
                     <form method="post"
                           action="/admin/ai-support-knowledge/candidates/{{ item.id }}/reject"
                           style="margin-top:10px;">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button class="button secondary" type="submit">略過，不學這筆</button>
                     </form>
 
@@ -186,6 +189,7 @@
 
                     <form method="post"
                           action="/admin/ai-support-knowledge/{{ item.id }}/archive">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button class="button secondary" type="submit">停用這筆知識</button>
                     </form>
                 </article>

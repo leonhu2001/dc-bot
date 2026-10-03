@@ -314,7 +314,14 @@ async def admin_staff_sync(request: Request):
 
 @router.get("/admin/staff/sync")
 async def admin_staff_sync_get(request: Request):
-    return await run_admin_staff_sync(request)
+    # 相容舊連結但禁止 GET 產生寫入；實際同步只允許受 CSRF 驗證的 POST。
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(
+        "Method Not Allowed",
+        status_code=405,
+        headers={"Allow": "POST"},
+    )
 
 # MAWAN PHASE 4B-2 V4 STAFF WORKSPACE
 
