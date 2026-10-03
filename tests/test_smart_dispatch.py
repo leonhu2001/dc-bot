@@ -69,6 +69,45 @@ def test_specified_staff_cannot_bypass_game_requirement():
 
 
 
+def test_customer_service_role_mention_uses_configured_bot_role():
+    from views.smart_dispatch import _customer_service_role_mention
+
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+            self.mention = f"<@&{role_id}>"
+
+    class Guild:
+        def get_role(self, role_id):
+            if role_id == 123:
+                return Role(role_id)
+            return None
+
+    class Bot:
+        customer_service_role_id_value = 123
+
+    assert _customer_service_role_mention(
+        Bot(),
+        Guild(),
+    ) == "<@&123>"
+
+
+def test_customer_service_role_mention_is_safe_when_role_missing():
+    from views.smart_dispatch import _customer_service_role_mention
+
+    class Guild:
+        def get_role(self, role_id):
+            return None
+
+    class Bot:
+        customer_service_role_id_value = 999
+
+    assert _customer_service_role_mention(
+        Bot(),
+        Guild(),
+    ) is None
+
+
 def test_sweet_order_gender_rules_filter_smart_dispatch_candidates():
     from services.order_rules import ROLE_IDS
     from views.smart_dispatch import get_eligible_dispatch_candidate_ids
