@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
@@ -71,6 +72,16 @@ async def admin_customer_360(
         customer_id,
     )
 
+    origin = str(request.query_params.get("return_to") or "").strip()
+    if not (origin == "/admin" or origin.startswith("/admin/")):
+        origin = ""
+
+    customer_page_url = f"/admin/search/customer/{customer_id}"
+    if origin:
+        customer_page_url += "?return_to=" + quote(origin, safe="")
+
+    child_return_param = quote(customer_page_url, safe="")
+
     response = templates.TemplateResponse(
         request=request,
         name="admin_customer_360.html",
@@ -78,6 +89,7 @@ async def admin_customer_360(
             "title": f"{bundle['identity']['display_name']}｜客戶 360°",
             "user": user,
             "customer": bundle,
+            "child_return_param": child_return_param,
         },
     )
     response.headers["Cache-Control"] = "no-store"
