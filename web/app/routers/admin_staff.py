@@ -155,110 +155,19 @@ async def admin_staff_page(
     message: str | None = None,
     error: str | None = None,
 ):
-    user = require_admin(request)
+    query = {
+        "q": str(q or ""),
+        "status": str(status or "active"),
+        "role": "" if str(role or "") == "all" else str(role or ""),
+    }
+    if message:
+        query["message"] = str(message)
+    if error:
+        query["error"] = str(error)
 
-    if not user:
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "沒有權限",
-                "message": "你沒有客服後台權限。",
-                "user": get_current_user(request),
-            },
-            status_code=403,
-        )
-
-    if role not in VALID_STAFF_ROLE_FILTERS:
-        role = "all"
-
-    if status not in {"active", "inactive", "all"}:
-        status = "active"
-
-    db = SessionLocal()
-
-    try:
-        all_members = list(db.scalars(select(WebStaffMember)).all())
-
-        active_members = [member for member in all_members if member.is_active]
-        inactive_members = [member for member in all_members if not member.is_active]
-
-        if status == "inactive":
-            members = inactive_members
-        elif status == "all":
-            members = all_members
-        else:
-            members = active_members
-
-        if role == "customer_service":
-            members = [member for member in members if member.is_customer_service]
-        elif role in RECEIVER_ROLE_IDS:
-            members = [
-                member
-                for member in members
-                if role in str(member.roles_json or "")
-            ]
-        elif role == "worker":
-            members = [member for member in members if member.is_worker]
-        elif role == "companion":
-            members = [member for member in members if member.is_companion]
-
-        keyword = q.strip()
-        if keyword:
-            members = [
-                member
-                for member in members
-                if member_matches_keyword(member, keyword)
-            ]
-
-        members.sort(
-            key=lambda member: str(
-                member.display_name
-                or member.global_name
-                or member.username
-                or member.discord_id
-            )
-        )
-
-        prepare_member_labels(members)
-
-        stats = {
-            "total": len(all_members),
-            "active": len(active_members),
-            "inactive": len(inactive_members),
-            "customer_service": len([
-                member for member in active_members
-                if member.is_customer_service
-            ]),
-            "worker": len([
-                member for member in active_members
-                if member.is_worker
-            ]),
-            "companion": len([
-                member for member in active_members
-                if member.is_companion
-            ]),
-        }
-    finally:
-        db.close()
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin_staff.html",
-        context={
-            "title": "人員名單",
-            "user": user,
-            "members": members,
-            "stats": stats,
-            "role": role,
-            "status": status,
-            "q": q,
-            "message": message,
-            "error": error,
-            "role_filter_options": STAFF_ROLE_FILTERS,
-            "staff_role_filters": STAFF_ROLE_FILTERS,
-            "customer_service_label": CUSTOMER_SERVICE_LABEL,
-        },
+    return RedirectResponse(
+        url=f"/admin/staff-center?{urlencode(query)}",
+        status_code=303,
     )
 
 
@@ -302,7 +211,7 @@ async def run_admin_staff_sync(request: Request):
         db.close()
 
     return RedirectResponse(
-        url=f"/admin/staff?{urlencode(query)}",
+        url=f"/admin/staff-center?{urlencode(query)}",
         status_code=303,
     )
 
@@ -1143,41 +1052,24 @@ async def admin_staff_detail_v4(
 # MAWAN WEBSITE FINAL NON-ORDER V1 - CUSTOMER MANAGEMENT
 
 @router.get("/admin/customers")
-async def admin_customers_final(request: Request, q: str = ""):
-    user=_mw4b2_admin_user(request)
-    if not user: return RedirectResponse(url="/admin",status_code=303)
-    key=str(q or "").strip().lower(); db=SessionLocal()
-    try:
-        rows=db.execute(_mw4b2_text("""
-            SELECT customer_discord_id,MAX(customer_display_name) customer_display_name,
-                   COUNT(*) order_count,
-                   SUM(CASE WHEN status IN ('closed','completed','done') THEN 1 ELSE 0 END) completed_count,
-                   SUM(CASE WHEN status IN ('cancelled','canceled') THEN 1 ELSE 0 END) cancelled_count,
-                   MAX(created_at) last_order_at
-            FROM web_orders
-            WHERE customer_discord_id IS NOT NULL AND TRIM(customer_discord_id)<>''
-            GROUP BY customer_discord_id ORDER BY last_order_at DESC
-        """)).mappings().all()
-        customers=[]
-        for x in rows:
-            x=dict(x); cid=str(x.get("customer_discord_id") or ""); name=str(x.get("customer_display_name") or cid)
-            if key and key not in cid.lower() and key not in name.lower(): continue
-            spend=db.execute(_mw4b2_text("""
-                SELECT COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','canceled')
-                    THEN COALESCE(customer_pay_amount,amount,0) ELSE 0 END),0)
-                FROM web_orders WHERE customer_discord_id=:cid
-            """),{"cid":cid}).scalar() or 0
-            fav=db.execute(_mw4b2_text("SELECT COUNT(*) FROM staff_favorites WHERE customer_discord_id=:cid"),{"cid":cid}).scalar() or 0
-            rev=db.execute(_mw4b2_text("SELECT COUNT(*) FROM order_reviews WHERE customer_discord_id=:cid"),{"cid":cid}).scalar() or 0
-            customers.append(dict(
-                customer_discord_id=cid,customer_display_name=name,
-                order_count=int(x.get("order_count") or 0),completed_count=int(x.get("completed_count") or 0),
-                cancelled_count=int(x.get("cancelled_count") or 0),total_spend=int(spend),
-                favorite_count=int(fav),review_count=int(rev),last_order_at=str(x.get("last_order_at") or "")[:16]
-            ))
-    finally: db.close()
-    return templates.TemplateResponse(request=request,name="admin_customers.html",context={
-        "title":"客戶管理｜魔丸娛樂","user":user,"q":q,"customers":customers})
+async def admin_customers_final(
+    request: Request,
+    q: str = "",
+    error: str | None = None,
+):
+    user = _mw4b2_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/admin", status_code=303)
+
+    query = {"q": str(q or "")}
+    if error:
+        query["error"] = str(error)
+
+    return RedirectResponse(
+        url=f"/admin/customer-center?{urlencode(query)}",
+        status_code=303,
+    )
+
 
 @router.get("/admin/customers/{customer_discord_id}")
 async def admin_customer_detail_final(customer_discord_id: str, request: Request):
