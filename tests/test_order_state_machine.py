@@ -438,4 +438,4 @@ def test_cancellation_transition_records_structured_reason_and_preserves_it():
 
     assert CANCELLATION_REASON_LABELS["no_staff"] == "缺少可接人員"
     assert preserved["reason_code"] == "no_staff"
-    assert preserved["reason_text"] == "cleanup"
+    assert preserved["reason_text"] == "晚班無可接人員"
