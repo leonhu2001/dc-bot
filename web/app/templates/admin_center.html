@@ -119,8 +119,13 @@
 
         <div class="center-stats">
             <div class="center-stat"><span>客戶數</span><strong>{{ snapshot.stats.customers }}</strong></div>
+            {% if is_manager %}
             <div class="center-stat"><span>錢包帳戶</span><strong>{{ snapshot.stats.wallet_count }}</strong></div>
             <div class="center-stat"><span>錢包總餘額</span><strong>{{ "{:,}".format(snapshot.stats.wallet_total) }}T</strong></div>
+            {% else %}
+            <div class="center-stat"><span>公開評價</span><strong>{{ snapshot.stats.visible_reviews }}</strong></div>
+            <div class="center-stat"><span>全部評價</span><strong>{{ snapshot.stats.review_count }}</strong></div>
+            {% endif %}
             <div class="center-stat"><span>評價</span><strong>{{ snapshot.stats.review_count }}</strong></div>
         </div>
     </div>
@@ -140,7 +145,11 @@
                 </div>
                 <div class="center-cell"><span>訂單數</span><b>{{ row.order_count }}</b></div>
                 <div class="center-cell"><span>完成消費</span><b>{{ "{:,}".format(row.completed_spend or 0) }}T</b></div>
+                {% if is_manager %}
                 <div class="center-cell"><span>錢包</span><b>{{ "{:,}".format(row.wallet_balance or 0) }}T</b></div>
+                {% else %}
+                <div class="center-cell"><span>最近活動</span><b>{{ row.last_seen_at or '-' }}</b></div>
+                {% endif %}
                 <div class="center-actions">
                     <a class="button secondary" href="/admin/customers/{{ row.customer_discord_id }}?return_to=/admin/customer-center">客戶資料</a>
                     {% if is_manager %}
