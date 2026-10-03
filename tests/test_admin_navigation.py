@@ -202,12 +202,13 @@ def test_standalone_admin_templates_do_not_load_overlay_css():
         uses_layout = "extends" in text and "layout.html" in text
         includes_sidebar = "_admin_sidebar.html" in text
 
+        assert "mw_admin_theme.css" not in text, (
+            f"{path.name} still references the removed overlay theme"
+        )
+
         if includes_sidebar and not uses_layout:
             assert "mw_portal_r5.css" in text, (
                 f"{path.name} is missing canonical portal CSS"
-            )
-            assert "mw_admin_theme.css" not in text, (
-                f"{path.name} still loads the removed overlay theme"
             )
 
 
