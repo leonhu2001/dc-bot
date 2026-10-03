@@ -94,6 +94,24 @@ def test_authenticated_sensitive_pages_are_never_cacheable():
     assert not should_no_store("/admin", authenticated=False)
 
 
+def test_order_workspace_template_injects_csrf_for_all_post_forms():
+    template = Path("web/app/templates/admin_order_detail.html").read_text(
+        encoding="utf-8"
+    )
+
+    meta = 'name="csrf-token"'
+    script = 'src="/static/js/csrf.js?v=1"'
+
+    assert meta in template
+    assert script in template
+    assert template.index(meta) < template.index(script)
+
+    assert (
+        '/admin/order-workspace/{{ order.id }}/acceptance/'
+        '{{ claim.staff_discord_id }}/remove'
+    ) in template
+
+
 def test_oauth_return_path_rejects_open_redirects():
     assert _safe_return_path("/me/orders") == "/me/orders"
     assert _safe_return_path("/admin?x=1") == "/admin?x=1"
