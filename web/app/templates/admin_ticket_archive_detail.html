@@ -20,7 +20,6 @@
         <h2>{{ archive.order_no or ("WEB-" ~ archive.order_id if archive.order_id else archive.ticket_channel_name) }}</h2>
         <div class="td-sub">{{ archive.ticket_channel_name }} · {{ archive.message_count }} 則訊息</div>
       </div>
-      <a class="td-back" href="{{ request.query_params.get('return_to') or '/admin/support-center' }}">返回上一層</a>
     </div>
   </section>
 
