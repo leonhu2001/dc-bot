@@ -150,6 +150,63 @@ def test_sweet_order_gender_rules_filter_smart_dispatch_candidates():
     assert male_only == ["2", "3"]
     assert unrestricted_double == ["1", "2", "3"]
 
+def test_familiar_worker_benefit_starts_at_diamond():
+    from core.vip_levels import VIP_LEVELS
+    from views.smart_dispatch import customer_has_familiar_worker_benefit
+
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+
+    class Member:
+        def __init__(self, member_id, role_ids):
+            self.id = member_id
+            self.roles = [Role(role_id) for role_id in role_ids]
+
+    class Guild:
+        def __init__(self, member):
+            self.members = [member]
+
+        def get_member(self, member_id):
+            return next(
+                (
+                    member
+                    for member in self.members
+                    if member.id == member_id
+                ),
+                None,
+            )
+
+    platinum_role = next(
+        int(level["role_id"])
+        for level in VIP_LEVELS
+        if level["name"] == "白金魔丸"
+    )
+    diamond_role = next(
+        int(level["role_id"])
+        for level in VIP_LEVELS
+        if level["name"] == "鑽石魔丸"
+    )
+    black_diamond_role = next(
+        int(level["role_id"])
+        for level in VIP_LEVELS
+        if level["name"] == "黑鑽魔丸"
+    )
+
+    assert not customer_has_familiar_worker_benefit(
+        Guild(Member(10, [platinum_role])),
+        10,
+    )
+    assert customer_has_familiar_worker_benefit(
+        Guild(Member(10, [diamond_role])),
+        10,
+    )
+    assert customer_has_familiar_worker_benefit(
+        Guild(Member(10, [black_diamond_role])),
+        10,
+    )
+
+
 def _setup_assignment_db(path):
     with sqlite3.connect(path) as conn:
         conn.executescript(
@@ -170,6 +227,93 @@ def _setup_assignment_db(path):
             """
         )
         conn.commit()
+
+
+def _setup_familiar_assignment_db(path):
+    with sqlite3.connect(path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE web_orders (
+                id INTEGER PRIMARY KEY,
+                customer_discord_id TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+
+            CREATE TABLE order_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                worker_discord_id TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                assigned_at TEXT
+            );
+
+            CREATE TABLE staff_favorites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_discord_id TEXT NOT NULL,
+                staff_discord_id TEXT NOT NULL
+            );
+            """
+        )
+        conn.commit()
+
+
+def test_completed_favorite_workers_require_history_and_favorite(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+    _setup_familiar_assignment_db(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            INSERT INTO web_orders (id, customer_discord_id, status) VALUES
+                (1, '100', 'closed'),
+                (2, '100', 'closed'),
+                (3, '100', 'active'),
+                (4, '200', 'closed');
+
+            INSERT INTO order_assignments (
+                order_id,
+                worker_discord_id,
+                is_active,
+                assigned_at
+            ) VALUES
+                (1, 'A', 1, '2026-10-01 01:00:00'),
+                (2, 'B', 1, '2026-10-01 02:00:00'),
+                (3, 'C', 1, '2026-10-01 03:00:00'),
+                (4, 'D', 1, '2026-10-01 04:00:00');
+
+            INSERT INTO staff_favorites (
+                customer_discord_id,
+                staff_discord_id
+            ) VALUES
+                ('100', 'A'),
+                ('100', 'C'),
+                ('100', 'D');
+            """
+        )
+        conn.commit()
+
+    result = smart_dispatch.get_completed_favorite_worker_ids(
+        "100",
+        ["D", "C", "B", "A"],
+        db_file=db_path,
+    )
+
+    assert result == ["A"]
+
+
+def test_rank_dispatch_candidates_prefers_priority_after_specified(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+    _setup_assignment_db(db_path)
+
+    ranked = smart_dispatch.rank_dispatch_candidates(
+        ["A", "VIP", "S"],
+        specified_staff_ids=["S"],
+        priority_staff_ids=["VIP"],
+        db_file=db_path,
+        now_taipei=datetime(2026, 10, 2, 12, 0, tzinfo=TAIPEI_TZ),
+    )
+
+    assert ranked == ["S", "VIP", "A"]
 
 
 def test_rank_dispatch_candidates_prefers_specified_then_low_load(tmp_path):
@@ -243,6 +387,37 @@ def test_choose_initial_candidates_keeps_specified_and_batch_size():
     )
 
     assert selected_two == ["S1", "A", "B", "C"]
+
+
+def test_choose_initial_candidates_gives_familiar_staff_head_start():
+    selected = smart_dispatch.choose_initial_candidate_ids(
+        ["VIP", "A", "B", "C"],
+        specified_staff_ids=[],
+        priority_staff_ids=["VIP"],
+        required_staff_count=1,
+    )
+
+    assert selected == ["VIP"]
+
+    selected_two = smart_dispatch.choose_initial_candidate_ids(
+        ["VIP", "A", "B", "C"],
+        specified_staff_ids=[],
+        priority_staff_ids=["VIP"],
+        required_staff_count=2,
+    )
+
+    assert selected_two == ["VIP", "A"]
+
+
+def test_choose_initial_candidates_uses_familiar_batch_when_enough_exist():
+    selected = smart_dispatch.choose_initial_candidate_ids(
+        ["V1", "V2", "V3", "A", "B"],
+        specified_staff_ids=[],
+        priority_staff_ids=["V1", "V2", "V3"],
+        required_staff_count=1,
+    )
+
+    assert selected == ["V1", "V2", "V3"]
 
 
 def test_next_candidate_batch_skips_already_notified():
