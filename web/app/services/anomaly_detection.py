@@ -172,6 +172,10 @@ def _issue(
     order_id: int | None = None,
     action_url: str | None = None,
     action_label: str | None = None,
+    repair_action: str | None = None,
+    repair_target_id: int | None = None,
+    repair_label: str | None = None,
+    repair_block_reason: str | None = None,
     source: str = "runtime",
 ) -> None:
     if severity not in SEVERITY_ORDER:
@@ -195,6 +199,19 @@ def _issue(
             "order_id": int(order_id) if order_id is not None else None,
             "action_url": action_url,
             "action_label": action_label,
+            "repair_action": str(repair_action) if repair_action else None,
+            "repair_target_id": (
+                int(repair_target_id)
+                if repair_target_id is not None
+                else None
+            ),
+            "repair_label": str(repair_label) if repair_label else None,
+            "repairable": bool(repair_action),
+            "repair_block_reason": (
+                str(repair_block_reason)
+                if repair_block_reason
+                else None
+            ),
             "source": source,
         }
     )
@@ -450,6 +467,9 @@ def _check_payment_reviews(
                 age_minutes=age,
                 action_url="/admin/payment-reviews",
                 action_label="處理付款",
+                repair_action="retry_payment_review_apply",
+                repair_target_id=int(data["id"]),
+                repair_label="重新套用付款",
             )
         elif status == "approved_pending_apply" and age is not None and age >= 10:
             _issue(
@@ -542,6 +562,9 @@ def _check_sync_events(
                     else "/admin/system"
                 ),
                 action_label="查看相關資料",
+                repair_action="retry_sync_event",
+                repair_target_id=event_id,
+                repair_label="重新排入同步",
             )
         elif status == "processing" and age is not None and age >= 10:
             _issue(
@@ -554,6 +577,9 @@ def _check_sync_events(
                 detail=f"{event_type} 已 {_format_age(age)}沒有完成。",
                 age_minutes=age,
                 order_id=order_id,
+                repair_action="retry_sync_event",
+                repair_target_id=event_id,
+                repair_label="重新排入同步",
             )
         elif status == "pending" and age is not None and age >= 15:
             _issue(
@@ -566,6 +592,9 @@ def _check_sync_events(
                 detail=f"{event_type} 已等待 {_format_age(age)}。",
                 age_minutes=age,
                 order_id=order_id,
+                repair_action="retry_sync_event",
+                repair_target_id=event_id,
+                repair_label="重新排入同步",
             )
 
 
@@ -770,6 +799,9 @@ def _append_accounting_issues(
                 if order_id is not None
                 else "前往帳務對帳"
             ),
+            repair_action=item.get("repair_action"),
+            repair_label=item.get("repair_label"),
+            repair_block_reason=item.get("repair_block_reason"),
             source="accounting",
         )
 
@@ -866,6 +898,9 @@ def build_anomaly_snapshot(
         "issue_count": total_issue_count,
         "critical_count": int(severity_counts.get("critical", 0)),
         "warning_count": int(severity_counts.get("warning", 0)),
+        "repairable_count": sum(
+            1 for item in issues if item.get("repairable")
+        ),
         "category_counts": dict(category_counts),
         "category_labels": dict(CATEGORY_LABELS),
         "issues": visible_issues,
