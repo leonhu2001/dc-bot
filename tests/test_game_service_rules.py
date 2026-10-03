@@ -582,6 +582,33 @@ def test_delta_platform_labels_are_direct_catalog_rules():
         assert get_required_game_role_keys(rule) == (expected_game,), key
 
 
+def test_delta_farm_orders_accept_either_desktop_or_mobile_identity():
+    for rule_key, rule in ORDER_RULES.items():
+        if rule.category != "farm":
+            continue
+
+        assert get_required_game_role_keys(rule) == (
+            "delta_desktop",
+            "delta_mobile",
+        ), rule_key
+
+        allowed_ids = get_allowed_role_ids(rule)
+        required_ids = get_required_game_role_ids(rule)
+
+        # 任一平台身分組即可通過 game gate；服務職位仍照原 rule 驗證。
+        service_role_id = allowed_ids[0]
+        assert role_ids_match_requirements(
+            [service_role_id, GAME_ROLE_BY_KEY["delta_desktop"].role_id],
+            allowed_ids,
+            required_ids,
+        ) is True
+        assert role_ids_match_requirements(
+            [service_role_id, GAME_ROLE_BY_KEY["delta_mobile"].role_id],
+            allowed_ids,
+            required_ids,
+        ) is True
+
+
 def test_all_season_3x3_variants_allow_all_five_store_roles():
     keys = (
         "farm_season_3x3_normal",
@@ -599,37 +626,39 @@ def test_all_season_3x3_variants_allow_all_five_store_roles():
 
 
 
-def test_web_delta_catalog_exposes_desktop_and_mobile_groups():
-    groups = {
+def test_web_delta_catalog_exposes_split_desktop_and_mobile_categories():
+    desktop_groups = {
         group["key"]: group
-        for group in get_grouped_order_catalog("basic")
+        for group in get_grouped_order_catalog("delta_desktop_basic")
+    }
+    mobile_groups = {
+        group["key"]: group
+        for group in get_grouped_order_catalog("delta_mobile_basic")
     }
 
-    assert groups["tech_play"]["label"] == "技術陪〈端遊〉"
-    assert groups["tech_play_mobile"]["label"] == "技術陪〈手遊〉"
-    assert groups["entertain"]["label"] == "娛樂陪〈端遊〉"
-    assert groups["entertain_mobile"]["label"] == "娛樂陪〈手遊〉"
+    assert desktop_groups["tech_play"]["label"] == "技術陪〈端遊〉"
+    assert desktop_groups["entertain"]["label"] == "娛樂陪〈端遊〉"
+    assert "tech_play_mobile" not in desktop_groups
+    assert "entertain_mobile" not in desktop_groups
 
-    assert [variant["rule_key"] for variant in groups["tech_play_mobile"]["variants"]] == [
+    assert mobile_groups["tech_play_mobile"]["label"] == "技術陪〈手遊〉"
+    assert mobile_groups["entertain_mobile"]["label"] == "娛樂陪〈手遊〉"
+    assert "tech_play" not in mobile_groups
+    assert "entertain" not in mobile_groups
+
+    assert [
+        variant["rule_key"]
+        for variant in mobile_groups["tech_play_mobile"]["variants"]
+    ] == [
         "basic_mobile_tech_secret_single",
         "basic_mobile_tech_secret_double",
         "basic_mobile_tech_topsecret_single",
         "basic_mobile_tech_topsecret_double",
     ]
-    assert [variant["price"] for variant in groups["tech_play_mobile"]["variants"]] == [
-        380,
-        760,
-        420,
-        840,
-    ]
-    assert [variant["rule_key"] for variant in groups["entertain_mobile"]["variants"]] == [
-        "basic_mobile_entertain_single",
-        "basic_mobile_entertain_double",
-    ]
-    assert [variant["price"] for variant in groups["entertain_mobile"]["variants"]] == [
-        320,
-        600,
-    ]
+    assert [
+        variant["price"]
+        for variant in mobile_groups["tech_play_mobile"]["variants"]
+    ] == [380, 760, 420, 840]
 
 
 
