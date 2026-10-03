@@ -2,7 +2,7 @@
 {% set _return_param = request.query_params.get('return_to', '') %}
 {% set _back = namespace(href='') %}
 
-{% if _return_param and _return_param.startswith('/admin') %}
+{% if _return_param and (_return_param == '/admin' or _return_param.startswith('/admin/')) %}
     {% set _back.href = _return_param %}
 {% elif _p.startswith('/admin/staff') %}
     {% set _back.href = '/admin/staff-center' %}
