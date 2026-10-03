@@ -17745,7 +17745,81 @@ class WebsiteOrderCsConfirmView(
             )
             return
 
+        await interaction.response.send_message(
+            "請先選擇取消原因，再按「確認取消網站訂單」。",
+            view=WebsitePendingCancelConfirmView(
+                order_id=int(order_id),
+                order_channel_id=int(channel_id),
+            ),
+            ephemeral=True,
+        )
+
+
+
+
+class WebsitePendingCancelConfirmView(discord.ui.View):
+    def __init__(
+        self,
+        *,
+        order_id: int,
+        order_channel_id: int,
+    ):
+        super().__init__(timeout=60)
+        self.order_id = int(order_id)
+        self.order_channel_id = int(order_channel_id)
+        self.cancellation_reason_code = "unspecified"
+        self.add_item(OrderCancellationReasonSelect())
+
+    @discord.ui.button(
+        label="確認取消網站訂單",
+        style=discord.ButtonStyle.danger,
+        row=0,
+    )
+    async def confirm_cancel(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if (
+            not isinstance(interaction.user, discord.Member)
+            or not is_customer_staff(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "只有客服可以取消網站訂單。",
+                ephemeral=True,
+            )
+            return
+
+        if self.cancellation_reason_code == "unspecified":
+            await interaction.response.send_message(
+                "請先從下拉選單選擇取消原因。",
+                ephemeral=True,
+            )
+            return
+
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "找不到 Discord 伺服器，請重新操作。",
+                ephemeral=True,
+            )
+            return
+
+        channel = interaction.guild.get_channel(
+            self.order_channel_id
+        )
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message(
+                "找不到這張網站訂單票口。",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.defer(ephemeral=True)
+
+        reason_label = dict(CANCEL_REASON_OPTIONS).get(
+            self.cancellation_reason_code,
+            self.cancellation_reason_code,
+        )
 
         try:
             from shared.order_state import (
@@ -17755,13 +17829,14 @@ class WebsiteOrderCsConfirmView(
             )
 
             transition_order_state(
-                order_id=int(order_id),
+                order_id=self.order_id,
                 target_status=CANCELLED,
                 source="website_pending_cancel",
-                reason="客服從待確認面板取消網站訂單",
-                actor_discord_id=getattr(interaction.user, "id", None),
+                reason=reason_label,
+                actor_discord_id=interaction.user.id,
                 expected_statuses={PENDING_CS_DISPATCH},
                 require_empty_dispatch_message=True,
+                cancellation_reason_code=self.cancellation_reason_code,
             )
         except ValueError:
             await interaction.followup.send(
@@ -17770,14 +17845,17 @@ class WebsiteOrderCsConfirmView(
             )
             return
 
-        SELF_SERVICE_ORDER_SELECTIONS.pop(channel_id, None)
+        SELF_SERVICE_ORDER_SELECTIONS.pop(
+            self.order_channel_id,
+            None,
+        )
 
         try:
-            delete_order_row_from_db(channel_id)
+            delete_order_row_from_db(self.order_channel_id)
         except Exception as exc:
             print(
                 "[website-order] cancel local row cleanup failed "
-                f"channel_id={channel_id}: {exc}",
+                f"channel_id={self.order_channel_id}: {exc}",
                 flush=True,
             )
 
@@ -17788,8 +17866,9 @@ class WebsiteOrderCsConfirmView(
                 interaction.guild,
                 title="網站訂單已取消",
                 fields=[
-                    ("網站訂單", f"WEB-{order_id}", True),
+                    ("網站訂單", f"WEB-{self.order_id}", True),
                     ("操作客服", interaction.user.mention, True),
+                    ("取消原因", reason_label, True),
                     ("票口", channel.mention, False),
                 ],
                 color=discord.Color.red(),
@@ -17802,7 +17881,10 @@ class WebsiteOrderCsConfirmView(
             )
 
         await interaction.followup.send(
-            f"已取消 WEB-{order_id}，票口將在 3 秒後關閉。",
+            (
+                f"已取消 WEB-{self.order_id}｜"
+                f"{reason_label}，票口將在 3 秒後關閉。"
+            ),
             ephemeral=False,
         )
 
@@ -17811,18 +17893,41 @@ class WebsiteOrderCsConfirmView(
         try:
             await channel.delete(
                 reason=(
-                    f"Website order WEB-{order_id} "
+                    f"Website order WEB-{self.order_id} "
                     f"cancelled by {interaction.user}"
                 )
             )
         except discord.HTTPException as exc:
             print(
                 "[website-order] cancel ticket delete failed "
-                f"channel_id={channel_id}: {exc}",
+                f"channel_id={self.order_channel_id}: {exc}",
                 flush=True,
             )
 
+    @discord.ui.button(
+        label="保留訂單",
+        style=discord.ButtonStyle.secondary,
+        row=0,
+    )
+    async def keep_order(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if (
+            not isinstance(interaction.user, discord.Member)
+            or not is_customer_staff(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "只有客服可以操作。",
+                ephemeral=True,
+            )
+            return
 
+        await interaction.response.edit_message(
+            content="已保留網站訂單。",
+            view=None,
+        )
 
 
 # BEGIN MAWAN_R13_UNIFIED_WEBSITE_ORDER_FLOW
