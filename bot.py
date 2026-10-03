@@ -233,6 +233,7 @@ from views.support_calls import (
 
 from views.smart_dispatch import (
     prepare_initial_smart_dispatch,
+    send_initial_smart_dispatch_alert,
     send_specified_staff_dispatch_dms,
     smart_dispatch_escalation_loop,
 )
@@ -6660,11 +6661,7 @@ async def resume_stored_order(
             )
 
     new_message = await dispatch_channel.send(
-        content=(
-            resume_smart_dispatch["content"]
-            if resume_smart_dispatch is not None
-            else None
-        ),
+        content=None,
         embed=embed,
         view=DispatchClaimView(
             customer_id=customer_id or 0,
@@ -6683,6 +6680,16 @@ async def resume_stored_order(
             everyone=False
         )
     )
+
+    if resume_smart_dispatch is not None:
+        try:
+            await send_initial_smart_dispatch_alert(
+                guild,
+                content=resume_smart_dispatch["content"],
+                dispatch_jump_url=new_message.jump_url,
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(f"[smart-dispatch] resume initial alert failed: {exc}", flush=True)
 
     # 刪除同一張票口的所有舊派單訊息，避免存單恢復後殘留不能操作的舊面板。
     for message_id in old_dispatch_message_ids:
@@ -7884,7 +7891,7 @@ async def create_waiting_acceptance_order_from_self_service(
     )
 
     dispatch_message = await dispatch_channel.send(
-        content=smart_dispatch["content"],
+        content=None,
         embed=embed,
         view=DispatchClaimView(
             customer_id=customer_id,
@@ -7903,6 +7910,15 @@ async def create_waiting_acceptance_order_from_self_service(
             everyone=False,
         ),
     )
+
+    try:
+        await send_initial_smart_dispatch_alert(
+            guild,
+            content=smart_dispatch["content"],
+            dispatch_jump_url=dispatch_message.jump_url,
+        )
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        print(f"[smart-dispatch] initial alert failed: {exc}", flush=True)
 
     web_note_parts = []
 
@@ -15028,11 +15044,7 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
     )
 
     dispatch_message = await dispatch_channel.send(
-        content=(
-            resend_smart_dispatch["content"]
-            if resend_smart_dispatch is not None
-            else None
-        ),
+        content=None,
         embed=embed,
         view=view,
         allowed_mentions=discord.AllowedMentions(
@@ -15041,6 +15053,16 @@ async def resend_dispatch(interaction: discord.Interaction, order_channel_id: st
             everyone=False,
         ),
     )
+
+    if resend_smart_dispatch is not None:
+        try:
+            await send_initial_smart_dispatch_alert(
+                guild,
+                content=resend_smart_dispatch["content"],
+                dispatch_jump_url=dispatch_message.jump_url,
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(f"[smart-dispatch] resend initial alert failed: {exc}", flush=True)
 
     claim_data = {
         "companion": set(),
@@ -16575,7 +16597,7 @@ async def _web_order_created_ensure_dispatch(
 
         dispatch_message = (
             await dispatch_channel.send(
-                content=smart_dispatch["content"],
+                content=None,
                 embed=placeholder,
                 allowed_mentions=(
                     discord.AllowedMentions(
@@ -16593,24 +16615,19 @@ async def _web_order_created_ensure_dispatch(
 
     if existing_plan is None:
         try:
-            if str(dispatch_message.content or "").strip() != str(
-                smart_dispatch["content"]
-            ).strip():
-                await dispatch_message.edit(
-                    content=smart_dispatch["content"],
-                    allowed_mentions=discord.AllowedMentions(
-                        users=True,
-                        roles=True,
-                        everyone=False,
-                    ),
-                )
-        except discord.HTTPException as exc:
+            await send_initial_smart_dispatch_alert(
+                guild,
+                content=smart_dispatch["content"],
+                dispatch_jump_url=dispatch_message.jump_url,
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
             print(
-                f"[smart-dispatch] website content update failed "
+                f"[smart-dispatch] website initial alert failed "
                 f"order_id={order_id}: {exc}",
                 flush=True,
             )
 
+    if existing_plan is None:
         try:
             create_smart_dispatch_plan(
                 order_id=int(order_id),
