@@ -1019,7 +1019,7 @@ async def admin_staff_detail_v4(
 
         return RedirectResponse(
             url=(
-                "/admin/staff"
+                "/admin/staff-center"
                 "?error="
                 "%E6%89%BE%E4%B8%8D%E5%88%B0%E9%80%99%E4%BD%8D%E4%BA%BA%E5%93%A1"
             ),
@@ -1079,7 +1079,7 @@ async def admin_customer_detail_final(customer_discord_id: str, request: Request
     try:
         orders=[dict(r) for r in db.execute(_mw4b2_text(
             "SELECT * FROM web_orders WHERE customer_discord_id=:cid ORDER BY id DESC LIMIT 80"),{"cid":cid}).mappings().all()]
-        if not orders: return RedirectResponse(url="/admin/customers?error=not_found",status_code=303)
+        if not orders: return RedirectResponse(url="/admin/customer-center?error=not_found",status_code=303)
         name=str(orders[0].get("customer_display_name") or cid)
         favorites=[dict(r) for r in db.execute(_mw4b2_text("""
             SELECT f.staff_discord_id,COALESCE(p.display_name,f.staff_display_name,f.staff_discord_id) staff_name,
