@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from math import floor
-from typing import Literal
+import time
+from typing import Any, Literal
 
 from services.game_roles import GAME_ROLE_BY_KEY
 
@@ -141,6 +142,85 @@ class PriceResult:
     required_staff_count: int
     free_specify_fee: bool
     details: tuple[str, ...]
+
+
+RULE_OVERRIDE_FIELDS = {
+    "label",
+    "pricing_type",
+    "price",
+    "unit_label",
+    "allowed_roles",
+    "required_staff_count",
+    "min_quantity",
+    "max_quantity",
+    "allow_specify",
+    "max_specified_count",
+    "specify_fee_default",
+    "specify_fee_by_role",
+    "specify_free_min_units",
+    "specify_free_basis",
+    "player_count_enabled",
+    "min_player_count",
+    "max_player_count",
+    "price_multiply_player_count",
+    "point_benefits_allowed",
+    "min_protector_count",
+    "service_bonus_buy",
+    "service_bonus_gift",
+    "staff_adjustments",
+    "staff_adjustment_labels",
+    "note",
+    "allowed_game_roles",
+    "required_game_roles",
+    "specify_fee_by_game_role",
+}
+
+_TUPLE_OVERRIDE_FIELDS = {
+    "allowed_roles",
+    "allowed_game_roles",
+    "required_game_roles",
+}
+_DICT_OVERRIDE_FIELDS = {
+    "specify_fee_by_role",
+    "staff_adjustments",
+    "staff_adjustment_labels",
+    "specify_fee_by_game_role",
+}
+
+
+def rule_to_override_payload(rule: OrderRule) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key in RULE_OVERRIDE_FIELDS:
+        value = getattr(rule, key)
+        if key in _TUPLE_OVERRIDE_FIELDS:
+            payload[key] = list(value or ())
+        elif key in _DICT_OVERRIDE_FIELDS:
+            payload[key] = dict(value or {})
+        else:
+            payload[key] = value
+    return payload
+
+
+def build_rule_with_override(
+    base_rule: OrderRule,
+    payload: dict[str, Any] | None,
+) -> OrderRule:
+    if not payload:
+        return base_rule
+
+    changes: dict[str, Any] = {}
+    for key, value in payload.items():
+        if key not in RULE_OVERRIDE_FIELDS:
+            continue
+        if key in _TUPLE_OVERRIDE_FIELDS:
+            value = tuple(str(item) for item in (value or []) if str(item).strip())
+        elif key in _DICT_OVERRIDE_FIELDS:
+            if not isinstance(value, dict):
+                raise ValueError(f"{key} 必須是物件。")
+            value = dict(value)
+        changes[key] = value
+
+    return replace(base_rule, **changes)
 
 
 def _protectors_fee() -> dict[RoleKey, int]:
@@ -1137,39 +1217,185 @@ def rule_role_labels(rule: OrderRule) -> str:
     return qualification or required_games
 
 
+def validate_rule_definition(key: str, rule: OrderRule) -> None:
+    if rule.category not in CATEGORY_LABELS:
+        raise RuntimeError(f"{key}: unknown category {rule.category}")
+
+    if rule.pricing_type not in {"fixed", "hourly", "game", "unit", "manual"}:
+        raise RuntimeError(f"{key}: invalid pricing type")
+
+    if rule.pricing_type != "manual" and int(rule.price) < 0:
+        raise RuntimeError(f"{key}: invalid price")
+
+    if rule.required_staff_count != "player_count" and int(rule.required_staff_count) <= 0:
+        raise RuntimeError(f"{key}: invalid required staff count")
+
+    if int(rule.min_quantity) <= 0:
+        raise RuntimeError(f"{key}: invalid minimum quantity")
+    if rule.max_quantity is not None and int(rule.max_quantity) < int(rule.min_quantity):
+        raise RuntimeError(f"{key}: maximum quantity is below minimum quantity")
+
+    if rule.player_count_enabled:
+        if int(rule.min_player_count) <= 0:
+            raise RuntimeError(f"{key}: invalid minimum player count")
+        if (
+            rule.max_player_count is not None
+            and int(rule.max_player_count) < int(rule.min_player_count)
+        ):
+            raise RuntimeError(f"{key}: maximum player count is below minimum")
+
+    if rule.allow_specify:
+        if (
+            not rule.specify_fee_by_role
+            and not rule.specify_fee_by_game_role
+            and int(rule.specify_fee_default or 0) <= 0
+            and rule.specify_free_min_units is None
+        ):
+            raise RuntimeError(f"{key}: specify enabled but no fee configured")
+
+    if not rule.allowed_roles and not rule.allowed_game_roles:
+        raise RuntimeError(f"{key}: no allowed roles")
+
+    unknown_roles = [
+        role_key
+        for role_key in tuple(rule.allowed_roles) + tuple(rule.allowed_game_roles)
+        if role_key not in ALL_ROLE_IDS
+    ]
+    if unknown_roles:
+        raise RuntimeError(f"{key}: unknown allowed roles {unknown_roles}")
+
+    unknown_required_games = [
+        role_key
+        for role_key in rule.required_game_roles
+        if role_key not in ALL_ROLE_IDS
+    ]
+    if unknown_required_games:
+        raise RuntimeError(
+            f"{key}: unknown required game roles {unknown_required_games}"
+        )
+
+    if (
+        rule.min_protector_count > 0
+        and rule.min_protector_count
+        > get_required_staff_count(rule, rule.max_player_count or 1)
+    ):
+        raise RuntimeError(f"{key}: min protector count exceeds required staff count")
+
+
 def validate_rules() -> None:
-    for key, rule in ORDER_RULES.items():
-        if rule.category not in CATEGORY_LABELS:
-            raise RuntimeError(f"{key}: unknown category {rule.category}")
-
-        if rule.pricing_type != "manual" and int(rule.price) < 0:
-            raise RuntimeError(f"{key}: invalid price")
-
-        if rule.required_staff_count != "player_count" and int(rule.required_staff_count) <= 0:
-            raise RuntimeError(f"{key}: invalid required staff count")
-
-        if rule.allow_specify:
-            if not rule.specify_fee_by_role and not rule.specify_fee_by_game_role and rule.specify_fee_default <= 0:
-                raise RuntimeError(f"{key}: specify enabled but no fee configured")
-
-        if not rule.allowed_roles and not rule.allowed_game_roles:
-            raise RuntimeError(f"{key}: no allowed roles")
-
-        unknown_required_games = [
-            role_key
-            for role_key in rule.required_game_roles
-            if role_key not in ALL_ROLE_IDS
-        ]
-        if unknown_required_games:
-            raise RuntimeError(
-                f"{key}: unknown required game roles {unknown_required_games}"
-            )
-
-        if rule.min_protector_count > 0 and rule.min_protector_count > get_required_staff_count(rule, rule.max_player_count or 1):
-            raise RuntimeError(f"{key}: min protector count exceeds required staff count")
+    for key, rule in dict.items(ORDER_RULES):
+        validate_rule_definition(str(key), rule)
 
 
 validate_rules()
+
+_BASE_ORDER_RULES = dict(ORDER_RULES)
+
+
+class EffectiveOrderRules(dict):
+    """Read-through mapping that overlays manager-published rule versions.
+
+    The code definitions remain the immutable fallback. Both Web and Discord Bot
+    processes read the same SQLite override table, so a published change becomes
+    effective without a Git deployment or service restart.
+    """
+
+    def __init__(self, base_rules: dict[str, OrderRule]):
+        super().__init__(base_rules)
+        self._override_cache: dict[str, dict[str, Any]] = {}
+        self._override_cache_at = 0.0
+
+    def invalidate(self) -> None:
+        self._override_cache_at = 0.0
+        self._override_cache = {}
+
+    def _overrides(self) -> dict[str, dict[str, Any]]:
+        now = time.monotonic()
+        if now - self._override_cache_at < 2.0:
+            return self._override_cache
+
+        try:
+            from services.order_rule_store import load_active_overrides
+
+            data = load_active_overrides()
+        except Exception:
+            data = {}
+
+        self._override_cache = data
+        self._override_cache_at = now
+        return data
+
+    def _effective(self, key: str) -> OrderRule:
+        base = dict.__getitem__(self, key)
+        item = self._overrides().get(str(key))
+        if not item:
+            return base
+
+        try:
+            rule = build_rule_with_override(base, item.get("payload") or {})
+            validate_rule_definition(str(key), rule)
+            return rule
+        except Exception:
+            # A corrupted override must never take the storefront or Bot down.
+            return base
+
+    def __getitem__(self, key):
+        return self._effective(str(key))
+
+    def get(self, key, default=None):
+        try:
+            return self._effective(str(key))
+        except KeyError:
+            return default
+
+    def values(self):
+        return [self._effective(str(key)) for key in dict.keys(self)]
+
+    def items(self):
+        return [
+            (str(key), self._effective(str(key)))
+            for key in dict.keys(self)
+        ]
+
+    def copy(self):
+        return {
+            str(key): self._effective(str(key))
+            for key in dict.keys(self)
+        }
+
+
+ORDER_RULES = EffectiveOrderRules(_BASE_ORDER_RULES)
+
+
+def get_base_rule(rule_key: str) -> OrderRule:
+    try:
+        return _BASE_ORDER_RULES[str(rule_key)]
+    except KeyError as exc:
+        raise KeyError(f"unknown order rule: {rule_key}") from exc
+
+
+def get_rule_override_metadata(rule_key: str) -> dict[str, Any] | None:
+    try:
+        from services.order_rule_store import get_active_override
+
+        return get_active_override(str(rule_key))
+    except Exception:
+        return None
+
+
+def preview_rule_override(
+    rule_key: str,
+    payload: dict[str, Any],
+) -> OrderRule:
+    base = get_base_rule(rule_key)
+    rule = build_rule_with_override(base, payload)
+    validate_rule_definition(str(rule_key), rule)
+    return rule
+
+
+def invalidate_rule_override_cache() -> None:
+    if isinstance(ORDER_RULES, EffectiveOrderRules):
+        ORDER_RULES.invalidate()
 
 
 __all__ = [
@@ -1186,7 +1412,9 @@ __all__ = [
     "RoleKey",
     "OrderRule",
     "calculate_price",
+    "build_rule_with_override",
     "get_allowed_role_ids",
+    "get_base_rule",
     "get_allowed_role_keys",
     "get_allowed_role_labels",
     "get_required_game_role_ids",
@@ -1194,8 +1422,13 @@ __all__ = [
     "role_ids_match_requirements",
     "get_required_staff_count",
     "get_rule",
+    "get_rule_override_metadata",
     "get_rules_by_category",
     "get_service_quantity",
+    "invalidate_rule_override_cache",
+    "preview_rule_override",
+    "rule_to_override_payload",
+    "validate_rule_definition",
     "role_labels",
     "rule_role_labels",
     "validate_rules",
