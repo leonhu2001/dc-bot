@@ -185,6 +185,9 @@ from services.order_flow import (
     build_payment_method_embed,
     get_payment_method_info,
 )
+from services.order_discounts import (
+    allocate_store_absorbed_fixed_discount,
+)
 
 from services.game_roles import GAME_ROLES
 
@@ -7554,7 +7557,7 @@ def add_self_service_financial_breakdown_fields(
             )
 
         text += (
-            "\n同步降低打手分潤基準"
+            "\n店內吸收，不影響打手分潤"
         )
 
         embed.add_field(
@@ -8434,6 +8437,11 @@ def calculate_manual_price_adjustment(
         ),
     )
 
+    allocation = allocate_store_absorbed_fixed_discount(
+        after_percent_amount=after_percent,
+        fixed_discount_amount=fixed,
+    )
+
     return {
         "price_formula_version": 2,
         "manual_discount_mode": "pay_rate",
@@ -8447,24 +8455,17 @@ def calculate_manual_price_adjustment(
         "manual_discount_amount": percent_off,
         "percent_discount_amount": percent_off,
 
-        # 百分比與固定折扣都會降低打手分潤基準。
-        "payout_base_amount": max(
-            0,
-            after_percent - fixed,
-        ),
+        # 百分比折扣仍會降低分潤基準；客服固定金額折扣由店內全額吸收。
+        "payout_base_amount": allocation.payout_base_amount,
 
         # 舊 DB 欄位仍保留相容，
         # 但畫面統一叫固定折扣。
         "cash_coupon_amount": fixed,
         "fixed_discount_amount": fixed,
 
-        # 固定折扣改由打手分潤共同承擔，不再列店內吸收。
-        "store_absorbed_amount": 0,
+        "store_absorbed_amount": allocation.store_absorbed_amount,
 
-        "customer_pay_amount": max(
-            0,
-            after_percent - fixed,
-        ),
+        "customer_pay_amount": allocation.customer_pay_amount,
 
         "manual_discount_reason": str(
             data.get(
@@ -8592,7 +8593,7 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
             reason = adjustment["cash_coupon_reason"] or "未填原因"
             detail_parts.append(
                 f"固定折扣 -{_format_plain_amount(adjustment['cash_coupon_amount'])}"
-                f"（{reason}，同步降低打手分潤基準）"
+                f"（{reason}，店內吸收，不影響打手分潤）"
             )
 
         lines.append(("金額明細", "｜".join(detail_parts)))
@@ -9454,25 +9455,17 @@ def calculate_self_service_financials(
         ),
     )
 
-    customer_service_amount = max(
-        0,
-        after_fixed
-        - point_cash,
+    allocation = allocate_store_absorbed_fixed_discount(
+        after_percent_amount=after_percent,
+        fixed_discount_amount=fixed,
+        additional_store_discount_amount=point_cash,
+        extra_customer_charge_amount=specify_effective,
     )
 
-    # 百分比折扣與固定折扣都會降低打手分潤；
-    # 點數折價仍由店內吸收，不影響打手分潤。
-    payout_base = max(
-        0,
-        after_fixed
-        + specify_effective,
-    )
-
-    customer_pay = max(
-        0,
-        customer_service_amount
-        + specify_effective,
-    )
+    # 百分比折扣仍會降低分潤基準；
+    # 客服固定金額折扣與點數折價都由店內吸收，不影響打手分潤。
+    payout_base = allocation.payout_base_amount
+    customer_pay = allocation.customer_pay_amount
 
     notes = []
 
@@ -9665,7 +9658,7 @@ def calculate_self_service_financials(
         ),
 
         "store_absorbed_amount": (
-            point_cash
+            allocation.store_absorbed_amount
         ),
 
         "customer_pay_amount": (
@@ -10173,7 +10166,7 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
         if coupon_amount > 0:
             adjustment_note.append(
                 f"固定折扣：-{_format_plain_amount(coupon_amount)}"
-                "（同步降低打手分潤基準）"
+                "（店內吸收，不影響打手分潤）"
             )
 
         await interaction.followup.send(
