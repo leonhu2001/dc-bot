@@ -1593,6 +1593,28 @@ body.mw-r5-admin
                         {% endfor %}
                     </select>
                 </label>
+
+                <div class="mw-r8-field span-2" id="mw-cancellation-reason-fields">
+                    <span>取消原因</span>
+                    <select name="cancellation_reason_code">
+                        {% for code, label in cancellation_reason_labels.items() %}
+                            <option
+                                value="{{ code }}"
+                                {% if order.cancellation_reason_code == code %}selected{% endif %}
+                            >
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <small class="muted-text">
+                        新取消單必須選擇原因；既有舊取消單若顯示「未分類」，可在這裡補登。
+                    </small>
+                    <textarea
+                        name="cancellation_reason_text"
+                        maxlength="1000"
+                        placeholder="補充說明（選填）"
+                    >{{ order.cancellation_reason_text or '' }}</textarea>
+                </div>
             </div>
 
             <div class="mw-r8-actions">
@@ -1600,7 +1622,7 @@ body.mw-r5-admin
             </div>
 
             <div class="mw-r8-warning">
-                修改這裡會更新網站訂單資料；若該單已有正式接單人員，金額／客服調整會重新計算分潤並保留原本已發放狀態。已送出的 Discord 收據或舊訊息文字不會被這個表單改寫；實際結單／取消流程仍以 Discord 原流程為準。
+                修改這裡會更新網站訂單資料；若該單已有正式接單人員，金額／客服調整會重新計算分潤並保留原本已發放狀態。將狀態改為「已取消」時必須選擇取消原因，並寫入取消分析。已送出的 Discord 收據或舊訊息文字不會被這個表單改寫。
             </div>
         </form>
     </div>
@@ -1797,6 +1819,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const dateInput = document.querySelector('input[name="closed_date"]');
     const autoInput = document.querySelector('input[name="closed_date_auto"]');
     const touchedInput = document.querySelector('input[name="closed_date_touched"]');
+    const cancellationFields = document.getElementById("mw-cancellation-reason-fields");
 
     if (!statusSelect || !dateInput || !autoInput || !touchedInput) {
         return;
@@ -1818,6 +1841,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function syncFinalDate() {
         const isFinal = statusSelect.value === "closed" || statusSelect.value === "cancelled";
+        if (cancellationFields) {
+            cancellationFields.hidden = statusSelect.value !== "cancelled";
+        }
         if (isFinal && !dateInput.value) {
             dateInput.value = taipeiDate();
             autoInput.value = "1";
