@@ -43,8 +43,7 @@
 
 
 
-<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=review_actions_20260930_1">
-<link rel="stylesheet" href="/static/css/mw_admin_theme.css?v=20261004_1">
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
 
     <!-- MAWAN_SITE_IDENTITY -->
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
@@ -52,11 +51,11 @@
 
 </head>
 
-<!-- MAWAN_R5R1_VISUAL_FINAL -->
-<body class="mw-r5-layout">
-
 {% set current_path = request.url.path %}
 {% set mw_admin_area = current_path.startswith('/admin') %}
+
+<!-- MAWAN_R5R1_VISUAL_FINAL -->
+<body class="mw-r5-layout {% if mw_admin_area %}mw-r5-admin{% else %}mw-r5-employee{% endif %}">
 
 <div class="mw-r5-shell">
 

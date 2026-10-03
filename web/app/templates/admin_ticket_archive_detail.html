@@ -1,17 +1,6 @@
 {% extends "layout.html" %}
 {% block page_title %}票口聊天紀錄{% endblock %}
 {% block content %}
-<style>
-.td-page{display:grid;gap:18px}
-.td-card{border:1px solid rgba(245,198,107,.18);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.018)),rgba(8,11,19,.94);box-shadow:0 24px 68px rgba(0,0,0,.28)}
-.td-top{display:flex;justify-content:space-between;gap:16px;align-items:start;padding:22px}.td-k{color:var(--mw-gold,#f5c66b);font-size:11px;font-weight:950;letter-spacing:.16em}.td-top h2{font-size:30px;margin:6px 0}.td-sub{color:var(--mw-muted,#a7a0b5)}
-.td-back{display:inline-flex;padding:10px 13px;border:1px solid rgba(245,198,107,.28);border-radius:12px;text-decoration:none;color:#ffe3a3;background:rgba(245,198,107,.08);font-weight:900}
-.td-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.td-meta>div{border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;background:rgba(255,255,255,.025)}.td-meta span{display:block;color:rgba(255,255,255,.46);font-size:11px;margin-bottom:6px}.td-meta b{font-size:13px;word-break:break-all}
-.chat{padding:18px 14px}.msg{display:flex;margin:11px 0}.msg.customer{justify-content:flex-end}.msg.bot{justify-content:center}.bubble{max-width:min(720px,86%);background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.075);border-radius:14px;padding:11px 13px}.customer .bubble{background:rgba(245,198,107,.1);border-color:rgba(245,198,107,.22)}.cs .bubble{background:rgba(116,150,255,.09);border-color:rgba(116,150,255,.18)}.bot .bubble{max-width:82%;background:rgba(255,255,255,.025)}
-.who{display:flex;gap:8px;align-items:baseline;margin-bottom:7px}.who b{font-size:12px}.who small{color:rgba(255,255,255,.42);font-size:10px}.content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:13px}.files{display:grid;gap:6px;margin-top:9px}.files a{display:block;padding:8px 9px;border-radius:8px;background:rgba(255,255,255,.045);font-size:12px;overflow-wrap:anywhere}.embed-box{margin-top:8px;border-left:3px solid var(--mw-gold,#f5c66b);background:rgba(255,255,255,.035);padding:9px 10px;border-radius:5px}.embed-box strong{display:block;margin-bottom:5px}.embed-box p{margin:4px 0;white-space:pre-wrap}.embed-field{margin-top:7px;font-size:12px}.edited{opacity:.45;font-size:10px;margin-left:5px}
-@media(max-width:780px){.td-meta{grid-template-columns:1fr 1fr}.td-top{display:block}.td-back{margin-top:12px}.bubble{max-width:94%}}
-</style>
-
 <section class="td-page">
   <section class="td-card">
     <div class="td-top">
