@@ -236,6 +236,22 @@ async def send_specified_staff_dispatch_dms(
     return sent, failed
 
 
+def _customer_service_role_mention(
+    bot: discord.Client,
+    guild: discord.Guild,
+) -> str | None:
+    role_id = getattr(
+        bot,
+        "customer_service_role_id_value",
+        None,
+    )
+    try:
+        role = guild.get_role(int(role_id))
+    except (TypeError, ValueError):
+        role = None
+    return role.mention if role is not None else None
+
+
 def _role_mentions(
     guild: discord.Guild,
     role_ids: Iterable[str | int],
@@ -409,6 +425,21 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             + " ".join(role_mentions)
                         )
 
+                    support_mention = (
+                        _customer_service_role_mention(
+                            bot,
+                            guild,
+                        )
+                    )
+                    if support_mention:
+                        lines.append(
+                            "🚨 **客服介入提醒**｜"
+                            f"{support_mention} "
+                            "智慧派單已完成全量擴大，"
+                            f"目前仍缺 **{missing} 人**，"
+                            "請客服確認人力、指定名額或是否需要存單／取消。"
+                        )
+
                     lines.append(f"原派單：{jump_url}")
 
                     try:
@@ -416,7 +447,10 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             "\n".join(lines),
                             allowed_mentions=discord.AllowedMentions(
                                 users=True,
-                                roles=bool(role_mentions),
+                                roles=bool(
+                                    role_mentions
+                                    or support_mention
+                                ),
                                 everyone=False,
                             ),
                         )
