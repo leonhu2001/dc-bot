@@ -1511,21 +1511,35 @@ async def admin_sync_staff(request: Request):
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_admin(error="你沒有客服後台權限，或登入狀態已過期。")
+        return RedirectResponse(
+            url="/admin/staff-center?error="
+            + urlencode({"error": "你沒有客服後台權限，或登入狀態已過期。"})[6:],
+            status_code=303,
+        )
 
     db = SessionLocal()
 
     try:
         result = sync_staff_members_from_discord(db)
         db.commit()
+        message = (
+            result.get("message")
+            or (
+                "成員同步完成：掃描 "
+                f"{result.get('total_seen', result.get('scanned', '?'))} 人，"
+                f"寫入 {result.get('synced_count', result.get('written', '?'))} 人。"
+            )
+        )
+        query = urlencode({"message": message})
     except Exception as e:
         db.rollback()
-        return redirect_to_admin(error=f"同步成員失敗：{e}")
+        query = urlencode({"error": f"同步成員失敗：{e}"})
     finally:
         db.close()
 
-    return redirect_to_admin(
-        message=result.get("message") or f"成員同步完成：掃描 {result.get('total_seen', result.get('scanned', '?'))} 人，寫入 {result.get('synced_count', result.get('written', '?'))} 人。"
+    return RedirectResponse(
+        url=f"/admin/staff-center?{query}",
+        status_code=303,
     )
 
 
