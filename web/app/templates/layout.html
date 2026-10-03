@@ -168,6 +168,18 @@
         </p>
 
 
+    {% elif _p.startswith('/admin/payouts/report') %}
+
+        <div class="mw-r5-kicker">OPERATIONS & FINANCE</div>
+        <h1 class="mw-r5-page-title">營運財務報表</h1>
+        <p>查看營收、成本、實留、回購、取消與服務效率趨勢。</p>
+
+    {% elif _p.startswith('/admin/tickets/') %}
+
+        <div class="mw-r5-kicker">TICKET ARCHIVE</div>
+        <h1 class="mw-r5-page-title">票口聊天紀錄</h1>
+        <p>查看已封存票口的對話、附件、客服與關閉資訊。</p>
+
     {% elif _p.startswith('/admin/payout') %}
 
         <div class="mw-r5-kicker">
