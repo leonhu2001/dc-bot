@@ -343,7 +343,7 @@
                             <td><span class="profile-muted" style="margin-top:0">{{ row.updated_at }}</span></td>
                             <td>
                                 <div class="profile-actions">
-                                    <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}?return_to=/admin/staff-center">編輯</a>
+                                    <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}?return_to=/admin/staff_profiles/">編輯</a>
                                     <form method="post" action="/admin/staff_profiles/toggle_public">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <input type="hidden" name="staff_discord_id" value="{{ row.staff_id }}">
