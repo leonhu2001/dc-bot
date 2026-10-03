@@ -122,11 +122,12 @@
             {% if is_manager %}
             <div class="center-stat"><span>錢包帳戶</span><strong>{{ snapshot.stats.wallet_count }}</strong></div>
             <div class="center-stat"><span>錢包總餘額</span><strong>{{ "{:,}".format(snapshot.stats.wallet_total) }}T</strong></div>
-            {% else %}
-            <div class="center-stat"><span>公開評價</span><strong>{{ snapshot.stats.visible_reviews }}</strong></div>
-            <div class="center-stat"><span>全部評價</span><strong>{{ snapshot.stats.review_count }}</strong></div>
-            {% endif %}
             <div class="center-stat"><span>評價</span><strong>{{ snapshot.stats.review_count }}</strong></div>
+            {% else %}
+            <div class="center-stat"><span>全部評價</span><strong>{{ snapshot.stats.review_count }}</strong></div>
+            <div class="center-stat"><span>公開評價</span><strong>{{ snapshot.stats.visible_reviews }}</strong></div>
+            <div class="center-stat"><span>非公開 / 隱藏</span><strong>{{ snapshot.stats.review_count - snapshot.stats.visible_reviews }}</strong></div>
+            {% endif %}
         </div>
     </div>
 
