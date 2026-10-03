@@ -4,6 +4,8 @@
 
 {% if _return_param and (_return_param == '/admin' or _return_param.startswith('/admin/')) %}
     {% set _back.href = _return_param %}
+{% elif _p.startswith('/admin/search/customer/') %}
+    {% set _back.href = '/admin/search' %}
 {% elif _p.startswith('/admin/staff') %}
     {% set _back.href = '/admin/staff-center' %}
 {% elif _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') %}
