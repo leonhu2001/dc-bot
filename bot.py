@@ -3853,6 +3853,28 @@ async def process_acceptance_sync_events_once() -> None:
     if guild is None:
         return
 
+    async def _resolve_member(worker_id: int | None):
+        if worker_id is None:
+            return None
+
+        member = guild.get_member(worker_id)
+        if member is not None:
+            return member
+
+        try:
+            fetched_member = await guild.fetch_member(worker_id)
+            return (
+                fetched_member
+                if isinstance(fetched_member, discord.Member)
+                else None
+            )
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException,
+        ):
+            return None
+
     db = SessionLocal()
 
     try:
@@ -3875,7 +3897,16 @@ async def process_acceptance_sync_events_once() -> None:
             except Exception:
                 payload = {}
 
-            if not payload.get("prepay_acceptance"):
+            is_prepay_acceptance = bool(payload.get("prepay_acceptance"))
+            is_admin_worker_change = payload.get("reason") in {
+                "admin_added_worker",
+                "admin_removed_worker",
+            }
+
+            # Other claim events are handled by their original Discord flow.
+            # Admin changes made after payment need this worker to reconcile
+            # ticket permissions because the website cannot call Discord itself.
+            if not is_prepay_acceptance and not is_admin_worker_change:
                 continue
 
             event.status = SyncEventStatus.PROCESSING.value
@@ -3883,36 +3914,32 @@ async def process_acceptance_sync_events_once() -> None:
             db.commit()
 
             try:
-                await refresh_acceptance_dispatch_from_web_order(guild, int(event.order_id))
+                order = db.get(WebOrder, int(event.order_id))
+                ticket_channel_id = (
+                    _to_int(order.ticket_channel_id)
+                    if order is not None
+                    else None
+                )
 
-                if event.event_type == SyncEventType.ORDER_UNCLAIMED.value:
-                    worker_id = _to_int(payload.get("worker_discord_id"))
-                    order = db.get(WebOrder, int(event.order_id))
-                    ticket_channel_id = (
-                        _to_int(order.ticket_channel_id)
-                        if order is not None
-                        else None
+                if is_prepay_acceptance:
+                    await refresh_acceptance_dispatch_from_web_order(
+                        guild,
+                        int(event.order_id),
                     )
 
-                    if worker_id is not None and ticket_channel_id is not None:
-                        member = guild.get_member(worker_id)
+                worker_id = _to_int(payload.get("worker_discord_id"))
 
-                        if member is None:
-                            try:
-                                fetched_member = await guild.fetch_member(worker_id)
-                                member = (
-                                    fetched_member
-                                    if isinstance(fetched_member, discord.Member)
-                                    else None
-                                )
-                            except (
-                                discord.NotFound,
-                                discord.Forbidden,
-                                discord.HTTPException,
-                            ):
-                                member = None
+                if worker_id is not None and ticket_channel_id is not None:
+                    member = await _resolve_member(worker_id)
 
-                        if member is not None:
+                    if member is not None:
+                        if event.event_type == SyncEventType.ORDER_CLAIMED.value:
+                            await grant_order_ticket_access(
+                                guild,
+                                ticket_channel_id,
+                                member,
+                            )
+                        elif event.event_type == SyncEventType.ORDER_UNCLAIMED.value:
                             await revoke_order_ticket_access(
                                 guild,
                                 ticket_channel_id,
