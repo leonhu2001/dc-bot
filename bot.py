@@ -3791,6 +3791,53 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
 
 
+async def repair_pending_acceptance_dispatch_panels_once(
+    guild: discord.Guild,
+    *,
+    limit: int = 100,
+) -> int:
+    """依 canonical acceptance 狀態修復等待接單中的 Discord panel。"""
+    import sqlite3
+
+    db_path = Path(__file__).parent / "web_dashboard.db"
+    conn = sqlite3.connect(db_path, timeout=15)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT id
+            FROM web_orders
+            WHERE status IN ('waiting_acceptance', 'accepted_pending_pay')
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    repaired = 0
+
+    for row in rows:
+        order_id = int(row["id"])
+
+        try:
+            await refresh_acceptance_dispatch_from_web_order(
+                guild,
+                order_id,
+            )
+            repaired += 1
+        except Exception as exc:
+            print(
+                f"[acceptance-sync] startup reconcile failed "
+                f"order_id={order_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    return repaired
+
+
 async def process_acceptance_sync_events_once() -> None:
     import json
     from datetime import datetime
@@ -13053,6 +13100,25 @@ async def on_ready():
     guild_for_voice = bot.get_guild(GUILD_ID)
     if guild_for_voice is not None:
         try:
+            reconciled_acceptance_panels = (
+                await repair_pending_acceptance_dispatch_panels_once(
+                    guild_for_voice,
+                )
+            )
+            if reconciled_acceptance_panels:
+                print(
+                    "[acceptance-sync] startup reconciled dispatch panels: "
+                    f"{reconciled_acceptance_panels}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                "[acceptance-sync] startup reconcile failed: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+        try:
             repaired_payment_panels = await repair_pending_acceptance_payment_panels_once(
                 guild_for_voice,
                 reason="bot_startup",
@@ -18617,6 +18683,17 @@ async def process_one_web_sync_event(
         payload = json.loads(event.get("payload_json") or "{}")
     except Exception:
         payload = {}
+
+    from web.app.services.order_service import (
+        is_prepay_acceptance_sync_event,
+    )
+
+    # 付款前接單有自己的 acceptance worker；一般 web-sync 不得先吃掉事件。
+    if is_prepay_acceptance_sync_event(
+        event_type,
+        payload,
+    ):
+        return
 
     if (
         event_type == "order_updated"

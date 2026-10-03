@@ -57,6 +57,22 @@ PENDING_PAYMENT_METHODS = {
 }
 
 
+def is_prepay_acceptance_sync_event(
+    event_type: str | None,
+    payload: dict | None,
+) -> bool:
+    normalized_type = str(event_type or "").strip().lower()
+
+    return (
+        normalized_type
+        in {
+            SyncEventType.ORDER_CLAIMED.value,
+            SyncEventType.ORDER_UNCLAIMED.value,
+        }
+        and bool((payload or {}).get("prepay_acceptance"))
+    )
+
+
 def _normalize_text(value) -> str:
     return str(value or "").strip()
 
