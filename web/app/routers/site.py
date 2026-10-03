@@ -605,12 +605,9 @@ async def public_order(
             for group
             in all_groups
             if str(
-                group.get(
-                    "key"
-                )
+                group.get("key")
                 or ""
-            )
-            .endswith("_teaching")
+            ).endswith("_teaching")
         ]
         category_filter = "all"
 
