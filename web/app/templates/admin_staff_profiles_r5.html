@@ -247,7 +247,7 @@
             <div class="profile-toolbar-note">
                 後台修改個人牆資料後，可展開 Panel 資訊取得同步指令，再同步至 Discord。
             </div>
-            <a class="profile-button" href="/admin/staff">返回人員管理</a>
+            <a class="profile-button" href="/admin/staff-center">返回人員管理</a>
         </div>
 
         <section class="profile-stats">
@@ -342,7 +342,7 @@
                             <td><span class="profile-muted" style="margin-top:0">{{ row.updated_at }}</span></td>
                             <td>
                                 <div class="profile-actions">
-                                    <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}">編輯</a>
+                                    <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}?return_to=/admin/staff-center">編輯</a>
                                     <form method="post" action="/admin/staff_profiles/toggle_public">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <input type="hidden" name="staff_discord_id" value="{{ row.staff_id }}">
