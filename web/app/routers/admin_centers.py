@@ -337,38 +337,44 @@ def _customer_snapshot(
         except sqlite3.Error:
             pass
 
-    result_rows = []
-    with _connect(WEB_DB) as conn:
-        has_favorites = _table_exists(conn, "staff_favorites")
-        has_reviews = _table_exists(conn, "order_reviews")
+    favorite_map: dict[str, int] = {}
+    customer_review_map: dict[str, int] = {}
 
-        for row in rows:
-            item = dict(row)
-            customer_id = str(item.get("customer_discord_id") or "")
-            item["wallet_balance"] = int(wallet_map.get(customer_id, 0))
-            item["favorite_count"] = (
-                int(
-                    conn.execute(
-                        "SELECT COUNT(*) FROM staff_favorites WHERE customer_discord_id = ?",
-                        (customer_id,),
-                    ).fetchone()[0]
-                    or 0
-                )
-                if has_favorites
-                else 0
-            )
-            item["review_count"] = (
-                int(
-                    conn.execute(
-                        "SELECT COUNT(*) FROM order_reviews WHERE customer_discord_id = ?",
-                        (customer_id,),
-                    ).fetchone()[0]
-                    or 0
-                )
-                if has_reviews
-                else 0
-            )
-            result_rows.append(item)
+    with _connect(WEB_DB) as conn:
+        if _table_exists(conn, "staff_favorites"):
+            favorite_map = {
+                str(row["customer_discord_id"]): int(row["count"] or 0)
+                for row in conn.execute(
+                    """
+                    SELECT customer_discord_id, COUNT(*) AS count
+                    FROM staff_favorites
+                    WHERE COALESCE(customer_discord_id, '') <> ''
+                    GROUP BY customer_discord_id
+                    """
+                ).fetchall()
+            }
+
+        if _table_exists(conn, "order_reviews"):
+            customer_review_map = {
+                str(row["customer_discord_id"]): int(row["count"] or 0)
+                for row in conn.execute(
+                    """
+                    SELECT customer_discord_id, COUNT(*) AS count
+                    FROM order_reviews
+                    WHERE COALESCE(customer_discord_id, '') <> ''
+                    GROUP BY customer_discord_id
+                    """
+                ).fetchall()
+            }
+
+    result_rows = []
+    for row in rows:
+        item = dict(row)
+        customer_id = str(item.get("customer_discord_id") or "")
+        item["wallet_balance"] = int(wallet_map.get(customer_id, 0))
+        item["favorite_count"] = int(favorite_map.get(customer_id, 0))
+        item["review_count"] = int(customer_review_map.get(customer_id, 0))
+        result_rows.append(item)
 
     return {
         "rows": result_rows,
