@@ -7557,7 +7557,7 @@ def add_self_service_financial_breakdown_fields(
             )
 
         text += (
-            "\n同步降低打手分潤基準"
+            "\n店內吸收，不影響打手分潤"
         )
 
         embed.add_field(
@@ -9460,12 +9460,6 @@ def calculate_self_service_financials(
         fixed_discount_amount=fixed,
         additional_store_discount_amount=point_cash,
         extra_customer_charge_amount=specify_effective,
-    )
-
-    customer_service_amount = max(
-        0,
-        allocation.after_fixed_amount
-        - point_cash,
     )
 
     # 百分比折扣仍會降低分潤基準；
