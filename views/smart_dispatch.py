@@ -176,6 +176,31 @@ def prepare_initial_smart_dispatch(
     }
 
 
+async def send_initial_smart_dispatch_alert(
+    guild: discord.Guild,
+    *,
+    content: str | None,
+    dispatch_jump_url: str,
+) -> discord.Message | None:
+    """Send smart-dispatch pings to the dedicated alert channel."""
+    text = str(content or "").strip()
+    if not text:
+        return None
+
+    channel = guild.get_channel(SMART_DISPATCH_ALERT_CHANNEL_ID)
+    if not isinstance(channel, discord.TextChannel):
+        return None
+
+    return await channel.send(
+        f"{text}\n前往原派單：{dispatch_jump_url}",
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=True,
+            everyone=False,
+        ),
+    )
+
+
 async def send_specified_staff_dispatch_dms(
     guild: discord.Guild,
     *,
