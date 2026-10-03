@@ -311,6 +311,22 @@ def history_safe_status(value: str | None) -> str:
     return value if value in {"active", "stored", "closed", "cancelled"} else "closed"
 
 
+def history_resolve_status_edit(
+    original_value: str | None,
+    submitted_value: str | None,
+) -> str:
+    original = history_safe_status(original_value)
+    submitted = history_safe_status(submitted_value)
+
+    if original in {"closed", "cancelled"}:
+        return original
+
+    if submitted == "cancelled":
+        return original
+
+    return submitted
+
+
 def history_effective_closed_date(order) -> str:
     """給歷史訂單頁顯示用：優先 closed_at，沒有就 updated_at，再沒有 created_at。"""
     value = (
@@ -1516,10 +1532,10 @@ async def bulk_update_order_history(request: Request):
 
             # 歷史頁不能繞過正式取消流程。已結單／已取消是終態；
             # 若要取消其他狀態，請到訂單工作區選擇取消原因。
-            if original_status in {"closed", "cancelled"}:
-                status = original_status
-            elif status == "cancelled":
-                status = original_status
+            status = history_resolve_status_edit(
+                original_status,
+                status,
+            )
 
             original_closed_at = (
                 history_normalize_date(original_row[1])
