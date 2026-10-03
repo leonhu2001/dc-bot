@@ -157,6 +157,7 @@ from services.orders import (
     ORDER_ITEMS_BY_CATEGORY,
     ORDER_ITEM_TO_CATEGORY,
     ORDER_ITEM_GROUPS_BY_CATEGORY,
+    SELF_SERVICE_ACTIVE_CATEGORIES,
     get_order_item_details_for_group,
     get_order_item_group_label,
     get_order_item_detail_label,
@@ -2563,11 +2564,11 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
 
         options = [
             discord.SelectOption(
-                label=label,
+                label=ORDER_CATEGORY_LABELS.get(category_key, category_key),
                 value=category_key,
                 default=selected_category == category_key
             )
-            for category_key, label in ORDER_CATEGORY_LABELS.items()
+            for category_key in SELF_SERVICE_ACTIVE_CATEGORIES
         ]
 
         super().__init__(
