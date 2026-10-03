@@ -83,25 +83,30 @@
                 <div class="pay-review-actions">
                   {% if item.kind == "topup" %}
                     <form method="post" action="/admin/payment-reviews/topup/{{ item.id }}/approve">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                       <button class="pay-review-action" type="submit">確認收款</button>
                     </form>
                     <form method="post" action="/admin/payment-reviews/topup/{{ item.id }}/reject">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                       <input class="pay-review-reason" name="reason" value="客服駁回" aria-label="駁回原因">
                       <button class="pay-review-action reject" type="submit">駁回</button>
                     </form>
                   {% else %}
                     {% if item.can_approve %}
                       <form method="post" action="/admin/payment-reviews/{{ item.id }}/approve">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button class="pay-review-action" type="submit">確認收款</button>
                       </form>
                     {% endif %}
                     {% if item.can_retry %}
                       <form method="post" action="/admin/payment-reviews/{{ item.id }}/retry">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button class="pay-review-action" type="submit">重新套用</button>
                       </form>
                     {% endif %}
                     {% if item.can_reject %}
                       <form method="post" action="/admin/payment-reviews/{{ item.id }}/reject">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <input class="pay-review-reason" name="reason" value="客服未確認到款項" aria-label="駁回原因">
                         <button class="pay-review-action reject" type="submit">駁回</button>
                       </form>
