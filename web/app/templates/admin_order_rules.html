@@ -1,0 +1,354 @@
+{% extends "layout.html" %}
+
+{% block page_title %}商品與規則{% endblock %}
+
+{% block content %}
+
+{% if ok %}
+<div class="panel compact-panel">
+    <span class="status-chip is-paid">SUCCESS</span>
+    <p class="muted-text">{{ ok }}</p>
+</div>
+{% endif %}
+
+{% if error or preview_error %}
+<div class="panel compact-panel">
+    <span class="status-chip is-unpaid">BLOCKED</span>
+    <p class="muted-text">{{ error or preview_error }}</p>
+</div>
+{% endif %}
+
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>商品 / 價格 / 接單規則</h2>
+            <p class="muted-text">
+                這裡發布後不需要 Git 部署；Web 與 DC Bot 會共用同一份正式規則。
+                每次發布都保留版本，可回復。歷史訂單仍使用建立當下的規則快照。
+            </p>
+        </div>
+        {% if selected_key %}
+        <div>
+            <span class="status-chip {% if active_meta %}is-paid{% endif %}">
+                {% if active_meta %}OVERRIDE v{{ active_version }}{% else %}CODE DEFAULT{% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:minmax(300px, 0.85fr) minmax(0, 1.7fr); gap:16px; align-items:start;">
+
+    <div class="panel compact-panel">
+        <div class="section-title-row">
+            <div>
+                <h2>商品規則</h2>
+                <p class="muted-text">共 {{ rules|length }} 個規則</p>
+            </div>
+        </div>
+
+        <div style="max-height:72vh; overflow:auto; display:flex; flex-direction:column; gap:8px;">
+            {% for item in rules %}
+            <a
+                href="/admin/order-rules?edit={{ item.key }}"
+                style="
+                    display:block;
+                    padding:10px 12px;
+                    border:1px solid rgba(255,255,255,.08);
+                    border-radius:10px;
+                    text-decoration:none;
+                    {% if item.key == selected_key %}background:rgba(216,174,73,.10); border-color:rgba(216,174,73,.35);{% endif %}
+                "
+            >
+                <div style="display:flex; justify-content:space-between; gap:10px;">
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ "{:,}".format(item.price) }}T</span>
+                </div>
+                <div class="muted-text" style="font-size:12px; margin-top:4px;">
+                    {{ item.category_label }} ｜ {{ item.key }}
+                    {% if item.is_overridden %} ｜ v{{ item.override_version }}{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if selected_rule %}
+    <div>
+
+        {% if preview_payload %}
+        <div class="panel compact-panel">
+            <div class="section-title-row">
+                <div>
+                    <h2>發布前預覽</h2>
+                    <p class="muted-text">
+                        下列欄位會改變。確認後才會正式套用到 Web 與 Discord Bot。
+                    </p>
+                </div>
+                <span class="status-chip">PREVIEW</span>
+            </div>
+
+            {% if preview_diff %}
+            <div class="admin-order-list compact-list">
+                {% for diff in preview_diff %}
+                <article class="admin-order-card compact-order-card">
+                    <strong>{{ diff.field }}</strong>
+                    <div class="order-meta compact-meta" style="margin-top:8px;">
+                        <div>
+                            <span>目前</span>
+                            <strong>{{ diff.before }}</strong>
+                        </div>
+                        <div>
+                            <span>發布後</span>
+                            <strong>{{ diff.after }}</strong>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form
+                method="post"
+                action="/admin/order-rules/{{ selected_key }}/publish"
+                onsubmit="return confirm('確定發布這個商品規則嗎？Web 與 DC Bot 會在數秒內使用新版本。');"
+                style="margin-top:12px;"
+            >
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                <input type="hidden" name="expected_active_version" value="{{ active_version }}">
+                <textarea name="payload_json" hidden>{{ preview_payload_json }}</textarea>
+                <button class="button" type="submit">確認發布</button>
+                <a class="button secondary" href="/admin/order-rules?edit={{ selected_key }}">取消預覽</a>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="panel compact-panel">
+            <div class="section-title-row">
+                <div>
+                    <h2>{{ selected_rule.label }}</h2>
+                    <p class="muted-text">
+                        {{ CATEGORY_LABELS.get(selected_rule.category, selected_rule.category) if CATEGORY_LABELS is defined else selected_rule.category }}
+                        ｜ <code>{{ selected_key }}</code>
+                    </p>
+                </div>
+            </div>
+
+            <form method="post" action="/admin/order-rules/{{ selected_key }}/preview">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
+                <div class="order-meta compact-meta">
+                    <div>
+                        <span>商品名稱</span>
+                        <input name="label" value="{{ payload.get('label', '') }}" required>
+                    </div>
+                    <div>
+                        <span>售價</span>
+                        <input name="price" type="number" min="0" value="{{ payload.get('price', 0) }}" required>
+                    </div>
+                    <div>
+                        <span>計價方式</span>
+                        <select name="pricing_type">
+                            {% for value, label in pricing_types %}
+                            <option value="{{ value }}" {% if payload.get('pricing_type') == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <span>單位</span>
+                        <input name="unit_label" value="{{ payload.get('unit_label', '單') }}">
+                    </div>
+                    <div>
+                        <span>需要人數</span>
+                        <input
+                            name="required_staff_count"
+                            value="{{ payload.get('required_staff_count', 1) }}"
+                            placeholder="1 / 2 / player_count"
+                        >
+                    </div>
+                    <div>
+                        <span>最少數量</span>
+                        <input name="min_quantity" type="number" min="1" value="{{ payload.get('min_quantity', 1) }}">
+                    </div>
+                    <div>
+                        <span>最多數量</span>
+                        <input name="max_quantity" type="number" min="1" value="{{ '' if payload.get('max_quantity') is none else payload.get('max_quantity') }}">
+                    </div>
+                    <div>
+                        <span>預設指定費</span>
+                        <input name="specify_fee_default" type="number" min="0" value="{{ payload.get('specify_fee_default', 0) }}">
+                    </div>
+                    <div>
+                        <span>最多指定人數</span>
+                        <input name="max_specified_count" type="number" min="0" value="{{ '' if payload.get('max_specified_count') is none else payload.get('max_specified_count') }}">
+                    </div>
+                    <div>
+                        <span>免指定費門檻</span>
+                        <input name="specify_free_min_units" type="number" min="0" value="{{ '' if payload.get('specify_free_min_units') is none else payload.get('specify_free_min_units') }}">
+                    </div>
+                    <div>
+                        <span>最少玩家數</span>
+                        <input name="min_player_count" type="number" min="1" value="{{ payload.get('min_player_count', 1) }}">
+                    </div>
+                    <div>
+                        <span>最多玩家數</span>
+                        <input name="max_player_count" type="number" min="1" value="{{ '' if payload.get('max_player_count') is none else payload.get('max_player_count') }}">
+                    </div>
+                    <div>
+                        <span>至少護航數</span>
+                        <input name="min_protector_count" type="number" min="0" value="{{ payload.get('min_protector_count', 0) }}">
+                    </div>
+                    <div>
+                        <span>買幾送</span>
+                        <input name="service_bonus_buy" type="number" min="1" value="{{ '' if payload.get('service_bonus_buy') is none else payload.get('service_bonus_buy') }}">
+                    </div>
+                    <div>
+                        <span>贈送數量</span>
+                        <input name="service_bonus_gift" type="number" min="0" value="{{ payload.get('service_bonus_gift', 0) }}">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin:14px 0;">
+                    <label><input type="checkbox" name="allow_specify" {% if payload.get('allow_specify') %}checked{% endif %}> 開放指定</label>
+                    <label><input type="checkbox" name="player_count_enabled" {% if payload.get('player_count_enabled') %}checked{% endif %}> 可選人數</label>
+                    <label><input type="checkbox" name="price_multiply_player_count" {% if payload.get('price_multiply_player_count') %}checked{% endif %}> 價格 × 人數</label>
+                    <label><input type="checkbox" name="point_benefits_allowed" {% if payload.get('point_benefits_allowed') %}checked{% endif %}> 可使用點數福利</label>
+                </div>
+
+                <div class="panel compact-panel" style="margin-top:12px;">
+                    <h3>可接單職位</h3>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        {% for key, label in service_role_labels.items() %}
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="allowed_roles"
+                                value="{{ key }}"
+                                {% if key in payload.get('allowed_roles', []) %}checked{% endif %}
+                            >
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="panel compact-panel" style="margin-top:12px;">
+                    <h3>可接單遊戲階級</h3>
+                    <p class="muted-text">例如輻能、菁英、頂獵；沒有需要可全部不勾。</p>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        {% for key, label in game_role_labels.items() %}
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="allowed_game_roles"
+                                value="{{ key }}"
+                                {% if key in payload.get('allowed_game_roles', []) %}checked{% endif %}
+                            >
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="panel compact-panel" style="margin-top:12px;">
+                    <h3>必須具備的遊戲身分</h3>
+                    <p class="muted-text">智慧派單會要求同時符合「可接單資格」與這組遊戲身分。</p>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        {% for key, label in game_role_labels.items() %}
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="required_game_roles"
+                                value="{{ key }}"
+                                {% if key in payload.get('required_game_roles', []) %}checked{% endif %}
+                            >
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div style="margin-top:12px;">
+                    <label style="display:block; margin-bottom:6px;">備註</label>
+                    <textarea name="note" rows="3" style="width:100%;">{{ payload.get('note', '') }}</textarea>
+                </div>
+
+                <div style="margin-top:14px;">
+                    <button class="button" type="submit">預覽變更</button>
+                    {% if active_meta %}
+                    <span class="muted-text" style="margin-left:8px;">
+                        目前後台版本 v{{ active_version }} ｜ {{ active_meta.updated_at }}
+                    </span>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <div class="panel compact-panel">
+            <div class="section-title-row">
+                <div>
+                    <h2>版本紀錄</h2>
+                    <p class="muted-text">
+                        回復舊版時不會覆蓋歷史，而是發布成一個新的版本。
+                    </p>
+                </div>
+
+                {% if active_meta %}
+                <form
+                    method="post"
+                    action="/admin/order-rules/{{ selected_key }}/reset"
+                    onsubmit="return confirm('確定恢復程式內建規則嗎？目前後台覆寫會被停用。');"
+                >
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <input type="hidden" name="expected_active_version" value="{{ active_version }}">
+                    <button class="button secondary" type="submit">恢復程式預設</button>
+                </form>
+                {% endif %}
+            </div>
+
+            {% if versions %}
+            <div class="admin-order-list compact-list">
+                {% for version in versions %}
+                <article class="admin-order-card compact-order-card">
+                    <div class="order-card-header">
+                        <div>
+                            <strong>v{{ version.version }} ｜ {{ version.action }}</strong>
+                            <p class="muted-text">
+                                {{ version.actor_display_name or version.actor_discord_id or '系統' }}
+                                ｜ {{ version.created_at }}
+                            </p>
+                        </div>
+                        {% if version.payload %}
+                        <form
+                            method="post"
+                            action="/admin/order-rules/{{ selected_key }}/rollback"
+                            onsubmit="return confirm('確定把 v{{ version.version }} 的內容重新發布嗎？');"
+                        >
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <input type="hidden" name="target_version" value="{{ version.version }}">
+                            <input type="hidden" name="expected_active_version" value="{{ active_version }}">
+                            <button class="button secondary" type="submit">回復此版</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">目前還沒有後台發布紀錄。</div>
+            {% endif %}
+        </div>
+
+    </div>
+    {% endif %}
+</div>
+
+<style>
+@media (max-width: 980px) {
+    main > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+
+{% endblock %}
