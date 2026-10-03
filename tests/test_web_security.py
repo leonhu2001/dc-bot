@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -110,6 +111,65 @@ def test_order_workspace_template_injects_csrf_for_all_post_forms():
         '/admin/order-workspace/{{ order.id }}/acceptance/'
         '{{ claim.staff_discord_id }}/remove'
     ) in template
+
+
+def test_all_unsafe_html_forms_include_explicit_csrf_token():
+    form_pattern = re.compile(
+        r"<form\b[^>]*\bmethod\s*=\s*[\"']?"
+        r"(?:post|put|patch|delete)[\"']?[^>]*>",
+        re.IGNORECASE,
+    )
+    csrf_pattern = re.compile(
+        r"name\s*=\s*[\"']csrf_token[\"']",
+        re.IGNORECASE,
+    )
+
+    template_dir = Path("web/app/templates")
+    missing = []
+
+    for template_path in sorted(template_dir.glob("*.html")):
+        content = template_path.read_text(encoding="utf-8")
+
+        for match in form_pattern.finditer(content):
+            end = content.find("</form>", match.end())
+            block = content[
+                match.start():
+                end + len("</form>") if end >= 0 else match.end() + 6000
+            ]
+
+            if not csrf_pattern.search(block):
+                missing.append(
+                    f"{template_path.name}: {match.group(0)[:120]}"
+                )
+
+    assert missing == []
+
+
+def test_shared_layouts_load_csrf_bootstrap_before_page_scripts():
+    for template_name in ("layout.html", "site_layout.html"):
+        template = Path(
+            "web/app/templates",
+            template_name,
+        ).read_text(encoding="utf-8")
+
+        meta = 'name="csrf-token"'
+        script = 'src="/static/js/csrf.js?v=1"'
+
+        assert meta in template
+        assert script in template
+        assert template.index(meta) < template.index(script)
+
+
+def test_staff_sync_get_route_cannot_write():
+    source = Path("web/app/routers/admin_staff.py").read_text(
+        encoding="utf-8"
+    )
+    start = source.index('@router.get("/admin/staff/sync")')
+    end = source.find("\n@router.", start + 1)
+    body = source[start:end if end >= 0 else None]
+
+    assert "run_admin_staff_sync(request)" not in body
+    assert "status_code=405" in body
 
 
 def test_oauth_return_path_rejects_open_redirects():
