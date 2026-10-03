@@ -80,6 +80,21 @@ PREPAY_ORDER_STATES = {
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
 
+CANCELLATION_REASON_LABELS = {
+    "customer_changed_mind": "客人取消／改變需求",
+    "schedule_conflict": "時間無法配合",
+    "no_staff": "缺少可接人員",
+    "payment_issue": "未付款／付款問題",
+    "price_issue": "價格／預算問題",
+    "duplicate_order": "重複／誤下單",
+    "service_unavailable": "服務無法提供",
+    "internal_correction": "店內修正",
+    "other": "其他",
+    "unspecified": "未分類",
+}
+
+CANCELLATION_REASON_CODES = frozenset(CANCELLATION_REASON_LABELS)
+
 
 class OrderStateTransitionError(ValueError):
     pass
@@ -96,6 +111,127 @@ class OrderStateTransitionResult:
 
 def _now_iso() -> str:
     return datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
+
+
+def normalize_cancellation_reason_code(value: str | None) -> str:
+    code = str(value or "").strip().lower()
+    return code if code in CANCELLATION_REASON_CODES else "unspecified"
+
+
+def _ensure_order_cancellation_table(conn: Connection) -> None:
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS order_cancellations (
+            order_id INTEGER PRIMARY KEY,
+            reason_code TEXT NOT NULL DEFAULT 'unspecified',
+            reason_text TEXT,
+            source TEXT NOT NULL DEFAULT 'unknown',
+            actor_discord_id TEXT,
+            created_at TEXT NOT NULL
+        )
+    """))
+    conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_order_cancellations_reason_created
+        ON order_cancellations(reason_code, created_at)
+    """))
+
+
+def ensure_order_cancellation_table(bind=None) -> None:
+    if bind is None:
+        from shared.db import engine as bind
+
+    with bind.begin() as conn:
+        _ensure_order_cancellation_table(conn)
+        try:
+            has_orders = inspect(conn).has_table("web_orders")
+        except Exception:
+            has_orders = False
+
+        if has_orders:
+            conn.execute(text("""
+                INSERT INTO order_cancellations (
+                    order_id,
+                    reason_code,
+                    reason_text,
+                    source,
+                    actor_discord_id,
+                    created_at
+                )
+                SELECT
+                    id,
+                    'unspecified',
+                    NULL,
+                    'legacy_backfill',
+                    NULL,
+                    COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)
+                FROM web_orders
+                WHERE LOWER(TRIM(COALESCE(status, '')))
+                      IN ('cancelled', 'canceled')
+                ON CONFLICT(order_id) DO NOTHING
+            """))
+
+
+def record_order_cancellation_in_connection(
+    conn: Connection,
+    *,
+    order_id: int,
+    reason_code: str | None,
+    reason_text: str | None = None,
+    source: str = "unknown",
+    actor_discord_id: str | int | None = None,
+) -> None:
+    _ensure_order_cancellation_table(conn)
+
+    code = normalize_cancellation_reason_code(reason_code)
+    detail = str(reason_text or "").strip()[:1000] or None
+    actor = str(actor_discord_id) if actor_discord_id is not None else None
+
+    conn.execute(
+        text("""
+            INSERT INTO order_cancellations (
+                order_id,
+                reason_code,
+                reason_text,
+                source,
+                actor_discord_id,
+                created_at
+            )
+            VALUES (
+                :order_id,
+                :reason_code,
+                :reason_text,
+                :source,
+                :actor_discord_id,
+                :created_at
+            )
+            ON CONFLICT(order_id) DO UPDATE SET
+                reason_code = CASE
+                    WHEN excluded.reason_code != 'unspecified'
+                    THEN excluded.reason_code
+                    ELSE order_cancellations.reason_code
+                END,
+                reason_text = COALESCE(
+                    excluded.reason_text,
+                    order_cancellations.reason_text
+                ),
+                source = CASE
+                    WHEN excluded.reason_code != 'unspecified'
+                    THEN excluded.source
+                    ELSE order_cancellations.source
+                END,
+                actor_discord_id = COALESCE(
+                    excluded.actor_discord_id,
+                    order_cancellations.actor_discord_id
+                )
+        """),
+        {
+            "order_id": int(order_id),
+            "reason_code": code,
+            "reason_text": detail,
+            "source": str(source or "unknown")[:80],
+            "actor_discord_id": actor,
+            "created_at": _now_iso(),
+        },
+    )
 
 
 def normalize_order_status(value: str | None) -> str:
@@ -239,6 +375,8 @@ def transition_order_state_in_connection(
     expected_statuses: Iterable[str] | None = None,
     sync_acceptance_meta: bool = True,
     require_empty_dispatch_message: bool = False,
+    cancellation_reason_code: str | None = None,
+    cancellation_reason_text: str | None = None,
 ) -> OrderStateTransitionResult:
     row = conn.execute(
         text(
@@ -282,6 +420,16 @@ def transition_order_state_in_connection(
                 conn,
                 order_id=int(order_id),
                 status=target,
+            )
+
+        if target == CANCELLED:
+            record_order_cancellation_in_connection(
+                conn,
+                order_id=int(order_id),
+                reason_code=cancellation_reason_code,
+                reason_text=cancellation_reason_text or reason,
+                source=source,
+                actor_discord_id=actor_discord_id,
             )
 
         return OrderStateTransitionResult(
@@ -344,6 +492,16 @@ def transition_order_state_in_connection(
             status=target,
         )
 
+    if target == CANCELLED:
+        record_order_cancellation_in_connection(
+            conn,
+            order_id=int(order_id),
+            reason_code=cancellation_reason_code,
+            reason_text=cancellation_reason_text or reason,
+            source=source,
+            actor_discord_id=actor_discord_id,
+        )
+
     _record_transition(
         conn,
         order_id=int(order_id),
@@ -373,6 +531,8 @@ def transition_order_state(
     expected_statuses: Iterable[str] | None = None,
     sync_acceptance_meta: bool = True,
     require_empty_dispatch_message: bool = False,
+    cancellation_reason_code: str | None = None,
+    cancellation_reason_text: str | None = None,
 ) -> OrderStateTransitionResult:
     from shared.db import engine
 
@@ -387,6 +547,8 @@ def transition_order_state(
             expected_statuses=expected_statuses,
             sync_acceptance_meta=sync_acceptance_meta,
             require_empty_dispatch_message=require_empty_dispatch_message,
+            cancellation_reason_code=cancellation_reason_code,
+            cancellation_reason_text=cancellation_reason_text,
         )
 
 
