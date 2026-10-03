@@ -64,6 +64,8 @@ def test_known_drilldown_pages_keep_explicit_return_paths():
         "admin_wallet_detail.html": "return_to",
         "admin_ticket_archive_detail.html": "return_to",
         "admin_order_detail.html": "return_to",
+        "admin_accounting_reconciliation.html": "return_to",
+        "admin_anomalies.html": "return_to",
     }
 
     for filename, marker in expectations.items():
