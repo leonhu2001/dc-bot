@@ -1072,38 +1072,20 @@ async def admin_customers_final(
 
 
 @router.get("/admin/customers/{customer_discord_id}")
-async def admin_customer_detail_final(customer_discord_id: str, request: Request):
-    user=_mw4b2_admin_user(request)
-    if not user: return RedirectResponse(url="/admin",status_code=303)
-    cid=str(customer_discord_id or "").strip(); db=SessionLocal()
-    try:
-        orders=[dict(r) for r in db.execute(_mw4b2_text(
-            "SELECT * FROM web_orders WHERE customer_discord_id=:cid ORDER BY id DESC LIMIT 80"),{"cid":cid}).mappings().all()]
-        if not orders: return RedirectResponse(url="/admin/customer-center?error=not_found",status_code=303)
-        name=str(orders[0].get("customer_display_name") or cid)
-        favorites=[dict(r) for r in db.execute(_mw4b2_text("""
-            SELECT f.staff_discord_id,COALESCE(p.display_name,f.staff_display_name,f.staff_discord_id) staff_name,
-                   p.profile_type,p.role_title,f.created_at
-            FROM staff_favorites f LEFT JOIN staff_profiles p ON p.staff_discord_id=f.staff_discord_id
-            WHERE f.customer_discord_id=:cid ORDER BY f.id DESC
-        """),{"cid":cid}).mappings().all()]
-        reviews=[dict(r) for r in db.execute(_mw4b2_text("""
-            SELECT id,order_id,staff_discord_id,staff_display_name,rating,comment,is_public,is_hidden,created_at
-            FROM order_reviews WHERE customer_discord_id=:cid ORDER BY id DESC LIMIT 50
-        """),{"cid":cid}).mappings().all()]
-        wallet=[dict(r) for r in db.execute(_mw4b2_text(
-            "SELECT * FROM web_checkout_wallet_transactions WHERE customer_discord_id=:cid ORDER BY id DESC LIMIT 30"),{"cid":cid}).mappings().all()]
-        points=[dict(r) for r in db.execute(_mw4b2_text(
-            "SELECT * FROM web_checkout_point_transactions WHERE customer_discord_id=:cid ORDER BY id DESC LIMIT 30"),{"cid":cid}).mappings().all()]
-        done=sum(str(o.get("status") or "").lower() in {"closed","completed","done"} for o in orders)
-        cancel=sum(str(o.get("status") or "").lower() in {"cancelled","canceled"} for o in orders)
-        spend=sum(int(o.get("customer_pay_amount") or o.get("amount") or 0) for o in orders
-                  if str(o.get("status") or "").lower() not in {"cancelled","canceled"})
-    finally: db.close()
-    return templates.TemplateResponse(request=request,name="admin_customer_detail.html",context={
-        "title":name+"｜客戶管理","user":user,"customer_id":cid,"customer_name":name,
-        "orders":orders,"favorites":favorites,"reviews":reviews,"wallet_transactions":wallet,"point_transactions":points,
-        "wallet_balance":wallet[0].get("balance_after") if wallet else None,
-        "point_balance":points[0].get("balance_after") if points else None,
-        "stats":{"orders":len(orders),"completed":done,"cancelled":cancel,"total_spend":spend,
-                 "favorites":len(favorites),"reviews":len(reviews)}})
+async def admin_customer_detail_final(
+    customer_discord_id: str,
+    request: Request,
+):
+    user = _mw4b2_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/admin", status_code=303)
+
+    customer_id = str(customer_discord_id or "").strip()
+    target = f"/admin/search/customer/{customer_id}"
+
+    return_to = str(request.query_params.get("return_to") or "").strip()
+    if return_to == "/admin" or return_to.startswith("/admin/"):
+        target += "?" + urlencode({"return_to": return_to})
+
+    return RedirectResponse(url=target, status_code=303)
+
