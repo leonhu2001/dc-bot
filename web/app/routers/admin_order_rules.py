@@ -262,6 +262,7 @@ async def _render(
             "title": "商品與規則",
             "user": user,
             "rules": rule_rows,
+            "category_labels": CATEGORY_LABELS,
             "selected_key": selected_key,
             "selected_rule": selected_rule,
             "selected_base": selected_base,
