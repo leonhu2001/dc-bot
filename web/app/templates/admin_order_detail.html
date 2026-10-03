@@ -770,7 +770,7 @@ body.mw-r5-admin
             </h1>
 
             <p>
-                查看訂單內容、客服處理狀態與相關紀錄。
+                {{ order.customer_name }} · {{ order.item }}｜查看訂單內容、客服處理狀態與相關紀錄。
             </p>
 
         </header>
@@ -783,43 +783,17 @@ body.mw-r5-admin
 
 <main class="page">
 
-<header class="top">
-
-    <div>
-
-        <div class="eyebrow">
-            ORDER WORKSPACE
-        </div>
-
-
-
-        <div class="subtitle">
-            {{ order.customer_name }}
-            ·
-            {{ order.item }}
-        </div>
-
-    </div>
-
-
-    <div class="actions">
-
-
-        {% if order.ticket_channel_id %}
-
-            <button
-                class="button gold"
-                type="button"
-                data-copy="{{ order.ticket_channel_id }}"
-            >
-                複製票口 ID
-            </button>
-
-        {% endif %}
-
-    </div>
-
-</header>
+{% if order.ticket_channel_id %}
+<div class="mw-admin-inline-actions">
+    <button
+        class="button secondary"
+        type="button"
+        data-copy="{{ order.ticket_channel_id }}"
+    >
+        複製票口 ID
+    </button>
+</div>
+{% endif %}
 
 
 {% if message %}
