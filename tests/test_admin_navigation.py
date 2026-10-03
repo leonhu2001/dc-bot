@@ -118,3 +118,24 @@ def test_admin_templates_compile_with_jinja():
     env.get_template("_admin_backbar.html")
     for path in sorted(TEMPLATES.glob("admin*.html")):
         env.get_template(path.name)
+
+
+def test_legacy_duplicate_list_routes_point_to_canonical_centers():
+    routers = ROOT / "web" / "app" / "routers"
+
+    staff_source = (routers / "admin_staff.py").read_text(encoding="utf-8")
+    ticket_source = (routers / "ticket_archives.py").read_text(encoding="utf-8")
+    system_source = (routers / "admin_system.py").read_text(encoding="utf-8")
+
+    assert "/admin/staff-center?" in staff_source
+    assert "/admin/customer-center?" in staff_source
+    assert 'target = "/admin/support-center"' in ticket_source
+    assert 'url=f"/admin/anomalies?days=' in system_source
+
+
+def test_system_maintenance_contains_operations_monitoring():
+    page = (TEMPLATES / "admin_anomalies.html").read_text(encoding="utf-8")
+
+    assert "營運監控" in page
+    assert "智慧派單填滿率" in page
+    assert "取消率" in page
