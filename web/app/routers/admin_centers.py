@@ -167,7 +167,11 @@ def _staff_snapshot(q: str = "") -> dict[str, Any]:
     }
 
 
-def _customer_snapshot(q: str = "") -> dict[str, Any]:
+def _customer_snapshot(
+    q: str = "",
+    *,
+    include_wallets: bool = False,
+) -> dict[str, Any]:
     if not WEB_DB.exists():
         return {"rows": [], "reviews": [], "stats": {}}
 
@@ -263,7 +267,7 @@ def _customer_snapshot(q: str = "") -> dict[str, Any]:
     wallet_map: dict[str, int] = {}
     wallet_count = 0
     wallet_total = 0
-    if BOT_DB.exists():
+    if include_wallets and BOT_DB.exists():
         try:
             with _connect(BOT_DB) as bot:
                 if _table_exists(bot, "customer_wallets"):
@@ -416,7 +420,12 @@ async def _render(
         snapshot = await run_in_threadpool(_staff_snapshot, q)
         title = "人員中心"
     elif center == "customers":
-        snapshot = await run_in_threadpool(_customer_snapshot, q)
+        snapshot = await run_in_threadpool(
+            lambda: _customer_snapshot(
+                q,
+                include_wallets=is_manager,
+            )
+        )
         title = "客戶中心"
     elif center == "finance":
         snapshot = await run_in_threadpool(
