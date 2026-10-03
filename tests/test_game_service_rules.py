@@ -636,13 +636,13 @@ def test_web_delta_catalog_exposes_split_desktop_and_mobile_categories():
         for group in get_grouped_order_catalog("delta_mobile_basic")
     }
 
-    assert desktop_groups["tech_play"]["label"] == "技術陪〈端遊〉"
-    assert desktop_groups["entertain"]["label"] == "娛樂陪〈端遊〉"
+    assert desktop_groups["tech_play"]["label"] == "技術陪"
+    assert desktop_groups["entertain"]["label"] == "娛樂陪"
     assert "tech_play_mobile" not in desktop_groups
     assert "entertain_mobile" not in desktop_groups
 
-    assert mobile_groups["tech_play_mobile"]["label"] == "技術陪〈手遊〉"
-    assert mobile_groups["entertain_mobile"]["label"] == "娛樂陪〈手遊〉"
+    assert mobile_groups["tech_play_mobile"]["label"] == "技術陪"
+    assert mobile_groups["entertain_mobile"]["label"] == "娛樂陪"
     assert "tech_play" not in mobile_groups
     assert "entertain" not in mobile_groups
 
