@@ -71,7 +71,7 @@ GROUP_SPECS = [
     {
         "key": "tech_play",
         "category": "delta_desktop_basic",
-        "label": "技術陪〈端遊〉",
+        "label": "技術陪",
         "selector_label": "難度 / 陪玩人數",
         "description": "三角洲端遊技術陪，依難度與陪玩人數選擇方案。",
         "variants": [
@@ -85,7 +85,7 @@ GROUP_SPECS = [
     {
         "key": "tech_play_mobile",
         "category": "delta_mobile_basic",
-        "label": "技術陪〈手遊〉",
+        "label": "技術陪",
         "selector_label": "難度 / 陪玩人數",
         "description": "三角洲手遊技術陪，機密 380T/H、絕密 420T/H。",
         "variants": [
@@ -99,7 +99,7 @@ GROUP_SPECS = [
     {
         "key": "entertain",
         "category": "delta_desktop_basic",
-        "label": "娛樂陪〈端遊〉",
+        "label": "娛樂陪",
         "selector_label": "陪玩人數",
         "description": "需同時具備男陪／女陪與三角洲<端遊>身分組；以聊天、娛樂與遊戲體驗為主。",
         "variants": [
@@ -111,7 +111,7 @@ GROUP_SPECS = [
     {
         "key": "entertain_mobile",
         "category": "delta_mobile_basic",
-        "label": "娛樂陪〈手遊〉",
+        "label": "娛樂陪",
         "selector_label": "陪玩人數",
         "description": "需同時具備男陪／女陪與三角洲<手遊>身分組；價格與端遊相同。",
         "variants": [
