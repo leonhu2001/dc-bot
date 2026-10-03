@@ -30,7 +30,7 @@
 
 <div class="ops-report">
   <div class="ops-head">
-    <div><div class="ops-kicker">OPERATIONS & FINANCE</div><h1>營運財務報表</h1><div class="muted">{{ report.period_label }} · 已結單資料</div></div>
+    <div class="ops-period">{{ report.period_label }} · 已結單資料</div>
     <form class="ops-filter" method="get" action="/admin/payouts/report">
       <select class="input" name="period">
         <option value="month" {% if report.period == "month" %}selected{% endif %}>本月</option>
