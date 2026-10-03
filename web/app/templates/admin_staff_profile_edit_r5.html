@@ -27,7 +27,7 @@
 <div class="profile-field full"><label>個人特色</label><textarea class="profile-textarea" name="bio" maxlength="1200">{{ profile.bio }}</textarea></div>
 <div class="profile-field full"><label>名片圖片 URL</label><input class="profile-input" name="card_image_url" value="{{ profile.card_image_url }}" maxlength="1000"><div class="profile-preview"><div class="profile-preview-label">目前名片圖片預覽</div>{% if profile.card_image_url %}<img src="{{ profile.card_image_url }}" alt="名片預覽">{% else %}<div class="profile-no-image">尚未設定名片圖片 URL</div>{% endif %}</div></div>
 </div>
-<div class="profile-edit-actions"><button class="profile-button gold" type="submit">儲存變更</button><a class="profile-button" href="/admin/staff_profiles/">返回個人牆管理</a></div>
+<div class="profile-edit-actions"><button class="profile-button gold" type="submit">儲存變更</button><a class="profile-button" href="/admin/staff-center">返回人員中心</a></div>
 </form>
 </div>
 </section>

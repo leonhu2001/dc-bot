@@ -30,9 +30,9 @@
         <div class="mw-r5-legacy-body">
 
 <main>
-<div class="top"><div><div class="k">CUSTOMER WORKSPACE</div><div class="m">{{ customer_id }}</div></div><div><a class="btn" href="/admin/customers">← 返回</a><a class="btn" href="/admin/wallets/{{ customer_id }}">完整錢包</a></div></div>
+<div class="top"><div><div class="k">CUSTOMER WORKSPACE</div><div class="m">{{ customer_id }}</div></div><div><a class="btn" href="/admin/customer-center">← 返回</a><a class="btn" href="/admin/wallets/{{ customer_id }}?return_to=/admin/customers/{{ customer_id }}">完整錢包</a></div></div>
 <div class="stats">{% for label,value in [("訂單",stats.orders),("完成",stats.completed),("取消",stats.cancelled),("累計消費",stats.total_spend ~ "T"),("收藏",stats.favorites),("評價",stats.reviews)] %}<div class="stat"><span>{{ label }}</span><strong>{{ value }}</strong></div>{% endfor %}</div>
-<div class="grid"><section><div class="card"><h2>近期訂單</h2>{% for o in orders %}<a class="row" href="/admin/order-workspace/{{ o.id }}"><span class="g">{{ o.bot_order_no or ("WEB-" ~ o.id) }}</span><span>{{ o.item or "未紀錄" }}</span><span>{{ o.customer_pay_amount or o.amount or 0 }}T</span><span class="m">{{ o.status }}</span></a>{% else %}<div class="empty">沒有訂單</div>{% endfor %}</div>
+<div class="grid"><section><div class="card"><h2>近期訂單</h2>{% for o in orders %}<a class="row" href="/admin/order-workspace/{{ o.id }}?return_to=/admin/customers/{{ customer_id }}"><span class="g">{{ o.bot_order_no or ("WEB-" ~ o.id) }}</span><span>{{ o.item or "未紀錄" }}</span><span>{{ o.customer_pay_amount or o.amount or 0 }}T</span><span class="m">{{ o.status }}</span></a>{% else %}<div class="empty">沒有訂單</div>{% endfor %}</div>
 <div class="card"><h2>評價紀錄</h2>{% for r in reviews %}<div class="item"><span class="g">{{ r.rating or "—" }} / 5</span> · {{ r.staff_display_name or r.staff_discord_id }}<br><span class="m">{{ r.comment or "沒有文字內容" }}</span></div>{% else %}<div class="empty">沒有評價</div>{% endfor %}</div></section>
 </div></main>
 

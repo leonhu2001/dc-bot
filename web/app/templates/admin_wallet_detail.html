@@ -239,7 +239,7 @@
         </div>
 
         <div class="wallet-detail-actions">
-            <a class="button" href="/admin/wallets">返回錢包總覽</a>
+            <a class="button" href="{{ request.query_params.get('return_to') or '/admin/customer-center' }}">返回上一層</a>
             <a class="button secondary" href="/admin">返回後台</a>
         </div>
     </section>

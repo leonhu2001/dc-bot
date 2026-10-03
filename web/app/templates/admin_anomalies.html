@@ -197,7 +197,7 @@
                 {% endif %}
 
                 {% if issue.action_url %}
-                <a class="button secondary" href="{{ issue.action_url }}">
+                <a class="button secondary" href="{{ issue.action_url }}{% if issue.action_url.startswith('/admin/order-workspace/') %}?return_to=/admin/anomalies{% endif %}">
                     {{ issue.action_label or '查看資料' }}
                 </a>
                 {% endif %}
