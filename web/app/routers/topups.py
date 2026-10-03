@@ -287,7 +287,11 @@ async def admin_topup_reject(
             reason=reason,
         )
     except ValueError as exc:
-        return _redirect_message("/admin/topups", "error", exc)
+        return _redirect_message(
+            "/admin/payment-reviews?status=pending",
+            "error",
+            exc,
+        )
     return _redirect_message(
         "/admin/payment-reviews?status=pending",
         "ok",
