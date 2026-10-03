@@ -969,3 +969,312 @@ html body.mw-r5-layout :is(.staff-money,.staff-count-main,.staff-count-sub) {
         padding-right: 38px !important;
     }
 }
+
+
+/* Payment review */
+html body.mw-r5-layout .pay-review-page {
+    gap: 14px !important;
+}
+
+html body.mw-r5-layout :is(.pay-review-card,.pay-review-panel) {
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    background: var(--admin-panel) !important;
+    box-shadow: none !important;
+}
+
+html body.mw-r5-layout .pay-review-card {
+    padding: 16px !important;
+}
+
+html body.mw-r5-layout .pay-review-card h2 {
+    margin: 4px 0 6px !important;
+    font-size: 18px !important;
+}
+
+html body.mw-r5-layout .pay-review-head {
+    padding: 13px 15px !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    background: var(--admin-panel-3) !important;
+}
+
+html body.mw-r5-layout .pay-review-head h3 {
+    margin: 2px 0 0 !important;
+    font-size: 16px !important;
+}
+
+html body.mw-r5-layout .pay-review-kicker {
+    color: var(--admin-gold) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: .13em !important;
+}
+
+html body.mw-r5-layout :is(.pay-review-link,.pay-review-action) {
+    min-height: 34px !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--admin-border) !important;
+    border-radius: 8px !important;
+    color: var(--admin-text-soft) !important;
+    background: rgba(255,255,255,.025) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-layout :is(.pay-review-link,.pay-review-action):hover {
+    color: var(--admin-gold-soft) !important;
+    border-color: rgba(214,176,90,.28) !important;
+    background: rgba(214,176,90,.065) !important;
+}
+
+html body.mw-r5-layout .pay-review-action.reject {
+    color: #efa6a6 !important;
+    border-color: rgba(223,123,123,.28) !important;
+    background: rgba(223,123,123,.065) !important;
+}
+
+html body.mw-r5-layout .pay-review-table th {
+    color: var(--admin-muted) !important;
+    background: var(--admin-panel-3) !important;
+    font-weight: 750 !important;
+    letter-spacing: .025em !important;
+}
+
+html body.mw-r5-layout .pay-review-table td {
+    color: var(--admin-text-soft) !important;
+}
+
+html body.mw-r5-layout .pay-review-muted {
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+}
+
+html body.mw-r5-layout .pay-review-amount {
+    color: var(--admin-gold-soft) !important;
+    font-weight: 750 !important;
+}
+
+html body.mw-r5-layout .pay-review-alert {
+    padding: 11px 13px !important;
+    border: 1px solid rgba(214,176,90,.22) !important;
+    border-radius: 10px !important;
+    color: var(--admin-gold-soft) !important;
+    background: rgba(214,176,90,.055) !important;
+}
+
+html body.mw-r5-layout .pay-review-reason {
+    width: 158px !important;
+    min-height: 34px !important;
+}
+
+/* Wallet list + detail */
+html body.mw-r5-layout .wallet-page,
+html body.mw-r5-layout .wallet-detail-page {
+    gap: 14px !important;
+}
+
+html body.mw-r5-layout .wallet-command {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+}
+
+html body.mw-r5-layout :is(
+    .wallet-card,.wallet-stat,.wallet-panel,
+    .wallet-detail-identity,.wallet-detail-panel,.wallet-detail-stat
+) {
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    color: var(--admin-text) !important;
+    background: var(--admin-panel) !important;
+    box-shadow: none !important;
+}
+
+html body.mw-r5-layout :is(.wallet-intro,.wallet-detail-identity)::after {
+    display: none !important;
+}
+
+html body.mw-r5-layout .wallet-filter-card {
+    padding: 14px !important;
+}
+
+html body.mw-r5-layout .wallet-filter {
+    grid-template-columns: minmax(0,1fr) auto auto !important;
+    gap: 9px !important;
+}
+
+html body.mw-r5-layout :is(.wallet-stat,.wallet-detail-stat) {
+    min-height: 92px !important;
+    padding: 14px 15px !important;
+}
+
+html body.mw-r5-layout :is(.wallet-stat,.wallet-detail-stat) span {
+    margin-bottom: 7px !important;
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-layout :is(.wallet-stat,.wallet-detail-stat) strong {
+    color: var(--admin-gold-soft) !important;
+    font-size: 27px !important;
+    font-weight: 800 !important;
+    line-height: 1.08 !important;
+    letter-spacing: -.02em !important;
+}
+
+html body.mw-r5-layout :is(.wallet-panel-head,.wallet-detail-head) {
+    padding: 13px 15px !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    background: var(--admin-panel-3) !important;
+}
+
+html body.mw-r5-layout :is(.wallet-panel-head,.wallet-detail-head) h3 {
+    margin: 2px 0 0 !important;
+    color: var(--admin-text) !important;
+    font-size: 16px !important;
+    font-weight: 750 !important;
+    letter-spacing: -.01em !important;
+}
+
+html body.mw-r5-layout .wallet-detail-identity {
+    padding: 15px !important;
+}
+
+html body.mw-r5-layout .wallet-detail-identity h2 {
+    margin: 3px 0 5px !important;
+    color: var(--admin-text) !important;
+    font-size: 19px !important;
+    font-weight: 800 !important;
+    letter-spacing: -.015em !important;
+}
+
+html body.mw-r5-layout :is(.wallet-boss-name,.wallet-amount) {
+    color: var(--admin-text-soft) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-layout .wallet-amount {
+    color: var(--admin-gold-soft) !important;
+}
+
+html body.mw-r5-layout :is(.wallet-boss-id,.wallet-code,.wallet-note) {
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+}
+
+html body.mw-r5-layout :is(.wallet-link,.wallet-pill) {
+    min-height: 34px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 10px !important;
+    border: 1px solid var(--admin-border) !important;
+    border-radius: 8px !important;
+    color: var(--admin-text-soft) !important;
+    background: rgba(255,255,255,.025) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-layout .wallet-plus {
+    color: #a9dfbb !important;
+}
+
+html body.mw-r5-layout .wallet-minus {
+    color: #efa6a6 !important;
+}
+
+/* Payout summary: retire the old parchment card treatment. */
+html body.mw-r5-layout .staff-summary-page {
+    gap: 14px !important;
+}
+
+html body.mw-r5-layout .staff-summary-filter {
+    padding: 14px !important;
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    background: var(--admin-panel) !important;
+}
+
+html body.mw-r5-layout .staff-summary-filter label span {
+    color: var(--admin-muted) !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-layout .staff-summary-ledger-panel {
+    border: 1px solid var(--admin-border-soft) !important;
+    border-radius: var(--admin-radius) !important;
+    background: var(--admin-panel) !important;
+}
+
+html body.mw-r5-layout .staff-summary-ledger-head {
+    padding: 13px 15px !important;
+    border-bottom: 1px solid var(--admin-border) !important;
+    background: var(--admin-panel-3) !important;
+}
+
+html body.mw-r5-layout .staff-summary-ledger-head h2 {
+    color: var(--admin-text) !important;
+    font-size: 16px !important;
+    font-weight: 750 !important;
+    letter-spacing: -.01em !important;
+}
+
+html body.mw-r5-layout .staff-summary-table th {
+    color: var(--admin-muted) !important;
+    background: var(--admin-panel-3) !important;
+    border-color: var(--admin-border-soft) !important;
+    font-size: 11.5px !important;
+    font-weight: 750 !important;
+    letter-spacing: .025em !important;
+}
+
+html body.mw-r5-layout .staff-summary-table td {
+    color: var(--admin-text-soft) !important;
+    background: transparent !important;
+    border-color: var(--admin-border-soft) !important;
+    font-size: 13px !important;
+}
+
+html body.mw-r5-layout :is(.staff-person-name,.staff-money,.staff-count-main) {
+    color: var(--admin-text-soft) !important;
+    font-size: 13px !important;
+    font-weight: 750 !important;
+}
+
+html body.mw-r5-layout :is(.staff-person-id,.staff-count-sub) {
+    color: var(--admin-muted) !important;
+    font-size: 11px !important;
+}
+
+html body.mw-r5-layout :is(.staff-role-badge,.staff-status-badge) {
+    min-height: 28px !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    color: var(--admin-text-soft) !important;
+    border-color: var(--admin-border) !important;
+    background: rgba(255,255,255,.025) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+}
+
+html body.mw-r5-layout .staff-status-badge.paid {
+    color: #a9dfbb !important;
+    border-color: rgba(123,199,154,.26) !important;
+}
+
+html body.mw-r5-layout .staff-status-badge.unpaid {
+    color: #efa6a6 !important;
+    border-color: rgba(223,123,123,.27) !important;
+}
+
+html body.mw-r5-layout .staff-status-badge.partial {
+    color: #e7c98a !important;
+    border-color: rgba(214,176,90,.27) !important;
+}
+
+html body.mw-r5-layout .staff-summary-total-card::after {
+    display: none !important;
+}
