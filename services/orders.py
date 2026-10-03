@@ -102,17 +102,41 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             "label": "甜蜜單",
             "details": [
                 {
-                    "label": "單陪",
-                    "value": "single",
-                    "rule_key": "basic_sweet_single",
+                    "label": "女單陪",
+                    "value": "female_single",
+                    "rule_key": "basic_sweet_female_single",
                     "quantity_unit": "小時",
                     "min_quantity": 1,
                     "max_quantity": 24,
                 },
                 {
-                    "label": "雙陪",
-                    "value": "double",
-                    "rule_key": "basic_sweet_double",
+                    "label": "男單陪",
+                    "value": "male_single",
+                    "rule_key": "basic_sweet_male_single",
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                },
+                {
+                    "label": "女雙陪",
+                    "value": "female_double",
+                    "rule_key": "basic_sweet_female_double",
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                },
+                {
+                    "label": "男雙陪",
+                    "value": "male_double",
+                    "rule_key": "basic_sweet_male_double",
+                    "quantity_unit": "小時",
+                    "min_quantity": 1,
+                    "max_quantity": 24,
+                },
+                {
+                    "label": "雙陪(不限)",
+                    "value": "double_any",
+                    "rule_key": "basic_sweet_double_any",
                     "quantity_unit": "小時",
                     "min_quantity": 1,
                     "max_quantity": 24,
@@ -358,6 +382,9 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
 
 # 所有 rule label 仍保留，讓舊訂單 / 舊紀錄可繼續被辨識。
 CATALOG_HIDDEN_RULE_KEYS = {
+    # 舊甜蜜單只留給既有訂單回查；新訂單改用男女細分規則。
+    "basic_sweet_single",
+    "basic_sweet_double",
     "farm_season_3x3_skin",
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
