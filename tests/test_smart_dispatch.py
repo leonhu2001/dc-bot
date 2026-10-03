@@ -633,6 +633,88 @@ def test_assignment_metrics_count_waiting_acceptance_claims(tmp_path):
     assert metrics["WAITING"]["active_count"] == 1
 
 
+def test_prepare_initial_dispatch_prioritizes_completed_favorite_for_diamond(tmp_path):
+    from core.vip_levels import VIP_LEVELS
+    from views.smart_dispatch import prepare_initial_smart_dispatch
+
+    db_path = tmp_path / "web_dashboard.db"
+    _setup_familiar_assignment_db(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            INSERT INTO web_orders (id, customer_discord_id, status)
+            VALUES (1, '500', 'closed');
+
+            INSERT INTO order_assignments (
+                order_id,
+                worker_discord_id,
+                is_active,
+                assigned_at
+            )
+            VALUES (1, '1', 1, '2026-10-01 01:00:00');
+
+            INSERT INTO staff_favorites (
+                customer_discord_id,
+                staff_discord_id
+            )
+            VALUES ('500', '1');
+            """
+        )
+        conn.commit()
+
+    diamond_role = next(
+        int(level["role_id"])
+        for level in VIP_LEVELS
+        if level["name"] == "鑽石魔丸"
+    )
+
+    class Role:
+        def __init__(self, role_id):
+            self.id = role_id
+
+    class Member:
+        def __init__(self, member_id, role_ids):
+            self.id = member_id
+            self.bot = False
+            self.roles = [Role(role_id) for role_id in role_ids]
+
+    class Guild:
+        def __init__(self):
+            self.members = [
+                Member(500, [diamond_role]),
+                Member(1, [100]),
+                Member(2, [100]),
+                Member(3, [100]),
+            ]
+
+        def get_member(self, member_id):
+            return next(
+                (
+                    member
+                    for member in self.members
+                    if member.id == member_id
+                ),
+                None,
+            )
+
+        def get_role(self, role_id):
+            return None
+
+    result = prepare_initial_smart_dispatch(
+        Guild(),
+        customer_id=500,
+        allowed_role_ids=["100"],
+        specified_staff_ids=[],
+        required_staff_count=1,
+        db_file=db_path,
+    )
+
+    assert result["priority_candidate_ids"] == ["1"]
+    assert result["initial_notified_ids"] == ["1"]
+    assert "VIP 熟悉收藏優先" in result["content"]
+
+
 def test_prepare_recovery_can_exclude_already_accepted_candidates():
     class Role:
         def __init__(self, role_id):
