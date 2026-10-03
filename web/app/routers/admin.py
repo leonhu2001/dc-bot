@@ -16,6 +16,14 @@ from shared.order_acceptance import (
     get_acceptance_state,
     unclaim_acceptance_order,
 )
+from shared.order_state import (
+    CANCELLED,
+    CANCELLATION_REASON_LABELS,
+    normalize_cancellation_reason_code,
+    normalize_order_status,
+    record_order_cancellation_in_connection,
+    transition_order_state_in_connection,
+)
 from web.app.services.admin_service import (
     add_worker_to_order,
     remove_worker_from_order,
@@ -1445,35 +1453,57 @@ async def admin_dashboard(
 async def admin_cancel_order(
     order_id: int,
     request: Request,
+    cancellation_reason_code: str = Form(default="unspecified"),
+    cancellation_reason_text: str = Form(default=""),
 ):
     user = require_admin_user(request)
 
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
 
+    reason_code = normalize_cancellation_reason_code(
+        cancellation_reason_code
+    )
+    reason_text = str(cancellation_reason_text or "").strip()
+
+    if reason_code == "unspecified":
+        return redirect_to_admin(error="取消訂單前請先選擇取消原因。")
+
     db = SessionLocal()
 
     try:
         row = db.execute(
-            text("SELECT id FROM web_orders WHERE id = :order_id"),
+            text(
+                "SELECT id, status FROM web_orders "
+                "WHERE id = :order_id"
+            ),
             {"order_id": order_id},
-        ).fetchone()
+        ).mappings().first()
 
         if row is None:
             return redirect_to_admin(error="找不到這筆訂單。")
 
-        db.execute(
-            text("UPDATE web_orders SET status = 'cancelled' WHERE id = :order_id"),
-            {"order_id": order_id},
+        transition_order_state_in_connection(
+            db.connection(),
+            order_id=int(order_id),
+            target_status=CANCELLED,
+            source="admin_cancel",
+            reason=reason_text or CANCELLATION_REASON_LABELS[reason_code],
+            actor_discord_id=user.get("id"),
+            cancellation_reason_code=reason_code,
+            cancellation_reason_text=reason_text,
         )
         db.commit()
+    except ValueError as exc:
+        db.rollback()
+        return redirect_to_admin(error=f"取消訂單失敗：{exc}")
     except Exception as exc:
         db.rollback()
         return redirect_to_admin(error=f"取消訂單失敗：{exc}")
     finally:
         db.close()
 
-    return redirect_to_admin(message="訂單已取消，已從總控列表隱藏。")
+    return redirect_to_admin(message="訂單已取消，取消原因已記錄。")
 
 
 @router.post("/admin/staff/sync")
@@ -2463,6 +2493,29 @@ def _mw4a2r6_load_order_bundle(
         )
     )
 
+    cancellation = {}
+    if _mw4a2r6_table_exists(
+        db,
+        "order_cancellations",
+    ):
+        cancellation_row = (
+            db.execute(
+                text(
+                    """
+                    SELECT *
+                    FROM order_cancellations
+                    WHERE order_id = :order_id
+                    LIMIT 1
+                    """
+                ),
+                {"order_id": int(order_id)},
+            )
+            .mappings()
+            .first()
+        )
+        if cancellation_row is not None:
+            cancellation = dict(cancellation_row)
+
 
     order = {
 
@@ -2664,6 +2717,30 @@ def _mw4a2r6_load_order_bundle(
             str(
                 meta.get(
                     "attention_reason"
+                )
+                or ""
+            ),
+
+        "cancellation_reason_code":
+            str(
+                cancellation.get(
+                    "reason_code"
+                )
+                or "unspecified"
+            ),
+
+        "cancellation_reason_text":
+            str(
+                cancellation.get(
+                    "reason_text"
+                )
+                or ""
+            ),
+
+        "cancellation_source":
+            str(
+                cancellation.get(
+                    "source"
                 )
                 or ""
             ),
@@ -3174,6 +3251,7 @@ async def admin_order_workspace_r8(
             "acceptance_state": acceptance_state,
             "paid_status": PayoutStatus.PAID.value,
             "unpaid_status": PayoutStatus.UNPAID.value,
+            "cancellation_reason_labels": CANCELLATION_REASON_LABELS,
             "message": message,
             "error": error,
         },
@@ -3192,6 +3270,8 @@ async def admin_order_workspace_edit_r8(
     amount: int = Form(default=0),
     payment_method: str = Form(default=""),
     status: str = Form(default="active"),
+    cancellation_reason_code: str = Form(default=""),
+    cancellation_reason_text: str = Form(default=""),
     closed_date: str = Form(default=""),
     closed_date_auto: str = Form(default=""),
     closed_date_touched: str = Form(default=""),
@@ -3222,7 +3302,15 @@ async def admin_order_workspace_edit_r8(
     category = str(category or "").strip()
     item = str(item or "").strip()
     payment_method = str(payment_method or "").strip()
-    status = str(status or "active").strip().lower()
+    status = normalize_order_status(
+        str(status or "active").strip().lower()
+    )
+    cancellation_reason_code = normalize_cancellation_reason_code(
+        cancellation_reason_code
+    )
+    cancellation_reason_text = str(
+        cancellation_reason_text or ""
+    ).strip()
     closed_date = str(closed_date or "").strip()
     closed_date_auto = str(closed_date_auto or "").strip().lower()
     closed_date_touched = str(closed_date_touched or "").strip().lower()
@@ -3252,6 +3340,43 @@ async def admin_order_workspace_edit_r8(
             return _mw4a2r6_redirect(order_id, error="找不到這筆訂單。")
 
         before = _mw_r8_jsonable_row(before_row)
+        previous_status = normalize_order_status(
+            str(before.get("status") or "")
+        )
+
+        if status == CANCELLED:
+            if (
+                previous_status != CANCELLED
+                and cancellation_reason_code == "unspecified"
+            ):
+                raise ValueError("取消訂單前請先選擇取消原因。")
+
+            if previous_status != CANCELLED:
+                transition_order_state_in_connection(
+                    db.connection(),
+                    order_id=int(order_id),
+                    target_status=CANCELLED,
+                    source="admin_order_workspace",
+                    reason=(
+                        cancellation_reason_text
+                        or CANCELLATION_REASON_LABELS[
+                            cancellation_reason_code
+                        ]
+                    ),
+                    actor_discord_id=user.get("id"),
+                    cancellation_reason_code=cancellation_reason_code,
+                    cancellation_reason_text=cancellation_reason_text,
+                )
+            else:
+                record_order_cancellation_in_connection(
+                    db.connection(),
+                    order_id=int(order_id),
+                    reason_code=cancellation_reason_code,
+                    reason_text=cancellation_reason_text,
+                    source="admin_order_workspace",
+                    actor_discord_id=user.get("id"),
+                )
+
         payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
 
         previous_amount_for_finance = _mw4a2r6_safe_int(
