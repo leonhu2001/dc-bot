@@ -44,6 +44,7 @@
 
 
 <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=review_actions_20260930_1">
+<link rel="stylesheet" href="/static/css/mw_admin_theme.css?v=20261004_1">
 
     <!-- MAWAN_SITE_IDENTITY -->
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
@@ -92,6 +93,66 @@
         </p>
 
 
+    {% elif _p == '/admin/staff-center' %}
+
+        <div class="mw-r5-kicker">STAFF OPERATIONS</div>
+        <h1 class="mw-r5-page-title">人員中心</h1>
+        <p>查找店內人員、接單資格、啟用狀態與個人牆資訊。</p>
+
+    {% elif _p == '/admin/customer-center' %}
+
+        <div class="mw-r5-kicker">CUSTOMER OPERATIONS</div>
+        <h1 class="mw-r5-page-title">客戶中心</h1>
+        <p>集中查看客戶訂單、消費、收藏、評價與錢包入口。</p>
+
+    {% elif _p == '/admin/finance-center' %}
+
+        <div class="mw-r5-kicker">FINANCE OPERATIONS</div>
+        <h1 class="mw-r5-page-title">財務中心</h1>
+        <p>付款審核、薪資結算與帳務對帳集中管理。</p>
+
+    {% elif _p == '/admin/support-center' %}
+
+        <div class="mw-r5-kicker">SUPPORT OPERATIONS</div>
+        <h1 class="mw-r5-page-title">客服中心</h1>
+        <p>查看票口封存、客服鈴 SLA 與 AI 客服知識狀態。</p>
+
+    {% elif _p == '/admin/search' %}
+
+        <div class="mw-r5-kicker">GLOBAL SEARCH</div>
+        <h1 class="mw-r5-page-title">全域搜尋</h1>
+        <p>跨客戶、訂單、付款、儲值與 Ticket 快速查找資料。</p>
+
+    {% elif _p == '/admin/wallets' or _p == '/admin/wallets/' %}
+
+        <div class="mw-r5-kicker">CUSTOMER WALLET</div>
+        <h1 class="mw-r5-page-title">錢包帳本</h1>
+        <p>查看客戶錢包餘額、最後異動與完整流水入口。</p>
+
+    {% elif _p.startswith('/admin/wallets/') %}
+
+        <div class="mw-r5-kicker">WALLET LEDGER</div>
+        <h1 class="mw-r5-page-title">錢包流水</h1>
+        <p>查看單一客戶的錢包餘額與每一筆異動紀錄。</p>
+
+    {% elif _p.startswith('/admin/order-rules') %}
+
+        <div class="mw-r5-kicker">PRODUCT RULES</div>
+        <h1 class="mw-r5-page-title">商品與規則</h1>
+        <p>管理商品價格、接單資格、平台與智慧派單條件。</p>
+
+    {% elif _p.startswith('/admin/marketing') %}
+
+        <div class="mw-r5-kicker">MARKETING FUNNEL</div>
+        <h1 class="mw-r5-page-title">行銷漏斗</h1>
+        <p>追蹤來源、瀏覽、報價、結帳與付款轉換表現。</p>
+
+    {% elif _p.startswith('/admin/anomalies') %}
+
+        <div class="mw-r5-kicker">SYSTEM OPERATIONS</div>
+        <h1 class="mw-r5-page-title">系統維運</h1>
+        <p>集中查看服務健康、營運監控、異常修復與近期操作。</p>
+
     {% elif _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') %}
 
         <div class="mw-r5-kicker">
@@ -106,6 +167,18 @@
             集中審核點單、雞腿與儲值付款。
         </p>
 
+
+    {% elif _p.startswith('/admin/payouts/report') %}
+
+        <div class="mw-r5-kicker">OPERATIONS & FINANCE</div>
+        <h1 class="mw-r5-page-title">營運財務報表</h1>
+        <p>查看營收、成本、實留、回購、取消與服務效率趨勢。</p>
+
+    {% elif _p.startswith('/admin/tickets/') %}
+
+        <div class="mw-r5-kicker">TICKET ARCHIVE</div>
+        <h1 class="mw-r5-page-title">票口聊天紀錄</h1>
+        <p>查看已封存票口的對話、附件、客服與關閉資訊。</p>
 
     {% elif _p.startswith('/admin/payout') %}
 
@@ -269,8 +342,8 @@
 {% endif %}
 
 {% if mw_admin_area %}
-<div style="margin:0 0 18px 0;">
-    <form method="get" action="/admin/search" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+<div class="mw-admin-searchbar">
+    <form method="get" action="/admin/search" class="admin-add-worker-form">
         <input
             class="input"
             type="text"

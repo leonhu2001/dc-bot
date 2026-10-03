@@ -6,12 +6,6 @@
 </style>
 
 <section class="pay-review-page">
-  <section class="pay-review-card">
-    <p class="pay-review-kicker">PAYMENT REVIEW</p>
-    <h2>付款審核</h2>
-    <p>點單與雞腿的街口／轉帳付款會直接進入此頁。客服請先查看原 Discord 票口內的付款截圖，再確認收款。儲值審核也統一顯示在這裡。</p>
-  </section>
-
   {% if error %}<div class="pay-review-alert">{{ error }}</div>{% endif %}
   {% if ok %}<div class="pay-review-alert">{{ ok }}</div>{% endif %}
 
