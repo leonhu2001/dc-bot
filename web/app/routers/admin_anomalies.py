@@ -14,6 +14,9 @@ from shared.models import AdminAuditLog
 from web.app.services.anomaly_detection import build_anomaly_snapshot
 from web.app.services.anomaly_repair import apply_anomaly_repair
 from web.app.services.system_health import build_system_health_snapshot
+from web.app.services.operations_monitoring import (
+    build_operations_monitoring_snapshot,
+)
 
 
 router = APIRouter(tags=["admin-anomalies"])
@@ -58,6 +61,7 @@ async def admin_anomalies(
     request: Request,
     severity: str = "",
     category: str = "",
+    days: int = 30,
 ):
     user = get_current_user(request)
 
@@ -87,6 +91,10 @@ async def admin_anomalies(
 
     snapshot = await run_in_threadpool(build_anomaly_snapshot)
     health = await run_in_threadpool(build_system_health_snapshot)
+    operations = await run_in_threadpool(
+        build_operations_monitoring_snapshot,
+        days=max(1, min(int(days or 30), 365)),
+    )
     audit_logs = await run_in_threadpool(_recent_audit_logs)
 
     severity_filter = str(severity or "").strip().lower()
@@ -122,6 +130,7 @@ async def admin_anomalies(
             "user": user,
             "snapshot": snapshot,
             "health": health,
+            "operations": operations,
             "audit_logs": audit_logs,
             "issues": issues,
             "severity_filter": severity_filter,

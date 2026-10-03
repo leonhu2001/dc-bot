@@ -1,24 +1,4 @@
 {% set _p = request.url.path %}
-{% set _return_param = request.query_params.get('return_to', '') %}
-{% set _back = namespace(href='') %}
-
-{% if _return_param and (_return_param == '/admin' or _return_param.startswith('/admin/')) %}
-    {% set _back.href = _return_param %}
-{% elif _p.startswith('/admin/search/customer/') %}
-    {% set _back.href = '/admin/search' %}
-{% elif _p.startswith('/admin/staff') %}
-    {% set _back.href = '/admin/staff-center' %}
-{% elif _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') %}
-    {% set _back.href = '/admin/customer-center' %}
-{% elif _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') or _p.startswith('/admin/payout') or _p.startswith('/admin/accounting-reconciliation') %}
-    {% set _back.href = '/admin/finance-center' %}
-{% elif _p.startswith('/admin/tickets') or _p.startswith('/admin/support-calls') or _p.startswith('/admin/ai-support-knowledge') %}
-    {% set _back.href = '/admin/support-center' %}
-{% elif _p.startswith('/admin/system') or _p.startswith('/admin/audit') %}
-    {% set _back.href = '/admin/anomalies' %}
-{% elif _p != '/admin' %}
-    {% set _back.href = '/admin' %}
-{% endif %}
 
 <aside class="mw-r5-sidebar">
 
@@ -28,18 +8,8 @@
     </div>
 
     <nav class="mw-r5-nav">
-
-        {% if _back.href %}
         <a
-            href="{{ _back.href }}"
-            style="margin-bottom:8px;border-color:rgba(223,183,92,.18);color:#d8c99d;"
-        >
-            ← 返回上一層
-        </a>
-        {% endif %}
-
-        <a
-            class="{% if _p == '/admin' or _p.startswith('/admin/search') %}active{% endif %}"
+            class="{% if _p == '/admin' or _p == '/admin/search' or _p.startswith('/admin/order-workspace') %}active{% endif %}"
             href="/admin"
         >
             營運總覽
@@ -53,7 +23,7 @@
         </a>
 
         <a
-            class="{% if _p.startswith('/admin/customer-center') or _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') %}active{% endif %}"
+            class="{% if _p.startswith('/admin/customer-center') or _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') or _p.startswith('/admin/search/customer/') %}active{% endif %}"
             href="/admin/customer-center"
         >
             客戶中心

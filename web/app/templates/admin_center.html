@@ -24,22 +24,32 @@
 .center-review{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.018)}
 .center-review p{margin:6px 0 0;white-space:pre-wrap}
 @media(max-width:1050px){.center-stats{grid-template-columns:repeat(2,1fr)}.center-row{grid-template-columns:1fr 1fr}}
-@media(max-width:650px){.center-stats{grid-template-columns:1fr 1fr}.center-row{grid-template-columns:1fr}.center-actions .button{flex:1}}
+@media(max-width:650px){.center-stats{grid-template-columns:1fr 1fr}.center-row{grid-template-columns:1fr}.center-actions .button{flex:1}.center-filter-form{grid-template-columns:1fr!important}}
 </style>
 
 <div class="center-grid">
+
+{% if message %}
+<div class="panel compact-panel"><span class="status-chip is-paid">SUCCESS</span><p class="muted-text">{{ message }}</p></div>
+{% endif %}
+{% if error %}
+<div class="panel compact-panel"><span class="status-chip is-unpaid">ERROR</span><p class="muted-text">{{ error }}</p></div>
+{% endif %}
 
 {% if center == 'staff' %}
 
     <div class="panel compact-panel">
         <div class="section-title-row">
             <div>
-                <h2>人員中心</h2>
+                <h2>人員概況</h2>
                 <p class="muted-text">人員名錄與個人牆放在同一個入口；一般查人、看資格與個人牆狀態不用再切兩個側欄頁。</p>
             </div>
             <div class="center-actions">
-                <a class="button secondary" href="/admin/staff?return_to=/admin/staff-center">完整人員管理</a>
-                <a class="button secondary" href="/admin/staff_profiles/?return_to=/admin/staff-center">完整個人牆管理</a>
+                <form method="post" action="/admin/staff/sync" style="margin:0;">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <button class="button secondary" type="submit">同步 Discord 人員</button>
+                </form>
+                <a class="button secondary" href="/admin/staff_profiles/?return_to=/admin/staff-center">個人牆管理</a>
             </div>
         </div>
 
@@ -52,9 +62,22 @@
     </div>
 
     <div class="panel compact-panel">
-        <form method="get" action="/admin/staff-center" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+        <form method="get" action="/admin/staff-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.4fr) minmax(150px,.5fr) auto;gap:10px;">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
-            <button class="button" type="submit">搜尋</button>
+            <select class="input" name="status">
+                <option value="active" {% if status == 'active' %}selected{% endif %}>在職</option>
+                <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>已停用</option>
+                <option value="all" {% if status == 'all' %}selected{% endif %}>全部狀態</option>
+            </select>
+            <select class="input" name="role">
+                <option value="">全部身分</option>
+                {% for option in staff_role_filters %}
+                    {% if option.value %}
+                    <option value="{{ option.value }}" {% if role == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <button class="button" type="submit">篩選</button>
         </form>
 
         <div class="center-list" style="margin-top:12px;">
@@ -105,14 +128,13 @@
     <div class="panel compact-panel">
         <div class="section-title-row">
             <div>
-                <h2>客戶中心</h2>
+                <h2>客戶概況</h2>
                 <p class="muted-text">客戶資料、錢包與評價集中查看；客戶明細仍保留完整訂單與備註功能。</p>
             </div>
             <div class="center-actions">
-                <a class="button secondary" href="/admin/customers?return_to=/admin/customer-center">完整客戶名單</a>
-                <a class="button secondary" href="/admin/reviews/?return_to=/admin/customer-center">完整評價管理</a>
+                <a class="button secondary" href="/admin/reviews/?return_to=/admin/customer-center">評價管理</a>
                 {% if is_manager %}
-                <a class="button secondary" href="/admin/wallets?return_to=/admin/customer-center">完整錢包</a>
+                <a class="button secondary" href="/admin/wallets?return_to=/admin/customer-center">錢包帳本</a>
                 {% endif %}
             </div>
         </div>
@@ -132,7 +154,7 @@
     </div>
 
     <div class="panel compact-panel">
-        <form method="get" action="/admin/customer-center" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+        <form method="get" action="/admin/customer-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋客戶名稱或 Discord ID">
             <button class="button" type="submit">搜尋</button>
         </form>
@@ -143,8 +165,13 @@
                 <div>
                     <strong>{{ row.customer_display_name }}</strong>
                     <small>{{ row.customer_discord_id }}</small>
+                    <small>收藏 {{ row.favorite_count }} ｜ 評價 {{ row.review_count }}</small>
                 </div>
-                <div class="center-cell"><span>訂單數</span><b>{{ row.order_count }}</b></div>
+                <div class="center-cell">
+                    <span>訂單</span>
+                    <b>{{ row.order_count }}</b>
+                    <small>完成 {{ row.completed_count }} ｜ 取消 {{ row.cancelled_count }}</small>
+                </div>
                 <div class="center-cell"><span>完成消費</span><b>{{ "{:,}".format(row.completed_spend or 0) }}T</b></div>
                 {% if is_manager %}
                 <div class="center-cell"><span>錢包</span><b>{{ "{:,}".format(row.wallet_balance or 0) }}T</b></div>
@@ -152,7 +179,7 @@
                 <div class="center-cell"><span>最近活動</span><b>{{ row.last_seen_at or '-' }}</b></div>
                 {% endif %}
                 <div class="center-actions">
-                    <a class="button secondary" href="/admin/customers/{{ row.customer_discord_id }}?return_to=/admin/customer-center">客戶資料</a>
+                    <a class="button secondary" href="/admin/search/customer/{{ row.customer_discord_id }}?return_to=/admin/customer-center">客戶資料</a>
                     {% if is_manager %}
                     <a class="button secondary" href="/admin/wallets/{{ row.customer_discord_id }}?return_to=/admin/customer-center">錢包</a>
                     {% endif %}
@@ -166,7 +193,7 @@
 
     <div class="panel compact-panel">
         <div class="section-title-row">
-            <div><h2>最近評價</h2><p class="muted-text">最新 12 筆，完整隱藏／公開管理仍可從上方進入。</p></div>
+            <div><h2>最近評價</h2><p class="muted-text">最新 12 筆；公開／隱藏調整可從上方「評價管理」處理。</p></div>
         </div>
         <div class="center-list">
         {% for row in snapshot.reviews %}
@@ -187,7 +214,7 @@
     <div class="panel compact-panel">
         <div class="section-title-row">
             <div>
-                <h2>財務中心</h2>
+                <h2>財務概況</h2>
                 <p class="muted-text">付款審核、薪資結算與帳務對帳集中到同一個入口。</p>
             </div>
             <div class="center-actions">
@@ -240,11 +267,10 @@
     <div class="panel compact-panel">
         <div class="section-title-row">
             <div>
-                <h2>客服中心</h2>
+                <h2>客服概況</h2>
                 <p class="muted-text">票口封存、客服鈴 / SLA 與 AI 客服知識集中在一個入口。</p>
             </div>
             <div class="center-actions">
-                <a class="button secondary" href="/admin/tickets?return_to=/admin/support-center">完整票口紀錄</a>
                 <a class="button secondary" href="/admin/support-calls?return_to=/admin/support-center">客服鈴 / SLA</a>
                 {% if is_manager %}
                 <a class="button secondary" href="/admin/ai-support-knowledge?return_to=/admin/support-center">AI 客服知識庫</a>
@@ -265,8 +291,12 @@
 
     <div class="panel compact-panel">
         <div class="section-title-row">
-            <div><h2>最近票口封存</h2><p class="muted-text">點進聊天紀錄後會固定提供返回客服中心。</p></div>
+            <div><h2>票口紀錄</h2><p class="muted-text">直接在客服中心搜尋封存票口，不再另外進一個重複清單頁。</p></div>
         </div>
+        <form method="get" action="/admin/support-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px;">
+            <input class="input" name="q" value="{{ q }}" placeholder="搜尋訂單號、客戶、客服、Ticket 或聊天內容">
+            <button class="button" type="submit">搜尋票口</button>
+        </form>
         <div class="center-list">
         {% for row in snapshot.tickets %}
             <a class="center-row" href="/admin/tickets/{{ row.id }}?return_to=/admin/support-center">
@@ -288,7 +318,7 @@
     {% if snapshot.knowledge %}
     <div class="panel compact-panel">
         <div class="section-title-row">
-            <div><h2>AI 客服知識</h2><p class="muted-text">只顯示狀態，正式核准與編輯仍在完整知識庫頁。</p></div>
+            <div><h2>AI 客服知識</h2><p class="muted-text">只顯示狀態；核准、編輯與停用請進入「AI 客服知識庫」。</p></div>
         </div>
         <div class="center-stats">
             <div class="center-stat"><span>待審核</span><strong>{{ snapshot.knowledge.pending_count }}</strong></div>

@@ -68,7 +68,7 @@
                 <div class="login-actions">
                     {% if user.is_admin %}
                         <a class="button" href="/admin">進入客服後台</a>
-                        <a class="button" href="/admin/staff">人員名單</a>
+                        <a class="button" href="/admin/staff-center">人員名單</a>
                     {% endif %}
 
                     {% if user.is_worker or user.is_companion or user.is_customer_service or user.is_admin %}

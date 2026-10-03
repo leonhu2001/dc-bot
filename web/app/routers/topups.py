@@ -210,19 +210,22 @@ async def admin_topups(request: Request, status: str | None = None):
     admin_user = require_admin(request)
     if not admin_user:
         return RedirectResponse("/admin", status_code=303)
-    rows = [_decorate(row) for row in list_topups_for_admin(status=status, limit=200)]
-    return templates.TemplateResponse(
-        request=request,
-        name="admin_topups.html",
-        context={
-            "title": "儲值審核",
-            "user": admin_user,
-            "topups": rows,
-            "status_filter": status or "",
-            "error": request.query_params.get("error"),
-            "ok": request.query_params.get("ok"),
-        },
-    )
+
+    raw = str(status or "").strip().lower()
+    if raw in {"pending", "pending_review", "approved_pending_credit", "crediting"}:
+        mapped = "pending"
+    elif raw == "completed":
+        mapped = "completed"
+    elif raw == "rejected":
+        mapped = "rejected"
+    else:
+        mapped = ""
+
+    target = "/admin/payment-reviews"
+    if mapped:
+        target += f"?status={mapped}"
+
+    return RedirectResponse(target, status_code=303)
 
 
 @router.post("/admin/topups/{topup_id}/approve")
@@ -246,9 +249,13 @@ async def admin_topup_approve(request: Request, topup_id: int):
             after=audit_snapshot(after),
         )
     except ValueError as exc:
-        return _redirect_message("/admin/topups", "error", exc)
+        return _redirect_message(
+            "/admin/payment-reviews?status=pending",
+            "error",
+            exc,
+        )
     return _redirect_message(
-        "/admin/topups",
+        "/admin/payment-reviews?status=pending",
         "ok",
         "已核准，Bot 將自動完成錢包與 VIP 入帳",
     )
@@ -280,5 +287,13 @@ async def admin_topup_reject(
             reason=reason,
         )
     except ValueError as exc:
-        return _redirect_message("/admin/topups", "error", exc)
-    return _redirect_message("/admin/topups", "ok", "儲值單已駁回")
+        return _redirect_message(
+            "/admin/payment-reviews?status=pending",
+            "error",
+            exc,
+        )
+    return _redirect_message(
+        "/admin/payment-reviews?status=pending",
+        "ok",
+        "儲值單已駁回",
+    )

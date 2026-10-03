@@ -1511,21 +1511,35 @@ async def admin_sync_staff(request: Request):
     user = require_admin_user(request)
 
     if not user:
-        return redirect_to_admin(error="你沒有客服後台權限，或登入狀態已過期。")
+        return RedirectResponse(
+            url="/admin/staff-center?"
+            + urlencode({"error": "你沒有客服後台權限，或登入狀態已過期。"}),
+            status_code=303,
+        )
 
     db = SessionLocal()
 
     try:
         result = sync_staff_members_from_discord(db)
         db.commit()
+        message = (
+            result.get("message")
+            or (
+                "成員同步完成：掃描 "
+                f"{result.get('total_seen', result.get('scanned', '?'))} 人，"
+                f"寫入 {result.get('synced_count', result.get('written', '?'))} 人。"
+            )
+        )
+        query = urlencode({"message": message})
     except Exception as e:
         db.rollback()
-        return redirect_to_admin(error=f"同步成員失敗：{e}")
+        query = urlencode({"error": f"同步成員失敗：{e}"})
     finally:
         db.close()
 
-    return redirect_to_admin(
-        message=result.get("message") or f"成員同步完成：掃描 {result.get('total_seen', result.get('scanned', '?'))} 人，寫入 {result.get('synced_count', result.get('written', '?'))} 人。"
+    return RedirectResponse(
+        url=f"/admin/staff-center?{query}",
+        status_code=303,
     )
 
 
@@ -2895,6 +2909,7 @@ def _mw4a2r6_load_order_bundle(
 def _mw4a2r6_redirect(
     order_id,
     *,
+    request: Request | None = None,
     message=None,
     error=None,
 ):
@@ -2919,6 +2934,19 @@ def _mw4a2r6_redirect(
         params[
             "error"
         ] = error
+
+
+    if request is not None:
+        return_to = str(
+            request.query_params.get("return_to")
+            or ""
+        ).strip()
+
+        if (
+            return_to == "/admin"
+            or return_to.startswith("/admin/")
+        ):
+            params["return_to"] = return_to
 
 
     base = (
@@ -3317,16 +3345,16 @@ async def admin_order_workspace_edit_r8(
     customer_service_discord_id = str(customer_service_discord_id or "").strip()
 
     if quantity < 1:
-        return _mw4a2r6_redirect(order_id, error="數量至少要是 1。")
+        return _mw4a2r6_redirect(order_id,request=request, error="數量至少要是 1。")
 
     if amount < 0:
-        return _mw4a2r6_redirect(order_id, error="金額不能小於 0。")
+        return _mw4a2r6_redirect(order_id,request=request, error="金額不能小於 0。")
 
     if status not in allowed_statuses:
-        return _mw4a2r6_redirect(order_id, error="訂單狀態不在允許清單。")
+        return _mw4a2r6_redirect(order_id,request=request, error="訂單狀態不在允許清單。")
 
     if closed_date and not _mw_r8_re.fullmatch(r"\d{4}-\d{2}-\d{2}", closed_date):
-        return _mw4a2r6_redirect(order_id, error="結案日期格式必須是 YYYY-MM-DD。")
+        return _mw4a2r6_redirect(order_id,request=request, error="結案日期格式必須是 YYYY-MM-DD。")
 
     db = SessionLocal()
 
@@ -3337,7 +3365,7 @@ async def admin_order_workspace_edit_r8(
         ).mappings().first()
 
         if before_row is None:
-            return _mw4a2r6_redirect(order_id, error="找不到這筆訂單。")
+            return _mw4a2r6_redirect(order_id,request=request, error="找不到這筆訂單。")
 
         before = _mw_r8_jsonable_row(before_row)
         previous_status = normalize_order_status(
@@ -3619,16 +3647,16 @@ async def admin_order_workspace_edit_r8(
 
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
 
     except Exception as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=f"訂單資料更新失敗：{exc}")
+        return _mw4a2r6_redirect(order_id,request=request, error=f"訂單資料更新失敗：{exc}")
 
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="訂單資料已更新。")
+    return _mw4a2r6_redirect(order_id,request=request, message="訂單資料已更新。")
 
 
 @router.post("/admin/order-workspace/{order_id}/add-worker")
@@ -3707,6 +3735,7 @@ async def admin_order_workspace_add_worker_r8(
             if state.is_full:
                 return _mw4a2r6_redirect(
                     order_id,
+                    request=request,
                     message=(
                         f"已補登接單人員（{state.accepted_count}/{state.required_staff_count}），"
                         "人數已滿，可進入付款程序。"
@@ -3715,6 +3744,7 @@ async def admin_order_workspace_add_worker_r8(
 
             return _mw4a2r6_redirect(
                 order_id,
+                request=request,
                 message=f"已補登接單人員（{state.accepted_count}/{state.required_staff_count}）。",
             )
 
@@ -3735,11 +3765,11 @@ async def admin_order_workspace_add_worker_r8(
 
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="已新增接單人員，分潤已重新計算。")
+    return _mw4a2r6_redirect(order_id,request=request, message="已新增接單人員，分潤已重新計算。")
 
 
 @router.post("/admin/order-workspace/{order_id}/acceptance/{staff_discord_id}/remove")
@@ -3781,12 +3811,13 @@ async def admin_order_workspace_remove_acceptance_r8(
 
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
     return _mw4a2r6_redirect(
         order_id,
+        request=request,
         message=f"已移除付款前接單人員（{state.accepted_count}/{state.required_staff_count}）。",
     )
 
@@ -3817,11 +3848,11 @@ async def admin_order_workspace_named_bonus_r8(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="掛名加成已更新。")
+    return _mw4a2r6_redirect(order_id,request=request, message="掛名加成已更新。")
 
 
 @router.post("/admin/order-workspace/{order_id}/assignments/{assignment_id}/remove")
@@ -3850,11 +3881,11 @@ async def admin_order_workspace_remove_worker_r8(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="已移除接單人員，分潤已重新計算。")
+    return _mw4a2r6_redirect(order_id,request=request, message="已移除接單人員，分潤已重新計算。")
 
 
 @router.post("/admin/order-workspace/{order_id}/manual-payout")
@@ -3888,11 +3919,11 @@ async def admin_order_workspace_manual_payout_r8(
         db.commit()
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="接單人員分潤金額已更新。")
+    return _mw4a2r6_redirect(order_id,request=request, message="接單人員分潤金額已更新。")
 
 
 @router.post("/admin/order-workspace/{order_id}/worker-payouts/{payout_id}/status")
@@ -3918,11 +3949,11 @@ async def admin_order_workspace_worker_payout_status_r8(
         )
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="接單人員分潤狀態已更新。")
+    return _mw4a2r6_redirect(order_id,request=request, message="接單人員分潤狀態已更新。")
 
 
 @router.post("/admin/order-workspace/{order_id}/customer-service-payouts/{payout_id}/status")
@@ -3948,11 +3979,11 @@ async def admin_order_workspace_cs_payout_status_r8(
         )
     except ValueError as exc:
         db.rollback()
-        return _mw4a2r6_redirect(order_id, error=str(exc))
+        return _mw4a2r6_redirect(order_id,request=request, error=str(exc))
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id, message="客服分潤狀態已更新。")
+    return _mw4a2r6_redirect(order_id,request=request, message="客服分潤狀態已更新。")
 
 # END MAWAN_R8_ORDER_WORKSPACE
 
@@ -3993,6 +4024,7 @@ async def admin_order_internal_note_r6(
 
         return _mw4a2r6_redirect(
             order_id,
+            request=request,
             error=
                 "客服內部備註最多 3000 字。",
         )
@@ -4029,6 +4061,7 @@ async def admin_order_internal_note_r6(
 
             return _mw4a2r6_redirect(
                 order_id,
+                request=request,
                 error=
                     "找不到這筆訂單。",
             )
@@ -4114,6 +4147,7 @@ async def admin_order_internal_note_r6(
 
         return _mw4a2r6_redirect(
             order_id,
+            request=request,
             error=(
                 "儲存客服內部備註失敗："
                 + str(
@@ -4130,6 +4164,7 @@ async def admin_order_internal_note_r6(
 
     return _mw4a2r6_redirect(
         order_id,
+        request=request,
         message=
             "客服內部備註已儲存。",
     )
@@ -4192,6 +4227,7 @@ async def admin_order_attention_r6(
 
         return _mw4a2r6_redirect(
             order_id,
+            request=request,
             error=
                 "注意原因最多 1000 字。",
         )
@@ -4233,6 +4269,7 @@ async def admin_order_attention_r6(
 
             return _mw4a2r6_redirect(
                 order_id,
+                request=request,
                 error=
                     "找不到這筆訂單。",
             )
@@ -4326,6 +4363,7 @@ async def admin_order_attention_r6(
 
         return _mw4a2r6_redirect(
             order_id,
+            request=request,
             error=(
                 "更新注意標記失敗："
                 + str(
@@ -4342,6 +4380,7 @@ async def admin_order_attention_r6(
 
     return _mw4a2r6_redirect(
         order_id,
+        request=request,
         message=(
             "已標記為需注意。"
 

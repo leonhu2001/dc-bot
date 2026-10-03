@@ -31,7 +31,7 @@
             <span class="status-chip {% if health.overall == 'ok' %}is-paid{% else %}is-unpaid{% endif %}">
                 {{ health.overall_text }}
             </span>
-            <a class="button secondary" href="/admin/anomalies">重新檢查</a>
+            <a class="button secondary" href="/admin/anomalies?days={{ operations.days }}">重新檢查</a>
         </div>
     </div>
 
@@ -90,6 +90,55 @@
     {% endif %}
 </div>
 
+<div class="panel compact-panel">
+    <div class="section-title-row">
+        <div>
+            <h2>營運監控</h2>
+            <p class="muted-text">
+                原「系統健康」頁的智慧派單與取消監控已合併到這裡，不再另外開一個重複頁面。
+                統計區間：最近 {{ operations.days }} 天。
+            </p>
+        </div>
+        <div>
+            <a class="button secondary" href="/admin/anomalies?days=7">7 天</a>
+            <a class="button secondary" href="/admin/anomalies?days=30">30 天</a>
+            <a class="button secondary" href="/admin/anomalies?days=90">90 天</a>
+        </div>
+    </div>
+
+    <div class="payout-stat-grid">
+        <div class="payout-stat-card">
+            <span>智慧派單填滿率</span>
+            <strong>{{ operations.smart_dispatch.fill_rate }}%</strong>
+            <p class="muted-text">
+                {{ operations.smart_dispatch.filled }} / {{ operations.smart_dispatch.total }}
+            </p>
+        </div>
+        <div class="payout-stat-card">
+            <span>平均首次接單</span>
+            <strong>{{ operations.smart_dispatch.avg_first_claim_text }}</strong>
+            <p class="muted-text">平均填滿：{{ operations.smart_dispatch.avg_fill_text }}</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>無候選 / 派單錯誤</span>
+            <strong>{{ operations.smart_dispatch.no_candidate }} / {{ operations.smart_dispatch.errors }}</strong>
+            <p class="muted-text">全員擴散 {{ operations.smart_dispatch.full_expansion }} 次</p>
+        </div>
+        <div class="payout-stat-card">
+            <span>取消率</span>
+            <strong>{{ operations.cancellations.cancellation_rate }}%</strong>
+            <p class="muted-text">
+                {{ operations.cancellations.cancelled_orders }} / {{ operations.cancellations.orders_created }}
+            </p>
+        </div>
+        <div class="payout-stat-card">
+            <span>取消流失金額</span>
+            <strong>{{ "{:,}".format(operations.cancellations.lost_value) }}T</strong>
+            <p class="muted-text">未分類 {{ operations.cancellations.unclassified }} 筆</p>
+        </div>
+    </div>
+</div>
+
 
 <div class="panel compact-panel">
     <div class="section-title-row">
@@ -112,6 +161,7 @@
     </div>
 
     <form method="get" action="/admin/anomalies" style="margin-top:14px;">
+        <input type="hidden" name="days" value="{{ operations.days }}">
         <div class="order-meta compact-meta">
             <div>
                 <span>嚴重程度</span>

@@ -58,25 +58,12 @@ async def ticket_archive_list(
     if isinstance(user, RedirectResponse):
         return user
 
-    archives = list_ticket_archives(
-        search=q,
-        limit=200,
-    )
+    target = "/admin/support-center"
+    if str(q or "").strip():
+        from urllib.parse import quote_plus
+        target += "?q=" + quote_plus(str(q or "").strip())
 
-    response = templates.TemplateResponse(
-        request=request,
-        name="admin_ticket_archives.html",
-        context={
-            "title": "票口紀錄｜魔丸娛樂",
-            "page_name": "admin_ticket_archives",
-            "user": user,
-            "archives": archives,
-            "query": str(q or "").strip(),
-        },
-    )
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["X-Robots-Tag"] = "noindex, nofollow"
-    return response
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.get("/admin/tickets/{archive_id}")
@@ -109,7 +96,7 @@ async def ticket_archive_detail(
 
 @router.get("/employee/tickets")
 async def legacy_employee_ticket_archive_list(request: Request):
-    return RedirectResponse(url="/admin/tickets", status_code=303)
+    return RedirectResponse(url="/admin/support-center", status_code=303)
 
 
 @router.get("/employee/tickets/{archive_id}")

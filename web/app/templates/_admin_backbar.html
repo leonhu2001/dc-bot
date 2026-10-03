@@ -1,0 +1,55 @@
+{% set _p = request.url.path %}
+{% set _return_param = request.query_params.get('return_to', '') %}
+{% set _back = namespace(href='', label='返回上一層') %}
+
+{% if _return_param and (_return_param == '/admin' or _return_param.startswith('/admin/')) %}
+    {% set _back.href = _return_param %}
+{% elif _p.startswith('/admin/search/customer/') %}
+    {% set _back.href = '/admin/search' %}
+    {% set _back.label = '返回搜尋結果' %}
+{% elif _p.startswith('/admin/staff_profiles/edit/') %}
+    {% set _back.href = '/admin/staff-center' %}
+    {% set _back.label = '返回人員中心' %}
+{% elif _p.startswith('/admin/staff_profiles') %}
+    {% set _back.href = '/admin/staff-center' %}
+    {% set _back.label = '返回人員中心' %}
+{% elif _p.startswith('/admin/staff/') %}
+    {% set _back.href = '/admin/staff-center' %}
+    {% set _back.label = '返回人員中心' %}
+{% elif _p.startswith('/admin/customers/') %}
+    {% set _back.href = '/admin/customer-center' %}
+    {% set _back.label = '返回客戶中心' %}
+{% elif _p.startswith('/admin/wallets/') %}
+    {% set _back.href = '/admin/wallets' %}
+    {% set _back.label = '返回錢包帳本' %}
+{% elif _p == '/admin/wallets' or _p == '/admin/wallets/' or _p.startswith('/admin/reviews') %}
+    {% set _back.href = '/admin/customer-center' %}
+    {% set _back.label = '返回客戶中心' %}
+{% elif _p.startswith('/admin/payouts/report') %}
+    {% set _back.href = '/admin/payouts/summary' %}
+    {% set _back.label = '返回薪資結算' %}
+{% elif _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') or _p.startswith('/admin/payout') or _p.startswith('/admin/accounting-reconciliation') %}
+    {% set _back.href = '/admin/finance-center' %}
+    {% set _back.label = '返回財務中心' %}
+{% elif _p.startswith('/admin/tickets/') %}
+    {% set _back.href = '/admin/support-center' %}
+    {% set _back.label = '返回客服中心' %}
+{% elif _p.startswith('/admin/support-calls') or _p.startswith('/admin/ai-support-knowledge') %}
+    {% set _back.href = '/admin/support-center' %}
+    {% set _back.label = '返回客服中心' %}
+{% elif _p.startswith('/admin/system') or _p.startswith('/admin/audit') %}
+    {% set _back.href = '/admin/anomalies' %}
+    {% set _back.label = '返回系統維運' %}
+{% elif _p.startswith('/admin/order-workspace/') %}
+    {% set _back.href = '/admin' %}
+    {% set _back.label = '返回營運總覽' %}
+{% elif _p == '/admin/search' %}
+    {% set _back.href = '/admin' %}
+    {% set _back.label = '返回營運總覽' %}
+{% endif %}
+
+{% if _back.href %}
+<div class="mw-admin-backbar" style="margin:0 0 14px 0;">
+    <a class="button secondary" href="{{ _back.href }}">← {{ _back.label }}</a>
+</div>
+{% endif %}
