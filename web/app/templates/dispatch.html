@@ -644,12 +644,14 @@
                                 {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
                                     {% if user_claimed_this_order %}
                                         <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                             <button class="button danger" type="submit">
                                                 取消接單
                                             </button>
                                         </form>
                                     {% else %}
                                         <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                             <button class="button" type="submit">
                                                 接單
                                             </button>
