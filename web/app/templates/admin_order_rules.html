@@ -128,7 +128,7 @@
                 <div>
                     <h2>{{ selected_rule.label }}</h2>
                     <p class="muted-text">
-                        {{ CATEGORY_LABELS.get(selected_rule.category, selected_rule.category) if CATEGORY_LABELS is defined else selected_rule.category }}
+                        {{ category_labels.get(selected_rule.category, selected_rule.category) }}
                         ｜ <code>{{ selected_key }}</code>
                     </p>
                 </div>
