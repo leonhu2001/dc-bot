@@ -1512,8 +1512,8 @@ async def admin_sync_staff(request: Request):
 
     if not user:
         return RedirectResponse(
-            url="/admin/staff-center?error="
-            + urlencode({"error": "你沒有客服後台權限，或登入狀態已過期。"})[6:],
+            url="/admin/staff-center?"
+            + urlencode({"error": "你沒有客服後台權限，或登入狀態已過期。"}),
             status_code=303,
         )
 
