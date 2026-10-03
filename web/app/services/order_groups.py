@@ -19,10 +19,10 @@ PUBLIC_ROLE_LABELS = {
 
 
 CATEGORY_ORDER = [
-    "basic",
-    "fun",
+    "delta_desktop_basic",
+    "delta_mobile_basic",
+    "delta_desktop_fun",
     "farm",
-    "general",
     "steam",
     "valorant",
     "lol",
@@ -46,7 +46,7 @@ HIDDEN_PUBLIC_RULE_KEYS = {
 GROUP_SPECS = [
     {
         "key": "exbar_gamble",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "絕巴四幻神賭單",
         "selector_label": "賭注目標",
         "description": "選擇本次四幻神賭單的目標。",
@@ -60,7 +60,7 @@ GROUP_SPECS = [
 
     {
         "key": "exbar_tech",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "絕巴技術陪",
         "description": "絕巴技術陪服務。",
         "variants": [
@@ -70,7 +70,7 @@ GROUP_SPECS = [
 
     {
         "key": "tech_play",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "技術陪〈端遊〉",
         "selector_label": "難度 / 陪玩人數",
         "description": "三角洲端遊技術陪，依難度與陪玩人數選擇方案。",
@@ -84,7 +84,7 @@ GROUP_SPECS = [
 
     {
         "key": "tech_play_mobile",
-        "category": "basic",
+        "category": "delta_mobile_basic",
         "label": "技術陪〈手遊〉",
         "selector_label": "難度 / 陪玩人數",
         "description": "三角洲手遊技術陪，機密 380T/H、絕密 420T/H。",
@@ -97,18 +97,8 @@ GROUP_SPECS = [
     },
 
     {
-        "key": "teaching",
-        "category": "general",
-        "label": "教學單",
-        "description": "跨遊戲通用，不要求特定遊戲身分組；僅頂護、菁英、頂獵、輻能可接。",
-        "variants": [
-            ("basic_teaching_one", "1 對 1 教學"),
-        ],
-    },
-
-    {
         "key": "entertain",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "娛樂陪〈端遊〉",
         "selector_label": "陪玩人數",
         "description": "需同時具備男陪／女陪與三角洲<端遊>身分組；以聊天、娛樂與遊戲體驗為主。",
@@ -120,7 +110,7 @@ GROUP_SPECS = [
 
     {
         "key": "entertain_mobile",
-        "category": "basic",
+        "category": "delta_mobile_basic",
         "label": "娛樂陪〈手遊〉",
         "selector_label": "陪玩人數",
         "description": "需同時具備男陪／女陪與三角洲<手遊>身分組；價格與端遊相同。",
@@ -131,23 +121,8 @@ GROUP_SPECS = [
     },
 
     {
-        "key": "sweet",
-        "category": "general",
-        "label": "甜蜜單",
-        "selector_label": "陪玩性別／人數",
-        "description": "跨遊戲通用；女單陪／女雙陪只限女陪，男單陪／男雙陪只限男陪，雙陪(不限)男女陪皆可接。",
-        "variants": [
-            ("basic_sweet_female_single", "女單陪"),
-            ("basic_sweet_male_single", "男單陪"),
-            ("basic_sweet_female_double", "女雙陪"),
-            ("basic_sweet_male_double", "男雙陪"),
-            ("basic_sweet_double_any", "雙陪(不限)"),
-        ],
-    },
-
-    {
         "key": "oil",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "油鍋單",
         "selector_label": "方案",
         "variants": [
@@ -159,7 +134,7 @@ GROUP_SPECS = [
 
     {
         "key": "bet",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "賭約單",
         "selector_label": "賭約金額",
         "variants": [
@@ -171,7 +146,7 @@ GROUP_SPECS = [
 
     {
         "key": "trial",
-        "category": "basic",
+        "category": "delta_desktop_basic",
         "label": "體驗單",
         "selector_label": "方案",
         "variants": [
@@ -182,7 +157,7 @@ GROUP_SPECS = [
 
     {
         "key": "lovebirds",
-        "category": "fun",
+        "category": "delta_desktop_fun",
         "label": "比翼雙飛",
         "variants": [
             ("fun_lovebirds", "比翼雙飛"),
@@ -191,7 +166,7 @@ GROUP_SPECS = [
 
     {
         "key": "read_no_reply",
-        "category": "fun",
+        "category": "delta_desktop_fun",
         "label": "已讀亂回",
         "variants": [
             ("fun_read_no_reply", "已讀亂回"),
@@ -200,7 +175,7 @@ GROUP_SPECS = [
 
     {
         "key": "rich_enough",
-        "category": "fun",
+        "category": "delta_desktop_fun",
         "label": "豪到你了嗎",
         "variants": [
             ("fun_rich_enough", "豪到你了嗎"),
@@ -209,7 +184,7 @@ GROUP_SPECS = [
 
     {
         "key": "eat_yourself",
-        "category": "fun",
+        "category": "delta_desktop_fun",
         "label": "想吃自己打",
         "variants": [
             ("fun_eat_yourself", "想吃自己打"),
@@ -218,7 +193,7 @@ GROUP_SPECS = [
 
     {
         "key": "galagame",
-        "category": "fun",
+        "category": "delta_desktop_fun",
         "label": "魔丸娛樂嘎拉給木",
         "selector_label": "難度",
         "description": "依好感度難度選擇本次趣味方案。",
@@ -330,7 +305,54 @@ GROUP_SPECS = [
             ("apex_predator_master", "大師 / 頂獵"),
         ],
     },
+
 ]
+
+
+# 甜蜜單與教學單改為遊戲內服務，避免智慧派單跨遊戲通知。
+_GAME_SHARED_GROUPS = (
+    ("delta_desktop", "delta_desktop_basic", "三角洲<端遊>"),
+    ("delta_mobile", "delta_mobile_basic", "三角洲<手遊>"),
+    ("steam", "steam", "Steam"),
+    ("valorant", "valorant", "特戰英豪"),
+    ("lol", "lol", "英雄聯盟"),
+    ("apex", "apex", "APEX"),
+)
+
+for _prefix, _category, _game_label in _GAME_SHARED_GROUPS:
+    GROUP_SPECS.append({
+        "key": f"{_prefix}_sweet",
+        "category": _category,
+        "label": "甜蜜單",
+        "selector_label": "陪玩性別／人數",
+        "description": f"{_game_label}限定；派單只通知同時具有陪玩資格與該遊戲身分組的人員。",
+        "variants": [
+            (f"{_prefix}_sweet_female_single", "女單陪"),
+            (f"{_prefix}_sweet_male_single", "男單陪"),
+            (f"{_prefix}_sweet_female_double", "女雙陪"),
+            (f"{_prefix}_sweet_male_double", "男雙陪"),
+            (f"{_prefix}_sweet_double_any", "雙陪(不限)"),
+        ],
+    })
+
+_GAME_TEACHING_GROUPS = (
+    ("delta_desktop", "delta_desktop_basic", "三角洲<端遊>"),
+    ("delta_mobile", "delta_mobile_basic", "三角洲<手遊>"),
+    ("valorant", "valorant", "特戰英豪"),
+    ("lol", "lol", "英雄聯盟"),
+    ("apex", "apex", "APEX"),
+)
+
+for _prefix, _category, _game_label in _GAME_TEACHING_GROUPS:
+    GROUP_SPECS.append({
+        "key": f"{_prefix}_teaching",
+        "category": _category,
+        "label": "教學單",
+        "description": f"{_game_label}限定教學；智慧派單會同時檢查導師階級與遊戲身分組。",
+        "variants": [
+            (f"{_prefix}_teaching_one", "1 對 1 教學"),
+        ],
+    })
 
 
 def _to_int(
