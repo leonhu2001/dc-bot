@@ -128,7 +128,7 @@ def test_staff_and_customer_centers_share_operational_data(tmp_path, monkeypatch
     assert staff["stats"]["profiles"] == 1
     assert staff["rows"][0]["main_games"] == "三角洲"
 
-    customers = admin_centers._customer_snapshot()
+    customers = admin_centers._customer_snapshot(include_wallets=True)
     assert customers["stats"]["customers"] == 1
     assert customers["stats"]["wallet_total"] == 888
     assert customers["rows"][0]["completed_spend"] == 450
@@ -148,3 +148,19 @@ def test_finance_center_payout_summary_combines_staff_types(tmp_path, monkeypatc
     assert payout["unpaid_count"] == 1
     assert payout["paid_total"] == 25
     assert payout["paid_count"] == 1
+
+
+def test_customer_center_does_not_expose_wallets_without_manager_access(tmp_path, monkeypatch):
+    web_db = tmp_path / "web_dashboard.db"
+    bot_db = tmp_path / "bot.db"
+    _make_web_db(web_db)
+    _make_bot_db(bot_db)
+
+    monkeypatch.setattr(admin_centers, "WEB_DB", web_db)
+    monkeypatch.setattr(admin_centers, "BOT_DB", bot_db)
+
+    customers = admin_centers._customer_snapshot(include_wallets=False)
+
+    assert customers["stats"]["wallet_count"] == 0
+    assert customers["stats"]["wallet_total"] == 0
+    assert customers["rows"][0]["wallet_balance"] == 0
