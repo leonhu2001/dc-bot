@@ -10,10 +10,12 @@ import discord
 SMART_DISPATCH_ALERT_CHANNEL_ID = 1555881625844191322
 REPEAT_REMINDER_SECONDS = 600
 
+from core.vip_levels import VIP_LEVELS
 from services.order_rules import role_ids_match_requirements
 from services.smart_dispatch import (
     FIRST_EXPANSION_SECONDS,
-        choose_initial_candidate_ids,
+    choose_initial_candidate_ids,
+    get_completed_favorite_worker_ids,
     complete_smart_dispatch_plan,
     list_pending_smart_dispatch_plans,
     mark_smart_dispatch_stage,
@@ -66,9 +68,56 @@ def get_eligible_dispatch_candidate_ids(
     return result
 
 
+def customer_has_familiar_worker_benefit(
+    guild: discord.Guild,
+    customer_id: str | int | None,
+) -> bool:
+    """Return whether the customer currently has the Diamond+ familiar-worker perk."""
+    customer_key = str(customer_id or "").strip()
+    if not customer_key:
+        return False
+
+    try:
+        numeric_id = int(customer_key)
+    except (TypeError, ValueError):
+        return False
+
+    member = None
+    get_member = getattr(guild, "get_member", None)
+    if callable(get_member):
+        member = get_member(numeric_id)
+
+    if member is None:
+        member = next(
+            (
+                item
+                for item in getattr(guild, "members", [])
+                if int(getattr(item, "id", 0) or 0) == numeric_id
+            ),
+            None,
+        )
+
+    if member is None:
+        return False
+
+    familiar_role_ids = {
+        str(level.get("role_id"))
+        for level in VIP_LEVELS
+        if "familiar_worker" in (level.get("benefit_keys") or [])
+    }
+    member_role_ids = {
+        str(role.id)
+        for role in getattr(member, "roles", [])
+        if getattr(role, "id", None) is not None
+    }
+
+    return bool(familiar_role_ids & member_role_ids)
+
+
 def prepare_initial_smart_dispatch(
     guild: discord.Guild,
     *,
+    customer_id: str | int | None = None,
     allowed_role_ids: list[str],
     specified_staff_ids: list[str],
     required_staff_count: int,
@@ -96,15 +145,29 @@ def prepare_initial_smart_dispatch(
             if worker_id not in excluded
         ]
 
+    priority_ids: list[str] = []
+
+    if customer_has_familiar_worker_benefit(
+        guild,
+        customer_id,
+    ):
+        priority_ids = get_completed_favorite_worker_ids(
+            customer_id,
+            candidate_ids,
+            db_file=db_file,
+        )
+
     ranked_ids = rank_dispatch_candidates(
         candidate_ids,
         specified_staff_ids=specified_staff_ids,
+        priority_staff_ids=priority_ids,
         db_file=db_file,
     )
 
     initial_ids = choose_initial_candidate_ids(
         ranked_ids,
         specified_staff_ids=specified_staff_ids,
+        priority_staff_ids=priority_ids,
         required_staff_count=required_staff_count,
     )
 
@@ -119,10 +182,22 @@ def prepare_initial_smart_dispatch(
         for worker_id in initial_ids
         if worker_id in specified_set
     ]
+    priority_set = {
+        str(item)
+        for item in priority_ids
+        if str(item).strip()
+    }
+    familiar_initial = [
+        worker_id
+        for worker_id in initial_ids
+        if worker_id in priority_set
+        and worker_id not in specified_set
+    ]
     general_initial = [
         worker_id
         for worker_id in initial_ids
         if worker_id not in specified_set
+        and worker_id not in priority_set
     ]
 
     lines: list[str] = []
@@ -133,8 +208,18 @@ def prepare_initial_smart_dispatch(
             + " ".join(f"<@{worker_id}>" for worker_id in specified_initial)
         )
 
+    if familiar_initial:
+        lines.append(
+            "💎 **VIP 熟悉收藏優先**｜"
+            + " ".join(f"<@{worker_id}>" for worker_id in familiar_initial)
+        )
+
     if general_initial:
-        prefix = "🔔 **優先派單**｜" if not specified_initial else "🔔 **剩餘名額優先通知**｜"
+        prefix = (
+            "🔔 **優先派單**｜"
+            if not specified_initial and not familiar_initial
+            else "🔔 **剩餘名額優先通知**｜"
+        )
         lines.append(
             prefix
             + " ".join(f"<@{worker_id}>" for worker_id in general_initial)
@@ -166,6 +251,7 @@ def prepare_initial_smart_dispatch(
 
     return {
         "ranked_candidate_ids": ranked_ids,
+        "priority_candidate_ids": priority_ids,
         "initial_notified_ids": initial_ids,
         "required_game_role_ids": [
             str(role_id)
