@@ -265,6 +265,10 @@
 </header>
 
 {% if mw_admin_area %}
+    {% include "_admin_backbar.html" %}
+{% endif %}
+
+{% if mw_admin_area %}
 <div style="margin:0 0 18px 0;">
     <form method="get" action="/admin/search" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
         <input
