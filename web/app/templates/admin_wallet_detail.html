@@ -238,10 +238,7 @@
             <p>Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span></p>
         </div>
 
-        <div class="wallet-detail-actions">
-            <a class="button" href="{{ request.query_params.get('return_to') or '/admin/customer-center' }}">返回上一層</a>
-            <a class="button secondary" href="/admin">返回後台</a>
-        </div>
+        <div class="wallet-detail-actions"></div>
     </section>
 
     <section class="wallet-detail-stats">
