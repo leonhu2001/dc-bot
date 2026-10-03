@@ -438,6 +438,38 @@ def test_sweet_order_gender_variants_have_exact_companion_roles():
     ) is True
 
 
+def test_discord_self_service_sweet_catalog_exposes_only_five_new_variants():
+    from services.orders import get_order_item_details_for_group
+
+    details = get_order_item_details_for_group(
+        "general",
+        "甜蜜單",
+    )
+
+    assert [item["label"] for item in details] == [
+        "女單陪",
+        "男單陪",
+        "女雙陪",
+        "男雙陪",
+        "雙陪(不限)",
+    ]
+    assert [item["rule_key"] for item in details] == [
+        "basic_sweet_female_single",
+        "basic_sweet_male_single",
+        "basic_sweet_female_double",
+        "basic_sweet_male_double",
+        "basic_sweet_double_any",
+    ]
+    assert "basic_sweet_single" not in {
+        item["rule_key"]
+        for item in details
+    }
+    assert "basic_sweet_double" not in {
+        item["rule_key"]
+        for item in details
+    }
+
+
 def test_web_sweet_catalog_exposes_only_five_new_variants():
     groups = {
         group["key"]: group
