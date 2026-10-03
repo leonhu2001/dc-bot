@@ -39,8 +39,10 @@
             <td>
               {% if topup.status == 'pending_review' %}
               <div class="topup-actions">
-                <form method="post" action="/admin/topups/{{ topup.id }}/approve"><button class="topup-action" type="submit">確認入帳</button></form>
-                <form method="post" action="/admin/topups/{{ topup.id }}/reject"><input type="hidden" name="reason" value="客服駁回"><button class="topup-action reject" type="submit">駁回</button></form>
+                <form method="post" action="/admin/topups/{{ topup.id }}/approve">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button class="topup-action" type="submit">確認入帳</button></form>
+                <form method="post" action="/admin/topups/{{ topup.id }}/reject">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><input type="hidden" name="reason" value="客服駁回"><button class="topup-action reject" type="submit">駁回</button></form>
               </div>
               {% else %}—{% endif %}
             </td>
