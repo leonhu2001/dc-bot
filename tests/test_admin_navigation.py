@@ -44,6 +44,9 @@ def test_admin_sidebar_is_navigation_only_and_consolidated():
 
 def test_page_level_backbar_contains_contextual_parent_routes():
     backbar = (TEMPLATES / "_admin_backbar.html").read_text(encoding="utf-8")
+    layout = (TEMPLATES / "layout.html").read_text(encoding="utf-8")
+
+    assert '_admin_backbar.html' in layout
 
     for parent in (
         "/admin/staff-center",
@@ -99,6 +102,7 @@ def test_center_template_has_no_duplicate_full_list_entry_points():
     assert 'href="/admin/staff?return_to=/admin/staff-center"' not in center
     assert 'href="/admin/customers?return_to=/admin/customer-center"' not in center
     assert 'href="/admin/tickets?return_to=/admin/support-center"' not in center
+    assert "/admin/search/customer/{{ row.customer_discord_id }}" in center
 
     # These remain distinct operational tools rather than duplicate lists.
     assert "個人牆管理" in center
@@ -125,11 +129,14 @@ def test_legacy_duplicate_list_routes_point_to_canonical_centers():
 
     staff_source = (routers / "admin_staff.py").read_text(encoding="utf-8")
     ticket_source = (routers / "ticket_archives.py").read_text(encoding="utf-8")
+    topup_source = (routers / "topups.py").read_text(encoding="utf-8")
     system_source = (routers / "admin_system.py").read_text(encoding="utf-8")
 
     assert "/admin/staff-center?" in staff_source
     assert "/admin/customer-center?" in staff_source
+    assert 'target = f"/admin/search/customer/{customer_id}"' in staff_source
     assert 'target = "/admin/support-center"' in ticket_source
+    assert 'target = "/admin/payment-reviews"' in topup_source
     assert 'url=f"/admin/anomalies?days=' in system_source
 
 
