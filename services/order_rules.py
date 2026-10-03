@@ -1245,13 +1245,23 @@ def validate_rule_definition(key: str, rule: OrderRule) -> None:
             raise RuntimeError(f"{key}: maximum player count is below minimum")
 
     if rule.allow_specify:
-        if (
-            not rule.specify_fee_by_role
-            and not rule.specify_fee_by_game_role
-            and int(rule.specify_fee_default or 0) <= 0
-            and rule.specify_free_min_units is None
-        ):
-            raise RuntimeError(f"{key}: specify enabled but no fee configured")
+        fee_map = {
+            **(rule.specify_fee_by_role or {}),
+            **(rule.specify_fee_by_game_role or {}),
+        }
+        specify_roles = tuple(rule.allowed_roles) + tuple(rule.allowed_game_roles)
+        missing_fee_roles = [
+            role_key
+            for role_key in specify_roles
+            if (
+                role_key not in fee_map
+                and int(rule.specify_fee_default or 0) <= 0
+            )
+        ]
+        if missing_fee_roles:
+            raise RuntimeError(
+                f"{key}: specify fee missing for roles {missing_fee_roles}"
+            )
 
     if not rule.allowed_roles and not rule.allowed_game_roles:
         raise RuntimeError(f"{key}: no allowed roles")
