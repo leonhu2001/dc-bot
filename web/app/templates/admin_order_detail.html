@@ -775,6 +775,8 @@ body.mw-r5-admin
 
         </header>
 
+        {% include "_admin_backbar.html" %}
+
         <div class="mw-r5-legacy-body">
 
 
@@ -801,13 +803,6 @@ body.mw-r5-admin
 
 
     <div class="actions">
-
-        <a
-            class="button"
-            href="{{ request.query_params.get('return_to') or '/admin' }}"
-        >
-            ← 返回客服後台
-        </a>
 
 
         {% if order.ticket_channel_id %}
@@ -1518,7 +1513,6 @@ body.mw-r5-admin
                 <h2>訂單資料編輯</h2>
                 <p>營運總覽進來後直接在這裡修改，不再需要另外開訂單管理頁。</p>
             </div>
-            <a class="mw-r8-btn" href="{{ request.query_params.get('return_to') or '/admin' }}">返回營運總覽</a>
         </div>
 
         <form method="post" action="/admin/order-workspace/{{ order.id }}/edit">
