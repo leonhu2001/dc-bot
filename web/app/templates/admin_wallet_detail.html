@@ -260,6 +260,7 @@
             </div>
 
             <form class="wallet-limit-form" method="get" action="/admin/wallets/{{ wallet.customer_discord_id }}">
+                <input type="hidden" name="return_to" value="{{ request.query_params.get('return_to', '') }}">
                 <input type="number" name="limit" min="1" max="300" value="{{ limit }}">
                 <button class="button" type="submit">筆數</button>
             </form>
