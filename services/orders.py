@@ -380,6 +380,156 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
 }
 
 
+# 新下單只顯示這些分類；basic / fun / general 仍留在 catalog 供舊存單回查。
+SELF_SERVICE_ACTIVE_CATEGORIES: tuple[str, ...] = (
+    "delta_desktop_basic",
+    "delta_mobile_basic",
+    "delta_desktop_fun",
+    "farm",
+    "steam",
+    "valorant",
+    "lol",
+    "apex",
+    "custom",
+)
+
+
+def _catalog_groups_for_rule_category(
+    source_category: str,
+    target_category: str,
+) -> list[dict]:
+    result: list[dict] = []
+
+    for group in SELF_SERVICE_ORDER_CATALOG.get(source_category, []):
+        details = [
+            detail
+            for detail in group.get("details", [])
+            if (
+                detail.get("rule_key") in ORDER_RULES
+                and ORDER_RULES[detail["rule_key"]].category == target_category
+            )
+        ]
+
+        if not details:
+            continue
+
+        cloned = dict(group)
+        cloned["details"] = [dict(detail) for detail in details]
+        result.append(cloned)
+
+    return result
+
+
+# 三角洲舊 catalog 仍可支援歷史資料；新分類依目前 rule category 派生，不重複維護價格/規格。
+SELF_SERVICE_ORDER_CATALOG["delta_desktop_basic"] = (
+    _catalog_groups_for_rule_category(
+        "basic",
+        "delta_desktop_basic",
+    )
+)
+SELF_SERVICE_ORDER_CATALOG["delta_mobile_basic"] = (
+    _catalog_groups_for_rule_category(
+        "basic",
+        "delta_mobile_basic",
+    )
+)
+SELF_SERVICE_ORDER_CATALOG["delta_desktop_fun"] = [
+    {
+        **group,
+        "details": [dict(detail) for detail in group.get("details", [])],
+    }
+    for group in SELF_SERVICE_ORDER_CATALOG.get("fun", [])
+]
+
+
+def _sweet_catalog_group(prefix: str) -> dict:
+    return {
+        "label": "甜蜜單",
+        "details": [
+            {
+                "label": "女單陪",
+                "value": "female_single",
+                "rule_key": f"{prefix}_sweet_female_single",
+                "quantity_unit": "小時",
+                "min_quantity": 1,
+                "max_quantity": 24,
+            },
+            {
+                "label": "男單陪",
+                "value": "male_single",
+                "rule_key": f"{prefix}_sweet_male_single",
+                "quantity_unit": "小時",
+                "min_quantity": 1,
+                "max_quantity": 24,
+            },
+            {
+                "label": "女雙陪",
+                "value": "female_double",
+                "rule_key": f"{prefix}_sweet_female_double",
+                "quantity_unit": "小時",
+                "min_quantity": 1,
+                "max_quantity": 24,
+            },
+            {
+                "label": "男雙陪",
+                "value": "male_double",
+                "rule_key": f"{prefix}_sweet_male_double",
+                "quantity_unit": "小時",
+                "min_quantity": 1,
+                "max_quantity": 24,
+            },
+            {
+                "label": "雙陪(不限)",
+                "value": "double_any",
+                "rule_key": f"{prefix}_sweet_double_any",
+                "quantity_unit": "小時",
+                "min_quantity": 1,
+                "max_quantity": 24,
+            },
+        ],
+    }
+
+
+def _teaching_catalog_group(prefix: str) -> dict:
+    return {
+        "label": "教學單",
+        "details": [
+            {
+                "label": "1對1教學",
+                "value": "teacher_1",
+                "rule_key": f"{prefix}_teaching_one",
+                "quantity_unit": "小時",
+                "min_quantity": 3,
+                "max_quantity": 24,
+            },
+        ],
+    }
+
+
+for _prefix, _category in (
+    ("delta_desktop", "delta_desktop_basic"),
+    ("delta_mobile", "delta_mobile_basic"),
+    ("steam", "steam"),
+    ("valorant", "valorant"),
+    ("lol", "lol"),
+    ("apex", "apex"),
+):
+    SELF_SERVICE_ORDER_CATALOG[_category].append(
+        _sweet_catalog_group(_prefix)
+    )
+
+for _prefix, _category in (
+    ("delta_desktop", "delta_desktop_basic"),
+    ("delta_mobile", "delta_mobile_basic"),
+    ("valorant", "valorant"),
+    ("lol", "lol"),
+    ("apex", "apex"),
+):
+    SELF_SERVICE_ORDER_CATALOG[_category].append(
+        _teaching_catalog_group(_prefix)
+    )
+
+
 # 所有 rule label 仍保留，讓舊訂單 / 舊紀錄可繼續被辨識。
 CATALOG_HIDDEN_RULE_KEYS = {
     # 舊甜蜜單只留給既有訂單回查；新訂單改用男女細分規則。
