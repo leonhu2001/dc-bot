@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Query, Request
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
 from web.app.services.operations_monitoring import build_operations_monitoring_snapshot
@@ -25,46 +26,10 @@ async def admin_system_health(
     request: Request,
     days: int = Query(default=30, ge=1, le=365),
 ):
-    user = get_current_user(request)
-
-    if not user:
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "請先登入",
-                "message": "請先使用 Discord 登入。",
-                "user": None,
-            },
-            status_code=401,
-        )
-
-    if not user.get("is_manager"):
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "沒有權限",
-                "message": "系統健康中心僅限總管使用。",
-                "user": user,
-            },
-            status_code=403,
-        )
-
-    health = await run_in_threadpool(build_system_health_snapshot)
-    operations = await run_in_threadpool(
-        build_operations_monitoring_snapshot,
-        days=days,
+    # Legacy URL retained for bookmarks. System health + operations monitoring
+    # now live in the single System Maintenance workspace.
+    return RedirectResponse(
+        url=f"/admin/anomalies?days={int(days)}",
+        status_code=303,
     )
 
-    return templates.TemplateResponse(
-        request=request,
-        name="admin_system.html",
-        context={
-            "title": "系統健康中心",
-            "user": user,
-            "health": health,
-            "operations": operations,
-            "days": operations["days"],
-        },
-    )
