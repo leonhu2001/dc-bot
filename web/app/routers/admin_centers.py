@@ -17,6 +17,7 @@ from services.topups import list_topups_for_admin
 from web.app.services.accounting_reconciliation import (
     build_accounting_reconciliation_snapshot,
 )
+from web.app.services.role_catalog import STAFF_ROLE_FILTERS
 
 
 router = APIRouter(tags=["admin-centers"])
@@ -61,11 +62,31 @@ def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     }
 
 
-def _staff_snapshot(q: str = "") -> dict[str, Any]:
+def _staff_snapshot(
+    q: str = "",
+    *,
+    status: str = "active",
+    role: str = "",
+) -> dict[str, Any]:
     if not WEB_DB.exists():
         return {"rows": [], "stats": {}}
 
     keyword = str(q or "").strip()
+    status = str(status or "active").strip().lower()
+    if status not in {"active", "inactive", "all"}:
+        status = "active"
+
+    role = str(role or "").strip()
+    if role == "all":
+        role = ""
+
+    valid_roles = {
+        str(item.get("value") or "")
+        for item in STAFF_ROLE_FILTERS
+    } | {"worker", "companion"}
+    if role not in valid_roles:
+        role = ""
+
     with _connect(WEB_DB) as conn:
         if not _table_exists(conn, "web_staff_members"):
             return {"rows": [], "stats": {}}
@@ -91,18 +112,43 @@ def _staff_snapshot(q: str = "") -> dict[str, Any]:
             """
         )
 
-        where = ""
+        conditions: list[str] = []
         params: list[Any] = []
+
+        if status == "active":
+            conditions.append("COALESCE(s.is_active, 0) = 1")
+        elif status == "inactive":
+            conditions.append("COALESCE(s.is_active, 0) = 0")
+
+        if role == "customer_service":
+            conditions.append("COALESCE(s.is_customer_service, 0) = 1")
+        elif role == "worker":
+            conditions.append("COALESCE(s.is_worker, 0) = 1")
+        elif role == "companion":
+            conditions.append("COALESCE(s.is_companion, 0) = 1")
+        elif role:
+            conditions.append("COALESCE(s.roles_json, '') LIKE ?")
+            params.append(f"%{role}%")
+
         if keyword:
             like = f"%{keyword}%"
-            where = """
-            WHERE
-                s.discord_id LIKE ?
-                OR COALESCE(s.display_name, '') LIKE ?
-                OR COALESCE(s.global_name, '') LIKE ?
-                OR COALESCE(s.username, '') LIKE ?
-            """
-            params = [like, like, like, like]
+            conditions.append(
+                """
+                (
+                    s.discord_id LIKE ?
+                    OR COALESCE(s.display_name, '') LIKE ?
+                    OR COALESCE(s.global_name, '') LIKE ?
+                    OR COALESCE(s.username, '') LIKE ?
+                )
+                """
+            )
+            params.extend([like, like, like, like])
+
+        where = (
+            "WHERE " + " AND ".join(conditions)
+            if conditions
+            else ""
+        )
 
         rows = conn.execute(
             f"""
@@ -111,6 +157,7 @@ def _staff_snapshot(q: str = "") -> dict[str, Any]:
                 s.username,
                 s.display_name,
                 s.global_name,
+                s.roles_json,
                 s.is_active,
                 s.is_customer_service,
                 s.is_worker,
@@ -132,6 +179,7 @@ def _staff_snapshot(q: str = "") -> dict[str, Any]:
             SELECT
                 COUNT(*) AS total,
                 SUM(CASE WHEN COALESCE(is_active,0)=1 THEN 1 ELSE 0 END) AS active,
+                SUM(CASE WHEN COALESCE(is_active,0)=0 THEN 1 ELSE 0 END) AS inactive,
                 SUM(CASE WHEN COALESCE(is_customer_service,0)=1 THEN 1 ELSE 0 END) AS customer_service,
                 SUM(CASE WHEN COALESCE(is_worker,0)=1 THEN 1 ELSE 0 END) AS worker,
                 SUM(CASE WHEN COALESCE(is_companion,0)=1 THEN 1 ELSE 0 END) AS companion
@@ -158,14 +206,18 @@ def _staff_snapshot(q: str = "") -> dict[str, Any]:
         "stats": {
             "total": int(stats_row["total"] or 0),
             "active": int(stats_row["active"] or 0),
+            "inactive": int(stats_row["inactive"] or 0),
             "customer_service": int(stats_row["customer_service"] or 0),
             "worker": int(stats_row["worker"] or 0),
             "companion": int(stats_row["companion"] or 0),
             "profiles": profile_total,
             "public_profiles": profile_public,
         },
+        "filters": {
+            "status": status,
+            "role": role,
+        },
     }
-
 
 def _customer_snapshot(
     q: str = "",
@@ -206,6 +258,8 @@ def _customer_snapshot(
                 customer_discord_id,
                 MAX(COALESCE(NULLIF(customer_display_name,''), customer_discord_id)) AS customer_display_name,
                 COUNT(*) AS order_count,
+                SUM(CASE WHEN LOWER(COALESCE(status,'')) IN ('closed','completed','done') THEN 1 ELSE 0 END) AS completed_count,
+                SUM(CASE WHEN LOWER(COALESCE(status,'')) IN ('cancelled','canceled') THEN 1 ELSE 0 END) AS cancelled_count,
                 SUM(
                     CASE
                         WHEN LOWER(COALESCE(status,'')) IN ('closed','completed','done')
@@ -284,11 +338,37 @@ def _customer_snapshot(
             pass
 
     result_rows = []
-    for row in rows:
-        item = dict(row)
-        customer_id = str(item.get("customer_discord_id") or "")
-        item["wallet_balance"] = int(wallet_map.get(customer_id, 0))
-        result_rows.append(item)
+    with _connect(WEB_DB) as conn:
+        has_favorites = _table_exists(conn, "staff_favorites")
+        has_reviews = _table_exists(conn, "order_reviews")
+
+        for row in rows:
+            item = dict(row)
+            customer_id = str(item.get("customer_discord_id") or "")
+            item["wallet_balance"] = int(wallet_map.get(customer_id, 0))
+            item["favorite_count"] = (
+                int(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM staff_favorites WHERE customer_discord_id = ?",
+                        (customer_id,),
+                    ).fetchone()[0]
+                    or 0
+                )
+                if has_favorites
+                else 0
+            )
+            item["review_count"] = (
+                int(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM order_reviews WHERE customer_discord_id = ?",
+                        (customer_id,),
+                    ).fetchone()[0]
+                    or 0
+                )
+                if has_reviews
+                else 0
+            )
+            result_rows.append(item)
 
     return {
         "rows": result_rows,
@@ -392,9 +472,16 @@ def _finance_snapshot(*, is_manager: bool) -> dict[str, Any]:
     }
 
 
-def _support_snapshot(*, is_manager: bool) -> dict[str, Any]:
+def _support_snapshot(
+    *,
+    is_manager: bool,
+    q: str = "",
+) -> dict[str, Any]:
     support = build_support_call_snapshot(days=30)
-    tickets = list_ticket_archives(limit=15)
+    tickets = list_ticket_archives(
+        search=str(q or "").strip(),
+        limit=200,
+    )
     knowledge = build_knowledge_snapshot() if is_manager else None
 
     return {
@@ -409,6 +496,8 @@ async def _render(
     *,
     center: str,
     q: str = "",
+    status: str = "active",
+    role: str = "",
 ):
     user = _current_admin(request)
     if user is None:
@@ -417,7 +506,13 @@ async def _render(
     is_manager = bool(user.get("is_manager"))
 
     if center == "staff":
-        snapshot = await run_in_threadpool(_staff_snapshot, q)
+        snapshot = await run_in_threadpool(
+            lambda: _staff_snapshot(
+                q,
+                status=status,
+                role=role,
+            )
+        )
         title = "人員中心"
     elif center == "customers":
         snapshot = await run_in_threadpool(
@@ -434,7 +529,10 @@ async def _render(
         title = "財務中心"
     elif center == "support":
         snapshot = await run_in_threadpool(
-            lambda: _support_snapshot(is_manager=is_manager)
+            lambda: _support_snapshot(
+                is_manager=is_manager,
+                q=q,
+            )
         )
         title = "客服中心"
     else:
@@ -449,14 +547,30 @@ async def _render(
             "center": center,
             "snapshot": snapshot,
             "q": str(q or "").strip(),
+            "status": str(status or "active").strip(),
+            "role": str(role or "").strip(),
+            "staff_role_filters": STAFF_ROLE_FILTERS,
+            "message": str(request.query_params.get("message") or ""),
+            "error": str(request.query_params.get("error") or ""),
             "is_manager": is_manager,
         },
     )
 
 
 @router.get("/admin/staff-center")
-async def staff_center(request: Request, q: str = ""):
-    return await _render(request, center="staff", q=q)
+async def staff_center(
+    request: Request,
+    q: str = "",
+    status: str = "active",
+    role: str = "",
+):
+    return await _render(
+        request,
+        center="staff",
+        q=q,
+        status=status,
+        role=role,
+    )
 
 
 @router.get("/admin/customer-center")
@@ -470,5 +584,5 @@ async def finance_center(request: Request):
 
 
 @router.get("/admin/support-center")
-async def support_center(request: Request):
-    return await _render(request, center="support")
+async def support_center(request: Request, q: str = ""):
+    return await _render(request, center="support", q=q)
