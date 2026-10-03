@@ -594,6 +594,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 bot.guild_id_value = GUILD_ID
 bot.manager_role_id_value = MANAGER_ROLE_ID
+bot.customer_service_role_id_value = CUSTOMER_ROLE_ID
 bot.complaint_panel_channel_id_value = COMPLAINT_PANEL_CHANNEL_ID
 bot.feedback_panel_channel_id_value = FEEDBACK_PANEL_CHANNEL_ID
 bot._extensions_loaded = False
