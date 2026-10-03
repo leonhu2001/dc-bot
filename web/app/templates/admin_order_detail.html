@@ -1515,7 +1515,7 @@ body.mw-r5-admin
             </div>
         </div>
 
-        <form method="post" action="/admin/order-workspace/{{ order.id }}/edit">
+        <form method="post" action="/admin/order-workspace/{{ order.id }}/edit?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <div class="mw-r8-edit-grid">
                 <label class="mw-r8-field">
@@ -1642,7 +1642,7 @@ body.mw-r5-admin
             </div>
         </div>
 
-        <form method="post" action="/admin/order-workspace/{{ order.id }}/attention">
+        <form method="post" action="/admin/order-workspace/{{ order.id }}/attention?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
             <label class="mw-r8-check">
                 <input type="checkbox" name="enabled" value="1" {% if order.needs_attention %}checked{% endif %}>
@@ -1687,7 +1687,7 @@ body.mw-r5-admin
                             <strong>{{ '客服補登' if claim.source.startswith('admin_web:') else '本人接單' }}</strong>
                         </div>
                         <div class="mw-r8-actions" style="margin-top:0;">
-                            <form method="post" action="/admin/order-workspace/{{ order.id }}/acceptance/{{ claim.staff_discord_id }}/remove" onsubmit="return confirm('確定移除這位付款前接單人員？');">
+                            <form method="post" action="/admin/order-workspace/{{ order.id }}/acceptance/{{ claim.staff_discord_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" onsubmit="return confirm('確定移除這位付款前接單人員？');">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                 <button class="mw-r8-btn danger" type="submit">移除</button>
                             </form>
@@ -1718,7 +1718,7 @@ body.mw-r5-admin
                     </div>
 
                     <div class="mw-r8-actions" style="margin-top:0;">
-                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/named-bonus">
+                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/named-bonus?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <label class="mw-r8-check">
                                 <input type="checkbox" name="enabled" value="on" {% if row.has_named_bonus %}checked{% endif %}>
@@ -1727,7 +1727,7 @@ body.mw-r5-admin
                             <button class="mw-r8-btn" type="submit">套用</button>
                         </form>
 
-                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/manual-payout">
+                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/manual-payout?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="worker_discord_id" value="{{ row.worker_discord_id }}">
                             <input type="hidden" name="worker_display_name" value="{{ row.worker_display_name or row.worker_discord_id }}">
@@ -1737,7 +1737,7 @@ body.mw-r5-admin
                         </form>
 
                         {% if row.payout_id %}
-                            <form method="post" action="/admin/order-workspace/{{ order.id }}/worker-payouts/{{ row.payout_id }}/status">
+                            <form method="post" action="/admin/order-workspace/{{ order.id }}/worker-payouts/{{ row.payout_id }}/status?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                 <input type="hidden" name="status" value="{{ unpaid_status if row.payout_status == paid_status else paid_status }}">
                                 <button class="mw-r8-btn" type="submit">
@@ -1746,7 +1746,7 @@ body.mw-r5-admin
                             </form>
                         {% endif %}
 
-                        <form method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/remove" onsubmit="return confirm('確定移除這位接單人員？');">
+                        <form method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" onsubmit="return confirm('確定移除這位接單人員？');">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="reason" value="客服後台訂單工作區移除">
                             <button class="mw-r8-btn danger" type="submit">移除</button>
@@ -1759,7 +1759,7 @@ body.mw-r5-admin
         </div>
 
         {% if not acceptance_state or not acceptance_state.is_full %}
-            <form method="post" action="/admin/order-workspace/{{ order.id }}/add-worker" class="mw-r8-actions">
+            <form method="post" action="/admin/order-workspace/{{ order.id }}/add-worker?return_to={{ request.query_params.get('return_to', '') | urlencode }}" class="mw-r8-actions">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <select name="worker_discord_id" required style="min-width:260px;min-height:40px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:#090908;color:#f4f2eb;padding:8px 10px;">
                     <option value="">{{ '補登付款前接單人員' if acceptance_state else '新增接單人員' }}</option>
@@ -1807,7 +1807,7 @@ body.mw-r5-admin
                         <strong>{{ '已發放' if row.payout_status == paid_status else '未發放' }}</strong>
                     </div>
                     <div>
-                        <form method="post" action="/admin/order-workspace/{{ order.id }}/customer-service-payouts/{{ row.id }}/status">
+                        <form method="post" action="/admin/order-workspace/{{ order.id }}/customer-service-payouts/{{ row.id }}/status?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="status" value="{{ unpaid_status if row.payout_status == paid_status else paid_status }}">
                             <button class="mw-r8-btn" type="submit">
