@@ -172,53 +172,7 @@ def test_nested_drilldowns_preserve_return_destination():
     assert "child_return_param" in search_source
 
 
-def test_admin_unified_theme_loads_after_legacy_portal_css():
-    layout = (TEMPLATES / "layout.html").read_text(encoding="utf-8")
 
-    portal_pos = layout.index("mw_portal_r5.css")
-    theme_pos = layout.index("mw_admin_theme.css")
-
-    assert theme_pos > portal_pos
-
-
-def test_standalone_admin_templates_load_unified_theme_last():
-    standalone = []
-
-    for path in sorted(TEMPLATES.glob("admin*.html")):
-        text = path.read_text(encoding="utf-8")
-        uses_layout = "extends" in text and "layout.html" in text
-        includes_sidebar = "_admin_sidebar.html" in text
-
-        if includes_sidebar and not uses_layout:
-            standalone.append(path)
-            assert "mw_admin_theme.css" in text, (
-                f"{path.name} is missing unified admin theme"
-            )
-            assert text.rfind("mw_admin_theme.css") < text.rfind("</head>")
-
-    assert standalone, "expected standalone admin templates"
-
-
-def test_admin_theme_defines_shared_visual_tokens():
-    theme = (
-        ROOT / "web" / "app" / "static" / "css" / "mw_admin_theme.css"
-    ).read_text(encoding="utf-8")
-
-    for token in (
-        "--admin-bg",
-        "--admin-panel",
-        "--admin-border",
-        "--admin-text",
-        "--admin-muted",
-        "--admin-gold",
-        "--admin-sidebar",
-        "--admin-font",
-    ):
-        assert token in theme
-
-    assert ".mw-admin-searchbar" in theme
-    assert ".mw-admin-backbar" in theme
-    assert ".mw-admin-inline-actions" in theme
 
 
 def test_primary_admin_workspaces_do_not_repeat_page_headers():
@@ -230,3 +184,75 @@ def test_primary_admin_workspaces_do_not_repeat_page_headers():
     assert '<header class="top">' not in order
     assert '<div class="k">STAFF WORKSPACE</div>' not in staff
     assert "mw-admin-inline-actions" in order
+
+
+def test_admin_uses_canonical_portal_css_without_overlay_theme():
+    layout = (TEMPLATES / "layout.html").read_text(encoding="utf-8")
+    static_css = ROOT / "web" / "app" / "static" / "css"
+
+    assert "mw_portal_r5.css" in layout
+    assert "mw_admin_theme.css" not in layout
+    assert not (static_css / "mw_admin_theme.css").exists()
+    assert "mw-r5-admin" in layout
+
+
+def test_standalone_admin_templates_do_not_load_overlay_css():
+    for path in sorted(TEMPLATES.glob("admin*.html")):
+        text = path.read_text(encoding="utf-8")
+        uses_layout = "extends" in text and "layout.html" in text
+        includes_sidebar = "_admin_sidebar.html" in text
+
+        if includes_sidebar and not uses_layout:
+            assert "mw_portal_r5.css" in text, (
+                f"{path.name} is missing canonical portal CSS"
+            )
+            assert "mw_admin_theme.css" not in text, (
+                f"{path.name} still loads the removed overlay theme"
+            )
+
+
+def test_portal_css_owns_admin_visual_tokens():
+    portal = (
+        ROOT / "web" / "app" / "static" / "css" / "mw_portal_r5.css"
+    ).read_text(encoding="utf-8")
+
+    for token in (
+        "--r5-bg",
+        "--r5-panel",
+        "--r5-panel-3",
+        "--r5-line",
+        "--r5-line-strong",
+        "--r5-text",
+        "--r5-text-soft",
+        "--r5-muted",
+        "--r5-gold",
+        "--r5-side",
+        "--r5-font",
+    ):
+        assert token in portal
+
+    assert ".mw-admin-searchbar" in portal
+    assert ".mw-admin-backbar" in portal
+    assert ".pay-review-page" in portal
+    assert ".wallet-page" in portal
+    assert ".staff-summary-page" in portal
+    assert ".td-page" in portal
+    assert ".ops-report" in portal
+
+
+def test_core_admin_pages_no_longer_embed_visual_override_blocks():
+    for filename in (
+        "admin.html",
+        "admin_order_detail.html",
+        "admin_staff_detail.html",
+        "admin_payment_reviews.html",
+        "admin_wallets.html",
+        "admin_wallet_detail.html",
+        "admin_payout_summary.html",
+        "admin_ticket_archive_detail.html",
+        "admin_operations_report.html",
+    ):
+        text = (TEMPLATES / filename).read_text(encoding="utf-8")
+        assert "<style>" not in text, (
+            f"{filename} still embeds page-level visual CSS"
+        )
