@@ -44,6 +44,7 @@
 
 
 <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=review_actions_20260930_1">
+<link rel="stylesheet" href="/static/css/mw_admin_theme.css?v=20261004_1">
 
     <!-- MAWAN_SITE_IDENTITY -->
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
@@ -269,8 +270,8 @@
 {% endif %}
 
 {% if mw_admin_area %}
-<div style="margin:0 0 18px 0;">
-    <form method="get" action="/admin/search" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+<div class="mw-admin-searchbar">
+    <form method="get" action="/admin/search" class="admin-add-worker-form">
         <input
             class="input"
             type="text"
