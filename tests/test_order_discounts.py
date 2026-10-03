@@ -1,6 +1,7 @@
 from services.order_discounts import (
     allocate_store_absorbed_fixed_discount,
 )
+from shared.payout import calculate_order_payout
 
 
 def test_fixed_discount_is_fully_absorbed_by_store():
@@ -48,3 +49,21 @@ def test_fixed_discount_is_capped_at_discountable_amount():
     assert result.payout_base_amount == 80
     assert result.customer_pay_amount == 0
     assert result.store_absorbed_amount == 80
+
+
+def test_fixed_discount_keeps_actual_worker_payout_unchanged():
+    allocation = allocate_store_absorbed_fixed_discount(
+        after_percent_amount=1000,
+        fixed_discount_amount=100,
+    )
+
+    payout = calculate_order_payout(
+        total_amount=allocation.payout_base_amount,
+        worker_discord_ids=["worker_a"],
+        named_bonus_worker_ids=[],
+    )
+
+    assert allocation.customer_pay_amount == 900
+    assert allocation.store_absorbed_amount == 100
+    assert payout.worker_payouts[0].final_payout == 800
+    assert payout.customer_service_payout == 50
