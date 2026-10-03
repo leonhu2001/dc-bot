@@ -339,11 +339,175 @@ def test_general_teaching_and_sweet_orders_are_cross_game():
         "basic_teaching_one",
         "basic_sweet_single",
         "basic_sweet_double",
+        "basic_sweet_female_single",
+        "basic_sweet_male_single",
+        "basic_sweet_female_double",
+        "basic_sweet_male_double",
+        "basic_sweet_double_any",
     ):
         rule = ORDER_RULES[rule_key]
         assert get_required_game_role_keys(rule) == ()
         assert get_required_game_role_ids(rule) == []
 
+
+
+
+def test_sweet_order_gender_variants_have_exact_companion_roles():
+    expected = {
+        "basic_sweet_female_single": (
+            ("female_companion",),
+            1,
+            520,
+            "甜蜜單｜女單陪",
+        ),
+        "basic_sweet_male_single": (
+            ("male_companion",),
+            1,
+            520,
+            "甜蜜單｜男單陪",
+        ),
+        "basic_sweet_female_double": (
+            ("female_companion",),
+            2,
+            1314,
+            "甜蜜單｜女雙陪",
+        ),
+        "basic_sweet_male_double": (
+            ("male_companion",),
+            2,
+            1314,
+            "甜蜜單｜男雙陪",
+        ),
+        "basic_sweet_double_any": (
+            ("male_companion", "female_companion"),
+            2,
+            1314,
+            "甜蜜單｜雙陪(不限)",
+        ),
+    }
+
+    for rule_key, (
+        allowed_roles,
+        required_staff,
+        price,
+        label,
+    ) in expected.items():
+        rule = ORDER_RULES[rule_key]
+        assert rule.allowed_roles == allowed_roles, rule_key
+        assert rule.required_staff_count == required_staff, rule_key
+        assert rule.price == price, rule_key
+        assert rule.label == label, rule_key
+        assert rule.allow_specify is True, rule_key
+        assert rule.max_specified_count == required_staff, rule_key
+        assert get_required_game_role_ids(rule) == [], rule_key
+
+    female_id = ROLE_IDS["female_companion"]
+    male_id = ROLE_IDS["male_companion"]
+
+    assert role_ids_match_requirements(
+        [female_id],
+        get_allowed_role_ids(ORDER_RULES["basic_sweet_female_single"]),
+        [],
+    ) is True
+    assert role_ids_match_requirements(
+        [male_id],
+        get_allowed_role_ids(ORDER_RULES["basic_sweet_female_single"]),
+        [],
+    ) is False
+
+    assert role_ids_match_requirements(
+        [male_id],
+        get_allowed_role_ids(ORDER_RULES["basic_sweet_male_double"]),
+        [],
+    ) is True
+    assert role_ids_match_requirements(
+        [female_id],
+        get_allowed_role_ids(ORDER_RULES["basic_sweet_male_double"]),
+        [],
+    ) is False
+
+    assert role_ids_match_requirements(
+        [female_id],
+        get_allowed_role_ids(ORDER_RULES["basic_sweet_double_any"]),
+        [],
+    ) is True
+    assert role_ids_match_requirements(
+        [male_id],
+        get_allowed_role_ids(ORDER_RULES["basic_sweet_double_any"]),
+        [],
+    ) is True
+
+
+def test_discord_self_service_sweet_catalog_exposes_only_five_new_variants():
+    from services.orders import get_order_item_details_for_group
+
+    details = get_order_item_details_for_group(
+        "general",
+        "甜蜜單",
+    )
+
+    assert [item["label"] for item in details] == [
+        "女單陪",
+        "男單陪",
+        "女雙陪",
+        "男雙陪",
+        "雙陪(不限)",
+    ]
+    assert [item["rule_key"] for item in details] == [
+        "basic_sweet_female_single",
+        "basic_sweet_male_single",
+        "basic_sweet_female_double",
+        "basic_sweet_male_double",
+        "basic_sweet_double_any",
+    ]
+    assert "basic_sweet_single" not in {
+        item["rule_key"]
+        for item in details
+    }
+    assert "basic_sweet_double" not in {
+        item["rule_key"]
+        for item in details
+    }
+
+
+def test_web_sweet_catalog_exposes_only_five_new_variants():
+    groups = {
+        group["key"]: group
+        for group in get_grouped_order_catalog("general")
+    }
+
+    sweet = groups["sweet"]
+    assert sweet["selector_label"] == "陪玩性別／人數"
+    assert [
+        variant["rule_key"]
+        for variant in sweet["variants"]
+    ] == [
+        "basic_sweet_female_single",
+        "basic_sweet_male_single",
+        "basic_sweet_female_double",
+        "basic_sweet_male_double",
+        "basic_sweet_double_any",
+    ]
+    assert [
+        variant["label"]
+        for variant in sweet["variants"]
+    ] == [
+        "女單陪",
+        "男單陪",
+        "女雙陪",
+        "男雙陪",
+        "雙陪(不限)",
+    ]
+    assert [
+        variant["allowed_roles"]
+        for variant in sweet["variants"]
+    ] == [
+        ["魔丸♟女陪"],
+        ["魔丸♞男陪"],
+        ["魔丸♟女陪"],
+        ["魔丸♞男陪"],
+        ["魔丸♞男陪", "魔丸♟女陪"],
+    ]
 
 def test_delta_desktop_and_mobile_pricing_are_separate():
     assert ORDER_RULES["basic_entertain_single"].price == 320
@@ -449,6 +613,11 @@ def test_storefront_business_values_are_direct_rules():
     expected = {
         "basic_sweet_single": ("hourly", 520, "H"),
         "basic_sweet_double": ("hourly", 1314, "H"),
+        "basic_sweet_female_single": ("hourly", 520, "H"),
+        "basic_sweet_male_single": ("hourly", 520, "H"),
+        "basic_sweet_female_double": ("hourly", 1314, "H"),
+        "basic_sweet_male_double": ("hourly", 1314, "H"),
+        "basic_sweet_double_any": ("hourly", 1314, "H"),
         "basic_trial_500": ("fixed", 450, "單"),
         "basic_trial_1000": ("fixed", 900, "單"),
         "basic_bet_1000": ("fixed", 800, "單"),

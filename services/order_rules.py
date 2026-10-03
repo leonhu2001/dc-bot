@@ -382,6 +382,7 @@ for key, label, price, staff_count, required_game_roles in [
         service_bonus_gift=1,
     ))
 
+# 舊甜蜜單規則保留給既有訂單／舊快照回查，不再出現在新下單選項。
 _add(OrderRule(
     "general", "basic_sweet_single", "甜蜜單｜單陪", "hourly", 520, "H",
     allowed_roles=COMPANION_ROLES,
@@ -415,6 +416,74 @@ _add(OrderRule(
     specify_free_min_units=2,
     specify_free_basis="quantity",
 ))
+
+
+def _add_sweet_rule(
+    key: str,
+    label: str,
+    *,
+    price: int,
+    required_staff_count: int,
+    allowed_roles: tuple[RoleKey, ...],
+) -> None:
+    _add(OrderRule(
+        "general",
+        key,
+        label,
+        "hourly",
+        price,
+        "H",
+        allowed_roles=allowed_roles,
+        allowed_game_roles=(),
+        required_game_roles=(),
+        required_staff_count=required_staff_count,
+        allow_specify=True,
+        max_specified_count=required_staff_count,
+        specify_fee_default=100,
+        specify_fee_by_role={
+            role: 100
+            for role in allowed_roles
+        },
+        specify_free_min_units=2,
+        specify_free_basis="quantity",
+    ))
+
+
+_add_sweet_rule(
+    "basic_sweet_female_single",
+    "甜蜜單｜女單陪",
+    price=520,
+    required_staff_count=1,
+    allowed_roles=("female_companion",),
+)
+_add_sweet_rule(
+    "basic_sweet_male_single",
+    "甜蜜單｜男單陪",
+    price=520,
+    required_staff_count=1,
+    allowed_roles=("male_companion",),
+)
+_add_sweet_rule(
+    "basic_sweet_female_double",
+    "甜蜜單｜女雙陪",
+    price=1314,
+    required_staff_count=2,
+    allowed_roles=("female_companion",),
+)
+_add_sweet_rule(
+    "basic_sweet_male_double",
+    "甜蜜單｜男雙陪",
+    price=1314,
+    required_staff_count=2,
+    allowed_roles=("male_companion",),
+)
+_add_sweet_rule(
+    "basic_sweet_double_any",
+    "甜蜜單｜雙陪(不限)",
+    price=1314,
+    required_staff_count=2,
+    allowed_roles=COMPANION_ROLES,
+)
 
 for key, label, price in [
     ("basic_oil_fuel", "油鍋單｜火箭燃油", 2600),

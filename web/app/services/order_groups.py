@@ -134,11 +134,14 @@ GROUP_SPECS = [
         "key": "sweet",
         "category": "general",
         "label": "甜蜜單",
-        "selector_label": "陪玩人數",
-        "description": "跨遊戲通用，不要求特定遊戲身分組；男陪、女陪可接。",
+        "selector_label": "陪玩性別／人數",
+        "description": "跨遊戲通用；女單陪／女雙陪只限女陪，男單陪／男雙陪只限男陪，雙陪(不限)男女陪皆可接。",
         "variants": [
-            ("basic_sweet_single", "單陪"),
-            ("basic_sweet_double", "雙陪"),
+            ("basic_sweet_female_single", "女單陪"),
+            ("basic_sweet_male_single", "男單陪"),
+            ("basic_sweet_female_double", "女雙陪"),
+            ("basic_sweet_male_double", "男雙陪"),
+            ("basic_sweet_double_any", "雙陪(不限)"),
         ],
     },
 
