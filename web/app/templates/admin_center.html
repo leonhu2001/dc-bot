@@ -24,7 +24,7 @@
 .center-review{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.018)}
 .center-review p{margin:6px 0 0;white-space:pre-wrap}
 @media(max-width:1050px){.center-stats{grid-template-columns:repeat(2,1fr)}.center-row{grid-template-columns:1fr 1fr}}
-@media(max-width:650px){.center-stats{grid-template-columns:1fr 1fr}.center-row{grid-template-columns:1fr}.center-actions .button{flex:1}}
+@media(max-width:650px){.center-stats{grid-template-columns:1fr 1fr}.center-row{grid-template-columns:1fr}.center-actions .button{flex:1}.center-filter-form{grid-template-columns:1fr!important}}
 </style>
 
 <div class="center-grid">
@@ -62,7 +62,7 @@
     </div>
 
     <div class="panel compact-panel">
-        <form method="get" action="/admin/staff-center" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.4fr) minmax(150px,.5fr) auto;gap:10px;">
+        <form method="get" action="/admin/staff-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.4fr) minmax(150px,.5fr) auto;gap:10px;">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
             <select class="input" name="status">
                 <option value="active" {% if status == 'active' %}selected{% endif %}>在職</option>
@@ -154,7 +154,7 @@
     </div>
 
     <div class="panel compact-panel">
-        <form method="get" action="/admin/customer-center" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+        <form method="get" action="/admin/customer-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋客戶名稱或 Discord ID">
             <button class="button" type="submit">搜尋</button>
         </form>
@@ -193,7 +193,7 @@
 
     <div class="panel compact-panel">
         <div class="section-title-row">
-            <div><h2>最近評價</h2><p class="muted-text">最新 12 筆，完整隱藏／公開管理仍可從上方進入。</p></div>
+            <div><h2>最近評價</h2><p class="muted-text">最新 12 筆；公開／隱藏調整可從上方「評價管理」處理。</p></div>
         </div>
         <div class="center-list">
         {% for row in snapshot.reviews %}
@@ -293,7 +293,7 @@
         <div class="section-title-row">
             <div><h2>票口紀錄</h2><p class="muted-text">直接在客服中心搜尋封存票口，不再另外進一個重複清單頁。</p></div>
         </div>
-        <form method="get" action="/admin/support-center" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px;">
+        <form method="get" action="/admin/support-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px;">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋訂單號、客戶、客服、Ticket 或聊天內容">
             <button class="button" type="submit">搜尋票口</button>
         </form>
@@ -318,7 +318,7 @@
     {% if snapshot.knowledge %}
     <div class="panel compact-panel">
         <div class="section-title-row">
-            <div><h2>AI 客服知識</h2><p class="muted-text">只顯示狀態，正式核准與編輯仍在完整知識庫頁。</p></div>
+            <div><h2>AI 客服知識</h2><p class="muted-text">只顯示狀態；核准、編輯與停用請進入「AI 客服知識庫」。</p></div>
         </div>
         <div class="center-stats">
             <div class="center-stat"><span>待審核</span><strong>{{ snapshot.knowledge.pending_count }}</strong></div>
