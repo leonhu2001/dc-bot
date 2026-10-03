@@ -170,3 +170,63 @@ def test_nested_drilldowns_preserve_return_destination():
     assert 'params["return_to"] = return_to' in admin_source
     assert "child_return_param" in customer_360
     assert "child_return_param" in search_source
+
+
+def test_admin_unified_theme_loads_after_legacy_portal_css():
+    layout = (TEMPLATES / "layout.html").read_text(encoding="utf-8")
+
+    portal_pos = layout.index("mw_portal_r5.css")
+    theme_pos = layout.index("mw_admin_theme.css")
+
+    assert theme_pos > portal_pos
+
+
+def test_standalone_admin_templates_load_unified_theme_last():
+    standalone = []
+
+    for path in sorted(TEMPLATES.glob("admin*.html")):
+        text = path.read_text(encoding="utf-8")
+        uses_layout = "extends" in text and "layout.html" in text
+        includes_sidebar = "_admin_sidebar.html" in text
+
+        if includes_sidebar and not uses_layout:
+            standalone.append(path)
+            assert "mw_admin_theme.css" in text, (
+                f"{path.name} is missing unified admin theme"
+            )
+            assert text.rfind("mw_admin_theme.css") < text.rfind("</head>")
+
+    assert standalone, "expected standalone admin templates"
+
+
+def test_admin_theme_defines_shared_visual_tokens():
+    theme = (
+        ROOT / "web" / "app" / "static" / "css" / "mw_admin_theme.css"
+    ).read_text(encoding="utf-8")
+
+    for token in (
+        "--admin-bg",
+        "--admin-panel",
+        "--admin-border",
+        "--admin-text",
+        "--admin-muted",
+        "--admin-gold",
+        "--admin-sidebar",
+        "--admin-font",
+    ):
+        assert token in theme
+
+    assert ".mw-admin-searchbar" in theme
+    assert ".mw-admin-backbar" in theme
+    assert ".mw-admin-inline-actions" in theme
+
+
+def test_primary_admin_workspaces_do_not_repeat_page_headers():
+    dashboard = (TEMPLATES / "admin.html").read_text(encoding="utf-8")
+    order = (TEMPLATES / "admin_order_detail.html").read_text(encoding="utf-8")
+    staff = (TEMPLATES / "admin_staff_detail.html").read_text(encoding="utf-8")
+
+    assert '<header class="top">' not in dashboard
+    assert '<header class="top">' not in order
+    assert '<div class="k">STAFF WORKSPACE</div>' not in staff
+    assert "mw-admin-inline-actions" in order
