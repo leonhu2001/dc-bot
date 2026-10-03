@@ -738,6 +738,7 @@ async def update_staff_profile_page(
     service_tags: str = Form(""),
     bio: str = Form(""),
     card_image_url: str = Form(""),
+    return_to: str = Form(""),
 ):
     if not _is_admin(request):
         return RedirectResponse(url="/login", status_code=303)
@@ -798,7 +799,11 @@ async def update_staff_profile_page(
     finally:
         conn.close()
 
-    return RedirectResponse(url="/admin/staff_profiles/", status_code=303)
+    target = str(return_to or "").strip()
+    if not (target == "/admin" or target.startswith("/admin/")):
+        target = "/admin/staff_profiles/"
+
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.post("/toggle_public")
