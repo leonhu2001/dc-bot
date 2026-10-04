@@ -923,7 +923,7 @@ async def admin_payout_summary(request: Request, month: str | None = "", role: s
     rows, totals = fetch_rows(month, role, q, status)
     unpaid_rows, unpaid_totals = fetch_rows(month, role, q, "unpaid")
     paid_rows, paid_totals = fetch_rows(month, role, q, "paid")
-    summary_rows = attach_staff_avatars_to_summary_rows(build_combined_summary_rows(unpaid_rows, paid_rows))
+    summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)
 
     return templates.TemplateResponse(
         request=request,
