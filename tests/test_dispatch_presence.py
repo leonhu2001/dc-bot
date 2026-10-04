@@ -51,5 +51,5 @@ def test_dispatch_presence_can_filter_candidates(tmp_path):
 
 
 def test_dispatch_presence_channel_name_reflects_count():
-    assert format_dispatch_presence_channel_name(0) == "⚫｜可接單・0人"
-    assert format_dispatch_presence_channel_name(5) == "🟢｜可接單・5人"
+    assert format_dispatch_presence_channel_name(0) == "🚬┃排隊中。。。。。"
+    assert format_dispatch_presence_channel_name(5) == "🟢┃5人在線"
