@@ -47,8 +47,24 @@ PREPAY_DISPATCH_STATUSES = {
 }
 
 
-def is_claimable_dispatch_status(value) -> bool:
-    return _normalize_text(value) in PREPAY_DISPATCH_STATUSES
+DISPATCH_STATUS_LABELS = {
+    WAITING_ACCEPTANCE: "可接單",
+    ACCEPTED_PENDING_PAY: "待付款（已滿）",
+    OrderStatus.ACTIVE.value: "進行中",
+}
+
+
+def is_dispatch_claim_open(order) -> bool:
+    status = _normalize_text(getattr(order, "status", None))
+
+    if status != WAITING_ACCEPTANCE:
+        return False
+
+    missing_count = getattr(order, "dispatch_missing_staff_count", None)
+    if missing_count is None:
+        return True
+
+    return int(missing_count or 0) > 0
 
 
 def partition_dispatch_orders(orders):
@@ -56,7 +72,7 @@ def partition_dispatch_orders(orders):
     non_claimable_orders = []
 
     for order in orders:
-        if is_claimable_dispatch_status(getattr(order, "status", None)):
+        if is_dispatch_claim_open(order):
             claimable_orders.append(order)
         else:
             non_claimable_orders.append(order)
@@ -272,6 +288,116 @@ def attach_acceptance_claims_to_orders(db: Session, orders: list[WebOrder]) -> N
         setattr(order, "prepay_protector_count", protector_count)
         setattr(order, "prepay_min_protector_count", int(meta["min_protector_count"] or 0))
 
+def attach_dispatch_operational_context(orders: list[WebOrder]) -> None:
+    for order in orders:
+        active_assignments = [
+            assignment
+            for assignment in (getattr(order, "assignments", None) or [])
+            if bool(getattr(assignment, "is_active", False))
+        ]
+        prepay_count = int(getattr(order, "prepay_claim_count", 0) or 0)
+        required_count = int(getattr(order, "prepay_required_count", 0) or 0)
+
+        status = _normalize_text(getattr(order, "status", None))
+        if status in PREPAY_DISPATCH_STATUSES:
+            current_count = prepay_count
+        else:
+            current_count = len(active_assignments) or prepay_count
+
+        if required_count <= 0:
+            required_count = current_count
+
+        missing_count = max(0, required_count - current_count)
+        claim_open = (
+            status == WAITING_ACCEPTANCE
+            and missing_count > 0
+        )
+
+        if claim_open:
+            status_label = "可接單"
+        else:
+            status_label = DISPATCH_STATUS_LABELS.get(
+                status,
+                status or "未知狀態",
+            )
+
+        if status == ACCEPTED_PENDING_PAY:
+            locked_message = "接單名額已滿，等待付款成立。"
+        elif status == OrderStatus.ACTIVE.value:
+            locked_message = "已付款成立，網站接單已鎖定。"
+        else:
+            locked_message = "此狀態不開放網站接單。"
+
+        setattr(order, "dispatch_current_staff_count", current_count)
+        setattr(order, "dispatch_required_staff_count", required_count)
+        setattr(order, "dispatch_missing_staff_count", missing_count)
+        setattr(order, "dispatch_claim_open", claim_open)
+        setattr(order, "dispatch_allows_unclaim", status in PREPAY_DISPATCH_STATUSES)
+        setattr(order, "dispatch_status_label", status_label)
+        setattr(order, "dispatch_locked_message", locked_message)
+
+
+def get_worker_dispatch_payout_preview(
+    order: WebOrder,
+    worker_discord_id: str,
+) -> dict:
+    worker_id = str(worker_discord_id)
+
+    for payout in getattr(order, "payouts", None) or []:
+        if str(getattr(payout, "worker_discord_id", "")) == worker_id:
+            return {
+                "label": "目前分潤",
+                "amount": int(round(float(getattr(payout, "final_payout", 0) or 0))),
+                "is_estimate": False,
+            }
+
+    if _normalize_text(getattr(order, "status", None)) in PREPAY_DISPATCH_STATUSES:
+        required_count = int(
+            getattr(order, "dispatch_required_staff_count", 0)
+            or getattr(order, "prepay_required_count", 0)
+            or 0
+        )
+        total_amount = int(
+            getattr(order, "payout_base_amount", None)
+            or getattr(order, "customer_pay_amount", None)
+            or getattr(order, "amount", 0)
+            or 0
+        )
+
+        if required_count > 0 and total_amount > 0:
+            placeholder_ids = [
+                worker_id,
+                *[
+                    f"preview-worker-{index}"
+                    for index in range(1, required_count)
+                ],
+            ]
+            payout_result = calculate_order_payout(
+                total_amount=total_amount,
+                worker_discord_ids=placeholder_ids,
+            )
+            preview = next(
+                (
+                    item
+                    for item in payout_result.worker_payouts
+                    if str(item.worker_discord_id) == worker_id
+                ),
+                None,
+            )
+            if preview is not None:
+                return {
+                    "label": "預估分潤",
+                    "amount": int(round(float(preview.final_payout or 0))),
+                    "is_estimate": True,
+                }
+
+    return {
+        "label": "分潤",
+        "amount": None,
+        "is_estimate": True,
+    }
+
+
 def create_demo_orders_if_empty(db: Session) -> None:
     # 正式環境不再自動建立 DEMO 測試訂單。
     return
@@ -286,7 +412,10 @@ def list_active_orders(db: Session) -> list[WebOrder]:
         .order_by(WebOrder.created_at.desc())
     )
 
-    return list(db.scalars(statement).all())
+    orders = list(db.scalars(statement).all())
+    attach_acceptance_claims_to_orders(db, orders)
+    attach_dispatch_operational_context(orders)
+    return orders
 
 def list_admin_orders(db: Session, status_filter: str | None = "active") -> list[WebOrder]:
     statement = (
