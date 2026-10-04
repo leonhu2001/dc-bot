@@ -230,3 +230,72 @@ def test_payment_review_writes_use_immediate_lock_and_conditional_status():
     assert 'conn.execute("BEGIN IMMEDIATE")' in retry_body
     assert "AND status = ?" in retry_body
 
+def test_duplicate_pending_review_rejects_changed_amount(tmp_path: Path):
+    db_file = tmp_path / "payments.db"
+
+    original = create_payment_review(
+        source_type="order",
+        source_id=30,
+        ticket_channel_id=777,
+        customer_discord_id="123",
+        customer_display_name="Boss",
+        amount=1000,
+        payment_method="轉帳",
+        db_file=db_file,
+    )
+
+    with pytest.raises(ValueError, match="已有尚未完成的付款審核"):
+        create_payment_review(
+            source_type="order",
+            source_id=30,
+            ticket_channel_id=777,
+            customer_discord_id="123",
+            customer_display_name="Boss",
+            amount=1200,
+            payment_method="轉帳",
+            db_file=db_file,
+        )
+
+    stored = get_payment_review(int(original["id"]), db_file=db_file)
+    assert stored is not None
+    assert int(stored["amount"]) == 1000
+    assert stored["status"] == PAYMENT_REVIEW_PENDING
+
+
+def test_duplicate_approved_review_rejects_changed_payment_method(tmp_path: Path):
+    db_file = tmp_path / "payments.db"
+
+    original = create_payment_review(
+        source_type="order",
+        source_id=31,
+        ticket_channel_id=778,
+        customer_discord_id="123",
+        customer_display_name="Boss",
+        amount=1000,
+        payment_method="轉帳",
+        db_file=db_file,
+    )
+    approve_payment_review(
+        int(original["id"]),
+        operator_discord_id="999",
+        operator_display_name="Staff",
+        db_file=db_file,
+    )
+
+    with pytest.raises(ValueError, match="已有尚未完成的付款審核"):
+        create_payment_review(
+            source_type="order",
+            source_id=31,
+            ticket_channel_id=778,
+            customer_discord_id="123",
+            customer_display_name="Boss",
+            amount=1000,
+            payment_method="街口",
+            db_file=db_file,
+        )
+
+    stored = get_payment_review(int(original["id"]), db_file=db_file)
+    assert stored is not None
+    assert stored["payment_method"] == "轉帳"
+    assert stored["status"] == PAYMENT_REVIEW_APPROVED
+
