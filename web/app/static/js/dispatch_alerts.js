@@ -1,10 +1,14 @@
 (function () {
-  const REFRESH_INTERVAL_MS = 5000;
+  const HOURLY_REFRESH_MS = 60 * 60 * 1000;
   const ENABLED_KEY = 'mw_dispatch_alert_enabled';
+
   let enabled = localStorage.getItem(ENABLED_KEY) === '1';
-  let checking = false;
   let audioContext = null;
-  let lastCount = null;
+  let pendingAlert = false;
+  let knownKeys = null;
+  let eventSource = null;
+  let refreshPromise = null;
+  let queuedAlertRefresh = false;
 
   function isDispatchPage() {
     return window.location.pathname === '/dispatch';
@@ -18,11 +22,27 @@
       audioContext = new AudioClass();
     }
 
-    if (audioContext.state === 'suspended') {
-      audioContext.resume().catch(() => {});
+    return audioContext;
+  }
+
+  function isAudioReady() {
+    return Boolean(audioContext && audioContext.state === 'running');
+  }
+
+  async function unlockAudio() {
+    const ctx = getAudioContext();
+    if (!ctx) return false;
+
+    try {
+      if (ctx.state !== 'running') {
+        await ctx.resume();
+      }
+    } catch (err) {
+      console.warn('[dispatch-alert] audio unlock failed', err);
     }
 
-    return audioContext;
+    updateButton();
+    return ctx.state === 'running';
   }
 
   function tone(ctx, freq, start, duration, volume) {
@@ -43,144 +63,352 @@
     osc.stop(start + duration + 0.05);
   }
 
-  function dingDong() {
-    if (!enabled) return;
+  async function dingDong() {
+    if (!enabled || !audioContext) return false;
 
-    const ctx = getAudioContext();
-    if (!ctx) return;
+    if (audioContext.state !== 'running') {
+      try {
+        await audioContext.resume();
+      } catch (err) {
+        console.warn('[dispatch-alert] audio resume failed', err);
+      }
+    }
 
-    const now = ctx.currentTime;
-    tone(ctx, 880, now, 0.22, 0.68);
-    tone(ctx, 660, now + 0.18, 0.32, 0.58);
+    if (audioContext.state !== 'running') {
+      return false;
+    }
+
+    const now = audioContext.currentTime;
+    tone(audioContext, 880, now, 0.22, 0.68);
+    tone(audioContext, 660, now + 0.18, 0.32, 0.58);
+    return true;
+  }
+
+  function getButton() {
+    return document.querySelector('.dispatch-alert-toggle');
+  }
+
+  function updateButton() {
+    const btn = getButton();
+    if (!btn) return;
+
+    if (!enabled) {
+      btn.textContent = '🔕 開啟新單提示';
+      return;
+    }
+
+    if (!isAudioReady()) {
+      btn.textContent = pendingAlert
+        ? '🔔 有新單｜點一下啟用聲音'
+        : '🔔 點一下啟用聲音';
+      return;
+    }
+
+    btn.textContent = '🔔 新單提示已開';
   }
 
   function makeButton() {
-    if (document.querySelector('.dispatch-alert-toggle')) return;
+    if (getButton()) {
+      updateButton();
+      return;
+    }
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'dispatch-alert-toggle';
-    btn.textContent = enabled ? '🔔 新單提示已開' : '🔕 開啟新單提示';
 
-    btn.addEventListener('click', () => {
-      enabled = !enabled;
-      localStorage.setItem(ENABLED_KEY, enabled ? '1' : '0');
+    btn.addEventListener('click', async () => {
+      if (!enabled) {
+        enabled = true;
+        localStorage.setItem(ENABLED_KEY, '1');
 
-      if (enabled) {
-        getAudioContext();
-        dingDong();
+        if (await unlockAudio()) {
+          pendingAlert = false;
+          await dingDong();
+        }
+
+        updateButton();
+        return;
       }
 
-      btn.textContent = enabled ? '🔔 新單提示已開' : '🔕 開啟新單提示';
+      if (!isAudioReady()) {
+        if (await unlockAudio()) {
+          pendingAlert = false;
+          await dingDong();
+        }
+
+        updateButton();
+        return;
+      }
+
+      enabled = false;
+      pendingAlert = false;
+      localStorage.setItem(ENABLED_KEY, '0');
+      updateButton();
     });
 
     document.body.appendChild(btn);
+    updateButton();
   }
 
-  async function fetchState() {
-    const res = await fetch('/dispatch/state?t=' + Date.now(), {
-      cache: 'no-store',
-      credentials: 'same-origin'
+  function installAudioUnlockFallback() {
+    const tryUnlock = async (event) => {
+      const target = event.target;
+      if (
+        target
+        && typeof target.closest === 'function'
+        && target.closest('.dispatch-alert-toggle')
+      ) {
+        return;
+      }
+
+      if (!enabled || isAudioReady()) return;
+
+      if (await unlockAudio()) {
+        if (pendingAlert) {
+          pendingAlert = false;
+          await dingDong();
+        }
+        updateButton();
+      }
+    };
+
+    window.addEventListener('pointerdown', tryUnlock, true);
+    window.addEventListener('keydown', tryUnlock, true);
+
+    document.addEventListener('visibilitychange', async () => {
+      if (
+        !document.hidden
+        && enabled
+        && audioContext
+        && audioContext.state !== 'running'
+      ) {
+        try {
+          await audioContext.resume();
+        } catch (err) {
+          console.warn('[dispatch-alert] foreground audio resume failed', err);
+        }
+        updateButton();
+      }
     });
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-
-    if (!data || !data.ok) return null;
-
-    return data;
-  }
-
-  function getPageWebKeys() {
-    const text = document.body.innerText || '';
-    const matches = text.match(/WEB-\\d+/g) || [];
-
-    return Array.from(new Set(matches.map((value) => value.replace('WEB-', '')))).sort();
   }
 
   function normalizeKeys(keys) {
     return (keys || []).map(String).sort();
   }
 
-  function sameKeys(a, b) {
-    if (a.length !== b.length) return false;
+  function parseDispatchShell(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.querySelector('.dispatch-shell');
+  }
 
-    for (let i = 0; i < a.length; i += 1) {
-      if (a[i] !== b[i]) return false;
+  async function fetchFreshDispatchShell() {
+    const res = await fetch('/dispatch?t=' + Date.now(), {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+
+    if (!res.ok) {
+      throw new Error('dispatch refresh failed: ' + res.status);
     }
 
+    const html = await res.text();
+    const nextShell = parseDispatchShell(html);
+    const currentShell = document.querySelector('.dispatch-shell');
+
+    if (!nextShell || !currentShell) {
+      throw new Error('dispatch shell missing from refresh response');
+    }
+
+    currentShell.replaceWith(nextShell);
     return true;
   }
 
-  function shouldSkipReload() {
-    const el = document.activeElement;
-    if (!el) return false;
+  async function refreshDispatch(options) {
+    const playAlert = Boolean(options && options.playAlert);
 
-    return ['input', 'textarea', 'select'].includes(el.tagName.toLowerCase());
-  }
-
-  async function check() {
-    if (checking || !isDispatchPage()) return;
-    checking = true;
-
-    try {
-      const data = await fetchState();
-
-      if (!data) return;
-
-      const apiKeys = normalizeKeys(data.keys || []);
-      const pageKeys = getPageWebKeys();
-
-      console.log('[dispatch-alert] poll', {
-        apiKeys,
-        pageKeys,
-        count: data.count,
-        signature: data.signature
-      });
-
-      const nextCount = Number(data.count || 0);
-      const hasNewOrder = lastCount !== null && nextCount > lastCount;
-
-      if (hasNewOrder) {
-        dingDong();
+    if (refreshPromise) {
+      if (playAlert) {
+        queuedAlertRefresh = true;
       }
+      return refreshPromise;
+    }
 
-      lastCount = nextCount;
+    refreshPromise = (async () => {
+      try {
+        await fetchFreshDispatchShell();
 
-      if (!sameKeys(apiKeys, pageKeys)) {
-        console.log('[dispatch-alert] page mismatch, reloading');
-
-        if (!shouldSkipReload()) {
-          if (hasNewOrder && enabled) {
-            setTimeout(() => window.location.reload(), 800);
-          } else {
-            window.location.reload();
+        if (playAlert) {
+          const played = await dingDong();
+          if (!played && enabled) {
+            pendingAlert = true;
+            updateButton();
           }
         }
+
+        return true;
+      } catch (err) {
+        console.warn('[dispatch-alert] soft refresh failed', err);
+        return false;
+      }
+    })();
+
+    let result = false;
+
+    try {
+      result = await refreshPromise;
+    } finally {
+      refreshPromise = null;
+
+      if (queuedAlertRefresh) {
+        queuedAlertRefresh = false;
+        setTimeout(() => {
+          refreshDispatch({ playAlert: true });
+        }, 0);
+      }
+    }
+
+    return result;
+  }
+
+  async function refreshAfterNewOrder(attempt) {
+    const retryAttempt = Number(attempt || 0);
+    const ok = await refreshDispatch({ playAlert: true });
+
+    if (!ok && retryAttempt < 3) {
+      setTimeout(() => {
+        refreshAfterNewOrder(retryAttempt + 1);
+      }, 3000);
+    }
+  }
+
+  async function primeKnownKeys() {
+    try {
+      const res = await fetch('/dispatch/state?t=' + Date.now(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data && data.ok) {
+        knownKeys = normalizeKeys(data.keys || []);
       }
     } catch (err) {
-      console.warn('[dispatch-alert] check failed', err);
-    } finally {
-      checking = false;
+      console.warn('[dispatch-alert] initial state failed', err);
     }
+  }
+
+  function connectDispatchEvents() {
+    if (eventSource) {
+      eventSource.close();
+    }
+
+    eventSource = new EventSource('/dispatch/events');
+
+    eventSource.onmessage = async (event) => {
+      let data;
+
+      try {
+        data = JSON.parse(event.data);
+      } catch (err) {
+        console.warn('[dispatch-alert] invalid SSE payload', err);
+        return;
+      }
+
+      if (!data || !data.ok) return;
+
+      const nextKeys = normalizeKeys(data.keys || []);
+
+      if (knownKeys === null) {
+        knownKeys = nextKeys;
+        return;
+      }
+
+      const previousKeys = new Set(knownKeys);
+      const hasNewOrder = nextKeys.some((key) => !previousKeys.has(key));
+
+      knownKeys = nextKeys;
+
+      if (hasNewOrder) {
+        console.log('[dispatch-alert] new order received, refreshing');
+        await refreshAfterNewOrder(0);
+      }
+    };
+
+    eventSource.onopen = () => {
+      console.log('[dispatch-alert] SSE connected');
+    };
+
+    eventSource.onerror = () => {
+      console.warn('[dispatch-alert] SSE disconnected; browser will reconnect');
+    };
+  }
+
+  function installDispatchFormSoftSubmit() {
+    document.addEventListener('submit', async (event) => {
+      const form = event.target;
+
+      if (
+        !(form instanceof HTMLFormElement)
+        || !form.closest('.dispatch-shell')
+        || !String(form.action || '').includes('/dispatch/orders/')
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      try {
+        const res = await fetch(form.action, {
+          method: String(form.method || 'POST').toUpperCase(),
+          body: new FormData(form),
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+
+        if (!res.ok) {
+          throw new Error('dispatch action failed: ' + res.status);
+        }
+
+        const html = await res.text();
+        const nextShell = parseDispatchShell(html);
+        const currentShell = document.querySelector('.dispatch-shell');
+
+        if (!nextShell || !currentShell) {
+          throw new Error('dispatch action response missing shell');
+        }
+
+        currentShell.replaceWith(nextShell);
+      } catch (err) {
+        console.warn('[dispatch-alert] soft action failed, falling back', err);
+        form.submit();
+      }
+    });
   }
 
   async function init() {
     if (!isDispatchPage()) return;
 
     makeButton();
+    installAudioUnlockFallback();
+    installDispatchFormSoftSubmit();
+    await primeKnownKeys();
+    connectDispatchEvents();
 
-    const data = await fetchState();
-    if (data) {
-      lastCount = Number(data.count || 0);
-    }
+    setInterval(() => {
+      refreshDispatch({ playAlert: false });
+    }, HOURLY_REFRESH_MS);
 
-    setInterval(check, REFRESH_INTERVAL_MS);
-    setTimeout(check, 1000);
-
-    console.log('[dispatch-alert] started v7');
+    console.log('[dispatch-alert] started v8 SSE');
   }
+
+  window.addEventListener('beforeunload', () => {
+    if (eventSource) {
+      eventSource.close();
+    }
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
