@@ -38,10 +38,13 @@ def test_bot_generic_web_sync_does_not_consume_prepay_acceptance_events():
 
 
 def test_bot_startup_reconciles_existing_acceptance_panels():
-    source = Path("bot.py").read_text(encoding="utf-8")
+    bot_source = Path("bot.py").read_text(encoding="utf-8")
+    runtime_source = Path("services/acceptance/runtime.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "async def repair_pending_acceptance_dispatch_panels_once" in source
-    assert "await repair_pending_acceptance_dispatch_panels_once(" in source
+    assert "async def repair_pending_acceptance_dispatch_panels_once" in runtime_source
+    assert "await repair_pending_acceptance_dispatch_panels_once(" in bot_source
 
 def test_generic_web_sync_atomically_claims_only_non_claim_events():
     source = Path("services/web_sync/event_store.py").read_text(
@@ -60,7 +63,9 @@ def test_generic_web_sync_atomically_claims_only_non_claim_events():
 
 
 def test_acceptance_worker_is_single_owner_for_claim_events():
-    source = Path("bot.py").read_text(encoding="utf-8")
+    source = Path("services/acceptance/runtime.py").read_text(
+        encoding="utf-8"
+    )
 
     start = source.index("async def process_acceptance_sync_events_once")
     end = source.index("async def acceptance_sync_event_worker", start)
@@ -75,7 +80,9 @@ def test_acceptance_worker_is_single_owner_for_claim_events():
     assert "Legacy claim events already completed" in body
 
 def test_cs_dispatch_failure_does_not_claim_rollback_succeeded_when_it_failed():
-    source = Path("bot.py").read_text(encoding="utf-8")
+    source = Path("services/web_sync/runtime.py").read_text(
+        encoding="utf-8"
+    )
 
     marker = source.index("CS dispatch rollback failed")
     start = source.rfind("except Exception as exc:", 0, marker)
