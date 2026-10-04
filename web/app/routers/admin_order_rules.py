@@ -16,8 +16,11 @@ from services.order_rule_store import (
     reset_rule_override,
     rollback_rule_override,
 )
+from services.game_roles import (
+    GAME_IDENTITY_ROLES,
+    GAME_RANK_ROLES,
+)
 from services.order_rules import (
-    ALL_ROLE_LABELS,
     CATEGORY_LABELS,
     ORDER_RULES,
     ROLE_LABELS,
@@ -56,6 +59,17 @@ BOOL_FIELDS = {
     "point_benefits_allowed",
 }
 PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
+
+# 舊分類只保留給歷史訂單與舊快照回查，不應再從後台修改。
+ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}
+
+
+def _is_admin_editable_rule(rule_key: str) -> bool:
+    rule = ORDER_RULES.get(str(rule_key))
+    return bool(
+        rule is not None
+        and str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES
+    )
 
 
 def _user(request: Request) -> dict | None:
@@ -220,7 +234,11 @@ async def _render(
     ensure_order_rule_store()
 
     rule_rows = sorted(
-        (_rule_row(str(key)) for key in ORDER_RULES.keys()),
+        (
+            _rule_row(str(key))
+            for key, rule in ORDER_RULES.items()
+            if str(rule.category) not in ADMIN_HIDDEN_RULE_CATEGORIES
+        ),
         key=lambda row: (
             str(row["category_label"]),
             str(row["label"]),
@@ -228,8 +246,9 @@ async def _render(
         ),
     )
 
+    editable_keys = {str(row["key"]) for row in rule_rows}
     selected_key = str(edit or "").strip()
-    if selected_key not in ORDER_RULES:
+    if selected_key not in editable_keys:
         selected_key = rule_rows[0]["key"] if rule_rows else ""
 
     selected_rule = ORDER_RULES.get(selected_key) if selected_key else None
@@ -249,10 +268,18 @@ async def _render(
         else []
     )
 
-    game_role_labels = {
-        key: label
-        for key, label in ALL_ROLE_LABELS.items()
-        if key not in ROLE_LABELS
+    rank_game_labels = {
+        "lol": "英雄聯盟",
+        "apex": "APEX",
+        "valorant": "特戰英豪",
+    }
+    game_rank_labels = {
+        role.key: f"{rank_game_labels.get(role.game, role.game)}｜{role.label}"
+        for role in GAME_RANK_ROLES
+    }
+    game_identity_labels = {
+        role.key: role.label
+        for role in GAME_IDENTITY_ROLES
     }
 
     return templates.TemplateResponse(
@@ -271,7 +298,8 @@ async def _render(
             "active_version": active_version,
             "versions": versions,
             "service_role_labels": ROLE_LABELS,
-            "game_role_labels": game_role_labels,
+            "game_rank_labels": game_rank_labels,
+            "game_identity_labels": game_identity_labels,
             "pricing_types": (
                 ("fixed", "固定價"),
                 ("hourly", "按小時"),
@@ -315,8 +343,8 @@ async def admin_order_rule_preview(
     if not user or not user.get("is_manager"):
         return RedirectResponse("/admin", status_code=303)
 
-    if rule_key not in ORDER_RULES:
-        return _redirect(error="找不到這個商品規則。")
+    if not _is_admin_editable_rule(rule_key):
+        return _redirect(error="這個規則只保留給歷史資料，後台不開放修改。")
 
     try:
         form = await request.form()
@@ -355,6 +383,9 @@ async def admin_order_rule_publish(
     user = _user(request)
     if not user or not user.get("is_manager"):
         return RedirectResponse("/admin", status_code=303)
+
+    if not _is_admin_editable_rule(rule_key):
+        return _redirect(error="這個規則只保留給歷史資料，後台不開放修改。")
 
     try:
         payload = json.loads(payload_json)
@@ -403,6 +434,9 @@ async def admin_order_rule_rollback(
     user = _user(request)
     if not user or not user.get("is_manager"):
         return RedirectResponse("/admin", status_code=303)
+
+    if not _is_admin_editable_rule(rule_key):
+        return _redirect(error="這個規則只保留給歷史資料，後台不開放修改。")
 
     try:
         versions = list_rule_versions(rule_key, limit=100)
@@ -464,6 +498,9 @@ async def admin_order_rule_reset(
     user = _user(request)
     if not user or not user.get("is_manager"):
         return RedirectResponse("/admin", status_code=303)
+
+    if not _is_admin_editable_rule(rule_key):
+        return _redirect(error="這個規則只保留給歷史資料，後台不開放修改。")
 
     try:
         before_payload = rule_to_override_payload(ORDER_RULES[rule_key])

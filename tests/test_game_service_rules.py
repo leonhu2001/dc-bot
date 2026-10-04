@@ -1,5 +1,10 @@
 import services
-from services.game_roles import GAME_ROLE_BY_KEY
+from services.game_roles import (
+    GAME_IDENTITY_ROLES,
+    GAME_RANK_ROLES,
+    GAME_ROLE_BY_KEY,
+    GAME_ROLES,
+)
 from services.order_rules import (
     ALL_ROLE_IDS,
     ORDER_RULES,
@@ -32,18 +37,21 @@ def test_lol_and_apex_master_roles_never_mix():
     assert lol_master.role_id != apex_master.role_id
 
 
-def test_delta_force_protectors_are_registered_as_game_roles():
+def test_delta_force_service_roles_are_legacy_aliases_not_game_roles():
     expected = {
         "delta_top_protector": ("1500234130871550004", "魔丸♛頂護"),
         "delta_female_protector": ("1500234170943934544", "魔丸♝女護"),
         "delta_male_protector": ("1500751039060643990", "魔丸♜男護"),
     }
 
+    canonical_keys = {role.key for role in GAME_ROLES}
     for key, (role_id, label) in expected.items():
         role = GAME_ROLE_BY_KEY[key]
         assert role.game == "delta_force"
         assert role.role_id == role_id
         assert role.label == label
+        assert role.kind == "service_alias"
+        assert key not in canonical_keys
 
     assert {
         GAME_ROLE_BY_KEY[key].role_id
@@ -53,6 +61,32 @@ def test_delta_force_protectors_are_registered_as_game_roles():
         ROLE_IDS["female_protector"],
         ROLE_IDS["male_protector"],
     }
+
+
+def test_game_identity_and_rank_catalogs_are_separate():
+    identity_keys = {role.key for role in GAME_IDENTITY_ROLES}
+    rank_keys = {role.key for role in GAME_RANK_ROLES}
+
+    assert identity_keys == {
+        "delta_desktop",
+        "delta_mobile",
+        "steam_game",
+        "lol_game",
+        "apex_game",
+        "valorant_game",
+    }
+    assert rank_keys == {
+        "lol_elite",
+        "lol_grandmaster",
+        "lol_master",
+        "apex_predator",
+        "apex_master",
+        "apex_diamond",
+        "valorant_radiant",
+        "valorant_immortal",
+        "valorant_ascendant",
+    }
+    assert identity_keys.isdisjoint(rank_keys)
 
 
 def test_game_rank_orders_do_not_inherit_delta_protector_roles():
