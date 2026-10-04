@@ -216,7 +216,8 @@
                 </div>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
-                    <h3>可接單職位</h3>
+                    <h3>接單職位</h3>
+                    <p class="muted-text">店內服務職位：頂護／女護／男護／男陪／女陪。這裡不放遊戲身分或階級。</p>
                     <div style="display:flex; gap:12px; flex-wrap:wrap;">
                         {% for key, label in service_role_labels.items() %}
                         <label>
@@ -233,10 +234,10 @@
                 </div>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
-                    <h3>可接單遊戲階級</h3>
-                    <p class="muted-text">例如輻能、菁英、頂獵；沒有需要可全部不勾。</p>
+                    <h3>階級資格</h3>
+                    <p class="muted-text">只放遊戲技術階級，例如輻能、菁英、頂獵。商品不限制階級時可全部不勾。</p>
                     <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                        {% for key, label in game_role_labels.items() %}
+                        {% for key, label in game_rank_labels.items() %}
                         <label>
                             <input
                                 type="checkbox"
@@ -251,10 +252,10 @@
                 </div>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
-                    <h3>必須具備的遊戲身分</h3>
-                    <p class="muted-text">智慧派單會要求同時符合「可接單資格」與這組遊戲身分。</p>
+                    <h3>遊戲身分</h3>
+                    <p class="muted-text">只放遊戲／平台身分，例如三角洲&lt;端遊&gt;、三角洲&lt;手遊&gt;、APEX。智慧派單會要求同時符合接單職位／階級與遊戲身分。</p>
                     <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                        {% for key, label in game_role_labels.items() %}
+                        {% for key, label in game_identity_labels.items() %}
                         <label>
                             <input
                                 type="checkbox"
