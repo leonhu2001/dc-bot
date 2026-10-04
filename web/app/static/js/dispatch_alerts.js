@@ -139,17 +139,24 @@
         signature: data.signature
       });
 
-      if (lastCount !== null && Number(data.count || 0) > lastCount) {
+      const nextCount = Number(data.count || 0);
+      const hasNewOrder = lastCount !== null && nextCount > lastCount;
+
+      if (hasNewOrder) {
         dingDong();
       }
 
-      lastCount = Number(data.count || 0);
+      lastCount = nextCount;
 
       if (!sameKeys(apiKeys, pageKeys)) {
         console.log('[dispatch-alert] page mismatch, reloading');
 
         if (!shouldSkipReload()) {
-          window.location.reload();
+          if (hasNewOrder && enabled) {
+            setTimeout(() => window.location.reload(), 800);
+          } else {
+            window.location.reload();
+          }
         }
       }
     } catch (err) {
@@ -172,7 +179,7 @@
     setInterval(check, REFRESH_INTERVAL_MS);
     setTimeout(check, 1000);
 
-    console.log('[dispatch-alert] started v6');
+    console.log('[dispatch-alert] started v7');
   }
 
   if (document.readyState === 'loading') {
