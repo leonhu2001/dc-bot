@@ -9,8 +9,10 @@ from shared.db import SessionLocal
 from services.dispatch_presence import (
     count_online_dispatch_workers,
     get_online_dispatch_support_ids,
-    touch_dispatch_presence,
-    touch_dispatch_support_presence,
+)
+from web.app.services.dispatch_access import (
+    can_use_dispatch,
+    touch_dispatch_user_presence,
 )
 from web.app.services.order_service import (
     claim_order_for_worker,
@@ -23,20 +25,6 @@ from web.app.services.order_service import (
 )
 
 router = APIRouter(tags=["dispatch"])
-
-
-def can_use_dispatch(user: dict | None) -> bool:
-    if not user:
-        return False
-
-    return bool(
-        user.get("is_admin")
-        or user.get("is_worker")
-        or user.get("is_companion")
-        or user.get("is_customer_service")
-    )
-
-
 
 def get_dispatch_role_type(user: dict | None) -> str:
     # 網站派單頁不再分舊職位名稱，統一視為接單人員。
@@ -110,24 +98,7 @@ async def dispatch_dashboard(
             status_code=403,
         )
 
-    display_name = (
-        user.get("global_name")
-        or user.get("display_name")
-        or user.get("username")
-        or user.get("id")
-    )
-
-    if user.get("is_worker") or user.get("is_companion"):
-        touch_dispatch_presence(
-            str(user.get("id") or ""),
-            display_name=display_name,
-        )
-
-    if user.get("is_manager") or user.get("is_customer_service"):
-        touch_dispatch_support_presence(
-            str(user.get("id") or ""),
-            display_name=display_name,
-        )
+    touch_dispatch_user_presence(user)
 
     db = SessionLocal()
 
