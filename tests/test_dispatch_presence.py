@@ -57,10 +57,10 @@ def test_dispatch_presence_can_filter_candidates(tmp_path):
 
 
 def test_dispatch_presence_channel_name_reflects_count():
-    assert format_dispatch_presence_channel_name(0) == "🚬┃排隊中。。。。。"
-    assert format_dispatch_presence_channel_name(1) == "🚬┃排隊中。。。。。"
-    assert format_dispatch_presence_channel_name(2) == "🟢┃在線打手2人"
-    assert format_dispatch_presence_channel_name(5) == "🟢┃在線打手5人"
+    assert format_dispatch_presence_channel_name(0) == "⏳｜排隊房・⚫暫無打手"
+    assert format_dispatch_presence_channel_name(1) == "⏳｜排隊房・⚫暫無打手"
+    assert format_dispatch_presence_channel_name(2) == "⏳｜排隊房・🟢在線打手2人"
+    assert format_dispatch_presence_channel_name(5) == "⏳｜排隊房・🟢在線打手5人"
 
 
 def test_dispatch_support_presence_expires_after_timeout(tmp_path):
