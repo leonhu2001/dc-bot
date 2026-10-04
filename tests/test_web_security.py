@@ -373,3 +373,15 @@ def test_nginx_validates_cloudflare_before_setting_real_ip():
     assert "proxy_set_header X-Forwarded-For $remote_addr;" in nginx
     assert "$proxy_add_x_forwarded_for" not in nginx
 
+def test_order_catalog_terms_link_is_not_nested_or_duplicated():
+    template = Path("web/app/templates/order_catalog.html").read_text(
+        encoding="utf-8"
+    )
+
+    assert template.count('class="mw-order-notice-link"') == 1
+    assert '<a class="mw-order-notice-link" href="/service-rules">' not in template
+    assert (
+        'aria-hidden="true" data-web-payment-hidden="1" '
+        'style="display:none !important;" aria-hidden="true"'
+    ) not in template
+
