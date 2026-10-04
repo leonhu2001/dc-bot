@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+from shared.web_order_sync import _order_payout_base_amount
 from shared.payout import calculate_order_payout
 
 
@@ -52,3 +55,21 @@ def test_two_workers_with_named_bonus_for_one_worker():
 
     assert payouts["worker_a"] == 425
     assert payouts["worker_b"] == 400
+
+
+def test_zero_payout_base_does_not_fall_back_to_customer_amount():
+    order = SimpleNamespace(
+        payout_base_amount=0,
+        amount=1000,
+    )
+
+    assert _order_payout_base_amount(order) == 0
+
+
+def test_missing_payout_base_falls_back_to_order_amount():
+    order = SimpleNamespace(
+        payout_base_amount=None,
+        amount=1000,
+    )
+
+    assert _order_payout_base_amount(order) == 1000
