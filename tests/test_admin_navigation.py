@@ -292,6 +292,27 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert 'name="required_game_roles"' in page
 
 
+def test_order_rule_admin_exposes_manager_quick_create_form():
+    page = (TEMPLATES / "admin_order_rules.html").read_text(encoding="utf-8")
+    router = (
+        ROOT / "web" / "app" / "routers" / "admin_order_rules.py"
+    ).read_text(encoding="utf-8")
+
+    assert "＋ 新增商品" in page
+    assert 'action="/admin/order-rules/create"' in page
+    assert "creatable_categories" in page
+    assert 'name="category"' in page
+    assert 'name="{{ option.field }}"' in page
+    assert 'name="required_game_roles"' in page
+    assert 'name="point_benefits_allowed" checked' in page
+
+    assert '@router.post("/admin/order-rules/create")' in router
+    assert "ADMIN_CREATABLE_RULE_CATEGORIES" in router
+    assert "CATEGORY_DEFAULT_GAME_ROLES" in router
+    assert "create_custom_rule_definition(" in router
+    assert 'action="create_order_rule"' in router
+
+
 def test_payout_summary_uses_shared_discord_avatar_resolver():
     page = (TEMPLATES / "admin_payout_summary.html").read_text(encoding="utf-8")
     router = (
