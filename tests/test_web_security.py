@@ -346,3 +346,30 @@ def test_order_credentials_store_access_metadata_but_never_secret_fields(
 
     assert "my-password" not in stored_text
     assert "my-account" not in stored_text
+
+def test_rate_limit_ip_uses_only_nginx_normalized_header():
+    source = Path("web/app/main.py").read_text(encoding="utf-8")
+    start = source.index("def _client_ip(request: Request) -> str:")
+    end = source.index("def _rate_limit_spec", start)
+    body = source[start:end]
+
+    assert 'request.headers.get("x-real-ip")' in body
+    assert 'request.headers.get("cf-connecting-ip")' not in body
+    assert 'request.headers.get("x-forwarded-for")' not in body
+
+
+def test_nginx_validates_cloudflare_before_setting_real_ip():
+    nginx = Path("nginx_dc_bot_dashboard.conf").read_text(encoding="utf-8")
+
+    assert "real_ip_header CF-Connecting-IP;" in nginx
+    assert "real_ip_recursive on;" in nginx
+    assert "set_real_ip_from 173.245.48.0/20;" in nginx
+    assert "set_real_ip_from 104.16.0.0/13;" in nginx
+    assert "set_real_ip_from 2606:4700::/32;" in nginx
+
+    # Forwarded identity sent to FastAPI is fully replaced after Nginx
+    # validation; it must not append an untrusted client-supplied XFF chain.
+    assert "proxy_set_header X-Real-IP $remote_addr;" in nginx
+    assert "proxy_set_header X-Forwarded-For $remote_addr;" in nginx
+    assert "$proxy_add_x_forwarded_for" not in nginx
+
