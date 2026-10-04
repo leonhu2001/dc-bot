@@ -398,6 +398,7 @@ from views.smart_dispatch import (
     send_specified_staff_dispatch_dms,
     smart_dispatch_escalation_loop,
 )
+from views.dispatch_presence import dispatch_presence_channel_loop
 
 from views.web_support_bridge import (
     WebSupportActionView,
@@ -563,6 +564,9 @@ WEB_SUPPORT_CHANNEL_ID = COMPLAINT_RECEIVE_CHANNEL_ID
 # 派單頻道 ID
 DISPATCH_CHANNEL_ID = 1483868763446186036
 
+# 接單大廳在線人數顯示頻道；0 代表停用。
+DISPATCH_ONLINE_CHANNEL_ID = 1483183532330455040
+
 # 評價頻道 ID
 REVIEW_CHANNEL_ID = 1482998033091268691
 
@@ -637,6 +641,10 @@ FEEDBACK_PANEL_CHANNEL_ID = _config_int("FEEDBACK_PANEL_CHANNEL_ID", FEEDBACK_PA
 COMPLAINT_RECEIVE_CHANNEL_ID = _config_int("COMPLAINT_RECEIVE_CHANNEL_ID", COMPLAINT_RECEIVE_CHANNEL_ID)
 WEB_SUPPORT_CHANNEL_ID = _config_int("WEB_SUPPORT_CHANNEL_ID", COMPLAINT_RECEIVE_CHANNEL_ID)
 DISPATCH_CHANNEL_ID = _config_int("DISPATCH_CHANNEL_ID", DISPATCH_CHANNEL_ID)
+DISPATCH_ONLINE_CHANNEL_ID = _config_int(
+    "DISPATCH_ONLINE_CHANNEL_ID",
+    DISPATCH_ONLINE_CHANNEL_ID,
+)
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
 CREDENTIAL_OWNER_USER_ID = _config_int("CREDENTIAL_OWNER_USER_ID", CREDENTIAL_OWNER_USER_ID)
@@ -3959,6 +3967,22 @@ async def on_ready():
         bot._smart_dispatch_worker_started = True
         bot.loop.create_task(smart_dispatch_escalation_loop(bot))
         print("[smart-dispatch] escalation worker started", flush=True)
+
+    if (
+        DISPATCH_ONLINE_CHANNEL_ID
+        and not getattr(bot, "_dispatch_presence_worker_started", False)
+    ):
+        bot._dispatch_presence_worker_started = True
+        bot.loop.create_task(
+            dispatch_presence_channel_loop(
+                bot,
+                channel_id=DISPATCH_ONLINE_CHANNEL_ID,
+            )
+        )
+        print(
+            "[dispatch-presence] channel sync worker started",
+            flush=True,
+        )
 
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0

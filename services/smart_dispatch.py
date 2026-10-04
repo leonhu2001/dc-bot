@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from services.dispatch_presence import get_online_dispatch_worker_ids
+
 TAIPEI_TZ = timezone(timedelta(hours=8))
 logger = logging.getLogger(__name__)
 FIRST_EXPANSION_SECONDS = 180
@@ -446,6 +448,13 @@ def rank_dispatch_candidates(
         db_file=db_file,
         now_taipei=now_taipei,
     )
+    online = set(
+        get_online_dispatch_worker_ids(
+            candidate_ids=deduped,
+            db_file=db_file,
+            now=now_taipei,
+        )
+    )
 
     def key(worker_id: str):
         item = metrics.get(worker_id) or {}
@@ -460,6 +469,7 @@ def rank_dispatch_candidates(
 
         return (
             0 if worker_id in specified else 1,
+            0 if worker_id in online else 1,
             0 if worker_id in priority else 1,
             int(item.get("active_count") or 0),
             int(item.get("today_count") or 0),

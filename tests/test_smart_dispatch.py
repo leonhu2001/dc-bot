@@ -317,6 +317,30 @@ def test_rank_dispatch_candidates_prefers_priority_after_specified(tmp_path):
     assert ranked == ["S", "VIP", "A"]
 
 
+def test_rank_dispatch_candidates_prefers_online_after_specified(tmp_path):
+    from services.dispatch_presence import touch_dispatch_presence
+
+    db_path = tmp_path / "web_dashboard.db"
+    _setup_assignment_db(db_path)
+    now = datetime(2026, 10, 2, 12, 0, tzinfo=TAIPEI_TZ)
+
+    touch_dispatch_presence(
+        "ONLINE",
+        db_file=db_path,
+        now=now,
+    )
+
+    ranked = smart_dispatch.rank_dispatch_candidates(
+        ["OFFLINE", "VIP", "ONLINE", "S"],
+        specified_staff_ids=["S"],
+        priority_staff_ids=["VIP"],
+        db_file=db_path,
+        now_taipei=now,
+    )
+
+    assert ranked == ["S", "ONLINE", "VIP", "OFFLINE"]
+
+
 def test_rank_dispatch_candidates_prefers_specified_then_low_load(tmp_path):
     db_path = tmp_path / "web_dashboard.db"
     _setup_assignment_db(db_path)

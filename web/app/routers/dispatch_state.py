@@ -3,6 +3,7 @@ import sqlite3
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from services.dispatch_presence import touch_dispatch_presence
 from web.app.config import config
 
 router = APIRouter(tags=["dispatch_state"])
@@ -20,6 +21,22 @@ async def dispatch_state(request: Request):
     user = request.session.get("user")
     if not user:
         return JSONResponse({"ok": False, "error": "not_logged_in"}, status_code=401)
+
+    presence_online = bool(
+        user.get("is_worker")
+        or user.get("is_companion")
+    )
+
+    if presence_online:
+        touch_dispatch_presence(
+            str(user.get("id") or ""),
+            display_name=(
+                user.get("global_name")
+                or user.get("display_name")
+                or user.get("username")
+                or user.get("id")
+            ),
+        )
 
     conn = sqlite3.connect(get_sqlite_path())
     conn.row_factory = sqlite3.Row
@@ -75,6 +92,7 @@ async def dispatch_state(request: Request):
 
         return {
             "ok": True,
+            "presence_online": presence_online,
             "count": len(orders),
             "keys": [order["key"] for order in orders],
             "signature": signature,
