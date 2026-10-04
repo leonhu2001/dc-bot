@@ -3,7 +3,10 @@ import sqlite3
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from services.dispatch_presence import touch_dispatch_presence
+from services.dispatch_presence import (
+    touch_dispatch_presence,
+    touch_dispatch_support_presence,
+)
 from web.app.config import config
 
 router = APIRouter(tags=["dispatch_state"])
@@ -22,20 +25,31 @@ async def dispatch_state(request: Request):
     if not user:
         return JSONResponse({"ok": False, "error": "not_logged_in"}, status_code=401)
 
+    display_name = (
+        user.get("global_name")
+        or user.get("display_name")
+        or user.get("username")
+        or user.get("id")
+    )
     presence_online = bool(
         user.get("is_worker")
         or user.get("is_companion")
+    )
+    support_presence_online = bool(
+        user.get("is_manager")
+        or user.get("is_customer_service")
     )
 
     if presence_online:
         touch_dispatch_presence(
             str(user.get("id") or ""),
-            display_name=(
-                user.get("global_name")
-                or user.get("display_name")
-                or user.get("username")
-                or user.get("id")
-            ),
+            display_name=display_name,
+        )
+
+    if support_presence_online:
+        touch_dispatch_support_presence(
+            str(user.get("id") or ""),
+            display_name=display_name,
         )
 
     conn = sqlite3.connect(get_sqlite_path())
@@ -93,6 +107,7 @@ async def dispatch_state(request: Request):
         return {
             "ok": True,
             "presence_online": presence_online,
+            "support_presence_online": support_presence_online,
             "count": len(orders),
             "keys": [order["key"] for order in orders],
             "signature": signature,
