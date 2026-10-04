@@ -216,55 +216,55 @@
                 </div>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
-                    <h3>接單職位</h3>
-                    <p class="muted-text">店內服務職位：頂護／女護／男護／男陪／女陪。這裡不放遊戲身分或階級。</p>
-                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                        {% for key, label in service_role_labels.items() %}
-                        <label>
-                            <input
-                                type="checkbox"
-                                name="allowed_roles"
-                                value="{{ key }}"
-                                {% if key in payload.get('allowed_roles', []) %}checked{% endif %}
-                            >
-                            {{ label }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="panel compact-panel" style="margin-top:12px;">
                     <h3>階級資格</h3>
-                    <p class="muted-text">只放遊戲技術階級，例如輻能、菁英、頂獵。商品不限制階級時可全部不勾。</p>
-                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                        {% for key, label in game_rank_labels.items() %}
-                        <label>
-                            <input
-                                type="checkbox"
-                                name="allowed_game_roles"
-                                value="{{ key }}"
-                                {% if key in payload.get('allowed_game_roles', []) %}checked{% endif %}
-                            >
-                            {{ label }}
-                        </label>
+                    <p class="muted-text">職位與遊戲階級統一在這裡管理；依遊戲分列。三角洲使用頂護／女護／男護，全局職位則是男陪／女陪。</p>
+                    <div class="rule-role-groups">
+                        {% for group in qualification_groups %}
+                        <div class="rule-role-row">
+                            <strong class="rule-role-group-label">{{ group.label }}</strong>
+                            <div class="rule-role-options">
+                                {% if group.options %}
+                                    {% for option in group.options %}
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            name="{{ option.field }}"
+                                            value="{{ option.key }}"
+                                            {% if option.key in payload.get(option.field, []) %}checked{% endif %}
+                                        >
+                                        {{ option.label }}
+                                    </label>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="muted-text">無額外階級資格</span>
+                                {% endif %}
+                            </div>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
                     <h3>遊戲身分</h3>
-                    <p class="muted-text">只放遊戲／平台身分，例如三角洲&lt;端遊&gt;、三角洲&lt;手遊&gt;、APEX。智慧派單會要求同時符合接單職位／階級與遊戲身分。</p>
-                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                        {% for key, label in game_identity_labels.items() %}
-                        <label>
-                            <input
-                                type="checkbox"
-                                name="required_game_roles"
-                                value="{{ key }}"
-                                {% if key in payload.get('required_game_roles', []) %}checked{% endif %}
-                            >
-                            {{ label }}
-                        </label>
+                    <p class="muted-text">遊戲／平台身分獨立管理；智慧派單會同時檢查上方階級資格與這裡的遊戲身分。</p>
+                    <div class="rule-role-groups">
+                        {% for group in game_identity_groups %}
+                        <div class="rule-role-row">
+                            <strong class="rule-role-group-label">{{ group.label }}</strong>
+                            <div class="rule-role-options">
+                                {% for option in group.options %}
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="required_game_roles"
+                                        value="{{ option.key }}"
+                                        {% if option.key in payload.get('required_game_roles', []) %}checked{% endif %}
+                                    >
+                                    {{ option.label }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>
@@ -345,9 +345,39 @@
 </div>
 
 <style>
+.rule-role-groups {
+    display: grid;
+    gap: 8px;
+}
+.rule-role-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    min-height: 42px;
+    padding: 9px 10px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 9px;
+    background: rgba(255,255,255,.015);
+}
+.rule-role-group-label {
+    color: var(--r5-gold-soft, #f2d68d);
+}
+.rule-role-options {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+}
 @media (max-width: 980px) {
     main > div[style*="grid-template-columns"] {
         grid-template-columns: 1fr !important;
+    }
+}
+@media (max-width: 680px) {
+    .rule-role-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
     }
 }
 </style>
