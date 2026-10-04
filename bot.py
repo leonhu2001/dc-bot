@@ -3916,6 +3916,7 @@ async def process_acceptance_sync_events_once() -> None:
                 .values(
                     status=SyncEventStatus.PROCESSING.value,
                     retry_count=int(event.retry_count or 0) + 1,
+                    processed_at=datetime.utcnow(),
                 )
             )
             db.commit()
@@ -15227,6 +15228,18 @@ def _web_sync_fetch_pending_events(limit: int = 10) -> list[dict]:
     try:
         conn.execute("BEGIN IMMEDIATE")
 
+        # Recover sync rows left in processing if a previous Bot process died
+        # after claiming them. processed_at doubles as the current attempt timestamp.
+        conn.execute(
+            """
+            UPDATE sync_events
+            SET status = 'pending'
+            WHERE status = 'processing'
+              AND processed_at IS NOT NULL
+              AND processed_at <= datetime('now', '-10 minutes')
+            """
+        )
+
         rows = conn.execute(
             """
             SELECT
@@ -15265,7 +15278,8 @@ def _web_sync_fetch_pending_events(limit: int = 10) -> list[dict]:
             cursor = conn.execute(
                 f"""
                 UPDATE sync_events
-                SET status = 'processing'
+                SET status = 'processing',
+                    processed_at = datetime('now')
                 WHERE status = 'pending'
                   AND id IN ({placeholders})
                 """,
