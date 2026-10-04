@@ -267,18 +267,42 @@ def test_dashboard_has_no_literal_newline_and_support_rows_have_no_link_underlin
     assert "text-decoration:none" in center
 
 
-def test_order_rule_admin_hides_legacy_categories_and_separates_role_groups():
+def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_game():
     routers = ROOT / "web" / "app" / "routers"
     source = (routers / "admin_order_rules.py").read_text(encoding="utf-8")
     page = (TEMPLATES / "admin_order_rules.html").read_text(encoding="utf-8")
 
     assert 'ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}' in source
-    assert "game_rank_labels" in source
-    assert "game_identity_labels" in source
-    assert "game_rank_labels.items()" in page
-    assert "game_identity_labels.items()" in page
-    assert "game_role_labels.items()" not in page
-    assert "<h3>接單職位</h3>" in page
-    assert "<h3>階級資格</h3>" in page
+    assert "QUALIFICATION_GROUPS" in source
+    assert "GAME_IDENTITY_GROUPS" in source
+    assert '"label": "全局職位"' in source
+    assert '"label": "三角洲"' in source
+    assert '"key": "top_protector"' in source
+    assert '"key": "female_protector"' in source
+    assert '"key": "male_protector"' in source
+    assert '"key": "male_companion"' in source
+    assert '"key": "female_companion"' in source
+
+    assert "<h3>接單職位</h3>" not in page
+    assert page.count("<h3>階級資格</h3>") == 1
     assert "<h3>遊戲身分</h3>" in page
+    assert "qualification_groups" in page
+    assert "game_identity_groups" in page
+    assert 'name="{{ option.field }}"' in page
+    assert 'name="required_game_roles"' in page
+
+
+def test_payout_summary_uses_shared_discord_avatar_resolver():
+    page = (TEMPLATES / "admin_payout_summary.html").read_text(encoding="utf-8")
+    router = (
+        ROOT / "web" / "app" / "routers" / "admin_payout_summary.py"
+    ).read_text(encoding="utf-8")
+
+    assert "discord_avatar(" in page
+    assert '"staff-avatar-img"' in page
+    assert "row.avatar_url" not in page
+    assert (
+        "summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)"
+        in router
+    )
 
