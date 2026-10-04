@@ -398,7 +398,10 @@ from views.smart_dispatch import (
     send_specified_staff_dispatch_dms,
     smart_dispatch_escalation_loop,
 )
-from views.dispatch_presence import dispatch_presence_channel_loop
+from views.dispatch_presence import (
+    dispatch_presence_channel_loop,
+    dispatch_support_presence_channel_loop,
+)
 
 from views.web_support_bridge import (
     WebSupportActionView,
@@ -567,6 +570,9 @@ DISPATCH_CHANNEL_ID = 1483868763446186036
 # 接單大廳在線人數顯示頻道；0 代表停用。
 DISPATCH_ONLINE_CHANNEL_ID = 1483183532330455040
 
+# 客服 / 總管在線狀態顯示頻道；0 代表停用。
+DISPATCH_SUPPORT_ONLINE_CHANNEL_ID = 1497622678138519572
+
 # 評價頻道 ID
 REVIEW_CHANNEL_ID = 1482998033091268691
 
@@ -644,6 +650,10 @@ DISPATCH_CHANNEL_ID = _config_int("DISPATCH_CHANNEL_ID", DISPATCH_CHANNEL_ID)
 DISPATCH_ONLINE_CHANNEL_ID = _config_int(
     "DISPATCH_ONLINE_CHANNEL_ID",
     DISPATCH_ONLINE_CHANNEL_ID,
+)
+DISPATCH_SUPPORT_ONLINE_CHANNEL_ID = _config_int(
+    "DISPATCH_SUPPORT_ONLINE_CHANNEL_ID",
+    DISPATCH_SUPPORT_ONLINE_CHANNEL_ID,
 )
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
@@ -3981,6 +3991,22 @@ async def on_ready():
         )
         print(
             "[dispatch-presence] channel sync worker started",
+            flush=True,
+        )
+
+    if (
+        DISPATCH_SUPPORT_ONLINE_CHANNEL_ID
+        and not getattr(bot, "_dispatch_support_presence_worker_started", False)
+    ):
+        bot._dispatch_support_presence_worker_started = True
+        bot.loop.create_task(
+            dispatch_support_presence_channel_loop(
+                bot,
+                channel_id=DISPATCH_SUPPORT_ONLINE_CHANNEL_ID,
+            )
+        )
+        print(
+            "[dispatch-support-presence] channel sync worker started",
             flush=True,
         )
 
