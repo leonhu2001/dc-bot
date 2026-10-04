@@ -259,9 +259,31 @@ def history_effective_closed_date(order) -> str:
 
 
 
+def history_date_value(value) -> str:
+    """Normalize a stored datetime or date input to the calendar date only."""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+
+    text = str(value or "").strip()
+    if not text:
+        return ""
+
+    if len(text) > 10 and text[10] not in {" ", "T"}:
+        return ""
+
+    date_text = text[:10]
+
+    try:
+        parsed = datetime.strptime(date_text, "%Y-%m-%d")
+    except ValueError:
+        return ""
+
+    return parsed.strftime("%Y-%m-%d")
+
+
 def history_closed_date_input_value(order) -> str:
     """給歷史訂單編輯欄位使用：只使用真正 closed_at，不用 updated_at / created_at fallback。"""
-    return history_normalize_date(getattr(order, "closed_at", None))
+    return history_date_value(getattr(order, "closed_at", None))
 
 
 def history_should_update_closed_at(current_closed_at, submitted_closed_at: str) -> bool:
@@ -273,28 +295,14 @@ def history_should_update_closed_at(current_closed_at, submitted_closed_at: str)
     current = history_normalize_date(current_closed_at)
     return submitted != current
 
-def history_normalize_date(value: str | None) -> str:
-    """把 input type=date 的 YYYY-MM-DD 轉成可存進 SQLite 的 datetime 字串。"""
-    value = str(value or "").strip()
 
-    if not value:
+def history_normalize_date(value) -> str:
+    """把日期或既有 datetime 正規化成可存進 SQLite 的日末時間。"""
+    date_text = history_date_value(value)
+    if not date_text:
         return ""
 
-    # input type=date 正常只會送 YYYY-MM-DD；這裡保守檢查避免亂字串進 DB。
-    parts = value.split("-")
-
-    if len(parts) != 3:
-        return ""
-
-    year, month, day = parts
-
-    if not (year.isdigit() and month.isdigit() and day.isdigit()):
-        return ""
-
-    if len(year) != 4 or len(month) != 2 or len(day) != 2:
-        return ""
-
-    return f"{year}-{month}-{day} 23:59:59"
+    return f"{date_text} 23:59:59"
 
 
 def history_db_path() -> str:
@@ -1157,7 +1165,6 @@ async def admin_order_history(
             "assignments_by_order_id": history_assignments_by_order([int(order.id) for order in orders]),
             "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "manual_payout_overrides": history_manual_payout_overrides([int(order.id) for order in orders]),
-            "payouts_by_order_id": fetch_history_payouts([int(order.id) for order in orders]),
             "current_status": status,
             "month_filter": month_filter,
             "month_options": list_history_month_options(),
