@@ -282,6 +282,24 @@
     }
   }
 
+  async function primeKnownKeys() {
+    try {
+      const res = await fetch('/dispatch/state?t=' + Date.now(), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data && data.ok) {
+        knownKeys = normalizeKeys(data.keys || []);
+      }
+    } catch (err) {
+      console.warn('[dispatch-alert] initial state failed', err);
+    }
+  }
+
   function connectDispatchEvents() {
     if (eventSource) {
       eventSource.close();
@@ -376,6 +394,7 @@
     makeButton();
     installAudioUnlockFallback();
     installDispatchFormSoftSubmit();
+    await primeKnownKeys();
     connectDispatchEvents();
 
     setInterval(() => {
