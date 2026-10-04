@@ -11,8 +11,8 @@ from services.dispatch_presence import (
 
 
 DEFAULT_IDLE_CHANNEL_NAME = "🚬┃排隊中。。。。。"
-DEFAULT_SUPPORT_IDLE_CHANNEL_NAME = "📞┃聯繫客服"
-SUPPORT_ONLINE_CHANNEL_NAME = "📞┃客服在線"
+DEFAULT_SUPPORT_IDLE_CHANNEL_NAME = "🛎️┃點單・服務大廳"
+SUPPORT_ONLINE_CHANNEL_NAME = "🟢┃點單・服務大廳"
 
 
 def format_dispatch_presence_channel_name(count: int) -> str:
