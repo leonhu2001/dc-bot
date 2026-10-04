@@ -926,11 +926,11 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
     return "｜".join(parts), payment_method
 
 
-def _resolve_guild_member_mention(
+def _resolve_guild_customer_display_name(
     source_channel: discord.TextChannel,
     mention_text: str | None,
 ) -> str:
-    """Prefer a clickable guild mention; fall back to the saved display name."""
+    """Show a stable customer name so embed viewers never see a raw Discord ID."""
     text = str(mention_text or "").strip()
 
     if not text:
@@ -952,7 +952,14 @@ def _resolve_guild_member_mention(
     member = guild.get_member(user_id) if guild is not None else None
 
     if member is not None:
-        return member.mention
+        live_name = str(
+            getattr(member, "display_name", None)
+            or getattr(member, "global_name", None)
+            or getattr(member, "name", None)
+            or ""
+        ).strip()
+        if live_name and live_name != str(user_id):
+            return live_name
 
     source_channel_id = getattr(source_channel, "id", None)
 
@@ -1002,7 +1009,7 @@ def build_self_service_order_embed(
         color = discord.Color.green()
 
     ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
-    customer_text = _resolve_guild_member_mention(
+    customer_text = _resolve_guild_customer_display_name(
         source_channel,
         customer_mention,
     )

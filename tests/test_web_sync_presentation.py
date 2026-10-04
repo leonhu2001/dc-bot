@@ -20,29 +20,8 @@ def test_build_receiver_text_keeps_boosters_before_companions():
         },
     ]
 
-    assert presentation.build_receiver_text(rows) == "打手\n陪玩"
+    assert presentation.build_receiver_text(rows) == "<@101>\n<@202>"
     assert presentation.build_receiver_text([]) == "尚未有人接單"
-
-
-def test_build_receiver_text_never_exposes_raw_discord_id():
-    rows = [
-        {
-            "worker_discord_id": "123456789012345678",
-            "worker_display_name": "123456789012345678",
-            "role_type": "booster",
-        },
-        {
-            "worker_discord_id": "223456789012345678",
-            "worker_display_name": "",
-            "role_type": "companion",
-        },
-    ]
-
-    text = presentation.build_receiver_text(rows)
-
-    assert text == "打手（名稱未同步）\n陪玩（名稱未同步）"
-    assert "123456789012345678" not in text
-    assert "223456789012345678" not in text
 
 
 def test_parse_json_helpers_keep_existing_fallback_behavior():

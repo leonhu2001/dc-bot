@@ -6565,6 +6565,30 @@ async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
     assignments = _web_sync_get_assignments(int(event["order_id"]))
     receiver_text = _web_sync_build_receiver_text(assignments)
 
+    customer_id = _to_int(event.get("customer_discord_id"))
+    customer_text = str(event.get("customer_display_name") or "").strip()
+
+    guild = getattr(channel, "guild", None)
+    if customer_id is not None and guild is not None:
+        member = guild.get_member(customer_id)
+        if member is None:
+            try:
+                fetched = await guild.fetch_member(customer_id)
+                member = fetched if isinstance(fetched, discord.Member) else None
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                member = None
+
+        if member is not None:
+            customer_text = str(
+                getattr(member, "display_name", None)
+                or getattr(member, "global_name", None)
+                or getattr(member, "name", None)
+                or customer_text
+            ).strip()
+
+    if customer_id is not None and customer_text == str(customer_id):
+        customer_text = ""
+
     # 網頁接單同步到 DC bot 記憶體，讓 Discord 的取消接單按鈕也認得。
     claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
     claim_data["booster"] = set()
@@ -6604,6 +6628,22 @@ async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
         )
 
     embed = _web_sync_embed_without_receiver_fields(embed)
+
+    if customer_text:
+        existing_fields = list(embed.fields)
+        embed.clear_fields()
+        for field in existing_fields:
+            field_name = str(field.name or "").strip()
+            embed.add_field(
+                name=field.name,
+                value=(
+                    customer_text
+                    if field_name in {"顧客", "下單用戶"}
+                    else field.value
+                ),
+                inline=field.inline,
+            )
+
     embed.add_field(
         name="目前接單",
         value=receiver_text,
@@ -6641,7 +6681,9 @@ async def repair_active_web_sync_dispatch_panels_once(
             SELECT
                 id AS order_id,
                 dispatch_channel_id,
-                dispatch_message_id
+                dispatch_message_id,
+                customer_discord_id,
+                customer_display_name
             FROM web_orders
             WHERE status IN ('active', 'stored')
               AND dispatch_channel_id IS NOT NULL
