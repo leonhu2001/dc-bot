@@ -6147,9 +6147,6 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
 
-    if dispatch_channel is None or not isinstance(dispatch_channel, discord.TextChannel):
-        return
-
     # 優先鎖 orders 目前記錄的派單訊息，同時補抓所有 claims 裡來源票口相同的派單訊息。
     candidate_message_ids: list[int] = []
 
@@ -6186,11 +6183,6 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     newest_existing_message_id: int | None = None
 
     for dispatch_message_id in candidate_message_ids:
-        try:
-            message = await dispatch_channel.fetch_message(dispatch_message_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            continue
-
         claim_data = ORDER_CLAIMS.setdefault(
             dispatch_message_id,
             {
@@ -6200,7 +6192,8 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             }
         )
 
-        # 若是舊資料，補齊缺少欄位。
+        # 先把 canonical claim 狀態終結並移除持久化資料。
+        # Discord 訊息即使已被刪除／無權限讀取，也不能讓 bot.db 留著 active claim。
         claim_data["customer_id"] = claim_data.get("customer_id") or customer_id
         claim_data["category_label"] = claim_data.get("category_label") or category_label
         claim_data["item"] = claim_data.get("item") or item
@@ -6211,6 +6204,15 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
         claim_data["dispatch_channel_id"] = dispatch_channel_id
         claim_data["locked"] = True
         claim_data["status"] = "closed"
+        remember_claim_data(dispatch_message_id, claim_data)
+
+        if not isinstance(dispatch_channel, discord.TextChannel):
+            continue
+
+        try:
+            message = await dispatch_channel.fetch_message(dispatch_message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            continue
 
         companion_ids = sorted(claim_data.get("companion", set()))
         booster_ids = sorted(claim_data.get("booster", set()))
@@ -6262,16 +6264,16 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
             )
             locked_any = True
             newest_existing_message_id = dispatch_message_id
-            remember_claim_data(dispatch_message_id, claim_data)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             continue
 
-    if locked_any:
-        # 用實際成功鎖定的最新派單訊息覆蓋，避免之後再找到舊面板。
-        if newest_existing_message_id is not None:
-            data["dispatch_message_id"] = newest_existing_message_id
-        remember_order_data(order_channel_id, data)
-        save_bot_data()
+    # 用實際成功鎖定的最新派單訊息覆蓋，避免之後再找到舊面板。
+    if newest_existing_message_id is not None:
+        data["dispatch_message_id"] = newest_existing_message_id
+
+    # 即使 Discord panel 已不存在，訂單與 claim 的 final 狀態仍必須落地。
+    remember_order_data(order_channel_id, data)
+    save_bot_data()
 
 
 
