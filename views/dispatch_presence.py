@@ -10,16 +10,16 @@ from services.dispatch_presence import (
 )
 
 
-DEFAULT_IDLE_CHANNEL_NAME = "⏳｜排隊房・⚫暫無陪玩"
+DEFAULT_IDLE_CHANNEL_NAME = "⚫┃暫無陪玩"
 DEFAULT_SUPPORT_IDLE_CHANNEL_NAME = "🛎️┃點單・服務大廳"
 SUPPORT_ONLINE_CHANNEL_NAME = "🟢┃點單・服務大廳"
 
 
 def format_dispatch_presence_channel_name(count: int) -> str:
     online_count = max(0, int(count or 0))
-    if online_count < 2:
+    if online_count <= 0:
         return DEFAULT_IDLE_CHANNEL_NAME
-    return f"⏳｜排隊房・🟢在線陪玩{online_count}人"
+    return f"🟢┃陪玩{online_count}人"
 
 
 async def dispatch_presence_channel_loop(
