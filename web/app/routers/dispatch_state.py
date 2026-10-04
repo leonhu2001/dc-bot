@@ -146,14 +146,15 @@ def _dispatch_event_snapshot() -> dict:
         str(row["bot_order_no"] or f"WEB-{row['id']}")
         for row in rows
     ]
-    signature = "|".join(
-        (
-            f"{row['id']}:{row['bot_order_no'] or f'WEB-{row['id']}'}:"
-            f"{row['updated_at'] or ''}:{row['amount'] or 0}:"
-            f"{row['quantity'] or 0}:{row['status'] or ''}"
+    signature_parts = []
+    for row in rows:
+        order_key = row["bot_order_no"] or f"WEB-{row['id']}"
+        signature_parts.append(
+            f"{row['id']}:{order_key}:{row['updated_at'] or ''}:"
+            f"{row['amount'] or 0}:{row['quantity'] or 0}:"
+            f"{row['status'] or ''}"
         )
-        for row in rows
-    )
+    signature = "|".join(signature_parts)
 
     return {
         "count": len(rows),
