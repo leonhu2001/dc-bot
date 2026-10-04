@@ -72,3 +72,17 @@ def test_acceptance_worker_is_single_owner_for_claim_events():
     assert "await _refresh_existing_web_sync_dispatch(" in body
     assert "Legacy claim events already completed" in body
 
+def test_cs_dispatch_failure_does_not_claim_rollback_succeeded_when_it_failed():
+    source = Path("bot.py").read_text(encoding="utf-8")
+
+    marker = source.index("[web-order-create] ")
+    start = source.rfind("except Exception as exc:", 0, marker)
+    end = source.index("# MAWAN_R12_WEBSITE_PENDING_CANCEL", marker)
+    body = source[start:end]
+
+    assert "rollback_error = None" in body
+    assert "except Exception as rollback_exc:" in body
+    assert "CS dispatch rollback failed" in body
+    assert "if rollback_error is None:" in body
+    assert "訂單狀態沒有成功恢復" in body
+
