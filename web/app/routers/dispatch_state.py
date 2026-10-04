@@ -6,13 +6,17 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from services.dispatch_presence import (
-    touch_dispatch_presence,
-    touch_dispatch_support_presence,
-)
 from web.app.config import config
+from web.app.services.dispatch_access import (
+    can_use_dispatch,
+    touch_dispatch_user_presence,
+)
+from web.app.services.order_service import VISIBLE_DISPATCH_STATUSES
 
 router = APIRouter(tags=["dispatch_state"])
+
+_VISIBLE_STATUS_VALUES = tuple(VISIBLE_DISPATCH_STATUSES)
+_VISIBLE_STATUS_PLACEHOLDERS = ", ".join("?" for _ in _VISIBLE_STATUS_VALUES)
 
 
 def get_sqlite_path() -> str:
@@ -28,39 +32,14 @@ async def dispatch_state(request: Request):
     if not user:
         return JSONResponse({"ok": False, "error": "not_logged_in"}, status_code=401)
 
-    display_name = (
-        user.get("global_name")
-        or user.get("display_name")
-        or user.get("username")
-        or user.get("id")
-    )
-    presence_online = bool(
-        user.get("is_worker")
-        or user.get("is_companion")
-    )
-    support_presence_online = bool(
-        user.get("is_manager")
-        or user.get("is_customer_service")
-    )
-
-    if presence_online:
-        touch_dispatch_presence(
-            str(user.get("id") or ""),
-            display_name=display_name,
-        )
-
-    if support_presence_online:
-        touch_dispatch_support_presence(
-            str(user.get("id") or ""),
-            display_name=display_name,
-        )
+    presence_online, support_presence_online = touch_dispatch_user_presence(user)
 
     conn = sqlite3.connect(get_sqlite_path())
     conn.row_factory = sqlite3.Row
 
     try:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 id,
                 bot_order_no,
@@ -76,9 +55,10 @@ async def dispatch_state(request: Request):
                 updated_at,
                 created_at
             FROM web_orders
-            WHERE status IN ('active', 'waiting_acceptance', 'accepted_pending_pay')
+            WHERE status IN ({_VISIBLE_STATUS_PLACEHOLDERS})
             ORDER BY id ASC
-            """
+            """,
+            _VISIBLE_STATUS_VALUES,
         ).fetchall()
 
         orders = []
@@ -126,7 +106,7 @@ def _dispatch_event_snapshot() -> dict:
 
     try:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 id,
                 bot_order_no,
@@ -135,9 +115,10 @@ def _dispatch_event_snapshot() -> dict:
                 quantity,
                 status
             FROM web_orders
-            WHERE status IN ('active', 'waiting_acceptance', 'accepted_pending_pay')
+            WHERE status IN ({_VISIBLE_STATUS_PLACEHOLDERS})
             ORDER BY id ASC
-            """
+            """,
+            _VISIBLE_STATUS_VALUES,
         ).fetchall()
     finally:
         conn.close()
@@ -163,27 +144,6 @@ def _dispatch_event_snapshot() -> dict:
     }
 
 
-def _touch_dispatch_stream_presence(user: dict) -> None:
-    display_name = (
-        user.get("global_name")
-        or user.get("display_name")
-        or user.get("username")
-        or user.get("id")
-    )
-
-    if user.get("is_worker") or user.get("is_companion"):
-        touch_dispatch_presence(
-            str(user.get("id") or ""),
-            display_name=display_name,
-        )
-
-    if user.get("is_manager") or user.get("is_customer_service"):
-        touch_dispatch_support_presence(
-            str(user.get("id") or ""),
-            display_name=display_name,
-        )
-
-
 @router.get("/dispatch/events")
 async def dispatch_events(request: Request):
     user = request.session.get("user")
@@ -193,12 +153,7 @@ async def dispatch_events(request: Request):
             status_code=401,
         )
 
-    if not (
-        user.get("is_admin")
-        or user.get("is_worker")
-        or user.get("is_companion")
-        or user.get("is_customer_service")
-    ):
+    if not can_use_dispatch(user):
         return JSONResponse(
             {"ok": False, "error": "forbidden"},
             status_code=403,
@@ -218,7 +173,7 @@ async def dispatch_events(request: Request):
             now = time.monotonic()
 
             if now - last_presence_touch >= 20:
-                _touch_dispatch_stream_presence(user)
+                touch_dispatch_user_presence(user)
                 last_presence_touch = now
 
             snapshot = _dispatch_event_snapshot()
