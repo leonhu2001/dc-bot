@@ -7,17 +7,27 @@ from services.orders import ORDER_CATEGORY_LABELS, _to_int
 
 
 def build_receiver_text(assignments: list[dict[str, Any]]) -> str:
+    """Build viewer-stable staff labels without relying on Discord mention resolution."""
     companions: list[str] = []
     boosters: list[str] = []
 
     for row in assignments:
         user_id = str(row.get("worker_discord_id") or "").strip()
         role_type = str(row.get("role_type") or "booster").strip()
+        display_name = str(row.get("worker_display_name") or "").strip()
 
         if not user_id:
             continue
 
-        text = f"<@{user_id}>"
+        # Raw <@ID> mentions inside embeds can render as a numeric ID for some
+        # viewers/clients. Prefer the persisted server display name so everyone
+        # sees the same label. Never fall back to exposing the Discord ID.
+        if display_name and display_name != user_id:
+            text = display_name
+        elif role_type == "companion":
+            text = "陪玩（名稱未同步）"
+        else:
+            text = "打手（名稱未同步）"
 
         if role_type == "companion":
             companions.append(text)
