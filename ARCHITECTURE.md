@@ -16,7 +16,7 @@ bot.py 仍是主入口，短期不一次大拆，避免正式營運出問題。
 ## Services
 
 - services/order_flow/：訂單流程、付款、結單、存單
-- services/web_sync/：Discord 與接單網頁同步
+- services/web_sync/：Discord 與接單網頁同步\n  - event_store.py：Web→Bot sync event 的 atomic claim、stale recovery、完成/失敗狀態與接單人查詢
 
 ## Views
 
@@ -30,4 +30,4 @@ bot.py 仍是主入口，短期不一次大拆，避免正式營運出問題。
 2. 一次性 patch 成功後要刪除。
 3. 正式設定與 token 不進 Git。
 4. 每次部署前都要 py_compile。
-5. 部署後要看 systemctl status 與 journalctl。
+5. 部署後要看 systemctl status 與 journalctl。\n6. Web→Bot 同步的資料庫存取集中在 services/web_sync/event_store.py；bot.py 只負責 Discord runtime 與畫面更新。
