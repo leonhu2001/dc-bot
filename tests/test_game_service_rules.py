@@ -21,6 +21,10 @@ from web.app.services.checkout_preview import (
     point_item_status,
 )
 from web.app.services.role_catalog import can_login_dashboard
+from web.app.routers.admin_order_rules import (
+    GAME_IDENTITY_GROUPS,
+    QUALIFICATION_GROUPS,
+)
 from web.app.services.order_groups import get_grouped_order_catalog
 
 
@@ -776,3 +780,68 @@ def test_no_current_rule_uses_old_150_specify_fee():
             int(value or 0)
             for value in (rule.specify_fee_by_game_role or {}).values()
         }, key
+
+def test_admin_qualification_groups_match_business_role_taxonomy():
+    groups = {group["key"]: group for group in QUALIFICATION_GROUPS}
+
+    global_options = {
+        option["key"]: option["field"]
+        for option in groups["global"]["options"]
+    }
+    assert global_options == {
+        "male_companion": "allowed_roles",
+        "female_companion": "allowed_roles",
+    }
+
+    delta_options = {
+        option["key"]: option["field"]
+        for option in groups["delta_force"]["options"]
+    }
+    assert delta_options == {
+        "top_protector": "allowed_roles",
+        "female_protector": "allowed_roles",
+        "male_protector": "allowed_roles",
+    }
+
+    assert {
+        option["key"]
+        for option in groups["lol"]["options"]
+    } == {"lol_elite", "lol_grandmaster", "lol_master"}
+
+    assert {
+        option["key"]
+        for option in groups["apex"]["options"]
+    } == {"apex_predator", "apex_master", "apex_diamond"}
+
+    assert {
+        option["key"]
+        for option in groups["valorant"]["options"]
+    } == {
+        "valorant_radiant",
+        "valorant_immortal",
+        "valorant_ascendant",
+    }
+
+    assert groups["steam"]["options"] == ()
+
+
+def test_admin_game_identity_groups_are_one_row_per_game():
+    groups = {group["key"]: group for group in GAME_IDENTITY_GROUPS}
+
+    assert [option["key"] for option in groups["delta_force"]["options"]] == [
+        "delta_desktop",
+        "delta_mobile",
+    ]
+    assert [option["key"] for option in groups["steam"]["options"]] == [
+        "steam_game",
+    ]
+    assert [option["key"] for option in groups["lol"]["options"]] == [
+        "lol_game",
+    ]
+    assert [option["key"] for option in groups["apex"]["options"]] == [
+        "apex_game",
+    ]
+    assert [option["key"] for option in groups["valorant"]["options"]] == [
+        "valorant_game",
+    ]
+
