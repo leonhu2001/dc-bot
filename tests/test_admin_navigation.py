@@ -284,7 +284,8 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert '"key": "female_companion"' in source
 
     assert "<h3>接單職位</h3>" not in page
-    assert page.count("<h3>階級資格</h3>") == 1
+    # One qualification block for quick-create and one for editing the selected product.
+    assert page.count("<h3>階級資格</h3>") == 2
     assert "<h3>遊戲身分</h3>" in page
     assert "qualification_groups" in page
     assert "game_identity_groups" in page
