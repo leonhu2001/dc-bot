@@ -2,10 +2,16 @@ from datetime import datetime, timedelta, timezone
 
 from services.dispatch_presence import (
     count_online_dispatch_workers,
+    get_online_dispatch_support_ids,
     get_online_dispatch_worker_ids,
+    has_online_dispatch_support,
     touch_dispatch_presence,
+    touch_dispatch_support_presence,
 )
-from views.dispatch_presence import format_dispatch_presence_channel_name
+from views.dispatch_presence import (
+    format_dispatch_presence_channel_name,
+    format_dispatch_support_channel_name,
+)
 
 
 def test_dispatch_presence_expires_after_timeout(tmp_path):
@@ -55,3 +61,38 @@ def test_dispatch_presence_channel_name_reflects_count():
     assert format_dispatch_presence_channel_name(1) == "🚬┃排隊中。。。。。"
     assert format_dispatch_presence_channel_name(2) == "🟢┃2人在線"
     assert format_dispatch_presence_channel_name(5) == "🟢┃5人在線"
+
+
+def test_dispatch_support_presence_expires_after_timeout(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+    now = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
+
+    touch_dispatch_support_presence(
+        "900",
+        display_name="Support A",
+        db_file=db_path,
+        now=now,
+    )
+
+    assert get_online_dispatch_support_ids(
+        db_file=db_path,
+        now=now + timedelta(seconds=89),
+    ) == ["900"]
+    assert has_online_dispatch_support(
+        db_file=db_path,
+        now=now + timedelta(seconds=89),
+    )
+
+    assert get_online_dispatch_support_ids(
+        db_file=db_path,
+        now=now + timedelta(seconds=91),
+    ) == []
+    assert not has_online_dispatch_support(
+        db_file=db_path,
+        now=now + timedelta(seconds=91),
+    )
+
+
+def test_dispatch_support_channel_name_reflects_any_online_staff():
+    assert format_dispatch_support_channel_name(False) == "📞┃聯繫客服"
+    assert format_dispatch_support_channel_name(True) == "📞┃客服在線"
