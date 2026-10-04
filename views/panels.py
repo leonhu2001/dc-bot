@@ -218,6 +218,7 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="我要下單",
+        emoji="🛒",
         style=discord.ButtonStyle.primary,
         custom_id="mawan_main_panel_order_button",
         row=0,
@@ -227,6 +228,7 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="我要入職",
+        emoji="💼",
         style=discord.ButtonStyle.success,
         custom_id="mawan_main_panel_recruit_button",
         row=0,
@@ -236,6 +238,7 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="我要客訴",
+        emoji="⚠️",
         style=discord.ButtonStyle.danger,
         custom_id="mawan_main_panel_complaint_button",
         row=1,
@@ -245,6 +248,7 @@ class MainPanelView(discord.ui.View):
 
     @discord.ui.button(
         label="顧客意見",
+        emoji="💬",
         style=discord.ButtonStyle.secondary,
         custom_id="mawan_main_panel_feedback_button",
         row=1,

@@ -575,7 +575,7 @@ DISPATCH_ONLINE_CHANNEL_ID = 1483183532330455040
 DISPATCH_SUPPORT_ONLINE_CHANNEL_ID = 1497622678138519572
 
 # 服務大廳主 Panel 訊息 ID；0 代表不自動校正既有 Panel。
-MAIN_SERVICE_PANEL_MESSAGE_ID = 1537533276884045856
+MAIN_SERVICE_PANEL_MESSAGE_ID = 1556309312379429029
 
 # 評價頻道 ID
 REVIEW_CHANNEL_ID = 1482998033091268691
@@ -3644,9 +3644,13 @@ async def on_member_join(member: discord.Member):
 
     embed = discord.Embed(
         description=(
-            f"**歡迎 {member.mention} 來到魔丸娛樂!**\n\n"
-            f"歡迎闆闆光臨!\n"
-            f"有任何問題都可以透過機器人開票口聯絡客服歐!"
+            f"🎉 **歡迎 {member.mention} 來到魔丸娛樂！**\n\n"
+            "歡迎加入我們 ฅ՞•ﻌ•՞ฅ\n"
+            "👤 想先挑選喜歡的陪玩／打手，可以逛逛個人牆\n"
+            "<#1538270157057691660> ・ <#1538270089785245856>\n\n"
+            "🎫 想直接下單、詢問服務或需要協助\n"
+            "請前往 <#1497622678138519572> 聯繫客服\n\n"
+            "**祝你在魔丸玩得開心 🖤**"
         ),
         color=discord.Color.green()
     )
