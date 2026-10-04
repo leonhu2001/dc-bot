@@ -3,14 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from services.order_rules import COMPANION_ROLES, PROTECTOR_ROLES, ROLE_IDS
-
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from services.order_rules import COMPANION_ROLES, PROTECTOR_ROLES, ROLE_IDS
 DEFAULT_DB = ROOT / "web_dashboard.db"
 DEFAULT_BACKUP_DIR = ROOT / "_archive"
 
@@ -292,7 +295,7 @@ def _print_audit(audit: AssignmentRoleAudit) -> None:
     )
     print("Mismatches:", len(audit.repairs))
     print(
-        "Invalid role_type rows:",
+        "Non-canonical/legacy role_type rows:",
         audit.invalid_role_type_count,
     )
 

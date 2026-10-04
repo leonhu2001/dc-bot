@@ -118,10 +118,11 @@ def main() -> None:
                 print(f"  - {field}")
                 print(f"    OLD: {old_rule.get(field)}")
                 print(f"    NEW: {new_rule.get(field)}")
+    else:
+        print("NONE")
 
+    if added or removed or changed:
         raise SystemExit(1)
-
-    print("NONE")
 
     title("REPORT_DONE")
     print("ORDER_RULES_BASELINE_DIFF_PASS")

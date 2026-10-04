@@ -1,5 +1,9 @@
 import json
+import os
 import sqlite3
+import subprocess
+import sys
+from pathlib import Path
 
 from tools.repair_assignment_role_types import (
     apply_assignment_role_repairs,
@@ -148,3 +152,26 @@ def test_role_repair_only_changes_evidence_backed_mismatches(
         (11, "worker"),
         (12, "worker"),
     ]
+
+
+
+def test_repair_script_runs_directly_without_pythonpath():
+    root = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(root / "tools" / "repair_assignment_role_types.py"),
+            "--help",
+        ],
+        cwd=str(root),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--apply" in result.stdout
