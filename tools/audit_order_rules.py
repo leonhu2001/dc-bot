@@ -175,6 +175,13 @@ def main() -> None:
     import services.order_rules as order_rules
 
     ROLE_IDS = load_role_ids()
+    all_role_ids = {
+        str(key): str(value)
+        for key, value in (
+            getattr(order_rules, "ALL_ROLE_IDS", ROLE_IDS)
+            or {}
+        ).items()
+    }
     rules = load_rules(order_rules)
     categories = load_categories(order_rules, rules)
     role_labels = getattr(order_rules, "ROLE_LABELS", {})
@@ -237,6 +244,8 @@ def main() -> None:
         price = get_attr(rule, ["price", "amount", "base_price"], 0)
         unit_label = get_attr(rule, ["unit_label", "unit", "quantity_label"], "")
         allowed_roles = normalize_list(get_attr(rule, ["allowed_roles", "role_keys"], []))
+        allowed_game_roles = normalize_list(get_attr(rule, "allowed_game_roles", []))
+        required_game_roles = normalize_list(get_attr(rule, "required_game_roles", []))
         required_staff_count = get_attr(rule, "required_staff_count", None)
         min_protector_count = int(get_attr(rule, "min_protector_count", 0) or 0)
         max_quantity = get_attr(rule, "max_quantity", None)
@@ -252,6 +261,8 @@ def main() -> None:
         print("price:", price)
         print("unit_label:", unit_label)
         print("allowed_roles:", allowed_roles)
+        print("allowed_game_roles:", allowed_game_roles)
+        print("required_game_roles:", required_game_roles)
         print("required_staff_count:", required_staff_count)
         print("min_protector_count:", min_protector_count)
         print("allow_specify:", allow_specify)
@@ -286,8 +297,8 @@ def main() -> None:
         if price_type == "manual" and price_int != 0:
             warnings.append(f"{key}: manual price usually should be 0, current={price_int}")
 
-        if not allowed_roles:
-            errors.append(f"{key}: allowed_roles is empty")
+        if not allowed_roles and not allowed_game_roles:
+            errors.append(f"{key}: no allowed service or game roles")
 
         for role_key in allowed_roles:
             if role_key not in ROLE_IDS:
@@ -295,6 +306,18 @@ def main() -> None:
 
             if all_receiver_roles and role_key not in all_receiver_roles:
                 errors.append(f"{key}: allowed role is not receiver role: {role_key}")
+
+        for role_key in allowed_game_roles:
+            if role_key not in all_role_ids:
+                errors.append(
+                    f"{key}: allowed game role missing ALL_ROLE_IDS mapping: {role_key}"
+                )
+
+        for role_key in required_game_roles:
+            if role_key not in all_role_ids:
+                errors.append(
+                    f"{key}: required game role missing ALL_ROLE_IDS mapping: {role_key}"
+                )
 
         try:
             if callable(getattr(order_rules, "get_required_staff_count", None)):
@@ -351,12 +374,43 @@ def main() -> None:
 
         if callable(getattr(order_rules, "build_order_rule_snapshot", None)):
             try:
+                get_allowed_role_ids = getattr(
+                    order_rules,
+                    "get_allowed_role_ids",
+                    None,
+                )
+                resolved_allowed_role_ids = (
+                    list(get_allowed_role_ids(rule))
+                    if callable(get_allowed_role_ids)
+                    else [
+                        str(all_role_ids.get(role_key, ""))
+                        for role_key in allowed_roles + allowed_game_roles
+                        if str(all_role_ids.get(role_key, "")).strip()
+                    ]
+                )
+
+                get_required_game_role_ids = getattr(
+                    order_rules,
+                    "get_required_game_role_ids",
+                    None,
+                )
+                resolved_required_game_role_ids = (
+                    list(get_required_game_role_ids(rule))
+                    if callable(get_required_game_role_ids)
+                    else [
+                        str(all_role_ids.get(role_key, ""))
+                        for role_key in required_game_roles
+                        if str(all_role_ids.get(role_key, "")).strip()
+                    ]
+                )
+
                 snapshot = order_rules.build_order_rule_snapshot(
                     rule,
                     quantity=1,
                     player_count=1,
                     required_staff_count=resolved_required,
-                    allowed_role_ids=[str(ROLE_IDS.get(role_key, "")) for role_key in allowed_roles],
+                    allowed_role_ids=resolved_allowed_role_ids,
+                    required_game_role_ids=resolved_required_game_role_ids,
                     specified_staff_ids=[],
                 )
 
