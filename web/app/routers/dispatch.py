@@ -18,29 +18,11 @@ from web.app.services.order_service import (
     get_worker_active_order_count,
     get_worker_active_order_ids,
     list_active_orders,
+    partition_dispatch_orders,
     unclaim_order_for_worker,
 )
 
 router = APIRouter(tags=["dispatch"])
-
-CLAIMABLE_DISPATCH_STATUSES = {
-    "waiting_acceptance",
-    "accepted_pending_pay",
-}
-
-
-def split_dispatch_orders(orders):
-    claimable_orders = [
-        order
-        for order in orders
-        if str(getattr(order, "status", "") or "") in CLAIMABLE_DISPATCH_STATUSES
-    ]
-    non_claimable_orders = [
-        order
-        for order in orders
-        if str(getattr(order, "status", "") or "") not in CLAIMABLE_DISPATCH_STATUSES
-    ]
-    return claimable_orders, non_claimable_orders
 
 
 def can_use_dispatch(user: dict | None) -> bool:
@@ -152,7 +134,7 @@ async def dispatch_dashboard(
     try:
         create_demo_orders_if_empty(db)
         orders = list_active_orders(db)
-        claimable_orders, non_claimable_orders = split_dispatch_orders(orders)
+        claimable_orders, non_claimable_orders = partition_dispatch_orders(orders)
         orders = [*claimable_orders, *non_claimable_orders]
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
