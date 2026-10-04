@@ -48,6 +48,19 @@ def ensure_order_rule_store(db_file: str | Path | None = None) -> None:
 
             CREATE INDEX IF NOT EXISTS idx_order_rule_override_versions_rule
             ON order_rule_override_versions(rule_key, version DESC);
+
+            CREATE TABLE IF NOT EXISTS custom_order_rules (
+                rule_key TEXT PRIMARY KEY,
+                category TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_by_discord_id TEXT,
+                created_by_display_name TEXT,
+                created_at TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_custom_order_rules_category
+            ON custom_order_rules(category, is_active);
             """
         )
         conn.commit()
@@ -131,6 +144,191 @@ def get_active_override(
     db_file: str | Path | None = None,
 ) -> dict[str, Any] | None:
     return load_active_overrides(db_file).get(str(rule_key))
+
+
+
+def load_custom_rule_definitions(
+    db_file: str | Path | None = None,
+) -> dict[str, dict[str, Any]]:
+    path = _path(db_file)
+    if not path.exists():
+        return {}
+
+    try:
+        conn = sqlite3.connect(
+            f"file:{path}?mode=ro",
+            uri=True,
+            timeout=2.0,
+        )
+    except sqlite3.Error:
+        return {}
+
+    conn.row_factory = sqlite3.Row
+    try:
+        table = conn.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type='table' AND name='custom_order_rules'
+            LIMIT 1
+            """
+        ).fetchone()
+        if table is None:
+            return {}
+
+        rows = conn.execute(
+            """
+            SELECT
+                rule_key,
+                category,
+                payload_json,
+                created_by_discord_id,
+                created_by_display_name,
+                created_at
+            FROM custom_order_rules
+            WHERE is_active = 1
+            ORDER BY created_at ASC, rule_key ASC
+            """
+        ).fetchall()
+    except sqlite3.Error:
+        return {}
+    finally:
+        conn.close()
+
+    result: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key = str(row["rule_key"] or "").strip()
+        category = str(row["category"] or "").strip()
+        payload = _decode_payload(row["payload_json"])
+        if not key or not category or not payload:
+            continue
+        result[key] = {
+            "rule_key": key,
+            "category": category,
+            "payload": payload,
+            "created_by_discord_id": str(
+                row["created_by_discord_id"] or ""
+            ),
+            "created_by_display_name": str(
+                row["created_by_display_name"] or ""
+            ),
+            "created_at": str(row["created_at"] or ""),
+        }
+    return result
+
+
+def get_custom_rule_definition(
+    rule_key: str,
+    db_file: str | Path | None = None,
+) -> dict[str, Any] | None:
+    return load_custom_rule_definitions(db_file).get(str(rule_key))
+
+
+def create_custom_order_rule(
+    *,
+    rule_key: str,
+    category: str,
+    payload: dict[str, Any],
+    actor_discord_id: str | int | None,
+    actor_display_name: str | None,
+    db_file: str | Path | None = None,
+) -> dict[str, Any]:
+    key = str(rule_key or "").strip()
+    category_value = str(category or "").strip()
+
+    if not key:
+        raise ValueError("缺少商品代碼。")
+    if not category_value:
+        raise ValueError("缺少商品分類。")
+    if not isinstance(payload, dict) or not payload:
+        raise ValueError("商品內容不能為空。")
+
+    path = _path(db_file)
+    ensure_order_rule_store(path)
+    now = _now_iso()
+    payload_json = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+
+        existing = conn.execute(
+            """
+            SELECT 1
+            FROM custom_order_rules
+            WHERE rule_key = ?
+            LIMIT 1
+            """,
+            (key,),
+        ).fetchone()
+        if existing is not None:
+            raise ValueError("這個商品代碼已存在，請重新建立。")
+
+        # A code-defined rule may already use this key even if no custom row
+        # exists. The caller validates that separately; this check protects
+        # against duplicate custom records at the persistence layer.
+        conn.execute(
+            """
+            INSERT INTO custom_order_rules (
+                rule_key,
+                category,
+                payload_json,
+                created_by_discord_id,
+                created_by_display_name,
+                created_at,
+                is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 1)
+            """,
+            (
+                key,
+                category_value,
+                payload_json,
+                str(actor_discord_id or ""),
+                str(actor_display_name or ""),
+                now,
+            ),
+        )
+
+        version = _next_version(conn, key)
+        conn.execute(
+            """
+            INSERT INTO order_rule_override_versions (
+                rule_key,
+                version,
+                action,
+                payload_json,
+                source_version,
+                actor_discord_id,
+                actor_display_name,
+                created_at
+            )
+            VALUES (?, ?, 'create', ?, NULL, ?, ?, ?)
+            """,
+            (
+                key,
+                version,
+                payload_json,
+                str(actor_discord_id or ""),
+                str(actor_display_name or ""),
+                now,
+            ),
+        )
+        conn.commit()
+
+    return {
+        "rule_key": key,
+        "category": category_value,
+        "payload": dict(payload),
+        "version": version,
+        "action": "create",
+        "created_at": now,
+    }
 
 
 def list_rule_versions(
