@@ -37,27 +37,27 @@
     </section>
 
     <section class="staff-summary-total-grid">
-        <div class="staff-summary-total-card">
+        <div class="staff-summary-total-card mw-r56-payout-metric">
             <span>未發放總額 ◆</span>
-            <strong>{{ unpaid_totals.display_total|default(unpaid_totals.unpaid_total)|round(0, 'common')|int }}</strong>
+            <strong class="mw-r56-payout-value">{{ unpaid_totals.display_total|default(unpaid_totals.unpaid_total)|round(0, 'common')|int }}</strong>
             <small>待審核 {{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }} 筆</small>
         </div>
 
-        <div class="staff-summary-total-card">
+        <div class="staff-summary-total-card mw-r56-payout-metric">
             <span>已發放總額 ◆</span>
-            <strong>{{ paid_totals.paid_total|round(0, 'common')|int }}</strong>
+            <strong class="mw-r56-payout-value">{{ paid_totals.paid_total|round(0, 'common')|int }}</strong>
             <small>本期已發放 {{ paid_totals.paid_count }} 筆</small>
         </div>
 
-        <div class="staff-summary-total-card">
+        <div class="staff-summary-total-card mw-r56-payout-metric">
             <span>未發放筆數 ◆</span>
-            <strong>{{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }}</strong>
+            <strong class="mw-r56-payout-value">{{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }}</strong>
             <small>待審核中</small>
         </div>
 
-        <div class="staff-summary-total-card">
+        <div class="staff-summary-total-card mw-r56-payout-metric">
             <span>已發放筆數 ◆</span>
-            <strong>{{ paid_totals.paid_count }}</strong>
+            <strong class="mw-r56-payout-value">{{ paid_totals.paid_count }}</strong>
             <small>結算完成</small>
         </div>
     </section>
