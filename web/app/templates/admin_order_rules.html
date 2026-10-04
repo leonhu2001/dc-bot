@@ -47,6 +47,169 @@
             </div>
         </div>
 
+        <details class="panel compact-panel" style="margin:0 0 12px;">
+            <summary style="cursor:pointer; font-weight:800;">＋ 新增商品</summary>
+            <p class="muted-text" style="margin-top:8px;">
+                「商品分類」就是它之後會出現在哪個下單分類。選 APEX 就進 APEX，
+                選三角洲趣味單就進三角洲趣味單；若遊戲身分不勾，系統會依分類自動補上對應遊戲身分。
+            </p>
+
+            <form
+                method="post"
+                action="/admin/order-rules/create"
+                onsubmit="return confirm('確定新增這個商品嗎？建立後 Web 與 DC Bot 會自動讀取。');"
+            >
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
+                <div class="order-meta compact-meta">
+                    <div>
+                        <span>商品分類</span>
+                        <select name="category" required>
+                            {% for value, label in product_categories %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <span>商品名稱</span>
+                        <input name="label" placeholder="例如：三角洲｜特殊護航單" required>
+                    </div>
+                    <div>
+                        <span>售價</span>
+                        <input name="price" type="number" min="0" value="0" required>
+                    </div>
+                    <div>
+                        <span>計價方式</span>
+                        <select name="pricing_type">
+                            {% for value, label in pricing_types %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <span>單位</span>
+                        <input name="unit_label" value="單">
+                    </div>
+                    <div>
+                        <span>需要人數</span>
+                        <input name="required_staff_count" value="1" placeholder="1 / 2 / player_count">
+                    </div>
+                    <div>
+                        <span>最少數量</span>
+                        <input name="min_quantity" type="number" min="1" value="1">
+                    </div>
+                    <div>
+                        <span>最多數量</span>
+                        <input name="max_quantity" type="number" min="1" value="24">
+                    </div>
+                    <div>
+                        <span>預設指定費</span>
+                        <input name="specify_fee_default" type="number" min="0" value="100">
+                    </div>
+                    <div>
+                        <span>最多指定人數</span>
+                        <input name="max_specified_count" type="number" min="0" value="">
+                    </div>
+                    <div>
+                        <span>免指定費門檻</span>
+                        <input name="specify_free_min_units" type="number" min="0" value="">
+                    </div>
+                    <div>
+                        <span>最少玩家數</span>
+                        <input name="min_player_count" type="number" min="1" value="1">
+                    </div>
+                    <div>
+                        <span>最多玩家數</span>
+                        <input name="max_player_count" type="number" min="1" value="">
+                    </div>
+                    <div>
+                        <span>至少護航數</span>
+                        <input name="min_protector_count" type="number" min="0" value="0">
+                    </div>
+                    <div>
+                        <span>買幾送</span>
+                        <input name="service_bonus_buy" type="number" min="1" value="">
+                    </div>
+                    <div>
+                        <span>贈送數量</span>
+                        <input name="service_bonus_gift" type="number" min="0" value="0">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin:14px 0;">
+                    <label><input type="checkbox" name="allow_specify"> 開放指定</label>
+                    <label><input type="checkbox" name="player_count_enabled"> 可選人數</label>
+                    <label><input type="checkbox" name="price_multiply_player_count"> 價格 × 人數</label>
+                    <label><input type="checkbox" name="point_benefits_allowed" checked> 可使用點數福利</label>
+                </div>
+
+                <div class="panel compact-panel" style="margin-top:12px;">
+                    <h3>階級資格</h3>
+                    <p class="muted-text">
+                        至少勾一個可接資格。男陪／女陪在全局職位；頂護／男護／女護在三角洲。
+                    </p>
+                    <div class="rule-role-groups">
+                        {% for group in qualification_groups %}
+                        <div class="rule-role-row">
+                            <strong class="rule-role-group-label">{{ group.label }}</strong>
+                            <div class="rule-role-options">
+                                {% if group.options %}
+                                    {% for option in group.options %}
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            name="{{ option.field }}"
+                                            value="{{ option.key }}"
+                                        >
+                                        {{ option.label }}
+                                    </label>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="muted-text">無額外階級資格</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="panel compact-panel" style="margin-top:12px;">
+                    <h3>遊戲身分</h3>
+                    <p class="muted-text">
+                        可不勾；新增時若全部未勾，系統會依「商品分類」自動帶入。
+                    </p>
+                    <div class="rule-role-groups">
+                        {% for group in game_identity_groups %}
+                        <div class="rule-role-row">
+                            <strong class="rule-role-group-label">{{ group.label }}</strong>
+                            <div class="rule-role-options">
+                                {% for option in group.options %}
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="required_game_roles"
+                                        value="{{ option.key }}"
+                                    >
+                                    {{ option.label }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div style="margin-top:12px;">
+                    <label style="display:block; margin-bottom:6px;">備註</label>
+                    <textarea name="note" rows="3" style="width:100%;" placeholder="可留空"></textarea>
+                </div>
+
+                <div style="margin-top:14px;">
+                    <button class="button" type="submit">建立商品</button>
+                </div>
+            </form>
+        </details>
+
         <div style="max-height:72vh; overflow:auto; display:flex; flex-direction:column; gap:8px;">
             {% for item in rules %}
             <a
