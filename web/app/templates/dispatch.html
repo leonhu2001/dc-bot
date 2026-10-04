@@ -391,11 +391,9 @@
                 <span class="dispatch-tag">護航接單</span>
                 <span class="dispatch-tag">陪玩接單</span>
                 <span class="dispatch-tag">即時提醒</span>
-                {% if user.is_worker or user.is_companion %}
-                    <span class="dispatch-tag" title="保持接單大廳開啟即可維持在線">
-                        🟢 在線
-                    </span>
-                {% endif %}
+                <span class="dispatch-tag" title="你目前正在接單大廳">
+                    🟢 在線
+                </span>
             </div>
         </div>
 
