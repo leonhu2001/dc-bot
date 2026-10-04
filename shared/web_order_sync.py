@@ -464,7 +464,7 @@ def sync_dispatch_claims_to_web(
     desired = {}
 
     for user_id in companion_ids:
-        desired[user_id] = "booster"
+        desired[user_id] = "companion"
 
     for user_id in booster_ids:
         desired[user_id] = "booster"

@@ -29,6 +29,28 @@ PROTECTOR_ROLE_IDS = {
     "1500751039060643990",  # 魔丸♜男護
 }
 
+COMPANION_ROLE_IDS = {
+    "1500751059239440575",  # 魔丸♞男陪
+    "1482080315798192210",  # 魔丸♟女陪
+}
+
+
+def _assignment_role_type_from_role_ids(
+    role_ids: list[str] | tuple[str, ...] | set[str],
+) -> str:
+    normalized = {
+        str(role_id).strip()
+        for role_id in role_ids
+        if str(role_id).strip()
+    }
+
+    # 護級優先；同時持有護級與陪級時仍視為打手／護級。
+    if normalized & PROTECTOR_ROLE_IDS:
+        return "booster"
+    if normalized & COMPANION_ROLE_IDS:
+        return "companion"
+    return "booster"
+
 # These two-person fun orders must end with exactly one protector-level
 # staff member and one companion-only staff member. A member who has both
 # a companion role and any protector role is counted as protector-level.
@@ -828,7 +850,8 @@ def promote_acceptance_claims_to_assignments(
         claim_rows = db.execute(text("""
             SELECT
                 staff_discord_id,
-                staff_display_name
+                staff_display_name,
+                staff_role_ids_json
             FROM order_acceptance_claims
             WHERE order_id = :order_id
               AND is_active = 1
@@ -840,6 +863,9 @@ def promote_acceptance_claims_to_assignments(
 
         for row in claim_rows:
             worker_discord_id = str(row["staff_discord_id"])
+            role_type = _assignment_role_type_from_role_ids(
+                _load_json_list(row["staff_role_ids_json"])
+            )
             assignment = db.scalar(
                 select(OrderAssignment)
                 .where(OrderAssignment.order_id == int(order_id))
@@ -852,7 +878,7 @@ def promote_acceptance_claims_to_assignments(
                     order_id=int(order_id),
                     worker_discord_id=worker_discord_id,
                     worker_display_name=row["staff_display_name"] or worker_discord_id,
-                    role_type="booster",
+                    role_type=role_type,
                     is_active=True,
                     # 「指定」只保留接單席位，不等於「掛名」；只有掛名才有額外 5% 分潤。
                     has_named_bonus=False,
@@ -860,7 +886,7 @@ def promote_acceptance_claims_to_assignments(
                 db.add(assignment)
             else:
                 assignment.worker_display_name = row["staff_display_name"] or assignment.worker_display_name
-                assignment.role_type = "booster"
+                assignment.role_type = role_type
                 assignment.is_active = True
                 assignment.removed_at = None
                 # 不因「指定」覆寫掛名狀態；既有真正掛名的 assignment 保留原值。
