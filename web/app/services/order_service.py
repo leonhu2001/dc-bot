@@ -321,11 +321,20 @@ def attach_dispatch_operational_context(orders: list[WebOrder]) -> None:
                 status or "未知狀態",
             )
 
+        if status == ACCEPTED_PENDING_PAY:
+            locked_message = "接單名額已滿，等待付款成立。"
+        elif status == OrderStatus.ACTIVE.value:
+            locked_message = "已付款成立，網站接單已鎖定。"
+        else:
+            locked_message = "此狀態不開放網站接單。"
+
         setattr(order, "dispatch_current_staff_count", current_count)
         setattr(order, "dispatch_required_staff_count", required_count)
         setattr(order, "dispatch_missing_staff_count", missing_count)
         setattr(order, "dispatch_claim_open", claim_open)
+        setattr(order, "dispatch_allows_unclaim", status in PREPAY_DISPATCH_STATUSES)
         setattr(order, "dispatch_status_label", status_label)
+        setattr(order, "dispatch_locked_message", locked_message)
 
 
 def get_worker_dispatch_payout_preview(
