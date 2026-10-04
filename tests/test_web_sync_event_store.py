@@ -245,3 +245,129 @@ def test_mark_event_failed_retries_then_stops(tmp_path):
             """
         ).fetchone()
     assert row == ("failed", 3, "last failure")
+
+
+
+def test_order_created_bundle_and_link_updates(tmp_path):
+    db_file = tmp_path / "web-sync.db"
+    _setup_db(db_file)
+
+    with sqlite3.connect(db_file) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE order_acceptance_meta (
+                order_id INTEGER PRIMARY KEY,
+                required_staff_count INTEGER,
+                specified_staff_ids_json TEXT,
+                allowed_role_ids_json TEXT,
+                required_game_role_ids_json TEXT
+            );
+
+            CREATE TABLE web_order_submission_meta (
+                order_id INTEGER PRIMARY KEY,
+                request_key TEXT,
+                extra_requirements TEXT,
+                terms_version TEXT,
+                terms_accepted_at TEXT,
+                submission_payload_json TEXT
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO order_acceptance_meta (
+                order_id,
+                required_staff_count,
+                specified_staff_ids_json,
+                allowed_role_ids_json,
+                required_game_role_ids_json
+            )
+            VALUES (1, 2, '["101"]', '["201"]', '["301"]')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO web_order_submission_meta (
+                order_id,
+                request_key,
+                extra_requirements,
+                terms_version,
+                terms_accepted_at,
+                submission_payload_json
+            )
+            VALUES (1, 'req-1', '備註', 'v1', '2026-10-04T00:00:00', '{}')
+            """
+        )
+        conn.commit()
+
+    bundle = event_store.load_order_created_bundle(1, db_file=db_file)
+
+    assert bundle["order"]["id"] == 1
+    assert bundle["acceptance"]["required_staff_count"] == 2
+    assert bundle["submission"]["request_key"] == "req-1"
+
+    event_store.update_order_created_links(
+        1,
+        ticket_channel_id=111,
+        dispatch_channel_id=222,
+        dispatch_message_id=333,
+        db_file=db_file,
+    )
+
+    with sqlite3.connect(db_file) as conn:
+        links = conn.execute(
+            """
+            SELECT ticket_channel_id, dispatch_channel_id, dispatch_message_id
+            FROM web_orders
+            WHERE id = 1
+            """
+        ).fetchone()
+
+    assert links == ("111", "222", "333")
+
+
+def test_order_created_retry_store_transitions_and_filters(tmp_path):
+    db_file = tmp_path / "web-sync.db"
+    _setup_db(db_file)
+
+    with sqlite3.connect(db_file) as conn:
+        conn.executemany(
+            """
+            INSERT INTO sync_events (
+                id,
+                order_id,
+                event_type,
+                payload_json,
+                status,
+                retry_count,
+                error_message
+            )
+            VALUES (?, 1, ?, '{}', ?, ?, ?)
+            """,
+            [
+                (1, "order_created", "failed", 2, "retry me"),
+                (2, "order_created", "failed", 20, "stop"),
+                (3, "order_updated", "failed", 1, "other"),
+            ],
+        )
+        conn.commit()
+
+    rows = event_store.fetch_order_created_retry_events(
+        db_file=db_file,
+        limit=10,
+    )
+
+    assert [row["event_id"] for row in rows] == [1]
+
+    event_store.mark_order_created_processing(1, db_file=db_file)
+
+    with sqlite3.connect(db_file) as conn:
+        row = conn.execute(
+            """
+            SELECT status, error_message
+            FROM sync_events
+            WHERE id = 1
+            """
+        ).fetchone()
+
+    assert row == ("processing", None)
