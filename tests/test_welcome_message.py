@@ -24,3 +24,12 @@ def test_welcome_embed_keeps_member_avatar():
 
     assert embed.description == build_welcome_description("<@123>")
     assert embed.thumbnail.url == "https://example.com/avatar.png"
+
+
+
+def test_welcome_sections_are_visually_separated():
+    description = build_welcome_description("<@123>")
+
+    assert "歡迎加入我們 ฅ՞•ﻌ•՞ฅ\n\n👤 **挑選陪玩／打手**" in description
+    assert "先看看大家的個人牆\n\n🎟️ **下單／客服**" in description
+    assert "直接下單、詢問服務或尋求協助\n\n**祝你在魔丸玩得開心 🖤**" in description
