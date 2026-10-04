@@ -979,8 +979,8 @@ document.addEventListener(
                                         </select>
                                     </td>
 
-                                    <td class="history-status-cell">
-                                        <select class="history-status-select" name="status_{{ order.id }}">
+                                    <td class="history-status-cell mw-r56-order-status-cell">
+                                        <select class="history-status-select mw-r56-order-status-select" name="status_{{ order.id }}">
                                             {% if order.status == "cancelled" %}
                                                 <option value="cancelled" selected>已取消</option>
                                             {% elif order.status == "closed" %}
