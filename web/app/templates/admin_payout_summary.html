@@ -94,11 +94,12 @@
                                 <td>
                                     <div class="staff-person">
                                         <div class="staff-avatar">
-                                            {% if row.avatar_url %}
-                                                <img src="{{ row.avatar_url }}" alt="{{ row.display_name }}">
-                                            {% else %}
-                                                {{ (row.display_name or '?')[:1] }}
-                                            {% endif %}
+                                            {{ discord_avatar(
+                                                row.discord_id,
+                                                row.display_name,
+                                                128,
+                                                "staff-avatar-img"
+                                            ) }}
                                         </div>
                                         <div>
                                             <span class="staff-person-name">{{ row.display_name }}</span>
