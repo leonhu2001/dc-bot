@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Iterable
 
 DEFAULT_ONLINE_TIMEOUT_SECONDS = 90
+MIN_TOUCH_INTERVAL_SECONDS = 20
+_ENSURED_DB_PATHS: set[str] = set()
 
 
 def _db_path(db_file: str | Path | None = None) -> Path:
@@ -28,6 +30,9 @@ def ensure_dispatch_presence_table(
     db_file: str | Path | None = None,
 ) -> None:
     path = _db_path(db_file)
+    cache_key = str(path.resolve())
+    if cache_key in _ENSURED_DB_PATHS:
+        return
 
     with sqlite3.connect(path, timeout=15) as conn:
         conn.executescript(
@@ -44,6 +49,8 @@ def ensure_dispatch_presence_table(
         )
         conn.commit()
 
+    _ENSURED_DB_PATHS.add(cache_key)
+
 
 def touch_dispatch_presence(
     worker_discord_id: str | int,
@@ -57,9 +64,40 @@ def touch_dispatch_presence(
         return
 
     ensure_dispatch_presence_table(db_file)
-    seen_at = _iso_utc(now or _now_utc())
+    current = now or _now_utc()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(timezone.utc)
+    seen_at = _iso_utc(current)
 
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        existing = conn.execute(
+            """
+            SELECT last_seen_at
+            FROM dispatch_presence
+            WHERE worker_discord_id = ?
+            LIMIT 1
+            """,
+            (worker_id,),
+        ).fetchone()
+
+        if existing is not None:
+            try:
+                previous = datetime.fromisoformat(
+                    str(existing[0] or "").replace("Z", "+00:00")
+                )
+            except ValueError:
+                previous = None
+
+            if previous is not None:
+                if previous.tzinfo is None:
+                    previous = previous.replace(tzinfo=timezone.utc)
+                elapsed = (
+                    current - previous.astimezone(timezone.utc)
+                ).total_seconds()
+                if elapsed < MIN_TOUCH_INTERVAL_SECONDS:
+                    return
+
         conn.execute(
             """
             INSERT INTO dispatch_presence (
