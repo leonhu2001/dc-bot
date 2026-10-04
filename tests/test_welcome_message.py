@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from views.welcome import (
     PROFILE_CHANNEL_IDS,
     SUPPORT_CHANNEL_ID,
@@ -55,3 +57,22 @@ def test_extract_welcome_member_mention_matches_old_and_new_copy():
 def test_extract_welcome_member_mention_ignores_unrelated_messages():
     assert extract_welcome_member_mention("一般公告 <@123>") is None
     assert extract_welcome_member_mention(None) is None
+
+
+def test_welcome_history_refresh_does_not_block_critical_workers():
+    source = Path("bot.py").read_text(encoding="utf-8")
+    on_ready = source.split("@bot.event\nasync def on_ready():", 1)[1]
+    on_ready = on_ready.split("# ========= Slash 指令 =========", 1)[0]
+
+    assert "ensure_payment_review_worker_started(bot)" in on_ready
+    assert "ensure_web_sync_event_worker_started()" in on_ready
+    assert "bot.loop.create_task(smart_dispatch_escalation_loop(bot))" in on_ready
+    assert "await refresh_welcome_history()" not in on_ready
+    assert "bot.loop.create_task(_refresh_welcome_history_background())" in on_ready
+
+    panel_refresh = on_ready.index("await refresh_main_service_panel()")
+    assert on_ready.index("ensure_payment_review_worker_started(bot)") < panel_refresh
+    assert on_ready.index("ensure_web_sync_event_worker_started()") < panel_refresh
+    assert on_ready.index(
+        "bot.loop.create_task(smart_dispatch_escalation_loop(bot))"
+    ) < panel_refresh
