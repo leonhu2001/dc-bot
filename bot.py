@@ -4068,6 +4068,25 @@ async def on_ready():
 
     guild_for_voice = bot.get_guild(GUILD_ID)
     if guild_for_voice is not None:
+        if not getattr(bot, "_active_dispatch_panels_refreshed", False):
+            try:
+                refreshed_active_dispatch_panels = (
+                    await repair_active_web_sync_dispatch_panels_once()
+                )
+                bot._active_dispatch_panels_refreshed = True
+                if refreshed_active_dispatch_panels:
+                    print(
+                        "[web-sync] startup refreshed active/stored dispatch panels: "
+                        f"{refreshed_active_dispatch_panels}",
+                        flush=True,
+                    )
+            except Exception as exc:
+                print(
+                    "[web-sync] startup active/stored dispatch refresh failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
         try:
             reconciled_acceptance_panels = (
                 await repair_pending_acceptance_dispatch_panels_once(
@@ -6516,6 +6535,73 @@ async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
             everyone=False,
         ),
     )
+
+
+async def repair_active_web_sync_dispatch_panels_once(
+    *,
+    limit: int = 100,
+) -> int:
+    """Refresh existing active/stored dispatch panels from canonical assignments.
+
+    This is intentionally run once on Bot startup so older messages are rewritten
+    with the current receiver presentation instead of keeping stale raw mentions.
+    """
+    db_path = _web_dashboard_db_path_for_bot()
+    conn = sqlite3.connect(db_path, timeout=15)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                id AS order_id,
+                dispatch_channel_id,
+                dispatch_message_id
+            FROM web_orders
+            WHERE status IN ('active', 'stored')
+              AND dispatch_channel_id IS NOT NULL
+              AND TRIM(dispatch_channel_id) <> ''
+              AND dispatch_message_id IS NOT NULL
+              AND TRIM(dispatch_message_id) <> ''
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (max(1, int(limit or 100)),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    repaired = 0
+
+    for row in rows:
+        event = dict(row)
+
+        try:
+            await _refresh_existing_web_sync_dispatch(event)
+            repaired += 1
+        except discord.NotFound:
+            print(
+                "[web-sync] startup active dispatch refresh skipped missing message "
+                f"order_id={event.get('order_id')} "
+                f"message_id={event.get('dispatch_message_id')}",
+                flush=True,
+            )
+        except discord.Forbidden:
+            print(
+                "[web-sync] startup active dispatch refresh missing permission "
+                f"order_id={event.get('order_id')} "
+                f"message_id={event.get('dispatch_message_id')}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(
+                "[web-sync] startup active dispatch refresh failed "
+                f"order_id={event.get('order_id')}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    return repaired
 
 
 async def _process_existing_web_sync_event(event: dict) -> None:
