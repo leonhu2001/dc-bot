@@ -123,15 +123,12 @@ def _is_manager_only_admin_path(path: str) -> bool:
 
 
 def _client_ip(request: Request) -> str:
-    # Uvicorn 只綁 127.0.0.1，公開流量必須經 Nginx/Cloudflare；因此可優先
-    # 使用 Cloudflare 正規化後的來源 IP。沒有該 header 時才 fallback socket IP。
-    cloudflare_ip = str(request.headers.get("cf-connecting-ip") or "").strip()
-    if cloudflare_ip:
-        return cloudflare_ip[:80]
-
-    forwarded = str(request.headers.get("x-forwarded-for") or "").split(",", 1)[0].strip()
-    if forwarded:
-        return forwarded[:80]
+    # Public traffic reaches Uvicorn only through the local Nginx proxy.
+    # Nginx overwrites X-Real-IP after validating Cloudflare's source network,
+    # so do not trust raw CF-Connecting-IP or X-Forwarded-For here.
+    real_ip = str(request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip[:80]
 
     if request.client is not None:
         return str(request.client.host or "unknown")[:80]
