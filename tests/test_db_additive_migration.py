@@ -29,6 +29,7 @@ def test_historical_discount_column_is_added_to_existing_web_orders():
         }
 
     assert "historical_discount_amount" in columns
+    assert "closed_at" in columns
 
 
 def test_historical_discount_migration_is_idempotent():
@@ -58,3 +59,4 @@ def test_historical_discount_migration_is_idempotent():
         ]
 
     assert columns.count("historical_discount_amount") == 1
+    assert columns.count("closed_at") == 1
