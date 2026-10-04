@@ -602,32 +602,115 @@ ORDER_ITEM_GROUPS_BY_CATEGORY = {
 }
 
 
+def _dynamic_self_service_groups(category: str | None) -> list[dict]:
+    category_value = str(category or "").strip()
+    if not category_value:
+        return []
+
+    try:
+        from services.order_rule_store import list_custom_rule_definitions
+
+        definitions = list_custom_rule_definitions(category=category_value)
+    except Exception:
+        definitions = []
+
+    groups: list[dict] = []
+    for item in definitions:
+        rule_key = str(item.get("rule_key") or "").strip()
+        rule = ORDER_RULES.get(rule_key)
+        if rule is None or str(getattr(rule, "category", "")) != category_value:
+            continue
+
+        unit_label = str(getattr(rule, "unit_label", "單") or "單")
+        quantity_unit = "小時" if unit_label == "H" else unit_label
+        minimum = max(1, int(getattr(rule, "min_quantity", 1) or 1))
+        maximum_raw = getattr(rule, "max_quantity", None)
+        if maximum_raw is None:
+            maximum = 24 if str(getattr(rule, "pricing_type", "")) in {"hourly", "game", "unit"} else minimum
+        else:
+            maximum = max(minimum, int(maximum_raw))
+
+        label = str(getattr(rule, "label", "") or rule_key)
+        groups.append({
+            "label": label,
+            "details": [{
+                "label": label,
+                "value": rule_key,
+                "rule_key": rule_key,
+                "quantity_unit": quantity_unit,
+                "min_quantity": minimum,
+                "max_quantity": maximum,
+            }],
+        })
+
+    return groups
+
+
+def get_order_item_groups_for_category(category: str | None) -> list[str]:
+    category_value = str(category or "").strip()
+    labels = [
+        str(group.get("label") or "")
+        for group in SELF_SERVICE_ORDER_CATALOG.get(category_value, [])
+        if str(group.get("label") or "").strip()
+    ]
+    for group in _dynamic_self_service_groups(category_value):
+        label = str(group.get("label") or "").strip()
+        if label and label not in labels:
+            labels.append(label)
+    return labels
+
+
 def get_order_item_group_label(item_label: str | None) -> str | None:
     if item_label is None:
         return None
 
-    key = ORDER_RULE_KEY_BY_LABEL.get(str(item_label))
-    if key is None:
-        return str(item_label)
+    item_text = str(item_label)
+    key = ORDER_RULE_KEY_BY_LABEL.get(item_text)
+    if key is not None:
+        for category, groups in SELF_SERVICE_ORDER_CATALOG.items():
+            for group in groups:
+                for detail in group.get("details", []):
+                    if detail.get("rule_key") == key:
+                        return str(group["label"])
 
-    for category, groups in SELF_SERVICE_ORDER_CATALOG.items():
-        for group in groups:
-            for detail in group.get("details", []):
-                if detail.get("rule_key") == key:
-                    return str(group["label"])
+    # 後台新增商品目前是一商品一群組，群組名稱直接使用商品名稱。
+    for rule in ORDER_RULES.values():
+        if str(getattr(rule, "label", "")) == item_text:
+            try:
+                from services.order_rule_store import get_custom_rule_definition
 
-    return str(item_label)
+                if get_custom_rule_definition(str(rule.key)):
+                    return item_text
+            except Exception:
+                pass
+
+    return item_text
 
 
 def get_order_item_details_for_group(category: str | None, group_label: str | None) -> list[dict]:
     if category is None or group_label is None:
         return []
 
-    for group in SELF_SERVICE_ORDER_CATALOG.get(str(category), []):
-        if str(group.get("label")) != str(group_label):
+    category_value = str(category)
+    group_value = str(group_label)
+
+    for group in SELF_SERVICE_ORDER_CATALOG.get(category_value, []):
+        if str(group.get("label")) != group_value:
             continue
 
         result: list[dict] = []
+        for detail in group.get("details", []):
+            item = dict(detail)
+            rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
+            item["item"] = str(getattr(rule, "label", "") or item.get("label") or "")
+            result.append(item)
+        return result
+
+    for group in _dynamic_self_service_groups(category_value):
+        if str(group.get("label")) != group_value:
+            continue
+
+        result = []
         for detail in group.get("details", []):
             item = dict(detail)
             rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
@@ -656,17 +739,24 @@ def get_order_item_detail_label(item_label: str | None) -> str | None:
     if item_label is None:
         return None
 
-    rule_key = ORDER_RULE_KEY_BY_LABEL.get(str(item_label))
-    if rule_key is None:
-        return str(item_label)
+    item_text = str(item_label)
+    rule_key = ORDER_RULE_KEY_BY_LABEL.get(item_text)
+    if rule_key is not None:
+        for groups in SELF_SERVICE_ORDER_CATALOG.values():
+            for group in groups:
+                for detail in group.get("details", []):
+                    if detail.get("rule_key") == rule_key:
+                        return str(detail.get("label") or item_text)
 
-    for groups in SELF_SERVICE_ORDER_CATALOG.values():
-        for group in groups:
-            for detail in group.get("details", []):
-                if detail.get("rule_key") == rule_key:
-                    return str(detail.get("label") or item_label)
+    for category in SELF_SERVICE_ACTIVE_CATEGORIES:
+        for group in _dynamic_self_service_groups(category):
+            if str(group.get("label")) != item_text:
+                continue
+            details = group.get("details", [])
+            if details:
+                return str(details[0].get("label") or item_text)
 
-    return str(item_label)
+    return item_text
 
 
 def get_self_service_quantity_meta(
