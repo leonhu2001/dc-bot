@@ -63,6 +63,138 @@ PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
 # 舊分類只保留給歷史訂單與舊快照回查，不應再從後台修改。
 ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}
 
+QUALIFICATION_GROUPS = (
+    {
+        "key": "global",
+        "label": "全局職位",
+        "options": (
+            {
+                "field": "allowed_roles",
+                "key": "male_companion",
+                "label": ROLE_LABELS["male_companion"],
+            },
+            {
+                "field": "allowed_roles",
+                "key": "female_companion",
+                "label": ROLE_LABELS["female_companion"],
+            },
+        ),
+    },
+    {
+        "key": "delta_force",
+        "label": "三角洲",
+        "options": (
+            {
+                "field": "allowed_roles",
+                "key": "top_protector",
+                "label": ROLE_LABELS["top_protector"],
+            },
+            {
+                "field": "allowed_roles",
+                "key": "female_protector",
+                "label": ROLE_LABELS["female_protector"],
+            },
+            {
+                "field": "allowed_roles",
+                "key": "male_protector",
+                "label": ROLE_LABELS["male_protector"],
+            },
+        ),
+    },
+    {
+        "key": "lol",
+        "label": "英雄聯盟",
+        "options": tuple(
+            {
+                "field": "allowed_game_roles",
+                "key": role.key,
+                "label": role.label,
+            }
+            for role in GAME_RANK_ROLES
+            if role.game == "lol"
+        ),
+    },
+    {
+        "key": "apex",
+        "label": "APEX",
+        "options": tuple(
+            {
+                "field": "allowed_game_roles",
+                "key": role.key,
+                "label": role.label,
+            }
+            for role in GAME_RANK_ROLES
+            if role.game == "apex"
+        ),
+    },
+    {
+        "key": "valorant",
+        "label": "特戰英豪",
+        "options": tuple(
+            {
+                "field": "allowed_game_roles",
+                "key": role.key,
+                "label": role.label,
+            }
+            for role in GAME_RANK_ROLES
+            if role.game == "valorant"
+        ),
+    },
+    {
+        "key": "steam",
+        "label": "Steam",
+        "options": (),
+    },
+)
+
+GAME_IDENTITY_GROUPS = (
+    {
+        "key": "delta_force",
+        "label": "三角洲",
+        "options": tuple(
+            {"key": role.key, "label": role.label}
+            for role in GAME_IDENTITY_ROLES
+            if role.game == "delta_force"
+        ),
+    },
+    {
+        "key": "steam",
+        "label": "Steam",
+        "options": tuple(
+            {"key": role.key, "label": role.label}
+            for role in GAME_IDENTITY_ROLES
+            if role.game == "steam"
+        ),
+    },
+    {
+        "key": "lol",
+        "label": "英雄聯盟",
+        "options": tuple(
+            {"key": role.key, "label": role.label}
+            for role in GAME_IDENTITY_ROLES
+            if role.game == "lol"
+        ),
+    },
+    {
+        "key": "apex",
+        "label": "APEX",
+        "options": tuple(
+            {"key": role.key, "label": role.label}
+            for role in GAME_IDENTITY_ROLES
+            if role.game == "apex"
+        ),
+    },
+    {
+        "key": "valorant",
+        "label": "特戰英豪",
+        "options": tuple(
+            {"key": role.key, "label": role.label}
+            for role in GAME_IDENTITY_ROLES
+            if role.game == "valorant"
+        ),
+    },
+)
+
 
 def _is_admin_editable_rule(rule_key: str) -> bool:
     rule = ORDER_RULES.get(str(rule_key))
@@ -268,20 +400,6 @@ async def _render(
         else []
     )
 
-    rank_game_labels = {
-        "lol": "英雄聯盟",
-        "apex": "APEX",
-        "valorant": "特戰英豪",
-    }
-    game_rank_labels = {
-        role.key: f"{rank_game_labels.get(role.game, role.game)}｜{role.label}"
-        for role in GAME_RANK_ROLES
-    }
-    game_identity_labels = {
-        role.key: role.label
-        for role in GAME_IDENTITY_ROLES
-    }
-
     return templates.TemplateResponse(
         request=request,
         name="admin_order_rules.html",
@@ -297,9 +415,8 @@ async def _render(
             "active_meta": active_meta,
             "active_version": active_version,
             "versions": versions,
-            "service_role_labels": ROLE_LABELS,
-            "game_rank_labels": game_rank_labels,
-            "game_identity_labels": game_identity_labels,
+            "qualification_groups": QUALIFICATION_GROUPS,
+            "game_identity_groups": GAME_IDENTITY_GROUPS,
             "pricing_types": (
                 ("fixed", "固定價"),
                 ("hourly", "按小時"),
