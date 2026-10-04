@@ -50,8 +50,8 @@
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    tone(ctx, 880, now, 0.22, 0.42);
-    tone(ctx, 660, now + 0.18, 0.32, 0.36);
+    tone(ctx, 880, now, 0.22, 0.68);
+    tone(ctx, 660, now + 0.18, 0.32, 0.58);
   }
 
   function makeButton() {
@@ -172,7 +172,7 @@
     setInterval(check, REFRESH_INTERVAL_MS);
     setTimeout(check, 1000);
 
-    console.log('[dispatch-alert] started v5');
+    console.log('[dispatch-alert] started v6');
   }
 
   if (document.readyState === 'loading') {
