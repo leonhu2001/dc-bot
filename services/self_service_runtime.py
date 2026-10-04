@@ -19,6 +19,10 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             continue
         globals()[name] = value
 
+    reorder_configurator = globals().get("configure_reorder_ticket_creator")
+    if callable(reorder_configurator):
+        reorder_configurator(create_reorder_ticket_from_closed_order)
+
     _CONFIGURED = True
 
 
@@ -4687,9 +4691,3 @@ async def create_reorder_ticket_from_closed_order(
         raise
 
 
-# views.review 不直接 import bot.py，
-# 由這裡把真正的 ticket creator 注入進去，
-# 避免 circular import。
-configure_reorder_ticket_creator(
-    create_reorder_ticket_from_closed_order
-)
