@@ -223,6 +223,41 @@ def build_rule_with_override(
     return replace(base_rule, **changes)
 
 
+def build_custom_rule_definition(
+    rule_key: str,
+    category: str,
+    payload: dict[str, Any],
+) -> OrderRule:
+    key = str(rule_key or "").strip()
+    category_value = str(category or "").strip()
+    if not key:
+        raise ValueError("缺少商品規則 key。")
+    if category_value not in CATEGORY_LABELS:
+        raise RuntimeError(f"{key}: unknown category {category_value}")
+
+    payload = dict(payload or {})
+    label = str(payload.get("label") or "").strip()
+    pricing_type = str(payload.get("pricing_type") or "").strip()
+
+    if not label:
+        raise ValueError("商品名稱不能空白。")
+    if pricing_type not in {"fixed", "hourly", "game", "unit", "manual"}:
+        raise ValueError("計價方式不正確。")
+
+    seed = OrderRule(
+        category=category_value,
+        key=key,
+        label=label,
+        pricing_type=pricing_type,
+        price=int(payload.get("price") or 0),
+        unit_label=str(payload.get("unit_label") or "單"),
+        allowed_roles=(),
+    )
+    rule = build_rule_with_override(seed, payload)
+    validate_rule_definition(key, rule)
+    return rule
+
+
 def _protectors_fee() -> dict[RoleKey, int]:
     return {
         "top_protector": 100,
@@ -1303,40 +1338,64 @@ _BASE_ORDER_RULES = dict(ORDER_RULES)
 
 
 class EffectiveOrderRules(dict):
-    """Read-through mapping that overlays manager-published rule versions.
-
-    The code definitions remain the immutable fallback. Both Web and Discord Bot
-    processes read the same SQLite override table, so a published change becomes
-    effective without a Git deployment or service restart.
-    """
+    """Read-through mapping for code rules, manager overrides and custom products."""
 
     def __init__(self, base_rules: dict[str, OrderRule]):
         super().__init__(base_rules)
         self._override_cache: dict[str, dict[str, Any]] = {}
-        self._override_cache_at = 0.0
+        self._custom_cache: dict[str, dict[str, Any]] = {}
+        self._cache_at = 0.0
 
     def invalidate(self) -> None:
-        self._override_cache_at = 0.0
+        self._cache_at = 0.0
         self._override_cache = {}
+        self._custom_cache = {}
 
-    def _overrides(self) -> dict[str, dict[str, Any]]:
+    def _refresh(self) -> None:
         now = time.monotonic()
-        if now - self._override_cache_at < 2.0:
-            return self._override_cache
+        if now - self._cache_at < 2.0:
+            return
 
         try:
-            from services.order_rule_store import load_active_overrides
+            from services.order_rule_store import (
+                load_active_overrides,
+                load_custom_rule_definitions,
+            )
 
-            data = load_active_overrides()
+            overrides = load_active_overrides()
+            custom = load_custom_rule_definitions()
         except Exception:
-            data = {}
+            overrides = {}
+            custom = {}
 
-        self._override_cache = data
-        self._override_cache_at = now
-        return data
+        self._override_cache = overrides
+        self._custom_cache = custom
+        self._cache_at = now
+
+    def _overrides(self) -> dict[str, dict[str, Any]]:
+        self._refresh()
+        return self._override_cache
+
+    def _customs(self) -> dict[str, dict[str, Any]]:
+        self._refresh()
+        return self._custom_cache
+
+    def _base_for_key(self, key: str) -> OrderRule:
+        if dict.__contains__(self, key):
+            return dict.__getitem__(self, key)
+
+        item = self._customs().get(str(key))
+        if not item:
+            raise KeyError(key)
+
+        return build_custom_rule_definition(
+            str(key),
+            str(item.get("category") or ""),
+            dict(item.get("payload") or {}),
+        )
 
     def _effective(self, key: str) -> OrderRule:
-        base = dict.__getitem__(self, key)
+        base = self._base_for_key(str(key))
         item = self._overrides().get(str(key))
         if not item:
             return base
@@ -1349,6 +1408,18 @@ class EffectiveOrderRules(dict):
             # A corrupted override must never take the storefront or Bot down.
             return base
 
+    def _all_keys(self) -> list[str]:
+        keys = [str(key) for key in dict.keys(self)]
+        for key in self._customs():
+            key = str(key)
+            if key not in keys:
+                keys.append(key)
+        return keys
+
+    def __contains__(self, key) -> bool:
+        key = str(key)
+        return dict.__contains__(self, key) or key in self._customs()
+
     def __getitem__(self, key):
         return self._effective(str(key))
 
@@ -1358,19 +1429,28 @@ class EffectiveOrderRules(dict):
         except KeyError:
             return default
 
+    def __iter__(self):
+        return iter(self._all_keys())
+
+    def __len__(self):
+        return len(self._all_keys())
+
+    def keys(self):
+        return self._all_keys()
+
     def values(self):
-        return [self._effective(str(key)) for key in dict.keys(self)]
+        return [self._effective(key) for key in self._all_keys()]
 
     def items(self):
         return [
-            (str(key), self._effective(str(key)))
-            for key in dict.keys(self)
+            (key, self._effective(key))
+            for key in self._all_keys()
         ]
 
     def copy(self):
         return {
-            str(key): self._effective(str(key))
-            for key in dict.keys(self)
+            key: self._effective(key)
+            for key in self._all_keys()
         }
 
 
@@ -1378,10 +1458,25 @@ ORDER_RULES = EffectiveOrderRules(_BASE_ORDER_RULES)
 
 
 def get_base_rule(rule_key: str) -> OrderRule:
+    key = str(rule_key)
+    if key in _BASE_ORDER_RULES:
+        return _BASE_ORDER_RULES[key]
+
     try:
-        return _BASE_ORDER_RULES[str(rule_key)]
-    except KeyError as exc:
-        raise KeyError(f"unknown order rule: {rule_key}") from exc
+        from services.order_rule_store import get_custom_rule_definition
+
+        item = get_custom_rule_definition(key)
+    except Exception:
+        item = None
+
+    if item:
+        return build_custom_rule_definition(
+            key,
+            str(item.get("category") or ""),
+            dict(item.get("payload") or {}),
+        )
+
+    raise KeyError(f"unknown order rule: {rule_key}")
 
 
 def get_rule_override_metadata(rule_key: str) -> dict[str, Any] | None:
@@ -1423,6 +1518,7 @@ __all__ = [
     "OrderRule",
     "calculate_price",
     "build_rule_with_override",
+    "build_custom_rule_definition",
     "get_allowed_role_ids",
     "get_base_rule",
     "get_allowed_role_keys",

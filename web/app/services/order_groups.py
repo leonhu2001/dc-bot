@@ -582,6 +582,40 @@ def _variant_data(
     }
 
 
+def _custom_group_specs() -> list[dict]:
+    try:
+        from services.order_rule_store import list_custom_rule_definitions
+
+        definitions = list_custom_rule_definitions()
+    except Exception:
+        definitions = []
+
+    result: list[dict] = []
+    for item in definitions:
+        rule_key = str(item.get("rule_key") or "").strip()
+        rule = ORDER_RULES.get(rule_key)
+        if rule is None:
+            continue
+
+        category = str(getattr(rule, "category", "") or "")
+        if category not in CATEGORY_ORDER:
+            continue
+
+        label = str(getattr(rule, "label", "") or rule_key)
+        result.append({
+            "key": f"custom_{rule_key}",
+            "category": category,
+            "label": label,
+            "selector_label": "方案",
+            "description": str(getattr(rule, "note", "") or "後台新增商品。"),
+            "variants": [
+                (rule_key, label),
+            ],
+        })
+
+    return result
+
+
 def _group_data(
     spec: dict,
 ) -> dict | None:
@@ -695,7 +729,7 @@ def get_public_order_categories() -> list[dict]:
     available = {
         spec["category"]
         for spec
-        in GROUP_SPECS
+        in [*GROUP_SPECS, *_custom_group_specs()]
     }
 
     for category in CATEGORY_ORDER:
@@ -736,7 +770,7 @@ def get_grouped_order_catalog(
 
     groups = []
 
-    for spec in GROUP_SPECS:
+    for spec in [*GROUP_SPECS, *_custom_group_specs()]:
 
         if (
             category != "all"

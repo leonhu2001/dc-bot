@@ -152,7 +152,9 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
             disabled = True
             placeholder = "請先選擇訂單類別"
         else:
-            group_options = ORDER_ITEM_GROUPS_BY_CATEGORY.get(selected_category, [])
+            from services.orders import get_order_item_groups_for_category
+
+            group_options = get_order_item_groups_for_category(selected_category)
 
             if group_options:
                 options = [

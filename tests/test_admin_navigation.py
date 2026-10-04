@@ -284,12 +284,34 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert '"key": "female_companion"' in source
 
     assert "<h3>接單職位</h3>" not in page
-    assert page.count("<h3>階級資格</h3>") == 1
+    # One qualification block for quick-create and one for editing the selected product.
+    assert page.count("<h3>階級資格</h3>") == 2
     assert "<h3>遊戲身分</h3>" in page
     assert "qualification_groups" in page
     assert "game_identity_groups" in page
     assert 'name="{{ option.field }}"' in page
     assert 'name="required_game_roles"' in page
+
+
+def test_order_rule_admin_exposes_manager_quick_create_form():
+    page = (TEMPLATES / "admin_order_rules.html").read_text(encoding="utf-8")
+    router = (
+        ROOT / "web" / "app" / "routers" / "admin_order_rules.py"
+    ).read_text(encoding="utf-8")
+
+    assert "＋ 新增商品" in page
+    assert 'action="/admin/order-rules/create"' in page
+    assert "creatable_categories" in page
+    assert 'name="category"' in page
+    assert 'name="{{ option.field }}"' in page
+    assert 'name="required_game_roles"' in page
+    assert 'name="point_benefits_allowed" checked' in page
+
+    assert '@router.post("/admin/order-rules/create")' in router
+    assert "ADMIN_CREATABLE_RULE_CATEGORIES" in router
+    assert "CATEGORY_DEFAULT_GAME_ROLES" in router
+    assert "create_custom_rule_definition(" in router
+    assert 'action="create_order_rule"' in router
 
 
 def test_payout_summary_uses_shared_discord_avatar_resolver():
