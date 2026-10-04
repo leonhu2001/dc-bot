@@ -135,6 +135,34 @@ def create_payment_review(
         ).fetchone()
 
         if existing is not None:
+            existing_customer_id = str(
+                existing["customer_discord_id"]
+                or ""
+            )
+            existing_target_id = str(
+                existing["target_discord_id"]
+                or ""
+            )
+            requested_target_id = (
+                str(target_discord_id)
+                if target_discord_id is not None
+                else ""
+            )
+
+            same_request = (
+                existing_customer_id == str(customer_discord_id)
+                and existing_target_id == requested_target_id
+                and int(existing["amount"] or 0) == amount
+                and str(existing["payment_method"] or "") == payment_method
+            )
+
+            if not same_request:
+                conn.rollback()
+                raise ValueError(
+                    "這個來源已有尚未完成的付款審核，但本次送出的"
+                    "付款人、對象、金額或付款方式不同；請先處理原審核。"
+                )
+
             conn.commit()
             return dict(existing)
 
