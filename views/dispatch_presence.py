@@ -7,10 +7,14 @@ import discord
 from services.dispatch_presence import count_online_dispatch_workers
 
 
+DEFAULT_IDLE_CHANNEL_NAME = "🚬┃排隊中。。。。。"
+
+
 def format_dispatch_presence_channel_name(count: int) -> str:
     online_count = max(0, int(count or 0))
-    icon = "🟢" if online_count > 0 else "⚫"
-    return f"{icon}｜可接單・{online_count}人"
+    if online_count <= 0:
+        return DEFAULT_IDLE_CHANNEL_NAME
+    return f"🟢┃{online_count}人在線"
 
 
 async def dispatch_presence_channel_loop(
