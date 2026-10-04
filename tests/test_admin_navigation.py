@@ -257,3 +257,28 @@ def test_core_admin_pages_no_longer_embed_visual_override_blocks():
         assert "<style>" not in text, (
             f"{filename} still embeds page-level visual CSS"
         )
+
+def test_dashboard_has_no_literal_newline_and_support_rows_have_no_link_underline():
+    dashboard = (TEMPLATES / "admin.html").read_text(encoding="utf-8")
+    center = (TEMPLATES / "admin_center.html").read_text(encoding="utf-8")
+
+    assert "\\n</head>" not in dashboard
+    assert ".center-row{" in center
+    assert "text-decoration:none" in center
+
+
+def test_order_rule_admin_hides_legacy_categories_and_separates_role_groups():
+    routers = ROOT / "web" / "app" / "routers"
+    source = (routers / "admin_order_rules.py").read_text(encoding="utf-8")
+    page = (TEMPLATES / "admin_order_rules.html").read_text(encoding="utf-8")
+
+    assert 'ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}' in source
+    assert "game_rank_labels" in source
+    assert "game_identity_labels" in source
+    assert "game_rank_labels.items()" in page
+    assert "game_identity_labels.items()" in page
+    assert "game_role_labels.items()" not in page
+    assert "<h3>接單職位</h3>" in page
+    assert "<h3>階級資格</h3>" in page
+    assert "<h3>遊戲身分</h3>" in page
+
