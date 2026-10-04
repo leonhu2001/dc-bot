@@ -3752,14 +3752,18 @@ async def build_reorder_self_service_draft(
         except Exception:
             item_group = None
 
-    valid_groups = (
-        ORDER_ITEM_GROUPS_BY_CATEGORY.get(
-            category_key,
-            [],
-        )
-        if category_key
-        else []
-    )
+    if category_key:
+        try:
+            from services.orders import get_order_item_groups_for_category
+
+            valid_groups = get_order_item_groups_for_category(category_key)
+        except Exception:
+            valid_groups = ORDER_ITEM_GROUPS_BY_CATEGORY.get(
+                category_key,
+                [],
+            )
+    else:
+        valid_groups = []
 
     if (
         item_group
