@@ -5,10 +5,19 @@ import importlib
 import inspect
 import os
 from pathlib import Path
+import sys
 from typing import Any
 
 
-ROOT = Path(os.environ.get("DC_BOT_ROOT", "/opt/dc-bot"))
+ROOT = Path(
+    os.environ.get(
+        "DC_BOT_ROOT",
+        str(Path(__file__).resolve().parents[1]),
+    )
+).resolve()
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def title(text: str) -> None:
