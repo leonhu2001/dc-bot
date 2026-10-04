@@ -26,6 +26,11 @@
         box-shadow: 0 22px 60px rgba(0,0,0,.3);
     }
 
+    .dispatch-hero-main,
+    .dispatch-column {
+        padding: 18px;
+    }
+
     .dispatch-hero-main {
         padding: 26px;
     }
@@ -52,10 +57,17 @@
         line-height: 1.8;
     }
 
-    .dispatch-tags {
+    .dispatch-tags,
+    .dispatch-chip-list,
+    .dispatch-status-stack,
+    .dispatch-actions,
+    .dispatch-my-links {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+    }
+
+    .dispatch-tags {
         margin-top: 18px;
     }
 
@@ -72,6 +84,30 @@
         padding: 7px 10px;
         font-size: 12px;
         font-weight: 900;
+    }
+
+    .dispatch-tag-button {
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .dispatch-tag[data-state="online"] {
+        border-color: rgba(114, 242, 166, .34);
+        background: rgba(114, 242, 166, .1);
+        color: #d9ffe8;
+    }
+
+    .dispatch-tag[data-state="reconnecting"] {
+        border-color: rgba(245, 198, 107, .34);
+        background: rgba(245, 198, 107, .1);
+        color: #ffe3a3;
+    }
+
+    .dispatch-tag[data-state="offline"],
+    .dispatch-tag[data-state="blocked"] {
+        border-color: rgba(255, 107, 138, .34);
+        background: rgba(255, 107, 138, .1);
+        color: #ffd5df;
     }
 
     .dispatch-stats {
@@ -127,24 +163,32 @@
         align-items: start;
     }
 
-    .dispatch-column {
-        padding: 18px;
-    }
-
-    .dispatch-column-head {
+    .dispatch-column-head,
+    .dispatch-subsection-head {
         display: flex;
         align-items: start;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 14px;
         padding-bottom: 14px;
         border-bottom: 1px solid rgba(255,255,255,.08);
     }
 
-    .dispatch-column-head h2 {
+    .dispatch-column-head {
+        margin-bottom: 14px;
+    }
+
+    .dispatch-column-head h2,
+    .dispatch-subsection-head h3 {
         margin: 0;
-        font-size: 22px;
         letter-spacing: .06em;
+    }
+
+    .dispatch-column-head h2 {
+        font-size: 22px;
+    }
+
+    .dispatch-subsection-head h3 {
+        font-size: 18px;
     }
 
     .dispatch-count {
@@ -154,6 +198,36 @@
     .dispatch-list {
         display: grid;
         gap: 12px;
+    }
+
+    .dispatch-subsection {
+        display: grid;
+        gap: 12px;
+    }
+
+    .dispatch-subsection + .dispatch-subsection {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(255,255,255,.08);
+    }
+
+    .dispatch-progress-group {
+        margin-top: 18px;
+        border-top: 1px solid rgba(255,255,255,.08);
+        padding-top: 18px;
+    }
+
+    .dispatch-progress-group > summary {
+        list-style: none;
+        cursor: pointer;
+    }
+
+    .dispatch-progress-group > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .dispatch-progress-body {
+        margin-top: 12px;
     }
 
     .dispatch-my-card,
@@ -166,10 +240,11 @@
             rgba(0,0,0,.18);
     }
 
-    .dispatch-my-card {
-        padding: 15px;
+    .dispatch-my-card,
+    .dispatch-order-card {
+        padding: 16px;
         display: grid;
-        gap: 12px;
+        gap: 14px;
     }
 
     .dispatch-my-card h3,
@@ -177,6 +252,31 @@
         margin: 4px 0 0;
         font-size: 17px;
         line-height: 1.45;
+    }
+
+    .dispatch-my-status {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .dispatch-my-status > div {
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,.075);
+        background: rgba(255,255,255,.035);
+    }
+
+    .dispatch-my-status span {
+        display: block;
+        color: var(--mw-muted, #a7a0b5);
+        font-size: 11px;
+    }
+
+    .dispatch-my-status strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 15px;
     }
 
     .dispatch-money {
@@ -192,10 +292,18 @@
         font-size: 19px;
     }
 
-    .dispatch-order-card {
-        padding: 16px;
-        display: grid;
-        gap: 14px;
+    .dispatch-my-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(245, 198, 107, .3);
+        border-radius: 999px;
+        padding: 7px 11px;
+        color: #ffe3a3;
+        background: rgba(245, 198, 107, .08);
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 900;
     }
 
     .dispatch-order-top {
@@ -209,6 +317,12 @@
         border-color: rgba(117, 232, 255, .34);
         background: rgba(117, 232, 255, .09);
         color: #c9f8ff;
+    }
+
+    .dispatch-missing {
+        border-color: rgba(255, 189, 89, .38);
+        background: rgba(255, 189, 89, .1);
+        color: #ffe0a3;
     }
 
     .dispatch-meta {
@@ -238,7 +352,7 @@
 
     .dispatch-assignment {
         display: grid;
-        grid-template-columns: 1fr 92px;
+        grid-template-columns: 1fr 112px;
         gap: 12px;
         align-items: center;
         border: 1px solid rgba(255,255,255,.075);
@@ -248,9 +362,6 @@
     }
 
     .dispatch-chip-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 7px;
         margin-top: 8px;
     }
 
@@ -263,7 +374,7 @@
     .dispatch-worker-count strong {
         display: block;
         color: var(--mw-text, #f4f0e8);
-        font-size: 26px;
+        font-size: 24px;
         line-height: 1.1;
     }
 
@@ -305,10 +416,18 @@
     .dispatch-footer {
         display: flex;
         justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
     }
 
     .dispatch-footer form {
         margin: 0;
+    }
+
+    .dispatch-footer-status {
+        color: var(--mw-muted, #a7a0b5);
+        font-size: 13px;
+        font-weight: 800;
     }
 
     .dispatch-button {
@@ -325,6 +444,12 @@
         border-color: rgba(255,107,138,.4);
         background: rgba(255,107,138,.13);
         color: #ffd8df;
+    }
+
+    .dispatch-footer button:disabled {
+        opacity: .56;
+        cursor: wait;
+        transform: none;
     }
 
     .dispatch-empty {
@@ -348,7 +473,8 @@
     @media (max-width: 760px) {
         .dispatch-stats,
         .dispatch-meta,
-        .dispatch-payout {
+        .dispatch-payout,
+        .dispatch-my-status {
             grid-template-columns: 1fr;
         }
 
@@ -363,11 +489,218 @@
         }
 
         .dispatch-order-top,
-        .dispatch-column-head {
+        .dispatch-column-head,
+        .dispatch-subsection-head {
             flex-direction: column;
         }
     }
 </style>
+
+{% macro render_order_card(order, user, claimed_order_ids, request) %}
+    {% set active_assignments = [] %}
+    {% for assignment in order.assignments %}
+        {% if assignment.is_active %}
+            {% set _ = active_assignments.append(assignment) %}
+        {% endif %}
+    {% endfor %}
+
+    {% set user_claimed_this_order = order.id in claimed_order_ids %}
+    {% set prepay_claims = order.prepay_claims or [] %}
+    {% set final_price = order.customer_pay_amount if order.customer_pay_amount is not none else order.amount %}
+    {% set original_price = order.original_amount if order.original_amount is not none else final_price %}
+    {% set percent_off = order.manual_discount_amount or 0 %}
+    {% set fixed_off = order.cash_coupon_amount or 0 %}
+    {% set point_off = (order.store_absorbed_amount or 0) - fixed_off %}
+    {% set service_after_percent = original_price - percent_off %}
+    {% set payout_base = order.payout_base_amount if order.payout_base_amount is not none else final_price %}
+    {% set specify_fee = payout_base - service_after_percent %}
+
+    <article class="dispatch-order-card" data-dispatch-order-id="{{ order.id }}">
+        <div class="dispatch-order-top">
+            <div>
+                <p class="dispatch-eyebrow">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
+                <h3>{{ order.category }}｜{{ order.item }}</h3>
+            </div>
+
+            <div class="dispatch-status-stack">
+                <span class="dispatch-chip dispatch-status">
+                    {{ order.dispatch_status_label }}
+                </span>
+                {% if order.dispatch_claim_open %}
+                    <span class="dispatch-chip dispatch-missing">
+                        還缺 {{ order.dispatch_missing_staff_count }} 人
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="dispatch-meta">
+            <div class="dispatch-meta-item">
+                <span>老闆</span>
+                <strong>{{ order.customer_display_name or "未記錄" }}</strong>
+            </div>
+
+            <div class="dispatch-meta-item">
+                <span>數量</span>
+                <strong>{{ order.quantity }} 單</strong>
+            </div>
+
+            <div class="dispatch-meta-item">
+                <span>金額</span>
+                <strong>{{ final_price }}T</strong>
+            </div>
+
+            <div class="dispatch-meta-item">
+                <span>付款方式</span>
+                <strong>{{ order.payment_method or "未記錄" }}</strong>
+            </div>
+        </div>
+
+        {% if
+            original_price != final_price
+            or percent_off > 0
+            or fixed_off > 0
+            or point_off > 0
+            or specify_fee > 0
+        %}
+            <div class="dispatch-payout">
+                <div>
+                    <span>商品原價</span>
+                    <strong>{{ original_price }}T</strong>
+                </div>
+
+                {% if percent_off > 0 %}
+                    <div>
+                        <span>百分比折扣</span>
+                        <strong>-{{ percent_off }}T</strong>
+                    </div>
+                {% endif %}
+
+                {% if fixed_off > 0 %}
+                    <div>
+                        <span>固定折扣</span>
+                        <strong>-{{ fixed_off }}T</strong>
+                    </div>
+                {% endif %}
+
+                {% if point_off > 0 %}
+                    <div>
+                        <span>點數折價</span>
+                        <strong>-{{ point_off }}T</strong>
+                    </div>
+                {% endif %}
+
+                {% if specify_fee > 0 %}
+                    <div>
+                        <span>指定費</span>
+                        <strong>+{{ specify_fee }}T</strong>
+                    </div>
+                {% endif %}
+
+                <div>
+                    <span>顧客實付</span>
+                    <strong>{{ final_price }}T</strong>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="dispatch-assignment">
+            <div>
+                <span class="dispatch-muted">接單人員</span>
+
+                {% if active_assignments %}
+                    <div class="dispatch-chip-list">
+                        {% for assignment in active_assignments %}
+                            <span class="dispatch-chip">
+                                @{{ assignment.worker_display_name or assignment.worker_discord_id }}
+                                {% if assignment.has_named_bonus %}
+                                    +掛名
+                                {% endif %}
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% elif prepay_claims %}
+                    <div class="dispatch-chip-list">
+                        {% for assignment in prepay_claims %}
+                            <span class="dispatch-chip">
+                                @{{ assignment.worker_display_name or assignment.worker_discord_id }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="dispatch-muted">尚未有人接單</p>
+                {% endif %}
+
+                {% if order.dispatch_required_staff_count %}
+                    <p class="dispatch-muted">
+                        接單進度：
+                        {{ order.dispatch_current_staff_count }}/{{ order.dispatch_required_staff_count }}
+                        {% if order.prepay_min_protector_count %}
+                            ｜護航 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}
+                        {% endif %}
+                    </p>
+                {% endif %}
+            </div>
+
+            <div class="dispatch-worker-count">
+                <span>人數</span>
+                <strong>
+                    {{ order.dispatch_current_staff_count }}
+                    {% if order.dispatch_required_staff_count %}
+                        /{{ order.dispatch_required_staff_count }}
+                    {% endif %}
+                </strong>
+            </div>
+        </div>
+
+        {% if user_claimed_this_order %}
+            {% for payout in order.payouts %}
+                {% if payout.worker_discord_id == user.id %}
+                    <div class="dispatch-payout">
+                        <div>
+                            <span>基本分潤</span>
+                            <strong>{{ payout.base_payout|round(0, 'common')|int }}T</strong>
+                        </div>
+
+                        <div>
+                            <span>掛名加成</span>
+                            <strong>{{ payout.named_bonus_amount|round(0, 'common')|int }}T</strong>
+                        </div>
+
+                        <div>
+                            <span>目前總分潤</span>
+                            <strong>{{ payout.final_payout|round(0, 'common')|int }}T</strong>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        {% if order.note %}
+            <p class="dispatch-note">{{ order.note }}</p>
+        {% endif %}
+
+        <div class="dispatch-footer">
+            {% if user_claimed_this_order and order.dispatch_allows_unclaim %}
+                <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim" data-dispatch-action="unclaim">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <button class="button danger" type="submit" data-busy-label="取消中…">
+                        取消接單
+                    </button>
+                </form>
+            {% elif order.dispatch_claim_open %}
+                <form method="post" action="/dispatch/orders/{{ order.id }}/claim" data-dispatch-action="claim">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <button class="button" type="submit" data-busy-label="接單中…">
+                        接單
+                    </button>
+                </form>
+            {% else %}
+                <span class="dispatch-footer-status">{{ order.dispatch_locked_message }}</span>
+            {% endif %}
+        </div>
+    </article>
+{% endmacro %}
 
 <div class="dispatch-shell">
     {% if message %}
@@ -383,20 +716,32 @@
             <p class="dispatch-eyebrow">MISSION DISPATCH</p>
             <h1 class="dispatch-title">接單說明</h1>
             <p class="dispatch-desc">
-                查看目前可接任務、進行中任務與預估分潤。接單後系統會同步紀錄，客服與五個新接單身分組皆沿用原本派單頁權限。
+                可接任務與進行中任務分區顯示；新單由即時連線推送，畫面更新完成後才播放提示音。
             </p>
 
             <div class="dispatch-tags">
                 <span class="dispatch-tag">魔丸♫客服</span>
                 <span class="dispatch-tag">護航接單</span>
                 <span class="dispatch-tag">陪玩接單</span>
-                <span class="dispatch-tag">即時提醒</span>
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的陪玩">
                     🟢 在線陪玩 {{ online_companion_count }} 人
                 </span>
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管">
                     🟢 在線客服 {{ online_support_count }} 人
                 </span>
+                <span class="dispatch-tag" data-dispatch-realtime-status data-state="reconnecting">
+                    🟡 即時連線中
+                </span>
+                <span class="dispatch-tag" data-dispatch-last-sync>
+                    最後同步 --
+                </span>
+                <button
+                    class="dispatch-tag dispatch-tag-button"
+                    type="button"
+                    data-dispatch-notification-toggle
+                >
+                    🖥️ 桌面通知未啟用
+                </button>
             </div>
         </div>
 
@@ -426,23 +771,79 @@
             {% if claimed_orders %}
                 <div class="dispatch-list">
                     {% for claimed_order in claimed_orders %}
+                        {% set summary = claimed_order_summaries.get(claimed_order.id, {}) %}
+                        {% set payout = summary.get("payout", {}) %}
                         <article class="dispatch-my-card">
                             <div>
                                 <p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p>
                                 <h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3>
                             </div>
 
+                            <div class="dispatch-my-status">
+                                <div>
+                                    <span>任務狀態</span>
+                                    <strong>{{ summary.get("status_label", claimed_order.status) }}</strong>
+                                </div>
+                                <div>
+                                    <span>接單進度</span>
+                                    <strong>
+                                        {{ summary.get("current_staff_count", 0) }}
+                                        /
+                                        {{ summary.get("required_staff_count", 0) or "?" }}
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>{{ payout.get("label", "分潤") }}</span>
+                                    <strong>
+                                        {% if payout.get("amount") is not none %}
+                                            {{ payout.get("amount") }}T
+                                        {% else %}
+                                            待計算
+                                        {% endif %}
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span>剩餘缺額</span>
+                                    <strong>{{ summary.get("missing_staff_count", 0) }} 人</strong>
+                                </div>
+                            </div>
+
                             <div class="dispatch-money">
                                 <span>訂單金額</span>
                                 <strong>{{ claimed_order.customer_pay_amount if claimed_order.customer_pay_amount is not none else claimed_order.amount }}T</strong>
                             </div>
+
+                            {% if summary.get("ticket_url") or summary.get("dispatch_url") %}
+                                <div class="dispatch-my-links">
+                                    {% if summary.get("ticket_url") %}
+                                        <a
+                                            class="dispatch-my-link"
+                                            href="{{ summary.get('ticket_url') }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                        >
+                                            前往票口
+                                        </a>
+                                    {% endif %}
+                                    {% if summary.get("dispatch_url") %}
+                                        <a
+                                            class="dispatch-my-link"
+                                            href="{{ summary.get('dispatch_url') }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                        >
+                                            前往派單訊息
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         </article>
                     {% endfor %}
                 </div>
             {% else %}
                 <div class="dispatch-empty">
                     <strong>目前尚未接任何訂單。</strong>
-                    <span>可接任務會顯示在右側派單任務。</span>
+                    <span>可接任務會顯示在右側任務區。</span>
                 </div>
             {% endif %}
         </aside>
@@ -452,244 +853,60 @@
                 <div>
                     <p class="dispatch-eyebrow">MISSION BOARD</p>
                     <h2>派單任務</h2>
-                    <p class="dispatch-desc">可接任務與已付款進行中的任務都會顯示；只有標示「可接單」的任務可以操作接單。</p>
+                    <p class="dispatch-desc">可接任務優先顯示；名額已滿或已付款成立的任務收進下方進行中區域。</p>
                 </div>
-                <span class="dispatch-pill dispatch-count">可接 {{ claimable_orders | length }}｜進行中 {{ non_claimable_orders | length }}</span>
+                <span class="dispatch-pill dispatch-count">
+                    可接 {{ claimable_orders | length }}｜進行中 {{ non_claimable_orders | length }}
+                </span>
             </div>
 
-            {% if orders %}
-                <div class="dispatch-list">
-                    {% for order in orders %}
-                        {% set active_assignments = [] %}
-                        {% for assignment in order.assignments %}
-                            {% if assignment.is_active %}
-                                {% set _ = active_assignments.append(assignment) %}
-                            {% endif %}
+            <section class="dispatch-subsection">
+                <div class="dispatch-subsection-head">
+                    <div>
+                        <p class="dispatch-eyebrow">AVAILABLE</p>
+                        <h3>可接任務</h3>
+                    </div>
+                    <span class="dispatch-pill">{{ claimable_orders | length }} 筆</span>
+                </div>
+
+                {% if claimable_orders %}
+                    <div class="dispatch-list">
+                        {% for order in claimable_orders %}
+                            {{ render_order_card(order, user, claimed_order_ids, request) }}
                         {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="dispatch-empty">
+                        <strong>目前沒有可接任務。</strong>
+                        <span>新單抵達後會即時出現在這裡。</span>
+                    </div>
+                {% endif %}
+            </section>
 
-                        {% set user_claimed_this_order = order.id in claimed_order_ids %}
+            <details class="dispatch-progress-group">
+                <summary class="dispatch-subsection-head">
+                    <div>
+                        <p class="dispatch-eyebrow">IN PROGRESS</p>
+                        <h3>進行中／已滿任務</h3>
+                    </div>
+                    <span class="dispatch-pill">{{ non_claimable_orders | length }} 筆 ▾</span>
+                </summary>
 
-                        <article class="dispatch-order-card">
-                            <div class="dispatch-order-top">
-                                <div>
-                                    <p class="dispatch-eyebrow">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
-                                    <h3>{{ order.category }}｜{{ order.item }}</h3>
-                                </div>
-
-                                <span class="dispatch-chip dispatch-status">
-                                    {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
-                                        可接單
-                                    {% elif order.status == "active" %}
-                                        進行中
-                                    {% elif order.status == "stored" %}
-                                        已存單
-                                    {% else %}
-                                        {{ order.status }}
-                                    {% endif %}
-                                </span>
-                            </div>
-
-                            <div class="dispatch-meta">
-                                <div class="dispatch-meta-item">
-                                    <span>老闆</span>
-                                    <strong>{{ order.customer_display_name or "未記錄" }}</strong>
-                                </div>
-
-                                <div class="dispatch-meta-item">
-                                    <span>數量</span>
-                                    <strong>{{ order.quantity }} 單</strong>
-                                </div>
-
-                                <div class="dispatch-meta-item">
-                                    <span>金額</span>
-                                    <strong>{{ order.customer_pay_amount if order.customer_pay_amount is not none else order.amount }}T</strong>
-                                </div>
-
-                                <div class="dispatch-meta-item">
-                                    <span>付款方式</span>
-                                    <strong>{{ order.payment_method or "未記錄" }}</strong>
-                                </div>
-                            </div>
-
-                            {% set final_price = order.customer_pay_amount if order.customer_pay_amount is not none else order.amount %}
-
-                            {% set original_price = order.original_amount if order.original_amount is not none else final_price %}
-
-                            {% set percent_off = order.manual_discount_amount or 0 %}
-
-                            {% set fixed_off = order.cash_coupon_amount or 0 %}
-
-                            {% set point_off = (order.store_absorbed_amount or 0) - fixed_off %}
-
-                            {% set service_after_percent = original_price - percent_off %}
-
-                            {% set payout_base = order.payout_base_amount if order.payout_base_amount is not none else final_price %}
-
-                            {% set specify_fee = payout_base - service_after_percent %}
-
-                            {% if
-                                original_price != final_price
-                                or percent_off > 0
-                                or fixed_off > 0
-                                or point_off > 0
-                                or specify_fee > 0
-                            %}
-                                <div class="dispatch-payout">
-
-                                    <div>
-                                        <span>商品原價</span>
-                                        <strong>{{ original_price }}T</strong>
-                                    </div>
-
-                                    {% if percent_off > 0 %}
-                                        <div>
-                                            <span>百分比折扣</span>
-                                            <strong>-{{ percent_off }}T</strong>
-                                        </div>
-                                    {% endif %}
-
-                                    {% if fixed_off > 0 %}
-                                        <div>
-                                            <span>固定折扣</span>
-                                            <strong>-{{ fixed_off }}T</strong>
-                                        </div>
-                                    {% endif %}
-
-                                    {% if point_off > 0 %}
-                                        <div>
-                                            <span>點數折價</span>
-                                            <strong>-{{ point_off }}T</strong>
-                                        </div>
-                                    {% endif %}
-
-                                    {% if specify_fee > 0 %}
-                                        <div>
-                                            <span>指定費</span>
-                                            <strong>+{{ specify_fee }}T</strong>
-                                        </div>
-                                    {% endif %}
-
-                                    <div>
-                                        <span>顧客實付</span>
-                                        <strong>{{ final_price }}T</strong>
-                                    </div>
-
-                                </div>
-                            {% endif %}
-
-                            <div class="dispatch-assignment">
-                                <div>
-                                    <span class="dispatch-muted">接單人員</span>
-
-                                    {% set prepay_claims = order.prepay_claims or [] %}
-
-                                    {% if active_assignments %}
-                                        <div class="dispatch-chip-list">
-                                            {% for assignment in active_assignments %}
-                                                <span class="dispatch-chip">
-                                                    @{{ assignment.worker_display_name or assignment.worker_discord_id }}
-                                                    {% if assignment.has_named_bonus %}
-                                                        +掛名
-                                                    {% endif %}
-                                                </span>
-                                            {% endfor %}
-                                        </div>
-                                    {% elif prepay_claims %}
-                                        <div class="dispatch-chip-list">
-                                            {% for assignment in prepay_claims %}
-                                                <span class="dispatch-chip">
-                                                    @{{ assignment.worker_display_name or assignment.worker_discord_id }}
-                                                </span>
-                                            {% endfor %}
-                                        </div>
-                                    {% else %}
-                                        <p class="dispatch-muted">尚未有人接單</p>
-                                    {% endif %}
-
-                                    {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
-                                        <p class="dispatch-muted">
-                                            付款前接單進度：
-                                            {{ order.prepay_claim_count or 0 }}/{{ order.prepay_required_count or "?" }}
-                                            {% if order.prepay_min_protector_count %}
-                                                ｜護航 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}
-                                            {% endif %}
-                                        </p>
-                                    {% endif %}
-                                </div>
-
-                                <div class="dispatch-worker-count">
-                                    <span>人數</span>
-                                    <strong>
-                                            {% if active_assignments %}
-                                                {{ active_assignments | length }}
-                                            {% else %}
-                                                {{ order.prepay_claim_count or 0 }}
-                                            {% endif %}
-                                        </strong>
-                                </div>
-                            </div>
-
-                            {% if user_claimed_this_order %}
-                                {% for payout in order.payouts %}
-                                    {% if payout.worker_discord_id == user.id %}
-                                        <div class="dispatch-payout">
-                                            <div>
-                                                <span>基本分潤</span>
-                                                <strong>{{ payout.base_amount }}T</strong>
-                                            </div>
-
-                                            <div>
-                                                <span>掛名加成</span>
-                                                <strong>{{ payout.named_bonus_amount }}T</strong>
-                                            </div>
-
-                                            <div>
-                                                <span>預估總分潤</span>
-                                                <strong>{{ payout.total_amount }}T</strong>
-                                            </div>
-                                        </div>
-                                    {% endif %}
-                                {% endfor %}
-                            {% endif %}
-
-                            {% if order.note %}
-                                <p class="dispatch-note">{{ order.note }}</p>
-                            {% endif %}
-
-                            <div class="dispatch-footer">
-                                {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
-                                    {% if user_claimed_this_order %}
-                                        <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim">
-<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                                            <button class="button danger" type="submit">
-                                                取消接單
-                                            </button>
-                                        </form>
-                                    {% else %}
-                                        <form method="post" action="/dispatch/orders/{{ order.id }}/claim">
-<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                                            <button class="button" type="submit">
-                                                接單
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% elif order.status == "active" %}
-                                    <span>已付款成立，網站接單已鎖定。</span>
-                                {% elif order.status == "stored" %}
-                                    <span>這張訂單已存單，網站接單已鎖定。</span>
-                                {% else %}
-                                    <span>此狀態不開放網站接單。</span>
-                                {% endif %}
-                            </div>
-                        </article>
-                    {% endfor %}
+                <div class="dispatch-progress-body">
+                    {% if non_claimable_orders %}
+                        <div class="dispatch-list">
+                            {% for order in non_claimable_orders %}
+                                {{ render_order_card(order, user, claimed_order_ids, request) }}
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="dispatch-empty">
+                            <strong>目前沒有進行中任務。</strong>
+                            <span>已滿或付款成立的任務會收在這裡。</span>
+                        </div>
+                    {% endif %}
                 </div>
-            {% else %}
-                <div class="dispatch-empty">
-                    <strong>目前沒有派單任務。</strong>
-                    <span>DC bot 或網站寫入新任務後，會即時顯示在這裡。</span>
-                </div>
-            {% endif %}
+            </details>
         </section>
     </section>
 </div>
