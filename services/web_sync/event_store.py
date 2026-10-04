@@ -174,3 +174,178 @@ def mark_event_failed(
             ),
         )
         conn.commit()
+
+
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name = ?
+        LIMIT 1
+        """,
+        (str(table_name),),
+    ).fetchone()
+    return row is not None
+
+
+def load_order_created_bundle(
+    order_id: int,
+    *,
+    db_file: str | Path | None = None,
+) -> dict[str, dict[str, Any]]:
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+
+        order_row = conn.execute(
+            """
+            SELECT *
+            FROM web_orders
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(order_id),),
+        ).fetchone()
+
+        if order_row is None:
+            raise RuntimeError(f"找不到網站訂單 WEB-{order_id}")
+
+        acceptance_row = None
+        if _table_exists(conn, "order_acceptance_meta"):
+            acceptance_row = conn.execute(
+                """
+                SELECT *
+                FROM order_acceptance_meta
+                WHERE order_id = ?
+                LIMIT 1
+                """,
+                (int(order_id),),
+            ).fetchone()
+
+        submission_row = None
+        if _table_exists(conn, "web_order_submission_meta"):
+            submission_row = conn.execute(
+                """
+                SELECT *
+                FROM web_order_submission_meta
+                WHERE order_id = ?
+                LIMIT 1
+                """,
+                (int(order_id),),
+            ).fetchone()
+
+        return {
+            "order": dict(order_row),
+            "acceptance": dict(acceptance_row) if acceptance_row is not None else {},
+            "submission": dict(submission_row) if submission_row is not None else {},
+        }
+
+
+def update_order_created_links(
+    order_id: int,
+    *,
+    ticket_channel_id: Any = None,
+    dispatch_channel_id: Any = None,
+    dispatch_message_id: Any = None,
+    db_file: str | Path | None = None,
+) -> None:
+    updates: list[str] = []
+    values: list[Any] = []
+
+    if ticket_channel_id is not None:
+        updates.append("ticket_channel_id = ?")
+        values.append(str(ticket_channel_id))
+
+    if dispatch_channel_id is not None:
+        updates.append("dispatch_channel_id = ?")
+        values.append(str(dispatch_channel_id))
+
+    if dispatch_message_id is not None:
+        updates.append("dispatch_message_id = ?")
+        values.append(str(dispatch_message_id))
+
+    if not updates:
+        return
+
+    values.append(int(order_id))
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.execute(
+            "UPDATE web_orders SET "
+            + ", ".join(updates)
+            + " WHERE id = ?",
+            tuple(values),
+        )
+        conn.commit()
+
+
+def mark_order_created_processing(
+    event_id: int,
+    *,
+    db_file: str | Path | None = None,
+) -> None:
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.execute(
+            """
+            UPDATE sync_events
+            SET status = 'processing',
+                error_message = NULL
+            WHERE id = ?
+              AND event_type = 'order_created'
+              AND status IN (
+                  'pending',
+                  'failed',
+                  'processing'
+              )
+            """,
+            (int(event_id),),
+        )
+        conn.commit()
+
+
+def fetch_order_created_retry_events(
+    *,
+    limit: int = 10,
+    db_file: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(int(limit or 10), 100))
+
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT
+                e.id AS event_id,
+                e.order_id,
+                e.event_type,
+                e.retry_count,
+                w.id AS web_order_id,
+                w.ticket_channel_id,
+                w.dispatch_channel_id,
+                w.dispatch_message_id,
+                w.category,
+                w.item,
+                w.quantity,
+                w.amount,
+                w.customer_discord_id,
+                w.customer_display_name
+            FROM sync_events e
+            JOIN web_orders w
+              ON w.id = e.order_id
+            WHERE e.event_type = 'order_created'
+              AND e.status IN (
+                  'failed',
+                  'processing'
+              )
+              AND COALESCE(
+                  e.retry_count,
+                  0
+              ) < 20
+            ORDER BY e.id ASC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+
+        return [dict(row) for row in rows]
