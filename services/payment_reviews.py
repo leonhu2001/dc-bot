@@ -273,7 +273,7 @@ def approve_payment_review(
         if str(row["status"]) != PAYMENT_REVIEW_PENDING:
             raise ValueError("只有待審核付款可以核准。")
 
-        conn.execute(
+        cur = conn.execute(
             """
             UPDATE payment_reviews
             SET status = ?,
@@ -283,6 +283,7 @@ def approve_payment_review(
                 apply_error = NULL,
                 updated_at = ?
             WHERE id = ?
+              AND status = ?
             """,
             (
                 PAYMENT_REVIEW_APPROVED,
@@ -291,8 +292,12 @@ def approve_payment_review(
                 str(operator_display_name or "").strip() or None,
                 now,
                 int(review_id),
+                PAYMENT_REVIEW_PENDING,
             ),
         )
+        if cur.rowcount != 1:
+            conn.rollback()
+            raise ValueError("付款審核狀態已被其他操作更新，請重新整理後再試。")
         conn.commit()
         result = conn.execute(
             "SELECT * FROM payment_reviews WHERE id = ?",
@@ -314,6 +319,7 @@ def reject_payment_review(
 
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
         conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT * FROM payment_reviews WHERE id = ?",
             (int(review_id),),
@@ -327,7 +333,7 @@ def reject_payment_review(
         }:
             raise ValueError("這筆付款審核目前不能駁回。")
 
-        conn.execute(
+        cur = conn.execute(
             """
             UPDATE payment_reviews
             SET status = ?,
@@ -337,6 +343,7 @@ def reject_payment_review(
                 rejected_reason = ?,
                 updated_at = ?
             WHERE id = ?
+              AND status IN (?, ?)
             """,
             (
                 PAYMENT_REVIEW_REJECTED,
@@ -346,8 +353,13 @@ def reject_payment_review(
                 str(reason or "").strip() or "客服駁回",
                 now,
                 int(review_id),
+                PAYMENT_REVIEW_PENDING,
+                PAYMENT_REVIEW_APPLY_ERROR,
             ),
         )
+        if cur.rowcount != 1:
+            conn.rollback()
+            raise ValueError("付款審核狀態已被其他操作更新，請重新整理後再試。")
         conn.commit()
         result = conn.execute(
             "SELECT * FROM payment_reviews WHERE id = ?",
@@ -437,6 +449,7 @@ def retry_payment_review_apply(
 
     with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
         conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT * FROM payment_reviews WHERE id = ?",
             (int(review_id),),
@@ -447,20 +460,25 @@ def retry_payment_review_apply(
         if str(row["status"]) != PAYMENT_REVIEW_APPLY_ERROR:
             raise ValueError("只有套用失敗的付款可以重新套用。")
 
-        conn.execute(
+        cur = conn.execute(
             """
             UPDATE payment_reviews
             SET status = ?,
                 apply_error = NULL,
                 updated_at = ?
             WHERE id = ?
+              AND status = ?
             """,
             (
                 PAYMENT_REVIEW_APPROVED,
                 now,
                 int(review_id),
+                PAYMENT_REVIEW_APPLY_ERROR,
             ),
         )
+        if cur.rowcount != 1:
+            conn.rollback()
+            raise ValueError("付款審核狀態已被其他操作更新，請重新整理後再試。")
         conn.commit()
 
         result = conn.execute(
