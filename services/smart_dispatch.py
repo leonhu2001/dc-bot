@@ -706,7 +706,6 @@ def list_pending_smart_dispatch_plans(
             SELECT *
             FROM smart_dispatch_notifications
             WHERE completed_at IS NULL
-              AND stage < 2
             ORDER BY created_at ASC, id ASC
             LIMIT ?
             """,

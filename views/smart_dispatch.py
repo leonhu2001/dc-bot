@@ -14,6 +14,7 @@ from core.vip_levels import VIP_LEVELS
 from services.order_rules import role_ids_match_requirements
 from services.smart_dispatch import (
     FIRST_EXPANSION_SECONDS,
+    FULL_EXPANSION_SECONDS,
     choose_initial_candidate_ids,
     get_completed_favorite_worker_ids,
     complete_smart_dispatch_plan,
@@ -386,6 +387,34 @@ def _role_mentions(
     return mentions
 
 
+def _ordered_remaining_candidate_ids(
+    *,
+    ranked_candidate_ids: Iterable[str | int],
+    currently_eligible_ids: set[str],
+    accepted_ids: set[str],
+    specified_ids: set[str],
+) -> list[str]:
+    ranked = list(dict.fromkeys(
+        str(item)
+        for item in ranked_candidate_ids
+        if str(item).strip()
+    ))
+    ranked_set = set(ranked)
+    ordered = [
+        *ranked,
+        *sorted(currently_eligible_ids - ranked_set),
+    ]
+    return [
+        worker_id
+        for worker_id in ordered
+        if (
+            worker_id in currently_eligible_ids
+            and worker_id not in accepted_ids
+            and worker_id not in specified_ids
+        )
+    ]
+
+
 async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
     from shared.order_acceptance import WAITING_ACCEPTANCE, get_acceptance_state
 
@@ -480,6 +509,82 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                 jump_url = (
                     f"https://discord.com/channels/{guild.id}/{dispatch_channel_id}/{dispatch_message_id}"
                 )
+                remaining_general_ids = _ordered_remaining_candidate_ids(
+                    ranked_candidate_ids=(plan.get("ranked_candidate_ids") or []),
+                    currently_eligible_ids=currently_eligible_ids,
+                    accepted_ids=accepted_ids,
+                    specified_ids=specified_ids,
+                )
+
+                # 6 分鐘仍未滿時，全量提醒目前仍符合資格的人員並通知客服。
+                # 不完成派單計畫：之後仍會每 10 分鐘持續提醒，直到真正滿人。
+                if age >= FULL_EXPANSION_SECONDS and stage < 2:
+                    final_user_ids = (
+                        remaining_general_ids
+                        if unrestricted_missing > 0
+                        else []
+                    )
+
+                    lines = [
+                        "⚠️ **派單仍缺人｜全量擴大通知**",
+                        f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
+                    ]
+
+                    if unresolved_specified:
+                        lines.append(
+                            "尚未接單的指定人員："
+                            + " ".join(
+                                f"<@{worker_id}>"
+                                for worker_id in unresolved_specified
+                            )
+                        )
+                        lines.append(
+                            "指定名額不可由其他人直接代接；若需更換指定，請由客服調整訂單。"
+                        )
+
+                    if final_user_ids:
+                        lines.append(
+                            "剩餘名額通知全部目前符合資格人員："
+                            + " ".join(
+                                f"<@{worker_id}>"
+                                for worker_id in final_user_ids
+                            )
+                        )
+
+                    support_mention = _customer_service_role_mention(bot, guild)
+                    if support_mention:
+                        lines.append(
+                            "🚨 **客服介入提醒**｜"
+                            f"{support_mention} "
+                            "智慧派單已進入全量擴大，"
+                            f"目前仍缺 **{missing} 人**，請協助確認人力。"
+                        )
+
+                    lines.append(f"前往原派單：{jump_url}")
+
+                    try:
+                        await alert_channel.send(
+                            "\n".join(lines),
+                            allowed_mentions=discord.AllowedMentions(
+                                users=True,
+                                roles=bool(support_mention),
+                                everyone=False,
+                            ),
+                        )
+                    except (discord.Forbidden, discord.HTTPException) as exc:
+                        mark_smart_dispatch_stage(
+                            order_id,
+                            stage=stage,
+                            last_error=f"full_expansion: {type(exc).__name__}: {exc}",
+                        )
+                        continue
+
+                    mark_smart_dispatch_stage(
+                        order_id,
+                        stage=2,
+                        newly_notified_ids=final_user_ids,
+                    )
+                    continue
 
                 if age >= FIRST_EXPANSION_SECONDS and stage < 1:
                     next_ids = []
@@ -498,6 +603,11 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                                 and worker_id not in specified_ids
                             )
                         ]
+
+                    # 若第一輪已經把所有可接人員都通知過，舊邏輯會讓第二輪
+                    # 靜默跳過。這裡改成重提醒仍可接、且尚未接單的人。
+                    if unrestricted_missing > 0 and not next_ids:
+                        next_ids = list(remaining_general_ids)
 
                     reminder_ids = list(dict.fromkeys([
                         *unresolved_specified,
@@ -576,15 +686,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                     repeat_ids = list(dict.fromkeys([
                         *unresolved_specified,
-                        *[
-                            worker_id
-                            for worker_id in (plan.get("ranked_candidate_ids") or [])
-                            if (
-                                worker_id in currently_eligible_ids
-                                and worker_id not in accepted_ids
-                                and worker_id not in specified_ids
-                            )
-                        ],
+                        *remaining_general_ids,
                     ]))
 
                     if repeat_ids:

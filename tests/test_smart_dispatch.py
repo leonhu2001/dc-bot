@@ -518,6 +518,58 @@ def test_smart_dispatch_plan_persists_and_advances(tmp_path, monkeypatch):
     ) == []
 
 
+
+def test_stage_two_plan_stays_pending_until_dispatch_is_completed(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+
+    smart_dispatch.create_smart_dispatch_plan(
+        order_id=88,
+        dispatch_channel_id="100",
+        dispatch_message_id="200",
+        required_staff_count=2,
+        allowed_role_ids=["1"],
+        specified_staff_ids=[],
+        ranked_candidate_ids=["A", "B", "C"],
+        notified_candidate_ids=["A", "B"],
+        db_file=db_path,
+    )
+
+    smart_dispatch.mark_smart_dispatch_stage(
+        88,
+        stage=2,
+        newly_notified_ids=["C"],
+        db_file=db_path,
+    )
+
+    plans = smart_dispatch.list_pending_smart_dispatch_plans(
+        db_file=db_path,
+    )
+    assert [plan["order_id"] for plan in plans] == [88]
+    assert plans[0]["stage"] == 2
+
+    smart_dispatch.complete_smart_dispatch_plan(
+        88,
+        reason="filled",
+        db_file=db_path,
+    )
+
+    assert smart_dispatch.list_pending_smart_dispatch_plans(
+        db_file=db_path,
+    ) == []
+
+
+def test_remaining_candidate_order_includes_newly_eligible_members():
+    from views.smart_dispatch import _ordered_remaining_candidate_ids
+
+    result = _ordered_remaining_candidate_ids(
+        ranked_candidate_ids=["A", "B", "C"],
+        currently_eligible_ids={"A", "B", "C", "NEW"},
+        accepted_ids={"A"},
+        specified_ids={"C"},
+    )
+
+    assert result == ["B", "NEW"]
+
 def test_plan_age_seconds_uses_timezone_aware_created_at():
     plan = {
         "created_at": "2026-10-02T12:00:00+08:00",
