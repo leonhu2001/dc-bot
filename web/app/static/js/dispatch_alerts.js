@@ -23,6 +23,8 @@
   let connectionState = 'reconnecting';
   let lastSyncAt = null;
   let backgroundAlertPending = false;
+  let onlineCompanionCount = null;
+  let onlineSupportCount = null;
 
   function isDispatchPage() {
     return window.location.pathname === '/dispatch';
@@ -209,6 +211,34 @@
     }).format(value);
   }
 
+  function updatePresenceIndicators() {
+    if (onlineCompanionCount !== null) {
+      document.querySelectorAll('[data-dispatch-online-companions]').forEach((node) => {
+        node.textContent = '🟢 在線陪玩 ' + onlineCompanionCount + ' 人';
+      });
+    }
+
+    if (onlineSupportCount !== null) {
+      document.querySelectorAll('[data-dispatch-online-support]').forEach((node) => {
+        node.textContent = '🟢 在線客服 ' + onlineSupportCount + ' 人';
+      });
+    }
+  }
+
+  function applyPresenceFromPayload(data) {
+    if (!data) return;
+
+    if (Number.isFinite(Number(data.online_companion_count))) {
+      onlineCompanionCount = Number(data.online_companion_count);
+    }
+
+    if (Number.isFinite(Number(data.online_support_count))) {
+      onlineSupportCount = Number(data.online_support_count);
+    }
+
+    updatePresenceIndicators();
+  }
+
   function updateConnectionIndicators() {
     document.querySelectorAll('[data-dispatch-realtime-status]').forEach((node) => {
       node.dataset.state = connectionState;
@@ -301,6 +331,7 @@
     updateSoundButton();
     updateConnectionIndicators();
     updateDesktopNotificationButton();
+    updatePresenceIndicators();
   }
 
   function installAudioUnlockFallback() {
@@ -530,6 +561,7 @@
         knownKeys = normalizeKeys(data.keys || []);
         knownSignature = String(data.signature || '');
         lastSyncAt = new Date();
+        applyPresenceFromPayload(data);
         updateConnectionIndicators();
       }
     } catch (err) {
@@ -563,6 +595,7 @@
       const nextSignature = String(data.signature || '');
       lastSyncAt = new Date();
       connectionState = 'online';
+      applyPresenceFromPayload(data);
       updateConnectionIndicators();
 
       if (knownKeys === null) {
