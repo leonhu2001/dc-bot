@@ -13,11 +13,13 @@ SUPPORT_CHANNEL_ID = 1497622678138519572
 def build_welcome_description(member_mention: str) -> str:
     return (
         f"🎉 **歡迎 {member_mention} 來到魔丸娛樂！**\n\n"
-        "歡迎加入我們 ฅ՞•ﻌ•՞ฅ\n"
-        "👤 想先挑選喜歡的陪玩／打手，可以逛逛個人牆\n"
-        f"<#{PROFILE_CHANNEL_IDS[0]}> ・ <#{PROFILE_CHANNEL_IDS[1]}>\n\n"
-        "🎫 想直接下單、詢問服務或需要協助\n"
-        f"請前往 <#{SUPPORT_CHANNEL_ID}> 聯繫客服\n\n"
+        "歡迎加入我們 ฅ՞•ﻌ•՞ฅ\n\n"
+        "👤 **挑選陪玩／打手**\n"
+        f"<#{PROFILE_CHANNEL_IDS[0]}> ・ <#{PROFILE_CHANNEL_IDS[1]}>\n"
+        "先看看大家的個人牆\n\n"
+        "🎟️ **下單／客服**\n"
+        f"<#{SUPPORT_CHANNEL_ID}>\n"
+        "直接下單、詢問服務或尋求協助\n\n"
         "**祝你在魔丸玩得開心 🖤**"
     )
 
