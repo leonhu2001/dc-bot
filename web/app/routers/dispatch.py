@@ -14,11 +14,13 @@ from web.app.services.dispatch_access import (
     can_use_dispatch,
     touch_dispatch_user_presence,
 )
+from web.app.config import config
 from web.app.services.order_service import (
     claim_order_for_worker,
     create_demo_orders_if_empty,
     get_worker_active_order_count,
     get_worker_active_order_ids,
+    get_worker_dispatch_payout_preview,
     list_active_orders,
     partition_dispatch_orders,
     unclaim_order_for_worker,
@@ -110,6 +112,64 @@ async def dispatch_dashboard(
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
         claimed_orders = [order for order in orders if order.id in claimed_order_ids]
+
+        guild_id = str(config.DISCORD_GUILD_ID or "").strip()
+        claimed_order_summaries = {}
+
+        for order in claimed_orders:
+            payout_preview = get_worker_dispatch_payout_preview(
+                order,
+                str(user["id"]),
+            )
+            ticket_channel_id = str(
+                getattr(order, "ticket_channel_id", "")
+                or ""
+            ).strip()
+            dispatch_channel_id = str(
+                getattr(order, "dispatch_channel_id", "")
+                or ""
+            ).strip()
+            dispatch_message_id = str(
+                getattr(order, "dispatch_message_id", "")
+                or ""
+            ).strip()
+
+            ticket_url = None
+            if guild_id and ticket_channel_id:
+                ticket_url = (
+                    f"https://discord.com/channels/{guild_id}/"
+                    f"{ticket_channel_id}"
+                )
+
+            dispatch_url = None
+            if guild_id and dispatch_channel_id and dispatch_message_id:
+                dispatch_url = (
+                    f"https://discord.com/channels/{guild_id}/"
+                    f"{dispatch_channel_id}/{dispatch_message_id}"
+                )
+
+            claimed_order_summaries[int(order.id)] = {
+                "status_label": getattr(
+                    order,
+                    "dispatch_status_label",
+                    str(getattr(order, "status", "") or ""),
+                ),
+                "current_staff_count": int(
+                    getattr(order, "dispatch_current_staff_count", 0)
+                    or 0
+                ),
+                "required_staff_count": int(
+                    getattr(order, "dispatch_required_staff_count", 0)
+                    or 0
+                ),
+                "missing_staff_count": int(
+                    getattr(order, "dispatch_missing_staff_count", 0)
+                    or 0
+                ),
+                "payout": payout_preview,
+                "ticket_url": ticket_url,
+                "dispatch_url": dispatch_url,
+            }
     finally:
         db.close()
 
@@ -130,6 +190,7 @@ async def dispatch_dashboard(
             "active_order_count": active_order_count,
             "claimed_order_ids": claimed_order_ids,
             "claimed_orders": claimed_orders,
+            "claimed_order_summaries": claimed_order_summaries,
             "message": message,
             "error": error,
         },
