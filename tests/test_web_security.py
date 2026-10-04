@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 from sqlalchemy import create_engine, inspect as sa_inspect
 
@@ -347,15 +348,39 @@ def test_order_credentials_store_access_metadata_but_never_secret_fields(
     assert "my-password" not in stored_text
     assert "my-account" not in stored_text
 
-def test_rate_limit_ip_uses_only_nginx_normalized_header():
-    source = Path("web/app/main.py").read_text(encoding="utf-8")
-    start = source.index("def _client_ip(request: Request) -> str:")
-    end = source.index("def _rate_limit_spec", start)
-    body = source[start:end]
+def test_rate_limit_ip_supports_old_and_new_trusted_proxy_rollout():
+    from web.app.main import _client_ip
 
-    assert 'request.headers.get("x-real-ip")' in body
-    assert 'request.headers.get("cf-connecting-ip")' not in body
-    assert 'request.headers.get("x-forwarded-for")' not in body
+    # Old Nginx config: X-Real-IP is Cloudflare's socket peer. In that case,
+    # and only that case, the app may trust CF-Connecting-IP.
+    old_proxy_request = SimpleNamespace(
+        headers={
+            "x-real-ip": "173.245.48.10",
+            "cf-connecting-ip": "203.0.113.20",
+        },
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+    assert _client_ip(old_proxy_request) == "203.0.113.20"
+
+    # Direct-origin request with a forged CF header must keep the socket peer.
+    direct_request = SimpleNamespace(
+        headers={
+            "x-real-ip": "198.51.100.25",
+            "cf-connecting-ip": "203.0.113.99",
+        },
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+    assert _client_ip(direct_request) == "198.51.100.25"
+
+    # New Nginx config has already normalized X-Real-IP to the visitor.
+    new_proxy_request = SimpleNamespace(
+        headers={
+            "x-real-ip": "203.0.113.30",
+            "cf-connecting-ip": "203.0.113.30",
+        },
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+    assert _client_ip(new_proxy_request) == "203.0.113.30"
 
 
 def test_nginx_validates_cloudflare_before_setting_real_ip():
