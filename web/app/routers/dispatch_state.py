@@ -6,6 +6,10 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from services.dispatch_presence import (
+    count_online_dispatch_workers,
+    get_online_dispatch_support_ids,
+)
 from web.app.config import config
 from web.app.services.dispatch_access import (
     can_use_dispatch,
@@ -94,6 +98,8 @@ async def dispatch_state(request: Request):
             "ok": True,
             "presence_online": presence_online,
             "support_presence_online": support_presence_online,
+            "online_companion_count": count_online_dispatch_workers(),
+            "online_support_count": len(get_online_dispatch_support_ids()),
             "count": len(orders),
             "keys": [order["key"] for order in orders],
             "signature": signature,
@@ -147,6 +153,13 @@ def _dispatch_event_snapshot() -> dict:
     }
 
 
+def _dispatch_presence_snapshot() -> dict:
+    return {
+        "online_companion_count": count_online_dispatch_workers(),
+        "online_support_count": len(get_online_dispatch_support_ids()),
+    }
+
+
 @router.get("/dispatch/events")
 async def dispatch_events(request: Request):
     user = request.session.get("user")
@@ -187,12 +200,19 @@ async def dispatch_events(request: Request):
                     "ok": True,
                     "initial": last_signature is None,
                     **snapshot,
+                    **_dispatch_presence_snapshot(),
                 }
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 last_signature = signature
                 last_heartbeat = now
             elif now - last_heartbeat >= 15:
-                yield ": keep-alive\n\n"
+                heartbeat = {
+                    "ok": True,
+                    "heartbeat": True,
+                    **snapshot,
+                    **_dispatch_presence_snapshot(),
+                }
+                yield f"data: {json.dumps(heartbeat, ensure_ascii=False)}\n\n"
                 last_heartbeat = now
 
             await asyncio.sleep(1)
