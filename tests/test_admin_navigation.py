@@ -289,6 +289,10 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert "＋ 新增商品" in page
     assert 'action="/admin/order-rules/create"' in page
     assert 'name="category"' in page
+    assert 'class="panel compact-panel new-product-panel"' in page
+    assert 'class="new-product-grid"' in page
+    assert "new-product-field--wide" in page
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr))" in page
     assert "<h3>遊戲身分</h3>" in page
     assert "qualification_groups" in page
     assert "game_identity_groups" in page
