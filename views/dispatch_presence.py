@@ -12,7 +12,7 @@ DEFAULT_IDLE_CHANNEL_NAME = "🚬┃排隊中。。。。。"
 
 def format_dispatch_presence_channel_name(count: int) -> str:
     online_count = max(0, int(count or 0))
-    if online_count <= 0:
+    if online_count < 2:
         return DEFAULT_IDLE_CHANNEL_NAME
     return f"🟢┃{online_count}人在線"
 
