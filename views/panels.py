@@ -24,6 +24,18 @@ recruit_control_view_factory: Callable[[], discord.ui.View] | None = None
 PANEL_SELECTIONS: dict[int, str] = {}
 
 
+def build_main_panel_embed() -> discord.Embed:
+    return discord.Embed(
+        title="魔丸娛樂｜服務大廳",
+        description=(
+            "歡迎來到魔丸娛樂，請選擇下方需要的服務。\n"
+            "點單、入職、客訴與顧客意見皆可由此進入。\n"
+            "客服服務時間：**AM 10:00－隔日 AM 2:00**"
+        ),
+        color=discord.Color.purple(),
+    )
+
+
 def configure_panel_views(
     *,
     customer_category_id: int,
