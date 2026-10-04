@@ -3,7 +3,9 @@ from pathlib import Path
 
 def test_close_path_finalizes_claim_before_discord_fetch():
     root = Path(__file__).resolve().parents[1]
-    source = (root / "bot.py").read_text(encoding="utf-8")
+    source = (root / "services" / "order_runtime.py").read_text(
+        encoding="utf-8"
+    )
 
     start = source.index("async def lock_dispatch_claim_panel")
     end = source.index(
