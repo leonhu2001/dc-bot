@@ -32,6 +32,9 @@ async def dispatch_state(request: Request):
     if not user:
         return JSONResponse({"ok": False, "error": "not_logged_in"}, status_code=401)
 
+    if not can_use_dispatch(user):
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+
     presence_online, support_presence_online = touch_dispatch_user_presence(user)
 
     conn = sqlite3.connect(get_sqlite_path())
