@@ -145,9 +145,13 @@ from services.smart_dispatch import (
 
 from services.web_sync.event_store import (
     claim_pending_events as _web_sync_fetch_pending_events,
+    fetch_order_created_retry_events as _web_order_created_fetch_retry_events,
     get_assignments as _web_sync_get_assignments,
+    load_order_created_bundle as _web_order_created_load_bundle,
     mark_event_done as _web_sync_mark_event_done,
     mark_event_failed as _web_sync_mark_event_failed,
+    mark_order_created_processing as _web_order_created_mark_processing,
+    update_order_created_links as _web_order_created_update_links,
 )
 
 from services.support_calls import (
@@ -15402,100 +15406,6 @@ def _web_order_created_json_list(value):
     ]
 
 
-def _web_order_created_table_exists(conn, table_name: str) -> bool:
-    row = conn.execute(
-        """
-        SELECT 1
-        FROM sqlite_master
-        WHERE type = 'table'
-          AND name = ?
-        LIMIT 1
-        """,
-        (str(table_name),),
-    ).fetchone()
-
-    return row is not None
-
-
-def _web_order_created_load_bundle(order_id: int) -> dict:
-    import sqlite3
-
-    conn = sqlite3.connect(
-        _web_dashboard_db_path_for_bot(),
-        timeout=15,
-    )
-    conn.row_factory = sqlite3.Row
-
-    try:
-        order_row = conn.execute(
-            """
-            SELECT *
-            FROM web_orders
-            WHERE id = ?
-            LIMIT 1
-            """,
-            (int(order_id),),
-        ).fetchone()
-
-        if order_row is None:
-            raise RuntimeError(
-                f"找不到網站訂單 WEB-{order_id}"
-            )
-
-        acceptance_row = None
-
-        if _web_order_created_table_exists(
-            conn,
-            "order_acceptance_meta",
-        ):
-            acceptance_row = conn.execute(
-                """
-                SELECT *
-                FROM order_acceptance_meta
-                WHERE order_id = ?
-                LIMIT 1
-                """,
-                (int(order_id),),
-            ).fetchone()
-
-        submission_row = None
-
-        if _web_order_created_table_exists(
-            conn,
-            "web_order_submission_meta",
-        ):
-            submission_row = conn.execute(
-                """
-                SELECT *
-                FROM web_order_submission_meta
-                WHERE order_id = ?
-                LIMIT 1
-                """,
-                (int(order_id),),
-            ).fetchone()
-
-        return {
-            "order": (
-                dict(order_row)
-                if order_row is not None
-                else {}
-            ),
-            "acceptance": (
-                dict(acceptance_row)
-                if acceptance_row is not None
-                else {}
-            ),
-            "submission": (
-                dict(submission_row)
-                if submission_row is not None
-                else {}
-            ),
-        }
-
-    finally:
-        conn.close()
-
-
 def _web_order_created_details(bundle: dict) -> dict:
     order = bundle.get("order") or {}
     acceptance = bundle.get("acceptance") or {}
@@ -15742,153 +15652,6 @@ def _web_order_created_details(bundle: dict) -> dict:
             ),
         ),
     }
-
-
-def _web_order_created_update_links(
-    order_id: int,
-    *,
-    ticket_channel_id=None,
-    dispatch_channel_id=None,
-    dispatch_message_id=None,
-) -> None:
-    import sqlite3
-
-    updates = []
-    values = []
-
-    if ticket_channel_id is not None:
-        updates.append(
-            "ticket_channel_id = ?"
-        )
-        values.append(
-            str(ticket_channel_id)
-        )
-
-    if dispatch_channel_id is not None:
-        updates.append(
-            "dispatch_channel_id = ?"
-        )
-        values.append(
-            str(dispatch_channel_id)
-        )
-
-    if dispatch_message_id is not None:
-        updates.append(
-            "dispatch_message_id = ?"
-        )
-        values.append(
-            str(dispatch_message_id)
-        )
-
-    if not updates:
-        return
-
-    values.append(
-        int(order_id)
-    )
-
-    conn = sqlite3.connect(
-        _web_dashboard_db_path_for_bot(),
-        timeout=15,
-    )
-
-    try:
-        conn.execute(
-            "UPDATE web_orders SET "
-            + ", ".join(updates)
-            + " WHERE id = ?",
-            tuple(values),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def _web_order_created_mark_processing(
-    event_id: int,
-) -> None:
-    import sqlite3
-
-    conn = sqlite3.connect(
-        _web_dashboard_db_path_for_bot(),
-        timeout=15,
-    )
-
-    try:
-        conn.execute(
-            """
-            UPDATE sync_events
-            SET status = 'processing',
-                error_message = NULL
-            WHERE id = ?
-              AND event_type = 'order_created'
-              AND status IN (
-                  'pending',
-                  'failed',
-                  'processing'
-              )
-            """,
-            (int(event_id),),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def _web_order_created_fetch_retry_events(
-    limit: int = 10,
-) -> list[dict]:
-    import sqlite3
-
-    conn = sqlite3.connect(
-        _web_dashboard_db_path_for_bot(),
-        timeout=15,
-    )
-    conn.row_factory = sqlite3.Row
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT
-                e.id AS event_id,
-                e.order_id,
-                e.event_type,
-                e.retry_count,
-                w.id AS web_order_id,
-                w.ticket_channel_id,
-                w.dispatch_channel_id,
-                w.dispatch_message_id,
-                w.category,
-                w.item,
-                w.quantity,
-                w.amount,
-                w.customer_discord_id,
-                w.customer_display_name
-            FROM sync_events e
-            JOIN web_orders w
-              ON w.id = e.order_id
-            WHERE e.event_type = 'order_created'
-              AND e.status IN (
-                  'failed',
-                  'processing'
-              )
-              AND COALESCE(
-                  e.retry_count,
-                  0
-              ) < 20
-            ORDER BY e.id ASC
-            LIMIT ?
-            """,
-            (int(limit),),
-        ).fetchall()
-
-        return [
-            dict(row)
-            for row in rows
-        ]
-
-    finally:
-        conn.close()
 
 
 async def _web_order_created_get_member(

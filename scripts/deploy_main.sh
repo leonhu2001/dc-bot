@@ -218,12 +218,29 @@ fi
 
 echo
 echo "=== 9. HTTP SMOKE CHECK ==="
-curl --fail --silent --show-error \
-    --retry 5 \
-    --retry-delay 1 \
-    --retry-connrefused \
-    http://127.0.0.1:8000/health
+HEALTH_URL="${WEB_HEALTH_URL:-http://127.0.0.1:8000/health}"
+HEALTH_RESPONSE=""
+HEALTH_OK=0
 
+for attempt in $(seq 1 15); do
+    if HEALTH_RESPONSE="$(curl --fail --silent --max-time 3 "$HEALTH_URL" 2>/dev/null)"; then
+        HEALTH_OK=1
+        break
+    fi
+
+    if [ "$attempt" -lt 15 ]; then
+        sleep 1
+    fi
+done
+
+if [ "$HEALTH_OK" -ne 1 ]; then
+    echo "ERROR: Web health endpoint did not become ready after 15 attempts."
+    curl --fail --silent --show-error --max-time 3 "$HEALTH_URL" || true
+    journalctl -u "$WEB_SERVICE" -n 80 --no-pager || true
+    false
+fi
+
+printf '%s\n' "$HEALTH_RESPONSE"
 echo
 echo
 
