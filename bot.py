@@ -17788,7 +17788,9 @@ class WebsiteOrderCsConfirmView(
         except Exception as exc:
 
             # 派單失敗就恢復客服確認狀態，
-            # 讓客服可以重試。
+            # 讓客服可以重試。恢復失敗時不可再對客服宣稱已恢復。
+            rollback_error = None
+
             try:
 
                 _web_cs_set_status(
@@ -17796,9 +17798,18 @@ class WebsiteOrderCsConfirmView(
                     WEB_ORDER_PENDING_CS_DISPATCH,
                 )
 
-            except Exception:
+            except Exception as rollback_exc:
 
-                pass
+                rollback_error = rollback_exc
+
+                print(
+                    "[web-order-create] "
+                    f"CS dispatch rollback failed "
+                    f"WEB-{order_id}: "
+                    f"{type(rollback_exc).__name__}: "
+                    f"{rollback_exc}",
+                    flush=True,
+                )
 
 
             print(
@@ -17811,11 +17822,24 @@ class WebsiteOrderCsConfirmView(
             )
 
 
-            await interaction.followup.send(
-                (
+            if rollback_error is None:
+
+                followup_message = (
                     "送單失敗，"
                     "訂單已恢復等待客服確認。"
-                ),
+                )
+
+            else:
+
+                followup_message = (
+                    "送單失敗，而且訂單狀態沒有成功恢復。"
+                    f"請先不要重複操作 WEB-{order_id}，"
+                    "通知總管檢查訂單狀態。"
+                )
+
+
+            await interaction.followup.send(
+                followup_message,
                 ephemeral=True,
             )
 
