@@ -153,6 +153,7 @@ async def dispatch_dashboard(
         create_demo_orders_if_empty(db)
         orders = list_active_orders(db)
         claimable_orders, non_claimable_orders = split_dispatch_orders(orders)
+        orders = [*claimable_orders, *non_claimable_orders]
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
         claimed_orders = [order for order in orders if order.id in claimed_order_ids]
