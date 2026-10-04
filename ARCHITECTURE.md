@@ -18,6 +18,7 @@ bot.py 仍是主入口，短期不一次大拆，避免正式營運出問題。
 - services/order_flow/：訂單流程、付款、結單、存單
 - services/web_sync/：Discord 與接單網頁同步
   - event_store.py：Web→Bot sync event 的 atomic claim、stale recovery、完成/失敗狀態、接單人查詢，以及 `order_created` 的資料庫讀寫
+  - presentation.py：Web sync 的純資料解析與顯示文字組裝，不直接呼叫 Discord API
 
 ## Views
 
