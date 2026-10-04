@@ -308,12 +308,14 @@ def history_parse_worker_option(value: str) -> tuple[str, str]:
         discord_id = discord_id.strip()
         role_type = role_type.strip().lower()
 
-        if role_type not in {"worker", "companion"}:
+        if role_type not in {"worker", "booster", "companion"}:
             role_type = "worker"
 
         return discord_id, role_type
 
-    return raw, "worker"
+    # 現行下拉選單只送 Discord ID；空字串代表交由 staff role map
+    # 判斷，不要在這裡先把所有人硬寫成舊版 worker。
+    return raw, ""
 
 
 
@@ -374,8 +376,12 @@ def history_staff_options() -> dict:
                     "id": discord_id,
                     "value": discord_id,
                     "name": name,
-                    # 後端仍需要 role_type 時給 worker 當預設，不影響派單 embed 顯示。
-                    "role_type": "worker",
+                    # 護級優先；只具陪玩身分時才記 companion。
+                    "role_type": (
+                        "booster"
+                        if is_worker
+                        else "companion"
+                    ),
                 }
 
     finally:
@@ -1523,6 +1529,33 @@ async def bulk_update_order_history(request: Request):
                     )
                     continue
 
+                existing_assignment = conn.execute(
+                    """
+                    SELECT worker_discord_id, role_type
+                    FROM order_assignments
+                    WHERE id = ?
+                    LIMIT 1
+                    """,
+                    (assignment_id,),
+                ).fetchone()
+
+                selected_role_type = (
+                    worker_role_map.get(selected_worker_id)
+                    or parsed_role_type
+                    or "worker"
+                )
+
+                # 只改掛名/其他欄位而沒有換人時，保留原本 role_type；
+                # 避免歷史頁儲存動作把已正確分類的 booster/companion 洗掉。
+                if (
+                    existing_assignment
+                    and str(existing_assignment[0] or "") == selected_worker_id
+                    and str(existing_assignment[1] or "").strip()
+                ):
+                    selected_role_type = str(
+                        existing_assignment[1]
+                    ).strip().lower()
+
                 conn.execute(
                     """
                     UPDATE order_assignments
@@ -1537,7 +1570,7 @@ async def bulk_update_order_history(request: Request):
                     (
                         selected_worker_id,
                         worker_name_map.get(selected_worker_id, selected_worker_id),
-                        worker_role_map.get(selected_worker_id, "worker"),
+                        selected_role_type,
                         named_bonus,
                         assignment_id,
                     ),
