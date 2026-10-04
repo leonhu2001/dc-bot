@@ -3847,7 +3847,7 @@ async def process_acceptance_sync_events_once() -> None:
     import json
     from datetime import datetime
 
-    from sqlalchemy import select
+    from sqlalchemy import select, update
 
     from shared.db import SessionLocal
     from shared.models import SyncEvent, SyncEventStatus, SyncEventType, WebOrder
@@ -3907,15 +3907,30 @@ async def process_acceptance_sync_events_once() -> None:
                 "admin_removed_worker",
             }
 
-            # Other claim events are handled by their original Discord flow.
-            # Admin changes made after payment need this worker to reconcile
-            # ticket permissions because the website cannot call Discord itself.
-            if not is_prepay_acceptance and not is_admin_worker_change:
+            # Claim/unclaim events have one owner: this worker. Claim the row
+            # conditionally so a second Bot instance cannot process the same event.
+            claimed = db.execute(
+                update(SyncEvent)
+                .where(SyncEvent.id == int(event.id))
+                .where(SyncEvent.status == SyncEventStatus.PENDING.value)
+                .values(
+                    status=SyncEventStatus.PROCESSING.value,
+                    retry_count=int(event.retry_count or 0) + 1,
+                )
+            )
+            db.commit()
+
+            if claimed.rowcount != 1:
                 continue
 
-            event.status = SyncEventStatus.PROCESSING.value
-            event.retry_count = int(event.retry_count or 0) + 1
-            db.commit()
+            if not is_prepay_acceptance and not is_admin_worker_change:
+                # Legacy claim events already completed in their original Discord
+                # flow. Mark them consumed instead of leaving them pending forever.
+                event.status = SyncEventStatus.DONE.value
+                event.error_message = None
+                event.processed_at = datetime.utcnow()
+                db.commit()
+                continue
 
             try:
                 order = db.get(WebOrder, int(event.order_id))
@@ -3929,6 +3944,19 @@ async def process_acceptance_sync_events_once() -> None:
                     await refresh_acceptance_dispatch_from_web_order(
                         guild,
                         int(event.order_id),
+                    )
+                elif is_admin_worker_change:
+                    if order is None:
+                        raise RuntimeError(
+                            f"web order not found: {event.order_id}"
+                        )
+
+                    await _refresh_existing_web_sync_dispatch(
+                        {
+                            "order_id": int(event.order_id),
+                            "dispatch_channel_id": order.dispatch_channel_id,
+                            "dispatch_message_id": order.dispatch_message_id,
+                        }
                     )
 
                 worker_id = _to_int(payload.get("worker_discord_id"))
@@ -15183,12 +15211,22 @@ def _web_dashboard_db_path_for_bot() -> str:
 
 
 def _web_sync_fetch_pending_events(limit: int = 10) -> list[dict]:
+    """Atomically claim generic Web -> Discord sync events.
+
+    Claim/unclaim events are owned by the acceptance-sync worker so the two
+    background workers cannot race each other or starve later generic events.
+    """
     import sqlite3
 
-    conn = sqlite3.connect(_web_dashboard_db_path_for_bot())
+    conn = sqlite3.connect(
+        _web_dashboard_db_path_for_bot(),
+        timeout=15,
+    )
     conn.row_factory = sqlite3.Row
 
     try:
+        conn.execute("BEGIN IMMEDIATE")
+
         rows = conn.execute(
             """
             SELECT
@@ -15210,13 +15248,39 @@ def _web_sync_fetch_pending_events(limit: int = 10) -> list[dict]:
             FROM sync_events e
             JOIN web_orders w ON w.id = e.order_id
             WHERE e.status = 'pending'
+              AND e.event_type NOT IN ('order_claimed', 'order_unclaimed')
             ORDER BY e.id ASC
             LIMIT ?
             """,
-            (limit,),
+            (max(1, min(int(limit or 10), 100)),),
         ).fetchall()
 
+        event_ids = [
+            int(row["event_id"])
+            for row in rows
+        ]
+
+        if event_ids:
+            placeholders = ",".join("?" for _ in event_ids)
+            cursor = conn.execute(
+                f"""
+                UPDATE sync_events
+                SET status = 'processing'
+                WHERE status = 'pending'
+                  AND id IN ({placeholders})
+                """,
+                event_ids,
+            )
+
+            if cursor.rowcount != len(event_ids):
+                conn.rollback()
+                return []
+
+        conn.commit()
         return [dict(row) for row in rows]
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -18758,80 +18822,82 @@ async def process_one_web_sync_event(
         event
     )
 
+async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
+    dispatch_channel_id = int(event.get("dispatch_channel_id") or 0)
+    dispatch_message_id = int(event.get("dispatch_message_id") or 0)
+
+    if not dispatch_channel_id or not dispatch_message_id:
+        raise RuntimeError("web order missing dispatch channel/message id")
+
+    channel = bot.get_channel(dispatch_channel_id)
+
+    if channel is None:
+        channel = await bot.fetch_channel(dispatch_channel_id)
+
+    message = await channel.fetch_message(dispatch_message_id)
+
+    assignments = _web_sync_get_assignments(int(event["order_id"]))
+    receiver_text = _web_sync_build_receiver_text(assignments)
+
+    # 網頁接單同步到 DC bot 記憶體，讓 Discord 的取消接單按鈕也認得。
+    claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
+    claim_data["booster"] = set()
+    claim_data["companion"] = set()
+
+    for row in assignments:
+        user_id = str(row.get("worker_discord_id") or "").strip()
+        role_type = str(row.get("role_type") or "booster").strip()
+
+        if not user_id:
+        continue
+
+        try:
+        parsed_user_id = int(user_id)
+        except Exception:
+        continue
+
+        if role_type == "companion":
+        claim_data["companion"].add(parsed_user_id)
+        else:
+        claim_data["booster"].add(parsed_user_id)
+
+    try:
+        remember_claim_data(dispatch_message_id, claim_data)
+    except Exception as exc:
+        print(f"[web-sync] remember claim data failed dispatch_message_id={dispatch_message_id}: {exc}")
+
+    if message.embeds:
+        embed = message.embeds[0].copy()
+    else:
+        embed = discord.Embed(title="派單訊息", color=discord.Color.blue())
+
+    embed = _web_sync_embed_without_receiver_fields(embed)
+    embed.add_field(
+        name="目前接單",
+        value=receiver_text,
+        inline=False,
+    )
+
+    embed = _normalize_dispatch_embed_field_order(embed)
+
+    await message.edit(
+          embed=embed,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+    )
+
+
+
 async def _process_existing_web_sync_event(event: dict) -> None:
     event_id = int(event["event_id"])
     retry_count = int(event.get("retry_count") or 0)
 
     try:
-        dispatch_channel_id = int(event.get("dispatch_channel_id") or 0)
-        dispatch_message_id = int(event.get("dispatch_message_id") or 0)
-
-        if not dispatch_channel_id or not dispatch_message_id:
-            raise RuntimeError("web order missing dispatch channel/message id")
-
-        channel = bot.get_channel(dispatch_channel_id)
-
-        if channel is None:
-            channel = await bot.fetch_channel(dispatch_channel_id)
-
-        message = await channel.fetch_message(dispatch_message_id)
-
-        assignments = _web_sync_get_assignments(int(event["order_id"]))
-        receiver_text = _web_sync_build_receiver_text(assignments)
-
-        # 網頁接單同步到 DC bot 記憶體，讓 Discord 的取消接單按鈕也認得。
-        claim_data = ORDER_CLAIMS.setdefault(dispatch_message_id, {})
-        claim_data["booster"] = set()
-        claim_data["companion"] = set()
-
-        for row in assignments:
-            user_id = str(row.get("worker_discord_id") or "").strip()
-            role_type = str(row.get("role_type") or "booster").strip()
-
-            if not user_id:
-                continue
-
-            try:
-                parsed_user_id = int(user_id)
-            except Exception:
-                continue
-
-            if role_type == "companion":
-                claim_data["companion"].add(parsed_user_id)
-            else:
-                claim_data["booster"].add(parsed_user_id)
-
-        try:
-            remember_claim_data(dispatch_message_id, claim_data)
-        except Exception as exc:
-            print(f"[web-sync] remember claim data failed dispatch_message_id={dispatch_message_id}: {exc}")
-
-        if message.embeds:
-            embed = message.embeds[0].copy()
-        else:
-            embed = discord.Embed(title="派單訊息", color=discord.Color.blue())
-
-        embed = _web_sync_embed_without_receiver_fields(embed)
-        embed.add_field(
-            name="目前接單",
-            value=receiver_text,
-            inline=False,
-        )
-
-        embed = _normalize_dispatch_embed_field_order(embed)
-
-        await message.edit(
-                  embed=embed,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-        )
-
+        await _refresh_existing_web_sync_dispatch(event)
         _web_sync_mark_event_done(event_id)
         print(f"[web-sync] event_id={event_id} done order_id={event.get('order_id')}")
-
     except Exception as exc:
         _web_sync_mark_event_failed(event_id, str(exc), retry_count)
         print(f"處理網站同步事件失敗 event_id={event_id}：{exc}")
-
 
 
 
