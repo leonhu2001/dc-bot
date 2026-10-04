@@ -447,6 +447,7 @@ from views.voice import (
 )
 
 from views.panels import (
+    build_main_panel_embed,
     configure_panel_views,
     MainPanelView,
 )
@@ -573,6 +574,9 @@ DISPATCH_ONLINE_CHANNEL_ID = 1483183532330455040
 # 客服 / 總管在線狀態顯示頻道；0 代表停用。
 DISPATCH_SUPPORT_ONLINE_CHANNEL_ID = 1497622678138519572
 
+# 服務大廳主 Panel 訊息 ID；0 代表不自動校正既有 Panel。
+MAIN_SERVICE_PANEL_MESSAGE_ID = 1537533276884045856
+
 # 評價頻道 ID
 REVIEW_CHANNEL_ID = 1482998033091268691
 
@@ -654,6 +658,10 @@ DISPATCH_ONLINE_CHANNEL_ID = _config_int(
 DISPATCH_SUPPORT_ONLINE_CHANNEL_ID = _config_int(
     "DISPATCH_SUPPORT_ONLINE_CHANNEL_ID",
     DISPATCH_SUPPORT_ONLINE_CHANNEL_ID,
+)
+MAIN_SERVICE_PANEL_MESSAGE_ID = _config_int(
+    "MAIN_SERVICE_PANEL_MESSAGE_ID",
+    MAIN_SERVICE_PANEL_MESSAGE_ID,
 )
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
@@ -3069,6 +3077,53 @@ configure_panel_views(
 )
 
 
+async def refresh_main_service_panel() -> bool:
+    if not (
+        DISPATCH_SUPPORT_ONLINE_CHANNEL_ID
+        and MAIN_SERVICE_PANEL_MESSAGE_ID
+    ):
+        return False
+
+    channel = bot.get_channel(DISPATCH_SUPPORT_ONLINE_CHANNEL_ID)
+    if not isinstance(channel, discord.TextChannel):
+        try:
+            fetched_channel = await bot.fetch_channel(
+                DISPATCH_SUPPORT_ONLINE_CHANNEL_ID
+            )
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            return False
+        channel = (
+            fetched_channel
+            if isinstance(fetched_channel, discord.TextChannel)
+            else None
+        )
+
+    if channel is None:
+        return False
+
+    try:
+        message = await channel.fetch_message(
+            MAIN_SERVICE_PANEL_MESSAGE_ID
+        )
+        await message.edit(
+            embed=build_main_panel_embed(),
+            view=MainPanelView(),
+        )
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+        print(
+            "[service-lobby] panel refresh failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+    print(
+        "[service-lobby] main panel refreshed",
+        flush=True,
+    )
+    return True
+
+
 # ========= Bot 事件 =========
 
 
@@ -3956,6 +4011,10 @@ async def on_ready():
     if not getattr(bot, "_reward_redeem_view_registered", False):
         bot.add_view(RewardRedeemView())
         bot._reward_redeem_view_registered = True
+
+    if not getattr(bot, "_main_service_panel_refreshed", False):
+        if await refresh_main_service_panel():
+            bot._main_service_panel_refreshed = True
 
     ensure_wallet_tables()
     ensure_support_call_tables()

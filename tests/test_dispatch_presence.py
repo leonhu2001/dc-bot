@@ -94,5 +94,5 @@ def test_dispatch_support_presence_expires_after_timeout(tmp_path):
 
 
 def test_dispatch_support_channel_name_reflects_any_online_staff():
-    assert format_dispatch_support_channel_name(False) == "📞┃聯繫客服"
-    assert format_dispatch_support_channel_name(True) == "📞┃客服在線"
+    assert format_dispatch_support_channel_name(False) == "🛎️┃點單・服務大廳"
+    assert format_dispatch_support_channel_name(True) == "🟢┃點單・服務大廳"
