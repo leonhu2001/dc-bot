@@ -452,7 +452,11 @@ from views.panels import (
     MainPanelView,
 )
 
-from views.welcome import build_welcome_embed
+from views.welcome import (
+    build_welcome_description,
+    build_welcome_embed,
+    extract_welcome_member_mention,
+)
 
 import discord
 from discord.ext import commands
@@ -3132,8 +3136,8 @@ async def refresh_main_service_panel() -> bool:
 
 
 
-async def refresh_welcome_preview_message() -> bool:
-    if not (WELCOME_CHANNEL_ID and WELCOME_PREVIEW_MESSAGE_ID):
+async def refresh_welcome_history() -> bool:
+    if not WELCOME_CHANNEL_ID:
         return False
 
     channel = bot.get_channel(WELCOME_CHANNEL_ID)
@@ -3148,40 +3152,57 @@ async def refresh_welcome_preview_message() -> bool:
             else None
         )
 
-    if channel is None:
+    if channel is None or bot.user is None:
         return False
 
-    try:
-        message = await channel.fetch_message(WELCOME_PREVIEW_MESSAGE_ID)
-        old_embed = message.embeds[0] if message.embeds else None
-        old_description = old_embed.description if old_embed is not None else ""
-        mention_match = re.search(r"<@!?\d+>", old_description or "")
-        member_mention = mention_match.group(0) if mention_match else "新朋友"
-        avatar_url = None
-        if old_embed is not None:
-            avatar_url = getattr(old_embed.thumbnail, "url", None)
+    updated = 0
+    matched = 0
 
-        await message.edit(
-            embed=build_welcome_embed(
-                member_mention,
-                avatar_url=avatar_url,
-            ),
-            allowed_mentions=discord.AllowedMentions(
-                users=False,
-                roles=False,
-                everyone=False,
-            ),
-        )
-    except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+    try:
+        async for message in channel.history(limit=None, oldest_first=True):
+            if message.author.id != bot.user.id or not message.embeds:
+                continue
+
+            old_embed = message.embeds[0]
+            member_mention = extract_welcome_member_mention(
+                old_embed.description
+            )
+            if member_mention is None:
+                continue
+
+            matched += 1
+            avatar_url = getattr(old_embed.thumbnail, "url", None)
+            new_description = build_welcome_description(member_mention)
+
+            if old_embed.description == new_description:
+                continue
+
+            await message.edit(
+                embed=build_welcome_embed(
+                    member_mention,
+                    avatar_url=avatar_url,
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=False,
+                    roles=False,
+                    everyone=False,
+                ),
+            )
+            updated += 1
+    except (discord.Forbidden, discord.HTTPException) as exc:
         print(
-            "[welcome] preview refresh failed: "
+            "[welcome] history refresh failed: "
             f"{type(exc).__name__}: {exc}",
             flush=True,
         )
         return False
 
-    print("[welcome] preview message refreshed", flush=True)
+    print(
+        f"[welcome] history refreshed: matched={matched}, updated={updated}",
+        flush=True,
+    )
     return True
+
 
 # ========= Bot 事件 =========
 
@@ -4069,9 +4090,9 @@ async def on_ready():
         if await refresh_main_service_panel():
             bot._main_service_panel_refreshed = True
 
-    if not getattr(bot, "_welcome_preview_refreshed", False):
-        if await refresh_welcome_preview_message():
-            bot._welcome_preview_refreshed = True
+    if not getattr(bot, "_welcome_history_refreshed", False):
+        if await refresh_welcome_history():
+            bot._welcome_history_refreshed = True
 
     ensure_wallet_tables()
     ensure_support_call_tables()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import discord
 
 
@@ -36,3 +38,12 @@ def build_welcome_embed(
     if avatar_url:
         embed.set_thumbnail(url=avatar_url)
     return embed
+
+
+
+def extract_welcome_member_mention(description: str | None) -> str | None:
+    if not description or "來到魔丸娛樂" not in description:
+        return None
+
+    match = re.search(r"<@!?\d+>", description)
+    return match.group(0) if match else None
