@@ -634,6 +634,42 @@ def test_assignment_metrics_count_waiting_acceptance_claims(tmp_path):
     assert metrics["WAITING"]["active_count"] == 1
 
 
+def test_assignment_metrics_count_accepted_pending_pay_claims(tmp_path):
+    db_path = tmp_path / "web_dashboard.db"
+    _setup_assignment_db(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE order_acceptance_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                staff_discord_id TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1
+            );
+
+            INSERT INTO web_orders (id, status)
+            VALUES (11, 'accepted_pending_pay');
+
+            INSERT INTO order_acceptance_claims (
+                order_id,
+                staff_discord_id,
+                is_active
+            )
+            VALUES (11, 'PENDING_PAY', 1);
+            """
+        )
+        conn.commit()
+
+    metrics = smart_dispatch.get_worker_assignment_metrics(
+        ["PENDING_PAY"],
+        db_file=db_path,
+        now_taipei=datetime(2026, 10, 2, 12, 0, tzinfo=TAIPEI_TZ),
+    )
+
+    assert metrics["PENDING_PAY"]["active_count"] == 1
+
+
 def test_prepare_initial_dispatch_prioritizes_completed_favorite_for_diamond(tmp_path):
     from core.vip_levels import VIP_LEVELS
     from views.smart_dispatch import prepare_initial_smart_dispatch
