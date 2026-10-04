@@ -47,6 +47,23 @@ PREPAY_DISPATCH_STATUSES = {
 }
 
 
+def is_claimable_dispatch_status(value) -> bool:
+    return _normalize_text(value) in PREPAY_DISPATCH_STATUSES
+
+
+def partition_dispatch_orders(orders):
+    claimable_orders = []
+    non_claimable_orders = []
+
+    for order in orders:
+        if is_claimable_dispatch_status(getattr(order, "status", None)):
+            claimable_orders.append(order)
+        else:
+            non_claimable_orders.append(order)
+
+    return claimable_orders, non_claimable_orders
+
+
 PENDING_PAYMENT_METHODS = {
     "",
     "待付款",
@@ -164,9 +181,13 @@ def _prepay_claimed_order_ids(db: Session, worker_discord_id: str) -> set[int]:
             JOIN web_orders o ON o.id = c.order_id
             WHERE c.staff_discord_id = :worker_discord_id
               AND c.is_active = 1
-              AND o.status IN ('waiting_acceptance', 'accepted_pending_pay')
+              AND o.status IN (:waiting_acceptance, :accepted_pending_pay)
         """),
-        {"worker_discord_id": str(worker_discord_id)},
+        {
+            "worker_discord_id": str(worker_discord_id),
+            "waiting_acceptance": WAITING_ACCEPTANCE,
+            "accepted_pending_pay": ACCEPTED_PENDING_PAY,
+        },
     ).fetchall()
 
     return {int(row[0]) for row in rows}
