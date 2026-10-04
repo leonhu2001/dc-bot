@@ -58,9 +58,9 @@ def test_dispatch_presence_can_filter_candidates(tmp_path):
 
 def test_dispatch_presence_channel_name_reflects_count():
     assert format_dispatch_presence_channel_name(0) == "⚫┃暫無陪玩"
-    assert format_dispatch_presence_channel_name(1) == "🟢┃陪玩1人"
-    assert format_dispatch_presence_channel_name(2) == "🟢┃陪玩2人"
-    assert format_dispatch_presence_channel_name(5) == "🟢┃陪玩5人"
+    assert format_dispatch_presence_channel_name(1) == "🟢┃在線陪玩：1"
+    assert format_dispatch_presence_channel_name(2) == "🟢┃在線陪玩：2"
+    assert format_dispatch_presence_channel_name(5) == "🟢┃在線陪玩：5"
 
 
 def test_dispatch_support_presence_expires_after_timeout(tmp_path):

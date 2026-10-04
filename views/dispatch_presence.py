@@ -19,7 +19,7 @@ def format_dispatch_presence_channel_name(count: int) -> str:
     online_count = max(0, int(count or 0))
     if online_count <= 0:
         return DEFAULT_IDLE_CHANNEL_NAME
-    return f"🟢┃陪玩{online_count}人"
+    return f"🟢┃在線陪玩：{online_count}"
 
 
 async def dispatch_presence_channel_loop(
