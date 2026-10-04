@@ -284,7 +284,10 @@ def get_worker_assignment_metrics(
                     FROM order_acceptance_claims c
                     JOIN web_orders o ON o.id = c.order_id
                     WHERE c.is_active = 1
-                      AND o.status = 'waiting_acceptance'
+                      AND o.status IN (
+                          'waiting_acceptance',
+                          'accepted_pending_pay'
+                      )
                       AND c.staff_discord_id IN ({placeholders})
                     GROUP BY c.staff_discord_id
                     """,
