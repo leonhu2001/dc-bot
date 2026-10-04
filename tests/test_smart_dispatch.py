@@ -1,3 +1,4 @@
+from pathlib import Path
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
@@ -828,3 +829,13 @@ def test_smart_dispatch_table_migrates_legacy_platform_role_into_game_roles(tmp_
     assert plan["required_game_role_ids"] == [
         "1555453449066254417"
     ]
+
+def test_smart_dispatch_backfill_failure_is_not_silent():
+    source = Path("services/smart_dispatch.py").read_text(encoding="utf-8")
+    start = source.index("# Backfill pending plans from the direct rule definitions.")
+    end = source.index("conn.commit()", start)
+    body = source[start:end]
+
+    assert "logger.exception(" in body
+    assert "except Exception:\n            pass" not in body
+

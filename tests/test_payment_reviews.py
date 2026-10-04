@@ -179,3 +179,54 @@ def test_only_external_methods_can_enter_review(tmp_path: Path):
             payment_method="我的錢包",
             db_file=db_file,
         )
+
+def test_approved_review_cannot_be_overwritten_by_reject(tmp_path: Path):
+    db_file = tmp_path / "payments.db"
+
+    review = create_payment_review(
+        source_type="order",
+        source_id=21,
+        ticket_channel_id=555,
+        customer_discord_id="123",
+        customer_display_name="Boss",
+        amount=1200,
+        payment_method="轉帳",
+        db_file=db_file,
+    )
+    approve_payment_review(
+        int(review["id"]),
+        operator_discord_id="999",
+        operator_display_name="Staff",
+        db_file=db_file,
+    )
+
+    with pytest.raises(ValueError):
+        reject_payment_review(
+            int(review["id"]),
+            operator_discord_id="998",
+            operator_display_name="Other Staff",
+            reason="late reject",
+            db_file=db_file,
+        )
+
+    stored = get_payment_review(int(review["id"]), db_file=db_file)
+    assert stored is not None
+    assert stored["status"] == PAYMENT_REVIEW_APPROVED
+
+
+def test_payment_review_writes_use_immediate_lock_and_conditional_status():
+    source = Path("services/payment_reviews.py").read_text(encoding="utf-8")
+
+    reject_start = source.index("def reject_payment_review(")
+    reject_end = source.index("def list_payment_reviews_for_runtime(", reject_start)
+    reject_body = source[reject_start:reject_end]
+
+    retry_start = source.index("def retry_payment_review_apply(")
+    retry_end = source.index("def mark_payment_review_apply_error(", retry_start)
+    retry_body = source[retry_start:retry_end]
+
+    assert 'conn.execute("BEGIN IMMEDIATE")' in reject_body
+    assert "AND status IN (?, ?)" in reject_body
+    assert 'conn.execute("BEGIN IMMEDIATE")' in retry_body
+    assert "AND status = ?" in retry_body
+
