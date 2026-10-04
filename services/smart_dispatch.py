@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
+logger = logging.getLogger(__name__)
 FIRST_EXPANSION_SECONDS = 180
 FULL_EXPANSION_SECONDS = 360
 
@@ -144,7 +146,9 @@ def ensure_smart_dispatch_tables(db_file: str | Path | None = None) -> None:
                         (_json_list(required_ids), int(order_id)),
                     )
         except Exception:
-            pass
+            logger.exception(
+                "Failed to backfill required game role IDs for smart dispatch"
+            )
 
         conn.commit()
 
