@@ -143,6 +143,13 @@ from services.smart_dispatch import (
     set_specified_dm_results,
 )
 
+from services.web_sync.event_store import (
+    claim_pending_events as _web_sync_fetch_pending_events,
+    get_assignments as _web_sync_get_assignments,
+    mark_event_done as _web_sync_mark_event_done,
+    mark_event_failed as _web_sync_mark_event_failed,
+)
+
 from services.support_calls import (
     ensure_support_call_tables,
     close_support_calls_for_ticket,
@@ -15211,167 +15218,6 @@ def _web_dashboard_db_path_for_bot() -> str:
     from pathlib import Path
 
     return str(Path(__file__).with_name("web_dashboard.db"))
-
-
-def _web_sync_fetch_pending_events(limit: int = 10) -> list[dict]:
-    """Atomically claim generic Web -> Discord sync events.
-
-    Claim/unclaim events are owned by the acceptance-sync worker so the two
-    background workers cannot race each other or starve later generic events.
-    """
-    import sqlite3
-
-    conn = sqlite3.connect(
-        _web_dashboard_db_path_for_bot(),
-        timeout=15,
-    )
-    conn.row_factory = sqlite3.Row
-
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-
-        # Recover sync rows left in processing if a previous Bot process died
-        # after claiming them. processed_at doubles as the current attempt timestamp.
-        conn.execute(
-            """
-            UPDATE sync_events
-            SET status = 'pending'
-            WHERE status = 'processing'
-              AND processed_at IS NOT NULL
-              AND processed_at <= datetime('now', '-10 minutes')
-            """
-        )
-
-        rows = conn.execute(
-            """
-            SELECT
-                e.id AS event_id,
-                e.order_id,
-                e.event_type,
-                e.retry_count,
-                e.payload_json,
-                w.id AS web_order_id,
-                w.ticket_channel_id,
-                w.dispatch_channel_id,
-                w.dispatch_message_id,
-                w.category,
-                w.item,
-                w.quantity,
-                w.amount,
-                w.customer_discord_id,
-                w.customer_display_name
-            FROM sync_events e
-            JOIN web_orders w ON w.id = e.order_id
-            WHERE e.status = 'pending'
-              AND e.event_type NOT IN ('order_claimed', 'order_unclaimed')
-            ORDER BY e.id ASC
-            LIMIT ?
-            """,
-            (max(1, min(int(limit or 10), 100)),),
-        ).fetchall()
-
-        event_ids = [
-            int(row["event_id"])
-            for row in rows
-        ]
-
-        if event_ids:
-            placeholders = ",".join("?" for _ in event_ids)
-            cursor = conn.execute(
-                f"""
-                UPDATE sync_events
-                SET status = 'processing',
-                    processed_at = datetime('now')
-                WHERE status = 'pending'
-                  AND id IN ({placeholders})
-                """,
-                event_ids,
-            )
-
-            if cursor.rowcount != len(event_ids):
-                conn.rollback()
-                return []
-
-        conn.commit()
-        return [dict(row) for row in rows]
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
-
-def _web_sync_get_assignments(order_id: int) -> list[dict]:
-    import sqlite3
-
-    conn = sqlite3.connect(_web_dashboard_db_path_for_bot())
-    conn.row_factory = sqlite3.Row
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT
-                worker_discord_id,
-                worker_display_name,
-                role_type,
-                is_active
-            FROM order_assignments
-            WHERE order_id = ?
-              AND is_active = 1
-            ORDER BY id ASC
-            """,
-            (order_id,),
-        ).fetchall()
-
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
-
-
-def _web_sync_mark_event_done(event_id: int) -> None:
-    import sqlite3
-
-    conn = sqlite3.connect(_web_dashboard_db_path_for_bot())
-
-    try:
-        conn.execute(
-            """
-            UPDATE sync_events
-            SET status = 'done',
-                error_message = NULL,
-                processed_at = datetime('now')
-            WHERE id = ?
-            """,
-            (event_id,),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def _web_sync_mark_event_failed(event_id: int, error_message: str, retry_count: int) -> None:
-    import sqlite3
-
-    next_retry = int(retry_count or 0) + 1
-    next_status = "failed" if next_retry >= 3 else "pending"
-
-    conn = sqlite3.connect(_web_dashboard_db_path_for_bot())
-
-    try:
-        conn.execute(
-            """
-            UPDATE sync_events
-            SET status = ?,
-                error_message = ?,
-                retry_count = ?,
-                processed_at = CASE WHEN ? = 'failed' THEN datetime('now') ELSE processed_at END
-            WHERE id = ?
-            """,
-            (next_status, error_message[:1000], next_retry, next_status, event_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def _web_sync_build_receiver_text(assignments: list[dict]) -> str:

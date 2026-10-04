@@ -44,10 +44,12 @@ def test_bot_startup_reconciles_existing_acceptance_panels():
     assert "await repair_pending_acceptance_dispatch_panels_once(" in source
 
 def test_generic_web_sync_atomically_claims_only_non_claim_events():
-    source = Path("bot.py").read_text(encoding="utf-8")
+    source = Path("services/web_sync/event_store.py").read_text(
+        encoding="utf-8"
+    )
 
-    start = source.index("def _web_sync_fetch_pending_events")
-    end = source.index("def _web_sync_get_assignments", start)
+    start = source.index("def claim_pending_events")
+    end = source.index("def get_assignments", start)
     body = source[start:end]
 
     assert 'conn.execute("BEGIN IMMEDIATE")' in body
