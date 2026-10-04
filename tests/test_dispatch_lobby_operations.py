@@ -39,10 +39,9 @@ def test_companion_presence_channel_uses_new_canonical_id():
     assert "DISPATCH_ONLINE_CHANNEL_ID = 1483183532330455040" not in bot_source
 
 
-def test_online_companion_label_uses_same_inline_text_style():
+def test_website_companion_label_keeps_original_format():
     template = _read("web/app/templates/dispatch.html")
     script = _read("web/app/static/js/dispatch_alerts.js")
 
-    assert "在線陪玩：{{ online_companion_count }}" in template
-    assert "'在線陪玩：' + onlineCompanionCount" in script
-    assert "🟢 在線陪玩 {{ online_companion_count }} 人" not in template
+    assert "🟢 在線陪玩 {{ online_companion_count }} 人" in template
+    assert "'🟢 在線陪玩 ' + onlineCompanionCount + ' 人'" in script
