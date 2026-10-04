@@ -18849,27 +18849,33 @@ async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
         role_type = str(row.get("role_type") or "booster").strip()
 
         if not user_id:
-        continue
+            continue
 
         try:
-        parsed_user_id = int(user_id)
+            parsed_user_id = int(user_id)
         except Exception:
-        continue
+            continue
 
         if role_type == "companion":
-        claim_data["companion"].add(parsed_user_id)
+            claim_data["companion"].add(parsed_user_id)
         else:
-        claim_data["booster"].add(parsed_user_id)
+            claim_data["booster"].add(parsed_user_id)
 
     try:
         remember_claim_data(dispatch_message_id, claim_data)
     except Exception as exc:
-        print(f"[web-sync] remember claim data failed dispatch_message_id={dispatch_message_id}: {exc}")
+        print(
+            "[web-sync] remember claim data failed "
+            f"dispatch_message_id={dispatch_message_id}: {exc}"
+        )
 
     if message.embeds:
         embed = message.embeds[0].copy()
     else:
-        embed = discord.Embed(title="派單訊息", color=discord.Color.blue())
+        embed = discord.Embed(
+            title="派單訊息",
+            color=discord.Color.blue(),
+        )
 
     embed = _web_sync_embed_without_receiver_fields(embed)
     embed.add_field(
@@ -18881,10 +18887,13 @@ async def _refresh_existing_web_sync_dispatch(event: dict) -> None:
     embed = _normalize_dispatch_embed_field_order(embed)
 
     await message.edit(
-          embed=embed,
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        embed=embed,
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
     )
-
 
 
 async def _process_existing_web_sync_event(event: dict) -> None:
