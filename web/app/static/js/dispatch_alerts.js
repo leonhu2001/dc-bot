@@ -214,7 +214,7 @@
   function updatePresenceIndicators() {
     if (onlineCompanionCount !== null) {
       document.querySelectorAll('[data-dispatch-online-companions]').forEach((node) => {
-        node.textContent = '🟢 在線陪玩 ' + onlineCompanionCount + ' 人';
+        node.textContent = '在線陪玩：' + onlineCompanionCount;
       });
     }
 
