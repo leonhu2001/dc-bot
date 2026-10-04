@@ -268,8 +268,13 @@ async def _render(
         else []
     )
 
+    rank_game_labels = {
+        "lol": "英雄聯盟",
+        "apex": "APEX",
+        "valorant": "特戰英豪",
+    }
     game_rank_labels = {
-        role.key: role.label
+        role.key: f"{rank_game_labels.get(role.game, role.game)}｜{role.label}"
         for role in GAME_RANK_ROLES
     }
     game_identity_labels = {
