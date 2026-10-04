@@ -723,10 +723,18 @@
                 <span class="dispatch-tag">魔丸♫客服</span>
                 <span class="dispatch-tag">護航接單</span>
                 <span class="dispatch-tag">陪玩接單</span>
-                <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的陪玩">
+                <span
+                    class="dispatch-tag"
+                    title="最近 90 秒仍在接單大廳的陪玩"
+                    data-dispatch-online-companions
+                >
                     🟢 在線陪玩 {{ online_companion_count }} 人
                 </span>
-                <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管">
+                <span
+                    class="dispatch-tag"
+                    title="最近 90 秒仍在接單大廳的客服或總管"
+                    data-dispatch-online-support
+                >
                     🟢 在線客服 {{ online_support_count }} 人
                 </span>
                 <span class="dispatch-tag" data-dispatch-realtime-status data-state="reconnecting">
