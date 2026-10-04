@@ -1,4 +1,9 @@
 (function () {
+  if (window.__mwDispatchAlertsStarted) {
+    return;
+  }
+  window.__mwDispatchAlertsStarted = true;
+
   const HOURLY_REFRESH_MS = 60 * 60 * 1000;
   const ENABLED_KEY = 'mw_dispatch_alert_enabled';
 
@@ -432,7 +437,7 @@
       refreshDispatch({ playAlert: false });
     }, HOURLY_REFRESH_MS);
 
-    console.log('[dispatch-alert] started v9 SSE crisp-chime');
+    console.log('[dispatch-alert] started v10 single-SSE crisp-chime');
   }
 
   window.addEventListener('beforeunload', () => {
@@ -441,9 +446,9 @@
     }
   });
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  if (document.readyState === 'complete') {
     init();
+  } else {
+    window.addEventListener('load', init, { once: true });
   }
 })();
