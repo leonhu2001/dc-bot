@@ -75,7 +75,7 @@ def test_acceptance_worker_is_single_owner_for_claim_events():
 def test_cs_dispatch_failure_does_not_claim_rollback_succeeded_when_it_failed():
     source = Path("bot.py").read_text(encoding="utf-8")
 
-    marker = source.index("[web-order-create] ")
+    marker = source.index("CS dispatch rollback failed")
     start = source.rfind("except Exception as exc:", 0, marker)
     end = source.index("# MAWAN_R12_WEBSITE_PENDING_CANCEL", marker)
     body = source[start:end]
