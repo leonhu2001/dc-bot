@@ -63,6 +63,20 @@
     osc.stop(start + duration + 0.05);
   }
 
+  function crispChimeTone(ctx, freq, start, duration, volume, harmonics) {
+    tone(ctx, freq, start, duration, volume);
+
+    (harmonics || []).forEach(([multiple, gain]) => {
+      tone(
+        ctx,
+        freq * multiple,
+        start,
+        duration,
+        volume * gain
+      );
+    });
+  }
+
   async function dingDong() {
     if (!enabled || !audioContext) return false;
 
@@ -79,8 +93,25 @@
     }
 
     const now = audioContext.currentTime;
-    tone(audioContext, 880, now, 0.22, 0.68);
-    tone(audioContext, 660, now + 0.18, 0.32, 0.58);
+
+    crispChimeTone(
+      audioContext,
+      1175,
+      now,
+      0.24,
+      0.62,
+      [[2, 0.22], [3, 0.08]]
+    );
+
+    crispChimeTone(
+      audioContext,
+      1568,
+      now + 0.20,
+      0.34,
+      0.66,
+      [[2, 0.18]]
+    );
+
     return true;
   }
 
@@ -401,7 +432,7 @@
       refreshDispatch({ playAlert: false });
     }, HOURLY_REFRESH_MS);
 
-    console.log('[dispatch-alert] started v8 SSE');
+    console.log('[dispatch-alert] started v9 SSE crisp-chime');
   }
 
   window.addEventListener('beforeunload', () => {
