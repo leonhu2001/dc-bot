@@ -142,6 +142,7 @@ from services.smart_dispatch import (
     get_smart_dispatch_plan,
     set_specified_dm_results,
 )
+from services.payment_review_runtime import ensure_payment_review_worker_started
 
 from services.web_sync.event_store import (
     claim_pending_events as _web_sync_fetch_pending_events,
@@ -3204,6 +3205,20 @@ async def refresh_welcome_history() -> bool:
     return True
 
 
+async def _refresh_welcome_history_background() -> None:
+    try:
+        if await refresh_welcome_history():
+            bot._welcome_history_refreshed = True
+    except Exception as exc:
+        print(
+            "[welcome] background history refresh failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+    finally:
+        bot._welcome_history_refresh_running = False
+
+
 # ========= Bot 事件 =========
 
 
@@ -4086,18 +4101,16 @@ async def on_ready():
         bot.add_view(RewardRedeemView())
         bot._reward_redeem_view_registered = True
 
-    if not getattr(bot, "_main_service_panel_refreshed", False):
-        if await refresh_main_service_panel():
-            bot._main_service_panel_refreshed = True
-
-    if not getattr(bot, "_welcome_history_refreshed", False):
-        if await refresh_welcome_history():
-            bot._welcome_history_refreshed = True
-
+    # Start business-critical background workers before any startup task that
+    # can spend time on Discord history/API calls. This keeps approvals,
+    # dispatch escalation, and web sync live even while maintenance work runs.
     ensure_wallet_tables()
     ensure_support_call_tables()
     ensure_smart_dispatch_tables()
     ensure_web_support_tables()
+
+    ensure_payment_review_worker_started(bot)
+    ensure_web_sync_event_worker_started()
 
     if not getattr(bot, "_support_call_sla_worker_started", False):
         bot._support_call_sla_worker_started = True
@@ -4108,7 +4121,6 @@ async def on_ready():
         bot._web_support_bridge_worker_started = True
         bot.loop.create_task(web_support_bridge_loop(bot))
         print("[web-support] Discord bridge worker started", flush=True)
-
 
     if not getattr(bot, "_smart_dispatch_worker_started", False):
         bot._smart_dispatch_worker_started = True
@@ -4147,6 +4159,17 @@ async def on_ready():
             flush=True,
         )
 
+    if not getattr(bot, "_main_service_panel_refreshed", False):
+        if await refresh_main_service_panel():
+            bot._main_service_panel_refreshed = True
+
+    if (
+        not getattr(bot, "_welcome_history_refreshed", False)
+        and not getattr(bot, "_welcome_history_refresh_running", False)
+    ):
+        bot._welcome_history_refresh_running = True
+        bot.loop.create_task(_refresh_welcome_history_background())
+
     if not getattr(bot, "_worker_tip_confirm_views_registered", False):
         restored_worker_tip_views = 0
 
@@ -4178,7 +4201,6 @@ async def on_ready():
         if restored_worker_tip_views:
             print(f"Restored worker tip payment views: {restored_worker_tip_views}")
 
-    ensure_web_sync_event_worker_started()
     global BACKUP_TASK_STARTED, STORED_REMINDER_TASK_STARTED, VIP_DOWNGRADE_TASK_STARTED
     # setup_hook normally registers these before READY; keep this as a safe
     # reconnect/fallback path without duplicate registration.
