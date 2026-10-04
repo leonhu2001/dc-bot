@@ -383,7 +383,7 @@
             <p class="dispatch-eyebrow">MISSION DISPATCH</p>
             <h1 class="dispatch-title">接單說明</h1>
             <p class="dispatch-desc">
-                查看目前可接任務、已接任務與預估分潤。接單後系統會同步紀錄，客服與五個新接單身分組皆沿用原本派單頁權限。
+                查看目前可接任務、進行中任務與預估分潤。接單後系統會同步紀錄，客服與五個新接單身分組皆沿用原本派單頁權限。
             </p>
 
             <div class="dispatch-tags">
@@ -391,8 +391,11 @@
                 <span class="dispatch-tag">護航接單</span>
                 <span class="dispatch-tag">陪玩接單</span>
                 <span class="dispatch-tag">即時提醒</span>
-                <span class="dispatch-tag" title="你目前正在接單大廳">
-                    🟢 在線
+                <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的陪玩">
+                    🟢 在線陪玩 {{ online_companion_count }} 人
+                </span>
+                <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管">
+                    🟢 在線客服 {{ online_support_count }} 人
                 </span>
             </div>
         </div>
@@ -405,7 +408,7 @@
 
             <article class="dispatch-stat">
                 <span>目前可接</span>
-                <strong>{{ orders | length }}</strong>
+                <strong>{{ claimable_orders | length }}</strong>
             </article>
         </div>
     </section>
@@ -439,7 +442,7 @@
             {% else %}
                 <div class="dispatch-empty">
                     <strong>目前尚未接任何訂單。</strong>
-                    <span>可接任務會顯示在右側任務榜。</span>
+                    <span>可接任務會顯示在右側派單任務。</span>
                 </div>
             {% endif %}
         </aside>
@@ -447,11 +450,11 @@
         <section class="dispatch-panel dispatch-column">
             <div class="dispatch-column-head">
                 <div>
-                    <p class="dispatch-eyebrow">AVAILABLE MISSIONS</p>
-                    <h2>目前可接訂單</h2>
-                    <p class="dispatch-desc">保留原本接單功能，只翻新任務卡片與分潤資訊顯示。</p>
+                    <p class="dispatch-eyebrow">MISSION BOARD</p>
+                    <h2>派單任務</h2>
+                    <p class="dispatch-desc">可接任務與已付款進行中的任務都會顯示；只有標示「可接單」的任務可以操作接單。</p>
                 </div>
-                <span class="dispatch-pill dispatch-count">{{ orders | length }} 筆</span>
+                <span class="dispatch-pill dispatch-count">可接 {{ claimable_orders | length }}｜進行中 {{ non_claimable_orders | length }}</span>
             </div>
 
             {% if orders %}
@@ -473,7 +476,17 @@
                                     <h3>{{ order.category }}｜{{ order.item }}</h3>
                                 </div>
 
-                                <span class="dispatch-chip dispatch-status">{{ order.status }}</span>
+                                <span class="dispatch-chip dispatch-status">
+                                    {% if order.status in ["waiting_acceptance", "accepted_pending_pay"] %}
+                                        可接單
+                                    {% elif order.status == "active" %}
+                                        進行中
+                                    {% elif order.status == "stored" %}
+                                        已存單
+                                    {% else %}
+                                        {{ order.status }}
+                                    {% endif %}
+                                </span>
                             </div>
 
                             <div class="dispatch-meta">
@@ -673,8 +686,8 @@
                 </div>
             {% else %}
                 <div class="dispatch-empty">
-                    <strong>目前沒有可接訂單。</strong>
-                    <span>等 DC bot 或網站資料庫寫入 active 訂單後，會自動顯示在這裡。</span>
+                    <strong>目前沒有派單任務。</strong>
+                    <span>DC bot 或網站寫入新任務後，會即時顯示在這裡。</span>
                 </div>
             {% endif %}
         </section>
