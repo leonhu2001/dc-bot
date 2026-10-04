@@ -452,6 +452,8 @@ from views.panels import (
     MainPanelView,
 )
 
+from views.welcome import build_welcome_embed
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -575,13 +577,14 @@ DISPATCH_ONLINE_CHANNEL_ID = 1483183532330455040
 DISPATCH_SUPPORT_ONLINE_CHANNEL_ID = 1497622678138519572
 
 # 服務大廳主 Panel 訊息 ID；0 代表不自動校正既有 Panel。
-MAIN_SERVICE_PANEL_MESSAGE_ID = 1556309312379429029
+MAIN_SERVICE_PANEL_MESSAGE_ID = 1537533276884045856
 
 # 評價頻道 ID
 REVIEW_CHANNEL_ID = 1482998033091268691
 
-# 歡迎頻道 ID
+# 歡迎頻道 / 指定預覽訊息 ID
 WELCOME_CHANNEL_ID = 1482080953353375752
+WELCOME_PREVIEW_MESSAGE_ID = 1556309312379429029
 
 # 新成員自動給予身分組 ID
 NEW_MEMBER_ROLE_ID = 1483872591457550494
@@ -665,6 +668,10 @@ MAIN_SERVICE_PANEL_MESSAGE_ID = _config_int(
 )
 REVIEW_CHANNEL_ID = _config_int("REVIEW_CHANNEL_ID", REVIEW_CHANNEL_ID)
 WELCOME_CHANNEL_ID = _config_int("WELCOME_CHANNEL_ID", WELCOME_CHANNEL_ID)
+WELCOME_PREVIEW_MESSAGE_ID = _config_int(
+    "WELCOME_PREVIEW_MESSAGE_ID",
+    WELCOME_PREVIEW_MESSAGE_ID,
+)
 CREDENTIAL_OWNER_USER_ID = _config_int("CREDENTIAL_OWNER_USER_ID", CREDENTIAL_OWNER_USER_ID)
 
 # 身分組
@@ -3124,6 +3131,58 @@ async def refresh_main_service_panel() -> bool:
     return True
 
 
+
+async def refresh_welcome_preview_message() -> bool:
+    if not (WELCOME_CHANNEL_ID and WELCOME_PREVIEW_MESSAGE_ID):
+        return False
+
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    if not isinstance(channel, discord.TextChannel):
+        try:
+            fetched_channel = await bot.fetch_channel(WELCOME_CHANNEL_ID)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            return False
+        channel = (
+            fetched_channel
+            if isinstance(fetched_channel, discord.TextChannel)
+            else None
+        )
+
+    if channel is None:
+        return False
+
+    try:
+        message = await channel.fetch_message(WELCOME_PREVIEW_MESSAGE_ID)
+        old_embed = message.embeds[0] if message.embeds else None
+        old_description = old_embed.description if old_embed is not None else ""
+        mention_match = re.search(r"<@!?\d+>", old_description or "")
+        member_mention = mention_match.group(0) if mention_match else "新朋友"
+        avatar_url = None
+        if old_embed is not None:
+            avatar_url = getattr(old_embed.thumbnail, "url", None)
+
+        await message.edit(
+            embed=build_welcome_embed(
+                member_mention,
+                avatar_url=avatar_url,
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=False,
+                roles=False,
+                everyone=False,
+            ),
+        )
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+        print(
+            "[welcome] preview refresh failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+    print("[welcome] preview message refreshed", flush=True)
+    return True
+
 # ========= Bot 事件 =========
 
 
@@ -3642,20 +3701,10 @@ async def on_member_join(member: discord.Member):
         print("找不到歡迎頻道，請確認 WELCOME_CHANNEL_ID 是否正確")
         return
 
-    embed = discord.Embed(
-        description=(
-            f"🎉 **歡迎 {member.mention} 來到魔丸娛樂！**\n\n"
-            "歡迎加入我們 ฅ՞•ﻌ•՞ฅ\n"
-            "👤 想先挑選喜歡的陪玩／打手，可以逛逛個人牆\n"
-            "<#1538270157057691660> ・ <#1538270089785245856>\n\n"
-            "🎫 想直接下單、詢問服務或需要協助\n"
-            "請前往 <#1497622678138519572> 聯繫客服\n\n"
-            "**祝你在魔丸玩得開心 🖤**"
-        ),
-        color=discord.Color.green()
+    embed = build_welcome_embed(
+        member.mention,
+        avatar_url=member.display_avatar.url,
     )
-
-    embed.set_thumbnail(url=member.display_avatar.url)
 
     await channel.send(
         embed=embed,
@@ -4019,6 +4068,10 @@ async def on_ready():
     if not getattr(bot, "_main_service_panel_refreshed", False):
         if await refresh_main_service_panel():
             bot._main_service_panel_refreshed = True
+
+    if not getattr(bot, "_welcome_preview_refreshed", False):
+        if await refresh_welcome_preview_message():
+            bot._welcome_preview_refreshed = True
 
     ensure_wallet_tables()
     ensure_support_call_tables()
