@@ -15,7 +15,9 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 
 ## Services
 
-- services/order_flow/：訂單流程、付款、結單、存單
+- services/order_flow.py：付款方式 embed 與基礎付款資訊
+- services/order_runtime.py：現有付款、dispatch、接單、存單與憑證 runtime；透過啟動 adapter 綁定尚未拆出的 legacy 依賴
+- services/self_service_runtime.py：現有自助下單、報價、指定人員、點數福利與 reorder runtime；透過啟動 adapter 綁定尚未拆出的 legacy 依賴
 - services/acceptance/runtime.py：付款前接單 Discord runtime、panel reconcile、sync worker 與付款 panel 修復；不直接 import bot.py
 - services/web_sync/：Discord 與接單網頁同步
   - event_store.py：Web→Bot sync event 的 atomic claim、stale recovery、完成/失敗狀態、接單人查詢，以及 `order_created` 的資料庫讀寫
@@ -39,3 +41,5 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 6. Web→Bot 同步的資料庫存取集中在 services/web_sync/event_store.py；Web 訂單高階 runtime 集中在 services/web_sync/runtime.py。
 7. 付款前接單的 Discord runtime 集中在 services/acceptance/runtime.py；shared/order_acceptance.py 繼續負責 canonical acceptance business state。
 8. runtime adapter 只能作為拆分過渡層，不允許新功能再依賴 bot.py globals；新功能必須直接使用 service/view 的明確 API。
+9. bot.py 只保留啟動、事件註冊、管理指令與尚未拆出的薄 orchestration；自助下單與訂單 runtime 不再新增實作到 bot.py。
+10. 之後若修改 order_runtime.py / self_service_runtime.py，優先把碰到的功能逐步改成明確 dependency API，而不是擴大 namespace adapter。
