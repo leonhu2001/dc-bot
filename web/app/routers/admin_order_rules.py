@@ -91,13 +91,13 @@ QUALIFICATION_GROUPS = (
             },
             {
                 "field": "allowed_roles",
-                "key": "female_protector",
-                "label": ROLE_LABELS["female_protector"],
+                "key": "male_protector",
+                "label": ROLE_LABELS["male_protector"],
             },
             {
                 "field": "allowed_roles",
-                "key": "male_protector",
-                "label": ROLE_LABELS["male_protector"],
+                "key": "female_protector",
+                "label": ROLE_LABELS["female_protector"],
             },
         ),
     },
