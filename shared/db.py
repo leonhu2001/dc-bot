@@ -78,6 +78,14 @@ def ensure_sqlite_additive_columns(bind=engine) -> None:
                 )
             )
 
+        if "closed_at" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE web_orders "
+                    "ADD COLUMN closed_at DATETIME"
+                )
+            )
+
 
 def create_all_tables() -> None:
     import shared.models  # noqa: F401
