@@ -3139,43 +3139,6 @@ td.mw-r56-order-status-cell,
 }
 
 
-.mw-r56-order-status-form,
-.mw-r56-order-status-wrapper {
-    display:
-        block !important;
-
-    width:
-        100% !important;
-
-    height:
-        100% !important;
-
-    min-width:
-        0 !important;
-
-    margin:
-        0 !important;
-
-    padding:
-        0 !important;
-
-    border:
-        0 !important;
-
-    border-radius:
-        0 !important;
-
-    background:
-        transparent !important;
-
-    background-image:
-        none !important;
-
-    box-shadow:
-        none !important;
-}
-
-
 .history-ledger-table
 td.mw-r56-order-status-cell
 select.mw-r56-order-status-select,
@@ -3340,9 +3303,15 @@ select.mw-r56-order-status-select:focus {
 
 /* ==========================================================
    Portal 按鈕文字置中
+   Source rule: no runtime class injection required.
    ========================================================== */
 
-.mw-r56-center-action {
+body.mw-r5-layout :is(button, a.button, a.btn, .button, .btn, .seal-button),
+body.mw-r5-admin :is(button, a.button, a.btn, .button, .btn, .seal-button),
+body.mw-r5-employee :is(button, a.button, a.btn, .button, .btn, .seal-button) {
+    display:
+        inline-flex !important;
+
     align-items:
         center !important;
 
@@ -3354,17 +3323,9 @@ select.mw-r56-order-status-select:focus {
 }
 
 
-button.mw-r56-center-action,
-a.mw-r56-center-action,
-.button.mw-r56-center-action,
-.btn.mw-r56-center-action {
-    display:
-        inline-flex !important;
-}
-
-
-input[type="submit"]
-.mw-r56-center-action {
+body.mw-r5-layout input[type="submit"],
+body.mw-r5-admin input[type="submit"],
+body.mw-r5-employee input[type="submit"] {
     text-align:
         center !important;
 }
