@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -9,6 +10,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from services.order_rule_store import (
+    create_custom_rule_definition,
     ensure_order_rule_store,
     get_active_override,
     list_rule_versions,
@@ -24,6 +26,7 @@ from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
     ROLE_LABELS,
+    build_custom_rule_definition,
     get_base_rule,
     invalidate_rule_override_cache,
     preview_rule_override,
@@ -62,6 +65,28 @@ PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
 
 # 舊分類只保留給歷史訂單與舊快照回查，不應再從後台修改。
 ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}
+
+ADMIN_CREATABLE_RULE_CATEGORIES = (
+    "delta_desktop_basic",
+    "delta_mobile_basic",
+    "delta_desktop_fun",
+    "farm",
+    "steam",
+    "valorant",
+    "lol",
+    "apex",
+)
+
+CATEGORY_DEFAULT_GAME_ROLES = {
+    "delta_desktop_basic": ("delta_desktop",),
+    "delta_mobile_basic": ("delta_mobile",),
+    "delta_desktop_fun": ("delta_desktop",),
+    "farm": ("delta_desktop", "delta_mobile"),
+    "steam": ("steam_game",),
+    "valorant": ("valorant_game",),
+    "lol": ("lol_game",),
+    "apex": ("apex_game",),
+}
 
 QUALIFICATION_GROUPS = (
     {
@@ -297,6 +322,129 @@ def _payload_from_form(rule_key: str, form) -> dict:
     return payload
 
 
+def _optional_int_from_form(form, field: str) -> int | None:
+    raw = str(form.get(field) or "").strip()
+    return None if raw == "" else _parse_int(raw, field=field)
+
+
+def _new_rule_payload_from_form(form, category: str) -> dict:
+    label = str(form.get("label") or "").strip()
+    pricing_type = str(form.get("pricing_type") or "").strip()
+    unit_label = str(form.get("unit_label") or "").strip() or "單"
+
+    if not label:
+        raise ValueError("商品名稱不能空白。")
+    if pricing_type not in PRICING_TYPES:
+        raise ValueError("計價方式不正確。")
+
+    allowed_roles = [
+        str(item)
+        for item in form.getlist("allowed_roles")
+        if str(item).strip()
+    ]
+    allowed_game_roles = [
+        str(item)
+        for item in form.getlist("allowed_game_roles")
+        if str(item).strip()
+    ]
+    required_game_roles = [
+        str(item)
+        for item in form.getlist("required_game_roles")
+        if str(item).strip()
+    ]
+    if not required_game_roles:
+        required_game_roles = list(
+            CATEGORY_DEFAULT_GAME_ROLES.get(category, ())
+        )
+
+    raw_required = str(form.get("required_staff_count") or "1").strip()
+    if raw_required == "player_count":
+        required_staff_count: int | str = "player_count"
+    else:
+        required_staff_count = _parse_int(
+            raw_required,
+            field="required_staff_count",
+        )
+
+    player_count_enabled = "player_count_enabled" in form
+    if required_staff_count == "player_count":
+        player_count_enabled = True
+
+    payload = {
+        "label": label,
+        "pricing_type": pricing_type,
+        "price": _parse_int(form.get("price", 0), field="price"),
+        "unit_label": unit_label,
+        "allowed_roles": allowed_roles,
+        "allowed_game_roles": allowed_game_roles,
+        "required_game_roles": required_game_roles,
+        "required_staff_count": required_staff_count,
+        "min_quantity": _parse_int(
+            form.get("min_quantity", 1),
+            field="min_quantity",
+        ),
+        "max_quantity": _optional_int_from_form(form, "max_quantity"),
+        "allow_specify": "allow_specify" in form,
+        "max_specified_count": _optional_int_from_form(
+            form,
+            "max_specified_count",
+        ),
+        "specify_fee_default": _parse_int(
+            form.get("specify_fee_default", 0),
+            field="specify_fee_default",
+        ),
+        "specify_fee_by_role": {},
+        "specify_free_min_units": _optional_int_from_form(
+            form,
+            "specify_free_min_units",
+        ),
+        "specify_free_basis": "quantity",
+        "player_count_enabled": player_count_enabled,
+        "min_player_count": _parse_int(
+            form.get("min_player_count", 1),
+            field="min_player_count",
+        ),
+        "max_player_count": _optional_int_from_form(
+            form,
+            "max_player_count",
+        ),
+        "price_multiply_player_count":
+            "price_multiply_player_count" in form,
+        "point_benefits_allowed": "point_benefits_allowed" in form,
+        "min_protector_count": _parse_int(
+            form.get("min_protector_count", 0),
+            field="min_protector_count",
+        ),
+        "service_bonus_buy": _optional_int_from_form(
+            form,
+            "service_bonus_buy",
+        ),
+        "service_bonus_gift": _parse_int(
+            form.get("service_bonus_gift", 0),
+            field="service_bonus_gift",
+        ),
+        "staff_adjustments": {},
+        "staff_adjustment_labels": {},
+        "note": str(form.get("note") or "").strip(),
+        "specify_fee_by_game_role": {},
+    }
+    return payload
+
+
+def _new_custom_rule_key(category: str) -> str:
+    return f"admin_{category}_{secrets.token_hex(5)}"
+
+
+def _assert_new_label_available(category: str, label: str) -> None:
+    wanted = str(label or "").strip().casefold()
+    for rule in ORDER_RULES.values():
+        if (
+            str(getattr(rule, "category", "")) == str(category)
+            and str(getattr(rule, "label", "")).strip().casefold() == wanted
+        ):
+            raise ValueError("這個分類已經有同名商品，請換一個商品名稱。")
+
+
 def _rule_row(key: str) -> dict:
     rule = ORDER_RULES[key]
     meta = get_active_override(key)
@@ -408,6 +556,10 @@ async def _render(
             "user": user,
             "rules": rule_rows,
             "category_labels": CATEGORY_LABELS,
+            "creatable_categories": [
+                (key, CATEGORY_LABELS.get(key, key))
+                for key in ADMIN_CREATABLE_RULE_CATEGORIES
+            ],
             "selected_key": selected_key,
             "selected_rule": selected_rule,
             "selected_base": selected_base,
@@ -449,6 +601,60 @@ async def admin_order_rules(
     edit: str = "",
 ):
     return await _render(request, edit=edit)
+
+
+@router.post("/admin/order-rules/create")
+async def admin_order_rule_create(request: Request):
+    user = _user(request)
+    if not user or not user.get("is_manager"):
+        return RedirectResponse("/admin", status_code=303)
+
+    try:
+        form = await request.form()
+        category = str(form.get("category") or "").strip()
+        if category not in ADMIN_CREATABLE_RULE_CATEGORIES:
+            raise ValueError("請選擇可新增商品的正式分類。")
+
+        payload = _new_rule_payload_from_form(form, category)
+        _assert_new_label_available(category, payload["label"])
+
+        rule_key = _new_custom_rule_key(category)
+        rule = build_custom_rule_definition(
+            rule_key,
+            category,
+            payload,
+        )
+
+        create_custom_rule_definition(
+            rule_key=rule_key,
+            category=category,
+            payload=rule_to_override_payload(rule),
+            actor_discord_id=str(user.get("id") or ""),
+            actor_display_name=_display_name(user),
+        )
+        invalidate_rule_override_cache()
+
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="create_order_rule",
+            target_type="order_rule",
+            target_id=rule_key,
+            before=None,
+            after={
+                "category": category,
+                **rule_to_override_payload(rule),
+            },
+        )
+    except (ValueError, RuntimeError) as exc:
+        return _redirect(error=str(exc))
+
+    return _redirect(
+        rule_key=rule_key,
+        ok=(
+            f"已新增 {rule.label}；Web 與 Discord 自助下單會自動讀取，"
+            "不需要重新部署。"
+        ),
+    )
 
 
 @router.post("/admin/order-rules/{rule_key}/preview")
