@@ -6,6 +6,12 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from shared.db import SessionLocal
+from services.dispatch_presence import (
+    count_online_dispatch_workers,
+    get_online_dispatch_support_ids,
+    touch_dispatch_presence,
+    touch_dispatch_support_presence,
+)
 from web.app.services.order_service import (
     claim_order_for_worker,
     create_demo_orders_if_empty,
@@ -16,6 +22,25 @@ from web.app.services.order_service import (
 )
 
 router = APIRouter(tags=["dispatch"])
+
+CLAIMABLE_DISPATCH_STATUSES = {
+    "waiting_acceptance",
+    "accepted_pending_pay",
+}
+
+
+def split_dispatch_orders(orders):
+    claimable_orders = [
+        order
+        for order in orders
+        if str(getattr(order, "status", "") or "") in CLAIMABLE_DISPATCH_STATUSES
+    ]
+    non_claimable_orders = [
+        order
+        for order in orders
+        if str(getattr(order, "status", "") or "") not in CLAIMABLE_DISPATCH_STATUSES
+    ]
+    return claimable_orders, non_claimable_orders
 
 
 def can_use_dispatch(user: dict | None) -> bool:
@@ -103,16 +128,39 @@ async def dispatch_dashboard(
             status_code=403,
         )
 
+    display_name = (
+        user.get("global_name")
+        or user.get("display_name")
+        or user.get("username")
+        or user.get("id")
+    )
+
+    if user.get("is_worker") or user.get("is_companion"):
+        touch_dispatch_presence(
+            str(user.get("id") or ""),
+            display_name=display_name,
+        )
+
+    if user.get("is_manager") or user.get("is_customer_service"):
+        touch_dispatch_support_presence(
+            str(user.get("id") or ""),
+            display_name=display_name,
+        )
+
     db = SessionLocal()
 
     try:
         create_demo_orders_if_empty(db)
         orders = list_active_orders(db)
+        claimable_orders, non_claimable_orders = split_dispatch_orders(orders)
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
         claimed_orders = [order for order in orders if order.id in claimed_order_ids]
     finally:
         db.close()
+
+    online_companion_count = count_online_dispatch_workers()
+    online_support_count = len(get_online_dispatch_support_ids())
 
     return templates.TemplateResponse(
         request=request,
@@ -121,6 +169,10 @@ async def dispatch_dashboard(
             "title": "派單頁面",
             "user": user,
             "orders": orders,
+            "claimable_orders": claimable_orders,
+            "non_claimable_orders": non_claimable_orders,
+            "online_companion_count": online_companion_count,
+            "online_support_count": online_support_count,
             "active_order_count": active_order_count,
             "claimed_order_ids": claimed_order_ids,
             "claimed_orders": claimed_orders,
