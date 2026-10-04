@@ -260,16 +260,6 @@ def _display_name_from_member(member) -> str:
     )
 
 
-def _order_payout_base_amount(order: WebOrder) -> int:
-    """Return payout base without treating a valid zero as missing."""
-    payout_base = getattr(order, "payout_base_amount", None)
-
-    if payout_base is None:
-        payout_base = getattr(order, "amount", 0)
-
-    return int(payout_base or 0)
-
-
 def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
     """Recalculate dashboard payouts from active order_assignments.
 
@@ -295,7 +285,11 @@ def _recalculate_web_order_payouts(db, order: WebOrder) -> None:
     ]
 
     payout_result = calculate_order_payout(
-        total_amount=_order_payout_base_amount(order),
+        total_amount=int(
+            getattr(order, "payout_base_amount", None)
+            or order.amount
+            or 0
+        ),
         worker_discord_ids=worker_ids,
         named_bonus_worker_ids=named_bonus_worker_ids,
     )

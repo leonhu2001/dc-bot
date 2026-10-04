@@ -48,6 +48,11 @@ from web.app.services.staff_service import (
     list_worker_members,
     sync_staff_members_from_discord,
 )
+from core.time_utils import (
+    format_taipei_datetime_from_utc,
+    get_taipei_date_from_utc,
+    get_taipei_now,
+)
 
 router = APIRouter(tags=["admin"])
 
@@ -322,6 +327,13 @@ async def admin_dashboard(
         value,
     ) -> str:
 
+        converted = format_taipei_datetime_from_utc(
+            str(value or "").strip()
+        )
+
+        if converted:
+            return converted
+
         raw = str(
             value
             or ""
@@ -330,7 +342,7 @@ async def admin_dashboard(
         if not raw:
             return "—"
 
-        raw = (
+        return (
             raw
             .replace(
                 "T",
@@ -340,9 +352,7 @@ async def admin_dashboard(
                 "Z",
                 "",
             )
-        )
-
-        return raw[:16]
+        )[:16]
 
 
     status_labels = {
@@ -1091,38 +1101,11 @@ async def admin_dashboard(
     }
 
 
-    today_date = ""
-
-
-    try:
-
-        if _ZoneInfo is not None:
-
-            today_date = (
-                _datetime.now(
-                    _ZoneInfo(
-                        "Asia/Taipei"
-                    )
-                )
-                .date()
-                .isoformat()
-            )
-
-        else:
-
-            today_date = (
-                _datetime.now()
-                .date()
-                .isoformat()
-            )
-
-    except Exception:
-
-        today_date = (
-            _datetime.now()
-            .date()
-            .isoformat()
-        )
+    today_date = (
+        get_taipei_now()
+        .date()
+        .isoformat()
+    )
 
 
     stats = {
@@ -1131,9 +1114,11 @@ async def admin_dashboard(
                 1
                 for order
                 in all_orders
-                if order[
-                    "created_at"
-                ][:10]
+                if get_taipei_date_from_utc(
+                    order[
+                        "created_at"
+                    ]
+                )
                 == today_date
             ),
 
