@@ -284,7 +284,11 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert '"key": "female_companion"' in source
 
     assert "<h3>接單職位</h3>" not in page
-    assert page.count("<h3>階級資格</h3>") == 1
+    # Existing-rule editor and new-product form both use the same taxonomy.
+    assert page.count("<h3>階級資格</h3>") == 2
+    assert "＋ 新增商品" in page
+    assert 'action="/admin/order-rules/create"' in page
+    assert 'name="category"' in page
     assert "<h3>遊戲身分</h3>" in page
     assert "qualification_groups" in page
     assert "game_identity_groups" in page

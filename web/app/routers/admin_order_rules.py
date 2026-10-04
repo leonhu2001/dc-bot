@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -9,6 +11,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from services.order_rule_store import (
+    create_custom_order_rule,
     ensure_order_rule_store,
     get_active_override,
     list_rule_versions,
@@ -24,6 +27,8 @@ from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
     ROLE_LABELS,
+    OrderRule,
+    build_custom_rule,
     get_base_rule,
     invalidate_rule_override_cache,
     preview_rule_override,
@@ -62,6 +67,24 @@ PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
 
 # 舊分類只保留給歷史訂單與舊快照回查，不應再從後台修改。
 ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}
+
+ADMIN_PRODUCT_CATEGORIES = tuple(
+    (key, label)
+    for key, label in CATEGORY_LABELS.items()
+    if key not in ADMIN_HIDDEN_RULE_CATEGORIES
+)
+
+CATEGORY_DEFAULT_GAME_ROLES = {
+    "delta_desktop_basic": ["delta_desktop"],
+    "delta_mobile_basic": ["delta_mobile"],
+    "delta_desktop_fun": ["delta_desktop"],
+    "farm": ["delta_desktop", "delta_mobile"],
+    "steam": ["steam_game"],
+    "valorant": ["valorant_game"],
+    "lol": ["lol_game"],
+    "apex": ["apex_game"],
+    "custom": [],
+}
 
 QUALIFICATION_GROUPS = (
     {
@@ -242,9 +265,8 @@ def _parse_int(value, *, field: str) -> int:
         raise ValueError(f"{field} 必須是整數。") from exc
 
 
-def _payload_from_form(rule_key: str, form) -> dict:
-    current = ORDER_RULES[str(rule_key)]
-    payload = rule_to_override_payload(current)
+def _payload_from_form_base(payload: dict, form) -> dict:
+    payload = dict(payload)
 
     payload["label"] = str(form.get("label") or "").strip()
     payload["pricing_type"] = str(form.get("pricing_type") or "").strip()
@@ -291,10 +313,52 @@ def _payload_from_form(rule_key: str, form) -> dict:
         if str(item).strip()
     ]
 
-    # Existing fee maps and advanced adjustments are intentionally preserved.
-    # The first admin version exposes the high-frequency business controls while
-    # leaving unusual per-role adjustment dictionaries untouched.
     return payload
+
+
+def _payload_from_form(rule_key: str, form) -> dict:
+    current = ORDER_RULES[str(rule_key)]
+    return _payload_from_form_base(
+        rule_to_override_payload(current),
+        form,
+    )
+
+
+def _new_product_payload(category: str, form) -> dict:
+    seed = OrderRule(
+        category=category,
+        key="__new_product__",
+        label="新商品",
+        pricing_type="fixed",
+    )
+    payload = rule_to_override_payload(seed)
+
+    # 新增商品不預設「所有人都可接」，避免忘記設定資格就直接上線。
+    payload["allowed_roles"] = []
+    payload["allowed_game_roles"] = []
+    payload["required_game_roles"] = []
+    payload["max_quantity"] = 24
+
+    payload = _payload_from_form_base(payload, form)
+
+    if not payload["required_game_roles"]:
+        payload["required_game_roles"] = list(
+            CATEGORY_DEFAULT_GAME_ROLES.get(category, [])
+        )
+
+    return payload
+
+
+def _new_product_key(category: str) -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    for _ in range(10):
+        key = (
+            f"admin_{category}_{stamp}_"
+            f"{secrets.token_hex(2)}"
+        )
+        if key not in ORDER_RULES:
+            return key
+    raise RuntimeError("無法產生唯一商品代碼，請再試一次。")
 
 
 def _rule_row(key: str) -> dict:
@@ -417,6 +481,7 @@ async def _render(
             "versions": versions,
             "qualification_groups": QUALIFICATION_GROUPS,
             "game_identity_groups": GAME_IDENTITY_GROUPS,
+            "product_categories": ADMIN_PRODUCT_CATEGORIES,
             "pricing_types": (
                 ("fixed", "固定價"),
                 ("hourly", "按小時"),
@@ -449,6 +514,67 @@ async def admin_order_rules(
     edit: str = "",
 ):
     return await _render(request, edit=edit)
+
+
+@router.post("/admin/order-rules/create")
+async def admin_order_rule_create(
+    request: Request,
+):
+    user = _user(request)
+    if not user or not user.get("is_manager"):
+        return RedirectResponse("/admin", status_code=303)
+
+    try:
+        form = await request.form()
+        category = str(form.get("category") or "").strip()
+
+        allowed_categories = {
+            key
+            for key, _label in ADMIN_PRODUCT_CATEGORIES
+        }
+        if category not in allowed_categories:
+            raise ValueError("請選擇正確的商品分類。")
+
+        payload = _new_product_payload(category, form)
+        rule_key = _new_product_key(category)
+        rule = build_custom_rule(
+            rule_key,
+            category,
+            payload,
+        )
+
+        result = create_custom_order_rule(
+            rule_key=rule_key,
+            category=category,
+            payload=rule_to_override_payload(rule),
+            actor_discord_id=str(user.get("id") or ""),
+            actor_display_name=_display_name(user),
+        )
+        invalidate_rule_override_cache()
+
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action="create_order_rule",
+            target_type="order_rule",
+            target_id=rule_key,
+            before=None,
+            after={
+                "category": category,
+                **rule_to_override_payload(rule),
+                "version": int(result["version"]),
+            },
+        )
+    except (ValueError, KeyError, RuntimeError) as exc:
+        return _redirect(error=str(exc))
+
+    return _redirect(
+        rule_key=rule_key,
+        ok=(
+            f"已新增「{rule.label}」到 "
+            f"{CATEGORY_LABELS.get(category, category)}。"
+            " Web 與 DC Bot 會自動讀取。"
+        ),
+    )
 
 
 @router.post("/admin/order-rules/{rule_key}/preview")
