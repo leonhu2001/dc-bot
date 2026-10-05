@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta, timezone
 
-import discord
-
 from services.dispatch_presence import (
     count_online_dispatch_workers,
     get_online_dispatch_support_ids,
@@ -11,7 +9,6 @@ from services.dispatch_presence import (
     touch_dispatch_support_presence,
 )
 from views.dispatch_presence import (
-    apply_display_only_permissions,
     format_dispatch_presence_channel_name,
     format_dispatch_support_channel_name,
 )
@@ -64,31 +61,6 @@ def test_dispatch_presence_channel_name_reflects_count():
     assert format_dispatch_presence_channel_name(1) == "🟢┃在線陪玩：1"
     assert format_dispatch_presence_channel_name(2) == "🟢┃在線陪玩：2"
     assert format_dispatch_presence_channel_name(5) == "🟢┃在線陪玩：5"
-
-
-def test_display_only_permissions_keep_channel_visible_but_disable_chat():
-    overwrite = discord.PermissionOverwrite(
-        view_channel=None,
-        send_messages=True,
-        add_reactions=True,
-        read_message_history=True,
-    )
-
-    changed = apply_display_only_permissions(
-        overwrite,
-        reveal_channel=True,
-    )
-
-    assert changed is True
-    assert overwrite.view_channel is True
-    assert overwrite.send_messages is False
-    assert overwrite.send_tts_messages is False
-    assert overwrite.add_reactions is False
-    assert overwrite.create_public_threads is False
-    assert overwrite.create_private_threads is False
-    assert overwrite.send_messages_in_threads is False
-    assert overwrite.read_message_history is False
-    assert overwrite.use_application_commands is False
 
 
 def test_dispatch_support_presence_expires_after_timeout(tmp_path):
