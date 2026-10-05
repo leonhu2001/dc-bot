@@ -6,9 +6,10 @@ After=network.target
 Type=simple
 WorkingDirectory=/opt/dc-bot
 EnvironmentFile=/opt/dc-bot/web/.env
-ExecStart=/opt/dc-bot/venv/bin/python -m uvicorn web.app.main:app --host 127.0.0.1 --port 8000
+ExecStart=/opt/dc-bot/venv/bin/python -m uvicorn web.app.main:app --host 127.0.0.1 --port 8000 --timeout-graceful-shutdown 10
 Restart=always
 RestartSec=5
+TimeoutStopSec=20
 User=dc-bot-web
 Group=dc-bot-web
 
