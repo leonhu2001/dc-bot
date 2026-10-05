@@ -1,0 +1,146 @@
+name: Refine VIP member move permission fix
+
+on:
+  push:
+    branches:
+      - fix/vip-member-move-permission
+
+permissions:
+  contents: write
+
+jobs:
+  refine:
+    if: ${{ !contains(github.event.head_commit.message, '[vip-move-scope-refined]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/vip-member-move-permission
+          fetch-depth: 0
+
+      - name: Scope owner inheritance to VIP rooms only
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("views/voice.py")
+          text = path.read_text(encoding="utf-8")
+          old = (
+              "    owner_overwrite.move_members = None\n"
+              "    overwrites[owner] = owner_overwrite"
+          )
+          new = (
+              "    if normalized_room_type == \"vip\":\n"
+              "        owner_overwrite.move_members = None\n"
+              "    overwrites[owner] = owner_overwrite"
+          )
+          if text.count(old) != 2:
+              raise SystemExit(f"owner control scope marker count={text.count(old)}")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+
+      - name: Add control-panel regression coverage
+        shell: bash
+        run: |
+          cat >> tests/test_vip_voice_move_permissions.py <<'PY'
+
+
+          def _control_test_channel(owner, *, owner_move_members=True):
+              class Guild:
+                  default_role = object()
+                  me = None
+
+              class Channel:
+                  guild = Guild()
+
+                  def __init__(self):
+                      self.overwrites = {
+                          owner: discord.PermissionOverwrite(
+                              view_channel=True,
+                              connect=True,
+                              move_members=owner_move_members,
+                          )
+                      }
+                      self.edited = None
+
+                  async def edit(self, *, overwrites, reason):
+                      self.edited = overwrites
+
+              return Channel()
+
+
+          def test_lock_control_only_clears_owner_move_members_for_vip(monkeypatch):
+              owner = object()
+              monkeypatch.setattr(voice, "get_room_targets_for_control", lambda guild, room_type: [])
+
+              public_channel = _control_test_channel(owner)
+              asyncio.run(
+                  voice.apply_voice_lock_state(
+                      public_channel,
+                      owner,
+                      locked=False,
+                      room_type="public",
+                  )
+              )
+              assert public_channel.edited[owner].move_members is True
+
+              vip_channel = _control_test_channel(owner)
+              asyncio.run(
+                  voice.apply_voice_lock_state(
+                      vip_channel,
+                      owner,
+                      locked=False,
+                      room_type="vip",
+                  )
+              )
+              assert vip_channel.edited[owner].move_members is None
+
+
+          def test_visibility_control_only_clears_owner_move_members_for_vip(monkeypatch):
+              owner = object()
+              monkeypatch.setattr(voice, "get_play_voice_allowed_roles", lambda guild: [])
+              monkeypatch.setattr(voice, "get_vip_voice_allowed_roles", lambda guild: [])
+
+              public_channel = _control_test_channel(owner)
+              asyncio.run(
+                  voice.apply_voice_hidden_state(
+                      public_channel,
+                      owner,
+                      hidden=False,
+                      room_type="public",
+                  )
+              )
+              assert public_channel.edited[owner].move_members is True
+
+              vip_channel = _control_test_channel(owner)
+              asyncio.run(
+                  voice.apply_voice_hidden_state(
+                      vip_channel,
+                      owner,
+                      hidden=False,
+                      room_type="vip",
+                  )
+              )
+              assert vip_channel.edited[owner].move_members is None
+          PY
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Validate refinement
+        run: |
+          python -m py_compile views/voice.py
+          python -m pytest -q tests/test_vip_voice_move_permissions.py
+
+      - name: Commit refinement
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/refine-vip-member-move-permission-fix.yml
+          git add views/voice.py tests/test_vip_voice_move_permissions.py
+          git commit -m "Scope VIP move-member inheritance to VIP rooms [vip-move-scope-refined]"
+          git push origin HEAD:fix/vip-member-move-permission
