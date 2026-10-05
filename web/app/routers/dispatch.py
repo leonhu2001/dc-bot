@@ -1,7 +1,7 @@
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -15,6 +15,10 @@ from web.app.services.dispatch_access import (
     touch_dispatch_user_presence,
 )
 from web.app.config import config
+from web.app.services.dispatch_support import (
+    assign_companion_from_dispatch,
+    can_manage_dispatch_orders,
+)
 from web.app.services.order_service import (
     claim_order_for_worker,
     create_demo_orders_if_empty,
@@ -25,12 +29,15 @@ from web.app.services.order_service import (
     partition_dispatch_orders,
     unclaim_order_for_worker,
 )
+from web.app.services.staff_service import list_companion_members
 
 router = APIRouter(tags=["dispatch"])
+
 
 def get_dispatch_role_type(user: dict | None) -> str:
     # 網站派單頁不再分舊職位名稱，統一視為接單人員。
     return "booster"
+
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -101,6 +108,11 @@ async def dispatch_dashboard(
         )
 
     touch_dispatch_user_presence(user)
+    support_can_manage = can_manage_dispatch_orders(user)
+    user_can_claim = bool(
+        user.get("is_worker")
+        or user.get("is_companion")
+    )
 
     db = SessionLocal()
 
@@ -112,6 +124,11 @@ async def dispatch_dashboard(
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
         claimed_orders = [order for order in orders if order.id in claimed_order_ids]
+        companion_options = (
+            list_companion_members(db)
+            if support_can_manage
+            else []
+        )
 
         guild_id = str(config.DISCORD_GUILD_ID or "").strip()
         claimed_order_summaries = {}
@@ -191,6 +208,9 @@ async def dispatch_dashboard(
             "claimed_order_ids": claimed_order_ids,
             "claimed_orders": claimed_orders,
             "claimed_order_summaries": claimed_order_summaries,
+            "support_can_manage": support_can_manage,
+            "user_can_claim": user_can_claim,
+            "companion_options": companion_options,
             "message": message,
             "error": error,
         },
@@ -203,6 +223,9 @@ async def claim_order(request: Request, order_id: int):
 
     if not user:
         return redirect_to_dispatch(error="你沒有派單頁面權限，或登入狀態已過期。")
+
+    if not (user.get("is_worker") or user.get("is_companion")):
+        return redirect_to_dispatch(error="客服請使用客服操作區指派陪玩。")
 
     db = SessionLocal()
 
@@ -228,6 +251,9 @@ async def unclaim_order(request: Request, order_id: int):
     if not user:
         return redirect_to_dispatch(error="你沒有派單頁面權限，或登入狀態已過期。")
 
+    if not (user.get("is_worker") or user.get("is_companion")):
+        return redirect_to_dispatch(error="客服不能以接單人員身分取消接單。")
+
     db = SessionLocal()
 
     try:
@@ -243,3 +269,32 @@ async def unclaim_order(request: Request, order_id: int):
         db.close()
 
     return redirect_to_dispatch(message="已取消接單。")
+
+
+@router.post("/dispatch/orders/{order_id}/support-assign")
+async def support_assign_companion(
+    request: Request,
+    order_id: int,
+    companion_discord_id: str = Form(...),
+):
+    user = require_dispatch_user(request)
+
+    if not user or not can_manage_dispatch_orders(user):
+        return redirect_to_dispatch(error="你沒有客服派單操作權限。")
+
+    db = SessionLocal()
+
+    try:
+        result_message = assign_companion_from_dispatch(
+            db,
+            order_id=order_id,
+            companion_discord_id=companion_discord_id,
+            support_user=user,
+        )
+    except ValueError as e:
+        db.rollback()
+        return redirect_to_dispatch(error=str(e))
+    finally:
+        db.close()
+
+    return redirect_to_dispatch(message=result_message)

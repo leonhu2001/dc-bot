@@ -11,7 +11,7 @@
     <nav class="mw-r5-nav">
 
         <a
-            class="{% if _p == '/employee' %}active{% endif %}"
+            class="{% if _p == '/employee' or _p.startswith('/my/payouts') %}active{% endif %}"
             href="/employee"
         >
             員工中心
@@ -22,13 +22,6 @@
             href="/dispatch"
         >
             接單大廳
-        </a>
-
-        <a
-            class="{% if _p.startswith('/my/payouts') %}active{% endif %}"
-            href="/my/payouts"
-        >
-            完整薪資
         </a>
 
         <a href="/">
