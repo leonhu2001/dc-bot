@@ -26,6 +26,19 @@ SOURCE_UPDATED=0
 DEPENDENCIES_UPDATED=0
 DEPENDENCY_SYNC_NEEDED=0
 
+restart_services() {
+    local started_at finished_at elapsed_ms
+    started_at="$(date +%s%3N)"
+
+    # 兩個 unit 放在同一個 systemd transaction，避免先等 Bot 完整重啟後
+    # 才開始重啟 Web。HTTP readiness 交給後面的 smoke check，不再固定 sleep 3 秒。
+    systemctl restart "$BOT_SERVICE" "$WEB_SERVICE"
+
+    finished_at="$(date +%s%3N)"
+    elapsed_ms=$((finished_at - started_at))
+    echo "Restart transaction: ${elapsed_ms}ms"
+}
+
 rollback() {
     local rc=$?
     trap - ERR
@@ -51,9 +64,7 @@ rollback() {
     fi
 
     if [ "$SOURCE_UPDATED" -eq 1 ]; then
-        systemctl restart "$BOT_SERVICE"
-        systemctl restart "$WEB_SERVICE"
-        sleep 3
+        restart_services || true
 
         echo "Bot after rollback: $(systemctl is-active "$BOT_SERVICE" || true)"
         echo "Web after rollback: $(systemctl is-active "$WEB_SERVICE" || true)"
@@ -194,9 +205,9 @@ fi
 
 echo
 echo "=== 8. RESTART SERVICES ==="
-systemctl restart "$BOT_SERVICE"
-systemctl restart "$WEB_SERVICE"
-sleep 3
+echo "Bot stop timeout: $(systemctl show "$BOT_SERVICE" -p TimeoutStopUSec --value 2>/dev/null || echo unknown)"
+echo "Web stop timeout: $(systemctl show "$WEB_SERVICE" -p TimeoutStopUSec --value 2>/dev/null || echo unknown)"
+restart_services
 
 BOT_STATE="$(systemctl is-active "$BOT_SERVICE" || true)"
 WEB_STATE="$(systemctl is-active "$WEB_SERVICE" || true)"
