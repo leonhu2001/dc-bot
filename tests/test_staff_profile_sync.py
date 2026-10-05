@@ -118,8 +118,6 @@ def test_profile_and_favorite_changes_share_one_durable_refresh_rule(tmp_path):
     assert len(claimed) == 1
     first_event_id = claimed[0]["event_id"]
 
-    # A second database change while the first event is processing must create a
-    # newer pending event without breaking the retry path of the first event.
     with sqlite3.connect(db_file) as conn:
         conn.execute(
             "DELETE FROM staff_favorites WHERE customer_discord_id='customer' AND staff_discord_id='1001'"
@@ -231,3 +229,57 @@ def test_stale_processing_event_is_superseded_by_newer_pending_event(tmp_path):
     first_row = next(row for row in rows if row["id"] == first_event_id)
     assert first_row["status"] == "done"
     assert "superseded" in str(first_row["error_message"])
+
+
+def test_snapshot_fallback_detects_favorite_change_when_triggers_are_missing(tmp_path):
+    db_file = tmp_path / "web_dashboard.db"
+    _create_source_tables(db_file)
+    ensure_staff_profile_refresh_sync(db_file=db_file)
+
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """
+            INSERT INTO staff_profiles (
+                staff_discord_id,
+                display_name,
+                profile_type,
+                forum_thread_id,
+                panel_message_id,
+                is_public,
+                updated_at
+            ) VALUES (
+                '4004',
+                'Fallback',
+                '陪玩',
+                '123456',
+                '654321',
+                1,
+                CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.commit()
+
+    bootstrap = claim_staff_profile_refresh_events(db_file=db_file)
+    assert len(bootstrap) == 1
+    assert bootstrap[0]["staff_discord_id"] == "4004"
+    assert bootstrap[0]["reason"] == "snapshot_bootstrap"
+    mark_staff_profile_refresh_done(bootstrap[0]["event_id"], db_file=db_file)
+
+    with sqlite3.connect(db_file) as conn:
+        conn.execute("DROP TRIGGER IF EXISTS trg_staff_profile_refresh_favorite_insert")
+        conn.execute("DROP TRIGGER IF EXISTS trg_staff_profile_refresh_favorite_delete")
+        conn.execute(
+            """
+            INSERT INTO staff_favorites(customer_discord_id, staff_discord_id, created_at)
+            VALUES ('website-user', '4004', CURRENT_TIMESTAMP)
+            """
+        )
+        conn.commit()
+
+    assert not [row for row in _event_rows(db_file) if row["status"] == "pending"]
+
+    recovered = claim_staff_profile_refresh_events(db_file=db_file)
+    assert len(recovered) == 1
+    assert recovered[0]["staff_discord_id"] == "4004"
+    assert recovered[0]["reason"] == "snapshot_changed"
