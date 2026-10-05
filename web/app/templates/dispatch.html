@@ -5,505 +5,14 @@
 
 {% block content %}
 <style>
-    .dispatch-shell {
-        display: grid;
-        gap: 18px;
-    }
-
-    .dispatch-hero {
-        display: grid;
-        grid-template-columns: 1.5fr 1fr;
-        gap: 18px;
-        align-items: stretch;
-    }
-
-    .dispatch-panel {
-        border: 1px solid var(--mw-line, rgba(255,255,255,.12));
-        border-radius: 24px;
-        background:
-            linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
-            rgba(9, 12, 20, .92);
-        box-shadow: 0 22px 60px rgba(0,0,0,.3);
-    }
-
-    .dispatch-hero-main,
-    .dispatch-column {
-        padding: 18px;
-    }
-
-    .dispatch-hero-main {
-        padding: 26px;
-    }
-
-    .dispatch-eyebrow {
-        margin: 0 0 8px;
-        color: var(--mw-gold, #f5c66b);
-        font-size: 12px;
-        font-weight: 950;
-        letter-spacing: .18em;
-        text-transform: uppercase;
-    }
-
-    .dispatch-title {
-        margin: 0;
-        font-size: clamp(30px, 4vw, 54px);
-        letter-spacing: .08em;
-        font-weight: 950;
-    }
-
-    .dispatch-desc {
-        margin: 12px 0 0;
-        color: var(--mw-muted, #a7a0b5);
-        line-height: 1.8;
-    }
-
-    .dispatch-tags,
-    .dispatch-chip-list,
-    .dispatch-status-stack,
-    .dispatch-actions,
-    .dispatch-my-links {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .dispatch-tags {
-        margin-top: 18px;
-    }
-
-    .dispatch-tag,
-    .dispatch-pill,
-    .dispatch-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border-radius: 999px;
-        border: 1px solid rgba(245, 198, 107, .28);
-        background: rgba(245, 198, 107, .09);
-        color: #ffe3a3;
-        padding: 7px 10px;
-        font-size: 12px;
-        font-weight: 900;
-    }
-
-    .dispatch-tag-button {
-        font: inherit;
-        cursor: pointer;
-    }
-
-    .dispatch-tag[data-state="online"] {
-        border-color: rgba(114, 242, 166, .34);
-        background: rgba(114, 242, 166, .1);
-        color: #d9ffe8;
-    }
-
-    .dispatch-tag[data-state="reconnecting"] {
-        border-color: rgba(245, 198, 107, .34);
-        background: rgba(245, 198, 107, .1);
-        color: #ffe3a3;
-    }
-
-    .dispatch-tag[data-state="offline"],
-    .dispatch-tag[data-state="blocked"] {
-        border-color: rgba(255, 107, 138, .34);
-        background: rgba(255, 107, 138, .1);
-        color: #ffd5df;
-    }
-
-    .dispatch-stats {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-        padding: 18px;
-    }
-
-    .dispatch-stat {
-        padding: 18px;
-        border-radius: 20px;
-        background: rgba(255,255,255,.055);
-        border: 1px solid rgba(255,255,255,.085);
-    }
-
-    .dispatch-stat span {
-        display: block;
-        color: var(--mw-muted, #a7a0b5);
-        font-size: 13px;
-        margin-bottom: 8px;
-    }
-
-    .dispatch-stat strong {
-        display: block;
-        font-size: 36px;
-        line-height: 1;
-        font-weight: 950;
-    }
-
-    .dispatch-notice {
-        border-radius: 18px;
-        padding: 14px 16px;
-        font-weight: 800;
-    }
-
-    .dispatch-notice.success {
-        border: 1px solid rgba(114, 242, 166, .34);
-        background: rgba(114, 242, 166, .1);
-        color: #d9ffe8;
-    }
-
-    .dispatch-notice.error {
-        border: 1px solid rgba(255, 107, 138, .34);
-        background: rgba(255, 107, 138, .1);
-        color: #ffd5df;
-    }
-
-    .dispatch-board {
-        display: grid;
-        grid-template-columns: minmax(320px, .72fr) minmax(0, 1.28fr);
-        gap: 18px;
-        align-items: start;
-    }
-
-    .dispatch-column-head,
-    .dispatch-subsection-head {
-        display: flex;
-        align-items: start;
-        justify-content: space-between;
-        gap: 12px;
-        padding-bottom: 14px;
-        border-bottom: 1px solid rgba(255,255,255,.08);
-    }
-
-    .dispatch-column-head {
-        margin-bottom: 14px;
-    }
-
-    .dispatch-column-head h2,
-    .dispatch-subsection-head h3 {
-        margin: 0;
-        letter-spacing: .06em;
-    }
-
-    .dispatch-column-head h2 {
-        font-size: 22px;
-    }
-
-    .dispatch-subsection-head h3 {
-        font-size: 18px;
-    }
-
-    .dispatch-count {
-        flex: 0 0 auto;
-    }
-
-    .dispatch-list {
-        display: grid;
-        gap: 12px;
-    }
-
-    .dispatch-subsection {
-        display: grid;
-        gap: 12px;
-    }
-
-    .dispatch-subsection + .dispatch-subsection {
-        margin-top: 18px;
-        padding-top: 18px;
-        border-top: 1px solid rgba(255,255,255,.08);
-    }
-
-    .dispatch-progress-group {
-        margin-top: 18px;
-        border-top: 1px solid rgba(255,255,255,.08);
-        padding-top: 18px;
-    }
-
-    .dispatch-progress-group > summary {
-        list-style: none;
-        cursor: pointer;
-    }
-
-    .dispatch-progress-group > summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .dispatch-progress-body {
-        margin-top: 12px;
-    }
-
-    .dispatch-my-card,
-    .dispatch-order-card,
-    .dispatch-empty {
-        border-radius: 20px;
-        border: 1px solid rgba(255,255,255,.09);
-        background:
-            linear-gradient(145deg, rgba(255,255,255,.06), rgba(255,255,255,.025)),
-            rgba(0,0,0,.18);
-    }
-
-    .dispatch-my-card,
-    .dispatch-order-card {
-        padding: 16px;
-        display: grid;
-        gap: 14px;
-    }
-
-    .dispatch-my-card h3,
-    .dispatch-order-card h3 {
-        margin: 4px 0 0;
-        font-size: 17px;
-        line-height: 1.45;
-    }
-
-    .dispatch-my-status {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-    }
-
-    .dispatch-my-status > div {
-        padding: 10px 12px;
-        border-radius: 14px;
-        border: 1px solid rgba(255,255,255,.075);
-        background: rgba(255,255,255,.035);
-    }
-
-    .dispatch-my-status span {
-        display: block;
-        color: var(--mw-muted, #a7a0b5);
-        font-size: 11px;
-    }
-
-    .dispatch-my-status strong {
-        display: block;
-        margin-top: 5px;
-        font-size: 15px;
-    }
-
-    .dispatch-money {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        color: var(--mw-muted, #a7a0b5);
-        font-size: 13px;
-    }
-
-    .dispatch-money strong {
-        color: var(--mw-gold, #f5c66b);
-        font-size: 19px;
-    }
-
-    .dispatch-my-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid rgba(245, 198, 107, .3);
-        border-radius: 999px;
-        padding: 7px 11px;
-        color: #ffe3a3;
-        background: rgba(245, 198, 107, .08);
-        text-decoration: none;
-        font-size: 12px;
-        font-weight: 900;
-    }
-
-    .dispatch-order-top {
-        display: flex;
-        align-items: start;
-        justify-content: space-between;
-        gap: 12px;
-    }
-
-    .dispatch-status {
-        border-color: rgba(117, 232, 255, .34);
-        background: rgba(117, 232, 255, .09);
-        color: #c9f8ff;
-    }
-
-    .dispatch-missing {
-        border-color: rgba(255, 189, 89, .38);
-        background: rgba(255, 189, 89, .1);
-        color: #ffe0a3;
-    }
-
-    .dispatch-meta {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
-    }
-
-    .dispatch-meta-item {
-        border: 1px solid rgba(255,255,255,.075);
-        border-radius: 16px;
-        padding: 12px;
-        background: rgba(255,255,255,.04);
-    }
-
-    .dispatch-meta-item span,
-    .dispatch-muted {
-        color: var(--mw-muted, #a7a0b5);
-        font-size: 12px;
-    }
-
-    .dispatch-meta-item strong {
-        display: block;
-        margin-top: 6px;
-        word-break: break-word;
-    }
-
-    .dispatch-assignment {
-        display: grid;
-        grid-template-columns: 1fr 112px;
-        gap: 12px;
-        align-items: center;
-        border: 1px solid rgba(255,255,255,.075);
-        border-radius: 18px;
-        padding: 13px;
-        background: rgba(255,255,255,.035);
-    }
-
-    .dispatch-chip-list {
-        margin-top: 8px;
-    }
-
-    .dispatch-worker-count {
-        text-align: center;
-        border-left: 1px solid rgba(255,255,255,.08);
-        color: var(--mw-muted, #a7a0b5);
-    }
-
-    .dispatch-worker-count strong {
-        display: block;
-        color: var(--mw-text, #f4f0e8);
-        font-size: 24px;
-        line-height: 1.1;
-    }
-
-    .dispatch-payout {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-        border: 1px solid rgba(245, 198, 107, .18);
-        border-radius: 18px;
-        padding: 12px;
-        background: rgba(245, 198, 107, .07);
-    }
-
-    .dispatch-payout div {
-        display: grid;
-        gap: 5px;
-    }
-
-    .dispatch-payout span {
-        color: var(--mw-muted, #a7a0b5);
-        font-size: 12px;
-    }
-
-    .dispatch-payout strong {
-        color: var(--mw-gold, #f5c66b);
-        font-size: 18px;
-    }
-
-    .dispatch-note {
-        margin: 0;
-        border-left: 3px solid rgba(245, 198, 107, .55);
-        padding: 10px 12px;
-        border-radius: 12px;
-        background: rgba(255,255,255,.045);
-        color: var(--mw-muted, #a7a0b5);
-        line-height: 1.7;
-    }
-
-    .dispatch-footer {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .dispatch-footer form {
-        margin: 0;
-    }
-
-    .dispatch-footer-status {
-        color: var(--mw-muted, #a7a0b5);
-        font-size: 13px;
-        font-weight: 800;
-    }
-
-    .dispatch-button {
-        border: 1px solid rgba(245, 198, 107, .4);
-        border-radius: 999px;
-        padding: 11px 18px;
-        color: var(--mw-text, #f4f0e8);
-        background: linear-gradient(135deg, rgba(245,198,107,.26), rgba(207,62,62,.16));
-        font-weight: 950;
-        cursor: pointer;
-    }
-
-    .dispatch-button.danger {
-        border-color: rgba(255,107,138,.4);
-        background: rgba(255,107,138,.13);
-        color: #ffd8df;
-    }
-
-    .dispatch-footer button:disabled {
-        opacity: .56;
-        cursor: wait;
-        transform: none;
-    }
-
-    .dispatch-empty {
-        padding: 22px;
-        display: grid;
-        gap: 7px;
-        color: var(--mw-muted, #a7a0b5);
-    }
-
-    .dispatch-empty strong {
-        color: var(--mw-text, #f4f0e8);
-    }
-
-    @media (max-width: 1120px) {
-        .dispatch-hero,
-        .dispatch-board {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 760px) {
-        .dispatch-stats,
-        .dispatch-meta,
-        .dispatch-payout,
-        .dispatch-my-status {
-            grid-template-columns: 1fr;
-        }
-
-        .dispatch-assignment {
-            grid-template-columns: 1fr;
-        }
-
-        .dispatch-worker-count {
-            border-left: 0;
-            border-top: 1px solid rgba(255,255,255,.08);
-            padding-top: 10px;
-        }
-
-        .dispatch-order-top,
-        .dispatch-column-head,
-        .dispatch-subsection-head {
-            flex-direction: column;
-        }
-    }
+    .dispatch-shell{display:grid;gap:18px}.dispatch-hero{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;align-items:stretch}.dispatch-panel{border:1px solid var(--mw-line,rgba(255,255,255,.12));border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025)),rgba(9,12,20,.92);box-shadow:0 22px 60px rgba(0,0,0,.3)}.dispatch-hero-main,.dispatch-column{padding:18px}.dispatch-hero-main{padding:26px}.dispatch-eyebrow{margin:0 0 8px;color:var(--mw-gold,#f5c66b);font-size:12px;font-weight:950;letter-spacing:.18em;text-transform:uppercase}.dispatch-title{margin:0;font-size:clamp(30px,4vw,54px);letter-spacing:.08em;font-weight:950}.dispatch-desc{margin:12px 0 0;color:var(--mw-muted,#a7a0b5);line-height:1.8}.dispatch-tags,.dispatch-chip-list,.dispatch-status-stack,.dispatch-actions,.dispatch-my-links,.dispatch-support-links{display:flex;flex-wrap:wrap;gap:8px}.dispatch-tags{margin-top:18px}.dispatch-tag,.dispatch-pill,.dispatch-chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid rgba(245,198,107,.28);background:rgba(245,198,107,.09);color:#ffe3a3;padding:7px 10px;font-size:12px;font-weight:900}.dispatch-tag-button{font:inherit;cursor:pointer}.dispatch-tag[data-state="online"]{border-color:rgba(114,242,166,.34);background:rgba(114,242,166,.1);color:#d9ffe8}.dispatch-tag[data-state="reconnecting"]{border-color:rgba(245,198,107,.34);background:rgba(245,198,107,.1);color:#ffe3a3}.dispatch-tag[data-state="offline"],.dispatch-tag[data-state="blocked"]{border-color:rgba(255,107,138,.34);background:rgba(255,107,138,.1);color:#ffd5df}.dispatch-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:18px}.dispatch-stat{padding:18px;border-radius:20px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.085)}.dispatch-stat span{display:block;color:var(--mw-muted,#a7a0b5);font-size:13px;margin-bottom:8px}.dispatch-stat strong{display:block;font-size:36px;line-height:1;font-weight:950}.dispatch-notice{border-radius:18px;padding:14px 16px;font-weight:800}.dispatch-notice.success{border:1px solid rgba(114,242,166,.34);background:rgba(114,242,166,.1);color:#d9ffe8}.dispatch-notice.error{border:1px solid rgba(255,107,138,.34);background:rgba(255,107,138,.1);color:#ffd5df}.dispatch-board{display:grid;grid-template-columns:minmax(320px,.72fr) minmax(0,1.28fr);gap:18px;align-items:start}.dispatch-column-head,.dispatch-subsection-head{display:flex;align-items:start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08)}.dispatch-column-head{margin-bottom:14px}.dispatch-column-head h2,.dispatch-subsection-head h3{margin:0;letter-spacing:.06em}.dispatch-column-head h2{font-size:22px}.dispatch-subsection-head h3{font-size:18px}.dispatch-count{flex:0 0 auto}.dispatch-list,.dispatch-subsection{display:grid;gap:12px}.dispatch-subsection+.dispatch-subsection{margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}.dispatch-progress-group{margin-top:18px;border-top:1px solid rgba(255,255,255,.08);padding-top:18px}.dispatch-progress-group>summary{list-style:none;cursor:pointer}.dispatch-progress-group>summary::-webkit-details-marker{display:none}.dispatch-progress-body{margin-top:12px}.dispatch-my-card,.dispatch-order-card,.dispatch-empty,.dispatch-support-duty{border-radius:20px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.025)),rgba(0,0,0,.18)}.dispatch-my-card,.dispatch-order-card,.dispatch-support-duty{padding:16px;display:grid;gap:14px}.dispatch-my-card h3,.dispatch-order-card h3,.dispatch-support-duty h3{margin:4px 0 0;font-size:17px;line-height:1.45}.dispatch-my-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.dispatch-my-status>div{padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.035)}.dispatch-my-status span{display:block;color:var(--mw-muted,#a7a0b5);font-size:11px}.dispatch-my-status strong{display:block;margin-top:5px;font-size:15px}.dispatch-money{display:flex;justify-content:space-between;align-items:center;color:var(--mw-muted,#a7a0b5);font-size:13px}.dispatch-money strong{color:var(--mw-gold,#f5c66b);font-size:19px}.dispatch-my-link,.dispatch-support-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(245,198,107,.3);border-radius:999px;padding:7px 11px;color:#ffe3a3;background:rgba(245,198,107,.08);text-decoration:none;font-size:12px;font-weight:900}.dispatch-support-link.danger{border-color:rgba(255,107,138,.34);background:rgba(255,107,138,.1);color:#ffd5df}.dispatch-order-top{display:flex;align-items:start;justify-content:space-between;gap:12px}.dispatch-status{border-color:rgba(117,232,255,.34);background:rgba(117,232,255,.09);color:#c9f8ff}.dispatch-missing{border-color:rgba(255,189,89,.38);background:rgba(255,189,89,.1);color:#ffe0a3}.dispatch-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.dispatch-meta-item{border:1px solid rgba(255,255,255,.075);border-radius:16px;padding:12px;background:rgba(255,255,255,.04)}.dispatch-meta-item span,.dispatch-muted{color:var(--mw-muted,#a7a0b5);font-size:12px}.dispatch-meta-item strong{display:block;margin-top:6px;word-break:break-word}.dispatch-assignment{display:grid;grid-template-columns:1fr 112px;gap:12px;align-items:center;border:1px solid rgba(255,255,255,.075);border-radius:18px;padding:13px;background:rgba(255,255,255,.035)}.dispatch-chip-list{margin-top:8px}.dispatch-worker-count{text-align:center;border-left:1px solid rgba(255,255,255,.08);color:var(--mw-muted,#a7a0b5)}.dispatch-worker-count strong{display:block;color:var(--mw-text,#f4f0e8);font-size:24px;line-height:1.1}.dispatch-payout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border:1px solid rgba(245,198,107,.18);border-radius:18px;padding:12px;background:rgba(245,198,107,.07)}.dispatch-payout div{display:grid;gap:5px}.dispatch-payout span{color:var(--mw-muted,#a7a0b5);font-size:12px}.dispatch-payout strong{color:var(--mw-gold,#f5c66b);font-size:18px}.dispatch-note{margin:0;border-left:3px solid rgba(245,198,107,.55);padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.045);color:var(--mw-muted,#a7a0b5);line-height:1.7}.dispatch-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px}.dispatch-footer form{margin:0}.dispatch-footer-status{color:var(--mw-muted,#a7a0b5);font-size:13px;font-weight:800}.dispatch-button,.dispatch-support-tools button{border:1px solid rgba(245,198,107,.4);border-radius:999px;padding:11px 18px;color:var(--mw-text,#f4f0e8);background:linear-gradient(135deg,rgba(245,198,107,.26),rgba(207,62,62,.16));font-weight:950;cursor:pointer}.dispatch-button.danger{border-color:rgba(255,107,138,.4);background:rgba(255,107,138,.13);color:#ffd8df}.dispatch-footer button:disabled{opacity:.56;cursor:wait;transform:none}.dispatch-empty{padding:22px;display:grid;gap:7px;color:var(--mw-muted,#a7a0b5)}.dispatch-empty strong{color:var(--mw-text,#f4f0e8)}.dispatch-support-tools{display:grid;gap:10px;padding:13px;border:1px solid rgba(117,232,255,.18);border-radius:18px;background:rgba(117,232,255,.045)}.dispatch-support-tools-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.dispatch-support-tools-head strong{font-size:13px}.dispatch-support-tools-head span{color:#c9f8ff;font-size:11px;font-weight:900}.dispatch-support-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.dispatch-support-form select{min-width:0;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#11141d;color:var(--mw-text,#f4f0e8);padding:10px 12px}.dispatch-support-form button{padding:9px 14px}.dispatch-support-duty{border-color:rgba(117,232,255,.18);background:linear-gradient(145deg,rgba(117,232,255,.07),rgba(255,255,255,.025)),rgba(0,0,0,.18)}.dispatch-support-duty p{margin:0;color:var(--mw-muted,#a7a0b5);line-height:1.7}.dispatch-support-duty .dispatch-pill{width:max-content;border-color:rgba(114,242,166,.3);background:rgba(114,242,166,.08);color:#d9ffe8}@media(max-width:1120px){.dispatch-hero,.dispatch-board{grid-template-columns:1fr}}@media(max-width:760px){.dispatch-stats,.dispatch-meta,.dispatch-payout,.dispatch-my-status{grid-template-columns:1fr}.dispatch-assignment,.dispatch-support-form{grid-template-columns:1fr}.dispatch-worker-count{border-left:0;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}.dispatch-order-top,.dispatch-column-head,.dispatch-subsection-head,.dispatch-support-tools-head{flex-direction:column}}
 </style>
 
-{% macro render_order_card(order, user, claimed_order_ids, request) %}
+{% macro render_order_card(order, user, claimed_order_ids, request, support_can_manage, user_can_claim, companion_options) %}
     {% set active_assignments = [] %}
     {% for assignment in order.assignments %}
-        {% if assignment.is_active %}
-            {% set _ = active_assignments.append(assignment) %}
-        {% endif %}
+        {% if assignment.is_active %}{% set _ = active_assignments.append(assignment) %}{% endif %}
     {% endfor %}
-
     {% set user_claimed_this_order = order.id in claimed_order_ids %}
     {% set prepay_claims = order.prepay_claims or [] %}
     {% set final_price = order.customer_pay_amount if order.customer_pay_amount is not none else order.amount %}
@@ -517,406 +26,137 @@
 
     <article class="dispatch-order-card" data-dispatch-order-id="{{ order.id }}">
         <div class="dispatch-order-top">
-            <div>
-                <p class="dispatch-eyebrow">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p>
-                <h3>{{ order.category }}｜{{ order.item }}</h3>
-            </div>
-
+            <div><p class="dispatch-eyebrow">{{ order.bot_order_no or ("WEB-" ~ order.id) }}</p><h3>{{ order.category }}｜{{ order.item }}</h3></div>
             <div class="dispatch-status-stack">
-                <span class="dispatch-chip dispatch-status">
-                    {{ order.dispatch_status_label }}
-                </span>
-                {% if order.dispatch_claim_open %}
-                    <span class="dispatch-chip dispatch-missing">
-                        還缺 {{ order.dispatch_missing_staff_count }} 人
-                    </span>
-                {% endif %}
+                <span class="dispatch-chip dispatch-status">{{ order.dispatch_status_label }}</span>
+                {% if order.dispatch_claim_open %}<span class="dispatch-chip dispatch-missing">還缺 {{ order.dispatch_missing_staff_count }} 人</span>{% endif %}
             </div>
         </div>
 
         <div class="dispatch-meta">
-            <div class="dispatch-meta-item">
-                <span>老闆</span>
-                <strong>{{ order.customer_display_name or "未記錄" }}</strong>
-            </div>
-
-            <div class="dispatch-meta-item">
-                <span>數量</span>
-                <strong>{{ order.quantity }} 單</strong>
-            </div>
-
-            <div class="dispatch-meta-item">
-                <span>金額</span>
-                <strong>{{ final_price }}T</strong>
-            </div>
-
-            <div class="dispatch-meta-item">
-                <span>付款方式</span>
-                <strong>{{ order.payment_method or "未記錄" }}</strong>
-            </div>
+            <div class="dispatch-meta-item"><span>老闆</span><strong>{{ order.customer_display_name or "未記錄" }}</strong></div>
+            <div class="dispatch-meta-item"><span>數量</span><strong>{{ order.quantity }} 單</strong></div>
+            <div class="dispatch-meta-item"><span>金額</span><strong>{{ final_price }}T</strong></div>
+            <div class="dispatch-meta-item"><span>付款方式</span><strong>{{ order.payment_method or "未記錄" }}</strong></div>
         </div>
 
-        {% if
-            original_price != final_price
-            or percent_off > 0
-            or fixed_off > 0
-            or point_off > 0
-            or specify_fee > 0
-        %}
+        {% if original_price != final_price or percent_off > 0 or fixed_off > 0 or point_off > 0 or specify_fee > 0 %}
             <div class="dispatch-payout">
-                <div>
-                    <span>商品原價</span>
-                    <strong>{{ original_price }}T</strong>
-                </div>
-
-                {% if percent_off > 0 %}
-                    <div>
-                        <span>百分比折扣</span>
-                        <strong>-{{ percent_off }}T</strong>
-                    </div>
-                {% endif %}
-
-                {% if fixed_off > 0 %}
-                    <div>
-                        <span>固定折扣</span>
-                        <strong>-{{ fixed_off }}T</strong>
-                    </div>
-                {% endif %}
-
-                {% if point_off > 0 %}
-                    <div>
-                        <span>點數折價</span>
-                        <strong>-{{ point_off }}T</strong>
-                    </div>
-                {% endif %}
-
-                {% if specify_fee > 0 %}
-                    <div>
-                        <span>指定費</span>
-                        <strong>+{{ specify_fee }}T</strong>
-                    </div>
-                {% endif %}
-
-                <div>
-                    <span>顧客實付</span>
-                    <strong>{{ final_price }}T</strong>
-                </div>
+                <div><span>商品原價</span><strong>{{ original_price }}T</strong></div>
+                {% if percent_off > 0 %}<div><span>百分比折扣</span><strong>-{{ percent_off }}T</strong></div>{% endif %}
+                {% if fixed_off > 0 %}<div><span>固定折扣</span><strong>-{{ fixed_off }}T</strong></div>{% endif %}
+                {% if point_off > 0 %}<div><span>點數折價</span><strong>-{{ point_off }}T</strong></div>{% endif %}
+                {% if specify_fee > 0 %}<div><span>指定費</span><strong>+{{ specify_fee }}T</strong></div>{% endif %}
+                <div><span>顧客實付</span><strong>{{ final_price }}T</strong></div>
             </div>
         {% endif %}
 
         <div class="dispatch-assignment">
             <div>
                 <span class="dispatch-muted">接單人員</span>
-
                 {% if active_assignments %}
-                    <div class="dispatch-chip-list">
-                        {% for assignment in active_assignments %}
-                            <span class="dispatch-chip">
-                                @{{ assignment.worker_display_name or assignment.worker_discord_id }}
-                                {% if assignment.has_named_bonus %}
-                                    +掛名
-                                {% endif %}
-                            </span>
-                        {% endfor %}
-                    </div>
+                    <div class="dispatch-chip-list">{% for assignment in active_assignments %}<span class="dispatch-chip">@{{ assignment.worker_display_name or assignment.worker_discord_id }}{% if assignment.has_named_bonus %} +掛名{% endif %}</span>{% endfor %}</div>
                 {% elif prepay_claims %}
-                    <div class="dispatch-chip-list">
-                        {% for assignment in prepay_claims %}
-                            <span class="dispatch-chip">
-                                @{{ assignment.worker_display_name or assignment.worker_discord_id }}
-                            </span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="dispatch-muted">尚未有人接單</p>
-                {% endif %}
-
-                {% if order.dispatch_required_staff_count %}
-                    <p class="dispatch-muted">
-                        接單進度：
-                        {{ order.dispatch_current_staff_count }}/{{ order.dispatch_required_staff_count }}
-                        {% if order.prepay_min_protector_count %}
-                            ｜護航 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}
-                        {% endif %}
-                    </p>
-                {% endif %}
+                    <div class="dispatch-chip-list">{% for assignment in prepay_claims %}<span class="dispatch-chip">@{{ assignment.worker_display_name or assignment.worker_discord_id }}</span>{% endfor %}</div>
+                {% else %}<p class="dispatch-muted">尚未有人接單</p>{% endif %}
+                {% if order.dispatch_required_staff_count %}<p class="dispatch-muted">接單進度：{{ order.dispatch_current_staff_count }}/{{ order.dispatch_required_staff_count }}{% if order.prepay_min_protector_count %}｜護航 {{ order.prepay_protector_count or 0 }}/{{ order.prepay_min_protector_count }}{% endif %}</p>{% endif %}
             </div>
-
-            <div class="dispatch-worker-count">
-                <span>人數</span>
-                <strong>
-                    {{ order.dispatch_current_staff_count }}
-                    {% if order.dispatch_required_staff_count %}
-                        /{{ order.dispatch_required_staff_count }}
-                    {% endif %}
-                </strong>
-            </div>
+            <div class="dispatch-worker-count"><span>人數</span><strong>{{ order.dispatch_current_staff_count }}{% if order.dispatch_required_staff_count %}/{{ order.dispatch_required_staff_count }}{% endif %}</strong></div>
         </div>
 
         {% if user_claimed_this_order %}
             {% for payout in order.payouts %}
                 {% if payout.worker_discord_id == user.id %}
-                    <div class="dispatch-payout">
-                        <div>
-                            <span>基本分潤</span>
-                            <strong>{{ payout.base_payout|round(0, 'common')|int }}T</strong>
-                        </div>
-
-                        <div>
-                            <span>掛名加成</span>
-                            <strong>{{ payout.named_bonus_amount|round(0, 'common')|int }}T</strong>
-                        </div>
-
-                        <div>
-                            <span>目前總分潤</span>
-                            <strong>{{ payout.final_payout|round(0, 'common')|int }}T</strong>
-                        </div>
-                    </div>
+                    <div class="dispatch-payout"><div><span>基本分潤</span><strong>{{ payout.base_payout|round(0,'common')|int }}T</strong></div><div><span>掛名加成</span><strong>{{ payout.named_bonus_amount|round(0,'common')|int }}T</strong></div><div><span>目前總分潤</span><strong>{{ payout.final_payout|round(0,'common')|int }}T</strong></div></div>
                 {% endif %}
             {% endfor %}
         {% endif %}
 
-        {% if order.note %}
-            <p class="dispatch-note">{{ order.note }}</p>
+        {% if order.note %}<p class="dispatch-note">{{ order.note }}</p>{% endif %}
+
+        {% if support_can_manage %}
+            <div class="dispatch-support-tools">
+                <div class="dispatch-support-tools-head"><strong>客服操作</strong><span>值班管理</span></div>
+                <form class="dispatch-support-form" method="post" action="/dispatch/orders/{{ order.id }}/support-assign">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
+                    <select name="companion_discord_id" required>
+                        <option value="">選擇陪玩指派到此單</option>
+                        {% for companion in companion_options %}
+                            <option value="{{ companion.discord_id }}">{{ companion.display_name or companion.global_name or companion.username or companion.discord_id }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">指派陪玩</button>
+                </form>
+                <div class="dispatch-support-links">
+                    <a class="dispatch-support-link" href="/admin/order-workspace/{{ order.id }}">修改訂單</a>
+                    <a class="dispatch-support-link danger" href="/admin/order-workspace/{{ order.id }}">取消訂單</a>
+                </div>
+            </div>
         {% endif %}
 
-        <div class="dispatch-footer">
-            {% if user_claimed_this_order and order.dispatch_allows_unclaim %}
-                <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim" data-dispatch-action="unclaim">
-                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                    <button class="button danger" type="submit" data-busy-label="取消中…">
-                        取消接單
-                    </button>
-                </form>
-            {% elif order.dispatch_claim_open %}
-                <form method="post" action="/dispatch/orders/{{ order.id }}/claim" data-dispatch-action="claim">
-                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                    <button class="button" type="submit" data-busy-label="接單中…">
-                        接單
-                    </button>
-                </form>
-            {% else %}
-                <span class="dispatch-footer-status">{{ order.dispatch_locked_message }}</span>
-            {% endif %}
-        </div>
+        {% if user_can_claim %}
+            <div class="dispatch-footer">
+                {% if user_claimed_this_order and order.dispatch_allows_unclaim %}
+                    <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim" data-dispatch-action="unclaim"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}"><button class="button danger" type="submit" data-busy-label="取消中…">取消接單</button></form>
+                {% elif order.dispatch_claim_open %}
+                    <form method="post" action="/dispatch/orders/{{ order.id }}/claim" data-dispatch-action="claim"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}"><button class="button" type="submit" data-busy-label="接單中…">接單</button></form>
+                {% else %}<span class="dispatch-footer-status">{{ order.dispatch_locked_message }}</span>{% endif %}
+            </div>
+        {% endif %}
     </article>
 {% endmacro %}
 
 <div class="dispatch-shell">
-    {% if message %}
-        <div class="dispatch-notice success">{{ message }}</div>
-    {% endif %}
-
-    {% if error %}
-        <div class="dispatch-notice error">{{ error }}</div>
-    {% endif %}
+    {% if message %}<div class="dispatch-notice success">{{ message }}</div>{% endif %}
+    {% if error %}<div class="dispatch-notice error">{{ error }}</div>{% endif %}
 
     <section class="dispatch-hero">
         <div class="dispatch-panel dispatch-hero-main">
             <p class="dispatch-eyebrow">MISSION DISPATCH</p>
-            <h1 class="dispatch-title">接單說明</h1>
-            <p class="dispatch-desc">
-                可接任務與進行中任務分區顯示；新單由即時連線推送，畫面更新完成後才播放提示音。
-            </p>
-
+            <h1 class="dispatch-title">接單大廳</h1>
+            <p class="dispatch-desc">陪玩可在這裡接單；客服值班時可直接指派陪玩，並進入訂單工作區修改或取消訂單。新單由即時連線推送，畫面更新完成後才播放提示音。</p>
             <div class="dispatch-tags">
-                <span class="dispatch-tag">魔丸♫客服</span>
-                <span class="dispatch-tag">護航接單</span>
-                <span class="dispatch-tag">陪玩接單</span>
-                <span
-                    class="dispatch-tag"
-                    title="最近 90 秒仍在接單大廳的陪玩"
-                    data-dispatch-online-companions
-                >
-                    🟢 在線陪玩 {{ online_companion_count }} 人
-                </span>
-                <span
-                    class="dispatch-tag"
-                    title="最近 90 秒仍在接單大廳的客服或總管"
-                    data-dispatch-online-support
-                >
-                    🟢 在線客服 {{ online_support_count }} 人
-                </span>
-                <span class="dispatch-tag" data-dispatch-realtime-status data-state="reconnecting">
-                    🟡 即時連線中
-                </span>
-                <span class="dispatch-tag" data-dispatch-last-sync>
-                    最後同步 --
-                </span>
-                <button
-                    class="dispatch-tag dispatch-tag-button"
-                    type="button"
-                    data-dispatch-notification-toggle
-                >
-                    🖥️ 桌面通知未啟用
-                </button>
+                {% if support_can_manage %}<span class="dispatch-tag" data-state="online">🛎️ 客服值班操作已開啟</span>{% endif %}
+                <span class="dispatch-tag">護航接單</span><span class="dispatch-tag">陪玩接單</span>
+                <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的接單人員" data-dispatch-online-companions>🟢 在線陪玩 {{ online_companion_count }} 人</span>
+                <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管" data-dispatch-online-support>🟢 在線客服 {{ online_support_count }} 人</span>
+                <span class="dispatch-tag" data-dispatch-realtime-status data-state="reconnecting">🟡 即時連線中</span>
+                <span class="dispatch-tag" data-dispatch-last-sync>最後同步 --</span>
+                <button class="dispatch-tag dispatch-tag-button" type="button" data-dispatch-notification-toggle>🖥️ 桌面通知未啟用</button>
             </div>
         </div>
-
         <div class="dispatch-panel dispatch-stats">
-            <article class="dispatch-stat">
-                <span>我的接單</span>
-                <strong>{{ claimed_orders | length }}</strong>
-            </article>
-
-            <article class="dispatch-stat">
-                <span>目前可接</span>
-                <strong>{{ claimable_orders | length }}</strong>
-            </article>
+            {% if support_can_manage and not user_can_claim %}
+                <article class="dispatch-stat"><span>目前可接</span><strong>{{ claimable_orders|length }}</strong></article>
+                <article class="dispatch-stat"><span>進行中</span><strong>{{ non_claimable_orders|length }}</strong></article>
+            {% else %}
+                <article class="dispatch-stat"><span>我的接單</span><strong>{{ claimed_orders|length }}</strong></article>
+                <article class="dispatch-stat"><span>目前可接</span><strong>{{ claimable_orders|length }}</strong></article>
+            {% endif %}
         </div>
     </section>
 
     <section class="dispatch-board">
         <aside class="dispatch-panel dispatch-column">
-            <div class="dispatch-column-head">
-                <div>
-                    <p class="dispatch-eyebrow">MY MISSIONS</p>
-                    <h2>我的接單狀態</h2>
-                </div>
-                <span class="dispatch-pill dispatch-count">{{ claimed_orders | length }} 筆</span>
-            </div>
+            <div class="dispatch-column-head"><div><p class="dispatch-eyebrow">{% if support_can_manage and not user_can_claim %}SUPPORT DUTY{% else %}MY MISSIONS{% endif %}</p><h2>{% if support_can_manage and not user_can_claim %}客服值班{% else %}我的接單狀態{% endif %}</h2></div>{% if user_can_claim %}<span class="dispatch-pill dispatch-count">{{ claimed_orders|length }} 筆</span>{% endif %}</div>
 
-            {% if claimed_orders %}
+            {% if support_can_manage and not user_can_claim %}
+                <article class="dispatch-support-duty"><span class="dispatch-pill">🟢 值班中</span><h3>直接處理派單狀況</h3><p>右側每張訂單都有客服操作區，可快速指派陪玩；需要改價格、內容、狀態或取消訂單時，點「修改訂單」或「取消訂單」即可進入該筆訂單工作區。</p><div class="dispatch-my-links"><a class="dispatch-my-link" href="/admin">開啟客服後台</a></div></article>
+            {% elif claimed_orders %}
                 <div class="dispatch-list">
                     {% for claimed_order in claimed_orders %}
-                        {% set summary = claimed_order_summaries.get(claimed_order.id, {}) %}
-                        {% set payout = summary.get("payout", {}) %}
-                        <article class="dispatch-my-card">
-                            <div>
-                                <p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p>
-                                <h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3>
-                            </div>
-
-                            <div class="dispatch-my-status">
-                                <div>
-                                    <span>任務狀態</span>
-                                    <strong>{{ summary.get("status_label", claimed_order.status) }}</strong>
-                                </div>
-                                <div>
-                                    <span>接單進度</span>
-                                    <strong>
-                                        {{ summary.get("current_staff_count", 0) }}
-                                        /
-                                        {{ summary.get("required_staff_count", 0) or "?" }}
-                                    </strong>
-                                </div>
-                                <div>
-                                    <span>{{ payout.get("label", "分潤") }}</span>
-                                    <strong>
-                                        {% if payout.get("amount") is not none %}
-                                            {{ payout.get("amount") }}T
-                                        {% else %}
-                                            待計算
-                                        {% endif %}
-                                    </strong>
-                                </div>
-                                <div>
-                                    <span>剩餘缺額</span>
-                                    <strong>{{ summary.get("missing_staff_count", 0) }} 人</strong>
-                                </div>
-                            </div>
-
-                            <div class="dispatch-money">
-                                <span>訂單金額</span>
-                                <strong>{{ claimed_order.customer_pay_amount if claimed_order.customer_pay_amount is not none else claimed_order.amount }}T</strong>
-                            </div>
-
-                            {% if summary.get("ticket_url") or summary.get("dispatch_url") %}
-                                <div class="dispatch-my-links">
-                                    {% if summary.get("ticket_url") %}
-                                        <a
-                                            class="dispatch-my-link"
-                                            href="{{ summary.get('ticket_url') }}"
-                                            target="_blank"
-                                            rel="noopener"
-                                        >
-                                            前往票口
-                                        </a>
-                                    {% endif %}
-                                    {% if summary.get("dispatch_url") %}
-                                        <a
-                                            class="dispatch-my-link"
-                                            href="{{ summary.get('dispatch_url') }}"
-                                            target="_blank"
-                                            rel="noopener"
-                                        >
-                                            前往派單訊息
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                        </article>
+                        {% set summary = claimed_order_summaries.get(claimed_order.id,{}) %}{% set payout = summary.get("payout",{}) %}
+                        <article class="dispatch-my-card"><div><p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p><h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3></div><div class="dispatch-my-status"><div><span>任務狀態</span><strong>{{ summary.get("status_label",claimed_order.status) }}</strong></div><div><span>接單進度</span><strong>{{ summary.get("current_staff_count",0) }}/{{ summary.get("required_staff_count",0) or "?" }}</strong></div><div><span>{{ payout.get("label","分潤") }}</span><strong>{% if payout.get("amount") is not none %}{{ payout.get("amount") }}T{% else %}待計算{% endif %}</strong></div><div><span>剩餘缺額</span><strong>{{ summary.get("missing_staff_count",0) }} 人</strong></div></div><div class="dispatch-money"><span>訂單金額</span><strong>{{ claimed_order.customer_pay_amount if claimed_order.customer_pay_amount is not none else claimed_order.amount }}T</strong></div>{% if summary.get("ticket_url") or summary.get("dispatch_url") %}<div class="dispatch-my-links">{% if summary.get("ticket_url") %}<a class="dispatch-my-link" href="{{ summary.get('ticket_url') }}" target="_blank" rel="noopener">前往票口</a>{% endif %}{% if summary.get("dispatch_url") %}<a class="dispatch-my-link" href="{{ summary.get('dispatch_url') }}" target="_blank" rel="noopener">前往派單訊息</a>{% endif %}</div>{% endif %}</article>
                     {% endfor %}
                 </div>
-            {% else %}
-                <div class="dispatch-empty">
-                    <strong>目前尚未接任何訂單。</strong>
-                    <span>可接任務會顯示在右側任務區。</span>
-                </div>
-            {% endif %}
+            {% else %}<div class="dispatch-empty"><strong>目前尚未接任何訂單。</strong><span>可接任務會顯示在右側任務區。</span></div>{% endif %}
         </aside>
 
         <section class="dispatch-panel dispatch-column">
-            <div class="dispatch-column-head">
-                <div>
-                    <p class="dispatch-eyebrow">MISSION BOARD</p>
-                    <h2>派單任務</h2>
-                    <p class="dispatch-desc">可接任務優先顯示；名額已滿或已付款成立的任務收進下方進行中區域。</p>
-                </div>
-                <span class="dispatch-pill dispatch-count">
-                    可接 {{ claimable_orders | length }}｜進行中 {{ non_claimable_orders | length }}
-                </span>
-            </div>
-
-            <section class="dispatch-subsection">
-                <div class="dispatch-subsection-head">
-                    <div>
-                        <p class="dispatch-eyebrow">AVAILABLE</p>
-                        <h3>可接任務</h3>
-                    </div>
-                    <span class="dispatch-pill">{{ claimable_orders | length }} 筆</span>
-                </div>
-
-                {% if claimable_orders %}
-                    <div class="dispatch-list">
-                        {% for order in claimable_orders %}
-                            {{ render_order_card(order, user, claimed_order_ids, request) }}
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="dispatch-empty">
-                        <strong>目前沒有可接任務。</strong>
-                        <span>新單抵達後會即時出現在這裡。</span>
-                    </div>
-                {% endif %}
-            </section>
-
-            <details class="dispatch-progress-group">
-                <summary class="dispatch-subsection-head">
-                    <div>
-                        <p class="dispatch-eyebrow">IN PROGRESS</p>
-                        <h3>進行中／已滿任務</h3>
-                    </div>
-                    <span class="dispatch-pill">{{ non_claimable_orders | length }} 筆 ▾</span>
-                </summary>
-
-                <div class="dispatch-progress-body">
-                    {% if non_claimable_orders %}
-                        <div class="dispatch-list">
-                            {% for order in non_claimable_orders %}
-                                {{ render_order_card(order, user, claimed_order_ids, request) }}
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="dispatch-empty">
-                            <strong>目前沒有進行中任務。</strong>
-                            <span>已滿或付款成立的任務會收在這裡。</span>
-                        </div>
-                    {% endif %}
-                </div>
-            </details>
+            <div class="dispatch-column-head"><div><p class="dispatch-eyebrow">MISSION BOARD</p><h2>派單任務</h2><p class="dispatch-desc">可接任務優先顯示；名額已滿或已付款成立的任務收進下方進行中區域。</p></div><span class="dispatch-pill dispatch-count">可接 {{ claimable_orders|length }}｜進行中 {{ non_claimable_orders|length }}</span></div>
+            <section class="dispatch-subsection"><div class="dispatch-subsection-head"><div><p class="dispatch-eyebrow">AVAILABLE</p><h3>可接任務</h3></div><span class="dispatch-pill">{{ claimable_orders|length }} 筆</span></div>{% if claimable_orders %}<div class="dispatch-list">{% for order in claimable_orders %}{{ render_order_card(order,user,claimed_order_ids,request,support_can_manage,user_can_claim,companion_options) }}{% endfor %}</div>{% else %}<div class="dispatch-empty"><strong>目前沒有可接任務。</strong><span>新單抵達後會即時出現在這裡。</span></div>{% endif %}</section>
+            <details class="dispatch-progress-group"><summary class="dispatch-subsection-head"><div><p class="dispatch-eyebrow">IN PROGRESS</p><h3>進行中／已滿任務</h3></div><span class="dispatch-pill">{{ non_claimable_orders|length }} 筆 ▾</span></summary><div class="dispatch-progress-body">{% if non_claimable_orders %}<div class="dispatch-list">{% for order in non_claimable_orders %}{{ render_order_card(order,user,claimed_order_ids,request,support_can_manage,user_can_claim,companion_options) }}{% endfor %}</div>{% else %}<div class="dispatch-empty"><strong>目前沒有進行中任務。</strong><span>已滿或付款成立的任務會收在這裡。</span></div>{% endif %}</div></details>
         </section>
     </section>
 </div>
-
 {% endblock %}
