@@ -78,6 +78,6 @@ def test_vip_whitelist_overwrite_is_minimal():
     assert overwrite.add_reactions is False
     assert overwrite.use_external_emojis is False
     assert overwrite.use_external_stickers is False
-    assert overwrite.move_members is False
+    assert overwrite.move_members is None
     assert overwrite.manage_channels is False
     assert overwrite.manage_messages is False
