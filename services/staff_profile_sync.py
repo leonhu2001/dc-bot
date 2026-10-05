@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -44,22 +45,60 @@ def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
     }
 
 
-def _create_profile_trigger(conn: sqlite3.Connection) -> None:
-    if not _table_exists(conn, "staff_profiles"):
+def _insert_refresh_event(
+    conn: sqlite3.Connection,
+    staff_id: object,
+    reason: str,
+) -> bool:
+    staff_id_text = str(staff_id or "").strip()
+    if not staff_id_text:
+        return False
+
+    cur = conn.execute(
+        """
+        INSERT OR IGNORE INTO staff_profile_refresh_events (
+            staff_discord_id,
+            reason,
+            status,
+            retry_count,
+            created_at
+        )
+        VALUES (?, ?, 'pending', 0, CURRENT_TIMESTAMP)
+        """,
+        (staff_id_text, str(reason or "data_changed")[:100]),
+    )
+    return int(cur.rowcount or 0) > 0
+
+
+def _create_profile_triggers(conn: sqlite3.Connection) -> None:
+    columns = _table_columns(conn, "staff_profiles")
+    if not columns or "staff_discord_id" not in columns:
+        return
+
+    watched = [
+        name
+        for name in (
+            "display_name",
+            "profile_type",
+            "role_title",
+            "main_games",
+            "service_tags",
+            "bio",
+            "card_image_url",
+            "forum_thread_id",
+            "forum_channel_id",
+            "panel_message_id",
+            "is_public",
+        )
+        if name in columns
+    ]
+    if not watched:
         return
 
     conn.execute(
-        """
+        f"""
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_profile_update
-        AFTER UPDATE OF
-            display_name,
-            profile_type,
-            role_title,
-            main_games,
-            service_tags,
-            bio,
-            card_image_url,
-            is_public
+        AFTER UPDATE OF {', '.join(watched)}
         ON staff_profiles
         BEGIN
             INSERT OR IGNORE INTO staff_profile_refresh_events (
@@ -82,7 +121,8 @@ def _create_profile_trigger(conn: sqlite3.Connection) -> None:
 
 
 def _create_favorite_triggers(conn: sqlite3.Connection) -> None:
-    if not _table_exists(conn, "staff_favorites"):
+    columns = _table_columns(conn, "staff_favorites")
+    if "staff_discord_id" not in columns:
         return
 
     conn.execute(
@@ -107,7 +147,6 @@ def _create_favorite_triggers(conn: sqlite3.Connection) -> None:
         END
         """
     )
-
     conn.execute(
         """
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_favorite_delete
@@ -134,7 +173,7 @@ def _create_favorite_triggers(conn: sqlite3.Connection) -> None:
 
 def _create_review_triggers(conn: sqlite3.Connection) -> None:
     columns = _table_columns(conn, "order_reviews")
-    if not columns or "staff_discord_id" not in columns:
+    if "staff_discord_id" not in columns:
         return
 
     conn.execute(
@@ -159,7 +198,6 @@ def _create_review_triggers(conn: sqlite3.Connection) -> None:
         END
         """
     )
-
     conn.execute(
         """
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_review_delete
@@ -183,9 +221,9 @@ def _create_review_triggers(conn: sqlite3.Connection) -> None:
         """
     )
 
-    update_columns = [
-        column
-        for column in (
+    watched = [
+        name
+        for name in (
             "staff_discord_id",
             "rating",
             "is_public",
@@ -195,16 +233,15 @@ def _create_review_triggers(conn: sqlite3.Connection) -> None:
             "service_item",
             "created_at",
         )
-        if column in columns
+        if name in columns
     ]
-    if not update_columns:
+    if not watched:
         return
 
-    update_of = ", ".join(update_columns)
     conn.execute(
         f"""
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_review_update
-        AFTER UPDATE OF {update_of}
+        AFTER UPDATE OF {', '.join(watched)}
         ON order_reviews
         BEGIN
             INSERT OR IGNORE INTO staff_profile_refresh_events (
@@ -241,25 +278,21 @@ def _create_review_triggers(conn: sqlite3.Connection) -> None:
     )
 
 
-def _assignment_active_predicate(columns: set[str], alias: str = "") -> str:
-    prefix = f"{alias}." if alias else ""
+def _assignment_active_sql(columns: set[str], alias: str) -> str:
     if "is_active" in columns:
-        return f"COALESCE({prefix}is_active, 1) = 1"
+        return f"COALESCE({alias}.is_active, 1) = 1"
     return "1 = 1"
 
 
 def _create_order_triggers(conn: sqlite3.Connection) -> None:
     order_columns = _table_columns(conn, "web_orders")
     assignment_columns = _table_columns(conn, "order_assignments")
-
-    required_assignment_columns = {"order_id", "worker_discord_id"}
-    if not order_columns or "id" not in order_columns or "status" not in order_columns:
+    if not {"id", "status"}.issubset(order_columns):
         return
-    if not required_assignment_columns.issubset(assignment_columns):
+    if not {"order_id", "worker_discord_id"}.issubset(assignment_columns):
         return
 
-    active_predicate = _assignment_active_predicate(assignment_columns, "oa")
-
+    active_oa = _assignment_active_sql(assignment_columns, "oa")
     conn.execute(
         f"""
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_order_status
@@ -281,20 +314,28 @@ def _create_order_triggers(conn: sqlite3.Connection) -> None:
                 CURRENT_TIMESTAMP
             FROM order_assignments oa
             WHERE oa.order_id = NEW.id
-              AND {active_predicate}
+              AND {active_oa}
               AND COALESCE(oa.worker_discord_id, '') != '';
         END
         """
     )
 
-    assignment_active_new = _assignment_active_predicate(assignment_columns, "NEW")
-    assignment_active_old = _assignment_active_predicate(assignment_columns, "OLD")
+    new_active = (
+        "COALESCE(NEW.is_active, 1) = 1"
+        if "is_active" in assignment_columns
+        else "1 = 1"
+    )
+    old_active = (
+        "COALESCE(OLD.is_active, 1) = 1"
+        if "is_active" in assignment_columns
+        else "1 = 1"
+    )
 
     conn.execute(
         f"""
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_assignment_insert
         AFTER INSERT ON order_assignments
-        WHEN {assignment_active_new}
+        WHEN {new_active}
           AND COALESCE(NEW.worker_discord_id, '') != ''
         BEGIN
             INSERT OR IGNORE INTO staff_profile_refresh_events (
@@ -314,12 +355,11 @@ def _create_order_triggers(conn: sqlite3.Connection) -> None:
         END
         """
     )
-
     conn.execute(
         f"""
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_assignment_delete
         AFTER DELETE ON order_assignments
-        WHEN {assignment_active_old}
+        WHEN {old_active}
           AND COALESCE(OLD.worker_discord_id, '') != ''
         BEGIN
             INSERT OR IGNORE INTO staff_profile_refresh_events (
@@ -340,14 +380,14 @@ def _create_order_triggers(conn: sqlite3.Connection) -> None:
         """
     )
 
-    update_columns = ["worker_discord_id"]
+    watched = ["worker_discord_id"]
     if "is_active" in assignment_columns:
-        update_columns.append("is_active")
+        watched.append("is_active")
 
     conn.execute(
         f"""
         CREATE TRIGGER IF NOT EXISTS trg_staff_profile_refresh_assignment_update
-        AFTER UPDATE OF {', '.join(update_columns)}
+        AFTER UPDATE OF {', '.join(watched)}
         ON order_assignments
         BEGIN
             INSERT OR IGNORE INTO staff_profile_refresh_events (
@@ -388,7 +428,7 @@ def ensure_staff_profile_refresh_sync(
     *,
     db_file: str | Path | None = None,
 ) -> None:
-    """Install the durable outbox and DB-level change hooks for profile panels."""
+    """Install durable DB-level refresh rules and the snapshot safety net."""
     with _connect(db_file) as conn:
         conn.execute(
             """
@@ -417,12 +457,250 @@ def ensure_staff_profile_refresh_sync(
             WHERE status = 'pending'
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS staff_profile_refresh_state (
+                staff_discord_id TEXT PRIMARY KEY,
+                fingerprint TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
-        _create_profile_trigger(conn)
+        _create_profile_triggers(conn)
         _create_favorite_triggers(conn)
         _create_review_triggers(conn)
         _create_order_triggers(conn)
         conn.commit()
+
+
+def _profile_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    columns = _table_columns(conn, "staff_profiles")
+    if "staff_discord_id" not in columns:
+        return []
+
+    select_parts = ["staff_discord_id"]
+    for name in (
+        "updated_at",
+        "is_public",
+        "panel_message_id",
+        "forum_thread_id",
+        "forum_channel_id",
+    ):
+        if name in columns:
+            select_parts.append(name)
+
+    return [
+        dict(row)
+        for row in conn.execute(
+            f"SELECT {', '.join(select_parts)} FROM staff_profiles"
+        ).fetchall()
+    ]
+
+
+def _favorite_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    columns = _table_columns(conn, "staff_favorites")
+    if "staff_discord_id" not in columns:
+        return {}
+    return {
+        str(row["staff_discord_id"]): int(row["c"] or 0)
+        for row in conn.execute(
+            """
+            SELECT staff_discord_id, COUNT(*) AS c
+            FROM staff_favorites
+            GROUP BY staff_discord_id
+            """
+        ).fetchall()
+    }
+
+
+def _review_stats(conn: sqlite3.Connection) -> dict[str, tuple[Any, ...]]:
+    columns = _table_columns(conn, "order_reviews")
+    if "staff_discord_id" not in columns:
+        return {}
+
+    conditions = []
+    if "is_public" in columns:
+        conditions.append("COALESCE(is_public, 1) = 1")
+    if "is_hidden" in columns:
+        conditions.append("COALESCE(is_hidden, 0) = 0")
+    where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    rating_sql = "AVG(rating)" if "rating" in columns else "NULL"
+    latest_sql = "MAX(created_at)" if "created_at" in columns else "NULL"
+    recent_sql = (
+        "SUM(CASE WHEN datetime(NULLIF(created_at, '')) >= datetime('now', '-30 days') "
+        "THEN 1 ELSE 0 END)"
+        if "created_at" in columns
+        else "0"
+    )
+
+    rows = conn.execute(
+        f"""
+        SELECT
+            staff_discord_id,
+            COUNT(*) AS review_count,
+            {rating_sql} AS average_rating,
+            {latest_sql} AS latest_review_at,
+            {recent_sql} AS recent_review_count
+        FROM order_reviews
+        {where_sql}
+        GROUP BY staff_discord_id
+        """
+    ).fetchall()
+
+    return {
+        str(row["staff_discord_id"]): (
+            int(row["review_count"] or 0),
+            round(float(row["average_rating"] or 0.0), 4),
+            str(row["latest_review_at"] or ""),
+            int(row["recent_review_count"] or 0),
+        )
+        for row in rows
+    }
+
+
+def _order_stats(conn: sqlite3.Connection) -> dict[str, tuple[int, int]]:
+    order_columns = _table_columns(conn, "web_orders")
+    assignment_columns = _table_columns(conn, "order_assignments")
+    if not {"id", "status"}.issubset(order_columns):
+        return {}
+    if not {"order_id", "worker_discord_id"}.issubset(assignment_columns):
+        return {}
+
+    active_sql = _assignment_active_sql(assignment_columns, "oa")
+    date_candidates = [
+        name
+        for name in ("closed_at", "updated_at", "created_at")
+        if name in order_columns
+    ]
+    if date_candidates:
+        date_expr = "COALESCE(" + ", ".join(
+            f"NULLIF(wo.{name}, '')" for name in date_candidates
+        ) + ")"
+        recent_sql = (
+            f"COUNT(DISTINCT CASE WHEN datetime({date_expr}) >= datetime('now', '-30 days') "
+            "THEN wo.id END)"
+        )
+    else:
+        recent_sql = "0"
+
+    rows = conn.execute(
+        f"""
+        SELECT
+            oa.worker_discord_id AS staff_discord_id,
+            COUNT(DISTINCT wo.id) AS completed_count,
+            {recent_sql} AS recent_completed_count
+        FROM order_assignments oa
+        JOIN web_orders wo ON wo.id = oa.order_id
+        WHERE wo.status = 'closed'
+          AND {active_sql}
+          AND COALESCE(oa.worker_discord_id, '') != ''
+        GROUP BY oa.worker_discord_id
+        """
+    ).fetchall()
+
+    return {
+        str(row["staff_discord_id"]): (
+            int(row["completed_count"] or 0),
+            int(row["recent_completed_count"] or 0),
+        )
+        for row in rows
+    }
+
+
+def _profile_snapshots(conn: sqlite3.Connection) -> dict[str, tuple[str, bool]]:
+    favorites = _favorite_counts(conn)
+    reviews = _review_stats(conn)
+    orders = _order_stats(conn)
+    snapshots: dict[str, tuple[str, bool]] = {}
+
+    for profile in _profile_rows(conn):
+        staff_id = str(profile.get("staff_discord_id") or "").strip()
+        if not staff_id:
+            continue
+
+        panel_message_id = str(profile.get("panel_message_id") or "").strip()
+        channel_id = str(
+            profile.get("forum_thread_id")
+            or profile.get("forum_channel_id")
+            or ""
+        ).strip()
+        has_panel = bool(panel_message_id and channel_id)
+
+        values = (
+            staff_id,
+            str(profile.get("updated_at") or ""),
+            int(profile.get("is_public") or 0),
+            panel_message_id,
+            channel_id,
+            favorites.get(staff_id, 0),
+            reviews.get(staff_id, (0, 0.0, "", 0)),
+            orders.get(staff_id, (0, 0)),
+        )
+        fingerprint = hashlib.sha256(repr(values).encode("utf-8")).hexdigest()
+        snapshots[staff_id] = (fingerprint, has_panel)
+
+    return snapshots
+
+
+def _reconcile_snapshot_events(conn: sqlite3.Connection) -> int:
+    """Detect missed trigger events by comparing panel-visible DB state."""
+    snapshots = _profile_snapshots(conn)
+    existing = {
+        str(row["staff_discord_id"]): str(row["fingerprint"])
+        for row in conn.execute(
+            "SELECT staff_discord_id, fingerprint FROM staff_profile_refresh_state"
+        ).fetchall()
+    }
+
+    enqueued = 0
+    for staff_id, (fingerprint, has_panel) in snapshots.items():
+        previous = existing.get(staff_id)
+        if previous is None:
+            conn.execute(
+                """
+                INSERT INTO staff_profile_refresh_state (
+                    staff_discord_id,
+                    fingerprint,
+                    updated_at
+                )
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """,
+                (staff_id, fingerprint),
+            )
+            if has_panel and _insert_refresh_event(conn, staff_id, "snapshot_bootstrap"):
+                enqueued += 1
+            continue
+
+        if previous == fingerprint:
+            continue
+
+        conn.execute(
+            """
+            UPDATE staff_profile_refresh_state
+            SET fingerprint = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE staff_discord_id = ?
+            """,
+            (fingerprint, staff_id),
+        )
+        if has_panel and _insert_refresh_event(conn, staff_id, "snapshot_changed"):
+            enqueued += 1
+
+    if snapshots:
+        placeholders = ",".join("?" for _ in snapshots)
+        conn.execute(
+            f"""
+            DELETE FROM staff_profile_refresh_state
+            WHERE staff_discord_id NOT IN ({placeholders})
+            """,
+            tuple(snapshots.keys()),
+        )
+    else:
+        conn.execute("DELETE FROM staff_profile_refresh_state")
+
+    return enqueued
 
 
 def enqueue_staff_profile_refresh(
@@ -432,26 +710,10 @@ def enqueue_staff_profile_refresh(
     db_file: str | Path | None = None,
 ) -> bool:
     ensure_staff_profile_refresh_sync(db_file=db_file)
-    staff_id_text = str(staff_id or "").strip()
-    if not staff_id_text:
-        return False
-
     with _connect(db_file) as conn:
-        cur = conn.execute(
-            """
-            INSERT OR IGNORE INTO staff_profile_refresh_events (
-                staff_discord_id,
-                reason,
-                status,
-                retry_count,
-                created_at
-            )
-            VALUES (?, ?, 'pending', 0, CURRENT_TIMESTAMP)
-            """,
-            (staff_id_text, str(reason or "manual")[:100]),
-        )
+        inserted = _insert_refresh_event(conn, staff_id, reason)
         conn.commit()
-        return int(cur.rowcount or 0) > 0
+        return inserted
 
 
 def claim_staff_profile_refresh_events(
@@ -467,9 +729,6 @@ def claim_staff_profile_refresh_events(
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
 
-        # If a newer pending event exists for the same staff member, the newer
-        # event already represents the latest database state. Retire an abandoned
-        # processing row instead of creating two pending rows for the same staff.
         conn.execute(
             """
             UPDATE staff_profile_refresh_events AS current
@@ -489,7 +748,6 @@ def claim_staff_profile_refresh_events(
             """,
             (f"-{stale_minutes} minutes",),
         )
-
         conn.execute(
             """
             UPDATE staff_profile_refresh_events
@@ -501,6 +759,8 @@ def claim_staff_profile_refresh_events(
             """,
             (f"-{stale_minutes} minutes",),
         )
+
+        _reconcile_snapshot_events(conn)
 
         rows = conn.execute(
             """
@@ -580,14 +840,12 @@ def mark_staff_profile_refresh_failed(
             """,
             (int(event_id),),
         ).fetchone()
-
         if row is None:
             conn.rollback()
             return
 
         next_status = requested_status
         final_error = str(error_message or "")[:1000]
-
         if requested_status == "pending":
             newer_pending = conn.execute(
                 """
@@ -600,7 +858,6 @@ def mark_staff_profile_refresh_failed(
                 """,
                 (str(row["staff_discord_id"]), int(event_id)),
             ).fetchone()
-
             if newer_pending is not None:
                 next_status = "done"
                 final_error = "superseded by newer pending refresh event"
