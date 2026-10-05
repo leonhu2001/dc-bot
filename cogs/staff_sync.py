@@ -18,7 +18,6 @@ from services.staff_profile_sync import (
 from shared.db import SessionLocal, create_all_tables
 from views.staff_profiles import (
     get_staff_profile,
-    get_staff_profile_panel_rows,
     refresh_staff_profile_panel_for_staff,
 )
 from web.app.config import config
@@ -28,8 +27,6 @@ from web.app.services.staff_service import sync_staff_members_from_discord
 DEFAULT_SYNC_INTERVAL_MINUTES = 30
 SECURITY_MAINTENANCE_SECONDS = 30
 STAFF_PROFILE_EVENT_INTERVAL_SECONDS = 5
-STAFF_PROFILE_RECONCILE_HOURS = 3
-STAFF_PROFILE_RECONCILE_DELAY_SECONDS = 0.25
 STALE_TOPUP_MINUTES = 5
 TAIPEI_TZ = timezone(timedelta(hours=8))
 BOT_DB_PATH = Path(__file__).resolve().parents[1] / "bot.db"
@@ -313,13 +310,11 @@ class StaffSyncCog(commands.Cog):
         self.sync_staff_members_loop.start()
         self.security_maintenance_loop.start()
         self.staff_profile_refresh_event_loop.start()
-        self.staff_profile_reconcile_loop.start()
 
     def cog_unload(self) -> None:
         self.sync_staff_members_loop.cancel()
         self.security_maintenance_loop.cancel()
         self.staff_profile_refresh_event_loop.cancel()
-        self.staff_profile_reconcile_loop.cancel()
 
     async def _sync_once(self) -> dict:
         def run_sync() -> dict:
@@ -590,48 +585,6 @@ class StaffSyncCog(commands.Cog):
 
     @staff_profile_refresh_event_loop.before_loop
     async def before_staff_profile_refresh_event_loop(self) -> None:
-        await self.bot.wait_until_ready()
-
-    @tasks.loop(hours=STAFF_PROFILE_RECONCILE_HOURS)
-    async def staff_profile_reconcile_loop(self) -> None:
-        rows = await asyncio.to_thread(get_staff_profile_panel_rows)
-        refreshed_count = 0
-        failed_count = 0
-
-        for profile in rows:
-            staff_id = str(profile.get("staff_discord_id") or "").strip()
-            if not staff_id:
-                continue
-
-            try:
-                refreshed = await self._refresh_staff_profile_panel(
-                    staff_id,
-                    reason="periodic_reconcile",
-                )
-            except Exception as exc:
-                refreshed = False
-                print(
-                    f"[staff-profile-sync] reconcile error staff_id={staff_id}: "
-                    f"{type(exc).__name__}: {exc}",
-                    flush=True,
-                )
-
-            if refreshed:
-                refreshed_count += 1
-            else:
-                failed_count += 1
-
-            await asyncio.sleep(STAFF_PROFILE_RECONCILE_DELAY_SECONDS)
-
-        if rows:
-            print(
-                "[staff-profile-sync] periodic reconcile complete "
-                f"refreshed={refreshed_count} failed={failed_count}",
-                flush=True,
-            )
-
-    @staff_profile_reconcile_loop.before_loop
-    async def before_staff_profile_reconcile_loop(self) -> None:
         await self.bot.wait_until_ready()
 
     @tasks.loop(minutes=DEFAULT_SYNC_INTERVAL_MINUTES)
