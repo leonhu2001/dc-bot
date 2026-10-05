@@ -68,3 +68,88 @@ def test_existing_vip_owner_explicit_deny_is_normalized(monkeypatch):
     assert channel.updated.move_members is None
     assert channel.updated.view_channel is True
     assert channel.updated.connect is True
+
+
+class _ControlOwner:
+    id = 321
+
+
+def _control_test_channel(owner, *, owner_move_members=True):
+    class Guild:
+        default_role = object()
+        me = None
+
+    class Channel:
+        guild = Guild()
+
+        def __init__(self):
+            self.overwrites = {
+                owner: discord.PermissionOverwrite(
+                    view_channel=True,
+                    connect=True,
+                    move_members=owner_move_members,
+                )
+            }
+            self.edited = None
+
+        async def edit(self, *, overwrites, reason):
+            self.edited = overwrites
+
+    return Channel()
+
+
+def test_lock_control_only_clears_owner_move_members_for_vip(monkeypatch):
+    owner = _ControlOwner()
+    monkeypatch.setattr(voice, "get_room_targets_for_control", lambda guild, room_type: [])
+    monkeypatch.setattr(voice, "get_vip_room_whitelist_user_ids", lambda owner_id: set())
+
+    public_channel = _control_test_channel(owner)
+    asyncio.run(
+        voice.apply_voice_lock_state(
+            public_channel,
+            owner,
+            locked=False,
+            room_type="public",
+        )
+    )
+    assert public_channel.edited[owner].move_members is True
+
+    vip_channel = _control_test_channel(owner)
+    asyncio.run(
+        voice.apply_voice_lock_state(
+            vip_channel,
+            owner,
+            locked=False,
+            room_type="vip",
+        )
+    )
+    assert vip_channel.edited[owner].move_members is None
+
+
+def test_visibility_control_only_clears_owner_move_members_for_vip(monkeypatch):
+    owner = _ControlOwner()
+    monkeypatch.setattr(voice, "get_play_voice_allowed_roles", lambda guild: [])
+    monkeypatch.setattr(voice, "get_vip_voice_allowed_roles", lambda guild: [])
+    monkeypatch.setattr(voice, "get_vip_room_whitelist_user_ids", lambda owner_id: set())
+
+    public_channel = _control_test_channel(owner)
+    asyncio.run(
+        voice.apply_voice_hidden_state(
+            public_channel,
+            owner,
+            hidden=False,
+            room_type="public",
+        )
+    )
+    assert public_channel.edited[owner].move_members is True
+
+    vip_channel = _control_test_channel(owner)
+    asyncio.run(
+        voice.apply_voice_hidden_state(
+            vip_channel,
+            owner,
+            hidden=False,
+            room_type="vip",
+        )
+    )
+    assert vip_channel.edited[owner].move_members is None

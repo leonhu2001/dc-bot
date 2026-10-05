@@ -953,7 +953,8 @@ async def apply_voice_lock_state(
     owner_overwrite.add_reactions = True
     owner_overwrite.use_external_emojis = True
     owner_overwrite.use_external_stickers = True
-    owner_overwrite.move_members = None
+    if normalized_room_type == "vip":
+        owner_overwrite.move_members = None
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
@@ -1101,7 +1102,8 @@ async def apply_voice_hidden_state(
     owner_overwrite.add_reactions = True
     owner_overwrite.use_external_emojis = True
     owner_overwrite.use_external_stickers = True
-    owner_overwrite.move_members = None
+    if normalized_room_type == "vip":
+        owner_overwrite.move_members = None
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
