@@ -1035,6 +1035,45 @@ def build_staff_order_request_embed(profile: dict, requester_id: int | str) -> d
     return embed
 
 
+async def _ensure_profile_thread_open_for_refresh(
+    channel,
+    *,
+    staff_id: int | str,
+    reason: str,
+):
+    """Reopen an archived profile thread before editing its saved panel message."""
+    if not bool(getattr(channel, "archived", False)):
+        return channel
+
+    edit_channel = getattr(channel, "edit", None)
+    if not callable(edit_channel):
+        return None
+
+    try:
+        reopened = await edit_channel(
+            archived=False,
+            reason=f"Staff profile refresh: {reason}"[:512],
+        )
+    except (
+        discord.NotFound,
+        discord.Forbidden,
+        discord.HTTPException,
+    ) as exc:
+        print(
+            f"[staff-profile] reopen archived thread failed "
+            f"staff_id={staff_id} reason={reason}: {exc}"
+        )
+        return None
+
+    if reopened is not None:
+        channel = reopened
+
+    print(
+        f"[staff-profile] reopened archived thread "
+        f"staff_id={staff_id} reason={reason}"
+    )
+    return channel
+
 
 async def refresh_staff_profile_panel_for_staff(
     guild: discord.Guild | None,
@@ -1092,6 +1131,14 @@ async def refresh_staff_profile_panel_for_staff(
             discord.HTTPException,
         ):
             return False
+
+    channel = await _ensure_profile_thread_open_for_refresh(
+        channel,
+        staff_id=staff_id_text,
+        reason=reason,
+    )
+    if channel is None:
+        return False
 
     if not hasattr(channel, "fetch_message"):
         return False
