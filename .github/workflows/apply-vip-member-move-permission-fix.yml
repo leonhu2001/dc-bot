@@ -1,0 +1,208 @@
+name: Apply VIP member move permission fix
+
+on:
+  push:
+    branches:
+      - fix/vip-member-move-permission
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[vip-move-fix-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/vip-member-move-permission
+          fetch-depth: 0
+
+      - name: Patch source permission policy
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('views/voice.py')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''        manage_messages=True if manage_channels else None,
+              )
+          '''
+          # Keep the exact existing helper intact and insert the VIP-owner policy after it.
+          marker = '''        manage_messages=True if manage_channels else None,
+              )
+          \n\n\n\ndef is_receiver_voice_role'''
+          replacement = '''        manage_messages=True if manage_channels else None,
+              )
+          \n\n\ndef build_vip_owner_overwrite() -> discord.PermissionOverwrite:
+              """VIP 房主不明確覆寫「移動成員」，讓該權限維持 Discord 的繼承狀態。"""
+              overwrite = build_full_temp_voice_overwrite(connect=True)
+              overwrite.move_members = None
+              return overwrite
+          \n\n\ndef is_receiver_voice_role'''
+          if text.count(marker) != 1:
+              raise SystemExit(f'owner helper marker count={text.count(marker)}')
+          text = text.replace(marker, replacement, 1)
+
+          marker = '''        use_external_stickers=False,
+              move_members=False,
+              manage_channels=False,
+              manage_messages=False,
+          )
+          \n\n\nasync def grant_vip_whitelist_access'''
+          replacement = '''        use_external_stickers=False,
+              move_members=None,
+              manage_channels=False,
+              manage_messages=False,
+          )
+          \n\n\nasync def grant_vip_whitelist_access'''
+          if text.count(marker) != 1:
+              raise SystemExit(f'whitelist marker count={text.count(marker)}')
+          text = text.replace(marker, replacement, 1)
+
+          marker = '''async def sync_vip_whitelist_permissions(
+              voice_channel: discord.VoiceChannel,
+              owner_id: int,
+          ) -> None:
+              """把 DB 白名單補回 Discord overwrite；Bot 重啟後仍有效。"""
+              for user_id in get_vip_room_whitelist_user_ids(int(owner_id)):
+          '''
+          replacement = '''async def sync_vip_whitelist_permissions(
+              voice_channel: discord.VoiceChannel,
+              owner_id: int,
+          ) -> None:
+              """同步 VIP 房主與白名單個人權限；Bot 重啟後也會修正既有房間。"""
+              owner = voice_channel.guild.get_member(int(owner_id))
+              if owner is not None and not owner.bot:
+                  owner_overwrite = voice_channel.overwrites_for(owner)
+                  if owner_overwrite.move_members is not None:
+                      owner_overwrite.move_members = None
+                      await voice_channel.set_permissions(
+                          owner,
+                          overwrite=owner_overwrite,
+                          reason="Normalize VIP owner move-members permission",
+                      )
+          \n              for user_id in get_vip_room_whitelist_user_ids(int(owner_id)):
+          '''
+          if text.count(marker) != 1:
+              raise SystemExit(f'sync marker count={text.count(marker)}')
+          text = text.replace(marker, replacement, 1)
+
+          marker = '''        member: build_full_temp_voice_overwrite(connect=True),'''
+          replacement = '''        member: build_vip_owner_overwrite(),'''
+          if text.count(marker) != 1:
+              raise SystemExit(f'VIP owner builder marker count={text.count(marker)}')
+          text = text.replace(marker, replacement, 1)
+
+          marker = '''    owner_overwrite.use_external_stickers = True
+              overwrites[owner] = owner_overwrite
+          '''
+          replacement = '''    owner_overwrite.use_external_stickers = True
+              owner_overwrite.move_members = None
+              overwrites[owner] = owner_overwrite
+          '''
+          if text.count(marker) != 2:
+              raise SystemExit(f'owner control marker count={text.count(marker)}')
+          text = text.replace(marker, replacement)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Add regression tests
+        shell: bash
+        run: |
+          cat > tests/test_vip_voice_move_permissions.py <<'PY'
+          import asyncio
+
+          import discord
+
+          from views import voice
+
+
+          def test_vip_owner_move_members_is_inherited():
+              overwrite = voice.build_vip_owner_overwrite()
+
+              assert overwrite.move_members is None
+              assert overwrite.view_channel is True
+              assert overwrite.connect is True
+              assert overwrite.manage_channels is False
+
+
+          def test_vip_whitelist_move_members_is_inherited():
+              overwrite = voice.build_vip_whitelist_overwrite()
+
+              assert overwrite.move_members is None
+              assert overwrite.view_channel is True
+              assert overwrite.connect is True
+              assert overwrite.manage_channels is False
+
+
+          def test_default_temp_voice_policy_is_unchanged():
+              overwrite = voice.build_full_temp_voice_overwrite(connect=True)
+
+              assert overwrite.move_members is False
+
+
+          def test_existing_vip_owner_explicit_deny_is_normalized(monkeypatch):
+              class Owner:
+                  id = 123
+                  bot = False
+
+              owner = Owner()
+              existing = discord.PermissionOverwrite(
+                  view_channel=True,
+                  connect=True,
+                  move_members=False,
+              )
+
+              class Guild:
+                  def get_member(self, user_id):
+                      return owner if int(user_id) == owner.id else None
+
+              class Channel:
+                  guild = Guild()
+
+                  def __init__(self):
+                      self.updated = None
+
+                  def overwrites_for(self, member):
+                      assert member is owner
+                      return existing
+
+                  async def set_permissions(self, member, *, overwrite, reason):
+                      assert member is owner
+                      self.updated = overwrite
+
+              channel = Channel()
+              monkeypatch.setattr(voice, 'get_vip_room_whitelist_user_ids', lambda _owner_id: set())
+
+              asyncio.run(voice.sync_vip_whitelist_permissions(channel, owner.id))
+
+              assert channel.updated is not None
+              assert channel.updated.move_members is None
+              assert channel.updated.view_channel is True
+              assert channel.updated.connect is True
+          PY
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Validate patch
+        run: |
+          python -m py_compile views/voice.py
+          python -m pytest -q tests/test_vip_voice_move_permissions.py
+
+      - name: Commit source fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-vip-member-move-permission-fix.yml
+          git add views/voice.py tests/test_vip_voice_move_permissions.py
+          git commit -m "Fix VIP personal move-member inheritance [vip-move-fix-applied]"
+          git push origin HEAD:fix/vip-member-move-permission
