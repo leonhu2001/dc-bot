@@ -9,13 +9,27 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from services.staff_profile_sync import (
+    claim_staff_profile_refresh_events,
+    ensure_staff_profile_refresh_sync,
+    mark_staff_profile_refresh_done,
+    mark_staff_profile_refresh_failed,
+)
 from shared.db import SessionLocal, create_all_tables
+from views.staff_profiles import (
+    get_staff_profile,
+    get_staff_profile_panel_rows,
+    refresh_staff_profile_panel_for_staff,
+)
 from web.app.config import config
 from web.app.services.staff_service import sync_staff_members_from_discord
 
 
 DEFAULT_SYNC_INTERVAL_MINUTES = 30
 SECURITY_MAINTENANCE_SECONDS = 30
+STAFF_PROFILE_EVENT_INTERVAL_SECONDS = 5
+STAFF_PROFILE_RECONCILE_HOURS = 3
+STAFF_PROFILE_RECONCILE_DELAY_SECONDS = 0.25
 STALE_TOPUP_MINUTES = 5
 TAIPEI_TZ = timezone(timedelta(hours=8))
 BOT_DB_PATH = Path(__file__).resolve().parents[1] / "bot.db"
@@ -294,13 +308,18 @@ class StaffSyncCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         _ensure_security_tables()
+        ensure_staff_profile_refresh_sync()
         self.sync_staff_members_loop.change_interval(minutes=_get_sync_interval_minutes())
         self.sync_staff_members_loop.start()
         self.security_maintenance_loop.start()
+        self.staff_profile_refresh_event_loop.start()
+        self.staff_profile_reconcile_loop.start()
 
     def cog_unload(self) -> None:
         self.sync_staff_members_loop.cancel()
         self.security_maintenance_loop.cancel()
+        self.staff_profile_refresh_event_loop.cancel()
+        self.staff_profile_reconcile_loop.cancel()
 
     async def _sync_once(self) -> dict:
         def run_sync() -> dict:
@@ -318,6 +337,42 @@ class StaffSyncCog(commands.Cog):
                 db.close()
 
         return await asyncio.to_thread(run_sync)
+
+    async def _refresh_staff_profile_panel(self, staff_id: str, *, reason: str) -> bool:
+        profile = get_staff_profile(staff_id)
+        if profile is None:
+            return True
+
+        panel_message_id = str(profile.get("panel_message_id") or "").strip()
+        channel_id = str(
+            profile.get("forum_thread_id")
+            or profile.get("forum_channel_id")
+            or ""
+        ).strip()
+
+        # A profile without a published panel has nothing to synchronize yet.
+        if not panel_message_id or not channel_id:
+            return True
+
+        for guild in list(self.bot.guilds):
+            try:
+                refreshed = await refresh_staff_profile_panel_for_staff(
+                    guild,
+                    staff_id,
+                    reason=reason,
+                )
+            except Exception as exc:
+                print(
+                    f"[staff-profile-sync] refresh error staff_id={staff_id} "
+                    f"guild={guild.id} reason={reason}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                continue
+
+            if refreshed:
+                return True
+
+        return False
 
     async def _delete_managed_voice_room(
         self,
@@ -477,6 +532,106 @@ class StaffSyncCog(commands.Cog):
 
     @security_maintenance_loop.before_loop
     async def before_security_maintenance_loop(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(seconds=STAFF_PROFILE_EVENT_INTERVAL_SECONDS)
+    async def staff_profile_refresh_event_loop(self) -> None:
+        try:
+            events = await asyncio.to_thread(
+                claim_staff_profile_refresh_events,
+                limit=20,
+            )
+        except Exception as exc:
+            print(
+                f"[staff-profile-sync] claim failed: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return
+
+        for event in events:
+            event_id = int(event.get("event_id") or 0)
+            staff_id = str(event.get("staff_discord_id") or "").strip()
+            reason = str(event.get("reason") or "data_changed").strip()
+            retry_count = int(event.get("retry_count") or 0)
+
+            if not event_id or not staff_id:
+                if event_id:
+                    await asyncio.to_thread(
+                        mark_staff_profile_refresh_done,
+                        event_id,
+                    )
+                continue
+
+            try:
+                refreshed = await self._refresh_staff_profile_panel(
+                    staff_id,
+                    reason=f"db:{reason}",
+                )
+                if not refreshed:
+                    raise RuntimeError("saved Discord profile panel could not be refreshed")
+            except Exception as exc:
+                await asyncio.to_thread(
+                    mark_staff_profile_refresh_failed,
+                    event_id,
+                    f"{type(exc).__name__}: {exc}",
+                    retry_count,
+                )
+                print(
+                    f"[staff-profile-sync] event failed event_id={event_id} "
+                    f"staff_id={staff_id} reason={reason}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                continue
+
+            await asyncio.to_thread(
+                mark_staff_profile_refresh_done,
+                event_id,
+            )
+
+    @staff_profile_refresh_event_loop.before_loop
+    async def before_staff_profile_refresh_event_loop(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(hours=STAFF_PROFILE_RECONCILE_HOURS)
+    async def staff_profile_reconcile_loop(self) -> None:
+        rows = await asyncio.to_thread(get_staff_profile_panel_rows)
+        refreshed_count = 0
+        failed_count = 0
+
+        for profile in rows:
+            staff_id = str(profile.get("staff_discord_id") or "").strip()
+            if not staff_id:
+                continue
+
+            try:
+                refreshed = await self._refresh_staff_profile_panel(
+                    staff_id,
+                    reason="periodic_reconcile",
+                )
+            except Exception as exc:
+                refreshed = False
+                print(
+                    f"[staff-profile-sync] reconcile error staff_id={staff_id}: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+            if refreshed:
+                refreshed_count += 1
+            else:
+                failed_count += 1
+
+            await asyncio.sleep(STAFF_PROFILE_RECONCILE_DELAY_SECONDS)
+
+        if rows:
+            print(
+                "[staff-profile-sync] periodic reconcile complete "
+                f"refreshed={refreshed_count} failed={failed_count}",
+                flush=True,
+            )
+
+    @staff_profile_reconcile_loop.before_loop
+    async def before_staff_profile_reconcile_loop(self) -> None:
         await self.bot.wait_until_ready()
 
     @tasks.loop(minutes=DEFAULT_SYNC_INTERVAL_MINUTES)
