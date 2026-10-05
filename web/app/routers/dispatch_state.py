@@ -21,6 +21,10 @@ router = APIRouter(tags=["dispatch_state"])
 
 _VISIBLE_STATUS_VALUES = tuple(VISIBLE_DISPATCH_STATUSES)
 _VISIBLE_STATUS_PLACEHOLDERS = ", ".join("?" for _ in _VISIBLE_STATUS_VALUES)
+_DISPATCH_EVENT_CACHE_TTL_SECONDS = 1.0
+_dispatch_event_cache: dict | None = None
+_dispatch_event_cache_expires_at = 0.0
+_dispatch_event_cache_lock = asyncio.Lock()
 
 
 def get_sqlite_path() -> str:
@@ -116,6 +120,34 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
     return snapshot
 
 
+def _build_dispatch_event_snapshot() -> dict:
+    return {
+        **_dispatch_state_snapshot(include_orders=False),
+        **_dispatch_presence_snapshot(),
+    }
+
+
+async def _shared_dispatch_event_snapshot() -> dict:
+    """Reuse one compact DB snapshot across all SSE clients for one second."""
+    global _dispatch_event_cache, _dispatch_event_cache_expires_at
+
+    now = time.monotonic()
+    cached = _dispatch_event_cache
+    if cached is not None and now < _dispatch_event_cache_expires_at:
+        return dict(cached)
+
+    async with _dispatch_event_cache_lock:
+        now = time.monotonic()
+        cached = _dispatch_event_cache
+        if cached is not None and now < _dispatch_event_cache_expires_at:
+            return dict(cached)
+
+        snapshot = await asyncio.to_thread(_build_dispatch_event_snapshot)
+        _dispatch_event_cache = dict(snapshot)
+        _dispatch_event_cache_expires_at = now + _DISPATCH_EVENT_CACHE_TTL_SECONDS
+        return dict(snapshot)
+
+
 @router.get("/dispatch/state")
 async def dispatch_state(request: Request):
     user = request.session.get("user")
@@ -132,13 +164,17 @@ async def dispatch_state(request: Request):
         )
 
     presence_online, support_presence_online = touch_dispatch_user_presence(user)
+    state_snapshot, presence_snapshot = await asyncio.gather(
+        asyncio.to_thread(_dispatch_state_snapshot, include_orders=True),
+        asyncio.to_thread(_dispatch_presence_snapshot),
+    )
 
     return {
         "ok": True,
         "presence_online": presence_online,
         "support_presence_online": support_presence_online,
-        **_dispatch_presence_snapshot(),
-        **_dispatch_state_snapshot(include_orders=True),
+        **presence_snapshot,
+        **state_snapshot,
     }
 
 
@@ -171,10 +207,10 @@ async def dispatch_events(request: Request):
             now = time.monotonic()
 
             if now - last_presence_touch >= 20:
-                touch_dispatch_user_presence(user)
+                await asyncio.to_thread(touch_dispatch_user_presence, user)
                 last_presence_touch = now
 
-            snapshot = _dispatch_state_snapshot(include_orders=False)
+            snapshot = await _shared_dispatch_event_snapshot()
             signature = snapshot["signature"]
 
             if last_signature is None or signature != last_signature:
@@ -182,7 +218,6 @@ async def dispatch_events(request: Request):
                     "ok": True,
                     "initial": last_signature is None,
                     **snapshot,
-                    **_dispatch_presence_snapshot(),
                 }
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 last_signature = signature
@@ -192,7 +227,6 @@ async def dispatch_events(request: Request):
                     "ok": True,
                     "heartbeat": True,
                     **snapshot,
-                    **_dispatch_presence_snapshot(),
                 }
                 yield f"data: {json.dumps(heartbeat, ensure_ascii=False)}\n\n"
                 last_heartbeat = now
