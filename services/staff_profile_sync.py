@@ -466,6 +466,30 @@ def claim_staff_profile_refresh_events(
 
     with _connect(db_file) as conn:
         conn.execute("BEGIN IMMEDIATE")
+
+        # If a newer pending event exists for the same staff member, the newer
+        # event already represents the latest database state. Retire an abandoned
+        # processing row instead of creating two pending rows for the same staff.
+        conn.execute(
+            """
+            UPDATE staff_profile_refresh_events AS current
+            SET status = 'done',
+                error_message = 'superseded by newer pending refresh event',
+                processed_at = CURRENT_TIMESTAMP
+            WHERE current.status = 'processing'
+              AND current.processed_at IS NOT NULL
+              AND current.processed_at <= datetime('now', ?)
+              AND EXISTS (
+                  SELECT 1
+                  FROM staff_profile_refresh_events newer
+                  WHERE newer.staff_discord_id = current.staff_discord_id
+                    AND newer.status = 'pending'
+                    AND newer.id != current.id
+              )
+            """,
+            (f"-{stale_minutes} minutes",),
+        )
+
         conn.execute(
             """
             UPDATE staff_profile_refresh_events
@@ -543,9 +567,44 @@ def mark_staff_profile_refresh_failed(
 ) -> None:
     next_retry = int(retry_count or 0) + 1
     retry_limit = max(1, int(max_retries or DEFAULT_MAX_RETRIES))
-    next_status = "failed" if next_retry >= retry_limit else "pending"
+    requested_status = "failed" if next_retry >= retry_limit else "pending"
 
     with _connect(db_file) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """
+            SELECT staff_discord_id
+            FROM staff_profile_refresh_events
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (int(event_id),),
+        ).fetchone()
+
+        if row is None:
+            conn.rollback()
+            return
+
+        next_status = requested_status
+        final_error = str(error_message or "")[:1000]
+
+        if requested_status == "pending":
+            newer_pending = conn.execute(
+                """
+                SELECT 1
+                FROM staff_profile_refresh_events
+                WHERE staff_discord_id = ?
+                  AND status = 'pending'
+                  AND id != ?
+                LIMIT 1
+                """,
+                (str(row["staff_discord_id"]), int(event_id)),
+            ).fetchone()
+
+            if newer_pending is not None:
+                next_status = "done"
+                final_error = "superseded by newer pending refresh event"
+
         conn.execute(
             """
             UPDATE staff_profile_refresh_events
@@ -553,15 +612,15 @@ def mark_staff_profile_refresh_failed(
                 retry_count = ?,
                 error_message = ?,
                 processed_at = CASE
-                    WHEN ? = 'failed' THEN CURRENT_TIMESTAMP
-                    ELSE NULL
+                    WHEN ? = 'pending' THEN NULL
+                    ELSE CURRENT_TIMESTAMP
                 END
             WHERE id = ?
             """,
             (
                 next_status,
                 next_retry,
-                str(error_message or "")[:1000],
+                final_error,
                 next_status,
                 int(event_id),
             ),
