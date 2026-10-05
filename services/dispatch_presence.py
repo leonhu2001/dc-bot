@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -203,6 +204,82 @@ def count_online_dispatch_workers(
             db_file=db_file,
             now=now,
         )
+    )
+
+
+def get_dispatch_companion_ids_for_role(
+    role_id: str | int,
+    *,
+    db_file: str | Path | None = None,
+) -> list[str]:
+    """Return active companion IDs carrying a specific Discord role.
+
+    Presence is intentionally kept separate from the staff roster.  The roster
+    decides whether somebody is a female/male companion; the presence table only
+    decides whether that person is currently in the web dispatch lobby.
+    """
+    role_key = str(role_id or "").strip()
+    path = _db_path(db_file)
+
+    if not role_key or not path.exists():
+        return []
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        table_exists = conn.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'web_staff_members'
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if table_exists is None:
+            return []
+
+        rows = conn.execute(
+            """
+            SELECT discord_id, roles_json
+            FROM web_staff_members
+            WHERE COALESCE(is_active, 1) = 1
+              AND COALESCE(is_companion, 0) = 1
+            """
+        ).fetchall()
+
+    result: list[str] = []
+    for discord_id, roles_json in rows:
+        try:
+            role_ids = {
+                str(item)
+                for item in json.loads(str(roles_json or "[]"))
+                if str(item).strip()
+            }
+        except (TypeError, ValueError, json.JSONDecodeError):
+            role_ids = set()
+
+        if role_key in role_ids:
+            result.append(str(discord_id))
+
+    return result
+
+
+def count_online_dispatch_companions_for_role(
+    role_id: str | int,
+    *,
+    timeout_seconds: int = DEFAULT_ONLINE_TIMEOUT_SECONDS,
+    db_file: str | Path | None = None,
+    now: datetime | None = None,
+) -> int:
+    candidate_ids = get_dispatch_companion_ids_for_role(
+        role_id,
+        db_file=db_file,
+    )
+    return count_online_dispatch_workers(
+        timeout_seconds=timeout_seconds,
+        candidate_ids=candidate_ids,
+        db_file=db_file,
+        now=now,
     )
 
 
