@@ -9,15 +9,20 @@ CONFIG_FILE = Path(__file__).resolve().parent.parent / "config.json"
 
 # 仍由 bot.py 呼叫 config_* 載入設定，但這類已搬動過的營運頻道 ID
 # 在這裡提供單一 canonical default，避免舊 bot.py fallback 重新生效。
+#
+# DISPATCH_ONLINE_CHANNEL_ID 是歷史相容鍵；目前代表「女陪在線」頻道。
+# 男陪在線頻道由 views.dispatch_presence 讀取 DISPATCH_MALE_ONLINE_CHANNEL_ID。
 CANONICAL_INT_DEFAULTS = {
-    "DISPATCH_ONLINE_CHANNEL_ID": 1556381428235902996,
+    "DISPATCH_ONLINE_CHANNEL_ID": 1538270157057691660,
+    "DISPATCH_MALE_ONLINE_CHANNEL_ID": 1538270089785245856,
 }
 
 # 已部署過的舊值在讀取 config.json 時做一次真正的設定遷移並寫回檔案，
 # 而不是每次 runtime 再蓋掉舊值。
 INT_VALUE_MIGRATIONS = {
     "DISPATCH_ONLINE_CHANNEL_ID": {
-        1556366139830042634: 1556381428235902996,
+        1556366139830042634: 1538270157057691660,
+        1556381428235902996: 1538270157057691660,
     },
 }
 
