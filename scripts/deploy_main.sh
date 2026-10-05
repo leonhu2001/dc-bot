@@ -4,6 +4,7 @@ set -Eeuo pipefail
 APP="${APP_DIR:-/opt/dc-bot}"
 BOT_SERVICE="${BOT_SERVICE:-dc-bot.service}"
 WEB_SERVICE="${WEB_SERVICE:-dc-bot-dashboard.service}"
+WEB_UNIT_PATH="${WEB_UNIT_PATH:-/etc/systemd/system/$WEB_SERVICE}"
 TARGET="${1:-}"
 
 if [ -z "$TARGET" ]; then
@@ -25,6 +26,7 @@ BACKUP="$APP/_archive/deploy_$STAMP"
 SOURCE_UPDATED=0
 DEPENDENCIES_UPDATED=0
 DEPENDENCY_SYNC_NEEDED=0
+WEB_UNIT_UPDATED=0
 
 restart_services() {
     local started_at finished_at elapsed_ms
@@ -61,6 +63,12 @@ rollback() {
             --disable-pip-version-check \
             -r "$BACKUP/venv-freeze.txt" \
             || echo "WARN: dependency rollback failed; manual venv repair may be required."
+    fi
+
+    if [ "$WEB_UNIT_UPDATED" -eq 1 ] && [ -f "$BACKUP/$WEB_SERVICE" ]; then
+        echo "Restoring previous web systemd unit..."
+        install -m 0644 "$BACKUP/$WEB_SERVICE" "$WEB_UNIT_PATH"
+        systemctl daemon-reload || true
     fi
 
     if [ "$SOURCE_UPDATED" -eq 1 ]; then
@@ -113,6 +121,13 @@ for db_name in bot.db web_dashboard.db; do
         echo "WARN: $db_name not found"
     fi
 done
+
+if [ -f "$WEB_UNIT_PATH" ]; then
+    cp -L "$WEB_UNIT_PATH" "$BACKUP/$WEB_SERVICE"
+    echo "PASS: $WEB_SERVICE backup"
+else
+    echo "WARN: $WEB_UNIT_PATH not found"
+fi
 
 "$APP/venv/bin/python" -m pip freeze > "$BACKUP/venv-freeze.txt"
 echo "PASS: Python dependency snapshot"
@@ -201,6 +216,17 @@ if /opt/dc-bot/venv/bin/python -c "import pytest" >/dev/null 2>&1; then
     /opt/dc-bot/venv/bin/python -m pytest -q
 else
     echo "SKIP: pytest is intentionally not required on production VPS."
+fi
+
+echo
+echo "=== 7B. SYNC WEB SYSTEMD UNIT ==="
+if cmp -s "$APP/dc-bot-dashboard.service" "$WEB_UNIT_PATH"; then
+    echo "SKIP: web systemd unit unchanged"
+else
+    WEB_UNIT_UPDATED=1
+    install -m 0644 "$APP/dc-bot-dashboard.service" "$WEB_UNIT_PATH"
+    systemctl daemon-reload
+    echo "PASS: web systemd unit synchronized"
 fi
 
 echo
