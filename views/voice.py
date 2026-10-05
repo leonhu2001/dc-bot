@@ -221,6 +221,13 @@ def build_full_temp_voice_overwrite(
     )
 
 
+def build_vip_owner_overwrite() -> discord.PermissionOverwrite:
+    """VIP 房主不明確覆寫「移動成員」，讓該權限維持 Discord 的繼承狀態。"""
+    overwrite = build_full_temp_voice_overwrite(connect=True)
+    overwrite.move_members = None
+    return overwrite
+
+
 
 def is_receiver_voice_role(role: discord.Role | None) -> bool:
     if role is None:
@@ -276,7 +283,7 @@ def build_vip_whitelist_overwrite() -> discord.PermissionOverwrite:
         add_reactions=False,
         use_external_emojis=False,
         use_external_stickers=False,
-        move_members=False,
+        move_members=None,
         manage_channels=False,
         manage_messages=False,
     )
@@ -328,7 +335,18 @@ async def sync_vip_whitelist_permissions(
     voice_channel: discord.VoiceChannel,
     owner_id: int,
 ) -> None:
-    """把 DB 白名單補回 Discord overwrite；Bot 重啟後仍有效。"""
+    """同步 VIP 房主與白名單個人權限；Bot 重啟後也會修正既有房間。"""
+    owner = voice_channel.guild.get_member(int(owner_id))
+    if owner is not None and not owner.bot:
+        owner_overwrite = voice_channel.overwrites_for(owner)
+        if owner_overwrite.move_members is not None:
+            owner_overwrite.move_members = None
+            await voice_channel.set_permissions(
+                owner,
+                overwrite=owner_overwrite,
+                reason="Normalize VIP owner move-members permission",
+            )
+
     for user_id in get_vip_room_whitelist_user_ids(int(owner_id)):
         member = voice_channel.guild.get_member(int(user_id))
         if member is None or member.bot:
@@ -469,7 +487,7 @@ def build_vip_room_overwrites(guild: discord.Guild, member: discord.Member) -> d
             move_members=True,
             manage_channels=True,
         ),
-        member: build_full_temp_voice_overwrite(connect=True),
+        member: build_vip_owner_overwrite(),
     }
 
     for role in get_vip_voice_allowed_roles(guild):
@@ -935,6 +953,8 @@ async def apply_voice_lock_state(
     owner_overwrite.add_reactions = True
     owner_overwrite.use_external_emojis = True
     owner_overwrite.use_external_stickers = True
+    if normalized_room_type == "vip":
+        owner_overwrite.move_members = None
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
@@ -1082,6 +1102,8 @@ async def apply_voice_hidden_state(
     owner_overwrite.add_reactions = True
     owner_overwrite.use_external_emojis = True
     owner_overwrite.use_external_stickers = True
+    if normalized_room_type == "vip":
+        owner_overwrite.move_members = None
     overwrites[owner] = owner_overwrite
 
     bot_member = guild.me
