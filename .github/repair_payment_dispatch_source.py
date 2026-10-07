@@ -9,7 +9,7 @@ def repair_payment_panel_command() -> None:
     start = source.index(start_marker)
     end = source.index(end_marker, start)
 
-    replacement = '''@bot.tree.command(
+    replacement = r'''@bot.tree.command(
     name="fix_acceptance_payment_panel",
     description="依票口 ID 補送等待付款 Panel",
     guild=discord.Object(id=GUILD_ID),
