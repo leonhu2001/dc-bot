@@ -8,13 +8,15 @@ from typing import Iterable
 import discord
 
 SMART_DISPATCH_ALERT_CHANNEL_ID = 1555881625844191322
+PUBLIC_ACCEPTANCE_OPEN_SECONDS = 60
+SECOND_ROUND_AFTER_OPEN_SECONDS = 360
+SECOND_ROUND_SECONDS = PUBLIC_ACCEPTANCE_OPEN_SECONDS + SECOND_ROUND_AFTER_OPEN_SECONDS
 REPEAT_REMINDER_SECONDS = 600
+SMART_DISPATCH_LOOP_SECONDS = 10
 
 from core.vip_levels import VIP_LEVELS
 from services.order_rules import role_ids_match_requirements
 from services.smart_dispatch import (
-    FIRST_EXPANSION_SECONDS,
-    FULL_EXPANSION_SECONDS,
     choose_initial_candidate_ids,
     get_completed_favorite_worker_ids,
     complete_smart_dispatch_plan,
@@ -253,6 +255,8 @@ def prepare_initial_smart_dispatch(
     return {
         "ranked_candidate_ids": ranked_ids,
         "priority_candidate_ids": priority_ids,
+        # 這一批現在代表「60 秒後第一輪要通知的人」。為了相容現有
+        # plan schema 沿用欄位名稱，真正的 Discord 通知會由 escalation loop 發出。
         "initial_notified_ids": initial_ids,
         "required_game_role_ids": [
             str(role_id)
@@ -269,23 +273,14 @@ async def send_initial_smart_dispatch_alert(
     content: str | None,
     dispatch_jump_url: str,
 ) -> discord.Message | None:
-    """Send smart-dispatch pings to the dedicated alert channel."""
-    text = str(content or "").strip()
-    if not text:
-        return None
+    """Defer public smart-dispatch pings until the one-minute lock expires.
 
-    channel = guild.get_channel(SMART_DISPATCH_ALERT_CHANNEL_ID)
-    if not isinstance(channel, discord.TextChannel):
-        return None
-
-    return await channel.send(
-        f"{text}\n前往原派單：{dispatch_jump_url}",
-        allowed_mentions=discord.AllowedMentions(
-            users=True,
-            roles=True,
-            everyone=False,
-        ),
-    )
+    Call sites remain unchanged; the persistent smart-dispatch plan drives the
+    actual first public notification so process restarts do not lose it.
+    Specified staff are still DM'd separately and may accept immediately.
+    """
+    _ = guild, content, dispatch_jump_url
+    return None
 
 
 async def send_specified_staff_dispatch_dms(
@@ -341,6 +336,7 @@ async def send_specified_staff_dispatch_dms(
                 f"類別：{category_label}\n"
                 f"項目：{item_label}\n"
                 f"需求人數：{max(1, int(required_staff_count or 1))} 位\n\n"
+                "你是指定人員，可直接繞過 1 分鐘公開接單鎖。\n"
                 "請前往派單頻道查看完整內容並接單：\n"
                 f"{dispatch_jump_url}"
             )
@@ -516,9 +512,9 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     specified_ids=specified_ids,
                 )
 
-                # 6 分鐘仍未滿時，全量提醒目前仍符合資格的人員並通知客服。
+                # 公開接單後再過 6 分鐘仍未滿：全量提醒目前仍符合資格的人員並通知客服。
                 # 不完成派單計畫：之後仍會每 10 分鐘持續提醒，直到真正滿人。
-                if age >= FULL_EXPANSION_SECONDS and stage < 2:
+                if age >= SECOND_ROUND_SECONDS and stage < 2:
                     final_user_ids = (
                         remaining_general_ids
                         if unrestricted_missing > 0
@@ -526,7 +522,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
 
                     lines = [
-                        "⚠️ **派單仍缺人｜全量擴大通知**",
+                        "⚠️ **派單仍缺人｜第二輪全量通知**",
                         f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
                     ]
 
@@ -556,7 +552,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         lines.append(
                             "🚨 **客服介入提醒**｜"
                             f"{support_mention} "
-                            "智慧派單已進入全量擴大，"
+                            "智慧派單已進入第二輪全量通知，"
                             f"目前仍缺 **{missing} 人**，請協助確認人力。"
                         )
 
@@ -575,7 +571,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         mark_smart_dispatch_stage(
                             order_id,
                             stage=stage,
-                            last_error=f"full_expansion: {type(exc).__name__}: {exc}",
+                            last_error=f"second_round: {type(exc).__name__}: {exc}",
                         )
                         continue
 
@@ -586,15 +582,29 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                if age >= FIRST_EXPANSION_SECONDS and stage < 1:
-                    next_ids = []
+                # T+60 秒：公開接單正式開放，這時才發第一輪智慧派單通知。
+                if age >= PUBLIC_ACCEPTANCE_OPEN_SECONDS and stage < 1:
+                    first_ids: list[str] = []
 
                     if unrestricted_missing > 0:
-                        next_ids = [
+                        first_ids = [
+                            str(worker_id)
+                            for worker_id in (plan.get("notified_candidate_ids") or [])
+                            if (
+                                str(worker_id) in currently_eligible_ids
+                                and str(worker_id) not in accepted_ids
+                                and str(worker_id) not in specified_ids
+                            )
+                        ]
+
+                    # 若舊 plan 沒有預先保留第一輪名單，仍從排名中補出一批，
+                    # 避免部署切換當下的等待單被漏通知。
+                    if unrestricted_missing > 0 and not first_ids:
+                        first_ids = [
                             worker_id
                             for worker_id in next_candidate_batch(
                                 plan.get("ranked_candidate_ids") or [],
-                                plan.get("notified_candidate_ids") or [],
+                                [],
                                 required_staff_count=unrestricted_missing,
                             )
                             if (
@@ -604,41 +614,20 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             )
                         ]
 
-                    # 若第一輪已經把所有可接人員都通知過，舊邏輯會讓第二輪
-                    # 靜默跳過。這裡改成重提醒仍可接、且尚未接單的人。
-                    if unrestricted_missing > 0 and not next_ids:
-                        next_ids = list(remaining_general_ids)
+                    if unrestricted_missing > 0 and not first_ids:
+                        first_ids = list(remaining_general_ids)
 
-                    reminder_ids = list(dict.fromkeys([
-                        *unresolved_specified,
-                        *next_ids,
-                    ]))
-
-                    if reminder_ids:
+                    if first_ids:
                         lines = [
-                            "🔔 **派單仍缺人｜第二輪通知**",
-                            f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
+                            "🟢 **新單已開放接單｜第一輪通知**",
+                            f"WEB-{order_id} 目前尚缺 **{missing} 人**。",
+                            "開放接單通知："
+                            + " ".join(
+                                f"<@{worker_id}>"
+                                for worker_id in first_ids
+                            ),
+                            f"前往原派單：{jump_url}",
                         ]
-
-                        if unresolved_specified:
-                            lines.append(
-                                "指定人員提醒："
-                                + " ".join(
-                                    f"<@{worker_id}>"
-                                    for worker_id in unresolved_specified
-                                )
-                            )
-
-                        if next_ids:
-                            lines.append(
-                                "剩餘名額通知："
-                                + " ".join(
-                                    f"<@{worker_id}>"
-                                    for worker_id in next_ids
-                                )
-                            )
-
-                        lines.append(f"前往原派單：{jump_url}")
 
                         try:
                             await alert_channel.send(
@@ -653,14 +642,14 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             mark_smart_dispatch_stage(
                                 order_id,
                                 stage=stage,
-                                last_error=f"second_wave: {type(exc).__name__}: {exc}",
+                                last_error=f"first_wave_unlock: {type(exc).__name__}: {exc}",
                             )
                             continue
 
                     mark_smart_dispatch_stage(
                         order_id,
                         stage=1,
-                        newly_notified_ids=next_ids,
+                        newly_notified_ids=first_ids,
                     )
                     continue
 
@@ -726,5 +715,4 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                 flush=True,
             )
 
-        await asyncio.sleep(60)
-
+        await asyncio.sleep(SMART_DISPATCH_LOOP_SECONDS)
