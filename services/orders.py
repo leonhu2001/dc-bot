@@ -638,6 +638,116 @@ def configure_order_helpers(
     _GET_NOW = get_now_func
 
 
+def _normalize_quantity_unit(value: str | None) -> str:
+    text = str(value or "單").strip() or "單"
+    return "小時" if text.upper() == "H" else text
+
+
+def _source_order_data(source_channel: discord.TextChannel | None) -> dict:
+    channel_id = getattr(source_channel, "id", None)
+    try:
+        data = _ORDER_SELECTIONS.get(int(channel_id), {}) if channel_id is not None else {}
+    except (TypeError, ValueError):
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def _order_quantity_unit(data: dict, item: str | None = None) -> str:
+    meta = get_self_service_quantity_meta(
+        data.get("category"),
+        data.get("item_group"),
+        data.get("item_detail_value"),
+    )
+    if meta:
+        return _normalize_quantity_unit(meta.get("unit"))
+
+    rule_key = str(data.get("order_rule_key") or "").strip()
+    if not rule_key:
+        rule_key = str(ORDER_RULE_KEY_BY_LABEL.get(str(item or data.get("item") or "")) or "")
+    rule = ORDER_RULES.get(rule_key)
+    if rule is not None:
+        return _normalize_quantity_unit(getattr(rule, "unit_label", "單"))
+    return "單"
+
+
+def _format_service_number(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else f"{value:g}"
+
+
+def _service_display_context(data: dict, *, item: str, quantity: int) -> dict:
+    unit = _order_quantity_unit(data, item)
+    service_text = f"{quantity} {unit}"
+
+    preview = data.get("preview") if isinstance(data.get("preview"), dict) else {}
+    preview_finance = preview.get("finance") if isinstance(preview.get("finance"), dict) else {}
+    preview_point = preview.get("point") if isinstance(preview.get("point"), dict) else {}
+
+    point_key = str(
+        data.get("point_benefit_key")
+        or data.get("selected_point_benefit_key")
+        or preview_point.get("key")
+        or ""
+    ).strip()
+    point_name = str(
+        data.get("point_benefit_name")
+        or preview_point.get("name")
+        or ""
+    ).strip()
+    point_cost = _to_int(
+        data.get("point_benefit_cost")
+        if data.get("point_benefit_cost") is not None
+        else preview_point.get("cost"),
+        0,
+    ) or 0
+    bonus_text = str(
+        data.get("service_bonus_text")
+        or preview_finance.get("point_service_note")
+        or ""
+    ).strip()
+    promotion_text = str(data.get("service_promotion_text") or "").strip()
+
+    try:
+        extra_hours = float(data.get("point_extra_hours") or 0)
+    except (TypeError, ValueError):
+        extra_hours = 0.0
+    extra_games = _to_int(data.get("point_extra_games"), 0) or 0
+
+    if point_key and extra_hours <= 0 and extra_games <= 0:
+        try:
+            from web.app.services.checkout_preview import POINT_ITEM_MAP
+
+            point_item = POINT_ITEM_MAP.get(point_key) or {}
+            kind = str(point_item.get("kind") or "")
+            if kind == "extra_hours":
+                extra_hours = float(point_item.get("hours") or 0)
+            elif kind in {"extra_game", "extra_games"}:
+                extra_games = _to_int(point_item.get("games"), 0) or 0
+        except Exception:
+            pass
+
+    actual_service_text = service_text
+    if unit == "小時" and extra_hours > 0:
+        actual_service_text = f"{_format_service_number(quantity + extra_hours)} 小時"
+    elif unit in {"局", "場"} and extra_games > 0:
+        actual_service_text = f"{quantity + extra_games} {unit}"
+
+    point_text = ""
+    if point_name:
+        point_text = (f"{point_cost} 點｜" if point_cost > 0 else "") + point_name
+        if bonus_text and bonus_text not in point_text:
+            point_text += f"\n{bonus_text}"
+    elif bonus_text:
+        point_text = bonus_text
+
+    return {
+        "unit": unit,
+        "service_text": service_text,
+        "actual_service_text": actual_service_text,
+        "point_text": point_text,
+        "promotion_text": promotion_text,
+    }
+
+
 def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
     """用訂單編號或票口 ID 從記憶體訂單資料找單。"""
     key = str(identifier or "").strip()
@@ -748,7 +858,7 @@ def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
         parts.append(ORDER_CATEGORY_LABELS.get(category, category))
 
     parts.append(item)
-    parts.append(f"數量：{quantity} 單")
+    parts.append(f"服務：{quantity} {_order_quantity_unit(data, item)}")
 
     if companion_preference is not None:
         parts.append(companion_preference)
@@ -791,17 +901,7 @@ def _resolve_guild_customer_display_name(
         if live_name and live_name != str(user_id):
             return live_name
 
-    source_channel_id = getattr(source_channel, "id", None)
-
-    try:
-        source_data = (
-            _ORDER_SELECTIONS.get(int(source_channel_id), {})
-            if source_channel_id is not None
-            else {}
-        )
-    except (TypeError, ValueError):
-        source_data = {}
-
+    source_data = _source_order_data(source_channel)
     if isinstance(source_data, dict):
         fallback_name = str(
             source_data.get("customer_display_name")
@@ -827,8 +927,27 @@ def build_self_service_order_embed(
     staff_note: str | None = None,
 ) -> discord.Embed:
     payment_text = str(payment_method or "未紀錄").strip() or "未紀錄"
+    source_data = _source_order_data(source_channel)
+    status = str(source_data.get("status") or "").strip().lower()
+    accepted_count = _to_int(source_data.get("accepted_count"), 0) or 0
+    required_staff_count = _to_int(source_data.get("required_staff_count"), 0) or 0
 
-    if payment_text in {"待付款", "未付款", "等待付款"}:
+    if status == "accepted_pending_pay":
+        status_text = "接單完成｜等待付款"
+        color = discord.Color.gold()
+    elif status == "active":
+        status_text = "已付款｜服務進行中"
+        color = discord.Color.green()
+    elif status == "stored":
+        status_text = "已存單"
+        color = discord.Color.blue()
+    elif status == "waiting_acceptance":
+        if accepted_count > 0 and required_staff_count > 0:
+            status_text = f"接單中｜{accepted_count}/{required_staff_count} 人"
+        else:
+            status_text = "等待接單｜付款前"
+        color = discord.Color.gold()
+    elif payment_text in {"待付款", "未付款", "等待付款"}:
         status_text = "等待接單｜付款前"
         color = discord.Color.gold()
     elif payment_text in {"未紀錄", "待客服確認"}:
@@ -840,6 +959,11 @@ def build_self_service_order_embed(
 
     ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
     customer_text = _resolve_guild_customer_display_name(source_channel, customer_mention)
+    service_context = _service_display_context(
+        source_data,
+        item=item,
+        quantity=quantity,
+    )
 
     embed = discord.Embed(
         title="魔丸娛樂｜接單面板",
@@ -851,20 +975,35 @@ def build_self_service_order_embed(
     embed.add_field(name="顧客", value=customer_text, inline=True)
     embed.add_field(name="票口", value=str(ticket_text), inline=True)
     embed.add_field(name="訂單", value=f"{category_label}｜{item}", inline=False)
-    embed.add_field(name="數量", value=f"{quantity} 單", inline=True)
+    embed.add_field(name="服務內容", value=service_context["service_text"], inline=True)
     embed.add_field(name="付款方式", value=payment_text, inline=True)
+
+    if service_context["actual_service_text"] != service_context["service_text"]:
+        embed.add_field(
+            name="實際服務",
+            value=service_context["actual_service_text"],
+            inline=True,
+        )
+
+    if service_context["point_text"]:
+        embed.add_field(
+            name="點數福利",
+            value=service_context["point_text"][:1024],
+            inline=False,
+        )
+
+    if service_context["promotion_text"]:
+        embed.add_field(
+            name="活動加贈",
+            value=service_context["promotion_text"][:1024],
+            inline=False,
+        )
 
     if companion_preference is not None:
         embed.add_field(name="指定", value=str(companion_preference), inline=True)
 
     if staff_note is None:
-        source_channel_id = getattr(source_channel, "id", None)
-        try:
-            source_data = _ORDER_SELECTIONS.get(int(source_channel_id), {}) if source_channel_id is not None else {}
-        except (TypeError, ValueError):
-            source_data = {}
-        if isinstance(source_data, dict):
-            staff_note = source_data.get("staff_note") or source_data.get("customer_service_note") or source_data.get("staff_order_note")
+        staff_note = source_data.get("staff_note") or source_data.get("customer_service_note") or source_data.get("staff_order_note")
 
     staff_note_text = str(staff_note or "").strip()
     if staff_note_text:
@@ -911,9 +1050,10 @@ def format_stored_order_option_label(channel_id: int, data: dict) -> str:
 
 def format_stored_order_option_description(channel_id: int, data: dict) -> str:
     quantity = _to_int(data.get("quantity"), 1) or 1
+    unit = _order_quantity_unit(data, data.get("item"))
     stored_at = str(data.get("stored_at") or "未紀錄時間")[:19]
     reason = str(data.get("stored_reason") or data.get("store_reason") or "未填寫原因")[:35]
-    return f"{quantity} 單｜{stored_at}｜{reason}"[:100]
+    return f"{quantity} {unit}｜{stored_at}｜{reason}"[:100]
 
 
 def build_stored_order_detail_embed(
@@ -952,12 +1092,16 @@ def build_stored_order_detail_embed(
     item = data.get("item") or "未紀錄"
     category = data.get("category")
     category_label = ORDER_CATEGORY_LABELS.get(category, data.get("category_label") or category or "未紀錄")
+    service_context = _service_display_context(data, item=str(item), quantity=quantity)
 
     embed.description = f"目前共有 **{total_count}** 筆存單。請先選擇存單，再按下方按鈕操作。"
     embed.add_field(name="顧客", value=f"<@{customer_id}>" if customer_id else "未紀錄", inline=True)
     embed.add_field(name="票口", value=ticket_text, inline=True)
     embed.add_field(name="狀態", value=str(data.get("status") or "stored"), inline=True)
-    embed.add_field(name="訂單", value=f"{category_label}｜{item} x{quantity}", inline=False)
+    embed.add_field(name="訂單", value=f"{category_label}｜{item}", inline=False)
+    embed.add_field(name="服務內容", value=service_context["service_text"], inline=True)
+    if service_context["actual_service_text"] != service_context["service_text"]:
+        embed.add_field(name="實際服務", value=service_context["actual_service_text"], inline=True)
     embed.add_field(name="金額", value=_format_amount(amount) if amount else "未紀錄", inline=True)
     embed.add_field(name="付款方式", value=str(data.get("payment_method") or "未紀錄"), inline=True)
     embed.add_field(name="存單時間", value=str(data.get("stored_at") or "未紀錄"), inline=False)
