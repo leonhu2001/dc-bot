@@ -35,10 +35,17 @@
 
         <div class="dispatch-meta">
             <div class="dispatch-meta-item"><span>老闆</span><strong>{{ order.customer_display_name or "未記錄" }}</strong></div>
-            <div class="dispatch-meta-item"><span>數量</span><strong>{{ order.quantity }} 單</strong></div>
+            <div class="dispatch-meta-item"><span>服務內容</span><strong>{{ order.dispatch_service_text or ((order.quantity|string) ~ " 單") }}</strong></div>
             <div class="dispatch-meta-item"><span>金額</span><strong>{{ final_price }}T</strong></div>
             <div class="dispatch-meta-item"><span>付款方式</span><strong>{{ order.payment_method or "未記錄" }}</strong></div>
         </div>
+
+        {% if order.dispatch_actual_service_text and order.dispatch_actual_service_text != order.dispatch_service_text %}
+            <p class="dispatch-note"><strong>實際服務：</strong>{{ order.dispatch_actual_service_text }}{% if order.dispatch_point_benefit_text %}<br><strong>點數福利：</strong>{{ order.dispatch_point_benefit_text }}{% endif %}</p>
+        {% elif order.dispatch_point_benefit_text %}
+            <p class="dispatch-note"><strong>點數福利：</strong>{{ order.dispatch_point_benefit_text }}</p>
+        {% endif %}
+        {% if order.dispatch_promotion_text %}<p class="dispatch-note"><strong>活動加贈：</strong>{{ order.dispatch_promotion_text }}</p>{% endif %}
 
         {% if original_price != final_price or percent_off > 0 or fixed_off > 0 or point_off > 0 or specify_fee > 0 %}
             <div class="dispatch-payout">
@@ -98,9 +105,9 @@
             <div class="dispatch-footer">
                 {% if user_claimed_this_order and order.dispatch_allows_unclaim %}
                     <form method="post" action="/dispatch/orders/{{ order.id }}/unclaim" data-dispatch-action="unclaim"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}"><button class="button danger" type="submit" data-busy-label="取消中…">取消接單</button></form>
-                {% elif order.dispatch_claim_open %}
+                {% elif order.dispatch_user_can_claim_now %}
                     <form method="post" action="/dispatch/orders/{{ order.id }}/claim" data-dispatch-action="claim"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}"><button class="button" type="submit" data-busy-label="接單中…">接單</button></form>
-                {% else %}<span class="dispatch-footer-status">{{ order.dispatch_locked_message }}</span>{% endif %}
+                {% else %}<span class="dispatch-footer-status">{{ order.dispatch_user_claim_reason or order.dispatch_locked_message }}</span>{% endif %}
             </div>
         {% endif %}
     </article>
@@ -114,7 +121,7 @@
         <div class="dispatch-panel dispatch-hero-main">
             <p class="dispatch-eyebrow">MISSION DISPATCH</p>
             <h1 class="dispatch-title">接單大廳</h1>
-            <p class="dispatch-desc">陪玩可在這裡接單；客服值班時可直接指派陪玩，並進入訂單工作區修改或取消訂單。新單由即時連線推送，畫面更新完成後才播放提示音。</p>
+            <p class="dispatch-desc">陪玩可在這裡接單；客服值班時可直接指派陪玩，並進入訂單工作區修改或取消訂單。提示音只會在你此刻真的符合資格、而且已經可以立即接單時播放；指定對象可直接繞過 1 分鐘接單保護期。</p>
             <div class="dispatch-tags">
                 {% if support_can_manage %}<span class="dispatch-tag" data-state="online">🛎️ 客服值班操作已開啟</span>{% endif %}
                 <span class="dispatch-tag">護航接單</span><span class="dispatch-tag">陪玩接單</span>
@@ -146,7 +153,7 @@
                 <div class="dispatch-list">
                     {% for claimed_order in claimed_orders %}
                         {% set summary = claimed_order_summaries.get(claimed_order.id,{}) %}{% set payout = summary.get("payout",{}) %}
-                        <article class="dispatch-my-card"><div><p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p><h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3></div><div class="dispatch-my-status"><div><span>任務狀態</span><strong>{{ summary.get("status_label",claimed_order.status) }}</strong></div><div><span>接單進度</span><strong>{{ summary.get("current_staff_count",0) }}/{{ summary.get("required_staff_count",0) or "?" }}</strong></div><div><span>{{ payout.get("label","分潤") }}</span><strong>{% if payout.get("amount") is not none %}{{ payout.get("amount") }}T{% else %}待計算{% endif %}</strong></div><div><span>剩餘缺額</span><strong>{{ summary.get("missing_staff_count",0) }} 人</strong></div></div><div class="dispatch-money"><span>訂單金額</span><strong>{{ claimed_order.customer_pay_amount if claimed_order.customer_pay_amount is not none else claimed_order.amount }}T</strong></div>{% if summary.get("ticket_url") or summary.get("dispatch_url") %}<div class="dispatch-my-links">{% if summary.get("ticket_url") %}<a class="dispatch-my-link" href="{{ summary.get('ticket_url') }}" target="_blank" rel="noopener">前往票口</a>{% endif %}{% if summary.get("dispatch_url") %}<a class="dispatch-my-link" href="{{ summary.get('dispatch_url') }}" target="_blank" rel="noopener">前往派單訊息</a>{% endif %}</div>{% endif %}</article>
+                        <article class="dispatch-my-card"><div><p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p><h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3></div><div class="dispatch-my-status"><div><span>任務狀態</span><strong>{{ summary.get("status_label",claimed_order.status) }}</strong></div><div><span>接單進度</span><strong>{{ summary.get("current_staff_count",0) }}/{{ summary.get("required_staff_count",0) or "?" }}</strong></div><div><span>服務內容</span><strong>{{ claimed_order.dispatch_service_text or ((claimed_order.quantity|string) ~ " 單") }}</strong></div><div><span>實際服務</span><strong>{{ claimed_order.dispatch_actual_service_text or claimed_order.dispatch_service_text }}</strong></div><div><span>{{ payout.get("label","分潤") }}</span><strong>{% if payout.get("amount") is not none %}{{ payout.get("amount") }}T{% else %}待計算{% endif %}</strong></div><div><span>剩餘缺額</span><strong>{{ summary.get("missing_staff_count",0) }} 人</strong></div></div><div class="dispatch-money"><span>訂單金額</span><strong>{{ claimed_order.customer_pay_amount if claimed_order.customer_pay_amount is not none else claimed_order.amount }}T</strong></div>{% if summary.get("ticket_url") or summary.get("dispatch_url") %}<div class="dispatch-my-links">{% if summary.get("ticket_url") %}<a class="dispatch-my-link" href="{{ summary.get('ticket_url') }}" target="_blank" rel="noopener">前往票口</a>{% endif %}{% if summary.get("dispatch_url") %}<a class="dispatch-my-link" href="{{ summary.get('dispatch_url') }}" target="_blank" rel="noopener">前往派單訊息</a>{% endif %}</div>{% endif %}</article>
                     {% endfor %}
                 </div>
             {% else %}<div class="dispatch-empty"><strong>目前尚未接任何訂單。</strong><span>可接任務會顯示在右側任務區。</span></div>{% endif %}
