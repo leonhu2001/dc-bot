@@ -1,8 +1,9 @@
+from pathlib import Path
+
 from core.vip_levels import VIP_LEVEL_BENEFITS
 from web.app.services.site_data import (
     VIP_GENERAL_RULES,
     VIP_LEVELS_PUBLIC,
-    VIP_PRIVATE_CHANNEL_RULES,
     VIP_REBATE_RULES,
 )
 
@@ -35,5 +36,17 @@ def test_vip_rule_copy_matches_current_policy():
         "儲值後如需退款僅能退錢包總金額的95%",
         "儲值達VIP標準也可使用返利，但若後續取出致使額度未到仍會降級",
     ]
-    assert "頻道成員包含：VIP 客人、指定打手、客服／管理員。" in VIP_PRIVATE_CHANNEL_RULES
     assert "體驗單、趣味單不適用 VIP 折扣。" in VIP_GENERAL_RULES
+
+
+def test_vip_page_does_not_show_private_channel_section():
+    template = (
+        Path(__file__).resolve().parents[1]
+        / "web"
+        / "app"
+        / "templates"
+        / "vip.html"
+    ).read_text(encoding="utf-8")
+
+    assert "VIP 專屬私人文字頻道" not in template
+    assert "private_channel_rules" not in template
