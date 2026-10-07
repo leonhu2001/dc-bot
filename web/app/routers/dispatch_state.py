@@ -22,6 +22,12 @@ router = APIRouter(tags=["dispatch_state"])
 _VISIBLE_STATUS_VALUES = tuple(VISIBLE_DISPATCH_STATUSES)
 _VISIBLE_STATUS_PLACEHOLDERS = ", ".join("?" for _ in _VISIBLE_STATUS_VALUES)
 _DISPATCH_EVENT_CACHE_TTL_SECONDS = 1.0
+# SessionMiddleware 的登入 cookie 目前是 12 小時效期。SSE 連線本身可以掛很久，
+# 但 HTTP response headers 只會在連線建立時送一次，因此長時間只靠 SSE 心跳
+# 不會刷新登入 cookie。定期主動結束串流，讓瀏覽器 EventSource 自動重連；
+# 每次重連都會重新經過 SessionMiddleware 並刷新 cookie 效期。
+# 這樣員工只要仍掛在接單大廳，就不會因為長時間待機而被自動登出。
+_DISPATCH_SSE_SESSION_REFRESH_SECONDS = 4 * 60 * 60
 _dispatch_event_cache: dict | None = None
 _dispatch_event_cache_expires_at = 0.0
 _dispatch_event_cache_lock = asyncio.Lock()
@@ -194,6 +200,7 @@ async def dispatch_events(request: Request):
         )
 
     async def event_stream():
+        stream_started = time.monotonic()
         last_signature = None
         last_presence_touch = 0.0
         last_heartbeat = 0.0
@@ -205,6 +212,15 @@ async def dispatch_events(request: Request):
                 return
 
             now = time.monotonic()
+
+            # StreamingResponse 已送出的 headers 無法在後續 heartbeat 更新 cookie。
+            # 在 session 到期前主動收掉 SSE，EventSource 會依 retry 自動重連，
+            # 新連線即可刷新登入 session。使用者不需要重新整理或重新登入。
+            if (
+                now - stream_started
+                >= _DISPATCH_SSE_SESSION_REFRESH_SECONDS
+            ):
+                return
 
             if now - last_presence_touch >= 20:
                 await asyncio.to_thread(touch_dispatch_user_presence, user)
