@@ -17,6 +17,7 @@ REPEAT_REMINDER_SECONDS = 600
 SMART_DISPATCH_LOOP_SECONDS = 10
 
 from core.vip_levels import VIP_LEVELS
+from services.dispatch_discord import refresh_unified_dispatch_message
 from services.order_rules import role_ids_match_requirements
 from services.smart_dispatch import (
     choose_initial_candidate_ids,
@@ -28,6 +29,8 @@ from services.smart_dispatch import (
     plan_age_seconds,
     rank_dispatch_candidates,
 )
+
+_DISPLAY_SIGNATURES: dict[int, tuple] = {}
 
 
 def get_eligible_dispatch_candidate_ids(
@@ -269,18 +272,56 @@ def prepare_initial_smart_dispatch(
     }
 
 
+async def _refresh_new_dispatch_when_persisted(
+    guild: discord.Guild,
+    dispatch_jump_url: str,
+) -> None:
+    try:
+        dispatch_message_id = int(str(dispatch_jump_url).rstrip("/").rsplit("/", 1)[-1])
+    except (TypeError, ValueError):
+        return
+
+    # The original message is sent just before the WebOrder + acceptance meta
+    # are persisted. Retry briefly, then render once from the persisted source
+    # of truth. This is one edit, not a per-second Discord countdown.
+    for _ in range(12):
+        await asyncio.sleep(0.5)
+        try:
+            from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
+
+            order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+        except Exception:
+            order_id = None
+
+        if order_id is None:
+            continue
+
+        try:
+            if await refresh_unified_dispatch_message(guild, int(order_id)):
+                return
+        except Exception as exc:
+            print(
+                f"[dispatch-display] initial refresh failed order={order_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+        return
+
+
 async def send_initial_smart_dispatch_alert(
     guild: discord.Guild,
     *,
     content: str | None,
     dispatch_jump_url: str,
 ) -> discord.Message | None:
-    """Defer public smart-dispatch pings until the one-minute lock expires.
-
-    Call sites remain unchanged; the persistent smart-dispatch plan drives the
-    actual first public notification so process restarts do not lose it.
-    """
-    _ = guild, content, dispatch_jump_url
+    """Keep creation silent and normalize the shared panel after persistence."""
+    _ = content
+    asyncio.create_task(
+        _refresh_new_dispatch_when_persisted(
+            guild,
+            dispatch_jump_url,
+        )
+    )
     return None
 
 
@@ -413,8 +454,44 @@ def _ordered_remaining_candidate_ids(
     ]
 
 
+async def _refresh_panel_on_state_change(
+    guild: discord.Guild,
+    order_id: int,
+    state,
+    *,
+    public_unlocked: bool,
+) -> None:
+    signature = (
+        str(getattr(state, "status", "") or ""),
+        int(getattr(state, "accepted_count", 0) or 0),
+        tuple(
+            sorted(
+                str(getattr(claim, "staff_discord_id", "") or "")
+                for claim in getattr(state, "claims", ())
+            )
+        ),
+        bool(public_unlocked),
+    )
+
+    if _DISPLAY_SIGNATURES.get(int(order_id)) == signature:
+        return
+
+    try:
+        refreshed = await refresh_unified_dispatch_message(guild, int(order_id))
+    except Exception as exc:
+        print(
+            f"[dispatch-display] state refresh failed order={order_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return
+
+    if refreshed:
+        _DISPLAY_SIGNATURES[int(order_id)] = signature
+
+
 async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
-    from shared.order_acceptance import WAITING_ACCEPTANCE, get_acceptance_state
+    from shared.order_acceptance import ACCEPTED_PENDING_PAY, WAITING_ACCEPTANCE, get_acceptance_state
 
     await bot.wait_until_ready()
 
@@ -437,15 +514,30 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                if state.status != WAITING_ACCEPTANCE or state.is_full:
+                guild = bot.get_guild(getattr(bot, "guild_id_value", 0))
+                if guild is None:
+                    continue
+
+                age = plan_age_seconds(plan)
+                await _refresh_panel_on_state_change(
+                    guild,
+                    order_id,
+                    state,
+                    public_unlocked=(age >= PUBLIC_ACCEPTANCE_OPEN_SECONDS),
+                )
+
+                # Full-before-payment remains tracked so the same canonical
+                # renderer can repaint the panel again when payment turns it
+                # active. No dispatch reminders run while it is full.
+                if state.status == ACCEPTED_PENDING_PAY or state.is_full:
+                    continue
+
+                if state.status != WAITING_ACCEPTANCE:
                     complete_smart_dispatch_plan(
                         order_id,
                         reason=f"order_status:{state.status}",
                     )
-                    continue
-
-                guild = bot.get_guild(getattr(bot, "guild_id_value", 0))
-                if guild is None:
+                    _DISPLAY_SIGNATURES.pop(order_id, None)
                     continue
 
                 try:
@@ -456,6 +548,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         order_id,
                         reason="invalid_dispatch_reference",
                     )
+                    _DISPLAY_SIGNATURES.pop(order_id, None)
                     continue
 
                 alert_channel = guild.get_channel(SMART_DISPATCH_ALERT_CHANNEL_ID)
@@ -467,7 +560,6 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                age = plan_age_seconds(plan)
                 stage = int(plan.get("stage") or 0)
                 required_count = max(1, int(state.required_staff_count or 1))
                 accepted_ids = {
