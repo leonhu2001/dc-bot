@@ -51,7 +51,16 @@ jobs:
 
       - name: Compile Python sources
         run: |
-          python -m compileall -q             bot.py             cogs             core             services             shared             web/app
+          python -m compileall -q \
+            bot.py \
+            cogs \
+            core \
+            services \
+            shared \
+            views \
+            web/app \
+            tools \
+            scripts
 
       - name: Audit Python dependencies
         run: |
