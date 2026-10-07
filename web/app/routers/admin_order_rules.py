@@ -61,6 +61,7 @@ BOOL_FIELDS = {
     "allow_specify",
     "player_count_enabled",
     "price_multiply_player_count",
+    "vip_discount_allowed",
     "point_benefits_allowed",
 }
 PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
@@ -269,6 +270,9 @@ def _payload_from_form_base(payload: dict, form) -> dict:
     payload = dict(payload)
 
     payload["label"] = str(form.get("label") or "").strip()
+    payload["catalog_group_label"] = str(
+        form.get("catalog_group_label") or ""
+    ).strip()
     payload["pricing_type"] = str(form.get("pricing_type") or "").strip()
     payload["unit_label"] = str(form.get("unit_label") or "").strip() or "單"
     payload["note"] = str(form.get("note") or "").strip()
@@ -368,11 +372,18 @@ def _rule_row(key: str) -> dict:
         "key": key,
         "category": rule.category,
         "category_label": CATEGORY_LABELS.get(rule.category, rule.category),
+        "catalog_group_label": str(
+            getattr(rule, "catalog_group_label", "") or ""
+        ),
         "label": rule.label,
         "price": int(rule.price or 0),
         "pricing_type": rule.pricing_type,
         "unit_label": rule.unit_label,
         "required_staff_count": rule.required_staff_count,
+        "vip_discount_allowed": bool(
+            getattr(rule, "vip_discount_allowed", True)
+        ),
+        "point_benefits_allowed": bool(rule.point_benefits_allowed),
         "override_version": int((meta or {}).get("version") or 0),
         "is_overridden": bool(meta),
         "updated_at": str((meta or {}).get("updated_at") or ""),
@@ -437,6 +448,7 @@ async def _render(
         ),
         key=lambda row: (
             str(row["category_label"]),
+            str(row["catalog_group_label"]),
             str(row["label"]),
             str(row["key"]),
         ),
