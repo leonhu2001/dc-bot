@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import traceback
 
 import discord
 
 import services.rewards as rewards
-from core.time_utils import get_taipei_now_iso
 from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
 from services.topup_notifications import (
     ensure_topup_notification_columns,
@@ -85,87 +83,6 @@ async def _repair_stuck_vip_members(bot: discord.Client) -> None:
         )
 
     print(f"[vip-repair] repaired members: {len(repaired)}", flush=True)
-
-
-def install_wallet_vip_guard() -> None:
-    """包住結單會員紀錄：錢包付款不重複計 VIP，其他付款補做 VIP 自動升級。"""
-    target_module = None
-    for module in list(sys.modules.values()):
-        if module is None:
-            continue
-        if hasattr(module, "SELF_SERVICE_ORDER_SELECTIONS") and hasattr(module, "add_customer_reward_from_order"):
-            target_module = module
-            break
-
-    if target_module is None or getattr(target_module, "_wallet_vip_guard_installed", False):
-        return
-
-    original = getattr(target_module, "add_customer_reward_from_order")
-
-    async def guarded_add_customer_reward_from_order(
-        guild,
-        order_channel_id: int,
-        customer_id: int,
-        amount_text: str,
-        notify_channel=None,
-    ) -> str:
-        order_data = getattr(target_module, "SELF_SERVICE_ORDER_SELECTIONS", {}).get(order_channel_id, {})
-        payment_method = str(order_data.get("payment_method") or "").strip()
-
-        if payment_method != "我的錢包":
-            result = await original(
-                guild,
-                order_channel_id,
-                customer_id,
-                amount_text,
-                notify_channel=notify_channel,
-            )
-
-            data = rewards.get_customer_reward_data(customer_id)
-            changed, old_level, new_level = repair_vip_progress_data(data)
-            if changed:
-                await _sync_member_vip_benefits(guild, customer_id, data)
-                if rewards._SAVE_BOT_DATA is not None:
-                    rewards._SAVE_BOT_DATA()
-
-                if int(new_level.get("threshold", 0) or 0) > int(old_level.get("threshold", 0) or 0):
-                    result += f"\n🎉 VIP 已自動升級為「{new_level['name']}」。"
-
-            return result
-
-        if order_data.get("reward_counted"):
-            return "此訂單已處理會員紀錄，未重複累積。"
-
-        data = rewards.get_customer_reward_data(customer_id)
-        vip_changed, _, _ = repair_vip_progress_data(data)
-        if vip_changed:
-            await _sync_member_vip_benefits(guild, customer_id, data)
-
-        data["order_count"] = int(data.get("order_count", 0) or 0) + 1
-        data["last_order_at"] = get_taipei_now_iso()
-        data["points"] = rewards.get_current_reward_points(data)
-
-        order_data["reward_counted"] = True
-        order_data["reward_amount"] = 0
-        order_data["reward_excluded"] = True
-        order_data["reward_excluded_reason"] = "錢包付款：儲值本金已於儲值時累積 VIP，避免重複計算"
-        order_data["reward_counted_at"] = get_taipei_now_iso()
-
-        selections = getattr(target_module, "SELF_SERVICE_ORDER_SELECTIONS", None)
-        if isinstance(selections, dict):
-            selections[order_channel_id] = order_data
-
-        if rewards._SAVE_BOT_DATA is not None:
-            rewards._SAVE_BOT_DATA()
-
-        return (
-            "會員紀錄已更新：完成訂單 +1；本單使用錢包付款，"
-            "儲值本金已於儲值時累積 VIP，因此未再次增加累積消費。"
-        )
-
-    setattr(target_module, "add_customer_reward_from_order", guarded_add_customer_reward_from_order)
-    target_module._wallet_vip_guard_installed = True
-    print("[topup] wallet VIP double-count guard installed", flush=True)
 
 
 async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
@@ -547,7 +464,6 @@ async def topup_credit_worker(bot: discord.Client) -> None:
 def ensure_topup_credit_worker_started(bot: discord.Client) -> None:
     ensure_topup_tables()
     ensure_topup_notification_columns()
-    install_wallet_vip_guard()
     install_legacy_wallet_add_bridge(bot)
     if getattr(bot, "_topup_credit_worker_started", False):
         return
