@@ -979,23 +979,19 @@ def build_self_service_order_embed(
     embed.add_field(name="付款方式", value=payment_text, inline=True)
 
     if service_context["actual_service_text"] != service_context["service_text"]:
+        actual_value = service_context["actual_service_text"]
+        if service_context["point_text"]:
+            actual_value += f"\n{service_context['point_text']}"
         embed.add_field(
             name="實際服務",
-            value=service_context["actual_service_text"],
+            value=actual_value[:1024],
             inline=True,
         )
-
-    if service_context["point_text"]:
+    elif service_context["point_text"] and isinstance(source_data.get("preview"), dict):
+        # 官網訂單的點數資料是巢狀 preview；原本財務欄位讀不到時在這裡保留服務福利。
         embed.add_field(
-            name="點數福利",
+            name="服務福利",
             value=service_context["point_text"][:1024],
-            inline=False,
-        )
-
-    if service_context["promotion_text"]:
-        embed.add_field(
-            name="活動加贈",
-            value=service_context["promotion_text"][:1024],
             inline=False,
         )
 
