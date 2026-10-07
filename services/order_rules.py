@@ -114,6 +114,13 @@ class OrderRule:
     max_player_count: int | None = None
     price_multiply_player_count: bool = False
 
+    # 後台新增商品可自行決定 Discord 自助下單的第二層分類。
+    # 空白代表沿用既有 catalog；舊的後台商品則由 services.orders
+    # 相容顯示成「後台新增商品」。
+    catalog_group_label: str = ""
+
+    # VIP 與點數必須是兩個獨立商品規則；關閉 VIP 不影響客服手動折扣。
+    vip_discount_allowed: bool = True
     point_benefits_allowed: bool = True
 
     min_protector_count: int = 0
@@ -163,6 +170,8 @@ RULE_OVERRIDE_FIELDS = {
     "min_player_count",
     "max_player_count",
     "price_multiply_player_count",
+    "catalog_group_label",
+    "vip_discount_allowed",
     "point_benefits_allowed",
     "min_protector_count",
     "service_bonus_buy",
@@ -218,6 +227,8 @@ def build_rule_with_override(
             if not isinstance(value, dict):
                 raise ValueError(f"{key} 必須是物件。")
             value = dict(value)
+        elif key == "catalog_group_label":
+            value = str(value or "").strip()
         changes[key] = value
 
     return replace(base_rule, **changes)
@@ -1281,6 +1292,9 @@ def validate_rule_definition(key: str, rule: OrderRule) -> None:
         ):
             raise RuntimeError(f"{key}: maximum player count is below minimum")
 
+    if len(str(rule.catalog_group_label or "")) > 100:
+        raise RuntimeError(f"{key}: catalog group label is too long")
+
     if rule.allow_specify:
         fee_map = {
             **(rule.specify_fee_by_role or {}),
@@ -1612,6 +1626,8 @@ def build_order_rule_snapshot(
                 )
             ],
             "specified_staff_ids": [str(item) for item in (specified_staff_ids or [])],
+            "catalog_group_label": str(getattr(rule, "catalog_group_label", "") or ""),
+            "vip_discount_allowed": bool(getattr(rule, "vip_discount_allowed", True)),
             "point_benefits_allowed": bool(getattr(rule, "point_benefits_allowed", True)),
         },
     }
