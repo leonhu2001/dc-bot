@@ -75,6 +75,31 @@ def require_dispatch_user(request: Request) -> dict | None:
     return user
 
 
+def keep_protected_orders_on_available_board(
+    claimable_orders,
+    non_claimable_orders,
+):
+    protected_orders = [
+        order
+        for order in non_claimable_orders
+        if (
+            str(getattr(order, "status", "") or "") == "waiting_acceptance"
+            and int(getattr(order, "dispatch_missing_staff_count", 0) or 0) > 0
+            and bool(getattr(order, "dispatch_acceptance_locked", False))
+        )
+    ]
+    protected_ids = {int(order.id) for order in protected_orders}
+
+    return (
+        [*claimable_orders, *protected_orders],
+        [
+            order
+            for order in non_claimable_orders
+            if int(order.id) not in protected_ids
+        ],
+    )
+
+
 @router.get("/dispatch")
 async def dispatch_dashboard(
     request: Request,
@@ -120,6 +145,10 @@ async def dispatch_dashboard(
         create_demo_orders_if_empty(db)
         orders = list_active_orders(db)
         claimable_orders, non_claimable_orders = partition_dispatch_orders(orders)
+        claimable_orders, non_claimable_orders = keep_protected_orders_on_available_board(
+            claimable_orders,
+            non_claimable_orders,
+        )
         orders = [*claimable_orders, *non_claimable_orders]
         active_order_count = get_worker_active_order_count(db, str(user["id"]))
         claimed_order_ids = get_worker_active_order_ids(db, str(user["id"]))
