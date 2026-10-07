@@ -59,6 +59,17 @@ def test_wallet_vip_repair_only_targets_post_topup_double_counts():
             "reward_excluded": False,
             "reward_amount": 200,
         },
+        6: {
+            "customer_id": customer_id,
+            "order_no": "MO20261007003",
+            "payment_method": "我的錢包",
+            "status": "stored",
+            "reward_counted": True,
+            "reward_excluded": False,
+            "reward_amount": 1470,
+            "reward_counted_at": "2026-10-07T18:10:00+08:00",
+            "closed_at": "2026-10-07T18:10:00+08:00",
+        },
     }
 
     candidates, undated = _find_candidates(
@@ -69,5 +80,6 @@ def test_wallet_vip_repair_only_targets_post_topup_double_counts():
 
     assert [(channel_id, amount) for channel_id, _, amount, _ in candidates] == [
         (1, 600),
+        (6, 1470),
     ]
     assert [channel_id for channel_id, _ in undated] == [5]
