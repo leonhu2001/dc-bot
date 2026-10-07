@@ -101,59 +101,17 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "甜蜜單",
             "details": [
-                {
-                    "label": "女單陪",
-                    "value": "female_single",
-                    "rule_key": "basic_sweet_female_single",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-                {
-                    "label": "男單陪",
-                    "value": "male_single",
-                    "rule_key": "basic_sweet_male_single",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-                {
-                    "label": "女雙陪",
-                    "value": "female_double",
-                    "rule_key": "basic_sweet_female_double",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-                {
-                    "label": "男雙陪",
-                    "value": "male_double",
-                    "rule_key": "basic_sweet_male_double",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
-                {
-                    "label": "雙陪(不限)",
-                    "value": "double_any",
-                    "rule_key": "basic_sweet_double_any",
-                    "quantity_unit": "小時",
-                    "min_quantity": 1,
-                    "max_quantity": 24,
-                },
+                {"label": "女單陪", "value": "female_single", "rule_key": "basic_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男單陪", "value": "male_single", "rule_key": "basic_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "女雙陪", "value": "female_double", "rule_key": "basic_sweet_female_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "男雙陪", "value": "male_double", "rule_key": "basic_sweet_male_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+                {"label": "雙陪(不限)", "value": "double_any", "rule_key": "basic_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
             ],
         },
         {
             "label": "教學單",
             "details": [
-                {
-                    "label": "1對1教學",
-                    "value": "teacher_1",
-                    "rule_key": "basic_teaching_one",
-                    "quantity_unit": "小時",
-                    "min_quantity": 3,
-                    "max_quantity": 24,
-                },
+                {"label": "1對1教學", "value": "teacher_1", "rule_key": "basic_teaching_one", "quantity_unit": "小時", "min_quantity": 3, "max_quantity": 24},
             ],
         },
     ],
@@ -165,38 +123,10 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "魔丸娛樂嘎拉給木",
             "details": [
-                {
-                    "label": "基礎",
-                    "value": "basic",
-                    "rule_key": "fun_mawan_galagame_basic",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "標準",
-                    "value": "standard",
-                    "rule_key": "fun_mawan_galagame_standard",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "困難",
-                    "value": "hard",
-                    "rule_key": "fun_mawan_galagame_hard",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "地獄",
-                    "value": "hell",
-                    "rule_key": "fun_mawan_galagame_hell",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
+                {"label": "基礎", "value": "basic", "rule_key": "fun_mawan_galagame_basic", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "標準", "value": "standard", "rule_key": "fun_mawan_galagame_standard", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "困難", "value": "hard", "rule_key": "fun_mawan_galagame_hard", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "地獄", "value": "hell", "rule_key": "fun_mawan_galagame_hell", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
             ],
         },
     ],
@@ -204,46 +134,11 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
         {
             "label": "賽季3x3",
             "details": [
-                {
-                    "label": "3x3",
-                    "value": "season_3x3",
-                    "rule_key": "farm_season_3x3_normal",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "3x3+造型",
-                    "value": "season_3x3_skin",
-                    "rule_key": "farm_season_3x3_dc_skin",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "3x3包損耗",
-                    "value": "season_3x3_loss",
-                    "rule_key": "farm_season_3x3_dc_loss",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "3x3+造型包損耗",
-                    "value": "season_3x3_skin_loss",
-                    "rule_key": "farm_season_3x3_dc_skin_loss",
-                    "quantity_unit": "單",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                },
-                {
-                    "label": "命運契約",
-                    "value": "season_contract",
-                    "rule_key": "farm_season_3x3_contract",
-                    "quantity_unit": "個",
-                    "min_quantity": 1,
-                    "max_quantity": 7,
-                },
+                {"label": "3x3", "value": "season_3x3", "rule_key": "farm_season_3x3_normal", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3x3+造型", "value": "season_3x3_skin", "rule_key": "farm_season_3x3_dc_skin", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3x3包損耗", "value": "season_3x3_loss", "rule_key": "farm_season_3x3_dc_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "3x3+造型包損耗", "value": "season_3x3_skin_loss", "rule_key": "farm_season_3x3_dc_skin_loss", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1},
+                {"label": "命運契約", "value": "season_contract", "rule_key": "farm_season_3x3_contract", "quantity_unit": "個", "min_quantity": 1, "max_quantity": 7},
             ],
         },
         {"label": "部門任務", "details": [{"label": "部門任務", "value": "department", "rule_key": "farm_department_task", "quantity_unit": "單", "min_quantity": 1, "max_quantity": 1}]},
@@ -318,54 +213,14 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             ],
         }
         for group_label, rule_prefix, ranked, rank_options in (
-            (
-                "娛樂陪",
-                "apex_entertain",
-                False,
-                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
-            ),
-            (
-                "娛樂陪 積分",
-                "apex_entertain",
-                True,
-                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
-            ),
-            (
-                "鑽石陪",
-                "apex_diamond",
-                False,
-                (("白金以下", "platinum"), ("鑽石", "diamond")),
-            ),
-            (
-                "鑽石陪 積分",
-                "apex_diamond",
-                True,
-                (("白金以下", "platinum"), ("鑽石", "diamond")),
-            ),
-            (
-                "大師陪",
-                "apex_master",
-                False,
-                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
-            ),
-            (
-                "大師陪 積分",
-                "apex_master",
-                True,
-                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
-            ),
-            (
-                "頂獵陪",
-                "apex_predator",
-                False,
-                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
-            ),
-            (
-                "頂獵陪 積分",
-                "apex_predator",
-                True,
-                (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master")),
-            ),
+            ("娛樂陪", "apex_entertain", False, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
+            ("娛樂陪 積分", "apex_entertain", True, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
+            ("鑽石陪", "apex_diamond", False, (("白金以下", "platinum"), ("鑽石", "diamond"))),
+            ("鑽石陪 積分", "apex_diamond", True, (("白金以下", "platinum"), ("鑽石", "diamond"))),
+            ("大師陪", "apex_master", False, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
+            ("大師陪 積分", "apex_master", True, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
+            ("頂獵陪", "apex_predator", False, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
+            ("頂獵陪 積分", "apex_predator", True, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
         )
     ],
     "custom": [
@@ -421,23 +276,10 @@ def _catalog_groups_for_rule_category(
 
 
 # 三角洲舊 catalog 仍可支援歷史資料；新分類依目前 rule category 派生，不重複維護價格/規格。
-SELF_SERVICE_ORDER_CATALOG["delta_desktop_basic"] = (
-    _catalog_groups_for_rule_category(
-        "basic",
-        "delta_desktop_basic",
-    )
-)
-SELF_SERVICE_ORDER_CATALOG["delta_mobile_basic"] = (
-    _catalog_groups_for_rule_category(
-        "basic",
-        "delta_mobile_basic",
-    )
-)
+SELF_SERVICE_ORDER_CATALOG["delta_desktop_basic"] = _catalog_groups_for_rule_category("basic", "delta_desktop_basic")
+SELF_SERVICE_ORDER_CATALOG["delta_mobile_basic"] = _catalog_groups_for_rule_category("basic", "delta_mobile_basic")
 SELF_SERVICE_ORDER_CATALOG["delta_desktop_fun"] = [
-    {
-        **group,
-        "details": [dict(detail) for detail in group.get("details", [])],
-    }
+    {**group, "details": [dict(detail) for detail in group.get("details", [])]}
     for group in SELF_SERVICE_ORDER_CATALOG.get("fun", [])
 ]
 
@@ -446,46 +288,11 @@ def _sweet_catalog_group(prefix: str) -> dict:
     return {
         "label": "甜蜜單",
         "details": [
-            {
-                "label": "女單陪",
-                "value": "female_single",
-                "rule_key": f"{prefix}_sweet_female_single",
-                "quantity_unit": "小時",
-                "min_quantity": 1,
-                "max_quantity": 24,
-            },
-            {
-                "label": "男單陪",
-                "value": "male_single",
-                "rule_key": f"{prefix}_sweet_male_single",
-                "quantity_unit": "小時",
-                "min_quantity": 1,
-                "max_quantity": 24,
-            },
-            {
-                "label": "女雙陪",
-                "value": "female_double",
-                "rule_key": f"{prefix}_sweet_female_double",
-                "quantity_unit": "小時",
-                "min_quantity": 1,
-                "max_quantity": 24,
-            },
-            {
-                "label": "男雙陪",
-                "value": "male_double",
-                "rule_key": f"{prefix}_sweet_male_double",
-                "quantity_unit": "小時",
-                "min_quantity": 1,
-                "max_quantity": 24,
-            },
-            {
-                "label": "雙陪(不限)",
-                "value": "double_any",
-                "rule_key": f"{prefix}_sweet_double_any",
-                "quantity_unit": "小時",
-                "min_quantity": 1,
-                "max_quantity": 24,
-            },
+            {"label": "女單陪", "value": "female_single", "rule_key": f"{prefix}_sweet_female_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "男單陪", "value": "male_single", "rule_key": f"{prefix}_sweet_male_single", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "女雙陪", "value": "female_double", "rule_key": f"{prefix}_sweet_female_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "男雙陪", "value": "male_double", "rule_key": f"{prefix}_sweet_male_double", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
+            {"label": "雙陪(不限)", "value": "double_any", "rule_key": f"{prefix}_sweet_double_any", "quantity_unit": "小時", "min_quantity": 1, "max_quantity": 24},
         ],
     }
 
@@ -494,14 +301,7 @@ def _teaching_catalog_group(prefix: str) -> dict:
     return {
         "label": "教學單",
         "details": [
-            {
-                "label": "1對1教學",
-                "value": "teacher_1",
-                "rule_key": f"{prefix}_teaching_one",
-                "quantity_unit": "小時",
-                "min_quantity": 3,
-                "max_quantity": 24,
-            },
+            {"label": "1對1教學", "value": "teacher_1", "rule_key": f"{prefix}_teaching_one", "quantity_unit": "小時", "min_quantity": 3, "max_quantity": 24},
         ],
     }
 
@@ -514,9 +314,7 @@ for _prefix, _category in (
     ("lol", "lol"),
     ("apex", "apex"),
 ):
-    SELF_SERVICE_ORDER_CATALOG[_category].append(
-        _sweet_catalog_group(_prefix)
-    )
+    SELF_SERVICE_ORDER_CATALOG[_category].append(_sweet_catalog_group(_prefix))
 
 for _prefix, _category in (
     ("delta_desktop", "delta_desktop_basic"),
@@ -525,14 +323,11 @@ for _prefix, _category in (
     ("lol", "lol"),
     ("apex", "apex"),
 ):
-    SELF_SERVICE_ORDER_CATALOG[_category].append(
-        _teaching_catalog_group(_prefix)
-    )
+    SELF_SERVICE_ORDER_CATALOG[_category].append(_teaching_catalog_group(_prefix))
 
 
 # 所有 rule label 仍保留，讓舊訂單 / 舊紀錄可繼續被辨識。
 CATALOG_HIDDEN_RULE_KEYS = {
-    # 舊甜蜜單只留給既有訂單回查；新訂單改用男女細分規則。
     "basic_sweet_single",
     "basic_sweet_double",
     "farm_season_3x3_skin",
@@ -545,11 +340,7 @@ CATALOG_HIDDEN_RULE_KEYS = {
 }
 
 ORDER_ITEMS_BY_CATEGORY = {
-    category: [
-        rule.label
-        for rule in get_rules_by_category(category)
-        if rule.key not in CATALOG_HIDDEN_RULE_KEYS
-    ]
+    category: [rule.label for rule in get_rules_by_category(category) if rule.key not in CATALOG_HIDDEN_RULE_KEYS]
     for category in ORDER_CATEGORY_LABELS
 }
 
@@ -623,14 +414,36 @@ def _dynamic_admin_rule_keys(category: str | None) -> list[str]:
     return result
 
 
+def _dynamic_admin_group_label(rule) -> str:
+    """Return the manager-selected second-level group for a custom product.
+
+    Existing custom products predate this field, so an empty value intentionally
+    keeps their historical 「後台新增商品」 grouping instead of changing live UI.
+    """
+    return (
+        str(getattr(rule, "catalog_group_label", "") or "").strip()
+        or DYNAMIC_ADMIN_GROUP_LABEL
+    )
+
+
+def _dynamic_admin_group_labels(category: str | None) -> list[str]:
+    result: list[str] = []
+    for rule_key in _dynamic_admin_rule_keys(category):
+        rule = ORDER_RULES.get(rule_key)
+        if rule is None:
+            continue
+        group_label = _dynamic_admin_group_label(rule)
+        if group_label not in result:
+            result.append(group_label)
+    return result
+
+
 class DynamicOrderItemGroups(dict):
     def get(self, category, default=None):
         base = list(super().get(category, default or []))
-        if (
-            _dynamic_admin_rule_keys(str(category or ""))
-            and DYNAMIC_ADMIN_GROUP_LABEL not in base
-        ):
-            base.append(DYNAMIC_ADMIN_GROUP_LABEL)
+        for group_label in _dynamic_admin_group_labels(str(category or "")):
+            if group_label not in base:
+                base.append(group_label)
         return base
 
     def __getitem__(self, category):
@@ -671,52 +484,63 @@ def get_order_item_group_label(item_label: str | None) -> str | None:
         from services.order_rule_store import get_custom_rule_definition
 
         if get_custom_rule_definition(str(key)):
-            return DYNAMIC_ADMIN_GROUP_LABEL
+            rule = ORDER_RULES.get(str(key))
+            return _dynamic_admin_group_label(rule)
     except Exception:
         pass
 
     return item_text
 
 
+def _dynamic_admin_detail(rule) -> dict:
+    maximum = getattr(rule, "max_quantity", None)
+    return {
+        "label": str(rule.label),
+        "value": str(rule.key),
+        "rule_key": str(rule.key),
+        "quantity_unit": str(rule.unit_label or "單"),
+        "min_quantity": max(1, int(rule.min_quantity or 1)),
+        "max_quantity": (
+            max(1, int(maximum))
+            if maximum is not None
+            else 24
+        ),
+        "item": str(rule.label),
+    }
+
+
 def get_order_item_details_for_group(category: str | None, group_label: str | None) -> list[dict]:
     if category is None or group_label is None:
         return []
 
-    if str(group_label) == DYNAMIC_ADMIN_GROUP_LABEL:
-        result: list[dict] = []
-        for rule_key in _dynamic_admin_rule_keys(str(category)):
-            rule = ORDER_RULES.get(rule_key)
-            if rule is None:
-                continue
-            maximum = getattr(rule, "max_quantity", None)
-            result.append({
-                "label": str(rule.label),
-                "value": str(rule.key),
-                "rule_key": str(rule.key),
-                "quantity_unit": str(rule.unit_label or "單"),
-                "min_quantity": max(1, int(rule.min_quantity or 1)),
-                "max_quantity": (
-                    max(1, int(maximum))
-                    if maximum is not None
-                    else 24
-                ),
-                "item": str(rule.label),
-            })
-        return result
+    category_text = str(category)
+    group_text = str(group_label)
+    result: list[dict] = []
 
-    for group in SELF_SERVICE_ORDER_CATALOG.get(str(category), []):
-        if str(group.get("label")) != str(group_label):
+    # Keep built-in catalog entries first.  If a manager intentionally chooses
+    # the same second-level name, custom products join that existing group.
+    for group in SELF_SERVICE_ORDER_CATALOG.get(category_text, []):
+        if str(group.get("label")) != group_text:
             continue
-
-        result: list[dict] = []
         for detail in group.get("details", []):
             item = dict(detail)
             rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
-            item["item"] = str(getattr(rule, "label", "") or item.get("label") or "")
+            item["item"] = str(
+                getattr(rule, "label", "")
+                or item.get("label")
+                or ""
+            )
             result.append(item)
-        return result
 
-    return []
+    for rule_key in _dynamic_admin_rule_keys(category_text):
+        rule = ORDER_RULES.get(rule_key)
+        if rule is None:
+            continue
+        if _dynamic_admin_group_label(rule) != group_text:
+            continue
+        result.append(_dynamic_admin_detail(rule))
+
+    return result
 
 
 def get_order_item_detail_for_selection(
@@ -789,10 +613,12 @@ _DISPATCH_CHANNEL_ID = 0
 _FORMAT_AMOUNT: Callable[[int], str] | None = None
 _GET_NOW: Callable[[], Any] | None = None
 
+
 def _format_amount(amount: int) -> str:
     if _FORMAT_AMOUNT is not None:
         return _FORMAT_AMOUNT(amount)
     return f"{int(amount or 0):,}T"
+
 
 def configure_order_helpers(
     order_selections: dict[int, dict],
@@ -811,6 +637,7 @@ def configure_order_helpers(
     _FORMAT_AMOUNT = format_amount_func
     _GET_NOW = get_now_func
 
+
 def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
     """用訂單編號或票口 ID 從記憶體訂單資料找單。"""
     key = str(identifier or "").strip()
@@ -827,19 +654,17 @@ def find_order_by_identifier(identifier: str) -> tuple[int | None, dict | None]:
     for order_channel_id, data in _ORDER_SELECTIONS.items():
         if not isinstance(data, dict):
             continue
-        candidates = [
-            data.get("order_no"),
-            data.get("receipt_id"),
-            str(order_channel_id),
-        ]
+        candidates = [data.get("order_no"), data.get("receipt_id"), str(order_channel_id)]
         if any(str(value or "").strip().lower() == key_lower for value in candidates):
             return int(order_channel_id), data
 
     return None, None
 
+
 def is_order_closed_for_rewards(data: dict) -> bool:
     status = str(data.get("status") or "").lower()
     return bool(data.get("reward_counted") or data.get("closed") or status == "closed")
+
 
 def get_order_amount_for_maintenance(data: dict) -> int:
     """Safely parse order amount for maintenance commands."""
@@ -860,6 +685,7 @@ def get_order_amount_for_maintenance(data: dict) -> int:
 
     return 0
 
+
 def get_order_amount_for_stats(data: dict) -> int:
     """Safely parse order amount for sales/statistics reports."""
     if not isinstance(data, dict):
@@ -878,11 +704,13 @@ def get_order_amount_for_stats(data: dict) -> int:
                     return int(parsed)
     return 0
 
+
 def is_closed_order_for_stats(data: dict) -> bool:
     """Return whether an order should count as completed in sales stats."""
     if not isinstance(data, dict):
         return False
     return bool(data.get("closed")) or str(data.get("status", "")).lower() == "closed"
+
 
 def is_stored_order_for_stats(data: dict) -> bool:
     """Return whether an order is currently stored/paused."""
@@ -890,11 +718,13 @@ def is_stored_order_for_stats(data: dict) -> bool:
         return False
     return str(data.get("status", "")).lower() == "stored"
 
+
 def is_cancelled_order_for_stats(data: dict) -> bool:
     """Return whether an order is cancelled, accepting both spellings."""
     if not isinstance(data, dict):
         return False
     return str(data.get("status", "")).lower() in {"cancelled", "canceled"}
+
 
 def get_order_summary_from_channel(channel_id: int) -> tuple[str, str]:
     """
@@ -1009,10 +839,7 @@ def build_self_service_order_embed(
         color = discord.Color.green()
 
     ticket_text = getattr(source_channel, "mention", None) or "未紀錄"
-    customer_text = _resolve_guild_customer_display_name(
-        source_channel,
-        customer_mention,
-    )
+    customer_text = _resolve_guild_customer_display_name(source_channel, customer_mention)
 
     embed = discord.Embed(
         title="魔丸娛樂｜接單面板",
@@ -1032,12 +859,10 @@ def build_self_service_order_embed(
 
     if staff_note is None:
         source_channel_id = getattr(source_channel, "id", None)
-
         try:
             source_data = _ORDER_SELECTIONS.get(int(source_channel_id), {}) if source_channel_id is not None else {}
         except (TypeError, ValueError):
             source_data = {}
-
         if isinstance(source_data, dict):
             staff_note = source_data.get("staff_note") or source_data.get("customer_service_note") or source_data.get("staff_order_note")
 
@@ -1046,19 +871,17 @@ def build_self_service_order_embed(
         embed.add_field(name="客服備註", value=staff_note_text[:1024], inline=False)
 
     normalized_receiver_text = str(receiver_text or "").strip()
-
     for prefix in ("打手：", "打手:", "陪玩：", "陪玩:"):
         if normalized_receiver_text.startswith(prefix):
             normalized_receiver_text = normalized_receiver_text[len(prefix):].strip()
             break
-
     if not normalized_receiver_text:
         normalized_receiver_text = "尚未接單"
 
     embed.add_field(name="目前接單", value=normalized_receiver_text[:1024], inline=False)
-
     embed.set_footer(text="魔丸娛樂｜接單系統")
     return embed
+
 
 def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
     """回傳目前記憶體中的存單，依存單時間新到舊排序。"""
@@ -1077,6 +900,7 @@ def get_stored_order_records(limit: int = 25) -> list[tuple[int, dict]]:
     )
     return records[:max(1, min(int(limit or 25), 25))]
 
+
 def format_stored_order_option_label(channel_id: int, data: dict) -> str:
     item = str(data.get("item") or "未紀錄")[:30]
     customer_id = data.get("customer_id") or "未紀錄"
@@ -1084,11 +908,13 @@ def format_stored_order_option_label(channel_id: int, data: dict) -> str:
     amount_text = f"{amount}T" if amount else "未紀錄金額"
     return f"{item}｜{customer_id}｜{amount_text}"[:100]
 
+
 def format_stored_order_option_description(channel_id: int, data: dict) -> str:
     quantity = _to_int(data.get("quantity"), 1) or 1
     stored_at = str(data.get("stored_at") or "未紀錄時間")[:19]
     reason = str(data.get("stored_reason") or data.get("store_reason") or "未填寫原因")[:35]
     return f"{quantity} 單｜{stored_at}｜{reason}"[:100]
+
 
 def build_stored_order_detail_embed(
     guild: discord.Guild | None,
@@ -1140,4 +966,3 @@ def build_stored_order_detail_embed(
     embed.add_field(name="存單備註", value=str(data.get("stored_note") or data.get("note") or "無")[:1024], inline=False)
     embed.add_field(name="派單訊息", value=dispatch_text, inline=False)
     return embed
-
