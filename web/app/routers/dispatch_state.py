@@ -15,6 +15,10 @@ from web.app.services.dispatch_access import (
     can_use_dispatch,
     touch_dispatch_user_presence,
 )
+from web.app.services.dispatch_claim_access import (
+    dispatch_user_role_ids,
+    evaluate_dispatch_claim_access,
+)
 from web.app.services.order_service import VISIBLE_DISPATCH_STATUSES
 
 router = APIRouter(tags=["dispatch_state"])
@@ -47,35 +51,12 @@ def _dispatch_presence_snapshot() -> dict:
     }
 
 
-def _load_json_id_list(value) -> list[str]:
-    if value is None:
-        return []
-
-    try:
-        parsed = json.loads(str(value))
-    except Exception:
-        return []
-
-    if not isinstance(parsed, list):
-        return []
-
-    return [str(item).strip() for item in parsed if str(item).strip()]
-
-
-def _load_csv_id_list(value) -> list[str]:
-    return [
-        part.strip()
-        for part in str(value or "").split(",")
-        if part.strip()
-    ]
-
-
-def _dispatch_order_rows() -> list[sqlite3.Row]:
+def _dispatch_order_rows() -> list[dict]:
     conn = sqlite3.connect(get_sqlite_path())
     conn.row_factory = sqlite3.Row
 
     try:
-        return conn.execute(
+        rows = conn.execute(
             f"""
             SELECT
                 o.id,
@@ -91,14 +72,14 @@ def _dispatch_order_rows() -> list[sqlite3.Row]:
                 o.status,
                 o.updated_at,
                 o.created_at,
+                m.order_rule_key,
                 m.required_staff_count AS acceptance_required_staff_count,
+                m.min_protector_count,
+                m.allowed_role_ids_json,
+                m.required_game_role_ids_json,
                 m.specified_staff_ids_json,
-                (
-                    SELECT GROUP_CONCAT(c.staff_discord_id, ',')
-                    FROM order_acceptance_claims c
-                    WHERE c.order_id = o.id
-                      AND c.is_active = 1
-                ) AS active_claim_staff_ids
+                m.status AS acceptance_status,
+                m.created_at AS acceptance_created_at
             FROM web_orders o
             LEFT JOIN order_acceptance_meta m ON m.order_id = o.id
             WHERE o.status IN ({_VISIBLE_STATUS_PLACEHOLDERS})
@@ -106,8 +87,38 @@ def _dispatch_order_rows() -> list[sqlite3.Row]:
             """,
             _VISIBLE_STATUS_VALUES,
         ).fetchall()
+
+        claim_rows = conn.execute(
+            """
+            SELECT
+                order_id,
+                staff_discord_id,
+                staff_role_ids_json
+            FROM order_acceptance_claims
+            WHERE is_active = 1
+            ORDER BY order_id ASC, claimed_at ASC, id ASC
+            """
+        ).fetchall()
     finally:
         conn.close()
+
+    claims_by_order: dict[int, list[dict]] = {}
+    for row in claim_rows:
+        order_id = int(row["order_id"])
+        claims_by_order.setdefault(order_id, []).append(
+            {
+                "staff_discord_id": str(row["staff_discord_id"] or ""),
+                "staff_role_ids_json": row["staff_role_ids_json"],
+            }
+        )
+
+    result = []
+    for row in rows:
+        data = dict(row)
+        data["active_claim_rows"] = claims_by_order.get(int(row["id"]), [])
+        result.append(data)
+
+    return result
 
 
 def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
@@ -117,9 +128,17 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
 
     for row in rows:
         order_key = str(row["bot_order_no"] or f"WEB-{row['id']}")
-        specified_staff_ids = _load_json_id_list(row["specified_staff_ids_json"])
-        active_claim_staff_ids = _load_csv_id_list(row["active_claim_staff_ids"])
-        required_staff_count = int(row["acceptance_required_staff_count"] or 0)
+        active_rows = list(row.get("active_claim_rows") or [])
+        meta = {
+            "order_rule_key": row.get("order_rule_key"),
+            "required_staff_count": row.get("acceptance_required_staff_count"),
+            "min_protector_count": row.get("min_protector_count"),
+            "allowed_role_ids_json": row.get("allowed_role_ids_json"),
+            "required_game_role_ids_json": row.get("required_game_role_ids_json"),
+            "specified_staff_ids_json": row.get("specified_staff_ids_json"),
+            "status": row.get("acceptance_status"),
+            "created_at": row.get("acceptance_created_at"),
+        }
 
         orders.append(
             {
@@ -143,26 +162,37 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
             }
         )
         alert_rules[order_key] = {
-            "required_staff_count": required_staff_count,
-            "specified_staff_ids": specified_staff_ids,
-            "active_claim_staff_ids": active_claim_staff_ids,
+            "order_id": int(row["id"]),
+            "order_status": str(row["status"] or ""),
+            "meta": meta,
+            "active_rows": active_rows,
         }
 
-    signature = "|".join(
-        (
+    signature_parts = []
+    for order in orders:
+        rule = alert_rules[order["key"]]
+        meta = rule["meta"]
+        claim_signature = ",".join(
+            sorted(
+                f"{claim.get('staff_discord_id','')}:{claim.get('staff_role_ids_json') or ''}"
+                for claim in rule["active_rows"]
+            )
+        )
+        signature_parts.append(
             f"{order['id']}:{order['key']}:{order['updated_at']}:"
             f"{order['amount']}:{order['quantity']}:{order['status']}:"
-            f"{alert_rules[order['key']]['required_staff_count']}:"
-            f"{','.join(sorted(alert_rules[order['key']]['specified_staff_ids']))}:"
-            f"{','.join(sorted(alert_rules[order['key']]['active_claim_staff_ids']))}"
+            f"{meta.get('required_staff_count') or 0}:"
+            f"{meta.get('min_protector_count') or 0}:"
+            f"{meta.get('allowed_role_ids_json') or ''}:"
+            f"{meta.get('required_game_role_ids_json') or ''}:"
+            f"{meta.get('specified_staff_ids_json') or ''}:"
+            f"{meta.get('created_at') or ''}:{claim_signature}"
         )
-        for order in orders
-    )
 
     snapshot = {
         "count": len(orders),
         "keys": [order["key"] for order in orders],
-        "signature": signature,
+        "signature": "|".join(signature_parts),
         "_alert_rules": alert_rules,
     }
 
@@ -172,71 +202,67 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
     return snapshot
 
 
-def _dispatch_alert_keys_for_user(snapshot: dict, user: dict | None) -> list[str]:
-    """Return orders that should actively alert this logged-in dispatch user.
-
-    A fully specified order only alerts its specified staff. If the order needs
-    more staff than were specified, the unreserved slots remain alertable to
-    everyone else until those unrestricted slots are filled. This mirrors the
-    same reserved-slot rule used by acceptance claiming.
-    """
+def _dispatch_claim_access_for_user(snapshot: dict, user: dict | None) -> dict[str, dict]:
     user_id = str((user or {}).get("id") or "").strip()
+    role_ids = dispatch_user_role_ids(user)
     alert_rules = snapshot.get("_alert_rules") or {}
-    result: list[str] = []
+    result: dict[str, dict] = {}
 
     for key in snapshot.get("keys") or []:
         key = str(key)
         rule = alert_rules.get(key) or {}
-        specified_set = {
-            str(item).strip()
-            for item in (rule.get("specified_staff_ids") or [])
-            if str(item).strip()
-        }
-
-        if not specified_set:
-            result.append(key)
-            continue
-
-        if user_id and user_id in specified_set:
-            result.append(key)
-            continue
-
-        required_staff_count = max(
-            1,
-            int(rule.get("required_staff_count") or 0),
+        result[key] = evaluate_dispatch_claim_access(
+            meta=dict(rule.get("meta") or {}),
+            active_rows=list(rule.get("active_rows") or []),
+            order_status=str(rule.get("order_status") or ""),
+            user_id=user_id,
+            user_role_ids=role_ids,
         )
-        unrestricted_slots = max(
-            0,
-            required_staff_count - len(specified_set),
-        )
-        if unrestricted_slots <= 0:
-            continue
-
-        active_claim_staff_ids = [
-            str(item).strip()
-            for item in (rule.get("active_claim_staff_ids") or [])
-            if str(item).strip()
-        ]
-        non_specified_active_count = sum(
-            1
-            for staff_id in active_claim_staff_ids
-            if staff_id not in specified_set
-        )
-
-        if non_specified_active_count < unrestricted_slots:
-            result.append(key)
 
     return result
 
 
+def _dispatch_alert_keys_for_user(snapshot: dict, user: dict | None) -> list[str]:
+    """Only alert when this user can successfully claim the order right now.
+
+    The sound therefore has one meaning: the logged-in user is eligible and the
+    current time/reserved-slot/protector rules all allow an immediate claim.
+    Specified staff can bypass the first 60 seconds; everybody else becomes
+    alertable only after the public lock expires.
+    """
+    access_map = _dispatch_claim_access_for_user(snapshot, user)
+    return [
+        str(key)
+        for key in snapshot.get("keys") or []
+        if bool((access_map.get(str(key)) or {}).get("allowed"))
+    ]
+
+
 def _public_dispatch_snapshot(snapshot: dict, user: dict | None) -> dict:
+    access_map = _dispatch_claim_access_for_user(snapshot, user)
+    public_access = {
+        key: {
+            "allowed": bool(value.get("allowed")),
+            "reason": str(value.get("reason") or ""),
+            "is_specified": bool(value.get("is_specified")),
+            "lock_active": bool(value.get("lock_active")),
+            "unlock_at_epoch_ms": value.get("unlock_at_epoch_ms"),
+        }
+        for key, value in access_map.items()
+    }
+
     return {
         **{
             key: value
             for key, value in snapshot.items()
             if key != "_alert_rules"
         },
-        "alert_keys": _dispatch_alert_keys_for_user(snapshot, user),
+        "alert_keys": [
+            str(key)
+            for key in snapshot.get("keys") or []
+            if bool((access_map.get(str(key)) or {}).get("allowed"))
+        ],
+        "claim_access": public_access,
     }
 
 
@@ -315,7 +341,7 @@ async def dispatch_events(request: Request):
 
     async def event_stream():
         stream_started = time.monotonic()
-        last_signature = None
+        last_public_signature = None
         last_presence_touch = 0.0
         last_heartbeat = 0.0
 
@@ -342,16 +368,17 @@ async def dispatch_events(request: Request):
 
             snapshot = await _shared_dispatch_event_snapshot()
             public_snapshot = _public_dispatch_snapshot(snapshot, user)
-            signature = snapshot["signature"]
+            alert_signature = ",".join(public_snapshot.get("alert_keys") or [])
+            public_signature = f"{snapshot['signature']}|alerts:{alert_signature}"
 
-            if last_signature is None or signature != last_signature:
+            if last_public_signature is None or public_signature != last_public_signature:
                 payload = {
                     "ok": True,
-                    "initial": last_signature is None,
+                    "initial": last_public_signature is None,
                     **public_snapshot,
                 }
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-                last_signature = signature
+                last_public_signature = public_signature
                 last_heartbeat = now
             elif now - last_heartbeat >= 15:
                 heartbeat = {
