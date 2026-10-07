@@ -44,7 +44,7 @@ def test_paid_notification_only_fires_for_newly_paid_salary():
     ) is False
 
 
-def test_salary_notification_includes_worker_income_and_chicken_leg(tmp_path, monkeypatch):
+def test_salary_notification_is_compact_and_links_employee_center(tmp_path, monkeypatch):
     db_file = tmp_path / "salary.db"
     conn = sqlite3.connect(db_file)
     try:
@@ -150,12 +150,17 @@ def test_salary_notification_includes_worker_income_and_chicken_leg(tmp_path, mo
     assert result["sent"] is True
     assert result["total"] == 600
     assert result["worker_total"] == 500
+    assert result["worker_count"] == 1
     assert result["tip_total"] == 100
-    assert len(sent) == 2
+    assert result["tip_count"] == 1
+    assert result["detail_messages"] == 0
+    assert result["employee_center_url"] == "https://mowanentertainment.com/employee"
+    assert len(sent) == 1
 
     embed_text = str(sent[0]["embeds"])
-    detail_text = str(sent[1]["content"])
     assert "600T" in embed_text
+    assert "陪玩／打單收入" in embed_text
     assert "🍗 雞腿" in embed_text
-    assert "MW-1001" in detail_text
-    assert "🍗 雞腿" in detail_text
+    assert "1筆" in embed_text
+    assert "https://mowanentertainment.com/employee" in embed_text
+    assert "MW-1001" not in embed_text
