@@ -1,7 +1,10 @@
 {% extends "site_layout.html" %}
 {% block content %}
 <style>
-.ec{width:min(1180px,calc(100% - 28px));margin:52px auto 90px}.ec-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;padding:24px;border:1px solid rgba(255,255,255,.09);border-radius:22px;background:linear-gradient(145deg,rgba(242,214,141,.07),rgba(255,255,255,.025)),#11110f}.ec-k{color:#dfb75c;font-size:11px;font-weight:900;letter-spacing:.18em}.ec h1{font-size:clamp(34px,5vw,54px);margin:7px 0}.ec-muted{color:rgba(235,232,222,.55);line-height:1.65}.ec-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.ec-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border:1px solid rgba(255,255,255,.11);border-radius:999px;text-decoration:none;background:rgba(255,255,255,.035);font-size:12px;font-weight:800}.ec-btn.primary{border-color:rgba(223,183,92,.35);background:rgba(223,183,92,.09);color:#f2d68d}.ec-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:16px 0}.ec-stat,.ec-card{border:1px solid rgba(255,255,255,.085);border-radius:16px;background:#11110f}.ec-stat{padding:15px;min-width:0}.ec-stat span{display:block;color:rgba(235,232,222,.5);font-size:11px}.ec-stat b{display:block;color:#f2d68d;font-size:24px;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ec-stat.money{background:linear-gradient(145deg,rgba(242,214,141,.075),rgba(255,255,255,.018)),#11110f}.ec-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:12px}.ec-card{overflow:hidden;margin-bottom:12px}.ec-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px;border-bottom:1px solid rgba(255,255,255,.08)}.ec-card h2{font-size:15px;margin:0}.ec-chip{padding:5px 8px;border-radius:999px;background:rgba(242,214,141,.08);border:1px solid rgba(242,214,141,.16);color:#f2d68d;font-size:10px;font-weight:900}.ec-row{display:grid;grid-template-columns:120px minmax(0,1fr) 86px 86px;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);font-size:12px;align-items:center}.ec-row:last-child,.ec-item:last-child{border-bottom:0}.ec-item{padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.07);font-size:12px;display:flex;justify-content:space-between;gap:16px}.ec-gold{color:#f2d68d}.ec-strong{font-weight:900}.ec-salary-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}.ec-salary-box{padding:14px;border:1px solid rgba(255,255,255,.075);border-radius:14px;background:rgba(255,255,255,.025)}.ec-salary-box span{display:block;color:rgba(235,232,222,.5);font-size:11px}.ec-salary-box b{display:block;margin-top:5px;font-size:22px;color:#f2d68d}.ec-tip{padding:13px 14px;color:rgba(235,232,222,.55);font-size:11px;line-height:1.7;border-top:1px solid rgba(255,255,255,.07)}@media(max-width:980px){.ec-hero{grid-template-columns:1fr}.ec-actions{justify-content:flex-start}.ec-stats{grid-template-columns:repeat(3,1fr)}.ec-grid{grid-template-columns:1fr}}@media(max-width:620px){.ec{margin-top:28px}.ec-hero{padding:18px}.ec-stats{grid-template-columns:repeat(2,1fr)}.ec-row{grid-template-columns:100px minmax(0,1fr) 74px}.ec-row>:last-child{display:none}.ec-salary-summary{grid-template-columns:1fr}}
+.ec{width:min(1180px,calc(100% - 28px));margin:52px auto 90px;color:#ebe8de}.ec-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;padding:26px;border:1px solid rgba(255,255,255,.09);border-radius:24px;background:linear-gradient(145deg,rgba(242,214,141,.08),rgba(255,255,255,.025)),#11110f;box-shadow:0 18px 50px rgba(0,0,0,.22)}.ec-k{color:#dfb75c;font-size:11px;font-weight:900;letter-spacing:.18em}.ec h1{font-size:clamp(34px,5vw,54px);margin:7px 0}.ec-muted{color:rgba(235,232,222,.55);line-height:1.65}.ec-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.ec-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border:1px solid rgba(255,255,255,.11);border-radius:999px;text-decoration:none;background:rgba(255,255,255,.035);font-size:12px;font-weight:800;color:#ebe8de}.ec-btn.primary{border-color:rgba(223,183,92,.35);background:rgba(223,183,92,.09);color:#f2d68d}.ec-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 20px}.ec-stat,.ec-card,.ec-salary{border:1px solid rgba(255,255,255,.085);background:#11110f}.ec-stat{padding:15px;border-radius:16px;min-width:0}.ec-stat span{display:block;color:rgba(235,232,222,.5);font-size:11px}.ec-stat b{display:block;color:#f2d68d;font-size:24px;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ec-salary{overflow:hidden;border-radius:22px;margin-bottom:18px;background:linear-gradient(145deg,rgba(242,214,141,.035),rgba(255,255,255,.012)),#11110f}.ec-salary-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 20px 14px}.ec-salary-title h2{font-size:22px;margin:3px 0 5px}.ec-salary-title p{margin:0;font-size:12px;color:rgba(235,232,222,.5)}.ec-chip{padding:6px 9px;border-radius:999px;background:rgba(242,214,141,.08);border:1px solid rgba(242,214,141,.16);color:#f2d68d;font-size:10px;font-weight:900;white-space:nowrap}.salary-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0 20px 18px}.salary-card{padding:17px;border:1px solid rgba(255,255,255,.075);border-radius:17px;background:rgba(255,255,255,.025);min-width:0}.salary-card.pending{border-color:rgba(242,214,141,.22);background:linear-gradient(145deg,rgba(242,214,141,.09),rgba(255,255,255,.02))}.salary-label{font-size:11px;color:rgba(235,232,222,.5)}.salary-value{font-size:clamp(28px,4vw,38px);font-weight:950;letter-spacing:-.025em;margin-top:6px;color:#f2d68d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.salary-sub{margin-top:7px;font-size:11px;color:rgba(235,232,222,.46);line-height:1.5}.salary-tabs{display:flex;gap:7px;padding:0 20px 14px;overflow:auto;scrollbar-width:none}.salary-tabs::-webkit-scrollbar{display:none}.salary-tab{border:1px solid rgba(255,255,255,.085);background:rgba(255,255,255,.025);color:rgba(235,232,222,.62);padding:8px 11px;border-radius:999px;font-size:11px;font-weight:850;cursor:pointer;white-space:nowrap}.salary-tab.active{color:#f2d68d;border-color:rgba(242,214,141,.28);background:rgba(242,214,141,.09)}.salary-tab .count{opacity:.58;margin-left:4px}.salary-list{border-top:1px solid rgba(255,255,255,.07)}.salary-list-head,.salary-row{display:grid;grid-template-columns:104px 126px minmax(170px,1fr) 104px 100px;gap:10px;align-items:center}.salary-list-head{padding:10px 20px;color:rgba(235,232,222,.36);font-size:10px;font-weight:800;letter-spacing:.04em}.salary-row{padding:13px 20px;border-top:1px solid rgba(255,255,255,.06);font-size:12px}.salary-row:first-child{border-top:0}.salary-order{color:#f2d68d;font-weight:900}.salary-main{min-width:0}.salary-main strong{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.salary-meta{display:block;color:rgba(235,232,222,.42);font-size:10px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.salary-kind{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);font-size:10px;font-weight:850}.salary-kind.tip{color:#ffd680;border-color:rgba(255,214,128,.18);background:rgba(255,214,128,.06)}.salary-kind.customer_service{color:#b9d9ff;border-color:rgba(185,217,255,.16);background:rgba(185,217,255,.05)}.salary-status{display:inline-flex;align-items:center;width:max-content;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:900}.salary-status.paid{color:#9dd7ad;background:rgba(89,180,112,.09);border:1px solid rgba(89,180,112,.15)}.salary-status.unpaid{color:#f2d68d;background:rgba(242,214,141,.08);border:1px solid rgba(242,214,141,.16)}.salary-amount{text-align:right;color:#f4dfaa;font-size:14px;font-weight:950}.salary-empty{padding:34px 20px;text-align:center;color:rgba(235,232,222,.45);font-size:12px}.salary-loading{padding:30px 20px;color:rgba(235,232,222,.45);font-size:12px}.ec-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:12px}.ec-card{overflow:hidden;border-radius:16px;margin-bottom:12px}.ec-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px;border-bottom:1px solid rgba(255,255,255,.08)}.ec-card h2{font-size:15px;margin:0}.ec-row{display:grid;grid-template-columns:120px minmax(0,1fr) 86px 86px;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);font-size:12px;align-items:center}.ec-row:last-child,.ec-item:last-child{border-bottom:0}.ec-item{padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.07);font-size:12px;display:flex;justify-content:space-between;gap:16px}.ec-gold{color:#f2d68d}.ec-strong{font-weight:900}.ec-note{padding:13px 14px;color:rgba(235,232,222,.5);font-size:11px;line-height:1.7;border-top:1px solid rgba(255,255,255,.07)}
+@media(max-width:980px){.ec-hero{grid-template-columns:1fr}.ec-actions{justify-content:flex-start}.ec-overview{grid-template-columns:repeat(2,1fr)}.ec-grid{grid-template-columns:1fr}.salary-list-head,.salary-row{grid-template-columns:96px 116px minmax(140px,1fr) 92px 88px}}
+@media(max-width:720px){.ec{margin-top:28px}.ec-hero{padding:19px}.ec-overview{grid-template-columns:repeat(2,1fr)}.salary-summary{grid-template-columns:1fr}.ec-salary-head{padding:17px 15px 12px}.salary-summary{padding:0 15px 15px}.salary-tabs{padding:0 15px 12px}.salary-list-head{display:none}.salary-list{padding:0 10px 10px;border-top:1px solid rgba(255,255,255,.07)}.salary-row{display:grid;grid-template-columns:1fr auto;grid-template-areas:"main amount" "order status" "kind kind";gap:8px 12px;margin-top:10px;padding:13px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.018)}.salary-row:first-child{border-top:1px solid rgba(255,255,255,.07)}.salary-date{display:none}.salary-order{grid-area:order}.salary-main{grid-area:main}.salary-kind{grid-area:kind}.salary-status{grid-area:status;justify-self:end}.salary-amount{grid-area:amount;align-self:start}.ec-row{grid-template-columns:100px minmax(0,1fr) 74px}.ec-row>:last-child{display:none}}
+@media(max-width:480px){.ec-overview{grid-template-columns:1fr 1fr}.ec-stat b{font-size:20px}.salary-value{font-size:30px}}
 </style>
 
 <section class="ec">
@@ -9,7 +12,7 @@
         <div>
             <div class="ec-k">EMPLOYEE CENTER</div>
             <h1>{{ member.name }}</h1>
-            <div class="ec-muted">服務、評價、收藏與薪資都集中在這裡，不用再切到另一個薪資頁面。</div>
+            <div class="ec-muted">你的接單、評價、收藏與薪資都集中在這裡。薪資區直接同步結算資料，不再另外算一套。</div>
         </div>
         <div class="ec-actions">
             <a class="ec-btn primary" href="/dispatch">接單大廳</a>
@@ -18,18 +21,55 @@
         </div>
     </div>
 
-    <div class="ec-stats">
-        {% for label,value,extra in [
-            ("服務訂單",stats.orders,""),
-            ("評價",stats.reviews,""),
-            ("平均評分",stats.rating,""),
-            ("收藏",stats.favorites,""),
-            ("累計薪資",stats.payout_total ~ "T","money"),
-            ("待結薪資",stats.payout_pending ~ "T","money")
-        ] %}
-            <div class="ec-stat {{ extra }}"><span>{{ label }}</span><b>{{ value }}</b></div>
-        {% endfor %}
+    <div class="ec-overview">
+        <div class="ec-stat"><span>服務訂單</span><b>{{ stats.orders }}</b></div>
+        <div class="ec-stat"><span>評價</span><b>{{ stats.reviews }}</b></div>
+        <div class="ec-stat"><span>平均評分</span><b>{{ stats.rating }}</b></div>
+        <div class="ec-stat"><span>收藏</span><b>{{ stats.favorites }}</b></div>
     </div>
+
+    <section class="ec-salary" aria-labelledby="salaryTitle">
+        <div class="ec-salary-head">
+            <div class="ec-salary-title">
+                <div class="ec-k">PAYROLL</div>
+                <h2 id="salaryTitle">我的薪資</h2>
+                <p>服務薪資、雞腿與客服分潤會分開列出，金額與發放狀態以薪資結算資料為準。</p>
+            </div>
+            <span class="ec-chip">與薪資結算同步</span>
+        </div>
+
+        <div class="salary-summary">
+            <div class="salary-card pending">
+                <div class="salary-label">待發放</div>
+                <div class="salary-value" id="salaryPending">—</div>
+                <div class="salary-sub" id="salaryPendingSub">正在讀取待發放薪資</div>
+            </div>
+            <div class="salary-card">
+                <div class="salary-label">本月已發放</div>
+                <div class="salary-value" id="salaryMonthPaid">—</div>
+                <div class="salary-sub" id="salaryMonthPaidSub">正在讀取本月發放紀錄</div>
+            </div>
+            <div class="salary-card">
+                <div class="salary-label">累計薪資</div>
+                <div class="salary-value" id="salaryLifetime">—</div>
+                <div class="salary-sub" id="salaryLifetimeSub">包含已發放與待發放</div>
+            </div>
+        </div>
+
+        <div class="salary-tabs" role="tablist" aria-label="薪資分類">
+            <button class="salary-tab active" type="button" data-filter="all">全部 <span class="count" data-count="all">0</span></button>
+            <button class="salary-tab" type="button" data-filter="service">服務薪資 <span class="count" data-count="service">0</span></button>
+            <button class="salary-tab" type="button" data-filter="tip">🍗 雞腿 <span class="count" data-count="tip">0</span></button>
+            <button class="salary-tab" type="button" data-filter="customer_service" id="salaryCsTab">客服分潤 <span class="count" data-count="customer_service">0</span></button>
+        </div>
+
+        <div class="salary-list">
+            <div class="salary-list-head" aria-hidden="true">
+                <span>日期</span><span>訂單</span><span>項目</span><span>狀態</span><span style="text-align:right">金額</span>
+            </div>
+            <div id="salaryRows"><div class="salary-loading">正在整理薪資明細…</div></div>
+        </div>
+    </section>
 
     <div class="ec-grid">
         <section>
@@ -46,32 +86,9 @@
                     <div class="ec-item ec-muted">目前沒有服務訂單。</div>
                 {% endfor %}
             </div>
-
-            <div class="ec-card">
-                <div class="ec-card-head"><h2>薪資紀錄</h2><span class="ec-chip">已整合</span></div>
-                {% for p in payouts %}
-                    <div class="ec-row">
-                        <span class="ec-gold ec-strong">{{ p.kind }}</span>
-                        <span>訂單 #{{ p.order_id }}</span>
-                        <span>{{ p.amount }}T</span>
-                        <span class="ec-muted">{{ p.status }}</span>
-                    </div>
-                {% else %}
-                    <div class="ec-item ec-muted">目前沒有薪資紀錄。</div>
-                {% endfor %}
-            </div>
         </section>
 
         <aside>
-            <div class="ec-card">
-                <div class="ec-card-head"><h2>薪資摘要</h2><span class="ec-chip">即時</span></div>
-                <div class="ec-salary-summary">
-                    <div class="ec-salary-box"><span>已結薪資</span><b>{{ stats.payout_paid }}T</b></div>
-                    <div class="ec-salary-box"><span>待結薪資</span><b>{{ stats.payout_pending }}T</b></div>
-                </div>
-                <div class="ec-tip">完整薪資入口已從導覽移除；員工日常需要看的薪資總額、待結狀態與近期紀錄都直接保留在員工中心。</div>
-            </div>
-
             <div class="ec-card">
                 <div class="ec-card-head"><h2>官網個人牆</h2><span class="ec-chip">PROFILE</span></div>
                 <div class="ec-item"><span>顯示名稱</span><b>{{ profile.display_name or member.name }}</b></div>
@@ -79,8 +96,112 @@
                 <div class="ec-item"><span>階級</span><b>{{ profile.role_title or "尚未設定" }}</b></div>
                 <div class="ec-item"><span>主要遊戲</span><b>{{ profile.main_games or "尚未設定" }}</b></div>
                 <div class="ec-item"><span>公開</span><b>{% if profile.is_public %}是{% else %}否{% endif %}</b></div>
+                <div class="ec-note">薪資不再從這個頁面的舊統計欄位計算；上方「我的薪資」會直接讀取正式分潤與雞腿資料。</div>
             </div>
         </aside>
     </div>
 </section>
+
+<script>
+(function(){
+    const money = value => `${new Intl.NumberFormat('zh-TW').format(Number(value || 0))}T`;
+    const rowsHost = document.getElementById('salaryRows');
+    const tabs = Array.from(document.querySelectorAll('.salary-tab'));
+    const csTab = document.getElementById('salaryCsTab');
+    let salaryItems = [];
+    let activeFilter = 'all';
+
+    function el(tag, className, text){
+        const node = document.createElement(tag);
+        if(className) node.className = className;
+        if(text !== undefined && text !== null) node.textContent = String(text);
+        return node;
+    }
+
+    function renderRows(){
+        rowsHost.replaceChildren();
+        const visible = activeFilter === 'all'
+            ? salaryItems
+            : salaryItems.filter(item => item.category_key === activeFilter);
+
+        if(!visible.length){
+            rowsHost.appendChild(el('div','salary-empty','這個分類目前沒有薪資紀錄。'));
+            return;
+        }
+
+        visible.forEach(item => {
+            const row = el('div','salary-row');
+            row.appendChild(el('span','salary-date',item.closed_date || '未紀錄'));
+            row.appendChild(el('span','salary-order',item.order_no || '未紀錄訂單'));
+
+            const main = el('div','salary-main');
+            main.appendChild(el('strong','',item.service_label || item.category_label || '薪資'));
+            main.appendChild(el('span','salary-meta',item.category_label || '薪資'));
+            row.appendChild(main);
+
+            const status = el('span',`salary-status ${item.payout_status === 'paid' ? 'paid' : 'unpaid'}`,item.status_label || '待發放');
+            row.appendChild(status);
+            row.appendChild(el('span','salary-amount',money(item.amount)));
+
+            const kind = el('span',`salary-kind ${item.category_key || ''}`,item.category_label || '薪資');
+            if(window.matchMedia('(max-width: 720px)').matches){
+                row.appendChild(kind);
+            }
+
+            rowsHost.appendChild(row);
+        });
+    }
+
+    function activate(filter){
+        activeFilter = filter;
+        tabs.forEach(tab => tab.classList.toggle('active',tab.dataset.filter === filter));
+        renderRows();
+    }
+
+    tabs.forEach(tab => tab.addEventListener('click',() => activate(tab.dataset.filter)));
+
+    fetch('/employee/salary-data',{
+        credentials:'same-origin',
+        headers:{'Accept':'application/json'}
+    })
+    .then(async response => {
+        const payload = await response.json();
+        if(!response.ok || !payload.ok) throw new Error(payload.error || '薪資資料讀取失敗');
+        return payload.data;
+    })
+    .then(data => {
+        const summary = data.summary || {};
+        const categories = data.categories || {};
+        salaryItems = Array.isArray(data.items) ? data.items : [];
+
+        document.getElementById('salaryPending').textContent = money(summary.pending);
+        document.getElementById('salaryPendingSub').textContent = Number(summary.pending_count || 0) > 0
+            ? `${summary.pending_count} 筆薪資尚未發放`
+            : '目前沒有待發放薪資';
+
+        document.getElementById('salaryMonthPaid').textContent = money(summary.current_month_paid);
+        document.getElementById('salaryMonthPaidSub').textContent = `${summary.current_month_label || '本月'}已完成發放`;
+
+        document.getElementById('salaryLifetime').textContent = money(summary.lifetime);
+        document.getElementById('salaryLifetimeSub').textContent = `其中已發放 ${money(summary.paid_total)}・共 ${summary.all_count || 0} 筆`;
+
+        document.querySelectorAll('[data-count]').forEach(node => {
+            const key = node.dataset.count;
+            node.textContent = Number((categories[key] || {}).count || 0);
+        });
+
+        if(csTab){
+            csTab.hidden = Number((categories.customer_service || {}).count || 0) === 0;
+        }
+
+        renderRows();
+    })
+    .catch(error => {
+        rowsHost.replaceChildren(el('div','salary-empty',error.message || '薪資資料讀取失敗，請重新整理後再試。'));
+        document.getElementById('salaryPendingSub').textContent = '資料讀取失敗';
+        document.getElementById('salaryMonthPaidSub').textContent = '資料讀取失敗';
+        document.getElementById('salaryLifetimeSub').textContent = '資料讀取失敗';
+    });
+})();
+</script>
 {% endblock %}

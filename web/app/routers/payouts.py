@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from web.app.config import config
@@ -432,6 +433,127 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
     }
 
     return unpaid_rows, paid_rows, totals
+
+
+def _taipei_current_month() -> str:
+    return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m")
+
+
+def _salary_category(role_label: str | None) -> tuple[str, str]:
+    value = str(role_label or "").strip()
+    if value == "🍗 雞腿":
+        return "tip", "🍗 雞腿"
+    if value == "客服":
+        return "customer_service", "客服分潤"
+    return "service", "服務薪資"
+
+
+def build_employee_salary_ledger(discord_id: str) -> dict:
+    """員工中心薪資資料。
+
+    直接沿用 build_my_payout_rows 的三套來源：worker_payouts、worker_tips、
+    customer_service_payouts，避免員工中心和薪資結算各算各的。
+    """
+    discord_id = str(discord_id or "").strip()
+    unpaid_rows, paid_rows, totals = build_my_payout_rows(
+        discord_id,
+        status="all",
+    )
+
+    person = None
+    if unpaid_rows:
+        person = unpaid_rows[0]
+    elif paid_rows:
+        person = paid_rows[0]
+
+    raw_items = list((person or {}).get("items") or [])
+    items: list[dict] = []
+
+    categories = {
+        "all": {"count": 0, "total": 0},
+        "service": {"count": 0, "total": 0},
+        "tip": {"count": 0, "total": 0},
+        "customer_service": {"count": 0, "total": 0},
+    }
+
+    for raw in raw_items:
+        category_key, category_label = _salary_category(raw.get("role"))
+        amount = int(raw.get("amount") or 0)
+        payout_status = "paid" if str(raw.get("payout_status") or "") == "paid" else "unpaid"
+
+        if category_key == "tip":
+            service_label = "老闆加雞腿"
+        elif category_key == "customer_service":
+            service_label = str(raw.get("item") or raw.get("category") or "客服分潤")
+        else:
+            service_label = str(raw.get("item") or raw.get("category") or "服務薪資")
+
+        item = {
+            "order_no": str(raw.get("order_no") or "未紀錄訂單"),
+            "closed_date": str(raw.get("closed_date") or "未紀錄"),
+            "customer_name": str(raw.get("customer_name") or "未紀錄"),
+            "service_label": service_label,
+            "category_key": category_key,
+            "category_label": category_label,
+            "payout_status": payout_status,
+            "status_label": "已發放" if payout_status == "paid" else "待發放",
+            "amount": amount,
+        }
+        items.append(item)
+
+        categories["all"]["count"] += 1
+        categories["all"]["total"] += amount
+        categories[category_key]["count"] += 1
+        categories[category_key]["total"] += amount
+
+    current_month = _taipei_current_month()
+    _, _, month_paid_totals = build_my_payout_rows(
+        discord_id,
+        month=current_month,
+        status="paid",
+    )
+
+    try:
+        year_text, month_text = current_month.split("-", 1)
+        current_month_label = f"{int(year_text)}年{int(month_text)}月"
+    except Exception:
+        current_month_label = current_month
+
+    return {
+        "summary": {
+            "pending": int(totals.get("unpaid_total") or 0),
+            "pending_count": int(totals.get("unpaid_count") or 0),
+            "current_month_paid": int(month_paid_totals.get("paid_total") or 0),
+            "current_month_label": current_month_label,
+            "lifetime": int(totals.get("all_total") or 0),
+            "paid_total": int(totals.get("paid_total") or 0),
+            "all_count": int(totals.get("all_count") or 0),
+        },
+        "categories": categories,
+        "items": items,
+    }
+
+
+@router.get("/employee/salary-data")
+async def employee_salary_data(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse(
+            {"ok": False, "error": "請先登入 Discord。"},
+            status_code=401,
+        )
+
+    discord_id = str(user.get("discord_id") or user.get("id") or "").strip()
+    if not discord_id:
+        return JSONResponse(
+            {"ok": False, "error": "找不到目前登入帳號。"},
+            status_code=400,
+        )
+
+    return {
+        "ok": True,
+        "data": build_employee_salary_ledger(discord_id),
+    }
 
 
 @router.get("/my/payouts")
