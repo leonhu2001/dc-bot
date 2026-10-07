@@ -154,8 +154,9 @@ def test_discord_dispatch_embed_keeps_service_details_after_acceptance():
     fields = {field.name: field.value for field in embed.fields}
     assert fields["狀態"] == "接單完成｜等待付款"
     assert fields["服務內容"] == "2 小時"
-    assert fields["實際服務"] == "2.5 小時"
-    assert "加時 30 分鐘" in fields["點數福利"]
+    assert fields["實際服務"].startswith("2.5 小時")
+    assert "加時 30 分鐘" in fields["實際服務"]
+    assert "點數福利" not in fields
 
     configure_order_helpers({})
 
@@ -196,7 +197,8 @@ def test_discord_dispatch_embed_understands_nested_web_point_snapshot():
 
     fields = {field.name: field.value for field in embed.fields}
     assert fields["服務內容"] == "2 小時"
-    assert fields["實際服務"] == "2.5 小時"
-    assert "加時 30 分鐘" in fields["點數福利"]
+    assert fields["實際服務"].startswith("2.5 小時")
+    assert "加時 30 分鐘" in fields["實際服務"]
+    assert "點數福利" not in fields
 
     configure_order_helpers({})
