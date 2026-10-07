@@ -15,6 +15,7 @@
   let audioContext = null;
   let pendingAlert = false;
   let knownKeys = null;
+  let knownAlertKeys = null;
   let knownSignature = null;
   let eventSource = null;
   let refreshPromise = null;
@@ -559,6 +560,7 @@
       const data = await res.json();
       if (data && data.ok) {
         knownKeys = normalizeKeys(data.keys || []);
+        knownAlertKeys = normalizeKeys(data.alert_keys || data.keys || []);
         knownSignature = String(data.signature || '');
         lastSyncAt = new Date();
         applyPresenceFromPayload(data);
@@ -592,6 +594,7 @@
       if (!data || !data.ok) return;
 
       const nextKeys = normalizeKeys(data.keys || []);
+      const nextAlertKeys = normalizeKeys(data.alert_keys || data.keys || []);
       const nextSignature = String(data.signature || '');
       lastSyncAt = new Date();
       connectionState = 'online';
@@ -600,29 +603,40 @@
 
       if (knownKeys === null) {
         knownKeys = nextKeys;
+        knownAlertKeys = nextAlertKeys;
         knownSignature = nextSignature;
         return;
       }
 
       const previousKeys = new Set(knownKeys);
+      const previousAlertKeys = new Set(knownAlertKeys || knownKeys);
       const newOrderKeys = nextKeys.filter((key) => !previousKeys.has(key));
+      const newAlertKeys = nextAlertKeys.filter(
+        (key) => !previousAlertKeys.has(key)
+      );
       const hasNewOrder = newOrderKeys.length > 0;
+      const hasNewAlert = newAlertKeys.length > 0;
       const hasStateChange =
         knownSignature !== null
         && nextSignature !== knownSignature;
 
       knownKeys = nextKeys;
+      knownAlertKeys = nextAlertKeys;
       knownSignature = nextSignature;
 
       if (!hasStateChange) {
         return;
       }
 
-      if (hasNewOrder) {
-        console.log('[dispatch-alert] new order received, refreshing');
-        await refreshAfterNewOrder(0, newOrderKeys);
+      if (hasNewAlert) {
+        console.log('[dispatch-alert] alertable order received, refreshing');
+        await refreshAfterNewOrder(0, newAlertKeys);
       } else {
-        console.log('[dispatch-alert] order state changed, refreshing silently');
+        if (hasNewOrder) {
+          console.log('[dispatch-alert] specified order received, refreshing silently');
+        } else {
+          console.log('[dispatch-alert] order state changed, refreshing silently');
+        }
         await refreshDispatch({ playAlert: false });
       }
     };
@@ -732,7 +746,7 @@
       refreshDispatch({ playAlert: false });
     }, HOURLY_REFRESH_MS);
 
-    console.log('[dispatch-alert] started v11 operations-upgrade');
+    console.log('[dispatch-alert] started v12 targeted-alerts');
   }
 
   window.addEventListener('beforeunload', () => {
