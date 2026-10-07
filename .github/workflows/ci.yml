@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply one-shot source repair
-        if: github.event_name == 'push' && github.event.head_commit.message == 'Apply source repair through CI'
+        if: github.event_name == 'push' && github.event.head_commit.message == 'Retry source repair through CI'
         run: |
           python .github/repair_payment_dispatch_source.py
 
@@ -78,7 +78,7 @@ jobs:
           python -m pytest -q tests --ignore=tests/golden
 
       - name: Commit repaired source
-        if: github.event_name == 'push' && github.event.head_commit.message == 'Apply source repair through CI'
+        if: github.event_name == 'push' && github.event.head_commit.message == 'Retry source repair through CI'
         run: |
           if git diff --quiet -- bot.py views/smart_dispatch.py tests/test_payment_panel_and_dispatch_source_regressions.py; then
             echo "No repair changes to commit."
