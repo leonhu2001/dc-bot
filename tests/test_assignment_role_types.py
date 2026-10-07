@@ -74,6 +74,10 @@ def test_payment_promotion_preserves_assignment_role_type(
     role_ids,
     expected_role_type,
 ):
+    # This test verifies assignment role typing after an order is claimable.
+    # The dedicated dispatch-lock suite covers the real 60-second waiting gate.
+    monkeypatch.setattr(order_acceptance, "PUBLIC_ACCEPTANCE_LOCK_SECONDS", 0)
+
     _engine, Session = _setup_db(tmp_path, monkeypatch)
     order_id = _create_order(
         Session,
