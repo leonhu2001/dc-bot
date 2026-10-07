@@ -156,6 +156,49 @@ def ensure_audit_table(db_file: str | Path | None = None) -> None:
         conn.commit()
 
 
+def _run_post_audit_hooks(
+    *,
+    action: str,
+    target_type: str,
+    target_id: str | int | None,
+    before: Mapping[str, Any] | None,
+    after: Mapping[str, Any] | None,
+    db_file: str | Path,
+) -> None:
+    """Run non-transactional side effects after an audit row is committed.
+
+    A notification failure must never roll back or disguise a completed salary
+    state change, so hooks are intentionally best-effort and isolated here.
+    """
+    if str(action) != "set_person_payout_status":
+        return
+    if str(target_type) != "payout_person":
+        return
+
+    try:
+        from web.app.services.payout_notifications import (
+            send_payout_paid_notification,
+        )
+
+        result = send_payout_paid_notification(
+            db_file=db_file,
+            person_id=target_id,
+            before=before,
+            after=after,
+        )
+        if result.get("sent"):
+            print(
+                "[payout_notification] sent",
+                "person=", str(target_id or ""),
+                "total=", result.get("total", 0),
+            )
+    except Exception as exc:
+        print(
+            "[payout_notification] delivery failed:",
+            repr(exc),
+        )
+
+
 def write_sqlite_audit_log(
     *,
     admin_discord_id: str | int,
@@ -209,7 +252,18 @@ def write_sqlite_audit_log(
             ),
         )
         conn.commit()
-        return int(cur.lastrowid)
+        audit_id = int(cur.lastrowid)
+
+    _run_post_audit_hooks(
+        action=str(action),
+        target_type=str(target_type),
+        target_id=target_id,
+        before=before_payload,
+        after=after_payload,
+        db_file=path,
+    )
+
+    return audit_id
 
 
 def audit_snapshot(
