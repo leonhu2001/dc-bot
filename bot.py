@@ -6884,6 +6884,37 @@ async def repair_active_web_sync_dispatch_panels_once(
     conn.row_factory = sqlite3.Row
 
     try:
+        # Canonical Web state wins over legacy bot.db claim rows.  Final Web
+        # orders must never keep a live/recoverable DispatchClaimView record.
+        final_rows = conn.execute(
+            """
+            SELECT dispatch_message_id
+            FROM web_orders
+            WHERE status IN ('closed', 'cancelled')
+              AND dispatch_message_id IS NOT NULL
+              AND TRIM(dispatch_message_id) <> ''
+            """
+        ).fetchall()
+
+        removed_final_claims = 0
+        for final_row in final_rows:
+            final_message_id = _to_int(final_row["dispatch_message_id"], None)
+            if final_message_id is None:
+                continue
+
+            if final_message_id in ORDER_CLAIMS:
+                ORDER_CLAIMS.pop(final_message_id, None)
+                removed_final_claims += 1
+
+            delete_claim_row_from_db(message_id=final_message_id)
+
+        if removed_final_claims:
+            print(
+                f"[claims] startup removed final Web-order claims: "
+                f"{removed_final_claims}",
+                flush=True,
+            )
+
         rows = conn.execute(
             """
             SELECT
@@ -6944,6 +6975,40 @@ async def _process_existing_web_sync_event(event: dict) -> None:
     retry_count = int(event.get("retry_count") or 0)
 
     try:
+        order_id = _to_int(event.get("order_id"), None)
+
+        # A generic order_updated event can arrive after the Web order is final.
+        # Do not rebuild/persist a claim for a closed/cancelled order; instead
+        # reconcile the legacy Bot claim row to the canonical Web state.
+        if order_id is not None:
+            conn = sqlite3.connect(_web_dashboard_db_path_for_bot(), timeout=15)
+            try:
+                final_row = conn.execute(
+                    """
+                    SELECT status, dispatch_message_id
+                    FROM web_orders
+                    WHERE id = ?
+                    LIMIT 1
+                    """,
+                    (int(order_id),),
+                ).fetchone()
+            finally:
+                conn.close()
+
+            if final_row is not None and str(final_row[0] or "").strip().lower() in {"closed", "cancelled"}:
+                final_message_id = _to_int(final_row[1], None)
+                if final_message_id is not None:
+                    ORDER_CLAIMS.pop(final_message_id, None)
+                    delete_claim_row_from_db(message_id=final_message_id)
+
+                _web_sync_mark_event_done(event_id)
+                print(
+                    f"[web-sync] event_id={event_id} final-order claim cleaned "
+                    f"order_id={order_id}",
+                    flush=True,
+                )
+                return
+
         await _refresh_existing_web_sync_dispatch(event)
         _web_sync_mark_event_done(event_id)
         print(f"[web-sync] event_id={event_id} done order_id={event.get('order_id')}")
