@@ -201,7 +201,10 @@ echo "=== 5. PYTHON COMPILE CHECK ==="
     core \
     services \
     shared \
-    web/app
+    views \
+    web/app \
+    tools \
+    scripts
 
 echo "PASS: Python compile"
 echo

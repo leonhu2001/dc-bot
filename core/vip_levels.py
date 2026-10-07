@@ -20,43 +20,8 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "custom_order": "・可根據闆闆要求製作\"自訂單\"",
 }
 
-# Discord 會員資訊只顯示該等級新增的福利，並用「享有上一級所有福利」
-# 表示繼承關係；實際權益與等級判斷仍由下方 VIP_LEVELS / 折扣規則決定。
-VIP_LEVEL_DISPLAY_BENEFITS: dict[str, tuple[str, ...]] = {
-    "銀級魔丸": (
-        "・專屬 VIP 身分組，可使用VIP專屬包廂",
-    ),
-    "金級魔丸": (
-        "・享有銀級魔丸所有福利",
-        "・優先客服回覆",
-        "・體驗單、趣味單外全館98折",
-        "・可根據闆闆要求製作\"自訂單\"",
-    ),
-    "白金魔丸": (
-        "・享有金級魔丸所有福利",
-        "・儲值返利2%",
-        "・每月一張折現券200T",
-        "・優先排單",
-    ),
-    "鑽石魔丸": (
-        "・享有白金魔丸所有福利",
-        "・優先安排熟悉打手",
-        "・儲值返利3%",
-        "・體驗單、趣味單外全館96折",
-    ),
-    "白鑽魔丸": (
-        "・享有鑽石魔丸所有福利",
-        "・儲值返利4%",
-        "・每月額外一張折現券500T",
-    ),
-    "黑鑽魔丸": (
-        "・享有白鑽魔丸所有福利",
-        "・每月一次免費「機密航天保底1000w」或娛樂陪 2H",
-        "・儲值返利5%",
-        "・體驗單、趣味單外全館94折",
-    ),
-}
-
+# benefit_keys 是每個 VIP 等級『實際生效』的完整權益。
+# 高等級沿用低等級的一般福利；同類型回饋／折扣只保留當前最高值。
 VIP_LEVELS: list[dict[str, Any]] = [
     {
         "name": "銀級魔丸",
@@ -318,19 +283,13 @@ def build_vip_level_benefits() -> dict[str, str]:
     benefits: dict[str, str] = {"普通魔丸": "尚未解鎖 VIP 福利。"}
 
     for level in VIP_LEVELS:
-        level_name = str(level["name"])
         lines = [f"累積消費 {int(level['threshold'])}⤴️"]
-        display_lines = VIP_LEVEL_DISPLAY_BENEFITS.get(level_name)
-
-        if display_lines is None:
-            display_lines = tuple(
-                VIP_BENEFIT_ITEMS[key]
-                for key in level.get("benefit_keys", [])
-                if key in VIP_BENEFIT_ITEMS
-            )
-
-        lines.extend(display_lines)
-        benefits[level_name] = "\n".join(lines)
+        lines.extend(
+            VIP_BENEFIT_ITEMS[key]
+            for key in level.get("benefit_keys", [])
+            if key in VIP_BENEFIT_ITEMS
+        )
+        benefits[str(level["name"])] = "\n".join(lines)
 
     return benefits
 

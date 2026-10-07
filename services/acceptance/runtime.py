@@ -689,8 +689,7 @@ async def repair_pending_acceptance_dispatch_panels_once(
     """依 canonical acceptance 狀態修復等待接單中的 Discord panel。"""
     import sqlite3
 
-    # runtime.py ?? services/acceptance/?
-    # web_dashboard.db ????????
+    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
     db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
     conn = sqlite3.connect(db_path, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -989,8 +988,7 @@ async def restore_acceptance_payment_panel_for_order(
         ACCEPTED_PENDING_PAY = "accepted_pending_pay"
         get_acceptance_state = None
 
-    # runtime.py ?? services/acceptance/?
-    # web_dashboard.db ????????
+    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
     db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
     conn = sqlite3.connect(db_path, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -1190,8 +1188,7 @@ async def repair_pending_acceptance_payment_panels_once(
 ) -> int:
     import sqlite3
 
-    # runtime.py ?? services/acceptance/?
-    # web_dashboard.db ????????
+    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
     db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
     conn = sqlite3.connect(db_path, timeout=15)
     conn.row_factory = sqlite3.Row
@@ -1238,8 +1235,7 @@ async def repair_pending_acceptance_ticket_access_once(
 
     from shared.order_acceptance import get_acceptance_state
 
-    # runtime.py ?? services/acceptance/?
-    # web_dashboard.db ????????
+    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
     db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
     conn = sqlite3.connect(db_path, timeout=15)
     conn.row_factory = sqlite3.Row
