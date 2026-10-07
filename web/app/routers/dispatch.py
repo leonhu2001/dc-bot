@@ -19,6 +19,7 @@ from web.app.services.dispatch_support import (
     assign_companion_from_dispatch,
     can_manage_dispatch_orders,
 )
+from web.app.services.dispatch_claim_access import decorate_dispatch_order
 from web.app.services.order_service import (
     claim_order_for_worker,
     create_demo_orders_if_empty,
@@ -119,6 +120,12 @@ async def dispatch_dashboard(
     try:
         create_demo_orders_if_empty(db)
         orders = list_active_orders(db)
+        for order in orders:
+            decorate_dispatch_order(
+                db,
+                order,
+                user=user if user_can_claim else None,
+            )
         claimable_orders, non_claimable_orders = partition_dispatch_orders(orders)
         orders = [*claimable_orders, *non_claimable_orders]
         active_order_count = get_worker_active_order_count(db, str(user["id"]))

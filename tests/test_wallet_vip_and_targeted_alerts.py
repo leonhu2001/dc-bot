@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 
 from services import rewards
@@ -84,61 +85,101 @@ def test_wallet_reward_exclusion_survives_later_amount_correction():
     assert order_data["reward_amount"] == 0
 
 
-def _snapshot(rule):
+def _snapshot(
+    *,
+    required_staff_count: int,
+    specified_staff_ids=(),
+    active_claims=(),
+    created_at: str = "2020-01-01T00:00:00+00:00",
+):
     return {
         "keys": ["MO-1"],
-        "_alert_rules": {"MO-1": rule},
+        "_alert_rules": {
+            "MO-1": {
+                "order_id": 1,
+                "order_status": "waiting_acceptance",
+                "meta": {
+                    "order_rule_key": "targeted_alert_test",
+                    "required_staff_count": required_staff_count,
+                    "min_protector_count": 0,
+                    "allowed_role_ids_json": ["10"],
+                    "required_game_role_ids_json": ["20"],
+                    "specified_staff_ids_json": list(specified_staff_ids),
+                    "status": "waiting_acceptance",
+                    "created_at": created_at,
+                },
+                "active_rows": [
+                    {
+                        "staff_discord_id": str(staff_id),
+                        "staff_role_ids_json": ["10", "20"],
+                    }
+                    for staff_id in active_claims
+                ],
+            }
+        },
     }
 
 
-def test_fully_specified_order_only_alerts_specified_staff():
+def _eligible_user(user_id: str) -> dict:
+    return {
+        "id": str(user_id),
+        "role_ids": ["10", "20"],
+    }
+
+
+def test_fully_specified_order_alerts_specified_staff_immediately():
     snapshot = _snapshot(
-        {
-            "required_staff_count": 1,
-            "specified_staff_ids": ["111"],
-            "active_claim_staff_ids": [],
-        }
+        required_staff_count=1,
+        specified_staff_ids=["111"],
+        created_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    assert _dispatch_alert_keys_for_user(snapshot, {"id": "111"}) == ["MO-1"]
-    assert _dispatch_alert_keys_for_user(snapshot, {"id": "222"}) == []
+    # 指定對象即使仍在 60 秒保護期，也可立即接，所以新單一出現就要響。
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("111")) == ["MO-1"]
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("222")) == []
 
 
-def test_partially_specified_multi_staff_order_alerts_for_open_general_slot():
+def test_partially_specified_multi_staff_order_alerts_eligible_general_slot_after_unlock():
     snapshot = _snapshot(
-        {
-            "required_staff_count": 3,
-            "specified_staff_ids": ["111"],
-            "active_claim_staff_ids": [],
-        }
+        required_staff_count=3,
+        specified_staff_ids=["111"],
     )
 
-    assert _dispatch_alert_keys_for_user(snapshot, {"id": "222"}) == ["MO-1"]
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("222")) == ["MO-1"]
 
 
 def test_non_specified_alert_stops_when_unrestricted_slots_are_filled():
     snapshot = _snapshot(
-        {
-            "required_staff_count": 2,
-            "specified_staff_ids": ["111"],
-            "active_claim_staff_ids": ["222"],
-        }
+        required_staff_count=2,
+        specified_staff_ids=["111"],
+        active_claims=["222"],
     )
 
-    assert _dispatch_alert_keys_for_user(snapshot, {"id": "333"}) == []
-    assert _dispatch_alert_keys_for_user(snapshot, {"id": "111"}) == ["MO-1"]
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("333")) == []
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("111")) == ["MO-1"]
 
 
-def test_unrestricted_order_alerts_every_dispatch_viewer():
+def test_unrestricted_order_only_alerts_eligible_dispatch_viewer_after_unlock():
     snapshot = _snapshot(
-        {
-            "required_staff_count": 2,
-            "specified_staff_ids": [],
-            "active_claim_staff_ids": [],
-        }
+        required_staff_count=2,
+        specified_staff_ids=[],
     )
 
-    assert _dispatch_alert_keys_for_user(snapshot, {"id": "333"}) == ["MO-1"]
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("333")) == ["MO-1"]
+    assert _dispatch_alert_keys_for_user(
+        snapshot,
+        {"id": "444", "role_ids": ["10"]},
+    ) == []
+
+
+def test_unrestricted_order_does_not_alert_during_public_lock():
+    snapshot = _snapshot(
+        required_staff_count=2,
+        specified_staff_ids=[],
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    assert _dispatch_alert_keys_for_user(snapshot, _eligible_user("333")) == []
 
 
 def test_dispatch_frontend_uses_user_specific_alert_keys():
