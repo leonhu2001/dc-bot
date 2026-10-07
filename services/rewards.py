@@ -25,6 +25,7 @@ _SILVER_MEMBER_ROLE_ID: int | None = None
 _VIP_ROLE_TIERS: list[dict] = []
 _REWARD_DB_FILE: Path | None = None
 VIP_PROGRESS_EXCLUDED_ITEMS = {"幣號"}
+WALLET_PAYMENT_METHOD = "我的錢包"
 
 # ========= VIP display / reward exclusions =========
 
@@ -635,6 +636,30 @@ async def add_customer_reward_from_order(
 
     if order_data.get("reward_counted"):
         return "此訂單已累積過會員消費，未重複累積。"
+
+    payment_method = str(order_data.get("payment_method") or "").strip()
+    if payment_method == WALLET_PAYMENT_METHOD:
+        data = get_customer_reward_data(customer_id)
+        data["order_count"] = int(data.get("order_count", 0) or 0) + 1
+        data["last_order_at"] = get_taipei_now_iso()
+        data["points"] = get_current_reward_points(data)
+
+        order_data["reward_counted"] = True
+        order_data["reward_amount"] = 0
+        order_data["reward_excluded"] = True
+        order_data["reward_excluded_reason"] = (
+            "錢包付款：儲值本金已於儲值時累積 VIP，避免重複計算"
+        )
+        order_data["reward_counted_at"] = get_taipei_now_iso()
+        _ORDER_SELECTIONS[order_channel_id] = order_data
+
+        if _SAVE_BOT_DATA is not None:
+            _SAVE_BOT_DATA()
+
+        return (
+            "會員紀錄已更新：完成訂單 +1；本單使用錢包付款，"
+            "儲值本金已於儲值時累積 VIP，因此未再次增加累積消費。"
+        )
 
     item_name = str(order_data.get("item") or "").strip()
     if item_name in NO_VIP_REWARD_ITEMS:
