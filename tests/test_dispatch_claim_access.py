@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from services.orders import (
+    build_self_service_order_embed,
+    configure_order_helpers,
+)
 from web.app.services.dispatch_claim_access import (
     build_dispatch_service_context,
     evaluate_dispatch_claim_access,
@@ -113,3 +117,86 @@ def test_dispatch_service_context_keeps_hours_and_point_bonus_visible():
     assert result["service_text"] == "2 小時"
     assert result["actual_service_text"] == "2.5 小時"
     assert "加時 30 分鐘" in result["point_benefit_text"]
+
+
+def test_discord_dispatch_embed_keeps_service_details_after_acceptance():
+    channel_id = 123456
+    configure_order_helpers(
+        {
+            channel_id: {
+                "status": "accepted_pending_pay",
+                "order_rule_key": "basic_entertain_single",
+                "quantity": 2,
+                "accepted_count": 1,
+                "required_staff_count": 1,
+                "point_benefit_key": "extra_10",
+                "point_benefit_name": "加時 30 分鐘",
+                "point_benefit_cost": 15,
+                "point_extra_hours": 0.5,
+                "service_bonus_text": "服務時間 +30 分鐘",
+                "customer_display_name": "測試老闆",
+            }
+        }
+    )
+    guild = SimpleNamespace(get_member=lambda user_id: None)
+    channel = SimpleNamespace(id=channel_id, mention="#ticket", guild=guild)
+
+    embed = build_self_service_order_embed(
+        customer_mention="<@999>",
+        category_label="三角洲 基礎單<端遊>",
+        item="娛樂陪｜單陪",
+        quantity=2,
+        payment_method="待付款",
+        source_channel=channel,
+        receiver_text="<@888>",
+    )
+
+    fields = {field.name: field.value for field in embed.fields}
+    assert fields["狀態"] == "接單完成｜等待付款"
+    assert fields["服務內容"] == "2 小時"
+    assert fields["實際服務"] == "2.5 小時"
+    assert "加時 30 分鐘" in fields["點數福利"]
+
+    configure_order_helpers({})
+
+
+def test_discord_dispatch_embed_understands_nested_web_point_snapshot():
+    channel_id = 654321
+    configure_order_helpers(
+        {
+            channel_id: {
+                "status": "waiting_acceptance",
+                "order_rule_key": "basic_entertain_single",
+                "quantity": 2,
+                "preview": {
+                    "point": {
+                        "key": "extra_10",
+                        "name": "加時 30 分鐘",
+                        "cost": 15,
+                    },
+                    "finance": {
+                        "point_service_note": "服務時間 +30 分鐘",
+                    },
+                },
+                "customer_display_name": "網站老闆",
+            }
+        }
+    )
+    guild = SimpleNamespace(get_member=lambda user_id: None)
+    channel = SimpleNamespace(id=channel_id, mention="#web-ticket", guild=guild)
+
+    embed = build_self_service_order_embed(
+        customer_mention="<@777>",
+        category_label="三角洲 基礎單<端遊>",
+        item="娛樂陪｜單陪",
+        quantity=2,
+        payment_method="待付款",
+        source_channel=channel,
+    )
+
+    fields = {field.name: field.value for field in embed.fields}
+    assert fields["服務內容"] == "2 小時"
+    assert fields["實際服務"] == "2.5 小時"
+    assert "加時 30 分鐘" in fields["點數福利"]
+
+    configure_order_helpers({})
