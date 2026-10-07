@@ -2,6 +2,7 @@ import asyncio
 import json
 import sqlite3
 import time
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -9,6 +10,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from services.dispatch_presence import (
     count_online_dispatch_workers,
     get_online_dispatch_support_ids,
+)
+from shared.order_acceptance import (
+    PUBLIC_ACCEPTANCE_LOCK_SECONDS,
+    WAITING_ACCEPTANCE,
 )
 from web.app.config import config
 from web.app.services.dispatch_access import (
@@ -70,6 +75,36 @@ def _load_csv_id_list(value) -> list[str]:
     ]
 
 
+def _acceptance_lock_info(
+    created_at_value,
+    status_value,
+) -> tuple[bool, str | None, int]:
+    if str(status_value or "").strip() != WAITING_ACCEPTANCE:
+        return False, None, 0
+
+    created_text = str(created_at_value or "").strip()
+    if not created_text:
+        return False, None, 0
+
+    try:
+        created = datetime.fromisoformat(created_text.replace("Z", "+00:00"))
+    except ValueError:
+        return False, None, 0
+
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    else:
+        created = created.astimezone(timezone.utc)
+
+    opens_at = created + timedelta(seconds=PUBLIC_ACCEPTANCE_LOCK_SECONDS)
+    now = datetime.now(timezone.utc)
+    remaining_float = (opens_at - now).total_seconds()
+    locked = remaining_float > 0
+    remaining_seconds = max(0, int(remaining_float + 0.999)) if locked else 0
+    opens_at_text = opens_at.isoformat().replace("+00:00", "Z")
+    return locked, opens_at_text, remaining_seconds
+
+
 def _dispatch_order_rows() -> list[sqlite3.Row]:
     conn = sqlite3.connect(get_sqlite_path())
     conn.row_factory = sqlite3.Row
@@ -91,6 +126,7 @@ def _dispatch_order_rows() -> list[sqlite3.Row]:
                 o.status,
                 o.updated_at,
                 o.created_at,
+                m.created_at AS acceptance_created_at,
                 m.required_staff_count AS acceptance_required_staff_count,
                 m.specified_staff_ids_json,
                 (
@@ -120,6 +156,12 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
         specified_staff_ids = _load_json_id_list(row["specified_staff_ids_json"])
         active_claim_staff_ids = _load_csv_id_list(row["active_claim_staff_ids"])
         required_staff_count = int(row["acceptance_required_staff_count"] or 0)
+        acceptance_locked, acceptance_opens_at, lock_remaining_seconds = (
+            _acceptance_lock_info(
+                row["acceptance_created_at"],
+                row["status"],
+            )
+        )
 
         orders.append(
             {
@@ -140,18 +182,23 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
                 "status": row["status"] or "",
                 "updated_at": row["updated_at"] or "",
                 "created_at": row["created_at"] or "",
+                "acceptance_locked": acceptance_locked,
+                "acceptance_opens_at": acceptance_opens_at,
+                "acceptance_lock_remaining_seconds": lock_remaining_seconds,
             }
         )
         alert_rules[order_key] = {
             "required_staff_count": required_staff_count,
             "specified_staff_ids": specified_staff_ids,
             "active_claim_staff_ids": active_claim_staff_ids,
+            "acceptance_locked": acceptance_locked,
         }
 
     signature = "|".join(
         (
             f"{order['id']}:{order['key']}:{order['updated_at']}:"
             f"{order['amount']}:{order['quantity']}:{order['status']}:"
+            f"{int(bool(alert_rules[order['key']]['acceptance_locked']))}:"
             f"{alert_rules[order['key']]['required_staff_count']}:"
             f"{','.join(sorted(alert_rules[order['key']]['specified_staff_ids']))}:"
             f"{','.join(sorted(alert_rules[order['key']]['active_claim_staff_ids']))}"
@@ -175,10 +222,10 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
 def _dispatch_alert_keys_for_user(snapshot: dict, user: dict | None) -> list[str]:
     """Return orders that should actively alert this logged-in dispatch user.
 
-    A fully specified order only alerts its specified staff. If the order needs
-    more staff than were specified, the unreserved slots remain alertable to
-    everyone else until those unrestricted slots are filled. This mirrors the
-    same reserved-slot rule used by acceptance claiming.
+    The first 60 seconds are a silent reading period for every worker. After
+    unlock, a fully specified order only alerts its specified staff. If the
+    order needs more staff than were specified, unrestricted slots remain
+    alertable to everyone else until those slots are filled.
     """
     user_id = str((user or {}).get("id") or "").strip()
     alert_rules = snapshot.get("_alert_rules") or {}
@@ -187,6 +234,10 @@ def _dispatch_alert_keys_for_user(snapshot: dict, user: dict | None) -> list[str
     for key in snapshot.get("keys") or []:
         key = str(key)
         rule = alert_rules.get(key) or {}
+
+        if bool(rule.get("acceptance_locked")):
+            continue
+
         specified_set = {
             str(item).strip()
             for item in (rule.get("specified_staff_ids") or [])
