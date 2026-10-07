@@ -47,6 +47,29 @@ def _dispatch_presence_snapshot() -> dict:
     }
 
 
+def _load_json_id_list(value) -> list[str]:
+    if value is None:
+        return []
+
+    try:
+        parsed = json.loads(str(value))
+    except Exception:
+        return []
+
+    if not isinstance(parsed, list):
+        return []
+
+    return [str(item).strip() for item in parsed if str(item).strip()]
+
+
+def _load_csv_id_list(value) -> list[str]:
+    return [
+        part.strip()
+        for part in str(value or "").split(",")
+        if part.strip()
+    ]
+
+
 def _dispatch_order_rows() -> list[sqlite3.Row]:
     conn = sqlite3.connect(get_sqlite_path())
     conn.row_factory = sqlite3.Row
@@ -55,22 +78,31 @@ def _dispatch_order_rows() -> list[sqlite3.Row]:
         return conn.execute(
             f"""
             SELECT
-                id,
-                bot_order_no,
-                ticket_channel_id,
-                dispatch_message_id,
-                customer_display_name,
-                customer_discord_id,
-                category,
-                item,
-                quantity,
-                amount,
-                status,
-                updated_at,
-                created_at
-            FROM web_orders
-            WHERE status IN ({_VISIBLE_STATUS_PLACEHOLDERS})
-            ORDER BY id ASC
+                o.id,
+                o.bot_order_no,
+                o.ticket_channel_id,
+                o.dispatch_message_id,
+                o.customer_display_name,
+                o.customer_discord_id,
+                o.category,
+                o.item,
+                o.quantity,
+                o.amount,
+                o.status,
+                o.updated_at,
+                o.created_at,
+                m.required_staff_count AS acceptance_required_staff_count,
+                m.specified_staff_ids_json,
+                (
+                    SELECT GROUP_CONCAT(c.staff_discord_id, ',')
+                    FROM order_acceptance_claims c
+                    WHERE c.order_id = o.id
+                      AND c.is_active = 1
+                ) AS active_claim_staff_ids
+            FROM web_orders o
+            LEFT JOIN order_acceptance_meta m ON m.order_id = o.id
+            WHERE o.status IN ({_VISIBLE_STATUS_PLACEHOLDERS})
+            ORDER BY o.id ASC
             """,
             _VISIBLE_STATUS_VALUES,
         ).fetchall()
@@ -81,9 +113,14 @@ def _dispatch_order_rows() -> list[sqlite3.Row]:
 def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
     rows = _dispatch_order_rows()
     orders = []
+    alert_rules: dict[str, dict] = {}
 
     for row in rows:
         order_key = str(row["bot_order_no"] or f"WEB-{row['id']}")
+        specified_staff_ids = _load_json_id_list(row["specified_staff_ids_json"])
+        active_claim_staff_ids = _load_csv_id_list(row["active_claim_staff_ids"])
+        required_staff_count = int(row["acceptance_required_staff_count"] or 0)
+
         orders.append(
             {
                 "id": row["id"],
@@ -105,11 +142,19 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
                 "created_at": row["created_at"] or "",
             }
         )
+        alert_rules[order_key] = {
+            "required_staff_count": required_staff_count,
+            "specified_staff_ids": specified_staff_ids,
+            "active_claim_staff_ids": active_claim_staff_ids,
+        }
 
     signature = "|".join(
         (
             f"{order['id']}:{order['key']}:{order['updated_at']}:"
-            f"{order['amount']}:{order['quantity']}:{order['status']}"
+            f"{order['amount']}:{order['quantity']}:{order['status']}:"
+            f"{alert_rules[order['key']]['required_staff_count']}:"
+            f"{','.join(sorted(alert_rules[order['key']]['specified_staff_ids']))}:"
+            f"{','.join(sorted(alert_rules[order['key']]['active_claim_staff_ids']))}"
         )
         for order in orders
     )
@@ -118,12 +163,81 @@ def _dispatch_state_snapshot(*, include_orders: bool) -> dict:
         "count": len(orders),
         "keys": [order["key"] for order in orders],
         "signature": signature,
+        "_alert_rules": alert_rules,
     }
 
     if include_orders:
         snapshot["orders"] = orders
 
     return snapshot
+
+
+def _dispatch_alert_keys_for_user(snapshot: dict, user: dict | None) -> list[str]:
+    """Return orders that should actively alert this logged-in dispatch user.
+
+    A fully specified order only alerts its specified staff. If the order needs
+    more staff than were specified, the unreserved slots remain alertable to
+    everyone else until those unrestricted slots are filled. This mirrors the
+    same reserved-slot rule used by acceptance claiming.
+    """
+    user_id = str((user or {}).get("id") or "").strip()
+    alert_rules = snapshot.get("_alert_rules") or {}
+    result: list[str] = []
+
+    for key in snapshot.get("keys") or []:
+        key = str(key)
+        rule = alert_rules.get(key) or {}
+        specified_set = {
+            str(item).strip()
+            for item in (rule.get("specified_staff_ids") or [])
+            if str(item).strip()
+        }
+
+        if not specified_set:
+            result.append(key)
+            continue
+
+        if user_id and user_id in specified_set:
+            result.append(key)
+            continue
+
+        required_staff_count = max(
+            1,
+            int(rule.get("required_staff_count") or 0),
+        )
+        unrestricted_slots = max(
+            0,
+            required_staff_count - len(specified_set),
+        )
+        if unrestricted_slots <= 0:
+            continue
+
+        active_claim_staff_ids = [
+            str(item).strip()
+            for item in (rule.get("active_claim_staff_ids") or [])
+            if str(item).strip()
+        ]
+        non_specified_active_count = sum(
+            1
+            for staff_id in active_claim_staff_ids
+            if staff_id not in specified_set
+        )
+
+        if non_specified_active_count < unrestricted_slots:
+            result.append(key)
+
+    return result
+
+
+def _public_dispatch_snapshot(snapshot: dict, user: dict | None) -> dict:
+    return {
+        **{
+            key: value
+            for key, value in snapshot.items()
+            if key != "_alert_rules"
+        },
+        "alert_keys": _dispatch_alert_keys_for_user(snapshot, user),
+    }
 
 
 def _build_dispatch_event_snapshot() -> dict:
@@ -180,7 +294,7 @@ async def dispatch_state(request: Request):
         "presence_online": presence_online,
         "support_presence_online": support_presence_online,
         **presence_snapshot,
-        **state_snapshot,
+        **_public_dispatch_snapshot(state_snapshot, user),
     }
 
 
@@ -227,13 +341,14 @@ async def dispatch_events(request: Request):
                 last_presence_touch = now
 
             snapshot = await _shared_dispatch_event_snapshot()
+            public_snapshot = _public_dispatch_snapshot(snapshot, user)
             signature = snapshot["signature"]
 
             if last_signature is None or signature != last_signature:
                 payload = {
                     "ok": True,
                     "initial": last_signature is None,
-                    **snapshot,
+                    **public_snapshot,
                 }
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 last_signature = signature
@@ -242,7 +357,7 @@ async def dispatch_events(request: Request):
                 heartbeat = {
                     "ok": True,
                     "heartbeat": True,
-                    **snapshot,
+                    **public_snapshot,
                 }
                 yield f"data: {json.dumps(heartbeat, ensure_ascii=False)}\n\n"
                 last_heartbeat = now
