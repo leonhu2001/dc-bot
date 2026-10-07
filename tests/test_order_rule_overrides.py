@@ -107,6 +107,7 @@ def test_invalid_rule_override_is_blocked():
     else:
         raise AssertionError("invalid rule override should be blocked")
 
+
 def test_manager_created_rule_becomes_effective_without_code_definition(
     tmp_path,
     monkeypatch,
@@ -254,3 +255,80 @@ def test_manager_created_rule_appears_in_dynamic_self_service_group(
         DYNAMIC_ADMIN_GROUP_LABEL
     )
 
+
+def test_manager_created_rule_can_choose_group_and_benefits(
+    tmp_path,
+    monkeypatch,
+):
+    db_file = tmp_path / "web_dashboard.db"
+    ensure_order_rule_store(db_file)
+
+    monkeypatch.setattr(
+        order_rule_store,
+        "default_db_path",
+        lambda: db_file,
+    )
+
+    key = "admin_farm_grouped_product"
+    payload = rule_to_override_payload(
+        OrderRule(
+            category="farm",
+            key=key,
+            label="勇敢者",
+            pricing_type="fixed",
+            price=3600,
+            unit_label="單",
+            allowed_roles=("male_companion",),
+            required_game_roles=("delta_desktop",),
+            required_staff_count=1,
+            min_quantity=1,
+            max_quantity=1,
+            catalog_group_label="陪解",
+            vip_discount_allowed=False,
+            point_benefits_allowed=False,
+        )
+    )
+
+    create_custom_order_rule(
+        rule_key=key,
+        category="farm",
+        payload=payload,
+        actor_discord_id="1",
+        actor_display_name="Tester",
+        db_file=db_file,
+    )
+    invalidate_rule_override_cache()
+
+    from core.vip_levels import (
+        VIP_DISCOUNT_EXCLUDED_RULE_KEYS,
+        get_vip_discount_pay_rate,
+    )
+    from services.orders import (
+        ORDER_ITEM_GROUPS_BY_CATEGORY,
+        get_order_item_details_for_group,
+        get_order_item_group_label,
+    )
+
+    rule = ORDER_RULES[key]
+    assert rule.catalog_group_label == "陪解"
+    assert rule.vip_discount_allowed is False
+    assert rule.point_benefits_allowed is False
+
+    groups = ORDER_ITEM_GROUPS_BY_CATEGORY.get("farm", [])
+    assert "陪解" in groups
+
+    details = get_order_item_details_for_group("farm", "陪解")
+    assert any(
+        item["rule_key"] == key
+        and item["label"] == "勇敢者"
+        and item["quantity_unit"] == "單"
+        for item in details
+    )
+    assert get_order_item_group_label("勇敢者") == "陪解"
+
+    assert key in VIP_DISCOUNT_EXCLUDED_RULE_KEYS
+    assert get_vip_discount_pay_rate(
+        "金級魔丸",
+        category="farm",
+        rule_key=key,
+    ) == 100
