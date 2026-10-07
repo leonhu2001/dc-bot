@@ -37,7 +37,6 @@
     </div>
 </div>
 
-
 <details class="panel compact-panel new-product-panel">
     <summary class="new-product-summary">
         <span>＋ 新增商品</span>
@@ -46,8 +45,8 @@
 
     <div class="new-product-intro">
         <p class="muted-text">
-            「商品分類」決定它之後出現在哪個下單分類。選 APEX 就進 APEX；
-            選三角洲趣味單就進三角洲趣味單。若遊戲身分不勾，系統會依分類自動補上。
+            「商品分類」是 Discord 自助下單第一欄；「第二層分類」是第二欄；「商品名稱」是第三欄。
+            VIP 折扣與點數福利皆為商品層級規則，可各自開關。若遊戲身分不勾，系統會依分類自動補上。
         </p>
     </div>
 
@@ -63,13 +62,13 @@
             <div class="new-product-section-head">
                 <div>
                     <h3>基本資料</h3>
-                    <p class="muted-text">先決定商品要放哪個分類、怎麼計價。</p>
+                    <p class="muted-text">先決定三層下單顯示、商品要放哪個分類，以及怎麼計價。</p>
                 </div>
             </div>
 
             <div class="new-product-grid">
                 <label class="new-product-field new-product-field--wide">
-                    <span>商品分類</span>
+                    <span>商品分類（第一欄）</span>
                     <select name="category" required>
                         {% for value, label in product_categories %}
                         <option value="{{ value }}">{{ label }}</option>
@@ -78,8 +77,14 @@
                 </label>
 
                 <label class="new-product-field new-product-field--wide">
-                    <span>商品名稱</span>
-                    <input name="label" placeholder="例如：三角洲｜特殊護航單" required>
+                    <span>第二層分類（第二欄）</span>
+                    <input name="catalog_group_label" maxlength="100" placeholder="例如：陪解">
+                    <small class="muted-text">可自訂，例如「陪解」。舊商品未設定時仍顯示「後台新增商品」。</small>
+                </label>
+
+                <label class="new-product-field new-product-field--wide">
+                    <span>商品名稱（第三欄）</span>
+                    <input name="label" placeholder="例如：勇敢者" required>
                 </label>
 
                 <label class="new-product-field">
@@ -162,8 +167,10 @@
         <section class="new-product-section">
             <div class="new-product-section-head">
                 <div>
-                    <h3>活動與功能</h3>
-                    <p class="muted-text">有需要才設定買送；其餘直接保持預設即可。</p>
+                    <h3>活動、優惠與功能</h3>
+                    <p class="muted-text">
+                        VIP 與點數是獨立商品開關；關閉後 Web / DC 都不套用該福利。客服手動折扣不受影響。
+                    </p>
                 </div>
             </div>
 
@@ -183,6 +190,7 @@
                 <label><input type="checkbox" name="allow_specify"> <span>開放指定</span></label>
                 <label><input type="checkbox" name="player_count_enabled"> <span>可選人數</span></label>
                 <label><input type="checkbox" name="price_multiply_player_count"> <span>價格 × 人數</span></label>
+                <label><input type="checkbox" name="vip_discount_allowed" checked> <span>套用 VIP 會員折扣</span></label>
                 <label><input type="checkbox" name="point_benefits_allowed" checked> <span>可使用點數福利</span></label>
             </div>
         </section>
@@ -266,7 +274,6 @@
     </form>
 </details>
 
-
 <div style="display:grid; grid-template-columns:minmax(300px, 0.85fr) minmax(0, 1.7fr); gap:16px; align-items:start;">
 
     <div class="panel compact-panel">
@@ -276,8 +283,6 @@
                 <p class="muted-text">共 {{ rules|length }} 個規則</p>
             </div>
         </div>
-
-
 
         <div style="max-height:72vh; overflow:auto; display:flex; flex-direction:column; gap:8px;">
             {% for item in rules %}
@@ -297,7 +302,9 @@
                     <span>{{ "{:,}".format(item.price) }}T</span>
                 </div>
                 <div class="muted-text" style="font-size:12px; margin-top:4px;">
-                    {{ item.category_label }} ｜ {{ item.key }}
+                    {{ item.category_label }}
+                    {% if item.catalog_group_label %} ｜ {{ item.catalog_group_label }}{% endif %}
+                    ｜ {{ item.key }}
                     {% if item.is_overridden %} ｜ v{{ item.override_version }}{% endif %}
                 </div>
             </a>
@@ -371,8 +378,12 @@
 
                 <div class="order-meta compact-meta">
                     <div>
-                        <span>商品名稱</span>
+                        <span>商品名稱（第三欄）</span>
                         <input name="label" value="{{ payload.get('label', '') }}" required>
+                    </div>
+                    <div>
+                        <span>第二層分類（第二欄）</span>
+                        <input name="catalog_group_label" maxlength="100" value="{{ payload.get('catalog_group_label', '') }}" placeholder="例如：陪解">
                     </div>
                     <div>
                         <span>售價</span>
@@ -444,8 +455,12 @@
                     <label><input type="checkbox" name="allow_specify" {% if payload.get('allow_specify') %}checked{% endif %}> 開放指定</label>
                     <label><input type="checkbox" name="player_count_enabled" {% if payload.get('player_count_enabled') %}checked{% endif %}> 可選人數</label>
                     <label><input type="checkbox" name="price_multiply_player_count" {% if payload.get('price_multiply_player_count') %}checked{% endif %}> 價格 × 人數</label>
-                    <label><input type="checkbox" name="point_benefits_allowed" {% if payload.get('point_benefits_allowed') %}checked{% endif %}> 可使用點數福利</label>
+                    <label><input type="checkbox" name="vip_discount_allowed" {% if payload.get('vip_discount_allowed', True) %}checked{% endif %}> 套用 VIP 會員折扣</label>
+                    <label><input type="checkbox" name="point_benefits_allowed" {% if payload.get('point_benefits_allowed', True) %}checked{% endif %}> 可使用點數福利</label>
                 </div>
+                <p class="muted-text" style="margin-top:-6px;">
+                    VIP 與點數各自控制；關閉 VIP 仍可由客服另外套用手動折扣。
+                </p>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
                     <h3>階級資格</h3>
@@ -647,6 +662,11 @@
     font-size: 12px;
     font-weight: 700;
 }
+.new-product-field small {
+    display: block;
+    margin-top: 5px;
+    line-height: 1.45;
+}
 .new-product-field input,
 .new-product-field select,
 .new-product-field textarea {
@@ -659,7 +679,7 @@
 }
 .new-product-toggles {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
     margin-top: 12px;
 }
@@ -678,7 +698,6 @@
     justify-content: flex-end;
     margin-top: 14px;
 }
-
 .rule-role-groups {
     display: grid;
     gap: 8px;
