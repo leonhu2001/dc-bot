@@ -23,6 +23,10 @@ PREPAY_ACCEPTANCE_STATUSES = {
     ACCEPTED_PENDING_PAY,
 }
 
+# 公開派單建立後先保留 60 秒閱讀／指定接單時間。
+# 指定人員仍需通過原本的遊戲身分與職位資格檢查，只豁免這個時間鎖。
+PUBLIC_ACCEPTANCE_LOCK_SECONDS = 60
+
 PROTECTOR_ROLE_IDS = {
     "1500234130871550004",  # 魔丸♛頂護
     "1500234170943934544",  # 魔丸♝女護
@@ -306,7 +310,8 @@ def _get_meta(conn, order_id: int) -> dict[str, Any]:
             required_game_role_ids_json,
             specified_staff_ids_json,
             point_benefits_allowed,
-            status
+            status,
+            created_at
         FROM order_acceptance_meta
         WHERE order_id = :order_id
         LIMIT 1
@@ -316,6 +321,44 @@ def _get_meta(conn, order_id: int) -> dict[str, Any]:
         raise ValueError("這張訂單沒有付款前接單資料。")
 
     return dict(row)
+
+
+def is_public_acceptance_locked(
+    meta: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Return whether the one-minute public acceptance window is still locked.
+
+    Existing/resumed orders keep their original acceptance-meta created_at, so
+    they do not get re-locked merely because a dispatch panel is re-created.
+    Malformed legacy timestamps fail open instead of stranding an order.
+    """
+    created_text = str(meta.get("created_at") or "").strip()
+    if not created_text:
+        return False
+
+    try:
+        created = datetime.fromisoformat(created_text.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+
+    current = now
+    if current is None:
+        current = (
+            datetime.now(created.tzinfo)
+            if created.tzinfo is not None
+            else datetime.utcnow()
+        )
+    elif created.tzinfo is not None and current.tzinfo is None:
+        current = current.replace(tzinfo=created.tzinfo)
+    elif created.tzinfo is None and current.tzinfo is not None:
+        current = current.replace(tzinfo=None)
+    elif created.tzinfo is not None and current.tzinfo is not None:
+        current = current.astimezone(created.tzinfo)
+
+    elapsed_seconds = (current - created).total_seconds()
+    return 0 <= elapsed_seconds < PUBLIC_ACCEPTANCE_LOCK_SECONDS
 
 
 def _get_order_status(conn, order_id: int) -> str:
@@ -454,6 +497,15 @@ def claim_acceptance_order(
             _load_json_list(meta.get("required_game_role_ids_json"))
         )
         specified_staff_ids = _load_json_list(meta.get("specified_staff_ids_json"))
+
+        if (
+            staff_discord_id not in specified_staff_ids
+            and is_public_acceptance_locked(meta)
+        ):
+            raise ValueError(
+                "🔒 此訂單目前為 1 分鐘接單保護期；指定人員可立即接單，"
+                "其他人請於派單 1 分鐘後再接。"
+            )
 
         if not role_ids_match_requirements(
             staff_role_ids_set,
@@ -990,10 +1042,12 @@ __all__ = [
     "WAITING_ACCEPTANCE",
     "AcceptanceClaim",
     "AcceptanceState",
+    "PUBLIC_ACCEPTANCE_LOCK_SECONDS",
     "claim_acceptance_order",
     "create_or_update_acceptance_meta",
     "ensure_acceptance_tables",
     "get_acceptance_state",
+    "is_public_acceptance_locked",
     "promote_acceptance_claims_to_assignments",
     "find_acceptance_order_id_by_dispatch_message_id",
     "close_acceptance_order",
