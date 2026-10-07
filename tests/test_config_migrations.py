@@ -6,11 +6,15 @@ from core.config import (
 )
 
 
-def test_dispatch_presence_channel_uses_canonical_default():
+def test_dispatch_presence_channels_use_canonical_defaults():
     assert config_int(
         "DISPATCH_ONLINE_CHANNEL_ID",
         1556366139830042634,
-    ) == 1556381428235902996
+    ) == 1538270157057691660
+    assert config_int(
+        "DISPATCH_MALE_ONLINE_CHANNEL_ID",
+        0,
+    ) == 1538270089785245856
 
 
 def test_dispatch_presence_channel_migrates_old_runtime_config(tmp_path):
@@ -33,8 +37,8 @@ def test_dispatch_presence_channel_migrates_old_runtime_config(tmp_path):
         config_file=config_file,
     )
 
-    assert migrated["DISPATCH_ONLINE_CHANNEL_ID"] == 1556381428235902996
+    assert migrated["DISPATCH_ONLINE_CHANNEL_ID"] == 1538270157057691660
 
     persisted = json.loads(config_file.read_text(encoding="utf-8"))
-    assert persisted["DISPATCH_ONLINE_CHANNEL_ID"] == 1556381428235902996
+    assert persisted["DISPATCH_ONLINE_CHANNEL_ID"] == 1538270157057691660
     assert persisted["GUILD_ID"] == 123
