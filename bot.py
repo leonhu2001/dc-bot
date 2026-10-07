@@ -4470,70 +4470,179 @@ async def browse_staff_profiles(
 
 @bot.tree.command(
     name="fix_acceptance_payment_panel",
-    description="客服補送等待接單滿人後的付款 panel",
+    description="??? ID ?????? panel",
     guild=discord.Object(id=GUILD_ID),
 )
 @app_commands.describe(
-    order_id="WEB 訂單 ID，可不填；不填時會使用目前票口最新等待付款訂單"
+    ticket_channel_id="Discord ???? ID??? 1557267849578545252"
 )
 @app_commands.default_permissions(manage_messages=True)
 async def fix_acceptance_payment_panel(
     interaction: discord.Interaction,
-    order_id: int | None = None,
+    ticket_channel_id: str,
 ):
     if not _require_customer_staff_or_manager(interaction):
-        await interaction.response.send_message("只有客服、店長或管理員可以補送付款 panel。", ephemeral=True)
+        await interaction.response.send_message(
+            "????????????????? panel?",
+            ephemeral=True,
+        )
         return
 
     if interaction.guild is None:
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        await interaction.response.send_message(
+            "??????????????",
+            ephemeral=True,
+        )
         return
 
-    target_order_id = order_id
-
-    if target_order_id is None:
-        if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("請在票口內使用，或手動輸入 WEB 訂單 ID。", ephemeral=True)
-            return
-
-        import sqlite3
-        db_path = Path(__file__).parent / "web_dashboard.db"
-        conn = sqlite3.connect(db_path, timeout=15)
-        conn.row_factory = sqlite3.Row
-        try:
-            row = conn.execute(
-                """
-                SELECT id
-                FROM web_orders
-                WHERE ticket_channel_id = ?
-                  AND status IN ('accepted_pending_pay', 'waiting_acceptance')
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (str(interaction.channel.id),),
-            ).fetchone()
-        finally:
-            conn.close()
-
-        if row is None:
-            await interaction.response.send_message(
-                "目前票口找不到等待接單 / 等待付款的 WEB 訂單，請手動輸入 order_id。",
-                ephemeral=True,
-            )
-            return
-
-        target_order_id = int(row["id"])
-
+    # ???? ACK Discord???? DB / API ?????? interaction timeout?
     await interaction.response.defer(ephemeral=True)
 
-    ok, message = await restore_acceptance_payment_panel_for_order(
-        interaction.guild,
-        int(target_order_id),
-        reason=f"manual_by_{interaction.user.id}",
+    try:
+        channel_id = int(str(ticket_channel_id).strip())
+    except (TypeError, ValueError):
+        await interaction.followup.send(
+            "?? ID ????????? Discord ?? ID?",
+            ephemeral=True,
+        )
+        return
+
+    ticket_channel = interaction.guild.get_channel(channel_id)
+
+    if not isinstance(ticket_channel, discord.TextChannel):
+        try:
+            fetched_channel = await interaction.guild.fetch_channel(channel_id)
+            ticket_channel = (
+                fetched_channel
+                if isinstance(fetched_channel, discord.TextChannel)
+                else None
+            )
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException,
+        ):
+            ticket_channel = None
+
+    if ticket_channel is None:
+        await interaction.followup.send(
+            f"??????? `{channel_id}`?",
+            ephemeral=True,
+        )
+        return
+
+    import sqlite3
+
+    db_path = Path(__file__).parent / "web_dashboard.db"
+    conn = sqlite3.connect(db_path, timeout=15)
+    conn.row_factory = sqlite3.Row
+
+    try:
+        row = conn.execute(
+            """
+            SELECT id, status, ticket_channel_id
+            FROM web_orders
+            WHERE CAST(ticket_channel_id AS TEXT) = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (str(channel_id),),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if row is None:
+        await interaction.followup.send(
+            f"????? <#{channel_id}> ??? WEB ???",
+            ephemeral=True,
+        )
+        return
+
+    target_order_id = int(row["id"])
+    current_status = str(row["status"] or "").strip().lower()
+
+    if current_status not in {
+        "accepted_pending_pay",
+        "waiting_acceptance",
+    }:
+        await interaction.followup.send(
+            f"WEB-{target_order_id} ????? `{current_status}`?"
+            "?????????????????????",
+            ephemeral=True,
+        )
+        return
+
+    # ??????? payment message?
+    # restore function ????? send ????? panel?
+    order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(
+        channel_id,
+        {},
     )
 
-    await interaction.followup.send(message, ephemeral=True)
+    old_message_id = order_data.pop(
+        "payment_message_id",
+        None,
+    )
+    order_data.pop(
+        "payment_channel_id",
+        None,
+    )
 
+    remember_order_data(
+        channel_id,
+        order_data,
+    )
+
+    try:
+        ok, message = await asyncio.wait_for(
+            restore_acceptance_payment_panel_for_order(
+                interaction.guild,
+                target_order_id,
+                reason=f"manual_ticket_repair_by_{interaction.user.id}",
+            ),
+            timeout=20,
+        )
+    except asyncio.TimeoutError:
+        await interaction.followup.send(
+            "?? ?????? 20 ??\n"
+            "????????????????????????? Panel?\n"
+            f"???<#{channel_id}>?WEB-{target_order_id}",
+            ephemeral=True,
+        )
+        return
+    except Exception as exc:
+        print(
+            f"[payment-panel-fix] "
+            f"ticket={channel_id} "
+            f"order={target_order_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+        await interaction.followup.send(
+            f"? ?????`{type(exc).__name__}: {exc}`\n"
+            f"???<#{channel_id}>?WEB-{target_order_id}",
+            ephemeral=True,
+        )
+        return
+
+    if ok:
+        await interaction.followup.send(
+            "? ?? Panel ??????\n"
+            f"???<#{channel_id}>\n"
+            f"???WEB-{target_order_id}\n"
+            f"? Panel?{old_message_id or '?'}\n"
+            f"{message}",
+            ephemeral=True,
+        )
+    else:
+        await interaction.followup.send(
+            "? ?????? Panel?\n"
+            f"???<#{channel_id}>\n"
+            f"???WEB-{target_order_id}\n"
+            f"{message}",
+            ephemeral=True,
+        )
 
 
 
