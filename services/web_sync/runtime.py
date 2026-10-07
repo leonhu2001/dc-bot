@@ -29,7 +29,7 @@ def configure_web_sync_runtime(namespace: Mapping[str, Any]) -> None:
 def _web_dashboard_db_path_for_bot() -> str:
     from pathlib import Path
 
-    return str(Path(__file__).with_name("web_dashboard.db"))
+    return str(Path(__file__).resolve().parents[2] / "web_dashboard.db")
 
 
 # zYao 3C3B web order created bridge v1
