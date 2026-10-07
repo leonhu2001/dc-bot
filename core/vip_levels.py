@@ -153,7 +153,43 @@ VIP_DISCOUNT_EXCLUDED_CATEGORIES: frozenset[str] = frozenset({
     "title",
 })
 
-VIP_DISCOUNT_EXCLUDED_RULE_KEYS: frozenset[str] = frozenset({
+
+class _VipDiscountExcludedRuleKeys(frozenset):
+    """Static exclusions plus each product's live VIP eligibility setting.
+
+    checkout_preview imports this object directly and tests membership, while
+    Discord pricing goes through get_vip_discount_pay_rate.  Keeping the live
+    product flag here makes both paths share exactly the same rule without a
+    second hard-coded exclusion list.
+    """
+
+    def __contains__(self, value) -> bool:
+        key = str(value or "").strip()
+
+        if super().__contains__(key):
+            return True
+
+        if not key:
+            return False
+
+        try:
+            from services.order_rules import ORDER_RULES
+
+            rule = ORDER_RULES.get(key)
+            if rule is not None:
+                return not bool(
+                    getattr(rule, "vip_discount_allowed", True)
+                )
+        except Exception:
+            # Fail open to the existing static VIP policy if product rules are
+            # temporarily unavailable.  The pricing path still has all legacy
+            # category/rule exclusions below.
+            pass
+
+        return False
+
+
+VIP_DISCOUNT_EXCLUDED_RULE_KEYS: frozenset[str] = _VipDiscountExcludedRuleKeys({
     "basic_trial_500",
     "basic_trial_1000",
     "farm_season_3x3_normal",
