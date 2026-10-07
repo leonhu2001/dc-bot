@@ -9,6 +9,7 @@ from web.app.services.discord_service import send_direct_message
 
 _WORKER_ROLES = {"worker", "護航 / 陪玩", "worker_payout", "護航 / 陪玩分潤"}
 _CS_ROLES = {"customer_service", "customer-service", "cs", "客服", "魔丸♫客服分潤"}
+_EMPLOYEE_CENTER_URL = "https://mowanentertainment.com/employee"
 
 
 def _role_targets(role: str | None) -> tuple[bool, bool]:
@@ -61,35 +62,17 @@ def _month_filter(month: str) -> tuple[str, list[str]]:
     )
 
 
-def _chunks(lines: list[str], limit: int = 1800) -> list[str]:
-    result: list[str] = []
-    current: list[str] = []
-    size = 0
-    for line in lines:
-        extra = len(line) + (1 if current else 0)
-        if current and size + extra > limit:
-            result.append("\n".join(current))
-            current = [line]
-            size = len(line)
-        else:
-            current.append(line)
-            size += extra
-    if current:
-        result.append("\n".join(current))
-    return result
-
-
 def _fetch_details(*, db_file: str | Path, person_id: str, month: str, role: str) -> dict:
     worker_enabled, cs_enabled = _role_targets(role)
     month_sql, month_params = _month_filter(month)
     data = {
         "display_name": person_id,
         "worker_total": 0,
+        "worker_count": 0,
         "tip_total": 0,
+        "tip_count": 0,
         "cs_total": 0,
-        "worker_lines": [],
-        "tip_lines": [],
-        "cs_lines": [],
+        "cs_count": 0,
     }
 
     conn = sqlite3.connect(str(db_file), timeout=15)
@@ -99,10 +82,7 @@ def _fetch_details(*, db_file: str | Path, person_id: str, month: str, role: str
             rows = conn.execute(
                 f"""
                 SELECT COALESCE(NULLIF(p.worker_display_name, ''), p.worker_discord_id) AS display_name,
-                       COALESCE(p.final_payout, 0) AS amount,
-                       COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
-                       w.category, w.item,
-                       COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
+                       COALESCE(p.final_payout, 0) AS amount
                 FROM worker_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -110,24 +90,20 @@ def _fetch_details(*, db_file: str | Path, person_id: str, month: str, role: str
                   AND p.payout_status = 'paid'
                   AND COALESCE(p.final_payout, 0) > 0
                   {month_sql}
-                ORDER BY closed_at ASC, p.id ASC
+                ORDER BY p.id ASC
                 """,
                 [person_id, *month_params],
             ).fetchall()
             for row in rows:
-                data["display_name"] = data["display_name"] if data["display_name"] != person_id else str(row["display_name"] or person_id)
-                amount = int(row["amount"] or 0)
-                data["worker_total"] += amount
-                date = str(row["closed_at"] or "")[:10] or "未紀錄"
-                service = str(row["item"] or row["category"] or "未紀錄服務")
-                data["worker_lines"].append(f"• {row['order_no']}｜{date}｜{service}｜{amount:,}T")
+                if data["display_name"] == person_id:
+                    data["display_name"] = str(row["display_name"] or person_id)
+                data["worker_total"] += int(row["amount"] or 0)
+                data["worker_count"] += 1
 
             rows = conn.execute(
                 f"""
                 SELECT COALESCE(NULLIF(p.worker_display_name, ''), p.worker_discord_id) AS display_name,
-                       COALESCE(p.amount, 0) AS amount,
-                       COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
-                       COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
+                       COALESCE(p.amount, 0) AS amount
                 FROM worker_tips p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -136,25 +112,21 @@ def _fetch_details(*, db_file: str | Path, person_id: str, month: str, role: str
                   AND p.payout_status = 'paid'
                   AND COALESCE(p.amount, 0) > 0
                   {month_sql}
-                ORDER BY closed_at ASC, p.id ASC
+                ORDER BY p.id ASC
                 """,
                 [person_id, *month_params],
             ).fetchall()
             for row in rows:
-                data["display_name"] = data["display_name"] if data["display_name"] != person_id else str(row["display_name"] or person_id)
-                amount = int(row["amount"] or 0)
-                data["tip_total"] += amount
-                date = str(row["closed_at"] or "")[:10] or "未紀錄"
-                data["tip_lines"].append(f"• {row['order_no']}｜{date}｜🍗 雞腿｜{amount:,}T")
+                if data["display_name"] == person_id:
+                    data["display_name"] = str(row["display_name"] or person_id)
+                data["tip_total"] += int(row["amount"] or 0)
+                data["tip_count"] += 1
 
         if cs_enabled:
             rows = conn.execute(
                 f"""
                 SELECT COALESCE(NULLIF(p.customer_service_display_name, ''), p.customer_service_discord_id) AS display_name,
-                       COALESCE(p.payout_amount, 0) AS amount,
-                       COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
-                       w.category, w.item,
-                       COALESCE(NULLIF(w.closed_at, ''), NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')) AS closed_at
+                       COALESCE(p.payout_amount, 0) AS amount
                 FROM customer_service_payouts p
                 JOIN web_orders w ON w.id = p.order_id
                 WHERE w.status = 'closed'
@@ -162,21 +134,23 @@ def _fetch_details(*, db_file: str | Path, person_id: str, month: str, role: str
                   AND p.payout_status = 'paid'
                   AND COALESCE(p.payout_amount, 0) > 0
                   {month_sql}
-                ORDER BY closed_at ASC, p.id ASC
+                ORDER BY p.id ASC
                 """,
                 [person_id, *month_params],
             ).fetchall()
             for row in rows:
-                data["display_name"] = data["display_name"] if data["display_name"] != person_id else str(row["display_name"] or person_id)
-                amount = int(row["amount"] or 0)
-                data["cs_total"] += amount
-                date = str(row["closed_at"] or "")[:10] or "未紀錄"
-                service = str(row["item"] or row["category"] or "未紀錄服務")
-                data["cs_lines"].append(f"• {row['order_no']}｜{date}｜客服｜{service}｜{amount:,}T")
+                if data["display_name"] == person_id:
+                    data["display_name"] = str(row["display_name"] or person_id)
+                data["cs_total"] += int(row["amount"] or 0)
+                data["cs_count"] += 1
     finally:
         conn.close()
 
     return data
+
+
+def _category_line(label: str, total: int, count: int) -> str:
+    return f"• **{label}**　{total:,}T・{count}筆"
 
 
 def send_payout_paid_notification(*, db_file, person_id, before, after) -> dict:
@@ -198,57 +172,50 @@ def send_payout_paid_notification(*, db_file, person_id, before, after) -> dict:
         role=str(after_data.get("person_role") or ""),
     )
     worker_total = int(details["worker_total"])
+    worker_count = int(details["worker_count"])
     tip_total = int(details["tip_total"])
+    tip_count = int(details["tip_count"])
     cs_total = int(details["cs_total"])
+    cs_count = int(details["cs_count"])
     total = worker_total + tip_total + cs_total
     if total <= 0:
         return {"sent": False, "reason": "empty_salary_details"}
 
-    fields = [
-        {"name": "本次發放", "value": f"**{total:,}T**", "inline": False},
-        {"name": "發放期間", "value": _period_label(month), "inline": True},
-    ]
+    category_lines: list[str] = []
     if worker_total:
-        fields.append({"name": "陪玩／打單收入", "value": f"{worker_total:,}T", "inline": True})
+        category_lines.append(_category_line("陪玩／打單收入", worker_total, worker_count))
     if tip_total:
-        fields.append({"name": "🍗 雞腿", "value": f"{tip_total:,}T", "inline": True})
+        category_lines.append(_category_line("🍗 雞腿", tip_total, tip_count))
     if cs_total:
-        fields.append({"name": "客服分潤", "value": f"{cs_total:,}T", "inline": True})
+        category_lines.append(_category_line("客服分潤", cs_total, cs_count))
 
+    period = _period_label(month)
     send_direct_message(
         person_id,
         embeds=[{
             "title": "💰 薪資已發放",
-            "description": f"{details['display_name']}，你的 {_period_label(month)} 薪資已完成發放。\n以下為本次薪資摘要，完整明細會接在後面。",
-            "fields": fields,
+            "description": (
+                f"{details['display_name']}，你的 **{period}** 薪資已完成發放。\n"
+                f"完整薪資明細請至 [員工中心]({_EMPLOYEE_CENTER_URL}) 查看。"
+            ),
+            "fields": [
+                {"name": "本次發放", "value": f"**{total:,}T**", "inline": True},
+                {"name": "發放期間", "value": period, "inline": True},
+                {"name": "薪資分類", "value": "\n".join(category_lines), "inline": False},
+            ],
             "footer": {"text": "魔丸娛樂｜員工薪資通知"},
         }],
     )
-
-    lines: list[str] = []
-    for title, key in (
-        ("**陪玩／打單收入**", "worker_lines"),
-        ("**🍗 雞腿**", "tip_lines"),
-        ("**客服分潤**", "cs_lines"),
-    ):
-        values = details[key]
-        if not values:
-            continue
-        if lines:
-            lines.append("")
-        lines.append(title)
-        lines.extend(values)
-
-    chunks = _chunks(lines)
-    for index, chunk in enumerate(chunks, start=1):
-        heading = "**薪資明細**" if len(chunks) == 1 else f"**薪資明細（{index}/{len(chunks)}）**"
-        send_direct_message(person_id, content=f"{heading}\n{chunk}")
 
     return {
         "sent": True,
         "total": total,
         "worker_total": worker_total,
+        "worker_count": worker_count,
         "tip_total": tip_total,
+        "tip_count": tip_count,
         "customer_service_total": cs_total,
-        "detail_messages": len(chunks),
+        "customer_service_count": cs_count,
+        "detail_messages": 0,
+        "employee_center_url": _EMPLOYEE_CENTER_URL,
     }
