@@ -684,6 +684,110 @@ def _group_data(
     }
 
 
+DYNAMIC_ADMIN_GROUP_LABEL = "後台新增商品"
+
+
+def _current_group_specs() -> list[dict]:
+    """Return static storefront groups plus live manager-created products.
+
+    Custom rules live in SQLite and can be created without a Git deployment, so
+    this must be built at request time instead of mutating GROUP_SPECS at import.
+    Products with the same second-level category share one storefront card.
+    """
+    specs = [
+        {
+            **spec,
+            "variants": list(spec.get("variants", [])),
+        }
+        for spec in GROUP_SPECS
+    ]
+
+    grouped = {
+        (
+            str(spec.get("category") or ""),
+            str(spec.get("label") or ""),
+        ): spec
+        for spec in specs
+    }
+
+    is_custom = getattr(
+        ORDER_RULES,
+        "is_custom",
+        None,
+    )
+    if not callable(is_custom):
+        return specs
+
+    for rule_key, rule in ORDER_RULES.items():
+        key = str(rule_key or "").strip()
+        if not key:
+            continue
+
+        try:
+            if not bool(is_custom(key)):
+                continue
+        except Exception:
+            continue
+
+        category = str(
+            getattr(rule, "category", "")
+            or ""
+        ).strip()
+        if not category:
+            continue
+
+        group_label = (
+            str(
+                getattr(
+                    rule,
+                    "catalog_group_label",
+                    "",
+                )
+                or ""
+            ).strip()
+            or DYNAMIC_ADMIN_GROUP_LABEL
+        )
+
+        group_key = (category, group_label)
+        spec = grouped.get(group_key)
+
+        if spec is None:
+            note = str(
+                getattr(rule, "note", "")
+                or ""
+            ).strip()
+            spec = {
+                "key": f"admin_{key}",
+                "category": category,
+                "label": group_label,
+                "selector_label": "方案",
+                "description": (
+                    note
+                    or "選擇適合你的方案。"
+                ),
+                "variants": [],
+            }
+            specs.append(spec)
+            grouped[group_key] = spec
+
+        if not any(
+            str(existing_key) == key
+            for existing_key, _label
+            in spec.get("variants", [])
+        ):
+            spec["variants"].append(
+                (
+                    key,
+                    str(
+                        getattr(rule, "label", key)
+                        or key
+                    ),
+                )
+            )
+
+    return specs
+
+
 def get_public_order_categories() -> list[dict]:
     result = [
         {
@@ -692,10 +796,11 @@ def get_public_order_categories() -> list[dict]:
         }
     ]
 
+    current_specs = _current_group_specs()
     available = {
         spec["category"]
         for spec
-        in GROUP_SPECS
+        in current_specs
     }
 
     for category in CATEGORY_ORDER:
@@ -725,10 +830,14 @@ def get_grouped_order_catalog(
         or "all"
     ).strip()
 
+    current_specs = _current_group_specs()
     valid = {
-        item["key"]
-        for item
-        in get_public_order_categories()
+        "all",
+        *[
+            str(spec.get("category") or "")
+            for spec in current_specs
+            if str(spec.get("category") or "")
+        ],
     }
 
     if category not in valid:
@@ -736,7 +845,7 @@ def get_grouped_order_catalog(
 
     groups = []
 
-    for spec in GROUP_SPECS:
+    for spec in current_specs:
 
         if (
             category != "all"
