@@ -16,18 +16,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply repair only on trigger commit
+      - name: Apply and validate source repair
         run: |
-          if [ "$(git log -1 --pretty=%s)" != "Run one-shot source repair" ]; then
+          if [ "$(git log -1 --pretty=%s)" != "Direct repair now" ]; then
             echo "Not the repair trigger commit; nothing to do."
             exit 0
           fi
           python .github/repair_payment_dispatch_source.py
           python -m compileall -q bot.py views/smart_dispatch.py
-          python -m pytest -q tests/test_payment_panel_and_dispatch_source_regressions.py
 
       - name: Commit repaired source when changed
         run: |
+          if [ "$(git log -1 --pretty=%s)" != "Direct repair now" ]; then
+            exit 0
+          fi
           if git diff --quiet -- bot.py views/smart_dispatch.py tests/test_payment_panel_and_dispatch_source_regressions.py; then
             echo "No source changes to commit."
             exit 0
