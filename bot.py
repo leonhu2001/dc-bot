@@ -4470,11 +4470,11 @@ async def browse_staff_profiles(
 
 @bot.tree.command(
     name="fix_acceptance_payment_panel",
-    description="??? ID ?????? panel",
+    description="依票口 ID 補送等待付款 Panel",
     guild=discord.Object(id=GUILD_ID),
 )
 @app_commands.describe(
-    ticket_channel_id="Discord ???? ID??? 1557267849578545252"
+    ticket_channel_id="Discord 票口頻道 ID，例如 1557267849578545252"
 )
 @app_commands.default_permissions(manage_messages=True)
 async def fix_acceptance_payment_panel(
@@ -4483,26 +4483,26 @@ async def fix_acceptance_payment_panel(
 ):
     if not _require_customer_staff_or_manager(interaction):
         await interaction.response.send_message(
-            "????????????????? panel?",
+            "只有客服、店長或管理員可以補送付款 Panel。",
             ephemeral=True,
         )
         return
 
     if interaction.guild is None:
         await interaction.response.send_message(
-            "??????????????",
+            "這個功能只能在伺服器內使用。",
             ephemeral=True,
         )
         return
 
-    # ???? ACK Discord???? DB / API ?????? interaction timeout?
+    # 先 ACK Discord，避免後續 DB / API 查詢超過 interaction timeout。
     await interaction.response.defer(ephemeral=True)
 
     try:
         channel_id = int(str(ticket_channel_id).strip())
     except (TypeError, ValueError):
         await interaction.followup.send(
-            "?? ID ????????? Discord ?? ID?",
+            "票口 ID 格式錯誤，請輸入純數字 Discord 頻道 ID。",
             ephemeral=True,
         )
         return
@@ -4526,7 +4526,7 @@ async def fix_acceptance_payment_panel(
 
     if ticket_channel is None:
         await interaction.followup.send(
-            f"??????? `{channel_id}`?",
+            f"找不到票口頻道 `{channel_id}`。",
             ephemeral=True,
         )
         return
@@ -4553,7 +4553,7 @@ async def fix_acceptance_payment_panel(
 
     if row is None:
         await interaction.followup.send(
-            f"????? <#{channel_id}> ??? WEB ???",
+            f"票口 <#{channel_id}> 找不到對應的 WEB 訂單。",
             ephemeral=True,
         )
         return
@@ -4566,14 +4566,13 @@ async def fix_acceptance_payment_panel(
         "waiting_acceptance",
     }:
         await interaction.followup.send(
-            f"WEB-{target_order_id} ????? `{current_status}`?"
-            "?????????????????????",
+            f"WEB-{target_order_id} 目前狀態為 `{current_status}`，"
+            "只有等待接單或接單完成待付款的訂單可以補送付款 Panel。",
             ephemeral=True,
         )
         return
 
-    # ??????? payment message?
-    # restore function ????? send ????? panel?
+    # 清除舊付款訊息記錄，讓 restore function 重新送出付款 Panel。
     order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(
         channel_id,
         {},
@@ -4604,9 +4603,9 @@ async def fix_acceptance_payment_panel(
         )
     except asyncio.TimeoutError:
         await interaction.followup.send(
-            "?? ?????? 20 ??\n"
-            "????????????????????????? Panel?\n"
-            f"???<#{channel_id}>?WEB-{target_order_id}",
+            "補送付款 Panel 超過 20 秒，已停止等待。\n"
+            "請先確認票口權限與 Bot 狀態，再重新執行此指令。\n"
+            f"票口：<#{channel_id}>｜訂單：WEB-{target_order_id}",
             ephemeral=True,
         )
         return
@@ -4620,26 +4619,26 @@ async def fix_acceptance_payment_panel(
         )
 
         await interaction.followup.send(
-            f"? ?????`{type(exc).__name__}: {exc}`\n"
-            f"???<#{channel_id}>?WEB-{target_order_id}",
+            f"補送付款 Panel 失敗：`{type(exc).__name__}: {exc}`\n"
+            f"票口：<#{channel_id}>｜訂單：WEB-{target_order_id}",
             ephemeral=True,
         )
         return
 
     if ok:
         await interaction.followup.send(
-            "? ?? Panel ??????\n"
-            f"???<#{channel_id}>\n"
-            f"???WEB-{target_order_id}\n"
-            f"? Panel?{old_message_id or '?'}\n"
+            "✅ 付款 Panel 已重新送出。\n"
+            f"票口：<#{channel_id}>\n"
+            f"訂單：WEB-{target_order_id}\n"
+            f"舊 Panel 訊息 ID：{old_message_id or '無'}\n"
             f"{message}",
             ephemeral=True,
         )
     else:
         await interaction.followup.send(
-            "? ?????? Panel?\n"
-            f"???<#{channel_id}>\n"
-            f"???WEB-{target_order_id}\n"
+            "❌ 無法補送付款 Panel。\n"
+            f"票口：<#{channel_id}>\n"
+            f"訂單：WEB-{target_order_id}\n"
             f"{message}",
             ephemeral=True,
         )

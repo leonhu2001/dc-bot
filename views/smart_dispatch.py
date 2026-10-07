@@ -653,7 +653,8 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                if stage >= 1:
+                # 第三次通知起才進入每 10 分鐘循環；第二輪完成前不可提前進入。
+                if stage >= 2:
                     updated_text = str(plan.get("updated_at") or "").strip()
                     try:
                         updated = datetime.fromisoformat(updated_text.replace("Z", "+00:00"))
@@ -705,7 +706,8 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                     mark_smart_dispatch_stage(
                         order_id,
-                        stage=1,
+                        # 保留第二輪 stage=2；不可降回 1，否則下一輪會重送第二輪通知。
+                        stage=stage,
                     )
 
         except Exception as exc:
