@@ -17,6 +17,80 @@ from web.app.services.role_catalog import (
 DISCORD_API_BASE = "https://discord.com/api/v10"
 
 
+def _bot_headers() -> dict[str, str]:
+    if not config.DISCORD_BOT_TOKEN:
+        raise RuntimeError("DISCORD_BOT_TOKEN is not configured")
+
+    return {
+        "Authorization": f"Bot {config.DISCORD_BOT_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+
+def send_direct_message(
+    discord_user_id: str | int,
+    *,
+    content: str | None = None,
+    embeds: list[dict] | None = None,
+) -> dict:
+    """Send a DM from the configured Discord bot account.
+
+    The web process uses Discord's REST API directly so salary notifications do
+    not depend on an in-memory discord.py bot instance. Callers should treat
+    delivery failure as non-transactional: the business action has already
+    completed and notification errors must not roll it back.
+    """
+    user_id = str(discord_user_id or "").strip()
+    if not user_id:
+        raise ValueError("discord_user_id is required")
+
+    payload: dict = {
+        "allowed_mentions": {"parse": []},
+    }
+
+    if content is not None:
+        text = str(content).strip()
+        if text:
+            payload["content"] = text
+
+    if embeds:
+        payload["embeds"] = list(embeds)
+
+    if "content" not in payload and "embeds" not in payload:
+        raise ValueError("DM requires content or embeds")
+
+    headers = _bot_headers()
+    channel_response = requests.post(
+        f"{DISCORD_API_BASE}/users/@me/channels",
+        headers=headers,
+        json={"recipient_id": user_id},
+        timeout=15,
+    )
+
+    if channel_response.status_code not in {200, 201}:
+        raise RuntimeError(
+            f"Failed to open Discord DM channel: HTTP {channel_response.status_code}"
+        )
+
+    channel_id = str(channel_response.json().get("id") or "").strip()
+    if not channel_id:
+        raise RuntimeError("Discord DM channel response did not include an id")
+
+    message_response = requests.post(
+        f"{DISCORD_API_BASE}/channels/{channel_id}/messages",
+        headers=headers,
+        json=payload,
+        timeout=15,
+    )
+
+    if message_response.status_code not in {200, 201}:
+        raise RuntimeError(
+            f"Failed to send Discord DM: HTTP {message_response.status_code}"
+        )
+
+    return message_response.json()
+
+
 def _normalize_role_ids(value) -> set[str]:
     if not value:
         return set()
