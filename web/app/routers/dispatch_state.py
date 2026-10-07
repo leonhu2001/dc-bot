@@ -250,18 +250,28 @@ def _public_dispatch_snapshot(snapshot: dict, user: dict | None) -> dict:
         }
         for key, value in access_map.items()
     }
+    alert_keys = [
+        str(key)
+        for key in snapshot.get("keys") or []
+        if bool((access_map.get(str(key)) or {}).get("allowed"))
+    ]
+    access_signature = "|".join(
+        f"{key}:{int(bool(value.get('allowed')))}:"
+        f"{int(bool(value.get('lock_active')))}:"
+        f"{int(bool(value.get('is_specified')))}:"
+        f"{str(value.get('reason') or '')}"
+        for key, value in sorted(access_map.items())
+    )
+    public_signature = f"{snapshot.get('signature','')}|access:{access_signature}"
 
     return {
         **{
             key: value
             for key, value in snapshot.items()
-            if key != "_alert_rules"
+            if key not in {"_alert_rules", "signature"}
         },
-        "alert_keys": [
-            str(key)
-            for key in snapshot.get("keys") or []
-            if bool((access_map.get(str(key)) or {}).get("allowed"))
-        ],
+        "signature": public_signature,
+        "alert_keys": alert_keys,
         "claim_access": public_access,
     }
 
@@ -368,8 +378,7 @@ async def dispatch_events(request: Request):
 
             snapshot = await _shared_dispatch_event_snapshot()
             public_snapshot = _public_dispatch_snapshot(snapshot, user)
-            alert_signature = ",".join(public_snapshot.get("alert_keys") or [])
-            public_signature = f"{snapshot['signature']}|alerts:{alert_signature}"
+            public_signature = str(public_snapshot.get("signature") or "")
 
             if last_public_signature is None or public_signature != last_public_signature:
                 payload = {
