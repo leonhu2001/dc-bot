@@ -4,6 +4,11 @@ from datetime import datetime
 from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session, selectinload
 
+from services.dispatch_display import (
+    acceptance_lock_display,
+    build_service_display,
+    dispatch_status_display,
+)
 from shared.models import (
     CustomerServicePayout,
     OrderAssignment,
@@ -58,6 +63,9 @@ def is_dispatch_claim_open(order) -> bool:
     status = _normalize_text(getattr(order, "status", None))
 
     if status != WAITING_ACCEPTANCE:
+        return False
+
+    if bool(getattr(order, "dispatch_acceptance_locked", False)):
         return False
 
     missing_count = getattr(order, "dispatch_missing_staff_count", None)
@@ -237,12 +245,28 @@ def attach_acceptance_claims_to_orders(db: Session, orders: list[WebOrder]) -> N
         setattr(order, "prepay_required_count", 0)
         setattr(order, "prepay_protector_count", 0)
         setattr(order, "prepay_min_protector_count", 0)
+        setattr(order, "dispatch_acceptance_locked", False)
+        setattr(order, "dispatch_acceptance_opens_at", None)
+        setattr(order, "dispatch_acceptance_lock_remaining_seconds", 0)
+
+        service_display = build_service_display(
+            quantity=getattr(order, "quantity", 0),
+            rule_key=getattr(order, "order_rule_key", None),
+            rule_snapshot=getattr(order, "rule_snapshot_json", None),
+            price_snapshot=getattr(order, "price_snapshot_json", None),
+        )
+        setattr(order, "dispatch_service_unit", service_display["unit"])
+        setattr(order, "dispatch_service_purchased_text", service_display["purchased_text"])
+        setattr(order, "dispatch_service_total_text", service_display["total_text"])
+        setattr(order, "dispatch_service_bonus_text", service_display["bonus_text"])
+        setattr(order, "dispatch_service_has_bonus", service_display["has_bonus"])
 
         meta = db.execute(
             text("""
                 SELECT
                     required_staff_count,
-                    min_protector_count
+                    min_protector_count,
+                    created_at
                 FROM order_acceptance_meta
                 WHERE order_id = :order_id
                 LIMIT 1
@@ -252,6 +276,18 @@ def attach_acceptance_claims_to_orders(db: Session, orders: list[WebOrder]) -> N
 
         if meta is None:
             continue
+
+        lock_display = acceptance_lock_display(
+            meta["created_at"],
+            getattr(order, "status", None),
+        )
+        setattr(order, "dispatch_acceptance_locked", bool(lock_display["locked"]))
+        setattr(order, "dispatch_acceptance_opens_at", lock_display["opens_at"])
+        setattr(
+            order,
+            "dispatch_acceptance_lock_remaining_seconds",
+            int(lock_display["remaining_seconds"] or 0),
+        )
 
         rows = db.execute(
             text("""
@@ -308,25 +344,30 @@ def attach_dispatch_operational_context(orders: list[WebOrder]) -> None:
             required_count = current_count
 
         missing_count = max(0, required_count - current_count)
+        acceptance_locked = bool(getattr(order, "dispatch_acceptance_locked", False))
         claim_open = (
             status == WAITING_ACCEPTANCE
             and missing_count > 0
+            and not acceptance_locked
+        )
+
+        status_label, status_detail = dispatch_status_display(
+            status=status,
+            locked=acceptance_locked,
+            current_staff_count=current_count,
+            required_staff_count=required_count,
         )
 
         if claim_open:
-            status_label = "可接單"
-        else:
-            status_label = DISPATCH_STATUS_LABELS.get(
-                status,
-                status or "未知狀態",
-            )
-
-        if status == ACCEPTED_PENDING_PAY:
+            locked_message = status_detail or "目前可接單。"
+        elif status == ACCEPTED_PENDING_PAY:
             locked_message = "接單名額已滿，等待付款成立。"
         elif status == OrderStatus.ACTIVE.value:
             locked_message = "已付款成立，網站接單已鎖定。"
+        elif acceptance_locked:
+            locked_message = "此單為 1 分鐘接單保護期，倒數結束後所有人同時開放接單。"
         else:
-            locked_message = "此狀態不開放網站接單。"
+            locked_message = status_detail or "此狀態不開放網站接單。"
 
         setattr(order, "dispatch_current_staff_count", current_count)
         setattr(order, "dispatch_required_staff_count", required_count)
@@ -334,6 +375,7 @@ def attach_dispatch_operational_context(orders: list[WebOrder]) -> None:
         setattr(order, "dispatch_claim_open", claim_open)
         setattr(order, "dispatch_allows_unclaim", status in PREPAY_DISPATCH_STATUSES)
         setattr(order, "dispatch_status_label", status_label)
+        setattr(order, "dispatch_status_detail", status_detail)
         setattr(order, "dispatch_locked_message", locked_message)
 
 
