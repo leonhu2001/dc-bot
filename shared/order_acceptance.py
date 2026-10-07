@@ -23,8 +23,8 @@ PREPAY_ACCEPTANCE_STATUSES = {
     ACCEPTED_PENDING_PAY,
 }
 
-# 公開派單建立後先保留 60 秒閱讀／指定接單時間。
-# 指定人員仍需通過原本的遊戲身分與職位資格檢查，只豁免這個時間鎖。
+# 公開派單建立後所有接單人員統一保留 60 秒閱讀時間。
+# 指定人員仍保留指定名額，但不再豁免時間鎖，確保所有人同時開放接單。
 PUBLIC_ACCEPTANCE_LOCK_SECONDS = 60
 
 PROTECTOR_ROLE_IDS = {
@@ -498,13 +498,10 @@ def claim_acceptance_order(
         )
         specified_staff_ids = _load_json_list(meta.get("specified_staff_ids_json"))
 
-        if (
-            staff_discord_id not in specified_staff_ids
-            and is_public_acceptance_locked(meta)
-        ):
+        if is_public_acceptance_locked(meta):
             raise ValueError(
-                "🔒 此訂單目前為 1 分鐘接單保護期；指定人員可立即接單，"
-                "其他人請於派單 1 分鐘後再接。"
+                "🔒 此訂單目前為 1 分鐘接單保護期；"
+                "所有接單人員將於派單 1 分鐘後同時開放接單。"
             )
 
         if not role_ids_match_requirements(
