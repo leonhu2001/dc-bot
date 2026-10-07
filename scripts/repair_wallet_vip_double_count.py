@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from core import database
 from core.vip_levels import BASE_MEMBER_LEVELS
@@ -198,7 +203,12 @@ def _find_candidates(
 
         candidates.append((int(channel_id), order_data, wrong_amount, event_time))
 
-    candidates.sort(key=lambda item: (item[3] or datetime.min.replace(tzinfo=TAIPEI_TZ), item[0]))
+    candidates.sort(
+        key=lambda item: (
+            item[3] or datetime.min.replace(tzinfo=TAIPEI_TZ),
+            item[0],
+        )
+    )
     return candidates, undated
 
 
@@ -283,7 +293,10 @@ def repair(
     )
 
     if not apply:
-        print("Dry run only. No data changed. Re-run with --apply after stopping Bot/Web services.")
+        print(
+            "Dry run only. No data changed. "
+            "Re-run with --apply after stopping Bot/Web services."
+        )
         return 0
 
     active_services = [
@@ -353,7 +366,7 @@ def main() -> int:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parents[1],
+        default=ROOT,
     )
     parser.add_argument(
         "--apply",
