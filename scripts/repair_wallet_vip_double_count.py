@@ -189,10 +189,11 @@ def _find_candidates(
         if wrong_amount <= 0:
             continue
 
-        status = str(order_data.get("status") or "").strip().lower()
-        if status != "closed" and not bool(order_data.get("closed")):
-            continue
-
+        # Current order status is not authoritative for this repair. A historical
+        # order can be reward-counted/closed and later move to another state such
+        # as "stored". Once a wallet order has a positive reward_amount, it is a
+        # double-count candidate regardless of its later status because wallet
+        # principal was already counted when the topup completed.
         event_time = _order_event_time(order_data)
         if event_time is None:
             undated.append((int(channel_id), order_data))
@@ -283,6 +284,7 @@ def repair(
         print(
             f"- {order_data.get('order_no') or channel_id}: "
             f"{wrong_amount:,}T / "
+            f"status={order_data.get('status') or '-'} / "
             f"reward_counted_at={order_data.get('reward_counted_at') or '-'} / "
             f"event={event_time.isoformat(timespec='seconds') if event_time else '-'}"
         )
