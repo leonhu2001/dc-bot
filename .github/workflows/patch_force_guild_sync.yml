@@ -1,0 +1,34 @@
+name: Patch force guild sync
+
+on:
+  push:
+    branches:
+      - fix/force-replace-guild-commands
+    paths:
+      - .github/workflows/patch_force_guild_sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/force-replace-guild-commands
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Patch bot sync block
+        run: python tools/_patch_force_guild_sync.py
+      - name: Remove one-time files
+        run: rm tools/_patch_force_guild_sync.py .github/workflows/patch_force_guild_sync.yml
+      - name: Commit patched source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py tools/_patch_force_guild_sync.py .github/workflows/patch_force_guild_sync.yml
+          git commit -m "Use verified clean guild command sync"
+          git push origin HEAD:fix/force-replace-guild-commands
