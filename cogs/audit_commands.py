@@ -12,6 +12,125 @@ from services.audit import build_audit_data_report
 from services.logging_service import send_order_log
 
 
+STAFF_COMMAND_TRANSLATIONS = {
+    "order_search": "訂單查詢",
+    "stored_orders": "存單查詢",
+    "fix_order_amount": "修正訂單金額",
+    "fix_order_customer": "修正訂單顧客",
+    "resend_dispatch": "重新派單",
+    "reward": "會員",
+    "customer_points": "點數查詢",
+    "adjust_points": "調整點數",
+    "add_purchase": "補登消費",
+    "customer": "顧客",
+    "notes": "備註查詢",
+    "add_note": "新增備註",
+    "remove_note": "刪除備註",
+    "wallet_history": "錢包流水",
+    "wallet_add": "錢包加值",
+    "wallet_adjust": "錢包調整",
+    "wallet_refund": "錢包退款",
+    "stats": "營運",
+    "today": "今日",
+    "month": "本月",
+    "top_customers": "消費排行",
+    "audit": "系統",
+    "data": "資料檢查",
+}
+
+
+STAFF_COMMAND_PATHS = (
+    "order_search",
+    "stored_orders",
+    "fix_order_amount",
+    "fix_order_customer",
+    "resend_dispatch",
+    "reward customer_points",
+    "reward adjust_points",
+    "reward add_purchase",
+    "customer notes",
+    "customer add_note",
+    "customer remove_note",
+    "wallet_history",
+    "wallet_add",
+    "wallet_adjust",
+    "wallet_refund",
+    "stats today",
+    "stats month",
+    "stats top_customers",
+    "audit data",
+)
+
+
+class StaffCommandTranslator(app_commands.Translator):
+    async def translate(
+        self,
+        string: app_commands.locale_str,
+        locale: discord.Locale,
+        context: app_commands.TranslationContext,
+    ) -> str | None:
+        if str(locale) != "zh-TW":
+            return None
+        return STAFF_COMMAND_TRANSLATIONS.get(string.message)
+
+
+def _resolve_staff_command(
+    tree: app_commands.CommandTree,
+    path: str,
+    guild_id: int | None,
+):
+    parts = [part for part in path.split() if part]
+    if not parts:
+        return None
+
+    command = None
+    if guild_id:
+        command = tree.get_command(
+            parts[0],
+            guild=discord.Object(id=int(guild_id)),
+        )
+
+    if command is None:
+        command = tree.get_command(parts[0])
+
+    if command is None:
+        return None
+
+    for part in parts[1:]:
+        getter = getattr(command, "get_command", None)
+        if getter is None:
+            return None
+        command = getter(part)
+        if command is None:
+            return None
+
+    return command
+
+
+async def _staff_command_check(interaction: discord.Interaction) -> bool:
+    member = interaction.user
+    if not isinstance(member, discord.Member):
+        return False
+
+    return bool(
+        is_customer_staff(member)
+        or member.guild_permissions.administrator
+    )
+
+
+def _install_staff_command_guards(bot: commands.Bot) -> None:
+    guild_id = int(getattr(bot, "guild_id_value", 0) or 0) or None
+
+    for path in STAFF_COMMAND_PATHS:
+        command = _resolve_staff_command(bot.tree, path, guild_id)
+        if command is None:
+            continue
+
+        checks = getattr(command, "checks", ())
+        if _staff_command_check not in checks:
+            command.add_check(_staff_command_check)
+
+
 class AuditCommands(commands.Cog):
     audit = app_commands.Group(name="audit", description="資料稽核")
 
@@ -92,3 +211,5 @@ class AuditCommands(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AuditCommands(bot))
+    await bot.tree.set_translator(StaffCommandTranslator())
+    _install_staff_command_guards(bot)
