@@ -173,35 +173,41 @@ def test_staff_management_paths_are_native_chinese_and_resolve():
     assert not missing, "Staff management command paths do not resolve: " + ", ".join(missing)
 
 
-def test_stale_global_cleanup_clears_remote_but_restores_local_tree(monkeypatch):
-    first = object()
-    second = object()
-
+def test_stale_global_cleanup_keeps_local_tree_empty_and_verifies_remote():
     class FakeTree:
         def __init__(self):
-            self.local = [first, second]
-            self.remote = [object(), object()]
-
-        async def fetch_commands(self):
-            return list(self.remote)
-
-        def get_commands(self):
-            return list(self.local)
+            self.local = [SimpleNamespace(name="抽獎")]
+            self.remote = [SimpleNamespace(name="lottery")]
+            self.sync_snapshots: list[list[str]] = []
 
         def clear_commands(self, *, guild=None):
             assert guild is None
             self.local.clear()
 
-        def add_command(self, command):
-            self.local.append(command)
-
         async def sync(self):
-            assert self.local == []
-            return []
+            self.sync_snapshots.append([item.name for item in self.local])
+            self.remote = [SimpleNamespace(name=item.name) for item in self.local]
+            return list(self.remote)
+
+        async def fetch_commands(self):
+            return list(self.remote)
 
     tree = FakeTree()
     asyncio.run(command_registry.clear_stale_remote_global_commands(tree))
-    assert tree.local == [first, second]
+
+    assert tree.sync_snapshots == [[]]
+    assert tree.local == []
+    assert tree.remote == []
+
+
+def test_bot_copies_global_declarations_to_guild_then_drops_global_tree():
+    source = (ROOT / "bot.py").read_text(encoding="utf-8")
+    copy_at = source.index("bot.tree.copy_global_to(guild=guild_command_scope)")
+    clear_at = source.index("bot.tree.clear_commands(guild=None)", copy_at)
+    cleanup_at = source.index("clear_stale_remote_global_commands(bot.tree)", clear_at)
+    guild_sync_at = source.index("force_replace_remote_guild_commands(bot.tree, GUILD_ID)", cleanup_at)
+
+    assert copy_at < clear_at < cleanup_at < guild_sync_at
 
 
 def test_force_replace_guild_commands_clears_stale_remote_and_verifies():

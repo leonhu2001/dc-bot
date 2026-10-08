@@ -4380,12 +4380,29 @@ async def on_ready():
                 "cogs.staff_sync",
             ):
                 await bot.load_extension(extension_name)
-            from core.command_registry import clear_stale_remote_global_commands
-            await clear_stale_remote_global_commands(bot.tree)
-            bot.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
+            guild_command_scope = discord.Object(id=GUILD_ID)
+            bot.tree.copy_global_to(guild=guild_command_scope)
+            # This bot publishes Slash commands only to the configured guild.
+            # After copying Cog/global declarations into that guild, drop the
+            # local global tree so a later bare sync can never republish them.
+            bot.tree.clear_commands(guild=None)
             bot._extensions_loaded = True
         except Exception as e:
             print(f"Extension load error: {e}")
+
+    try:
+        from core.command_registry import clear_stale_remote_global_commands
+        await asyncio.wait_for(
+            clear_stale_remote_global_commands(bot.tree),
+            timeout=30,
+        )
+    except asyncio.TimeoutError:
+        print(
+            "Global command cleanup timeout: Discord global cleanup exceeded 30 seconds.",
+            flush=True,
+        )
+    except Exception as e:
+        print(f"Global command cleanup error: {e}", flush=True)
 
     try:
         from core.command_registry import force_replace_remote_guild_commands
