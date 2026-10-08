@@ -12,6 +12,7 @@ from core.command_registry import (
     canonicalize_tree,
     install_canonical_command_registry,
 )
+from views.staff_management import REQUIRED_COMMAND_PATHS, resolve_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,38 @@ def _iter_literal_app_command_names() -> list[tuple[Path, int, str]]:
                     found.append((path, node.lineno, keyword.value.value))
 
     return found
+
+
+def _dummy_command(name: str) -> app_commands.Command:
+    async def callback(interaction: discord.Interaction):
+        return None
+
+    return app_commands.Command(name=name, description="test", callback=callback)
+
+
+def _build_staff_panel_tree() -> tuple[discord.Client, app_commands.CommandTree]:
+    client = discord.Client(intents=discord.Intents.none())
+    tree = app_commands.CommandTree(client)
+    groups: dict[str, app_commands.Group] = {}
+
+    for path in REQUIRED_COMMAND_PATHS:
+        parts = path.split()
+        if len(parts) == 1:
+            if tree.get_command(parts[0]) is None:
+                tree.add_command(_dummy_command(parts[0]))
+            continue
+
+        group_name, command_name = parts
+        group = groups.get(group_name)
+        if group is None:
+            group = app_commands.Group(name=group_name, description="test")
+            groups[group_name] = group
+            tree.add_command(group)
+
+        if group.get_command(command_name) is None:
+            group.add_command(_dummy_command(command_name))
+
+    return client, tree
 
 
 def test_every_literal_slash_command_has_a_chinese_canonical_name():
@@ -106,6 +139,27 @@ def test_command_tree_uses_chinese_names_and_keeps_legacy_panel_lookups():
     assert child is not None
     assert reward.get_command("adjust_points") is child
     assert child.name == "調整點數"
+
+
+def test_every_staff_management_panel_path_still_resolves_after_canonicalization():
+    install_canonical_command_registry()
+    _client, tree = _build_staff_panel_tree()
+
+    canonicalize_tree(tree)
+
+    missing: list[str] = []
+    still_english: list[str] = []
+
+    for path in REQUIRED_COMMAND_PATHS:
+        command = resolve_command(tree, path)
+        if command is None:
+            missing.append(path)
+            continue
+        if ASCII_COMMAND_CHARS.search(command.name):
+            still_english.append(f"{path} -> {command.name}")
+
+    assert not missing, "Staff management Panel paths broke after Chinese rename: " + ", ".join(missing)
+    assert not still_english, "Staff management Panel resolved English command names: " + ", ".join(still_english)
 
 
 def test_guild_copy_is_canonicalized_without_breaking_legacy_lookup():
