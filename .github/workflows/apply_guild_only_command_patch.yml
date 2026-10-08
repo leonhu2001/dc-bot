@@ -1,0 +1,45 @@
+name: Apply guild-only command patch
+
+on:
+  push:
+    branches:
+      - fix/guild-only-command-tree
+    paths:
+      - tools/patch_guild_only_commands.py
+      - .github/workflows/apply_guild_only_command_patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/guild-only-command-tree
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Apply source patch
+        run: python tools/patch_guild_only_commands.py
+      - name: Install focused test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install 'pytest<9,>=8.3'
+      - name: Verify command registry patch
+        run: |
+          python -m compileall -q bot.py core tests/test_command_registry.py
+          python -m pytest -q tests/test_command_registry.py
+      - name: Remove one-time patch files
+        run: |
+          rm tools/patch_guild_only_commands.py
+          rm .github/workflows/apply_guild_only_command_patch.yml
+      - name: Commit patched source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bot.py core/command_registry.py tests/test_command_registry.py tools/patch_guild_only_commands.py .github/workflows/apply_guild_only_command_patch.yml
+          git commit -m 'Keep Discord Slash commands guild-only [guild-only-patched]'
+          git push origin HEAD:fix/guild-only-command-tree
