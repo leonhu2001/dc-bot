@@ -69,7 +69,7 @@ class StaffCommandTranslator(app_commands.Translator):
         locale: discord.Locale,
         context: app_commands.TranslationContext,
     ) -> str | None:
-        if str(locale) != "zh-TW":
+        if locale is not discord.Locale.taiwan_chinese:
             return None
         return STAFF_COMMAND_TRANSLATIONS.get(string.message)
 
