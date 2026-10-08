@@ -77,7 +77,13 @@ async def force_replace_remote_guild_commands(
     tree: app_commands.CommandTree,
     guild_id: int,
 ) -> list[app_commands.AppCommand]:
-    """Replace the remote guild command set from a clean slate and verify it."""
+    """Atomically publish the complete guild command set and verify it.
+
+    Discord's guild command sync is already a bulk overwrite. Do not publish an
+    empty command set first: if the following network call times out, that leaves
+    the server with zero Slash commands. Keep the desired local tree intact and
+    publish it in one request instead.
+    """
 
     guild = discord.Object(id=int(guild_id))
     desired_commands = list(tree.get_commands(guild=guild))
@@ -86,21 +92,19 @@ async def force_replace_remote_guild_commands(
     if not desired_commands:
         raise RuntimeError("Refusing to publish an empty guild Slash command set")
 
-    tree.clear_commands(guild=guild)
-    try:
-        try:
-            await tree.sync(guild=guild)
-        except discord.HTTPException as exc:
-            print(
-                "[commands] empty guild overwrite failed; "
-                f"continuing with desired sync: {type(exc).__name__}: {exc}",
-                flush=True,
-            )
-    finally:
-        for command in desired_commands:
-            tree.add_command(command, guild=guild, override=True)
+    print(
+        "[commands] publishing complete guild command set atomically: "
+        f"{len(desired_commands)} top-level commands",
+        flush=True,
+    )
 
     synced = await tree.sync(guild=guild)
+    print(
+        "[commands] guild command publish returned: "
+        f"{len(synced)} top-level commands",
+        flush=True,
+    )
+
     remote_commands = await tree.fetch_commands(guild=guild)
     actual_names = sorted(command.name for command in remote_commands)
 
@@ -113,7 +117,7 @@ async def force_replace_remote_guild_commands(
         )
 
     print(
-        "[commands] verified guild commands after clean replace: "
+        "[commands] verified guild commands after atomic replace: "
         f"{len(actual_names)}",
         flush=True,
     )

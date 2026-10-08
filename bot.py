@@ -4408,13 +4408,13 @@ async def on_ready():
         from core.command_registry import force_replace_remote_guild_commands
         synced = await asyncio.wait_for(
             force_replace_remote_guild_commands(bot.tree, GUILD_ID),
-            timeout=60,
+            timeout=180,
         )
         print(f"Slash commands synced and verified: {len(synced)}", flush=True)
     except asyncio.TimeoutError:
         print(
-            "Sync timeout: Discord command sync exceeded 30 seconds; "
-            "persistent views remain available.",
+            "Sync timeout: Discord guild command publish exceeded 180 seconds; "
+            "the remote guild command set was not pre-cleared.",
             flush=True,
         )
     except Exception as e:

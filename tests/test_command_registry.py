@@ -233,7 +233,7 @@ def test_bot_merges_global_declarations_before_remote_cleanup_and_guild_sync():
     assert "copy_global_to" not in source[merge_at - 500:cleanup_at]
 
 
-def test_force_replace_guild_commands_clears_stale_remote_and_verifies():
+def test_force_replace_guild_commands_publishes_desired_set_without_emptying_first():
     desired = [SimpleNamespace(name="抽獎"), SimpleNamespace(name="訂單查詢")]
 
     class FakeTree:
@@ -247,13 +247,10 @@ def test_force_replace_guild_commands_clears_stale_remote_and_verifies():
             return list(self.local)
 
         def clear_commands(self, *, guild=None):
-            assert guild is not None
-            self.local.clear()
+            raise AssertionError("guild command sync must never clear the local/remote set first")
 
         def add_command(self, command, *, guild=None, override=False):
-            assert guild is not None
-            assert override is True
-            self.local.append(command)
+            raise AssertionError("guild command sync should not rebuild the local tree")
 
         async def sync(self, *, guild=None):
             assert guild is not None
@@ -268,7 +265,7 @@ def test_force_replace_guild_commands_clears_stale_remote_and_verifies():
     tree = FakeTree()
     synced = asyncio.run(command_registry.force_replace_remote_guild_commands(tree, 123))
 
-    assert tree.sync_snapshots == [[], ["抽獎", "訂單查詢"]]
+    assert tree.sync_snapshots == [["抽獎", "訂單查詢"]]
     assert [item.name for item in tree.local] == ["抽獎", "訂單查詢"]
     assert [item.name for item in tree.remote] == ["抽獎", "訂單查詢"]
     assert [item.name for item in synced] == ["抽獎", "訂單查詢"]
