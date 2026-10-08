@@ -12,30 +12,193 @@ from services.audit import build_audit_data_report
 from services.logging_service import send_order_log
 
 
+# Discord zh-TW 顯示名稱。只改顯示，不改內部 command key，避免既有 Panel / callback 失效。
 STAFF_COMMAND_TRANSLATIONS = {
+    # top-level / groups
+    "order": "訂單",
+    "vip": "會員",
+    "member": "會員",
+    "reward": "會員管理",
+    "customer": "顧客",
+    "stats": "營運",
+    "audit": "系統",
+    "setup": "設定",
+    "lottery": "抽獎",
+    "staff": "人員",
+
+    # public / member commands
+    "my_favorites": "我的收藏",
+    "browse_staff_profiles": "瀏覽個人牆",
+    "my_wallet_history": "我的錢包流水",
+    "my_info": "我的會員資料",
+    "points": "我的會員資料",
+
+    # staff profile / repair tools
+    "fix_acceptance_payment_panel": "補送付款面板",
+    "staff_profile_panel": "建立個人牆面板",
+    "refresh_staff_profile_panel": "更新個人牆面板",
+    "reward_redeem_panel": "點數兌換面板",
+    "set_customer_level": "設定會員等級",
+
+    # order tools
     "order_search": "訂單查詢",
     "stored_orders": "存單查詢",
+    "check_stored_orders": "檢查逾期存單",
+    "delete_order": "刪除訂單",
     "fix_order_amount": "修正訂單金額",
     "fix_order_customer": "修正訂單顧客",
     "resend_dispatch": "重新派單",
-    "reward": "會員",
-    "customer_points": "點數查詢",
-    "adjust_points": "調整點數",
-    "add_purchase": "補登消費",
-    "customer": "顧客",
-    "notes": "備註查詢",
-    "add_note": "新增備註",
-    "remove_note": "刪除備註",
+    "delete_dispatch_panel": "刪除派單面板",
+
+    # wallet
     "wallet_history": "錢包流水",
     "wallet_add": "錢包加值",
     "wallet_adjust": "錢包調整",
     "wallet_refund": "錢包退款",
-    "stats": "營運",
+    "wallet_refund_order": "訂單退款至錢包",
+
+    # rewards / customer
+    "customer_points": "會員資料查詢",
+    "adjust_points": "調整點數",
+    "add_purchase": "補登消費",
+    "import_purchases": "批量補登消費",
+    "set_customer_rewards": "修正會員資料",
+    "notes": "備註查詢",
+    "add_note": "新增備註",
+    "remove_note": "刪除備註",
+
+    # stats / audit
     "today": "今日",
     "month": "本月",
     "top_customers": "消費排行",
-    "audit": "系統",
+    "check_vip_downgrades": "檢查會員降階",
     "data": "資料檢查",
+
+    # setup
+    "panel": "建立面板",
+    "staff_panel": "客服管理面板",
+    "topup_panel": "儲值面板",
+    "complaint_panel": "客訴面板",
+    "feedback_panel": "意見箱面板",
+    "play_voice": "陪玩語音",
+    "vip_voice": "會員語音",
+    "public_voice": "公共語音",
+
+    # lottery / sync
+    "status": "查看狀態",
+    "draw": "開獎",
+    "sync_members": "同步人員",
+
+    # common parameter names
+    "keyword": "關鍵字",
+    "limit": "顯示筆數",
+    "channel": "頻道",
+    "message_id": "訊息ID",
+    "order_channel_id": "票口ID",
+    "customer": "顧客",
+    "amount": "金額",
+    "order": "訂單",
+    "adjust_customer": "同步會員累積",
+    "delete_dispatch_panel": "刪除派單面板",
+    "note": "備註",
+    "blacklist": "黑名單",
+    "index": "編號",
+    "points": "點數",
+    "reason": "原因",
+    "date": "日期",
+    "records": "紀錄",
+    "total_spent": "累積消費",
+    "order_count": "完成訂單數",
+    "last_order_date": "最後下單日期",
+    "point_adjustment": "點數修正",
+    "force": "強制檢查",
+    "prize": "獎品",
+    "description": "說明",
+    "winners": "得獎人數",
+}
+
+
+# 沒有特別列到的 command / group / parameter 名稱，以 token 組合做保底翻譯。
+# 目的不是翻譯一般文字，而是避免新增 snake_case Slash 指令後直接露出英文。
+_IDENTIFIER_TOKENS = {
+    "my": "我的",
+    "order": "訂單",
+    "orders": "訂單",
+    "stored": "存單",
+    "search": "查詢",
+    "check": "檢查",
+    "delete": "刪除",
+    "fix": "修正",
+    "amount": "金額",
+    "customer": "顧客",
+    "customers": "顧客",
+    "resend": "重送",
+    "dispatch": "派單",
+    "panel": "面板",
+    "acceptance": "接單",
+    "payment": "付款",
+    "wallet": "錢包",
+    "history": "流水",
+    "refund": "退款",
+    "add": "新增",
+    "adjust": "調整",
+    "reward": "會員",
+    "redeem": "兌換",
+    "member": "會員",
+    "points": "點數",
+    "purchase": "消費",
+    "purchases": "消費",
+    "import": "批量匯入",
+    "set": "設定",
+    "level": "等級",
+    "info": "資料",
+    "favorites": "收藏",
+    "browse": "瀏覽",
+    "staff": "人員",
+    "profile": "個人牆",
+    "profiles": "個人牆",
+    "refresh": "更新",
+    "notes": "備註",
+    "note": "備註",
+    "remove": "刪除",
+    "stats": "營運",
+    "today": "今日",
+    "month": "本月",
+    "top": "排行",
+    "audit": "系統",
+    "data": "資料",
+    "setup": "設定",
+    "topup": "儲值",
+    "complaint": "客訴",
+    "feedback": "意見",
+    "play": "陪玩",
+    "voice": "語音",
+    "vip": "會員",
+    "public": "公共",
+    "lottery": "抽獎",
+    "status": "狀態",
+    "draw": "開獎",
+    "sync": "同步",
+    "members": "人員",
+    "keyword": "關鍵字",
+    "limit": "筆數",
+    "channel": "頻道",
+    "message": "訊息",
+    "id": "ID",
+    "blacklist": "黑名單",
+    "index": "編號",
+    "reason": "原因",
+    "date": "日期",
+    "records": "紀錄",
+    "total": "累積",
+    "spent": "消費",
+    "count": "數量",
+    "last": "最後",
+    "point": "點數",
+    "force": "強制",
+    "prize": "獎品",
+    "description": "說明",
+    "winners": "得獎人數",
 }
 
 
@@ -62,6 +225,30 @@ STAFF_COMMAND_PATHS = (
 )
 
 
+def _translate_identifier(value: str) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+
+    explicit = STAFF_COMMAND_TRANSLATIONS.get(raw)
+    if explicit:
+        return explicit
+
+    parts = [part for part in raw.lower().split("_") if part]
+    if not parts:
+        return None
+
+    translated = []
+    for part in parts:
+        text = _IDENTIFIER_TOKENS.get(part)
+        if text is None:
+            return None
+        translated.append(text)
+
+    result = "".join(translated)
+    return result[:32] if result else None
+
+
 class StaffCommandTranslator(app_commands.Translator):
     async def translate(
         self,
@@ -71,7 +258,16 @@ class StaffCommandTranslator(app_commands.Translator):
     ) -> str | None:
         if locale is not discord.Locale.taiwan_chinese:
             return None
-        return STAFF_COMMAND_TRANSLATIONS.get(string.message)
+
+        # 指令、群組與參數的名稱才做 identifier 翻譯；描述本身原本就是中文。
+        if context.location in {
+            app_commands.TranslationContextLocation.command_name,
+            app_commands.TranslationContextLocation.group_name,
+            app_commands.TranslationContextLocation.parameter_name,
+        }:
+            return _translate_identifier(string.message)
+
+        return None
 
 
 def _resolve_staff_command(
