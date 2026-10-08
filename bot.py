@@ -4380,12 +4380,12 @@ async def on_ready():
                 "cogs.staff_sync",
             ):
                 await bot.load_extension(extension_name)
-            guild_command_scope = discord.Object(id=GUILD_ID)
-            bot.tree.copy_global_to(guild=guild_command_scope)
-            # This bot publishes Slash commands only to the configured guild.
-            # After copying Cog/global declarations into that guild, drop the
-            # local global tree so a later bare sync can never republish them.
-            bot.tree.clear_commands(guild=None)
+            from core.command_registry import move_global_commands_to_guild
+            moved_global_commands = move_global_commands_to_guild(bot.tree, GUILD_ID)
+            print(
+                f"[commands] moved global declarations into guild without replacing existing commands: {moved_global_commands}",
+                flush=True,
+            )
             bot._extensions_loaded = True
         except Exception as e:
             print(f"Extension load error: {e}")
