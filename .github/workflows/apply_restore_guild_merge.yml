@@ -1,0 +1,43 @@
+name: Apply restore guild merge patch
+
+on:
+  push:
+    branches:
+      - fix/restore-guild-command-merge
+    paths:
+      - tools/patch_restore_guild_merge.py
+      - .github/workflows/apply_restore_guild_merge.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/restore-guild-command-merge
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Apply source patch
+        run: python tools/patch_restore_guild_merge.py
+      - name: Install focused test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify command registry patch
+        run: |
+          python -m compileall -q bot.py core cogs views
+          python -m pytest -q tests/test_command_registry.py
+      - name: Remove one-time patch files
+        run: |
+          rm tools/patch_restore_guild_merge.py
+          rm .github/workflows/apply_restore_guild_merge.yml
+      - name: Commit patched source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py core/command_registry.py tests/test_command_registry.py tools/patch_restore_guild_merge.py .github/workflows/apply_restore_guild_merge.yml
+          git commit -m "Preserve guild Slash commands while moving Cog commands"
+          git push origin HEAD:fix/restore-guild-command-merge
