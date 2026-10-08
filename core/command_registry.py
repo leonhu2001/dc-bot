@@ -1,45 +1,56 @@
 from __future__ import annotations
 
+import asyncio
+
 import discord
 from discord import app_commands
 
 
 async def clear_stale_remote_global_commands(tree: app_commands.CommandTree) -> None:
-    """Delete historical remote global commands without altering the local tree."""
+    """Publish and verify an empty global command set.
 
-    try:
-        remote_global_commands = await tree.fetch_commands()
-    except discord.HTTPException as exc:
-        print(
-            "[commands] unable to inspect stale global commands; "
-            f"guild sync will continue: {type(exc).__name__}: {exc}",
-            flush=True,
-        )
-        return
+    The production bot is guild-only. Its local global tree must already be empty
+    after startup copies Cog declarations into the configured guild. This function
+    bulk-overwrites Discord's global commands with an empty set and then reads the
+    remote state back. A small retry covers transient Discord API/cache lag.
+    """
 
-    if not remote_global_commands:
-        return
-
-    local_global_commands = list(tree.get_commands())
+    # Idempotently enforce the invariant locally as well. Do not restore these
+    # objects: keeping them around is what made accidental global republishing
+    # possible in earlier revisions.
     tree.clear_commands(guild=None)
 
-    try:
-        await tree.sync()
-    except discord.HTTPException as exc:
-        print(
-            "[commands] unable to clear stale global commands; "
-            f"guild sync will continue: {type(exc).__name__}: {exc}",
-            flush=True,
-        )
-    else:
-        print(
-            "[commands] cleared stale global commands: "
-            f"{len(remote_global_commands)}",
-            flush=True,
-        )
-    finally:
-        for command in local_global_commands:
-            tree.add_command(command)
+    last_error: Exception | None = None
+    remaining_names: list[str] = []
+
+    for attempt in range(1, 4):
+        try:
+            await tree.sync()
+            remote_global_commands = await tree.fetch_commands()
+        except discord.HTTPException as exc:
+            last_error = exc
+            remote_global_commands = []
+        else:
+            remaining_names = [command.name for command in remote_global_commands]
+            if not remaining_names:
+                print(
+                    f"[commands] verified remote global commands empty on attempt {attempt}",
+                    flush=True,
+                )
+                return
+
+        if attempt < 3:
+            await asyncio.sleep(1)
+
+    if last_error is not None and not remaining_names:
+        raise RuntimeError(
+            "Discord global Slash command cleanup could not be verified"
+        ) from last_error
+
+    raise RuntimeError(
+        "Discord global Slash commands still exist after cleanup: "
+        + ", ".join(sorted(remaining_names))
+    )
 
 
 async def force_replace_remote_guild_commands(
