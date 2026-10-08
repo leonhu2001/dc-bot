@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-time exact source patch for the production command-sync timeout.
 path = Path("bot.py")
 source = path.read_text(encoding="utf-8")
 
