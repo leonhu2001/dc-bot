@@ -108,7 +108,7 @@ class CustomerCommands(commands.Cog):
 
     @customer.command(
         name='刪除備註',
-        description="客服刪除顧客備註，index 請看 /customer_notes 的編號",
+        description="客服刪除顧客備註，編號請看 /顧客管理 備註查詢",
     )
     @app_commands.describe(
         customer="要刪除備註的顧客",
@@ -123,7 +123,7 @@ class CustomerCommands(commands.Cog):
         data = get_customer_reward_data(customer.id)
         notes = data.setdefault("notes", [])
         if index < 1 or index > len(notes):
-            await interaction.response.send_message("找不到這個備註編號，請先用 /customer_notes 查看。", ephemeral=True)
+            await interaction.response.send_message("找不到這個備註編號，請先用 /顧客管理 備註查詢查看。", ephemeral=True)
             return
 
         removed = notes.pop(index - 1)
