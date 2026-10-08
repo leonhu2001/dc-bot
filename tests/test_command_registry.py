@@ -32,12 +32,16 @@ def _literal_name(call: ast.Call) -> str | None:
     return None
 
 
-def _iter_registered_command_names() -> list[tuple[Path, int, str]]:
+def _command_source_paths() -> list[Path]:
     paths = [ROOT / "bot.py"]
     paths.extend(sorted((ROOT / "cogs").rglob("*.py")))
+    return paths
+
+
+def _iter_registered_command_names() -> list[tuple[Path, int, str]]:
     found: list[tuple[Path, int, str]] = []
 
-    for path in paths:
+    for path in _command_source_paths():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and _call_attr(node) == "Group":
@@ -57,9 +61,70 @@ def _iter_registered_command_names() -> list[tuple[Path, int, str]]:
     return found
 
 
+def _registered_command_paths() -> set[str]:
+    """Build actual Slash paths from source declarations.
+
+    This intentionally does not use REQUIRED_COMMAND_PATHS to build the registry,
+    so the test catches a Panel path that was renamed without updating the real
+    command (or vice versa).
+    """
+
+    registered: set[str] = set()
+
+    for path in _command_source_paths():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        group_names: dict[str, str] = {}
+
+        # Module-level and class-level `foo = app_commands.Group(name="...")`.
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+
+            value = node.value
+            if not isinstance(value, ast.Call) or _call_attr(value) != "Group":
+                continue
+
+            group_name = _literal_name(value)
+            if group_name is None:
+                continue
+
+            targets: list[ast.expr]
+            if isinstance(node, ast.Assign):
+                targets = list(node.targets)
+            else:
+                targets = [node.target]
+
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    group_names[target.id] = group_name
+
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+
+            for decorator in node.decorator_list:
+                if not isinstance(decorator, ast.Call) or _call_attr(decorator) != "command":
+                    continue
+
+                command_name = _literal_name(decorator) or node.name
+                func = decorator.func
+                parent_name = None
+                if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+                    parent_name = func.value.id
+
+                group_name = group_names.get(parent_name or "")
+                if group_name:
+                    registered.add(f"{group_name} {command_name}")
+                else:
+                    registered.add(command_name)
+
+    return registered
+
+
 def _dummy_command(name: str) -> app_commands.Command:
     async def callback(interaction: discord.Interaction):
         return None
+
     return app_commands.Command(name=name, description="test", callback=callback)
 
 
@@ -95,6 +160,12 @@ def test_every_registered_slash_command_is_natively_chinese():
         if not (1 <= len(name) <= 32):
             invalid.append(f"{path.relative_to(ROOT)}:{line} invalid length {name!r}")
     assert not invalid, "Non-Chinese native Slash command names:\n" + "\n".join(invalid)
+
+
+def test_staff_management_paths_match_real_registered_commands():
+    registered = _registered_command_paths()
+    missing = [path for path in REQUIRED_COMMAND_PATHS if path not in registered]
+    assert not missing, "Staff management Panel paths missing from real command declarations: " + ", ".join(missing)
 
 
 def test_staff_management_paths_are_native_chinese_and_resolve():
