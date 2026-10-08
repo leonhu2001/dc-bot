@@ -12,25 +12,25 @@ from core.permissions import (
 
 
 REQUIRED_COMMAND_PATHS = (
-    "order_search",
-    "stored_orders",
-    "fix_order_amount",
-    "fix_order_customer",
-    "resend_dispatch",
-    "reward customer_points",
-    "reward adjust_points",
-    "reward add_purchase",
-    "customer notes",
-    "customer add_note",
-    "customer remove_note",
-    "wallet_history",
-    "wallet_add",
-    "wallet_adjust",
-    "wallet_refund",
-    "stats today",
-    "stats month",
-    "stats top_customers",
-    "audit data",
+    '訂單查詢',
+    '存單查詢',
+    '修正訂單金額',
+    '修正訂單顧客',
+    '重新派單',
+    '會員管理 會員資料',
+    '會員管理 調整點數',
+    '會員管理 補登消費',
+    '顧客管理 備註查詢',
+    '顧客管理 新增備註',
+    '顧客管理 刪除備註',
+    '錢包流水',
+    '錢包加值',
+    '錢包調整',
+    '錢包退款',
+    '營運 今日',
+    '營運 本月',
+    '營運 消費排行',
+    '系統 資料檢查',
 )
 
 
@@ -318,7 +318,7 @@ class OrderSearchModal(
 
         await invoke_existing_command(
             interaction,
-            "order_search",
+            '訂單查詢',
             keyword=(
                 str(self.keyword.value).strip()
                 or None
@@ -616,7 +616,7 @@ class FixOrderAmountModal(
                 f"同步會員累積："
                 f"{'是' if adjust else '否'}"
             ),
-            command_path="fix_order_amount",
+            command_path='修正訂單金額',
             command_kwargs={
                 "order": order,
                 "amount": amount,
@@ -659,7 +659,7 @@ class ResendDispatchModal(
                 "系統會清理這張票口的舊接單暫存，"
                 "並重新建立新的派單面板。"
             ),
-            command_path="resend_dispatch",
+            command_path='重新派單',
             command_kwargs={
                 "order_channel_id": channel_id,
             },
@@ -718,7 +718,7 @@ class FixOrderCustomerSelect(
                 f"會員累積搬移："
                 f"{'是' if self.adjust_customer else '否'}"
             ),
-            command_path="fix_order_customer",
+            command_path='修正訂單顧客',
             command_kwargs={
                 "order": self.order,
                 "customer": member,
@@ -876,7 +876,7 @@ class AddCustomerNoteModal(
                 f"{'是' if blacklist else '否'}\n"
                 f"備註：{note}"
             ),
-            command_path="customer add_note",
+            command_path='顧客管理 新增備註',
             command_kwargs={
                 "customer": self.member,
                 "note": note,
@@ -940,7 +940,7 @@ class RemoveCustomerNoteModal(
                 f"顧客：{self.member.mention}\n"
                 f"刪除第 **{index}** 筆備註"
             ),
-            command_path="customer remove_note",
+            command_path='顧客管理 刪除備註',
             command_kwargs={
                 "customer": self.member,
                 "index": index,
@@ -954,17 +954,17 @@ class WalletActionModal(
     MODES = {
         "topup": {
             "title": "客服儲值",
-            "command": "wallet_add",
+            "command": '錢包加值',
             "positive": True,
         },
         "adjust": {
             "title": "修正錢包餘額",
-            "command": "wallet_adjust",
+            "command": '錢包調整',
             "positive": False,
         },
         "refund": {
             "title": "退款到錢包",
-            "command": "wallet_refund",
+            "command": '錢包退款',
             "positive": True,
         },
     }
@@ -1149,7 +1149,7 @@ class AdjustPointsModal(
                 f"**{points:+,} 點**\n"
                 f"原因：{reason or '未填寫'}"
             ),
-            command_path="reward adjust_points",
+            command_path='會員管理 調整點數',
             command_kwargs={
                 "customer": self.member,
                 "points": points,
@@ -1256,7 +1256,7 @@ class AddPurchaseModal(
                 f"日期：`{date}`\n"
                 f"備註：{note or '未填寫'}"
             ),
-            command_path="reward add_purchase",
+            command_path='會員管理 補登消費',
             command_kwargs={
                 "customer": self.member,
                 "amount": amount,
@@ -1306,7 +1306,7 @@ class OrderMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "order_search",
+            '訂單查詢',
             keyword=None,
             status="active",
             limit=20,
@@ -1325,7 +1325,7 @@ class OrderMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "order_search",
+            '訂單查詢',
             keyword=None,
             status="closed",
             limit=20,
@@ -1410,7 +1410,7 @@ class StoredMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "stored_orders",
+            '存單查詢',
             limit=25,
         )
 
@@ -1426,7 +1426,7 @@ class StoredMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "order_search",
+            '訂單查詢',
             keyword=None,
             status="stored",
             limit=20,
@@ -1491,7 +1491,7 @@ class CustomerReadOnlyView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "reward customer_points",
+            '會員管理 會員資料',
             customer=self.member,
         )
 
@@ -1508,7 +1508,7 @@ class CustomerReadOnlyView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "customer notes",
+            '顧客管理 備註查詢',
             customer=self.member,
         )
 
@@ -1583,7 +1583,7 @@ class MemberWalletReadOnlyView(
     ):
         await invoke_existing_command(
             interaction,
-            "reward customer_points",
+            '會員管理 會員資料',
             customer=self.member,
         )
 
@@ -1600,7 +1600,7 @@ class MemberWalletReadOnlyView(
     ):
         await invoke_existing_command(
             interaction,
-            "wallet_history",
+            '錢包流水',
             customer=self.member,
             limit=10,
         )
@@ -1822,7 +1822,7 @@ class StatsMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "stats today",
+            '營運 今日',
         )
 
     @discord.ui.button(
@@ -1837,7 +1837,7 @@ class StatsMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "stats month",
+            '營運 本月',
         )
 
     @discord.ui.button(
@@ -1852,7 +1852,7 @@ class StatsMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "stats top_customers",
+            '營運 消費排行',
         )
 
 
@@ -1874,7 +1874,7 @@ class SystemMenuView(discord.ui.View):
     ):
         await invoke_existing_command(
             interaction,
-            "audit data",
+            '系統 資料檢查',
             limit=10,
         )
 

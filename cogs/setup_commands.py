@@ -20,7 +20,7 @@ from views.voice import (
 
 
 class SetupCommands(commands.Cog):
-    setup = app_commands.Group(name="setup", description="面板與語音入口設定")
+    setup = app_commands.Group(name='設定', description="面板與語音入口設定")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -41,7 +41,7 @@ class SetupCommands(commands.Cog):
             bot._topup_panel_view_registered = True
 
     @setup.command(
-        name="panel",
+        name='面板',
         description="建立魔丸娛樂客服面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -65,7 +65,7 @@ class SetupCommands(commands.Cog):
 
 
     @setup.command(
-        name="staff_panel",
+        name='客服管理面板',
         description="建立客服專用管理中心 Panel",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -127,7 +127,7 @@ class SetupCommands(commands.Cog):
         )
 
     @setup.command(
-        name="topup_panel",
+        name='儲值面板',
         description="建立魔丸娛樂儲值中心面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -152,7 +152,7 @@ class SetupCommands(commands.Cog):
         await interaction.response.send_message("儲值中心面板已建立。", ephemeral=True)
 
     @setup.command(
-        name="complaint_panel",
+        name='客訴面板',
         description="建立客訴表單面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -164,7 +164,7 @@ class SetupCommands(commands.Cog):
         )
 
     @setup.command(
-        name="feedback_panel",
+        name='意見箱面板',
         description="建立顧客意見箱面板",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -176,7 +176,7 @@ class SetupCommands(commands.Cog):
         )
 
     @setup.command(
-        name="play_voice",
+        name='陪玩語音',
         description="建立陪玩語音入口頻道",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -195,7 +195,7 @@ class SetupCommands(commands.Cog):
         await interaction.response.send_message(f"陪玩語音入口已建立 / 確認存在：{lobby_channel.mention}", ephemeral=True)
 
     @setup.command(
-        name="vip_voice",
+        name='貴賓語音',
         description="建立 VIP 語音入口頻道",
     )
     @app_commands.checks.has_permissions(administrator=True)
@@ -214,7 +214,7 @@ class SetupCommands(commands.Cog):
         await interaction.response.send_message(f"VIP 語音入口已建立 / 確認存在：{lobby_channel.mention}", ephemeral=True)
 
     @setup.command(
-        name="public_voice",
+        name='公共語音',
         description="建立公共語音入口頻道",
     )
     @app_commands.checks.has_permissions(administrator=True)

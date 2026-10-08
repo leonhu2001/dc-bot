@@ -16,7 +16,7 @@ from services.rewards import (
 
 
 class CustomerCommands(commands.Cog):
-    customer = app_commands.Group(name="customer", description="顧客備註管理")
+    customer = app_commands.Group(name='顧客管理', description="顧客備註管理")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -33,7 +33,7 @@ class CustomerCommands(commands.Cog):
         )
 
     @customer.command(
-        name="add_note",
+        name='新增備註',
         description="客服新增顧客備註或黑名單紀錄",
     )
     @app_commands.describe(
@@ -87,7 +87,7 @@ class CustomerCommands(commands.Cog):
         )
 
     @customer.command(
-        name="notes",
+        name='備註查詢',
         description="客服查詢顧客備註 / 黑名單紀錄",
     )
     @app_commands.describe(customer="要查詢備註的顧客")
@@ -107,8 +107,8 @@ class CustomerCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @customer.command(
-        name="remove_note",
-        description="客服刪除顧客備註，index 請看 /customer_notes 的編號",
+        name='刪除備註',
+        description="客服刪除顧客備註，編號請看 /顧客管理 備註查詢",
     )
     @app_commands.describe(
         customer="要刪除備註的顧客",
@@ -123,7 +123,7 @@ class CustomerCommands(commands.Cog):
         data = get_customer_reward_data(customer.id)
         notes = data.setdefault("notes", [])
         if index < 1 or index > len(notes):
-            await interaction.response.send_message("找不到這個備註編號，請先用 /customer_notes 查看。", ephemeral=True)
+            await interaction.response.send_message("找不到這個備註編號，請先用 /顧客管理 備註查詢查看。", ephemeral=True)
             return
 
         removed = notes.pop(index - 1)
