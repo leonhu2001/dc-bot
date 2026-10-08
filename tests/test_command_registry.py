@@ -4,6 +4,7 @@ import ast
 import asyncio
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import discord
 from discord import app_commands
@@ -55,27 +56,18 @@ def _iter_registered_command_names() -> list[tuple[Path, int, str]]:
                 if not isinstance(decorator, ast.Call) or _call_attr(decorator) != "command":
                     continue
                 name = _literal_name(decorator)
-                # No explicit name means Discord uses the Python function name.
                 found.append((path, decorator.lineno, name if name is not None else node.name))
 
     return found
 
 
 def _registered_command_paths() -> set[str]:
-    """Build actual Slash paths from source declarations.
-
-    This intentionally does not use REQUIRED_COMMAND_PATHS to build the registry,
-    so the test catches a Panel path that was renamed without updating the real
-    command (or vice versa).
-    """
-
     registered: set[str] = set()
 
     for path in _command_source_paths():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         group_names: dict[str, str] = {}
 
-        # Module-level and class-level `foo = app_commands.Group(name="...")`.
         for node in ast.walk(tree):
             if not isinstance(node, (ast.Assign, ast.AnnAssign)):
                 continue
@@ -210,3 +202,44 @@ def test_stale_global_cleanup_clears_remote_but_restores_local_tree(monkeypatch)
     tree = FakeTree()
     asyncio.run(command_registry.clear_stale_remote_global_commands(tree))
     assert tree.local == [first, second]
+
+
+def test_force_replace_guild_commands_clears_stale_remote_and_verifies():
+    desired = [SimpleNamespace(name="抽獎"), SimpleNamespace(name="訂單查詢")]
+
+    class FakeTree:
+        def __init__(self):
+            self.local = list(desired)
+            self.remote = [SimpleNamespace(name="lottery"), SimpleNamespace(name="delete_order")]
+            self.sync_snapshots: list[list[str]] = []
+
+        def get_commands(self, *, guild=None):
+            assert guild is not None
+            return list(self.local)
+
+        def clear_commands(self, *, guild=None):
+            assert guild is not None
+            self.local.clear()
+
+        def add_command(self, command, *, guild=None, override=False):
+            assert guild is not None
+            assert override is True
+            self.local.append(command)
+
+        async def sync(self, *, guild=None):
+            assert guild is not None
+            self.remote = [SimpleNamespace(name=item.name) for item in self.local]
+            self.sync_snapshots.append([item.name for item in self.local])
+            return list(self.remote)
+
+        async def fetch_commands(self, *, guild=None):
+            assert guild is not None
+            return list(self.remote)
+
+    tree = FakeTree()
+    synced = asyncio.run(command_registry.force_replace_remote_guild_commands(tree, 123))
+
+    assert tree.sync_snapshots == [[], ["抽獎", "訂單查詢"]]
+    assert [item.name for item in tree.local] == ["抽獎", "訂單查詢"]
+    assert [item.name for item in tree.remote] == ["抽獎", "訂單查詢"]
+    assert [item.name for item in synced] == ["抽獎", "訂單查詢"]

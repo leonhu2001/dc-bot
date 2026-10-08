@@ -4388,12 +4388,12 @@ async def on_ready():
             print(f"Extension load error: {e}")
 
     try:
-        guild = discord.Object(id=GUILD_ID)
+        from core.command_registry import force_replace_remote_guild_commands
         synced = await asyncio.wait_for(
-            bot.tree.sync(guild=guild),
-            timeout=30,
+            force_replace_remote_guild_commands(bot.tree, GUILD_ID),
+            timeout=60,
         )
-        print(f"Slash commands synced: {len(synced)}", flush=True)
+        print(f"Slash commands synced and verified: {len(synced)}", flush=True)
     except asyncio.TimeoutError:
         print(
             "Sync timeout: Discord command sync exceeded 30 seconds; "
