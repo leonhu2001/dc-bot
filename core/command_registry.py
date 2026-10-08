@@ -230,8 +230,10 @@ def _canonicalize_group(group: app_commands.Group) -> None:
                 f"Slash 指令中文名稱衝突：{group.name} {old_name} -> {new_name}"
             )
 
-        removed = group.remove_command(old_name)
-        if removed is None:
+        # discord.py Group.remove_command mutates the child mapping in-place and
+        # intentionally does not return the removed command.
+        group.remove_command(old_name)
+        if _original_group_get_command(group, old_name) is not None:
             raise RuntimeError(f"無法從群組移除 Slash 指令：{group.name} {old_name}")
 
         child.name = new_name
