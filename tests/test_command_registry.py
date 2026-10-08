@@ -173,6 +173,29 @@ def test_staff_management_paths_are_native_chinese_and_resolve():
     assert not missing, "Staff management command paths do not resolve: " + ", ".join(missing)
 
 
+def test_move_global_commands_to_guild_preserves_existing_guild_commands():
+    client = discord.Client(intents=discord.Intents.none())
+    tree = app_commands.CommandTree(client)
+    guild = discord.Object(id=123)
+
+    tree.add_command(_dummy_command("訂單查詢"), guild=guild)
+    tree.add_command(_dummy_command("修正訂單金額"), guild=guild)
+
+    lottery = app_commands.Group(name="抽獎", description="test")
+    lottery.add_command(_dummy_command("開獎"))
+    tree.add_command(lottery)
+
+    moved = command_registry.move_global_commands_to_guild(tree, guild.id)
+
+    assert moved == 1
+    assert tree.get_commands() == []
+    assert tree.get_command("訂單查詢", guild=guild) is not None
+    assert tree.get_command("修正訂單金額", guild=guild) is not None
+    moved_lottery = tree.get_command("抽獎", guild=guild)
+    assert moved_lottery is not None
+    assert moved_lottery.get_command("開獎") is not None
+
+
 def test_stale_global_cleanup_keeps_local_tree_empty_and_verifies_remote():
     class FakeTree:
         def __init__(self):
@@ -200,14 +223,14 @@ def test_stale_global_cleanup_keeps_local_tree_empty_and_verifies_remote():
     assert tree.remote == []
 
 
-def test_bot_copies_global_declarations_to_guild_then_drops_global_tree():
+def test_bot_merges_global_declarations_before_remote_cleanup_and_guild_sync():
     source = (ROOT / "bot.py").read_text(encoding="utf-8")
-    copy_at = source.index("bot.tree.copy_global_to(guild=guild_command_scope)")
-    clear_at = source.index("bot.tree.clear_commands(guild=None)", copy_at)
-    cleanup_at = source.index("clear_stale_remote_global_commands(bot.tree)", clear_at)
+    merge_at = source.index("move_global_commands_to_guild(bot.tree, GUILD_ID)")
+    cleanup_at = source.index("clear_stale_remote_global_commands(bot.tree)", merge_at)
     guild_sync_at = source.index("force_replace_remote_guild_commands(bot.tree, GUILD_ID)", cleanup_at)
 
-    assert copy_at < clear_at < cleanup_at < guild_sync_at
+    assert merge_at < cleanup_at < guild_sync_at
+    assert "copy_global_to" not in source[merge_at - 500:cleanup_at]
 
 
 def test_force_replace_guild_commands_clears_stale_remote_and_verifies():

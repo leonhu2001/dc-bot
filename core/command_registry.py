@@ -6,18 +6,38 @@ import discord
 from discord import app_commands
 
 
+def move_global_commands_to_guild(
+    tree: app_commands.CommandTree,
+    guild_id: int,
+) -> int:
+    """Merge global declarations into one guild without replacing guild commands.
+
+    ``CommandTree.copy_global_to`` replaces the guild command mapping with a copy
+    of the global mapping. That is unsafe for this bot because many commands are
+    declared directly against the production guild in ``bot.py``. Instead, add
+    each global top-level command to the guild individually, preserving unrelated
+    guild-only commands, then remove the local global tree so it cannot be synced.
+    """
+
+    guild = discord.Object(id=int(guild_id))
+    global_commands = list(tree.get_commands())
+
+    for command in global_commands:
+        tree.add_command(command, guild=guild, override=True)
+
+    tree.clear_commands(guild=None)
+    return len(global_commands)
+
+
 async def clear_stale_remote_global_commands(tree: app_commands.CommandTree) -> None:
     """Publish and verify an empty global command set.
 
     The production bot is guild-only. Its local global tree must already be empty
-    after startup copies Cog declarations into the configured guild. This function
+    after startup moves Cog declarations into the configured guild. This function
     bulk-overwrites Discord's global commands with an empty set and then reads the
     remote state back. A small retry covers transient Discord API/cache lag.
     """
 
-    # Idempotently enforce the invariant locally as well. Do not restore these
-    # objects: keeping them around is what made accidental global republishing
-    # possible in earlier revisions.
     tree.clear_commands(guild=None)
 
     last_error: Exception | None = None
@@ -57,21 +77,14 @@ async def force_replace_remote_guild_commands(
     tree: app_commands.CommandTree,
     guild_id: int,
 ) -> list[app_commands.AppCommand]:
-    """Replace the remote guild command set from a clean slate and verify it.
-
-    A normal guild sync should already be a bulk overwrite, but historical command
-    migrations left stale English commands visible in Discord. This helper makes
-    the cleanup explicit: snapshot the desired local guild tree, publish an empty
-    guild command set, restore the local tree, publish the desired set, then fetch
-    Discord's remote state and verify the top-level command names exactly match.
-
-    The local command objects are restored in a finally block, so a failed empty
-    sync cannot erase the bot's in-memory command tree.
-    """
+    """Replace the remote guild command set from a clean slate and verify it."""
 
     guild = discord.Object(id=int(guild_id))
     desired_commands = list(tree.get_commands(guild=guild))
     expected_names = sorted(command.name for command in desired_commands)
+
+    if not desired_commands:
+        raise RuntimeError("Refusing to publish an empty guild Slash command set")
 
     tree.clear_commands(guild=guild)
     try:
