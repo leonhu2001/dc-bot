@@ -84,8 +84,8 @@ def add_wallet_field_to_member_embed(embed: discord.Embed, customer_id) -> disco
 
 
 class RewardCommands(commands.Cog):
-    member = app_commands.Group(name='會員', description="會員資料")
-    reward = app_commands.Group(name='會員管理', description="會員點數與消費管理")
+    member = app_commands.Group(name="member", description="會員資料")
+    reward = app_commands.Group(name="reward", description="會員點數與消費管理")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -97,7 +97,7 @@ class RewardCommands(commands.Cog):
         return is_customer_staff(member) or has_role(member, self.manager_role_id()) or member.guild_permissions.administrator
 
     @member.command(
-        name='我的資料',
+        name="points",
         description="查詢自己的魔丸會員資料",
     )
     async def my_points(self, interaction: discord.Interaction):
@@ -107,7 +107,7 @@ class RewardCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @reward.command(
-        name='會員資料',
+        name="customer_points",
         description="客服查詢指定顧客的魔丸會員資料",
     )
     @app_commands.describe(customer="要查詢的顧客")
@@ -128,7 +128,7 @@ class RewardCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @reward.command(
-        name='調整點數',
+        name="adjust_points",
         description="客服調整顧客魔丸點數，可輸入正數加點或負數扣點",
     )
     @app_commands.describe(
@@ -175,7 +175,7 @@ class RewardCommands(commands.Cog):
         await interaction.response.send_message(message, ephemeral=True)
 
     @reward.command(
-        name='補登消費',
+        name="add_purchase",
         description="客服補登單筆顧客歷史消費",
     )
     @app_commands.describe(
@@ -232,7 +232,7 @@ class RewardCommands(commands.Cog):
         await interaction.response.send_message(message, ephemeral=True)
 
     @reward.command(
-        name='批量補登消費',
+        name="import_purchases",
         description="客服批量補登歷史消費，多行格式：顧客ID,金額,日期,備註",
     )
     @app_commands.describe(records="每行一筆：顧客ID,金額,日期,備註；備註可省略")
@@ -304,7 +304,7 @@ class RewardCommands(commands.Cog):
         await interaction.followup.send(f"{summary}\n\n{detail}", ephemeral=True)
 
     @reward.command(
-        name='修正會員資料',
+        name="set_customer_rewards",
         description="管理員手動修正顧客會員資料",
     )
     @app_commands.describe(

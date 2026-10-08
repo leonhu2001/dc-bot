@@ -19,7 +19,7 @@ from services.stats import build_sales_stats_embed
 
 
 class StatsCommands(commands.Cog):
-    stats = app_commands.Group(name='營運', description="營運統計")
+    stats = app_commands.Group(name="stats", description="營運統計")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -38,7 +38,7 @@ class StatsCommands(commands.Cog):
         )
 
     @stats.command(
-        name='今日',
+        name="today",
         description="客服查詢今日營運統計",
     )
     @app_commands.default_permissions(manage_messages=True)
@@ -54,7 +54,7 @@ class StatsCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @stats.command(
-        name='本月',
+        name="month",
         description="客服查詢本月營運統計",
     )
     @app_commands.default_permissions(manage_messages=True)
@@ -73,7 +73,7 @@ class StatsCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @stats.command(
-        name='消費排行',
+        name="top_customers",
         description="客服查詢顧客累積消費排行前 10 名",
     )
     @app_commands.default_permissions(manage_messages=True)
@@ -122,7 +122,7 @@ class StatsCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @stats.command(
-        name='檢查會員降階',
+        name="check_vip_downgrades",
         description="管理員手動檢查 VIP 維持條件並執行降階",
     )
     @app_commands.describe(force="是否強制重新檢查本月，預設否")

@@ -19,13 +19,13 @@ class LotteryCommands(commands.Cog):
     """全店免費反應抽獎。
 
     參加方式：
-    - 管理 / 客服使用 /抽獎 面板 發送抽獎訊息
+    - 管理 / 客服使用 /lottery panel 發送抽獎訊息
     - 顧客在訊息底下按 🎉
     - 每個 Discord 帳號同一個表情只能按一次，所以自然每人只算一次
     """
 
     lottery = app_commands.Group(
-        name='抽獎',
+        name="lottery",
         description="魔丸全店反應抽獎",
     )
 
@@ -103,7 +103,7 @@ class LotteryCommands(commands.Cog):
         return embed
 
     @lottery.command(
-        name='面板',
+        name="panel",
         description="發送全店免費反應抽獎面板",
     )
     @app_commands.describe(
@@ -139,12 +139,12 @@ class LotteryCommands(commands.Cog):
         await message.add_reaction(GIVEAWAY_EMOJI)
 
         await interaction.followup.send(
-            f"已發送抽獎面板。\n訊息 ID：`{message.id}`\n開獎請用：`/抽獎 開獎 message_id:{message.id}`",
+            f"已發送抽獎面板。\n訊息 ID：`{message.id}`\n開獎請用：`/lottery draw message_id:{message.id}`",
             ephemeral=True,
         )
 
     @lottery.command(
-        name='查看狀態',
+        name="status",
         description="查看某則抽獎訊息目前參加人數",
     )
     @app_commands.describe(
@@ -185,7 +185,7 @@ class LotteryCommands(commands.Cog):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @lottery.command(
-        name='開獎',
+        name="draw",
         description="從抽獎訊息的 🎉 反應名單中開獎",
     )
     @app_commands.describe(
