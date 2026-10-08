@@ -25,7 +25,9 @@ jobs:
       - name: Apply source patch
         run: python tools/patch_restore_guild_merge.py
       - name: Install focused test dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
       - name: Verify command registry patch
         run: |
           python -m compileall -q bot.py core cogs views
