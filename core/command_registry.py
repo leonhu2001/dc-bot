@@ -311,8 +311,54 @@ def _group_get_command_with_legacy_alias(self: app_commands.Group, name: str):
     return _ORIGINAL_GROUP_GET_COMMAND(self, alias)
 
 
+async def _clear_stale_remote_global_commands(
+    tree: app_commands.CommandTree,
+) -> None:
+    if getattr(tree, "_stale_global_cleanup_checked", False):
+        return
+
+    tree._stale_global_cleanup_checked = True
+
+    try:
+        remote_global_commands = await tree.fetch_commands()
+    except discord.HTTPException as exc:
+        print(
+            "[commands] unable to inspect global commands; "
+            f"guild sync will continue: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return
+
+    if not remote_global_commands:
+        return
+
+    local_global_commands = list(tree.get_commands())
+
+    tree.clear_commands(guild=None)
+    try:
+        await _ORIGINAL_TREE_SYNC(tree)
+    finally:
+        for command in local_global_commands:
+            tree.add_command(command)
+
+    print(
+        "[commands] cleared stale global commands: "
+        f"{len(remote_global_commands)}",
+        flush=True,
+    )
+
+
 async def _sync_with_canonical_names(self: app_commands.CommandTree, *args, **kwargs):
     guild = kwargs.get("guild")
+
+    # This bot intentionally publishes commands to its one guild. Historical
+    # deployments also registered global English commands; a guild-only sync does
+    # not delete those, so Discord can show both the new Chinese guild commands and
+    # the old English global commands. Before the first guild sync, remove any
+    # remote globals while preserving the local command objects used by the bot.
+    if guild is not None:
+        await _clear_stale_remote_global_commands(self)
+
     canonicalize_tree(self, guild=guild)
     return await _ORIGINAL_TREE_SYNC(self, *args, **kwargs)
 
