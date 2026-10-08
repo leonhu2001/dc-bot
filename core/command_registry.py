@@ -357,7 +357,14 @@ async def _sync_with_canonical_names(self: app_commands.CommandTree, *args, **kw
     # the old English global commands. Before the first guild sync, remove any
     # remote globals while preserving the local command objects used by the bot.
     if guild is not None:
-        await _clear_stale_remote_global_commands(self)
+        try:
+            await _clear_stale_remote_global_commands(self)
+        except discord.HTTPException as exc:
+            print(
+                "[commands] unable to clear stale global commands; "
+                f"guild sync will continue: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     canonicalize_tree(self, guild=guild)
     return await _ORIGINAL_TREE_SYNC(self, *args, **kwargs)
