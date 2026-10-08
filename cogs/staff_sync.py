@@ -300,7 +300,7 @@ def _registry_age_seconds(row: dict) -> float:
 
 
 class StaffSyncCog(commands.Cog):
-    staff = app_commands.Group(name='人員', description="人員同步")
+    staff = app_commands.Group(name="staff", description="人員同步")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -607,7 +607,7 @@ class StaffSyncCog(commands.Cog):
         await self.bot.wait_until_ready()
 
     @staff.command(
-        name='同步人員',
+        name="sync_members",
         description="手動同步網站後台的客服 / 打手 / 陪玩下拉選單名單",
     )
     @app_commands.default_permissions(manage_messages=True)
