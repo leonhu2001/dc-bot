@@ -82,6 +82,12 @@ CANONICAL_COMMAND_NAMES: dict[str, str] = {
     "vip_voice": "貴賓語音",
     "public_voice": "公共語音",
 
+    # VIP voice administration
+    "hidden_add": "新增隱藏貴賓",
+    "hidden_remove": "移除隱藏貴賓",
+    "hidden_list": "隱藏貴賓名單",
+    "create_voice": "建立貴賓語音",
+
     # lottery / sync
     "status": "查看狀態",
     "draw": "開獎",
@@ -149,6 +155,9 @@ _IDENTIFIER_TOKENS: dict[str, str] = {
     "draw": "開獎",
     "sync": "同步",
     "members": "人員",
+    "hidden": "隱藏貴賓",
+    "create": "建立",
+    "list": "名單",
 }
 
 _ASCII_COMMAND_CHARS = re.compile(r"[A-Za-z_]")
@@ -253,7 +262,9 @@ def _canonicalize_scope(
                 f"Slash 指令中文名稱衝突：{scope} {old_name} -> {new_name}"
             )
 
-        removed = tree.remove_command(old_name, guild=guild, type=command.type)
+        # These are chat-input Command/Group objects. Context-menu commands are
+        # deliberately skipped above, so the default type is the correct one.
+        removed = tree.remove_command(old_name, guild=guild)
         if removed is None:
             raise RuntimeError(f"無法從 CommandTree 移除 Slash 指令：{old_name}")
 
