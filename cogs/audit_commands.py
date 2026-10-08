@@ -41,20 +41,20 @@ STAFF_COMMAND_TRANSLATIONS = {
     "set_customer_level": "設定會員等級",
 
     # order tools
-    "order_search": "訂單查詢",
-    "stored_orders": "存單查詢",
+    '訂單查詢': "訂單查詢",
+    '存單查詢': "存單查詢",
     "check_stored_orders": "檢查逾期存單",
     "delete_order": "刪除訂單",
-    "fix_order_amount": "修正訂單金額",
-    "fix_order_customer": "修正訂單顧客",
-    "resend_dispatch": "重新派單",
+    '修正訂單金額': "修正訂單金額",
+    '修正訂單顧客': "修正訂單顧客",
+    '重新派單': "重新派單",
     "delete_dispatch_panel": "刪除派單面板",
 
     # wallet
-    "wallet_history": "錢包流水",
-    "wallet_add": "錢包加值",
-    "wallet_adjust": "錢包調整",
-    "wallet_refund": "錢包退款",
+    '錢包流水': "錢包流水",
+    '錢包加值': "錢包加值",
+    '錢包調整': "錢包調整",
+    '錢包退款': "錢包退款",
     "wallet_refund_order": "訂單退款至錢包",
 
     # rewards / customer
@@ -203,25 +203,25 @@ _IDENTIFIER_TOKENS = {
 
 
 STAFF_COMMAND_PATHS = (
-    "order_search",
-    "stored_orders",
-    "fix_order_amount",
-    "fix_order_customer",
-    "resend_dispatch",
-    "reward customer_points",
-    "reward adjust_points",
-    "reward add_purchase",
-    "customer notes",
-    "customer add_note",
-    "customer remove_note",
-    "wallet_history",
-    "wallet_add",
-    "wallet_adjust",
-    "wallet_refund",
-    "stats today",
-    "stats month",
-    "stats top_customers",
-    "audit data",
+    '訂單查詢',
+    '存單查詢',
+    '修正訂單金額',
+    '修正訂單顧客',
+    '重新派單',
+    '會員管理 會員資料',
+    '會員管理 調整點數',
+    '會員管理 補登消費',
+    '顧客管理 備註查詢',
+    '顧客管理 新增備註',
+    '顧客管理 刪除備註',
+    '錢包流水',
+    '錢包加值',
+    '錢包調整',
+    '錢包退款',
+    '營運 今日',
+    '營運 本月',
+    '營運 消費排行',
+    '系統 資料檢查',
 )
 
 
@@ -328,7 +328,7 @@ def _install_staff_command_guards(bot: commands.Bot) -> None:
 
 
 class AuditCommands(commands.Cog):
-    audit = app_commands.Group(name="audit", description="資料稽核")
+    audit = app_commands.Group(name='系統', description="資料稽核")
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -344,7 +344,7 @@ class AuditCommands(commands.Cog):
         )
 
     @audit.command(
-        name="data",
+        name='資料檢查',
         description="客服檢查訂單、會員累積、存單與接單面板資料是否異常",
     )
     @app_commands.describe(limit="每一類最多顯示幾筆明細，預設 10，最高 25")

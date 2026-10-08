@@ -801,8 +801,8 @@ bot.feedback_panel_channel_id_value = FEEDBACK_PANEL_CHANNEL_ID
 bot._extensions_loaded = False
 
 # ========= Slash 指令群組 =========
-order_group = app_commands.Group(name="order", description="訂單管理")
-vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
+order_group = app_commands.Group(name='訂單', description="訂單管理")
+vip_group = app_commands.Group(name='貴賓', description="VIP / 會員管理")
 
 
 # ========= 工具函式 =========
@@ -3235,7 +3235,7 @@ def member_has_vip_voice_role(member: discord.Member | None) -> bool:
 
 
 @vip_group.command(
-    name="hidden_add",
+    name='新增隱藏貴賓',
     description="管理員把成員加入 Hidden VIP 白名單",
 )
 @app_commands.describe(member="要加入 Hidden VIP 白名單的成員")
@@ -3284,7 +3284,7 @@ async def vip_hidden_add(interaction: discord.Interaction, member: discord.Membe
 
 
 @vip_group.command(
-    name="hidden_remove",
+    name='移除隱藏貴賓',
     description="管理員把成員移出 Hidden VIP 白名單",
 )
 @app_commands.describe(member="要移出 Hidden VIP 白名單的成員")
@@ -3350,7 +3350,7 @@ async def vip_hidden_remove(interaction: discord.Interaction, member: discord.Me
 
 
 @vip_group.command(
-    name="hidden_list",
+    name='隱藏貴賓名單',
     description="管理員查看目前 Hidden VIP 白名單",
 )
 @app_commands.default_permissions(administrator=True)
@@ -3401,7 +3401,7 @@ async def vip_hidden_list(interaction: discord.Interaction):
 
 
 @vip_group.command(
-    name="create_voice",
+    name='建立貴賓語音',
     description="管理員直接替有效 VIP 建立永久 VIP 語音房",
 )
 @app_commands.describe(user_id="要建立 VIP 語音房的 Discord 使用者 ID")
@@ -4380,6 +4380,8 @@ async def on_ready():
                 "cogs.staff_sync",
             ):
                 await bot.load_extension(extension_name)
+            from core.command_registry import clear_stale_remote_global_commands
+            await clear_stale_remote_global_commands(bot.tree)
             bot.tree.copy_global_to(guild=discord.Object(id=GUILD_ID))
             bot._extensions_loaded = True
         except Exception as e:
@@ -4408,7 +4410,7 @@ async def on_ready():
 
 
 @bot.tree.command(
-    name="my_favorites",
+    name='我的收藏',
     description="查看你收藏的成員",
     guild=discord.Object(id=GUILD_ID),
 )
@@ -4433,7 +4435,7 @@ async def my_favorites(interaction: discord.Interaction):
 
 
 @bot.tree.command(
-    name="browse_staff_profiles",
+    name='瀏覽個人牆',
     description="瀏覽公開成員個人牆",
     guild=discord.Object(id=GUILD_ID),
 )
@@ -4469,7 +4471,7 @@ async def browse_staff_profiles(
 
 
 @bot.tree.command(
-    name="fix_acceptance_payment_panel",
+    name='補送付款面板',
     description="依票口 ID 補送等待付款 Panel",
     guild=discord.Object(id=GUILD_ID),
 )
@@ -4646,7 +4648,7 @@ async def fix_acceptance_payment_panel(
 
 
 @bot.tree.command(
-    name="staff_profile_panel",
+    name='建立個人牆面板',
     description="客服在成員個人牆貼文內生成或更新成員 panel",
     guild=discord.Object(id=GUILD_ID),
 )
@@ -4806,7 +4808,7 @@ async def _fetch_staff_profile_panel_target(guild: discord.Guild, profile: dict)
 
 
 @bot.tree.command(
-    name="refresh_staff_profile_panel",
+    name='更新個人牆面板',
     description="將後台個人牆資料同步到 Discord panel",
     guild=discord.Object(id=GUILD_ID),
 )
@@ -5089,7 +5091,7 @@ class RewardRedeemView(discord.ui.View):
         )
 
 
-@bot.tree.command(name="reward_redeem_panel", description="發送會員點數兌換面板")
+@bot.tree.command(name='點數兌換面板', description="發送會員點數兌換面板")
 async def reward_redeem_panel(interaction: discord.Interaction):
     if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
         await interaction.response.send_message("只有客服可以發送點數兌換面板。", ephemeral=True)
@@ -5132,7 +5134,7 @@ VIP_LEVEL_CHOICES = [
 
 
 @bot.tree.command(
-    name="set_customer_level",
+    name='設定會員等級',
     description="管理員直接指定顧客 VIP 等級",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5211,7 +5213,7 @@ def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool
 
 
 @bot.tree.command(
-    name="wallet_add",
+    name='錢包加值',
     description="客服幫顧客錢包儲值",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5251,7 +5253,7 @@ async def wallet_add(
 
 
 @bot.tree.command(
-    name="wallet_adjust",
+    name='錢包調整',
     description="客服修正顧客錢包餘額，基於目前餘額加減",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5295,7 +5297,7 @@ async def wallet_adjust(
 
 
 @bot.tree.command(
-    name="wallet_refund",
+    name='錢包退款',
     description="客服手動退回顧客錢包餘額",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5336,7 +5338,7 @@ async def wallet_refund(
 
 
 @bot.tree.command(
-    name="wallet_history",
+    name='錢包流水',
     description="客服查詢顧客錢包流水",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5359,7 +5361,7 @@ async def wallet_history(
 
 
 @bot.tree.command(
-    name="my_wallet_history",
+    name='我的錢包流水',
     description="查詢自己的錢包流水",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5377,7 +5379,7 @@ async def my_wallet_history(
 
 
 @bot.tree.command(
-    name="wallet_refund_order",
+    name='訂單退款至錢包',
     description="客服針對指定訂單手動退款到顧客錢包",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5437,7 +5439,7 @@ async def wallet_refund_order(
 
 
 @bot.tree.command(
-    name="my_info",
+    name='我的會員資料',
     description="查詢自己的會員資訊、點數與錢包餘額",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5455,7 +5457,7 @@ async def my_info(interaction: discord.Interaction):
 
 
 @bot.tree.command(
-    name="order_search",
+    name='訂單查詢',
     description="客服搜尋訂單，可用訂單編號、顧客 ID、項目或狀態查詢",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5796,7 +5798,7 @@ def sync_web_order_deleted_from_bot(ticket_channel_id, dispatch_message_id=None,
 
 
 @bot.tree.command(
-    name="delete_order",
+    name='刪除訂單',
     description="客服刪除訂單資料，支援訂單編號或票口 ID",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -5923,7 +5925,7 @@ async def delete_order(
 
 
 @bot.tree.command(
-    name="fix_order_amount",
+    name='修正訂單金額',
     description="客服修正訂單金額，可同步調整會員累積",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -6004,7 +6006,7 @@ async def fix_order_amount(
 
 
 @bot.tree.command(
-    name="fix_order_customer",
+    name='修正訂單顧客',
     description="客服修正訂單顧客，可同步搬移會員累積",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -6086,7 +6088,7 @@ async def fix_order_customer(
 
 
 @bot.tree.command(
-    name="resend_dispatch",
+    name='重新派單',
     description="重新發送指定票口的派單面板"
 )
 @app_commands.describe(
@@ -7517,7 +7519,7 @@ class StoredOrderRefreshButton(discord.ui.Button):
 
 
 @bot.tree.command(
-    name="stored_orders",
+    name='存單查詢',
     description="客服查看與管理目前所有存單",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -7541,7 +7543,7 @@ async def stored_orders(interaction: discord.Interaction, limit: int = 25):
 
 
 @bot.tree.command(
-    name="check_stored_orders",
+    name='檢查逾期存單',
     description="客服手動檢查是否有超過 3/7 天的存單提醒",
     guild=discord.Object(id=GUILD_ID)
 )
@@ -7560,7 +7562,7 @@ async def check_stored_orders(interaction: discord.Interaction):
 
 
 @bot.tree.command(
-    name="delete_dispatch_panel",
+    name='刪除派單面板',
     description="刪除派單頻道中已取消訂單的接單面板",
     guild=discord.Object(id=GUILD_ID)
 )
