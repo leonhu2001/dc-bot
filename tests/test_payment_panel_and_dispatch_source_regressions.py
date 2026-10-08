@@ -1,11 +1,17 @@
+import re
 from pathlib import Path
 
 
 def test_payment_panel_repair_command_has_readable_copy():
     source = Path("bot.py").read_text(encoding="utf-8")
-    start = source.index('name="fix_acceptance_payment_panel"')
-    end = source.index('name="staff_profile_panel"', start)
-    block = source[start:end]
+    start_match = re.search(r"name=['\"]補送付款面板['\"]", source)
+    end_match = re.search(r"name=['\"]建立個人牆面板['\"]", source)
+
+    assert start_match is not None
+    assert end_match is not None
+    assert end_match.start() > start_match.start()
+
+    block = source[start_match.start():end_match.start()]
 
     assert "???" not in block
     assert "依票口 ID 補送等待付款 Panel" in block
