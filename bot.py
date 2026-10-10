@@ -7697,4 +7697,17 @@ configure_web_sync_runtime(globals())
 configure_order_runtime(globals())
 configure_self_service_runtime(globals())
 
+# Customer-facing member portal in channel 1558395213406412801.
+# Register as a persistent view and use an on_ready listener so reconnects
+# refresh the existing panel instead of posting duplicates.
+from cogs.member_portal import MemberPortalView, ensure_member_portal_panel
+from services.loyalty_benefits import ensure_loyalty_tables
+
+ensure_loyalty_tables()
+bot.add_view(MemberPortalView())
+
+@bot.listen("on_ready")
+async def _refresh_member_portal_panel_on_ready():
+    await ensure_member_portal_panel(bot)
+
 bot.run(TOKEN)

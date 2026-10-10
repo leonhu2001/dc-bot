@@ -185,12 +185,6 @@ async def ensure_member_portal_panel(bot: commands.Bot) -> None:
         return
 
 
-class MemberPortalCog(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.bot.add_view(MemberPortalView())
-        self.bot.loop.create_task(ensure_member_portal_panel(bot))
-
-
-async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(MemberPortalCog(bot))
+# Registration is intentionally owned by bot.py because this project does not
+# dynamically load extension cogs. Keeping the panel helpers here avoids adding
+# another second startup path.
