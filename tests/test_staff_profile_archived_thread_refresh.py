@@ -74,7 +74,7 @@ def test_archived_public_profile_thread_is_reopened_then_rearchived(monkeypatch)
     )
 
     assert refreshed is True
-    assert [call["archived"] for call in thread.edit_calls] == [False]
+    assert [call["archived"] for call in thread.edit_calls] == [False, True]
     assert thread.archived is True
     assert len(thread.message.edits) == 1
 
