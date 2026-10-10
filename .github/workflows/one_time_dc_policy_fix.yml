@@ -11,6 +11,8 @@ jobs:
   apply:
     if: contains(github.event.head_commit.message, '[apply-dc-policy-fix]')
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +35,7 @@ jobs:
       - name: Compile and run focused regression tests
         run: |
           python -m compileall -q core services shared views web bot.py
-          pytest -q \
+          python -m pytest -q \
             tests/test_vip_room_whitelist.py \
             tests/test_vip_whitelist_startup_sync.py \
             tests/test_dispatch_policy_consistency.py \
