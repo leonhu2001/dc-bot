@@ -1,0 +1,109 @@
+import sqlite3
+from pathlib import Path
+
+from web.app.services.admin_customer_loyalty import enrich_customer_rows, load_customer_loyalty
+
+
+def _make_db(path: Path) -> None:
+    with sqlite3.connect(path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE customer_loyalty_progress (
+                customer_discord_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                rule_key TEXT NOT NULL,
+                rule_label TEXT NOT NULL,
+                pricing_type TEXT NOT NULL,
+                player_count INTEGER NOT NULL DEFAULT 1,
+                progress_units REAL NOT NULL DEFAULT 0,
+                threshold_units REAL NOT NULL,
+                benefit_kind TEXT NOT NULL,
+                benefit_units REAL NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (customer_discord_id, scope_key)
+            );
+
+            CREATE TABLE customer_benefit_coupons (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_discord_id TEXT NOT NULL,
+                scope_key TEXT NOT NULL,
+                rule_key TEXT NOT NULL,
+                rule_label TEXT NOT NULL,
+                pricing_type TEXT NOT NULL,
+                player_count INTEGER NOT NULL DEFAULT 1,
+                benefit_kind TEXT NOT NULL,
+                benefit_units REAL NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                source TEXT NOT NULL DEFAULT 'loyalty',
+                issued_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO customer_loyalty_progress
+            VALUES ('100','basic_entertain_single|players:1','basic_entertain_single',
+                    '娛樂陪〈端遊〉｜單陪','hourly',1,6,10,'extra_hours',0.5,'2026-10-11T01:00:00+08:00')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO customer_loyalty_progress
+            VALUES ('100','valorant_entertain_ranked|players:2','valorant_entertain_ranked',
+                    '特戰英豪｜娛樂陪｜積分','game',2,14,20,'extra_games',1,'2026-10-11T02:00:00+08:00')
+            """
+        )
+        for status in ("active", "reserved", "redeemed", "expired"):
+            conn.execute(
+                """
+                INSERT INTO customer_benefit_coupons (
+                    customer_discord_id, scope_key, rule_key, rule_label,
+                    pricing_type, player_count, benefit_kind, benefit_units,
+                    status, source, issued_at
+                ) VALUES ('100','basic_entertain_single|players:1','basic_entertain_single',
+                          '娛樂陪〈端遊〉｜單陪','hourly',1,'extra_hours',0.5,?,'loyalty','2026-10-11')
+                """,
+                (status,),
+            )
+        conn.commit()
+
+
+def test_load_customer_loyalty_formats_progress_and_coupon_counts(tmp_path: Path):
+    db = tmp_path / "web_dashboard.db"
+    _make_db(db)
+
+    snapshot = load_customer_loyalty(db, ["100"])["100"]
+
+    assert snapshot["progress"][0]["title"] == "特戰英豪｜娛樂陪｜積分｜2位"
+    assert snapshot["progress"][0]["progress_text"] == "14 / 20局"
+    assert snapshot["progress"][0]["benefit_text"] == "+1 局"
+    assert snapshot["progress"][1]["progress_text"] == "6 / 10H"
+    assert snapshot["progress"][1]["benefit_text"] == "+30 分鐘"
+    assert snapshot["coupon_counts"] == {
+        "active": 1,
+        "reserved": 1,
+        "redeemed": 1,
+        "expired": 1,
+        "other": 0,
+    }
+
+
+def test_enrich_customer_rows_keeps_customer_center_fields(tmp_path: Path):
+    db = tmp_path / "web_dashboard.db"
+    _make_db(db)
+
+    rows = enrich_customer_rows(
+        db,
+        [
+            {"customer_discord_id": "100", "customer_display_name": "老闆A"},
+            {"customer_discord_id": "200", "customer_display_name": "老闆B"},
+        ],
+    )
+
+    assert rows[0]["customer_display_name"] == "老闆A"
+    assert len(rows[0]["loyalty_progress"]) == 2
+    assert rows[0]["loyalty_coupon_counts"]["active"] == 1
+    assert rows[0]["loyalty_has_anything"] is True
+    assert rows[1]["loyalty_progress"] == []
+    assert rows[1]["loyalty_coupon_counts"]["active"] == 0
+    assert rows[1]["loyalty_has_anything"] is False
