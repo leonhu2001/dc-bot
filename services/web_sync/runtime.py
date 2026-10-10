@@ -783,6 +783,27 @@ def _web_order_created_seed_state(
         )
     )
 
+    try:
+        import json as _json
+        _price_snapshot = _json.loads(str(data.get("price_snapshot_json") or "{}"))
+        _preview = _price_snapshot.get("preview") if isinstance(_price_snapshot, dict) else {}
+        _preview = _preview if isinstance(_preview, dict) else {}
+        _loyalty = _preview.get("loyalty") if isinstance(_preview.get("loyalty"), dict) else {}
+        _finance = _preview.get("finance") if isinstance(_preview.get("finance"), dict) else {}
+        if _loyalty.get("id"):
+            data["selected_loyalty_coupon_id"] = int(_loyalty["id"])
+            data["loyalty_coupon_name"] = str(_loyalty.get("name") or "累積福利")
+            data["loyalty_service_units"] = float(_loyalty.get("reward_units") or 0)
+            data["loyalty_service_value"] = int(_finance.get("loyalty_service_value") or 0)
+            data["service_bonus_text"] = "｜".join(
+                part for part in (
+                    str(_finance.get("point_service_note") or "").strip(),
+                    str(_finance.get("loyalty_service_note") or "").strip(),
+                ) if part
+            )
+    except Exception as exc:
+        print(f"[loyalty] website snapshot parse skipped WEB-{order_id}: {exc}")
+
     amount = int(
         details["amount"]
     )

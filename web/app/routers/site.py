@@ -383,6 +383,9 @@ async def member_center(
         guild_id=config.DISCORD_GUILD_ID,
     )
 
+    from services.loyalty_benefits import get_customer_benefit_snapshot
+    benefits = get_customer_benefit_snapshot(customer_id)
+
     return templates.TemplateResponse(
         request=request,
         name="member_center.html",
@@ -392,6 +395,7 @@ async def member_center(
             page_name="member",
             member=member,
             portal=portal,
+            benefits=benefits,
         ),
     )
 
@@ -946,6 +950,11 @@ async def public_checkout_preview(
                     "point_item_key"
                 ),
 
+            benefit_coupon_id=
+                payload.get(
+                    "benefit_coupon_id"
+                ),
+
             use_wallet=
                 bool(
                     payload.get(
@@ -1477,6 +1486,17 @@ async def public_order_create(
             order.id
         )
 
+        selected_benefit_coupon_id = order_payload.get("benefit_coupon_id")
+        if selected_benefit_coupon_id not in (None, ""):
+            from services.loyalty_benefits import reserve_coupon
+            reserve_coupon(
+                int(selected_benefit_coupon_id),
+                customer_id=customer_id,
+                rule_key=str(order_payload.get("rule_key") or ""),
+                player_count=int(order_payload.get("player_count") or 1),
+                reservation_key=f"WEB-{order_id}",
+            )
+
 
         accepted_at = (
             _datetime.now(
@@ -1663,6 +1683,13 @@ async def public_order_create(
     except ValueError as exc:
 
         db.rollback()
+        try:
+            coupon_id = order_payload.get("benefit_coupon_id") if "order_payload" in locals() else None
+            if coupon_id not in (None, ""):
+                from services.loyalty_benefits import release_coupon
+                release_coupon(int(coupon_id), customer_id=customer_id)
+        except Exception:
+            pass
 
 
         return JSONResponse(
@@ -1678,6 +1705,13 @@ async def public_order_create(
     except Exception as exc:
 
         db.rollback()
+        try:
+            coupon_id = order_payload.get("benefit_coupon_id") if "order_payload" in locals() else None
+            if coupon_id not in (None, ""):
+                from services.loyalty_benefits import release_coupon
+                release_coupon(int(coupon_id), customer_id=customer_id)
+        except Exception:
+            pass
 
 
         print(

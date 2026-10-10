@@ -1267,8 +1267,24 @@ def calculate_point_service_value(
     quantity = max(1, int(quote.get("quantity") or 1))
     service_amount = max(0, int(quote.get("customer_pay_amount") or 0))
     gross_extra_value = int(round((service_amount / quantity) * units))
-    rate = max(0, min(100, int(vip_pay_rate or 100)))
-    return max(0, int(round(gross_extra_value * rate / 100)))
+    # VIP discount only affects what the customer pays for purchased service.
+    # Free service promised by the store is funded at the original unit value.
+    return max(0, gross_extra_value)
+
+
+def calculate_loyalty_service_value(
+    *,
+    quote: dict,
+    loyalty_item: dict | None,
+) -> int:
+    if not loyalty_item:
+        return 0
+    units = float(loyalty_item.get("reward_units") or 0)
+    if units <= 0:
+        return 0
+    quantity = max(1, int(quote.get("quantity") or 1))
+    service_amount = max(0, int(quote.get("customer_pay_amount") or 0))
+    return max(0, int(round((service_amount / quantity) * units)))
 
 
 def calculate_checkout_financials(
@@ -1280,12 +1296,15 @@ def calculate_checkout_financials(
     wallet_balance: int,
     use_wallet: bool,
     point_service_value: int = 0,
+    loyalty_item: dict | None = None,
+    loyalty_service_value: int = 0,
 ) -> dict:
     service_amount = max(0, int(service_amount or 0))
     vip_pay_rate = max(0, min(100, int(vip_pay_rate or 100)))
     specify_fee = max(0, int(specify_fee or 0))
     wallet_balance = max(0, int(wallet_balance or 0))
     point_service_value = max(0, int(point_service_value or 0))
+    loyalty_service_value = max(0, int(loyalty_service_value or 0))
 
     after_vip = int(round(service_amount * vip_pay_rate / 100))
     vip_discount_amount = max(0, service_amount - after_vip)
@@ -1314,6 +1333,19 @@ def calculate_checkout_financials(
             games = int(point_item.get("games") or 0)
             point_service_note = f"服務局數 +{games} 局"
 
+    loyalty_service_note = ""
+    if loyalty_item:
+        pricing_type = str(loyalty_item.get("pricing_type") or "")
+        units = float(loyalty_item.get("reward_units") or 0)
+        if pricing_type == "hourly":
+            loyalty_service_note = (
+                "累積福利：服務時間 +30 分鐘"
+                if units == 0.5
+                else f"累積福利：服務時間 +{units:g} 小時"
+            )
+        elif pricing_type == "game":
+            loyalty_service_note = f"累積福利：服務局數 +{units:g} 局"
+
     effective_specify_fee = max(0, specify_fee - point_waived_specify)
     after_point = max(0, after_vip - point_cash_discount)
     subtotal = max(0, after_point + effective_specify_fee)
@@ -1323,10 +1355,10 @@ def calculate_checkout_financials(
     # All point rewards are funded by the store. Customer discounts and free
     # specify do not lower worker payout, while point-added time/games add the
     # equivalent discounted service value to the payout base.
-    payout_base = max(0, after_vip + specify_fee + point_service_value)
+    payout_base = max(0, after_vip + specify_fee + point_service_value + loyalty_service_value)
     point_store_absorbed = max(
         0,
-        point_cash_discount + point_waived_specify + point_service_value,
+        point_cash_discount + point_waived_specify + point_service_value + loyalty_service_value,
     )
 
     return {
@@ -1348,6 +1380,8 @@ def calculate_checkout_financials(
         "effective_specify_fee": effective_specify_fee,
         "point_service_note": point_service_note,
         "point_service_value": point_service_value,
+        "loyalty_service_note": loyalty_service_note,
+        "loyalty_service_value": loyalty_service_value,
         "point_store_absorbed_amount": point_store_absorbed,
         "subtotal_before_wallet": subtotal,
         "customer_pay_amount": subtotal,
@@ -1529,6 +1563,15 @@ def build_checkout_options(
     )
 
 
+    from services.loyalty_benefits import list_available_coupons
+
+    benefit_options = list_available_coupons(
+        customer_id,
+        rule_key=str(rule_key),
+        player_count=int(quote.get("player_count") or player_count or 1),
+    )
+
+
     payment_methods = []
 
 
@@ -1590,6 +1633,9 @@ def build_checkout_options(
         "point_options":
             point_options,
 
+        "benefit_options":
+            benefit_options,
+
         "payment_methods":
             payment_methods,
 
@@ -1608,6 +1654,7 @@ def build_checkout_preview(
     customer_adjustments: Any = None,
     specified_staff_ids: Any = None,
     point_item_key: str | None = None,
+    benefit_coupon_id: int | None = None,
     use_wallet: bool = False,
     payment_method: str | None = None,
 ) -> dict:
@@ -1812,6 +1859,25 @@ def build_checkout_preview(
         )
 
 
+    selected_loyalty_item = None
+    if benefit_coupon_id not in (None, ""):
+        from services.loyalty_benefits import validate_coupon_for_order
+
+        selected_loyalty_item = validate_coupon_for_order(
+            int(benefit_coupon_id),
+            customer_id=customer_id,
+            rule_key=str(rule_key),
+            player_count=int(quote.get("player_count") or player_count or 1),
+            allow_reserved=True,
+        )
+
+        if selected_point_item and str(selected_point_item.get("kind") or "") in {
+            "extra_hours",
+            "extra_games",
+        }:
+            raise ValueError("累積加時／加局券不能和點數加時／加局同張訂單使用。")
+
+
     finance = (
         calculate_checkout_financials(
             service_amount=
@@ -1837,6 +1903,12 @@ def build_checkout_preview(
                     vip_pay_rate=vip_rate,
                     point_item=selected_point_item,
                 ),
+
+            loyalty_item=selected_loyalty_item,
+            loyalty_service_value=calculate_loyalty_service_value(
+                quote=quote,
+                loyalty_item=selected_loyalty_item,
+            ),
 
             wallet_balance=
                 customer[
@@ -2007,6 +2079,15 @@ def build_checkout_preview(
                 ),
         },
 
+        "loyalty": {
+            "id": int(selected_loyalty_item["id"]) if selected_loyalty_item else None,
+            "name": str(selected_loyalty_item.get("display_name") or "") if selected_loyalty_item else "",
+            "rule_key": str(selected_loyalty_item.get("rule_key") or "") if selected_loyalty_item else None,
+            "player_count": int(selected_loyalty_item.get("player_count") or 1) if selected_loyalty_item else None,
+            "pricing_type": str(selected_loyalty_item.get("pricing_type") or "") if selected_loyalty_item else None,
+            "reward_units": float(selected_loyalty_item.get("reward_units") or 0) if selected_loyalty_item else 0,
+        },
+
         "finance":
             finance,
 
@@ -2053,9 +2134,6 @@ PUBLIC_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
-    "valorant_entertain",
-    "valorant_tech",
-    "valorant_top_tech",
 }
 
 
@@ -2618,9 +2696,6 @@ MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
-    "valorant_entertain",
-    "valorant_tech",
-    "valorant_top_tech",
 }
 
 

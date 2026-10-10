@@ -17,6 +17,7 @@ from shared.db import create_all_tables
 from services.topups import ensure_topup_tables
 from services.payment_reviews import ensure_payment_review_tables
 from services.wallet_service import ensure_wallet_tables
+from services.loyalty_benefits import ensure_loyalty_tables
 from services.ticket_archives import ensure_ticket_archive_tables
 from services.support_calls import ensure_support_call_tables
 from services.smart_dispatch import ensure_smart_dispatch_tables
@@ -591,6 +592,7 @@ async def startup_event():
     ensure_topup_tables()
     ensure_payment_review_tables()
     ensure_wallet_tables()
+    ensure_loyalty_tables()
     ensure_ticket_archive_tables()
     ensure_support_call_tables()
     ensure_smart_dispatch_tables()

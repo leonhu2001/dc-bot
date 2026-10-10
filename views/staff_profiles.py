@@ -1132,6 +1132,7 @@ async def refresh_staff_profile_panel_for_staff(
         ):
             return False
 
+    was_archived = bool(getattr(channel, "archived", False))
     channel = await _ensure_profile_thread_open_for_refresh(
         channel,
         staff_id=staff_id_text,
@@ -1140,46 +1141,70 @@ async def refresh_staff_profile_panel_for_staff(
     if channel is None:
         return False
 
-    if not hasattr(channel, "fetch_message"):
-        return False
-
     try:
-        panel_message = await channel.fetch_message(message_id)
-    except (
-        discord.NotFound,
-        discord.Forbidden,
-        discord.HTTPException,
-    ):
-        return False
+        if not hasattr(channel, "fetch_message"):
+            return False
 
-    latest_profile = get_staff_profile(staff_id_text)
-    if latest_profile is None:
-        return False
+        try:
+            panel_message = await channel.fetch_message(message_id)
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException,
+        ):
+            return False
 
-    try:
-        await panel_message.edit(
-            embed=build_staff_profile_embed(latest_profile),
-            view=StaffProfilePanelView(staff_id_text),
-            allowed_mentions=discord.AllowedMentions(
-                users=False,
-                roles=False,
-                everyone=False,
-            ),
-        )
-    except discord.HTTPException as exc:
+        latest_profile = get_staff_profile(staff_id_text)
+        if latest_profile is None:
+            return False
+
+        try:
+            await panel_message.edit(
+                embed=build_staff_profile_embed(latest_profile),
+                view=StaffProfilePanelView(staff_id_text),
+                allowed_mentions=discord.AllowedMentions(
+                    users=False,
+                    roles=False,
+                    everyone=False,
+                ),
+            )
+        except discord.HTTPException as exc:
+            print(
+                f"[staff-profile] refresh failed "
+                f"staff_id={staff_id_text} "
+                f"reason={reason}: {exc}"
+            )
+            return False
+
         print(
-            f"[staff-profile] refresh failed "
+            f"[staff-profile] refreshed "
             f"staff_id={staff_id_text} "
-            f"reason={reason}: {exc}"
+            f"reason={reason}"
         )
-        return False
-
-    print(
-        f"[staff-profile] refreshed "
-        f"staff_id={staff_id_text} "
-        f"reason={reason}"
-    )
-    return True
+        return True
+    finally:
+        # Background refresh may temporarily reopen an archived thread so the
+        # saved panel can be edited. Put it back immediately; genuinely active
+        # conversations are never auto-archived.
+        if was_archived and not bool(getattr(channel, "archived", False)):
+            edit_channel = getattr(channel, "edit", None)
+            if callable(edit_channel):
+                try:
+                    restored = await edit_channel(
+                        archived=True,
+                        reason=f"Staff profile refresh complete: {reason}"[:512],
+                    )
+                    if restored is not None:
+                        channel = restored
+                except (
+                    discord.NotFound,
+                    discord.Forbidden,
+                    discord.HTTPException,
+                ) as exc:
+                    print(
+                        f"[staff-profile] rearchive thread failed "
+                        f"staff_id={staff_id_text} reason={reason}: {exc}"
+                    )
 
 
 def get_order_staff_ids_for_profile_refresh(
