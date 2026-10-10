@@ -20,8 +20,8 @@ def db_path() -> str:
     return str(Path.cwd() / "web_dashboard.db")
 
 
-def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path(), timeout=15)
+def _connect(database_path: str | None = None) -> sqlite3.Connection:
+    conn = sqlite3.connect(database_path or db_path(), timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -31,8 +31,8 @@ def _now_text() -> str:
     return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def ensure_internal_transfer_tables() -> None:
-    conn = _connect()
+def ensure_internal_transfer_tables(database_path: str | None = None) -> None:
+    conn = _connect(database_path)
     try:
         conn.executescript(
             """
@@ -276,7 +276,6 @@ def _insert_adjustment_legs(
     reason: str,
     effective_at: str,
 ) -> None:
-    common = (int(transfer_id), str(reason), "unpaid", effective_at, effective_at, effective_at)
     conn.execute(
         """
         INSERT INTO employee_payroll_adjustments (
