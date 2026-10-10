@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+
+{% block page_title %}客戶中心・VIP 管理{% endblock %}
+
+{% block content %}
+<style>
+.vip-shell{display:grid;gap:14px}
+.vip-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.vip-tabs a{padding:9px 13px;border:1px solid rgba(255,255,255,.08);border-radius:9px;color:inherit;text-decoration:none;background:rgba(255,255,255,.018);font-size:12px;font-weight:800}
+.vip-tabs a.active{border-color:rgba(223,183,92,.45);background:rgba(223,183,92,.09);color:var(--r5-gold-soft,#f2d68d)}
+.vip-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.vip-stat{padding:14px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.018)}
+.vip-stat span{display:block;color:var(--r5-muted,#969289);font-size:11px;font-weight:800}
+.vip-stat strong{display:block;margin-top:6px;font-size:27px;color:var(--r5-gold-soft,#f2d68d)}
+.vip-policy{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.vip-policy span{padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.065);font-size:11px}
+.vip-list{display:grid;gap:10px}
+.vip-card{padding:14px;border:1px solid rgba(255,255,255,.075);border-radius:12px;background:rgba(255,255,255,.018)}
+.vip-card.due{border-color:rgba(224,91,91,.32);background:rgba(224,91,91,.035)}
+.vip-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.vip-name strong{display:block;font-size:15px}.vip-name small{display:block;margin-top:4px;color:var(--r5-muted,#969289);word-break:break-all}
+.vip-badge{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;border:1px solid rgba(223,183,92,.28);color:var(--r5-gold-soft,#f2d68d);font-size:11px;font-weight:900}
+.vip-badge.due{border-color:rgba(224,91,91,.35);color:#f0a2a2}
+.vip-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:12px}
+.vip-cell span{display:block;color:var(--r5-muted,#969289);font-size:10px;font-weight:800}.vip-cell b{display:block;margin-top:4px;font-size:12px;word-break:break-word}
+.vip-actions{display:grid;grid-template-columns:1.2fr .8fr;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)}
+.vip-form{display:grid;grid-template-columns:minmax(120px,.6fr) minmax(180px,1fr) auto;gap:8px;align-items:center}
+.vip-note{margin-top:8px;color:var(--r5-muted,#969289);font-size:11px}
+.vip-empty{text-align:center;padding:26px;color:var(--r5-muted,#969289)}
+@media(max-width:1100px){.vip-grid{grid-template-columns:repeat(3,1fr)}.vip-actions{grid-template-columns:1fr}}
+@media(max-width:700px){.vip-stats{grid-template-columns:1fr}.vip-grid{grid-template-columns:1fr 1fr}.vip-form{grid-template-columns:1fr}.vip-head{flex-direction:column}}
+</style>
+
+<div class="vip-shell">
+    {% if message %}
+    <div class="panel compact-panel"><span class="status-chip is-paid">SUCCESS</span><p class="muted-text">{{ message }}</p></div>
+    {% endif %}
+    {% if error %}
+    <div class="panel compact-panel"><span class="status-chip is-unpaid">ERROR</span><p class="muted-text">{{ error }}</p></div>
+    {% endif %}
+
+    <div class="panel compact-panel">
+        <div class="section-title-row">
+            <div>
+                <h2>VIP 管理</h2>
+                <p class="muted-text">保級到期只會進入人工審核，不會自動降階。客服可升 / 降一階、延長最多 30 天；總管可指定任意階級。</p>
+            </div>
+            <a class="button secondary" href="/admin/customer-center">返回客戶中心</a>
+        </div>
+
+        <div class="vip-tabs">
+            <a href="/admin/customer-center" class="">全部顧客</a>
+            <a href="/admin/customer-center/vip?view=vip" class="{% if view == 'vip' %}active{% endif %}">VIP 管理</a>
+            <a href="/admin/customer-center/vip?view=pending" class="{% if view == 'pending' %}active{% endif %}">待降階審核{% if snapshot.stats.pending_count %}・{{ snapshot.stats.pending_count }}{% endif %}</a>
+            {% if is_manager %}
+            <a href="/admin/customer-center/vip?view=all" class="{% if view == 'all' %}active{% endif %}">全部會員資料</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel compact-panel">
+        <div class="vip-stats">
+            <div class="vip-stat"><span>目前 VIP</span><strong>{{ snapshot.stats.vip_count }}</strong></div>
+            <div class="vip-stat"><span>待降階審核</span><strong>{{ snapshot.stats.pending_count }}</strong></div>
+            <div class="vip-stat"><span>缺少最近消費日期</span><strong>{{ snapshot.stats.unknown_last_order_count }}</strong></div>
+        </div>
+        <div class="vip-policy">
+            {% for level in snapshot.levels %}
+                {% if level.index > 0 %}<span>{{ level.name }}・{{ level.retention_days }} 天</span>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel compact-panel">
+        <form method="get" action="/admin/customer-center/vip" class="admin-add-worker-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;">
+            <input type="hidden" name="view" value="{{ view }}">
+            <input class="input" name="q" value="{{ q }}" placeholder="搜尋老闆名稱或 Discord ID">
+            <button class="button" type="submit">搜尋</button>
+        </form>
+    </div>
+
+    <div class="vip-list">
+        {% for row in snapshot.rows %}
+        <div class="vip-card {% if row.is_due %}due{% endif %}">
+            <div class="vip-head">
+                <div class="vip-name">
+                    <strong>{{ row.customer_display_name }}</strong>
+                    <small>{{ row.customer_id }}</small>
+                </div>
+                <span class="vip-badge {% if row.is_due %}due{% endif %}">
+                    {% if row.is_due %}待審核・逾期 {{ row.days_overdue }} 天{% elif not row.expiry_at %}缺少消費日期{% else %}{{ row.current_level }}{% endif %}
+                </span>
+            </div>
+
+            <div class="vip-grid">
+                <div class="vip-cell"><span>目前 VIP</span><b>{{ row.current_level }}</b></div>
+                <div class="vip-cell"><span>累積消費對應</span><b>{{ row.cumulative_level }}</b></div>
+                <div class="vip-cell"><span>累積消費</span><b>{{ "{:,}".format(row.total_spent) }}T</b></div>
+                <div class="vip-cell"><span>最近一次消費</span><b>{% if row.last_order_at %}{{ row.last_order_at[:10] }}{% else %}—{% endif %}</b></div>
+                <div class="vip-cell"><span>距最近消費</span><b>{% if row.days_since_purchase is not none %}{{ row.days_since_purchase }} 天{% else %}—{% endif %}</b></div>
+                <div class="vip-cell"><span>目前保級期限</span><b>{% if row.expiry_at %}{{ row.expiry_at[:10] }}{% else %}—{% endif %}</b></div>
+            </div>
+
+            {% if row.protection_until %}
+            <div class="vip-note">人工保級已延長至 {{ row.protection_until[:10] }}。</div>
+            {% elif row.is_due %}
+            <div class="vip-note">系統建議：{{ row.current_level }} → {{ row.suggested_level }}。這只是建議，沒有按下調整前不會改會員等級。</div>
+            {% elif row.days_remaining is not none %}
+            <div class="vip-note">距保級審核約 {{ row.days_remaining }} 天。</div>
+            {% endif %}
+
+            <div class="vip-actions">
+                <form method="post" action="/admin/customer-center/vip/action" class="vip-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <input type="hidden" name="customer_id" value="{{ row.customer_id }}">
+                    <input type="hidden" name="action" value="set_level">
+                    <input type="hidden" name="return_view" value="{{ view }}">
+                    <select class="input" name="target_level_index" required>
+                        {% for level in snapshot.levels %}
+                            {% if is_manager or level.index == row.current_index or level.index == row.current_index - 1 or level.index == row.current_index + 1 %}
+                            <option value="{{ level.index }}" {% if row.is_due and level.index == row.suggested_index %}selected{% elif not row.is_due and level.index == row.current_index %}selected{% endif %}>{{ level.name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <input class="input" name="reason" maxlength="200" required placeholder="調整原因（必填）">
+                    <button class="button" type="submit">調整 VIP</button>
+                </form>
+
+                {% if row.current_index > 0 %}
+                <form method="post" action="/admin/customer-center/vip/action" class="vip-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <input type="hidden" name="customer_id" value="{{ row.customer_id }}">
+                    <input type="hidden" name="action" value="extend">
+                    <input type="hidden" name="return_view" value="{{ view }}">
+                    <select class="input" name="extend_days" required>
+                        <option value="7">延長 7 天</option>
+                        <option value="30">延長 30 天</option>
+                        {% if is_manager %}
+                        <option value="60">延長 60 天</option>
+                        <option value="90">延長 90 天</option>
+                        <option value="180">延長 180 天</option>
+                        {% endif %}
+                    </select>
+                    <input class="input" name="reason" maxlength="200" required placeholder="延長原因（必填）">
+                    <button class="button secondary" type="submit">延長保級</button>
+                </form>
+                {% endif %}
+            </div>
+
+            {% if row.last_manual_reason %}
+            <div class="vip-note">最近人工調整：{{ row.last_manual_reason }}{% if row.last_manual_by %}（{{ row.last_manual_by }}）{% endif %}</div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="panel compact-panel vip-empty">目前沒有符合條件的會員。</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
