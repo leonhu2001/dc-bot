@@ -3,6 +3,24 @@ from __future__ import annotations
 import tools.apply_loyalty_portal_patch as patch
 
 
+_original_replace = patch.replace
+
+
+def replace_v2(path: str, old: str, new: str, *, count: int = 1) -> None:
+    legacy_keys = '    "valorant_entertain",\n    "valorant_tech",\n    "valorant_top_tech",\n'
+    if path == "web/app/services/checkout_preview.py" and old == legacy_keys:
+        text = patch.read(path)
+        found = text.count(old)
+        if found != 2:
+            raise RuntimeError(f"{path}: expected 2 legacy Valorant exclusion blocks, found {found}")
+        patch.write(path, text.replace(old, new))
+        return
+    _original_replace(path, old, new, count=count)
+
+
+patch.replace = replace_v2
+
+
 def patch_staff_profile_archive_v2() -> None:
     path = "views/staff_profiles.py"
     old = '''    channel = await _ensure_profile_thread_open_for_refresh(
