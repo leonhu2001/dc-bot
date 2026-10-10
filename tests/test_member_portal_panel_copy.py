@@ -12,7 +12,7 @@ def test_member_portal_panel_is_compact_and_uses_icons():
     assert '"查詢結果僅自己可見。"' in source
     assert 'name="會員功能"' not in source
     assert 'name="官網完整專區"' not in source
-    assert "MAWAN_MEMBER_PORTAL_V1" not in source
+    assert 'MEMBER_PORTAL_MARKER = "\\u200b"' in source
 
     for emoji in ("📋", "💰", "👑", "🎁", "🌐"):
         assert f'emoji="{emoji}"' in source
