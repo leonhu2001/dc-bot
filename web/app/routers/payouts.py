@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from web.app.config import config
+from web.app.services.internal_transfers import ensure_internal_transfer_tables
 
 
 router = APIRouter(tags=["payouts"])
@@ -91,6 +92,7 @@ def normalize_my_payout_status(status: str | None) -> str:
 
 
 def get_my_payout_month_options() -> list[dict]:
+    ensure_internal_transfer_tables()
     conn = sqlite3.connect(my_payout_db_path())
     conn.row_factory = sqlite3.Row
 
@@ -106,6 +108,9 @@ def get_my_payout_month_options() -> list[dict]:
                 ) AS month_value
                 FROM web_orders
                 WHERE status = 'closed'
+                UNION ALL
+                SELECT substr(effective_at, 1, 7) AS month_value
+                FROM employee_payroll_adjustments
             )
             WHERE month_value GLOB '????-??'
             ORDER BY month_value DESC
@@ -232,6 +237,7 @@ def add_my_payout_item(
 
 def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all") -> tuple[list[dict], list[dict], dict]:
     ensure_worker_tip_table()
+    ensure_internal_transfer_tables()
     discord_id = str(discord_id or "").strip()
     month = str(month or "").strip()
     status = normalize_my_payout_status(status)
@@ -403,6 +409,62 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
                 payout_status=row["payout_status"],
                 amount=row["amount"],
             )
+
+        adjustment_status_sql = ""
+        adjustment_status_params: list[str] = []
+        if status in {"paid", "unpaid"}:
+            adjustment_status_sql = " AND a.payout_status = ? "
+            adjustment_status_params.append(status)
+
+        adjustment_month_sql = ""
+        adjustment_month_params: list[str] = []
+        if month:
+            adjustment_month_sql = " AND substr(a.effective_at, 1, 7) = ? "
+            adjustment_month_params.append(month)
+
+        adjustment_rows = conn.execute(
+            f"""
+            SELECT
+                a.transfer_id,
+                a.employee_display_name AS display_name,
+                a.counterparty_display_name AS counterparty_name,
+                a.direction,
+                a.amount,
+                a.payout_status,
+                a.reason,
+                a.effective_at
+            FROM employee_payroll_adjustments a
+            WHERE CAST(a.employee_discord_id AS TEXT) = ?
+              {adjustment_status_sql}
+              {adjustment_month_sql}
+            ORDER BY a.effective_at DESC, a.id DESC
+            """,
+            [discord_id, *adjustment_status_params, *adjustment_month_params],
+        ).fetchall()
+
+        for row in adjustment_rows:
+            if row["display_name"] and not person["display_name"]:
+                person["display_name"] = row["display_name"]
+            counterparty = str(row["counterparty_name"] or "內部員工")
+            direction = str(row["direction"] or "")
+            item_label = (
+                f"轉入｜來自 {counterparty}"
+                if direction == "incoming"
+                else f"轉出｜給 {counterparty}"
+            )
+            if str(row["reason"] or "").strip():
+                item_label += f"｜{str(row['reason']).strip()}"
+            add_my_payout_item(
+                person,
+                order_no=f"內部轉帳 #{int(row['transfer_id'])}",
+                closed_at=row["effective_at"],
+                customer_name=counterparty,
+                category="內部轉帳",
+                item=item_label,
+                role_label="內部轉帳",
+                payout_status=row["payout_status"],
+                amount=row["amount"],
+            )
     finally:
         conn.close()
 
@@ -445,14 +507,17 @@ def _salary_category(role_label: str | None) -> tuple[str, str]:
         return "tip", "🍗 雞腿"
     if value == "客服":
         return "customer_service", "客服分潤"
+    if value == "內部轉帳":
+        return "internal_transfer", "內部轉帳"
     return "service", "服務薪資"
 
 
 def build_employee_salary_ledger(discord_id: str) -> dict:
     """員工中心薪資資料。
 
-    直接沿用 build_my_payout_rows 的三套來源：worker_payouts、worker_tips、
-    customer_service_payouts，避免員工中心和薪資結算各算各的。
+    直接沿用 build_my_payout_rows 的正式薪資來源：worker_payouts、worker_tips、
+    customer_service_payouts 與 employee_payroll_adjustments，避免員工中心和
+    薪資結算各算各的。
     """
     discord_id = str(discord_id or "").strip()
     unpaid_rows, paid_rows, totals = build_my_payout_rows(
@@ -474,6 +539,7 @@ def build_employee_salary_ledger(discord_id: str) -> dict:
         "service": {"count": 0, "total": 0},
         "tip": {"count": 0, "total": 0},
         "customer_service": {"count": 0, "total": 0},
+        "internal_transfer": {"count": 0, "total": 0},
     }
 
     for raw in raw_items:
@@ -485,6 +551,8 @@ def build_employee_salary_ledger(discord_id: str) -> dict:
             service_label = "老闆加雞腿"
         elif category_key == "customer_service":
             service_label = str(raw.get("item") or raw.get("category") or "客服分潤")
+        elif category_key == "internal_transfer":
+            service_label = str(raw.get("item") or "內部轉帳")
         else:
             service_label = str(raw.get("item") or raw.get("category") or "服務薪資")
 
