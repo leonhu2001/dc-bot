@@ -22,6 +22,7 @@ from services.vip_review_store import (
 from web.app.services.accounting_reconciliation import (
     build_accounting_reconciliation_snapshot,
 )
+from web.app.services.admin_customer_loyalty import enrich_customer_rows
 from web.app.services.audit_trail import write_sqlite_audit_log
 from web.app.services.role_catalog import STAFF_ROLE_FILTERS
 
@@ -382,6 +383,8 @@ def _customer_snapshot(
         item["favorite_count"] = int(favorite_map.get(customer_id, 0))
         item["review_count"] = int(customer_review_map.get(customer_id, 0))
         result_rows.append(item)
+
+    result_rows = enrich_customer_rows(WEB_DB, result_rows)
 
     return {
         "rows": result_rows,
