@@ -51,12 +51,7 @@
         ".account-dropdown"
     );
 
-    if (
-        accountDropdown
-        && !accountDropdown.querySelector(
-            '[href="/me/wallet"]'
-        )
-    ) {
+    if (accountDropdown) {
         const logoutLink = accountDropdown.querySelector(
             '[href="/auth/logout"]'
         );
@@ -66,12 +61,17 @@
                 ? logoutLink.previousElementSibling
                 : null;
 
-        const walletLink = document.createElement(
-            "a"
+        let walletLink = accountDropdown.querySelector(
+            '[href="/me/wallet"]'
         );
 
-        walletLink.href = "/me/wallet";
-        walletLink.textContent = "我的錢包 / 儲值";
+        if (!walletLink) {
+            walletLink = document.createElement(
+                "a"
+            );
+            walletLink.href = "/me/wallet";
+            walletLink.textContent = "我的錢包 / 儲值";
+        }
 
         if (
             logoutDivider
@@ -88,7 +88,7 @@
                 walletLink,
                 logoutLink
             );
-        } else {
+        } else if (!walletLink.isConnected) {
             accountDropdown.appendChild(
                 walletLink
             );
