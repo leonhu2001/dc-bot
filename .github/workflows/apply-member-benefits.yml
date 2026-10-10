@@ -27,6 +27,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Fix patch matcher for current staff profile code
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('tools/apply_member_benefits_portal.py')
+          text = p.read_text(encoding='utf-8')
+          old = '''    text = replace_once(\n        text,\n        "    await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id,\\n        reason=reason,\\n    )\\n\\n",\n        "    can_edit = await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id,\\n        reason=reason,\\n    )\\n    if not can_edit:\\n        return True\\n\\n",\n        label="skip archived profile edit",\n    )\n'''
+          new = '''    text = replace_once(\n        text,\n        "    channel = await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id=staff_id_text,\\n        reason=reason,\\n    )\\n    if channel is None:\\n        return False\\n\\n",\n        "    can_edit = await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id=staff_id_text,\\n        reason=reason,\\n    )\\n    if not can_edit:\\n        return True\\n\\n",\n        label="skip archived profile edit",\n    )\n'''
+          if old not in text:
+              raise SystemExit('old matcher block not found')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Apply patch
         run: python tools/apply_member_benefits_portal.py
 
