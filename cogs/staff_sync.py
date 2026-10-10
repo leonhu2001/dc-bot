@@ -12,13 +12,13 @@ from discord.ext import commands, tasks
 from services.staff_profile_sync import (
     claim_staff_profile_refresh_events,
     ensure_staff_profile_refresh_sync,
+    get_staff_id_for_profile_thread,
     mark_staff_profile_refresh_done,
     mark_staff_profile_refresh_failed,
 )
 from shared.db import SessionLocal, create_all_tables
 from views.staff_profiles import (
     get_staff_profile,
-    get_staff_profile_panel_rows,
     refresh_staff_profile_panel_for_staff,
 )
 from services.loyalty_benefits import (
@@ -439,25 +439,24 @@ class StaffSyncCog(commands.Cog):
         # genuinely reopen one, refresh it once so the visible panel is current.
         if not bool(getattr(before, "archived", False)) or bool(getattr(after, "archived", False)):
             return
-        for profile in get_staff_profile_panel_rows():
-            if str(profile.get("forum_thread_id") or "") != str(after.id):
-                continue
-            staff_id = str(profile.get("staff_discord_id") or "").strip()
-            if not staff_id:
-                return
-            try:
-                await refresh_staff_profile_panel_for_staff(
-                    after.guild,
-                    staff_id,
-                    reason="thread_reopened",
-                )
-            except Exception as exc:
-                print(
-                    f"[staff-profile] reopen refresh failed staff_id={staff_id}: "
-                    f"{type(exc).__name__}: {exc}",
-                    flush=True,
-                )
+        staff_id = await asyncio.to_thread(
+            get_staff_id_for_profile_thread,
+            after.id,
+        )
+        if not staff_id:
             return
+        try:
+            await refresh_staff_profile_panel_for_staff(
+                after.guild,
+                staff_id,
+                reason="thread_reopened",
+            )
+        except Exception as exc:
+            print(
+                f"[staff-profile] reopen refresh failed staff_id={staff_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
 
     @commands.Cog.listener()

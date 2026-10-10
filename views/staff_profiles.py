@@ -1046,7 +1046,7 @@ async def _ensure_profile_thread_open_for_refresh(
     Discord automatically surfaces active threads in the channel list. Profile data syncs
     are background maintenance and must not turn an archived personal wall active again.
     """
-    if isinstance(channel, discord.Thread) and bool(getattr(channel, "archived", False)):
+    if bool(getattr(channel, "archived", False)):
         print(
             f"[staff-profile] archived thread left archived staff_id={staff_id} "
             f"thread={channel.id} reason={reason}",
