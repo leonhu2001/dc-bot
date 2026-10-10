@@ -27,10 +27,10 @@ def test_member_portal_detail_embeds_are_result_first_and_use_link_buttons():
 
     assert 'name="訂單摘要"' in source
     assert 'name="最近 5 筆"' in source
-    assert 'label="查看完整訂單"' in source
-    assert 'label="查看錢包紀錄"' in source
-    assert 'label="查看 VIP 專區"' in source
-    assert 'label="查看我的福利"' in source
+    assert '_link_view("查看完整訂單"' in source
+    assert '_link_view("查看錢包紀錄"' in source
+    assert '_link_view("查看 VIP 專區"' in source
+    assert '_link_view("查看我的福利"' in source
     assert 'value="請使用 Discord 的儲值中心。"' in source
     assert 'value="尚未開始累積。\\n完成符合活動的付費服務後才會顯示。"' in source
 
