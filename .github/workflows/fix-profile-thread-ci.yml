@@ -1,0 +1,77 @@
+name: Fix profile thread CI
+
+on:
+  push:
+    branches:
+      - feature/member-benefits-portal
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/member-benefits-portal
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Apply focused fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              if old not in text:
+                  if new in text:
+                      return
+                  raise SystemExit(f"anchor missing: {path}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # An archived Discord-like thread must never be edited by background refresh,
+          # including test doubles and future wrapper types.
+          replace_once(
+              "views/staff_profiles.py",
+              '    if isinstance(channel, discord.Thread) and bool(getattr(channel, "archived", False)):\n',
+              '    if bool(getattr(channel, "archived", False)):\n',
+          )
+
+          # Add a targeted thread-id lookup to the existing event-sync data service.
+          path = Path("services/staff_profile_sync.py")
+          text = path.read_text(encoding="utf-8")
+          if "def get_staff_id_for_profile_thread(" not in text:
+              anchor = '''def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:\n'''
+              helper = '''def get_staff_id_for_profile_thread(\n    thread_id: int | str,\n    *,\n    db_file: str | Path | None = None,\n) -> str | None:\n    """Resolve exactly one profile from a Discord thread id without a full-profile scan."""\n    thread_id_text = str(thread_id or "").strip()\n    if not thread_id_text:\n        return None\n    with _connect(db_file) as conn:\n        if not _table_exists(conn, "staff_profiles"):\n            return None\n        row = conn.execute(\n            """\n            SELECT staff_discord_id\n            FROM staff_profiles\n            WHERE forum_thread_id = ?\n            LIMIT 1\n            """,\n            (thread_id_text,),\n        ).fetchone()\n    if row is None:\n        return None\n    value = str(row["staff_discord_id"] or "").strip()\n    return value or None\n\n\n'''
+              if anchor not in text:
+                  raise SystemExit("staff profile sync lookup anchor missing")
+              path.write_text(text.replace(anchor, helper + anchor, 1), encoding="utf-8")
+
+          # Preserve change-driven sync policy: a thread reopen resolves only that thread.
+          replace_once(
+              "cogs/staff_sync.py",
+              '''from services.staff_profile_sync import (\n    claim_staff_profile_refresh_events,\n    ensure_staff_profile_refresh_sync,\n    mark_staff_profile_refresh_done,\n    mark_staff_profile_refresh_failed,\n)\n''',
+              '''from services.staff_profile_sync import (\n    claim_staff_profile_refresh_events,\n    ensure_staff_profile_refresh_sync,\n    get_staff_id_for_profile_thread,\n    mark_staff_profile_refresh_done,\n    mark_staff_profile_refresh_failed,\n)\n''',
+          )
+          replace_once(
+              "cogs/staff_sync.py",
+              '''from views.staff_profiles import (\n    get_staff_profile,\n    get_staff_profile_panel_rows,\n    refresh_staff_profile_panel_for_staff,\n)\n''',
+              '''from views.staff_profiles import (\n    get_staff_profile,\n    refresh_staff_profile_panel_for_staff,\n)\n''',
+          )
+          old = '''        for profile in get_staff_profile_panel_rows():\n            if str(profile.get("forum_thread_id") or "") != str(after.id):\n                continue\n            staff_id = str(profile.get("staff_discord_id") or "").strip()\n            if not staff_id:\n                return\n            try:\n                await refresh_staff_profile_panel_for_staff(\n                    after.guild,\n                    staff_id,\n                    reason="thread_reopened",\n                )\n            except Exception as exc:\n                print(\n                    f"[staff-profile] reopen refresh failed staff_id={staff_id}: "\n                    f"{type(exc).__name__}: {exc}",\n                    flush=True,\n                )\n            return\n'''
+          new = '''        staff_id = await asyncio.to_thread(\n            get_staff_id_for_profile_thread,\n            after.id,\n        )\n        if not staff_id:\n            return\n        try:\n            await refresh_staff_profile_panel_for_staff(\n                after.guild,\n                staff_id,\n                reason="thread_reopened",\n            )\n        except Exception as exc:\n            print(\n                f"[staff-profile] reopen refresh failed staff_id={staff_id}: "\n                f"{type(exc).__name__}: {exc}",\n                flush=True,\n            )\n'''
+          replace_once("cogs/staff_sync.py", old, new)
+          PY
+      - name: Compile
+        run: python -m compileall -q cogs services views tests
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cogs/staff_sync.py services/staff_profile_sync.py views/staff_profiles.py
+          git commit -m "Keep profile thread refresh targeted and archive-safe"
+          git push origin HEAD:feature/member-benefits-portal
