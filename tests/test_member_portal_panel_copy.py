@@ -30,7 +30,10 @@ def test_member_portal_detail_embeds_are_result_first_and_use_link_buttons():
     assert '_link_view("查看完整訂單"' in source
     assert '_link_view("查看錢包紀錄"' in source
     assert '_link_view("查看 VIP 專區"' in source
-    assert '_link_view("查看我的福利"' in source
+    # 福利頁現在需要同時容納網站連結與黑鑽專屬兌換按鈕，
+    # 因此由專用 View 組合，而不是只有單一 _link_view。
+    assert 'label="查看我的福利"' in source
+    assert 'view=MemberBenefitsView(monthly)' in source
     assert 'value="請使用 Discord 的儲值中心。"' in source
     assert 'value="尚未開始累積。\\n完成符合活動的付費服務後才會顯示。"' in source
 
