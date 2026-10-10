@@ -297,7 +297,8 @@ def reserve_coupon_in_session(
     rule_key: str,
     player_count: int = 1,
 ) -> None:
-    ensure_loyalty_tables(db.get_bind())
+    # Schema is initialized at application/bot startup. Avoid opening a second
+    # SQLite write transaction while this Session already owns the order transaction.
     scope = loyalty_scope_key(rule_key, player_count)
     result = db.execute(text("""
         UPDATE customer_benefit_coupons

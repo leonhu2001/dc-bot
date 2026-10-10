@@ -139,6 +139,18 @@
         );
 
 
+    const benefitSelect =
+        byId(
+            "mw-checkout-benefit"
+        );
+
+
+    const benefitNote =
+        byId(
+            "mw-checkout-benefit-note"
+        );
+
+
     const useWallet =
         byId(
             "mw-checkout-use-wallet"
@@ -896,6 +908,29 @@
     }
 
 
+    function renderBenefitCoupons(items) {
+        if (!benefitSelect) {
+            return;
+        }
+        benefitSelect.innerHTML = "";
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = "不使用福利券";
+        benefitSelect.append(empty);
+        (items || []).forEach(item => {
+            const option = document.createElement("option");
+            option.value = String(item.id || "");
+            option.textContent = item.title || "會員福利券";
+            benefitSelect.append(option);
+        });
+        if (benefitNote) {
+            benefitNote.textContent = (items || []).length
+                ? "福利券與點數福利同張訂單擇一使用"
+                : "這個方案目前沒有可用福利券";
+        }
+    }
+
+
     function renderCheckoutOptions(
         data
     ) {
@@ -937,6 +972,10 @@
 
         renderPointOptions(
             data.point_options
+        );
+
+        renderBenefitCoupons(
+            data.benefit_coupons
         );
 
 
@@ -1135,6 +1174,10 @@
             );
         }
 
+        if (finance.benefit_service_note) {
+            notes.push(finance.benefit_service_note);
+        }
+
 
         if (
             finance.wallet_use_amount
@@ -1232,6 +1275,10 @@
 
             point_item_key:
                 pointSelect.value
+                || null,
+
+            benefit_coupon_id:
+                benefitSelect?.value
                 || null,
 
             use_wallet: false,
@@ -1747,6 +1794,10 @@
         "change",
         async () => {
 
+            if (pointSelect.value && benefitSelect) {
+                benefitSelect.value = "";
+            }
+
             const option =
                 pointSelect.options[
                     pointSelect.selectedIndex
@@ -1758,6 +1809,17 @@
                 || "選擇後由伺服器重新驗證資格";
 
 
+            await refreshCheckoutPreview();
+        }
+    );
+
+
+    benefitSelect?.addEventListener(
+        "change",
+        async () => {
+            if (benefitSelect.value && pointSelect) {
+                pointSelect.value = "";
+            }
             await refreshCheckoutPreview();
         }
     );
@@ -1871,6 +1933,10 @@
 
                 pointSelect.value =
                     "";
+            }
+
+            if (benefitSelect) {
+                benefitSelect.value = "";
             }
 
 
@@ -2065,6 +2131,10 @@
 
             point_item_key:
                 pointSelect?.value
+                || null,
+
+            benefit_coupon_id:
+                benefitSelect?.value
                 || null,
 
             use_wallet: false,

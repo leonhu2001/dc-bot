@@ -225,6 +225,12 @@ def final_server_preview(
             )
             or None,
 
+        "benefit_coupon_id":
+            payload.get(
+                "benefit_coupon_id"
+            )
+            or None,
+
         "use_wallet":
             bool(
                 payload.get(
@@ -1540,6 +1546,23 @@ def persist_final_order(
     ):
         raise RuntimeError(
             "WebOrder flush 後沒有 order id。"
+        )
+
+
+    selected_coupon = preview.get("benefit_coupon") if isinstance(preview, dict) else None
+    if isinstance(selected_coupon, dict) and selected_coupon.get("id"):
+        from services.loyalty_benefits import reserve_coupon_in_session
+        reserve_coupon_in_session(
+            db,
+            coupon_id=int(selected_coupon["id"]),
+            customer_id=customer_id,
+            order_id=int(order.id),
+            rule_key=str(rule.key),
+            player_count=_first_int(
+                quote,
+                ("player_count",),
+                default=_to_int(payload.get("player_count"), 1),
+            ),
         )
 
 

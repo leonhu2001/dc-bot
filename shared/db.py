@@ -103,3 +103,6 @@ def create_all_tables() -> None:
 
     ensure_acceptance_tables()
     ensure_order_cancellation_table(engine)
+
+    from services.loyalty_benefits import ensure_loyalty_tables
+    ensure_loyalty_tables(engine)

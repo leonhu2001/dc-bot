@@ -4889,13 +4889,14 @@ async def refresh_staff_profile_panel(
 # ========= 點數兌換面板 =========
 
 POINT_REDEEM_ITEMS = [
-    {"key": "discount_20", "cost": 5, "name": "20 元折價券"},
-    {"key": "discount_30", "cost": 10, "name": "30 元折價券"},
-    {"key": "extra_10", "cost": 15, "name": "加時 30 分鐘"},
-    {"key": "extra_15", "cost": 20, "name": "加場一場保撤"},
-    {"key": "free_specify_fee", "cost": 25, "name": "免指定費 1 次"},
-    {"key": "discount_100", "cost": 30, "name": "100 元折價券"},
-    {"key": "extra_30", "cost": 40, "name": "加時一小時"},
+    {"key": "discount_20", "cost": 10, "name": "20T 折價券"},
+    {"key": "discount_30", "cost": 15, "name": "30T 折價券"},
+    {"key": "free_specify_fee", "cost": 30, "name": "免指定費 1 次"},
+    {"key": "discount_100", "cost": 45, "name": "100T 折價券"},
+    {"key": "extra_hour_30m", "cost": 60, "name": "加時 30 分鐘"},
+    {"key": "extra_hour_1h", "cost": 110, "name": "加時 1 小時"},
+    {"key": "extra_game_1", "cost": 40, "name": "加 1 局"},
+    {"key": "extra_game_2", "cost": 70, "name": "加 2 局"},
 ]
 
 POINT_REDEEM_ITEMS_BY_KEY = {
