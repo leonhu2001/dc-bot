@@ -1,0 +1,41 @@
+name: Fix archived profile log
+
+on:
+  push:
+    branches:
+      - feature/member-benefits-portal
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/member-benefits-portal
+      - name: Patch archive log
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('views/staff_profiles.py')
+          text = p.read_text(encoding='utf-8')
+          old = '            f"thread={channel.id} reason={reason}",\n'
+          new = '            f"thread={getattr(channel, \'id\', \'unknown\')} reason={reason}",\n'
+          if old not in text:
+              if new not in text:
+                  raise SystemExit('archive log anchor missing')
+          else:
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Compile
+        run: python -m compileall -q views
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add views/staff_profiles.py
+          git commit -m "Avoid touching archived profile thread during logging"
+          git push origin HEAD:feature/member-benefits-portal
