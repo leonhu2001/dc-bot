@@ -92,7 +92,7 @@ def normalize_my_payout_status(status: str | None) -> str:
 
 
 def get_my_payout_month_options() -> list[dict]:
-    ensure_internal_transfer_tables()
+    ensure_internal_transfer_tables(my_payout_db_path())
     conn = sqlite3.connect(my_payout_db_path())
     conn.row_factory = sqlite3.Row
 
@@ -237,7 +237,7 @@ def add_my_payout_item(
 
 def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all") -> tuple[list[dict], list[dict], dict]:
     ensure_worker_tip_table()
-    ensure_internal_transfer_tables()
+    ensure_internal_transfer_tables(my_payout_db_path())
     discord_id = str(discord_id or "").strip()
     month = str(month or "").strip()
     status = normalize_my_payout_status(status)
