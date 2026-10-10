@@ -47,7 +47,6 @@ OPTIONAL_INT_FIELDS = {
     "max_specified_count",
     "specify_free_min_units",
     "max_player_count",
-    "service_bonus_buy",
 }
 INT_FIELDS = {
     "price",
@@ -55,7 +54,6 @@ INT_FIELDS = {
     "specify_fee_default",
     "min_player_count",
     "min_protector_count",
-    "service_bonus_gift",
 }
 BOOL_FIELDS = {
     "allow_specify",
@@ -63,6 +61,7 @@ BOOL_FIELDS = {
     "price_multiply_player_count",
     "vip_discount_allowed",
     "point_benefits_allowed",
+    "loyalty_benefits_enabled",
 }
 PRICING_TYPES = {"fixed", "hourly", "game", "unit", "manual"}
 
@@ -300,6 +299,11 @@ def _payload_from_form_base(payload: dict, form) -> dict:
 
     for field in BOOL_FIELDS:
         payload[field] = field in form
+
+    # 舊的同單買幾送幾已全面停用。欄位只保留歷史 payload 相容，
+    # 後台任何新建/修改都強制清空，避免舊 override 將活動復活。
+    payload["service_bonus_buy"] = None
+    payload["service_bonus_gift"] = 0
 
     payload["allowed_roles"] = [
         str(item)

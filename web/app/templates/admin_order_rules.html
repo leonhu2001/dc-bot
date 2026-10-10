@@ -169,22 +169,15 @@
                 <div>
                     <h3>活動、優惠與功能</h3>
                     <p class="muted-text">
-                        VIP 與點數是獨立商品開關；關閉後 Web / DC 都不套用該福利。客服手動折扣不受影響。
+                        VIP、點數與跨單累積福利各自獨立。舊的同單「買幾送幾」已全面停用。
                     </p>
                 </div>
             </div>
 
-            <div class="new-product-grid new-product-grid--compact">
-                <label class="new-product-field">
-                    <span>買幾送</span>
-                    <input name="service_bonus_buy" type="number" min="1" value="">
-                </label>
-
-                <label class="new-product-field">
-                    <span>贈送數量</span>
-                    <input name="service_bonus_gift" type="number" min="0" value="0">
-                </label>
-            </div>
+            <p class="muted-text">
+                跨單累積福利：計時商品每累積 10 個付費小時發 +30 分鐘券；計局商品每累積 20 個付費局發 +1 局券。
+                固定價／單位價商品即使勾選也不會產生累積。
+            </p>
 
             <div class="new-product-toggles">
                 <label><input type="checkbox" name="allow_specify"> <span>開放指定</span></label>
@@ -192,6 +185,7 @@
                 <label><input type="checkbox" name="price_multiply_player_count"> <span>價格 × 人數</span></label>
                 <label><input type="checkbox" name="vip_discount_allowed" checked> <span>套用 VIP 會員折扣</span></label>
                 <label><input type="checkbox" name="point_benefits_allowed" checked> <span>可使用點數福利</span></label>
+                <label><input type="checkbox" name="loyalty_benefits_enabled"> <span>啟用跨單累積福利</span></label>
             </div>
         </section>
 
@@ -442,12 +436,8 @@
                         <input name="min_protector_count" type="number" min="0" value="{{ payload.get('min_protector_count', 0) }}">
                     </div>
                     <div>
-                        <span>買幾送</span>
-                        <input name="service_bonus_buy" type="number" min="1" value="{{ '' if payload.get('service_bonus_buy') is none else payload.get('service_bonus_buy') }}">
-                    </div>
-                    <div>
-                        <span>贈送數量</span>
-                        <input name="service_bonus_gift" type="number" min="0" value="{{ payload.get('service_bonus_gift', 0) }}">
+                        <span>跨單累積福利</span>
+                        <strong>{{ '10H → +30分鐘' if payload.get('pricing_type') == 'hourly' else ('20局 → +1局' if payload.get('pricing_type') == 'game' else '此計價方式不適用') }}</strong>
                     </div>
                 </div>
 
@@ -457,9 +447,10 @@
                     <label><input type="checkbox" name="price_multiply_player_count" {% if payload.get('price_multiply_player_count') %}checked{% endif %}> 價格 × 人數</label>
                     <label><input type="checkbox" name="vip_discount_allowed" {% if payload.get('vip_discount_allowed', True) %}checked{% endif %}> 套用 VIP 會員折扣</label>
                     <label><input type="checkbox" name="point_benefits_allowed" {% if payload.get('point_benefits_allowed', True) %}checked{% endif %}> 可使用點數福利</label>
+                    <label><input type="checkbox" name="loyalty_benefits_enabled" {% if payload.get('loyalty_benefits_enabled', False) %}checked{% endif %}> 啟用跨單累積福利</label>
                 </div>
                 <p class="muted-text" style="margin-top:-6px;">
-                    VIP 與點數各自控制；關閉 VIP 仍可由客服另外套用手動折扣。
+                    VIP、點數與跨單累積各自控制；跨單福利僅計真正付費的基礎時數／局數。
                 </p>
 
                 <div class="panel compact-panel" style="margin-top:12px;">
