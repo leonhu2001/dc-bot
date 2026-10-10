@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - feature/member-benefits-portal
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,25 +26,91 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fix patch matcher for current staff profile code
+      - name: Apply final integration fixes
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path('tools/apply_member_benefits_portal.py')
+
+          def patch(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old in text:
+                  p.write_text(text.replace(old, new, 1), encoding='utf-8')
+                  print('patched', path)
+              elif new not in text:
+                  raise SystemExit(f'anchor missing in {path}')
+
+          # Archived personal walls stay archived during background data refreshes.
+          patch(
+              'tests/test_staff_profile_archived_thread_refresh.py',
+              '''    assert [call["archived"] for call in thread.edit_calls] == [False]\n    assert thread.archived is False\n    assert len(thread.message.edits) == 1\n''',
+              '''    assert thread.edit_calls == []\n    assert thread.archived is True\n    assert len(thread.message.edits) == 0\n''',
+          )
+
+          # Old same-order buy/get assertions become cross-order loyalty assertions.
+          patch(
+              'tests/test_game_service_rules.py',
+              '''def test_buy_8_get_1_and_prices():\n    rule = ORDER_RULES["valorant_radiant_ranked"]\n    result = calculate_price(rule, quantity=8, player_count=2)\n    assert rule.price == 400\n    assert result.base_amount == 6400\n    assert result.service_quantity == 9\n    assert set(get_allowed_role_ids(rule)) == {"1545357782906314782"}\n\n    lol = ORDER_RULES["lol_entertain_aram"]\n    assert lol.price == 300\n    assert lol.unit_label == "H"\n    assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 9\n''',
+              '''def test_same_order_buy_get_is_disabled_and_loyalty_is_enabled():\n    rule = ORDER_RULES["valorant_radiant_ranked"]\n    result = calculate_price(rule, quantity=8, player_count=2)\n    assert rule.price == 400\n    assert result.base_amount == 6400\n    assert result.service_quantity == 8\n    assert rule.loyalty_benefits_enabled is True\n    assert set(get_allowed_role_ids(rule)) == {"1545357782906314782"}\n\n    lol = ORDER_RULES["lol_entertain_aram"]\n    assert lol.price == 300\n    assert lol.unit_label == "H"\n    assert lol.loyalty_benefits_enabled is True\n    assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 8\n''',
+          )
+
+          # Discord selector: no double-default when a coupon is selected, and clearer UI copy.
+          patch(
+              'services/self_service_runtime.py',
+              '''                default=parent_view.selected_key is None,\n''',
+              '''                default=(parent_view.selected_key is None and parent_view.selected_coupon_id is None),\n''',
+          )
+          patch(
+              'services/self_service_runtime.py',
+              '''            placeholder="選擇這張單要使用的點數福利",\n''',
+              '''            placeholder="選擇點數 / 會員福利",\n''',
+          )
+          patch(
+              'services/self_service_runtime.py',
+              '''        label="選擇點數福利",\n''',
+              '''        label="點數 / 會員福利",\n''',
+          )
+          patch(
+              'services/self_service_runtime.py',
+              '''        if price_adjustment.get(\n            "service_bonus_text"\n        ):\n            web_note_parts.append(\n                "點數福利："\n                f"{price_adjustment['service_bonus_text']}"\n            )\n\n    # service_promotion_web_note_v1\n''',
+              '''        if price_adjustment.get(\n            "service_bonus_text"\n        ):\n            web_note_parts.append(\n                "點數福利："\n                f"{price_adjustment['service_bonus_text']}"\n            )\n\n    if price_adjustment.get("benefit_coupon_title"):\n        benefit_note = str(price_adjustment.get("benefit_service_note") or "").strip()\n        web_note_parts.append(\n            "會員福利："\n            f"{price_adjustment['benefit_coupon_title']}"\n            + (f"｜{benefit_note}" if benefit_note else "")\n        )\n\n    # service_promotion_web_note_v1\n''',
+          )
+
+          # Wallet-paid orders count as paid consumption. Use subtotal-before-wallet from snapshot
+          # when available rather than external remaining payment (= 0 for wallet-full payment).
+          p = Path('services/loyalty_benefits.py')
           text = p.read_text(encoding='utf-8')
-          old = '''    text = replace_once(\n        text,\n        "    await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id,\\n        reason=reason,\\n    )\\n\\n",\n        "    can_edit = await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id,\\n        reason=reason,\\n    )\\n    if not can_edit:\\n        return True\\n\\n",\n        label="skip archived profile edit",\n    )\n'''
-          new = '''    text = replace_once(\n        text,\n        "    channel = await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id=staff_id_text,\\n        reason=reason,\\n    )\\n    if channel is None:\\n        return False\\n\\n",\n        "    can_edit = await _ensure_profile_thread_open_for_refresh(\\n        channel,\\n        staff_id=staff_id_text,\\n        reason=reason,\\n    )\\n    if not can_edit:\\n        return True\\n\\n",\n        label="skip archived profile edit",\n    )\n'''
-          if old not in text:
-              raise SystemExit('old matcher block not found')
-          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          old_select = '''            SELECT id, customer_discord_id, order_rule_key, quantity,\n                   customer_pay_amount, status, created_at, updated_at, closed_at,\n                   price_snapshot_json, ticket_channel_id\n'''
+          new_select = '''            SELECT id, customer_discord_id, order_rule_key, quantity,\n                   amount, original_amount, customer_pay_amount, status, created_at, updated_at, closed_at,\n                   price_snapshot_json, ticket_channel_id\n'''
+          if old_select in text:
+              text = text.replace(old_select, new_select, 1)
+          elif new_select not in text:
+              raise SystemExit('loyalty select anchor missing')
+
+          old_gate = '''        elif int(row.get("customer_pay_amount") or 0) <= 0:\n            note = "no_paid_amount"\n        else:\n            player_count = 1\n            try:\n                import json\n                snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))\n                if isinstance(snapshot, dict):\n                    preview = snapshot.get("preview") if isinstance(snapshot.get("preview"), dict) else snapshot\n                    quote = preview.get("quote") if isinstance(preview, dict) and isinstance(preview.get("quote"), dict) else {}\n                    input_data = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else {}\n                    player_count = int(quote.get("player_count") or input_data.get("player_count") or 1)\n            except Exception:\n                player_count = 1\n'''
+          new_gate = '''        else:\n            player_count = 1\n            qualifying_paid_amount = int(row.get("customer_pay_amount") or row.get("amount") or 0)\n            try:\n                import json\n                snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))\n                if isinstance(snapshot, dict):\n                    preview = snapshot.get("preview") if isinstance(snapshot.get("preview"), dict) else snapshot\n                    quote = preview.get("quote") if isinstance(preview, dict) and isinstance(preview.get("quote"), dict) else {}\n                    input_data = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else {}\n                    finance = preview.get("finance") if isinstance(preview, dict) and isinstance(preview.get("finance"), dict) else {}\n                    player_count = int(quote.get("player_count") or input_data.get("player_count") or snapshot.get("player_count") or 1)\n                    if "subtotal_before_wallet" in finance:\n                        qualifying_paid_amount = int(finance.get("subtotal_before_wallet") or 0)\n                    elif "customer_pay_amount" in snapshot:\n                        qualifying_paid_amount = int(snapshot.get("customer_pay_amount") or 0)\n            except Exception:\n                player_count = 1\n\n            if qualifying_paid_amount <= 0:\n                note = "no_paid_amount"\n            else:\n'''
+          if old_gate in text:
+              text = text.replace(old_gate, new_gate, 1)
+              # Indent the existing eligible-order body until event insertion.
+              start = text.index('                rule = _rule_for_key(rule_key)', text.index(new_gate))
+              end = text.index('\n\n        conn.execute(text("""\n            INSERT INTO loyalty_order_events', start)
+              block = text[start:end]
+              block = '\n'.join(('    ' + line if line.strip() else line) for line in block.split('\n'))
+              text = text[:start] + block + text[end:]
+          elif 'qualifying_paid_amount = int(row.get("customer_pay_amount")' not in text:
+              raise SystemExit('loyalty paid gate anchor missing')
+          p.write_text(text, encoding='utf-8')
+
+          # Regression: point-added work keeps full list-value payout even for VIP-discounted customer price.
+          p = Path('tests/test_checkout_point_benefits.py')
+          text = p.read_text(encoding='utf-8')
+          test = '''\n\ndef test_point_added_service_uses_full_value_even_with_vip_discount():\n    point_item = {"kind": "extra_hours", "hours": 0.5}\n    service_value = checkout.calculate_point_service_value(\n        quote={"quantity": 2, "customer_pay_amount": 600},\n        vip_pay_rate=94,\n        point_item=point_item,\n    )\n    assert service_value == 150\n\n    finance = checkout.calculate_checkout_financials(\n        service_amount=600,\n        vip_pay_rate=94,\n        specify_fee=0,\n        point_item=point_item,\n        point_service_value=service_value,\n        wallet_balance=0,\n        use_wallet=False,\n    )\n    assert finance["customer_pay_amount"] == 564\n    assert finance["payout_base_amount"] == 714\n    assert finance["point_store_absorbed_amount"] == 150\n'''
+          if 'test_point_added_service_uses_full_value_even_with_vip_discount' not in text:
+              p.write_text(text + test, encoding='utf-8')
           PY
 
-      - name: Apply patch
-        run: python tools/apply_member_benefits_portal.py
-
       - name: Compile changed Python
-        run: |
-          python -m compileall -q bot.py cogs services shared views web/app tests
+        run: python -m compileall -q bot.py cogs services shared views web/app tests
 
       - name: Commit generated changes
         run: |
@@ -55,6 +120,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bot.py cogs services shared views web/app tests
-          git commit -m "Implement member benefits and portal flow"
+          git add services tests
+          git commit -m "Harden loyalty benefits and archived profile behavior"
           git push origin HEAD:feature/member-benefits-portal
