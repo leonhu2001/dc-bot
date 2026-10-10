@@ -28,6 +28,7 @@
             {% endif %}
 
             <form class="it-form" method="post" action="/employee/internal-transfers">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 {% if is_reviewer %}
                 <div class="it-field">
                     <label for="fromEmployee">轉出人</label>
@@ -104,10 +105,12 @@
                 </div>
                 <div class="it-actions">
                     <form method="post" action="/employee/internal-transfers/{{ row.id }}/approve">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <input class="it-input" name="review_note" maxlength="500" placeholder="審核備註（可不填）">
                         <button class="it-btn" type="submit">核准</button>
                     </form>
                     <form method="post" action="/employee/internal-transfers/{{ row.id }}/reject">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <input class="it-input" name="review_note" maxlength="500" placeholder="拒絕原因（可不填）">
                         <button class="it-btn danger" type="submit">拒絕</button>
                     </form>
@@ -142,6 +145,7 @@
                 {% if row.can_cancel %}
                 <div class="it-actions">
                     <form method="post" action="/employee/internal-transfers/{{ row.id }}/cancel">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button class="it-btn secondary" type="submit">取消申請</button>
                     </form>
                 </div>
