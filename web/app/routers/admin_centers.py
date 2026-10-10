@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
@@ -14,9 +15,14 @@ from services.payment_reviews import list_payment_reviews
 from services.support_calls import build_support_call_snapshot
 from services.ticket_archives import list_ticket_archives
 from services.topups import list_topups_for_admin
+from services.vip_review_store import (
+    build_vip_review_snapshot,
+    queue_vip_review_action,
+)
 from web.app.services.accounting_reconciliation import (
     build_accounting_reconciliation_snapshot,
 )
+from web.app.services.audit_trail import write_sqlite_audit_log
 from web.app.services.role_catalog import STAFF_ROLE_FILTERS
 
 
@@ -219,6 +225,7 @@ def _staff_snapshot(
         },
     }
 
+
 def _customer_snapshot(
     q: str = "",
     *,
@@ -387,6 +394,51 @@ def _customer_snapshot(
             "visible_reviews": int(review_stats["visible"] or 0),
         },
     }
+
+
+def _vip_customer_name_map() -> dict[str, str]:
+    if not WEB_DB.exists():
+        return {}
+    try:
+        with _connect(WEB_DB) as conn:
+            if not _table_exists(conn, "web_orders"):
+                return {}
+            rows = conn.execute(
+                """
+                SELECT
+                    customer_discord_id,
+                    MAX(COALESCE(NULLIF(customer_display_name,''), customer_discord_id)) AS customer_display_name
+                FROM web_orders
+                WHERE COALESCE(customer_discord_id,'') <> ''
+                GROUP BY customer_discord_id
+                """
+            ).fetchall()
+            return {
+                str(row["customer_discord_id"]): str(row["customer_display_name"] or row["customer_discord_id"])
+                for row in rows
+            }
+    except sqlite3.Error:
+        return {}
+
+
+def _vip_snapshot(view: str = "vip", q: str = "") -> dict[str, Any]:
+    snapshot = build_vip_review_snapshot(db_file=BOT_DB, view=view)
+    names = _vip_customer_name_map()
+    keyword = str(q or "").strip().lower()
+
+    rows = []
+    for row in snapshot.get("rows", []):
+        item = dict(row)
+        customer_id = str(item.get("customer_id") or "")
+        display_name = names.get(customer_id, customer_id)
+        item["customer_display_name"] = display_name
+
+        if keyword and keyword not in customer_id.lower() and keyword not in display_name.lower():
+            continue
+        rows.append(item)
+
+    snapshot["rows"] = rows
+    return snapshot
 
 
 def _payout_snapshot() -> dict[str, int]:
@@ -582,6 +634,145 @@ async def staff_center(
 @router.get("/admin/customer-center")
 async def customer_center(request: Request, q: str = ""):
     return await _render(request, center="customers", q=q)
+
+
+@router.get("/admin/customer-center/vip")
+async def customer_vip_center(
+    request: Request,
+    view: str = "vip",
+    q: str = "",
+):
+    user = _current_admin(request)
+    if user is None:
+        return RedirectResponse("/no-access", status_code=303)
+
+    snapshot = await run_in_threadpool(lambda: _vip_snapshot(view=view, q=q))
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_vip_center.html",
+        context={
+            "title": "客戶中心・VIP 管理",
+            "user": user,
+            "snapshot": snapshot,
+            "view": snapshot.get("view", "vip"),
+            "q": str(q or "").strip(),
+            "message": str(request.query_params.get("message") or ""),
+            "error": str(request.query_params.get("error") or ""),
+            "is_manager": bool(user.get("is_manager")),
+        },
+    )
+
+
+@router.post("/admin/customer-center/vip/action")
+async def customer_vip_action(request: Request):
+    user = _current_admin(request)
+    if user is None:
+        return RedirectResponse("/no-access", status_code=303)
+
+    form = await request.form()
+    customer_id = str(form.get("customer_id") or "").strip()
+    action = str(form.get("action") or "").strip().lower()
+    reason = str(form.get("reason") or "").strip()
+    return_view = str(form.get("return_view") or "vip").strip().lower()
+    if return_view not in {"vip", "pending", "all"}:
+        return_view = "vip"
+
+    redirect_base = "/admin/customer-center/vip"
+    try:
+        if not customer_id.isdigit():
+            raise ValueError("顧客 Discord ID 無效")
+        if not reason:
+            raise ValueError("請填寫調整原因")
+
+        is_manager = bool(user.get("is_manager"))
+        operator_id = str(user.get("id") or "").strip()
+        operator_name = str(
+            user.get("display_name")
+            or user.get("global_name")
+            or user.get("username")
+            or operator_id
+        ).strip()
+
+        target_level_index = None
+        extend_days = None
+        before_snapshot = _vip_snapshot(view="all")
+        current_row = next(
+            (
+                row for row in before_snapshot.get("rows", [])
+                if str(row.get("customer_id") or "") == customer_id
+            ),
+            None,
+        )
+        if current_row is None:
+            raise ValueError("找不到這位顧客的會員資料")
+
+        if action == "set_level":
+            try:
+                target_level_index = int(form.get("target_level_index"))
+            except (TypeError, ValueError):
+                raise ValueError("VIP 階級無效")
+
+            current_index = int(current_row.get("current_index") or 0)
+            if not is_manager and abs(target_level_index - current_index) > 1:
+                raise PermissionError("客服每次只能升或降一個 VIP 階級")
+        elif action == "extend":
+            try:
+                extend_days = int(form.get("extend_days"))
+            except (TypeError, ValueError):
+                raise ValueError("延長天數無效")
+            max_days = 365 if is_manager else 30
+            if extend_days < 1 or extend_days > max_days:
+                raise PermissionError(f"延長天數需為 1～{max_days} 天")
+        else:
+            raise ValueError("不支援的 VIP 操作")
+
+        action_id = await run_in_threadpool(
+            lambda: queue_vip_review_action(
+                customer_id=customer_id,
+                action=action,
+                reason=reason,
+                operator_discord_id=operator_id,
+                operator_display_name=operator_name,
+                operator_is_manager=is_manager,
+                target_level_index=target_level_index,
+                extend_days=extend_days,
+                db_file=BOT_DB,
+            )
+        )
+
+        write_sqlite_audit_log(
+            admin_discord_id=operator_id,
+            action="queue_vip_review_action",
+            target_type="customer_vip",
+            target_id=customer_id,
+            before={
+                "current_level": current_row.get("current_level"),
+                "current_index": current_row.get("current_index"),
+                "expiry_at": current_row.get("expiry_at"),
+            },
+            after={
+                "queue_action_id": action_id,
+                "action": action,
+                "target_level_index": target_level_index,
+                "extend_days": extend_days,
+            },
+            reason=reason,
+            db_file=WEB_DB,
+        )
+
+        params = urlencode(
+            {
+                "view": return_view,
+                "message": "VIP 操作已送出，Bot 會套用規則並同步 Discord 身分組。",
+            }
+        )
+        return RedirectResponse(f"{redirect_base}?{params}", status_code=303)
+    except (ValueError, PermissionError) as exc:
+        params = urlencode({"view": return_view, "error": str(exc)})
+        return RedirectResponse(f"{redirect_base}?{params}", status_code=303)
+    except Exception:
+        params = urlencode({"view": return_view, "error": "VIP 操作送出失敗，請稍後再試。"})
+        return RedirectResponse(f"{redirect_base}?{params}", status_code=303)
 
 
 @router.get("/admin/finance-center")
