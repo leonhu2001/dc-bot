@@ -81,3 +81,17 @@ def test_vip_whitelist_overwrite_is_minimal():
     assert overwrite.move_members is None
     assert overwrite.manage_channels is False
     assert overwrite.manage_messages is False
+
+
+def test_list_vip_voice_rooms_returns_all_tracked_rooms(monkeypatch, tmp_path):
+    _configure_temp_database(monkeypatch, tmp_path)
+
+    database.upsert_vip_voice_room(owner_id=1001, channel_id=3003, panel_message_id=4004)
+    database.upsert_vip_voice_room(owner_id=1002, channel_id=3004, panel_message_id=4005)
+
+    rows = database.list_vip_voice_rooms()
+
+    assert {(row["owner_id"], row["channel_id"]) for row in rows} == {
+        (1001, 3003),
+        (1002, 3004),
+    }
