@@ -190,19 +190,20 @@ def test_new_lol_and_valorant_orders_allow_specify_with_100t_fee_and_max_four_st
         assert all(int(value) == 100 for value in rule.specify_fee_by_game_role.values())
 
 
-def test_buy_8_get_1_and_prices():
+def test_same_order_buy_get_is_disabled_and_loyalty_is_enabled():
     rule = ORDER_RULES["valorant_radiant_ranked"]
     result = calculate_price(rule, quantity=8, player_count=2)
     assert rule.price == 400
     assert result.base_amount == 6400
-    assert result.service_quantity == 9
+    assert result.service_quantity == 8
+    assert rule.loyalty_benefits_enabled is True
     assert set(get_allowed_role_ids(rule)) == {"1545357782906314782"}
 
     lol = ORDER_RULES["lol_entertain_aram"]
     assert lol.price == 300
     assert lol.unit_label == "H"
-    assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 9
-
+    assert lol.loyalty_benefits_enabled is True
+    assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 8
 
 def test_new_game_orders_split_hourly_and_game_point_rewards():
     common = dict(point_balance=999, quantity=1, has_specified_staff=False)

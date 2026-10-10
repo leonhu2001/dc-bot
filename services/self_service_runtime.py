@@ -874,6 +874,14 @@ async def create_waiting_acceptance_order_from_self_service(
             f"{price_adjustment['service_bonus_text']}"
         )
 
+    if price_adjustment.get("benefit_coupon_title"):
+        benefit_note = str(price_adjustment.get("benefit_service_note") or "").strip()
+        web_note_parts.append(
+            "會員福利："
+            f"{price_adjustment['benefit_coupon_title']}"
+            + (f"｜{benefit_note}" if benefit_note else "")
+        )
+
     # service_promotion_web_note_v1
     if price_adjustment.get(
         "service_promotion_text"
@@ -2658,7 +2666,7 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
                 label="不使用點數福利",
                 value="none",
                 description="清除這張單目前選擇的點數福利",
-                default=parent_view.selected_key is None,
+                default=(parent_view.selected_key is None and parent_view.selected_coupon_id is None),
             )
         ]
 
@@ -2686,7 +2694,7 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             options[0].description = "目前沒有符合點數與訂單條件的福利"
 
         super().__init__(
-            placeholder="選擇這張單要使用的點數福利",
+            placeholder="選擇點數 / 會員福利",
             min_values=1,
             max_values=1,
             options=options[:25],
@@ -3366,7 +3374,7 @@ class SelfServiceOrderView(discord.ui.View):
 
 
     @discord.ui.button(
-        label="選擇點數福利",
+        label="點數 / 會員福利",
         style=discord.ButtonStyle.secondary,
         custom_id="self_service_order_point_benefit_button",
         row=4,

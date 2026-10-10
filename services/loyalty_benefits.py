@@ -394,6 +394,34 @@ def _event_time_is_in_scope(row: dict[str, Any]) -> bool:
     return dt.astimezone(TAIPEI_TZ) >= LOYALTY_START_AT_TAIPEI
 
 
+def _qualifying_paid_amount(row: dict[str, Any]) -> int:
+    """Paid service amount before wallet deduction; wallet spend still qualifies."""
+    amount = int(row.get("customer_pay_amount") or row.get("amount") or 0)
+    try:
+        import json
+
+        snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))
+        if isinstance(snapshot, dict):
+            preview = (
+                snapshot.get("preview")
+                if isinstance(snapshot.get("preview"), dict)
+                else snapshot
+            )
+            finance = (
+                preview.get("finance")
+                if isinstance(preview, dict)
+                and isinstance(preview.get("finance"), dict)
+                else {}
+            )
+            if "subtotal_before_wallet" in finance:
+                return max(0, int(finance.get("subtotal_before_wallet") or 0))
+            if "customer_pay_amount" in snapshot:
+                return max(0, int(snapshot.get("customer_pay_amount") or 0))
+    except Exception:
+        pass
+    return max(0, amount)
+
+
 def process_closed_order(order_id: int) -> dict[str, Any] | None:
     """Idempotently accrue one closed order and issue any earned coupons."""
     ensure_loyalty_tables()
@@ -406,7 +434,7 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
 
         raw = conn.execute(text("""
             SELECT id, customer_discord_id, order_rule_key, quantity,
-                   customer_pay_amount, status, created_at, updated_at, closed_at,
+                   amount, original_amount, customer_pay_amount, status, created_at, updated_at, closed_at,
                    price_snapshot_json, ticket_channel_id
             FROM web_orders
             WHERE id = :order_id
@@ -433,7 +461,7 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
             note = "before_program_start"
         elif policy is None:
             note = "rule_not_eligible"
-        elif int(row.get("customer_pay_amount") or 0) <= 0:
+        elif _qualifying_paid_amount(row) <= 0:
             note = "no_paid_amount"
         else:
             player_count = 1
