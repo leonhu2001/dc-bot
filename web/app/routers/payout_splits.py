@@ -6,7 +6,9 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
+from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
 from web.app.services.payout_splits import (
     cancel_payout_split,
     create_payout_split,
@@ -56,23 +58,65 @@ def _redirect(*, message: str | None = None, error: str | None = None) -> Redire
     return RedirectResponse(f"/employee/payout-splits{suffix}", status_code=303)
 
 
-def _require_employee(request: Request) -> dict | RedirectResponse:
+async def _require_employee(request: Request) -> dict | RedirectResponse:
     user = _current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
-    if not _is_employee(user):
+
+    refreshed = dict(user)
+    discord_id = str(refreshed.get("id") or refreshed.get("discord_id") or "").strip()
+    if not discord_id:
         return RedirectResponse("/no-access", status_code=303)
-    return user
+
+    try:
+        role_ids = await run_in_threadpool(get_member_role_ids, discord_id)
+        access = get_dashboard_access(role_ids)
+    except Exception as exc:
+        refreshed.update(
+            {
+                "role_ids": [],
+                "is_manager": False,
+                "is_admin": False,
+                "is_customer_service": False,
+                "is_worker": False,
+                "is_companion": False,
+                "is_employee": False,
+            }
+        )
+        request.session["user"] = refreshed
+        print("[payout_split_access_refresh_failed]", type(exc).__name__)
+        return RedirectResponse("/no-access", status_code=303)
+
+    is_manager = bool(access.get("is_manager") or access.get("is_admin"))
+    is_customer_service = bool(access.get("is_customer_service"))
+    is_worker = bool(access.get("is_worker"))
+    is_companion = bool(access.get("is_companion"))
+    refreshed.update(
+        {
+            "role_ids": list(role_ids),
+            "is_manager": is_manager,
+            "is_admin": bool(is_manager or is_customer_service),
+            "is_customer_service": is_customer_service,
+            "is_worker": is_worker,
+            "is_companion": is_companion,
+            "is_employee": bool(is_manager or is_customer_service or is_worker or is_companion),
+        }
+    )
+    request.session["user"] = refreshed
+
+    if not _is_employee(refreshed):
+        return RedirectResponse("/no-access", status_code=303)
+    return refreshed
 
 
 @router.get("/employee/payout-splits")
 async def employee_payout_splits(request: Request):
-    user_or_response = _require_employee(request)
+    user_or_response = await _require_employee(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
 
     user = user_or_response
-    user_id = str(user.get("id") or "")
+    user_id = str(user.get("id") or user.get("discord_id") or "")
     is_manager = bool(user.get("is_manager"))
     split_rows = list_payout_splits(user_id, include_all=is_manager)
 
@@ -107,7 +151,7 @@ async def employee_payout_splits(request: Request):
 
 @router.post("/employee/payout-splits")
 async def create_employee_payout_split(request: Request):
-    user_or_response = _require_employee(request)
+    user_or_response = await _require_employee(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     user = user_or_response
@@ -120,7 +164,7 @@ async def create_employee_payout_split(request: Request):
         hours = float(hours_raw) if hours_raw else None
         split_id = create_payout_split(
             order_id=order_id,
-            from_worker_discord_id=str(user.get("id") or ""),
+            from_worker_discord_id=str(user.get("id") or user.get("discord_id") or ""),
             from_worker_display_name=_display_name(user),
             to_worker_discord_id=str(form.get("to_worker_discord_id") or ""),
             amount=amount,
@@ -135,7 +179,7 @@ async def create_employee_payout_split(request: Request):
 
 @router.post("/employee/payout-splits/{split_id}/approve")
 async def approve_employee_payout_split(split_id: int, request: Request):
-    user_or_response = _require_employee(request)
+    user_or_response = await _require_employee(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     user = user_or_response
@@ -144,7 +188,7 @@ async def approve_employee_payout_split(split_id: int, request: Request):
     try:
         decide_payout_split(
             split_id=split_id,
-            actor_discord_id=str(user.get("id") or ""),
+            actor_discord_id=str(user.get("id") or user.get("discord_id") or ""),
             actor_display_name=_display_name(user),
             approve=True,
             is_manager=bool(user.get("is_manager")),
@@ -158,7 +202,7 @@ async def approve_employee_payout_split(split_id: int, request: Request):
 
 @router.post("/employee/payout-splits/{split_id}/reject")
 async def reject_employee_payout_split(split_id: int, request: Request):
-    user_or_response = _require_employee(request)
+    user_or_response = await _require_employee(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     user = user_or_response
@@ -167,7 +211,7 @@ async def reject_employee_payout_split(split_id: int, request: Request):
     try:
         decide_payout_split(
             split_id=split_id,
-            actor_discord_id=str(user.get("id") or ""),
+            actor_discord_id=str(user.get("id") or user.get("discord_id") or ""),
             actor_display_name=_display_name(user),
             approve=False,
             is_manager=bool(user.get("is_manager")),
@@ -181,7 +225,7 @@ async def reject_employee_payout_split(split_id: int, request: Request):
 
 @router.post("/employee/payout-splits/{split_id}/cancel")
 async def cancel_employee_payout_split(split_id: int, request: Request):
-    user_or_response = _require_employee(request)
+    user_or_response = await _require_employee(request)
     if isinstance(user_or_response, RedirectResponse):
         return user_or_response
     user = user_or_response
@@ -189,7 +233,7 @@ async def cancel_employee_payout_split(split_id: int, request: Request):
     try:
         cancel_payout_split(
             split_id=split_id,
-            actor_discord_id=str(user.get("id") or ""),
+            actor_discord_id=str(user.get("id") or user.get("discord_id") or ""),
             actor_display_name=_display_name(user),
             is_manager=bool(user.get("is_manager")),
         )
