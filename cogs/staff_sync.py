@@ -502,7 +502,8 @@ class StaffSyncCog(commands.Cog):
             async for message in channel.history(limit=50):
                 if message.author.id != self.bot.user.id or not message.embeds:
                     continue
-                if str(message.embeds[0].footer.text or "") == MEMBER_PORTAL_MARKER:
+                footer_text = str(message.embeds[0].footer.text or "")
+                if footer_text in {MEMBER_PORTAL_MARKER, "MAWAN_MEMBER_PORTAL_V1"}:
                     existing = message
                     break
         except (discord.Forbidden, discord.HTTPException) as exc:
