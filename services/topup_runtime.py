@@ -6,6 +6,10 @@ import traceback
 import discord
 
 import services.rewards as rewards
+from core.discord_settings import (
+    CUSTOMER_SERVICE_REVIEW_CHANNEL_ID,
+    CUSTOMER_SERVICE_ROLE_ID,
+)
 from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
 from services.topup_notifications import (
     ensure_topup_notification_columns,
@@ -29,10 +33,10 @@ from services.vip_progress_repair import (
     repair_all_legacy_vip_progress,
     repair_vip_progress_data,
 )
+from services.vip_review_runtime import process_vip_review_tick
 from services.wallet_service import adjust_wallet_balance, find_wallet_transaction, get_wallet_balance
 
-TOPUP_REVIEW_CHANNEL_ID = 1502040302649872394
-CUSTOMER_SERVICE_ROLE_ID = 1482084782031638548
+TOPUP_REVIEW_CHANNEL_ID = CUSTOMER_SERVICE_REVIEW_CHANNEL_ID
 TOPUP_REVIEW_URL = "https://mowanentertainment.com/admin/payment-reviews?status=pending"
 
 
@@ -453,6 +457,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
         try:
             await _notify_pending_reviews(bot)
             await _sync_review_notifications(bot)
+            await process_vip_review_tick(bot)
             rows = get_pending_credit_topups(limit=20)
             for row in rows:
                 await _process_one_topup(bot, row)
