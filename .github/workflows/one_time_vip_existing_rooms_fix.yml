@@ -1,0 +1,61 @@
+name: One-time VIP existing room sweep fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, '[apply-vip-existing-fix]')
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Patch database API and regression test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          db_path = Path('core/database.py')
+          text = db_path.read_text(encoding='utf-8')
+          if 'def list_vip_voice_rooms(' not in text:
+              text += '''\n\ndef list_vip_voice_rooms() -> list[dict]:\n    \"\"\"Return every persisted VIP voice room tracked in bot.db.\"\"\"\n    db_file = _require_database_file()\n    _require_init_database()()\n\n    with sqlite3.connect(db_file) as conn:\n        conn.row_factory = sqlite3.Row\n        rows = conn.execute(\n            \"\"\"\n            SELECT owner_id, channel_id, panel_message_id\n            FROM vip_voice_rooms\n            ORDER BY owner_id\n            \"\"\"\n        ).fetchall()\n\n    return [dict(row) for row in rows]\n'''
+              db_path.write_text(text, encoding='utf-8')
+
+          test_path = Path('tests/test_vip_room_whitelist.py')
+          test_text = test_path.read_text(encoding='utf-8')
+          if 'def test_list_vip_voice_rooms_returns_all_tracked_rooms' not in test_text:
+              test_text += '''\n\ndef test_list_vip_voice_rooms_returns_all_tracked_rooms(monkeypatch, tmp_path):\n    _configure_temp_database(monkeypatch, tmp_path)\n\n    database.upsert_vip_voice_room(owner_id=1001, channel_id=3003, panel_message_id=4004)\n    database.upsert_vip_voice_room(owner_id=1002, channel_id=3004, panel_message_id=4005)\n\n    rows = database.list_vip_voice_rooms()\n\n    assert {(row[\"owner_id\"], row[\"channel_id\"]) for row in rows} == {\n        (1001, 3003),\n        (1002, 3004),\n    }\n'''
+              test_path.write_text(test_text, encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          if [ -f web/requirements-web.txt ]; then python -m pip install -r web/requirements-web.txt; fi
+
+      - name: Verify VIP room sweep
+        run: |
+          python -m compileall -q core views bot.py
+          python -m pytest -q tests/test_vip_room_whitelist.py tests/test_vip_whitelist_startup_sync.py
+
+      - name: Commit source fix and remove temporary workflow
+        run: |
+          rm -f .github/workflows/one_time_vip_existing_rooms_fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix existing VIP room whitelist permission sweep"
+          git push origin main
