@@ -32,6 +32,12 @@ from services.order_rules import (
 from web.app.services.public_checkout import (
     build_public_quote,
 )
+from services.loyalty_benefits import (
+    calculate_coupon_service_value,
+    coupon_service_note,
+    get_applicable_coupon,
+    list_applicable_coupons,
+)
 
 
 ROOT = Path(
@@ -1267,8 +1273,8 @@ def calculate_point_service_value(
     quantity = max(1, int(quote.get("quantity") or 1))
     service_amount = max(0, int(quote.get("customer_pay_amount") or 0))
     gross_extra_value = int(round((service_amount / quantity) * units))
-    rate = max(0, min(100, int(vip_pay_rate or 100)))
-    return max(0, int(round(gross_extra_value * rate / 100)))
+    # 額外服務是店家福利；VIP 折扣只影響顧客付款，不壓低陪玩薪資基底。
+    return max(0, gross_extra_value)
 
 
 def calculate_checkout_financials(
@@ -1280,12 +1286,15 @@ def calculate_checkout_financials(
     wallet_balance: int,
     use_wallet: bool,
     point_service_value: int = 0,
+    benefit_coupon: dict | None = None,
+    benefit_service_value: int = 0,
 ) -> dict:
     service_amount = max(0, int(service_amount or 0))
     vip_pay_rate = max(0, min(100, int(vip_pay_rate or 100)))
     specify_fee = max(0, int(specify_fee or 0))
     wallet_balance = max(0, int(wallet_balance or 0))
     point_service_value = max(0, int(point_service_value or 0))
+    benefit_service_value = max(0, int(benefit_service_value or 0))
 
     after_vip = int(round(service_amount * vip_pay_rate / 100))
     vip_discount_amount = max(0, service_amount - after_vip)
@@ -1323,11 +1332,15 @@ def calculate_checkout_financials(
     # All point rewards are funded by the store. Customer discounts and free
     # specify do not lower worker payout, while point-added time/games add the
     # equivalent discounted service value to the payout base.
-    payout_base = max(0, after_vip + specify_fee + point_service_value)
+    payout_base = max(
+        0,
+        after_vip + specify_fee + point_service_value + benefit_service_value,
+    )
     point_store_absorbed = max(
         0,
         point_cash_discount + point_waived_specify + point_service_value,
     )
+    benefit_store_absorbed = benefit_service_value if benefit_coupon else 0
 
     return {
         "service_amount": service_amount,
@@ -1349,14 +1362,19 @@ def calculate_checkout_financials(
         "point_service_note": point_service_note,
         "point_service_value": point_service_value,
         "point_store_absorbed_amount": point_store_absorbed,
+        "benefit_coupon_id": (int(benefit_coupon.get("id")) if benefit_coupon else None),
+        "benefit_coupon_title": (str(benefit_coupon.get("title") or "") if benefit_coupon else ""),
+        "benefit_service_note": coupon_service_note(benefit_coupon),
+        "benefit_service_value": benefit_service_value,
+        "benefit_store_absorbed_amount": benefit_store_absorbed,
         "subtotal_before_wallet": subtotal,
         "customer_pay_amount": subtotal,
         "wallet_use_amount": wallet_use,
         "remaining_pay_amount": remaining,
         "payout_base_amount": payout_base,
         "payout_base_preview": payout_base,
-        "store_absorbed_amount": point_store_absorbed,
-        "store_absorbed_preview": point_store_absorbed,
+        "store_absorbed_amount": point_store_absorbed + benefit_store_absorbed,
+        "store_absorbed_preview": point_store_absorbed + benefit_store_absorbed,
     }
 
 
@@ -1590,6 +1608,12 @@ def build_checkout_options(
         "point_options":
             point_options,
 
+        "benefit_coupons": list_applicable_coupons(
+            customer_id,
+            rule_key=rule_key,
+            player_count=int(quote.get("player_count") or player_count or 1),
+        ),
+
         "payment_methods":
             payment_methods,
 
@@ -1608,6 +1632,7 @@ def build_checkout_preview(
     customer_adjustments: Any = None,
     specified_staff_ids: Any = None,
     point_item_key: str | None = None,
+    benefit_coupon_id: int | str | None = None,
     use_wallet: bool = False,
     payment_method: str | None = None,
 ) -> dict:
@@ -1812,6 +1837,21 @@ def build_checkout_preview(
         )
 
 
+    selected_benefit_coupon = None
+    if benefit_coupon_id not in (None, ""):
+        if selected_point_item is not None:
+            raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
+        selected_benefit_coupon = get_applicable_coupon(
+            benefit_coupon_id,
+            customer_id=customer_id,
+            rule_key=rule_key,
+            player_count=int(quote.get("player_count") or player_count or 1),
+        )
+        if selected_benefit_coupon is None:
+            raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
+
+
+
     finance = (
         calculate_checkout_financials(
             service_amount=
@@ -1837,6 +1877,13 @@ def build_checkout_preview(
                     vip_pay_rate=vip_rate,
                     point_item=selected_point_item,
                 ),
+
+            benefit_coupon=selected_benefit_coupon,
+            benefit_service_value=calculate_coupon_service_value(
+                rule_key=rule_key,
+                player_count=int(quote.get("player_count") or player_count or 1),
+                coupon=selected_benefit_coupon,
+            ),
 
             wallet_balance=
                 customer[
@@ -2007,6 +2054,17 @@ def build_checkout_preview(
                 ),
         },
 
+        "benefit_coupon": (
+            {
+                "id": int(selected_benefit_coupon.get("id")),
+                "title": str(selected_benefit_coupon.get("title") or ""),
+                "benefit_kind": str(selected_benefit_coupon.get("benefit_kind") or ""),
+                "benefit_units": float(selected_benefit_coupon.get("benefit_units") or 0),
+            }
+            if selected_benefit_coupon
+            else None
+        ),
+
         "finance":
             finance,
 
@@ -2053,9 +2111,6 @@ PUBLIC_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
-    "valorant_entertain",
-    "valorant_tech",
-    "valorant_top_tech",
 }
 
 
@@ -2618,9 +2673,6 @@ MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
     "farm_season_3x3_dc_skin",
     "farm_season_3x3_dc_loss",
     "farm_season_3x3_dc_skin_loss",
-    "valorant_entertain",
-    "valorant_tech",
-    "valorant_top_tech",
 }
 
 

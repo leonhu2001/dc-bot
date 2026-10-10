@@ -108,6 +108,26 @@
                 </span>
             </a>
 
+            <a class="member-action-card" href="/me/wallet">
+                <small>WALLET</small><strong>錢包・儲值</strong>
+                <span>查看餘額、儲值與紀錄 →</span>
+            </a>
+
+            <a class="member-action-card" href="/me#favorites">
+                <small>FAVORITES</small><strong>我的收藏</strong>
+                <span>查看收藏的陪玩 →</span>
+            </a>
+
+            <a class="member-action-card" href="/me#vip">
+                <small>MEMBERSHIP</small><strong>點數 / VIP</strong>
+                <span>查看點數、等級與升級進度 →</span>
+            </a>
+
+            <a class="member-action-card" href="/me#benefits">
+                <small>BENEFITS</small><strong>我的福利</strong>
+                <span>查看福利券與累積進度 →</span>
+            </a>
+
         </div>
     </div>
 </section>
@@ -216,6 +236,25 @@
                 style="min-height:34px;padding:0 14px;margin-top:14px;border-radius:10px;font-size:12px;"
             >
                 立即儲值
+            </a>
+        </article>
+
+
+        <article class="member-stat-card">
+            <small>
+                BENEFITS
+            </small>
+
+            <strong>
+                {{ benefits.active_count }}
+            </strong>
+
+            <span>
+                可用福利券
+            </span>
+
+            <a href="/me#benefits" class="button button-primary" style="min-height:34px;padding:0 14px;margin-top:14px;border-radius:10px;font-size:12px;">
+                查看我的福利
             </a>
         </article>
 
@@ -431,6 +470,52 @@
 
             {% endif %}
 
+        </section>
+
+
+        <section class="member-panel member-panel-wide" id="benefits">
+            <div class="member-panel-head">
+                <div>
+                    <small>BENEFITS</small>
+                    <h3>我的福利</h3>
+                </div>
+                <a href="/order">前往點單 →</a>
+            </div>
+
+            {% if benefits.coupons %}
+                <div class="member-order-list">
+                    {% for coupon in benefits.coupons %}
+                        <div class="member-order-row">
+                            <div>
+                                <small>AVAILABLE COUPON</small>
+                                <strong>{{ coupon.title }}</strong>
+                                <span>獲得時間 · {{ coupon.issued_at }}</span>
+                            </div>
+                            <div class="member-order-meta"><strong>可使用</strong></div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if benefits.progress %}
+                <div class="member-benefit-row" style="margin-top:14px;">
+                    {% for item in benefits.progress %}
+                        <div>
+                            <span>{{ item.title }}</span>
+                            <strong>{{ item.progress_text }} {{ '局' if item.pricing_type == 'game' else '小時' }}</strong>
+                            <span>達標自動發 {{ '+1 局' if item.pricing_type == 'game' else '+30 分鐘' }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if not benefits.has_anything %}
+                <div class="member-empty">
+                    <span class="member-empty-icon">◇</span>
+                    <strong>目前還沒有累積進度</strong>
+                    <p>完成符合活動的付費服務後，才會開始顯示進度；0 進度的商品不會全部列在這裡。</p>
+                </div>
+            {% endif %}
         </section>
 
 

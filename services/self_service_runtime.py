@@ -720,6 +720,10 @@ async def create_waiting_acceptance_order_from_self_service(
         "point_free_first_hour_amount": price_adjustment.get("point_free_first_hour_amount"),
         "point_extra_hours": price_adjustment.get("point_extra_hours"),
         "point_extra_games": price_adjustment.get("point_extra_games"),
+        "benefit_coupon_id": price_adjustment.get("benefit_coupon_id"),
+        "benefit_coupon_title": price_adjustment.get("benefit_coupon_title"),
+        "benefit_service_value": price_adjustment.get("benefit_service_value"),
+        "benefit_service_note": price_adjustment.get("benefit_service_note"),
         "store_absorbed_amount": price_adjustment.get("store_absorbed_amount"),
         "customer_pay_amount": price_adjustment.get("customer_pay_amount"),
         "service_bonus_text": price_adjustment.get("service_bonus_text"),
@@ -870,6 +874,14 @@ async def create_waiting_acceptance_order_from_self_service(
             f"{price_adjustment['service_bonus_text']}"
         )
 
+    if price_adjustment.get("benefit_coupon_title"):
+        benefit_note = str(price_adjustment.get("benefit_service_note") or "").strip()
+        web_note_parts.append(
+            "會員福利："
+            f"{price_adjustment['benefit_coupon_title']}"
+            + (f"｜{benefit_note}" if benefit_note else "")
+        )
+
     # service_promotion_web_note_v1
     if price_adjustment.get(
         "service_promotion_text"
@@ -909,6 +921,16 @@ async def create_waiting_acceptance_order_from_self_service(
         bot_order_no=data.get("order_no") or data.get("receipt_id"),
         note=web_order_note,
     )
+
+    if price_adjustment.get("benefit_coupon_id"):
+        from services.loyalty_benefits import reserve_coupon_for_order
+        reserve_coupon_for_order(
+            coupon_id=int(price_adjustment["benefit_coupon_id"]),
+            customer_id=customer_id,
+            order_id=int(web_order.id),
+            rule_key=str(rule.key),
+            player_count=player_count,
+        )
 
     try:
         from shared.db import engine as _rule_snapshot_engine
@@ -1087,6 +1109,10 @@ async def create_waiting_acceptance_order_from_self_service(
     data["point_extra_hours"] = price_adjustment["point_extra_hours"]
     data["point_extra_games"] = price_adjustment["point_extra_games"]
     data["service_bonus_text"] = price_adjustment["service_bonus_text"]
+    data["benefit_coupon_id"] = price_adjustment.get("benefit_coupon_id")
+    data["benefit_coupon_title"] = price_adjustment.get("benefit_coupon_title")
+    data["benefit_service_value"] = price_adjustment.get("benefit_service_value")
+    data["benefit_service_note"] = price_adjustment.get("benefit_service_note")
     data["store_absorbed_amount"] = price_adjustment["store_absorbed_amount"]
     data["customer_pay_amount"] = price_adjustment["customer_pay_amount"]
     data["amount"] = amount
@@ -1534,6 +1560,9 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 point_text += f"｜{adjustment['service_bonus_text']}"
             lines.append(("點數福利", point_text))
 
+        if adjustment.get("benefit_coupon_title"):
+            lines.append(("我的福利", str(adjustment["benefit_coupon_title"])))
+
     # service_promotion_quote_preview_v2
     if price is not None:
         promotion_text = str(
@@ -1916,14 +1945,14 @@ FREE_PLAY_FIRST_HOUR_RULE_KEYS = {
 
 
 ORDER_POINT_BENEFIT_SPECS = {
-    "discount_20": {"kind": "cash_discount", "amount": 20, "summary": "20 元折價券，店內吸收，不影響打手分潤"},
-    "discount_30": {"kind": "cash_discount", "amount": 30, "summary": "30 元折價券，店內吸收，不影響打手分潤"},
-    "discount_100": {"kind": "cash_discount", "amount": 100, "summary": "100 元折價券，店內吸收，不影響打手分潤"},
-    "extra_10": {"kind": "extra_hours", "hours": 0.5, "summary": "服務時間 +30 分鐘，金額與打手分潤不變"},
-    "extra_30": {"kind": "extra_hours", "hours": 1, "summary": "服務時間 +1 小時，金額與打手分潤不變"},
-    "extra_15": {"kind": "extra_game", "games": 1, "summary": "加場 1 場保撤，金額與打手分潤不變"},
-    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費，顧客不用付指定費，打手分潤也不含指定費"},
-    "free_play_1h": {"kind": "free_first_hour", "hours": 1, "summary": "首小時免費，只適用娛樂陪單/雙陪與機密技術單/雙護"},
+    "discount_20": {"kind": "cash_discount", "amount": 20, "summary": "20T 折價券，店內吸收，不影響陪玩分潤"},
+    "discount_30": {"kind": "cash_discount", "amount": 30, "summary": "30T 折價券，店內吸收，不影響陪玩分潤"},
+    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費，指定費由店內吸收，陪玩應得不減少"},
+    "discount_100": {"kind": "cash_discount", "amount": 100, "summary": "100T 折價券，店內吸收，不影響陪玩分潤"},
+    "extra_hour_30m": {"kind": "extra_hours", "hours": 0.5, "pricing_types": ("hourly",), "summary": "服務時間 +30 分鐘，由店內吸收額外服務成本"},
+    "extra_hour_1h": {"kind": "extra_hours", "hours": 1, "pricing_types": ("hourly",), "summary": "服務時間 +1 小時，由店內吸收額外服務成本"},
+    "extra_game_1": {"kind": "extra_games", "games": 1, "pricing_types": ("game",), "summary": "服務局數 +1 局，由店內吸收額外服務成本"},
+    "extra_game_2": {"kind": "extra_games", "games": 2, "pricing_types": ("game",), "summary": "服務局數 +2 局，由店內吸收額外服務成本"},
 }
 
 
@@ -2004,52 +2033,23 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
             ) or 1
 
             if quantity >= 2:
-                return False, "2 小時以上本來就免指定費，不需要再花 25 點兌換。"
+                return False, "2 小時以上本來就免指定費，不需要再使用免指定費福利。"
 
-    if kind == "free_first_hour":
-        if str(getattr(rule, "key", "")) not in FREE_PLAY_FIRST_HOUR_RULE_KEYS:
-            return False, "免費陪玩 1 小時只適用娛樂陪單/雙陪與機密技術單/雙護。"
-        if pricing_type != "hourly":
-            return False, "免費陪玩 1 小時只適用小時計價項目。"
+    pricing_types = tuple(spec.get("pricing_types") or ())
+    if pricing_types and pricing_type not in pricing_types:
+        return False, "這個點數福利不適用此計價方式。"
 
-    if kind == "extra_game" and category in {"valorant", "lol"}:
-        return False, "特戰英豪 / 英雄聯盟不可使用加場一場保撤。"
+    if kind == "extra_hours" and pricing_type != "hourly":
+        return False, "加時只適用計時方案。"
 
-    if kind == "extra_hours" and pricing_type not in {"hourly", "game"}:
-        return False, "加時只適用小時或局數計價項目。"
-
-    if kind == "extra_game" and pricing_type != "game":
-        return False, "加場保撤只適用局數計價項目。"
+    if kind == "extra_games" and pricing_type != "game":
+        return False, "加局只適用計局方案。"
 
     return True, ""
 
 
 def _adapt_order_point_benefit_for_rule(rule, benefit: dict) -> dict:
-    data = dict(benefit or {})
-    pricing_type = str(getattr(rule, "pricing_type", "") or "")
-
-    if pricing_type == "game":
-        key = str(data.get("key") or "")
-
-        if key == "extra_10":
-            data.update({
-                "name": "加一局",
-                "kind": "extra_games",
-                "games": 1,
-                "summary": "服務局數 +1 局，金額與打手分潤不變",
-            })
-            data.pop("hours", None)
-
-        elif key == "extra_30":
-            data.update({
-                "name": "加兩局",
-                "kind": "extra_games",
-                "games": 2,
-                "summary": "服務局數 +2 局，金額與打手分潤不變",
-            })
-            data.pop("hours", None)
-
-    return data
+    return dict(benefit or {})
 
 
 def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
@@ -2392,9 +2392,49 @@ def calculate_self_service_financials(
         extra_customer_charge_amount=specify_effective,
     )
 
-    # 百分比折扣仍會降低分潤基準；
-    # 客服固定金額折扣與點數折價都由店內吸收，不影響打手分潤。
-    payout_base = allocation.payout_base_amount
+    from services.loyalty_benefits import (
+        calculate_coupon_service_value,
+        coupon_service_note,
+        get_applicable_coupon,
+    )
+
+    selected_coupon = None
+    selected_coupon_id = data.get("selected_benefit_coupon_id")
+    if selected_coupon_id not in (None, ""):
+        if benefit is not None:
+            raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
+        customer_id = data.get("customer_id")
+        if customer_id:
+            selected_coupon = get_applicable_coupon(
+                selected_coupon_id,
+                customer_id=customer_id,
+                rule_key=str(getattr(rule, "key", "")),
+                player_count=_to_int(data.get("player_count"), 1) or 1,
+            )
+        if selected_coupon is None:
+            raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
+
+    quantity_for_extra = max(1, _to_int(data.get("quantity"), 1) or 1)
+    point_service_value = 0
+    if extra_hours > 0:
+        point_service_value = max(0, int(round((service_original / quantity_for_extra) * extra_hours)))
+    elif extra_games > 0:
+        point_service_value = max(0, int(round((service_original / quantity_for_extra) * extra_games)))
+
+    benefit_service_value = calculate_coupon_service_value(
+        rule_key=str(getattr(rule, "key", "")),
+        player_count=_to_int(data.get("player_count"), 1) or 1,
+        coupon=selected_coupon,
+    )
+
+    # 百分比/VIP折扣只影響顧客付款。點數、免指定費與福利券都由店內吸收，
+    # 額外服務用商品正常原價補進陪玩分潤基底。
+    payout_base = (
+        allocation.payout_base_amount
+        + point_specify
+        + point_service_value
+        + benefit_service_value
+    )
     customer_pay = allocation.customer_pay_amount
 
     notes = []
@@ -2587,8 +2627,17 @@ def calculate_self_service_financials(
             payout_base
         ),
 
+        "benefit_coupon_id": (int(selected_coupon.get("id")) if selected_coupon else None),
+        "benefit_coupon_title": (str(selected_coupon.get("title") or "") if selected_coupon else ""),
+        "benefit_service_note": coupon_service_note(selected_coupon),
+        "benefit_service_value": benefit_service_value,
+        "point_service_value": point_service_value,
+
         "store_absorbed_amount": (
             allocation.store_absorbed_amount
+            + point_specify
+            + point_service_value
+            + benefit_service_value
         ),
 
         "customer_pay_amount": (
@@ -2617,15 +2666,25 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
                 label="不使用點數福利",
                 value="none",
                 description="清除這張單目前選擇的點數福利",
-                default=parent_view.selected_key is None,
+                default=(parent_view.selected_key is None and parent_view.selected_coupon_id is None),
             )
         ]
+
+        for coupon in parent_view.available_coupons:
+            options.append(
+                discord.SelectOption(
+                    label=_truncate_select_text(str(coupon.get("title") or "會員福利券")),
+                    value=f"coupon:{coupon['id']}",
+                    description="使用累積福利券；與點數福利擇一",
+                    default=str(coupon.get("id")) == str(parent_view.selected_coupon_id),
+                )
+            )
 
         for item in parent_view.available_items:
             options.append(
                 discord.SelectOption(
                     label=_truncate_select_text(f"{item['cost']} 點｜{item['name']}"),
-                    value=str(item["key"]),
+                    value=f"point:{item['key']}",
                     description=_truncate_select_text(item.get("summary") or f"兌換 {item['name']}"),
                     default=str(item["key"]) == str(parent_view.selected_key),
                 )
@@ -2635,7 +2694,7 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             options[0].description = "目前沒有符合點數與訂單條件的福利"
 
         super().__init__(
-            placeholder="選擇這張單要使用的點數福利",
+            placeholder="選擇點數 / 會員福利",
             min_values=1,
             max_values=1,
             options=options[:25],
@@ -2652,29 +2711,39 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
         selected = self.values[0]
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(view.channel_id, {})
 
-        if selected == "none":
-            for key in (
-                "selected_point_benefit_key",
-                "point_benefit_key",
-                "point_benefit_name",
-                "point_benefit_cost",
-                "point_discount_coupon_amount",
-                "point_waived_specify_fee",
-                "point_extra_hours",
-                "point_extra_games",
-                "service_bonus_text",
-            ):
-                data.pop(key, None)
-        else:
-            item = get_order_point_item(selected)
+        clear_keys = (
+            "selected_point_benefit_key",
+            "selected_benefit_coupon_id",
+            "point_benefit_key",
+            "point_benefit_name",
+            "point_benefit_cost",
+            "point_discount_coupon_amount",
+            "point_waived_specify_fee",
+            "point_extra_hours",
+            "point_extra_games",
+            "service_bonus_text",
+            "benefit_coupon_id",
+            "benefit_coupon_title",
+            "benefit_service_note",
+        )
+        for key in clear_keys:
+            data.pop(key, None)
 
+        if selected.startswith("coupon:"):
+            try:
+                data["selected_benefit_coupon_id"] = int(selected.split(":", 1)[1])
+            except (TypeError, ValueError):
+                await interaction.response.send_message("福利券格式錯誤，請重新選擇。", ephemeral=True)
+                return
+        elif selected.startswith("point:"):
+            point_key = selected.split(":", 1)[1]
+            item = get_order_point_item(point_key)
             if item is None:
                 await interaction.response.send_message("找不到這個點數福利，請重新選擇。", ephemeral=True)
                 return
-
-            data["selected_point_benefit_key"] = str(selected)
-            data["point_benefit_key"] = str(selected)
-            data["point_benefit_name"] = str(item.get("name") or selected)
+            data["selected_point_benefit_key"] = point_key
+            data["point_benefit_key"] = point_key
+            data["point_benefit_name"] = str(item.get("name") or point_key)
             data["point_benefit_cost"] = int(item.get("cost") or 0)
 
         data.pop("payment_method", None)
@@ -2711,8 +2780,15 @@ class SelfServicePointBenefitView(discord.ui.View):
 
         data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
         self.selected_key = data.get("selected_point_benefit_key")
+        self.selected_coupon_id = data.get("selected_benefit_coupon_id")
         self.point_balance = get_customer_point_balance_for_order(customer_id)
         self.available_items = self.build_available_items(data)
+        from services.loyalty_benefits import list_applicable_coupons
+        self.available_coupons = list_applicable_coupons(
+            customer_id,
+            rule_key=str(getattr(rule, "key", "")),
+            player_count=_to_int(data.get("player_count"), 1) or 1,
+        )
 
         self.add_item(SelfServicePointBenefitSelect(self))
 
@@ -2756,14 +2832,22 @@ class SelfServicePointBenefitView(discord.ui.View):
         benefit = get_selected_order_point_benefit(data, self.rule)
         selected_text = "尚未使用"
 
-        if benefit:
+        if data.get("selected_benefit_coupon_id"):
+            coupon = next(
+                (item for item in self.available_coupons if str(item.get("id")) == str(data.get("selected_benefit_coupon_id"))),
+                None,
+            )
+            if coupon:
+                selected_text = str(coupon.get("title") or "會員福利券")
+        elif benefit:
             selected_text = f"{benefit['cost']} 點｜{benefit['name']}"
 
         return (
-            f"請選擇這張單要使用的點數福利。\n"
+            f"請選擇這張單要使用的點數福利或會員福利券。\n"
             f"目前可用點數：{self.point_balance} 點\n"
+            f"可用福利券：{len(self.available_coupons)} 張\n"
             f"目前選擇：{selected_text}\n\n"
-            "提醒：這裡只是先保留在訂單上，付款成立時才會正式扣點。"
+            "同張訂單只能擇一；福利券會在訂單建立時先保留，結單後正式核銷。"
         )
 
     async def refresh_source_panel(self, interaction: discord.Interaction):
@@ -3290,7 +3374,7 @@ class SelfServiceOrderView(discord.ui.View):
 
 
     @discord.ui.button(
-        label="選擇點數福利",
+        label="點數 / 會員福利",
         style=discord.ButtonStyle.secondary,
         custom_id="self_service_order_point_benefit_button",
         row=4,

@@ -22,6 +22,33 @@ def _connect(db_file: str | Path | None = None) -> sqlite3.Connection:
     return conn
 
 
+def get_staff_id_for_profile_thread(
+    thread_id: int | str,
+    *,
+    db_file: str | Path | None = None,
+) -> str | None:
+    """Resolve exactly one profile from a Discord thread id without a full-profile scan."""
+    thread_id_text = str(thread_id or "").strip()
+    if not thread_id_text:
+        return None
+    with _connect(db_file) as conn:
+        if not _table_exists(conn, "staff_profiles"):
+            return None
+        row = conn.execute(
+            """
+            SELECT staff_discord_id
+            FROM staff_profiles
+            WHERE forum_thread_id = ?
+            LIMIT 1
+            """,
+            (thread_id_text,),
+        ).fetchone()
+    if row is None:
+        return None
+    value = str(row["staff_discord_id"] or "").strip()
+    return value or None
+
+
 def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
     row = conn.execute(
         """

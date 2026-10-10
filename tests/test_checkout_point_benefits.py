@@ -108,3 +108,26 @@ def test_point_cash_coupon_remains_store_absorbed():
     assert finance["customer_pay_amount"] == 500
     assert finance["payout_base_amount"] == 600
     assert finance["store_absorbed_amount"] == 100
+
+
+
+def test_point_added_service_uses_full_value_even_with_vip_discount():
+    point_item = {"kind": "extra_hours", "hours": 0.5}
+    service_value = checkout.calculate_point_service_value(
+        quote={"quantity": 2, "customer_pay_amount": 600},
+        vip_pay_rate=94,
+        point_item=point_item,
+    )
+    assert service_value == 150
+    finance = checkout.calculate_checkout_financials(
+        service_amount=600,
+        vip_pay_rate=94,
+        specify_fee=0,
+        point_item=point_item,
+        point_service_value=service_value,
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert finance["customer_pay_amount"] == 564
+    assert finance["payout_base_amount"] == 714
+    assert finance["point_store_absorbed_amount"] == 150

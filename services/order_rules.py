@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from math import floor
 import time
 from typing import Any, Literal
 
@@ -122,6 +121,9 @@ class OrderRule:
     # VIP 與點數必須是兩個獨立商品規則；關閉 VIP 不影響客服手動折扣。
     vip_discount_allowed: bool = True
     point_benefits_allowed: bool = True
+    # 跨訂單會員回饋。舊 service_bonus_* 僅保留歷史/後台相容，
+    # 不再直接增加同張訂單的服務數量。
+    loyalty_benefits_enabled: bool = False
 
     min_protector_count: int = 0
     service_bonus_buy: int | None = None
@@ -173,6 +175,7 @@ RULE_OVERRIDE_FIELDS = {
     "catalog_group_label",
     "vip_discount_allowed",
     "point_benefits_allowed",
+    "loyalty_benefits_enabled",
     "min_protector_count",
     "service_bonus_buy",
     "service_bonus_gift",
@@ -315,8 +318,7 @@ def get_required_staff_count(rule: OrderRule, player_count: int | None = None) -
 
 
 def get_service_quantity(rule: OrderRule, quantity: int) -> int:
-    if rule.service_bonus_buy and rule.service_bonus_gift:
-        return int(quantity) + floor(int(quantity) / int(rule.service_bonus_buy)) * int(rule.service_bonus_gift)
+    # 舊的同單買幾送幾已全面停用。會員加贈改由跨訂單福利券處理。
     return int(quantity)
 
 
@@ -427,8 +429,7 @@ _add(OrderRule(
     specify_fee_by_role=_protectors_fee(),
     specify_free_min_units=2,
     specify_free_basis="quantity",
-    service_bonus_buy=5,
-    service_bonus_gift=1,
+    loyalty_benefits_enabled=True,
     note="保底三選一：800w / 500w + 2 沙色保險 / 4 沙色保險",
 ))
 
@@ -511,8 +512,7 @@ for category, key, label, price, staff_count, required_game_roles in [
         },
         specify_free_min_units=2,
         specify_free_basis="quantity",
-        service_bonus_buy=5,
-        service_bonus_gift=1,
+        loyalty_benefits_enabled=True,
     ))
 
 # 舊甜蜜單規則保留給既有訂單／舊快照回查，不再出現在新下單選項。
@@ -883,64 +883,6 @@ _add(OrderRule(
 ))
 
 
-# ========= 特戰英豪 陪玩 =========
-
-_add(OrderRule(
-    "valorant", "valorant_entertain", "特戰英豪｜娛樂陪", "hourly", 350, "H",
-    allowed_roles=COMPANION_ROLES,
-    required_game_roles=VALORANT_GAME_ROLE,
-    required_staff_count="player_count",
-    player_count_enabled=True,
-    max_player_count=4,
-    price_multiply_player_count=True,
-    allow_specify=True,
-    max_specified_count=4,
-    specify_fee_default=100,
-    specify_fee_by_role=_all_receiver_fee(100),
-    specify_free_min_units=2,
-    specify_free_basis="quantity",
-    point_benefits_allowed=False,
-))
-
-_add(OrderRule(
-    "valorant", "valorant_tech", "特戰英豪｜技術陪", "game", 200, "局",
-    allowed_roles=PROTECTOR_ROLES,
-    required_game_roles=VALORANT_GAME_ROLE,
-    required_staff_count="player_count",
-    player_count_enabled=True,
-    max_player_count=4,
-    price_multiply_player_count=True,
-    allow_specify=True,
-    max_specified_count=4,
-    specify_fee_default=100,
-    specify_fee_by_role={
-        "top_protector": 100,
-        "female_protector": 100,
-        "male_protector": 100,
-    },
-    specify_free_min_units=2,
-    specify_free_basis="quantity_x_player_count",
-    point_benefits_allowed=False,
-))
-
-_add(OrderRule(
-    "valorant", "valorant_top_tech", "特戰英豪｜頂級技術陪", "game", 350, "局",
-    allowed_roles=("top_protector",),
-    required_game_roles=VALORANT_GAME_ROLE,
-    required_staff_count="player_count",
-    player_count_enabled=True,
-    max_player_count=4,
-    price_multiply_player_count=True,
-    allow_specify=True,
-    max_specified_count=4,
-    specify_fee_default=100,
-    specify_fee_by_role=_top_fee(100),
-    specify_free_min_units=2,
-    specify_free_basis="quantity_x_player_count",
-    point_benefits_allowed=False,
-))
-
-
 # ========= 特戰英豪 / 英雄聯盟新制陪玩 =========
 # 遊戲階級與舊男陪 / 女陪 / 護航完全分開，只在商品規則中明確列出可接資格。
 VALORANT_GAME_ROLES = ("valorant_ascendant", "valorant_immortal", "valorant_radiant")
@@ -983,8 +925,7 @@ def _add_game_service_rule(
         specify_free_min_units=2,
         specify_free_basis="quantity",
         point_benefits_allowed=True,
-        service_bonus_buy=5,
-        service_bonus_gift=1,
+        loyalty_benefits_enabled=True,
     ))
 
 
@@ -1053,8 +994,7 @@ def _add_apex_service_rule(
         specify_free_min_units=2,
         specify_free_basis="quantity",
         point_benefits_allowed=True,
-        service_bonus_buy=5,
-        service_bonus_gift=1,
+        loyalty_benefits_enabled=True,
     ))
 
 

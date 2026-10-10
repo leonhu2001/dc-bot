@@ -50,6 +50,7 @@ from web.app.services.customer_portal import (
     build_customer_portal_snapshot,
     get_customer_order,
 )
+from services.loyalty_benefits import list_customer_loyalty
 
 
 from web.app.services.marketing_funnel import (
@@ -392,6 +393,7 @@ async def member_center(
             page_name="member",
             member=member,
             portal=portal,
+            benefits=list_customer_loyalty(customer_id),
         ),
     )
 
@@ -944,6 +946,11 @@ async def public_checkout_preview(
             point_item_key=
                 payload.get(
                     "point_item_key"
+                ),
+
+            benefit_coupon_id=
+                payload.get(
+                    "benefit_coupon_id"
                 ),
 
             use_wallet=

@@ -1037,42 +1037,23 @@ def build_staff_order_request_embed(profile: dict, requester_id: int | str) -> d
 
 async def _ensure_profile_thread_open_for_refresh(
     channel,
+    staff_id: str,
     *,
-    staff_id: int | str,
     reason: str,
-):
-    """Reopen an archived profile thread before editing its saved panel message."""
-    if not bool(getattr(channel, "archived", False)):
-        return channel
+) -> bool:
+    """Return whether a profile panel may be edited without waking an archived thread.
 
-    edit_channel = getattr(channel, "edit", None)
-    if not callable(edit_channel):
-        return None
-
-    try:
-        reopened = await edit_channel(
-            archived=False,
-            reason=f"Staff profile refresh: {reason}"[:512],
-        )
-    except (
-        discord.NotFound,
-        discord.Forbidden,
-        discord.HTTPException,
-    ) as exc:
+    Discord automatically surfaces active threads in the channel list. Profile data syncs
+    are background maintenance and must not turn an archived personal wall active again.
+    """
+    if bool(getattr(channel, "archived", False)):
         print(
-            f"[staff-profile] reopen archived thread failed "
-            f"staff_id={staff_id} reason={reason}: {exc}"
+            f"[staff-profile] archived thread left archived staff_id={staff_id} "
+            f"thread={getattr(channel, 'id', 'unknown')} reason={reason}",
+            flush=True,
         )
-        return None
-
-    if reopened is not None:
-        channel = reopened
-
-    print(
-        f"[staff-profile] reopened archived thread "
-        f"staff_id={staff_id} reason={reason}"
-    )
-    return channel
+        return False
+    return True
 
 
 async def refresh_staff_profile_panel_for_staff(
@@ -1132,13 +1113,13 @@ async def refresh_staff_profile_panel_for_staff(
         ):
             return False
 
-    channel = await _ensure_profile_thread_open_for_refresh(
+    can_edit = await _ensure_profile_thread_open_for_refresh(
         channel,
         staff_id=staff_id_text,
         reason=reason,
     )
-    if channel is None:
-        return False
+    if not can_edit:
+        return True
 
     if not hasattr(channel, "fetch_message"):
         return False

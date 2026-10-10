@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 from services.staff_profile_sync import (
     claim_staff_profile_refresh_events,
     ensure_staff_profile_refresh_sync,
+    get_staff_id_for_profile_thread,
     mark_staff_profile_refresh_done,
     mark_staff_profile_refresh_failed,
 )
@@ -20,6 +21,17 @@ from views.staff_profiles import (
     get_staff_profile,
     refresh_staff_profile_panel_for_staff,
 )
+from services.loyalty_benefits import (
+    ensure_loyalty_tables,
+    process_closed_orders_since_start,
+    reconcile_coupon_reservations,
+)
+from views.member_portal import (
+    MEMBER_PORTAL_CHANNEL_ID,
+    MEMBER_PORTAL_MARKER,
+    MemberPortalView,
+    build_member_portal_embed,
+)
 from web.app.config import config
 from web.app.services.staff_service import sync_staff_members_from_discord
 
@@ -27,6 +39,7 @@ from web.app.services.staff_service import sync_staff_members_from_discord
 DEFAULT_SYNC_INTERVAL_MINUTES = 30
 SECURITY_MAINTENANCE_SECONDS = 30
 STAFF_PROFILE_EVENT_INTERVAL_SECONDS = 5
+LOYALTY_BENEFIT_INTERVAL_SECONDS = 15
 STALE_TOPUP_MINUTES = 5
 TAIPEI_TZ = timezone(timedelta(hours=8))
 BOT_DB_PATH = Path(__file__).resolve().parents[1] / "bot.db"
@@ -306,15 +319,18 @@ class StaffSyncCog(commands.Cog):
         self.bot = bot
         _ensure_security_tables()
         ensure_staff_profile_refresh_sync()
+        ensure_loyalty_tables()
         self.sync_staff_members_loop.change_interval(minutes=_get_sync_interval_minutes())
         self.sync_staff_members_loop.start()
         self.security_maintenance_loop.start()
         self.staff_profile_refresh_event_loop.start()
+        self.loyalty_benefit_loop.start()
 
     def cog_unload(self) -> None:
         self.sync_staff_members_loop.cancel()
         self.security_maintenance_loop.cancel()
         self.staff_profile_refresh_event_loop.cancel()
+        self.loyalty_benefit_loop.cancel()
 
     async def _sync_once(self) -> dict:
         def run_sync() -> dict:
@@ -412,6 +428,71 @@ class StaffSyncCog(commands.Cog):
                 await asyncio.sleep(2)
 
         return False
+
+    @commands.Cog.listener()
+    async def on_thread_update(
+        self,
+        before: discord.Thread,
+        after: discord.Thread,
+    ) -> None:
+        # Background sync no longer wakes archived profile threads. If Discord/users
+        # genuinely reopen one, refresh it once so the visible panel is current.
+        if not bool(getattr(before, "archived", False)) or bool(getattr(after, "archived", False)):
+            return
+        staff_id = await asyncio.to_thread(
+            get_staff_id_for_profile_thread,
+            after.id,
+        )
+        if not staff_id:
+            return
+        try:
+            await refresh_staff_profile_panel_for_staff(
+                after.guild,
+                staff_id,
+                reason="thread_reopened",
+            )
+        except Exception as exc:
+            print(
+                f"[staff-profile] reopen refresh failed staff_id={staff_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        if not getattr(self.bot, "_member_portal_view_registered", False):
+            self.bot.add_view(MemberPortalView())
+            self.bot._member_portal_view_registered = True
+
+        channel = self.bot.get_channel(MEMBER_PORTAL_CHANNEL_ID)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(MEMBER_PORTAL_CHANNEL_ID)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                channel = None
+        if not isinstance(channel, discord.TextChannel) or self.bot.user is None:
+            return
+
+        existing = None
+        try:
+            async for message in channel.history(limit=50):
+                if message.author.id != self.bot.user.id or not message.embeds:
+                    continue
+                if str(message.embeds[0].footer.text or "") == MEMBER_PORTAL_MARKER:
+                    existing = message
+                    break
+        except (discord.Forbidden, discord.HTTPException):
+            return
+
+        try:
+            if existing is None:
+                await channel.send(embed=build_member_portal_embed(), view=MemberPortalView())
+            else:
+                await existing.edit(embed=build_member_portal_embed(), view=MemberPortalView())
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(f"[member-portal] panel refresh failed: {exc}", flush=True)
+
 
     @commands.Cog.listener()
     async def on_voice_state_update(
@@ -528,6 +609,45 @@ class StaffSyncCog(commands.Cog):
     @security_maintenance_loop.before_loop
     async def before_security_maintenance_loop(self) -> None:
         await self.bot.wait_until_ready()
+
+    async def _notify_issued_benefits(self, result: dict) -> None:
+        coupons = result.get("issued_coupons") or []
+        if not coupons:
+            return
+        channel_id = str(result.get("ticket_channel_id") or "").strip()
+        customer_id = str(result.get("customer_id") or "").strip()
+        if not channel_id or not customer_id:
+            return
+        try:
+            channel = self.bot.get_channel(int(channel_id))
+            if channel is None:
+                channel = await self.bot.fetch_channel(int(channel_id))
+            if not isinstance(channel, discord.TextChannel):
+                return
+            lines = "\n".join(f"• {item.get('title')}" for item in coupons)
+            await channel.send(
+                f"<@{customer_id}> 🎁 **會員累積福利已入帳**\n{lines}\n"
+                "已放進「我的福利」，下次點同方案即可使用。",
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            print(f"[loyalty] ticket notification failed order={result.get('order_id')}: {exc}", flush=True)
+
+    @tasks.loop(seconds=LOYALTY_BENEFIT_INTERVAL_SECONDS)
+    async def loyalty_benefit_loop(self) -> None:
+        try:
+            results = await asyncio.to_thread(process_closed_orders_since_start, 200)
+            await asyncio.to_thread(reconcile_coupon_reservations, 200)
+        except Exception as exc:
+            print(f"[loyalty] reconcile failed: {type(exc).__name__}: {exc}", flush=True)
+            return
+        for result in results:
+            await self._notify_issued_benefits(result)
+
+    @loyalty_benefit_loop.before_loop
+    async def before_loyalty_benefit_loop(self) -> None:
+        await self.bot.wait_until_ready()
+
 
     @tasks.loop(seconds=STAFF_PROFILE_EVENT_INTERVAL_SECONDS)
     async def staff_profile_refresh_event_loop(self) -> None:
