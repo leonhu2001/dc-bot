@@ -171,9 +171,9 @@ def test_discord_dispatch_embed_understands_nested_web_point_snapshot():
                 "quantity": 2,
                 "preview": {
                     "point": {
-                        "key": "extra_10",
+                        "key": "extra_hour_30m",
                         "name": "加時 30 分鐘",
-                        "cost": 15,
+                        "cost": 60,
                     },
                     "finance": {
                         "point_service_note": "服務時間 +30 分鐘",

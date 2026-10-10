@@ -1,0 +1,110 @@
+from services.order_rules import OrderRule
+from web.app.services import checkout_preview as checkout
+
+
+def _rule(key: str, pricing_type: str) -> OrderRule:
+    return OrderRule(
+        category="basic",
+        key=key,
+        label=key,
+        pricing_type=pricing_type,
+        price=300,
+        allow_specify=True,
+        max_specified_count=1,
+        specify_fee_default=100,
+        point_benefits_allowed=True,
+    )
+
+
+def test_point_catalog_prices_and_removed_legacy_reward():
+    items = {item["key"]: item for item in checkout.POINT_ITEMS}
+    assert items["discount_20"]["cost"] == 10
+    assert items["discount_30"]["cost"] == 15
+    assert items["free_specify_fee"]["cost"] == 30
+    assert items["discount_100"]["cost"] == 45
+    assert items["extra_hour_30m"]["cost"] == 60
+    assert items["extra_hour_1h"]["cost"] == 110
+    assert items["extra_game_1"]["cost"] == 40
+    assert items["extra_game_2"]["cost"] == 70
+    assert "extra_15" not in items
+    assert all(item.get("kind") != "extra_game" for item in items.values())
+
+
+def test_hourly_and_game_service_rewards_are_separate(monkeypatch):
+    monkeypatch.setitem(checkout.ORDER_RULES, "test_hourly", _rule("test_hourly", "hourly"))
+    monkeypatch.setitem(checkout.ORDER_RULES, "test_game", _rule("test_game", "game"))
+
+    hourly = checkout.list_point_options(
+        rule_key="test_hourly", point_balance=999, quantity=1,
+        has_specified_staff=True,
+    )
+    game = checkout.list_point_options(
+        rule_key="test_game", point_balance=999, quantity=1,
+        has_specified_staff=True,
+    )
+    hourly_keys = {item["key"] for item in hourly}
+    game_keys = {item["key"] for item in game}
+
+    assert {"extra_hour_30m", "extra_hour_1h"} <= hourly_keys
+    assert {"extra_game_1", "extra_game_2"}.isdisjoint(hourly_keys)
+    assert {"extra_game_1", "extra_game_2"} <= game_keys
+    assert {"extra_hour_30m", "extra_hour_1h"}.isdisjoint(game_keys)
+
+    shared = {
+        "discount_20", "discount_30", "free_specify_fee", "discount_100",
+    }
+    assert shared <= hourly_keys
+    assert shared <= game_keys
+
+
+def test_store_absorbs_waived_specify_fee_without_reducing_payout_base():
+    finance = checkout.calculate_checkout_financials(
+        service_amount=600,
+        vip_pay_rate=100,
+        specify_fee=100,
+        point_item={"kind": "free_specify_fee"},
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert finance["customer_pay_amount"] == 600
+    assert finance["payout_base_amount"] == 700
+    assert finance["store_absorbed_amount"] == 100
+    assert finance["point_waived_specify_fee"] == 100
+
+
+def test_store_absorbs_extra_service_and_keeps_customer_price_unchanged():
+    point_item = {"kind": "extra_hours", "hours": 0.5}
+    service_value = checkout.calculate_point_service_value(
+        quote={"quantity": 2, "customer_pay_amount": 600},
+        vip_pay_rate=100,
+        point_item=point_item,
+    )
+    assert service_value == 150
+
+    finance = checkout.calculate_checkout_financials(
+        service_amount=600,
+        vip_pay_rate=100,
+        specify_fee=0,
+        point_item=point_item,
+        point_service_value=service_value,
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert finance["customer_pay_amount"] == 600
+    assert finance["payout_base_amount"] == 750
+    assert finance["store_absorbed_amount"] == 150
+    assert finance["point_service_note"] == "服務時間 +30 分鐘"
+
+
+def test_point_cash_coupon_remains_store_absorbed():
+    finance = checkout.calculate_checkout_financials(
+        service_amount=600,
+        vip_pay_rate=100,
+        specify_fee=0,
+        point_item={"kind": "cash_discount", "amount": 100},
+        wallet_balance=0,
+        use_wallet=False,
+    )
+    assert finance["customer_pay_amount"] == 500
+    assert finance["payout_base_amount"] == 600
+    assert finance["store_absorbed_amount"] == 100
