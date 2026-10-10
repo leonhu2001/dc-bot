@@ -7,15 +7,18 @@ from typing import Iterable
 
 import discord
 
-SMART_DISPATCH_ALERT_CHANNEL_ID = 1555881625844191322
-PUBLIC_ACCEPTANCE_OPEN_SECONDS = 60
-# 保留第一版智慧派單節奏：公開開放後 3 分鐘擴大一批、6 分鐘全量通知。
-SECOND_WAVE_AFTER_OPEN_SECONDS = 180
-FULL_EXPANSION_AFTER_OPEN_SECONDS = 360
-SECOND_WAVE_SECONDS = PUBLIC_ACCEPTANCE_OPEN_SECONDS + SECOND_WAVE_AFTER_OPEN_SECONDS
-FULL_EXPANSION_SECONDS = PUBLIC_ACCEPTANCE_OPEN_SECONDS + FULL_EXPANSION_AFTER_OPEN_SECONDS
-REPEAT_REMINDER_SECONDS = 600
-SMART_DISPATCH_LOOP_SECONDS = 10
+from core.discord_settings import (
+    SMART_DISPATCH_ALERT_CHANNEL_ID,
+    SMART_DISPATCH_PUBLIC_ACCEPTANCE_OPEN_SECONDS as PUBLIC_ACCEPTANCE_OPEN_SECONDS,
+    SMART_DISPATCH_SECOND_WAVE_SECONDS as SECOND_WAVE_SECONDS,
+    SMART_DISPATCH_FULL_EXPANSION_SECONDS as FULL_EXPANSION_SECONDS,
+    SMART_DISPATCH_REPEAT_REMINDER_SECONDS as REPEAT_REMINDER_SECONDS,
+    SMART_DISPATCH_LOOP_SECONDS,
+)
+
+# 保留操作語意：公開開放後 3 分鐘擴大一批、6 分鐘全量通知。
+SECOND_WAVE_AFTER_OPEN_SECONDS = SECOND_WAVE_SECONDS - PUBLIC_ACCEPTANCE_OPEN_SECONDS
+FULL_EXPANSION_AFTER_OPEN_SECONDS = FULL_EXPANSION_SECONDS - PUBLIC_ACCEPTANCE_OPEN_SECONDS
 
 from core.vip_levels import VIP_LEVELS
 from services.order_rules import role_ids_match_requirements
@@ -301,6 +304,35 @@ async def send_initial_smart_dispatch_alert(
     )
 
 
+async def _notify_specified_dispatch_failure(
+    guild: discord.Guild,
+    *,
+    staff_id: str,
+    reason: str,
+    dispatch_jump_url: str,
+) -> None:
+    alert_channel = guild.get_channel(SMART_DISPATCH_ALERT_CHANNEL_ID)
+    if alert_channel is None or not callable(getattr(alert_channel, "send", None)):
+        return
+
+    try:
+        await alert_channel.send(
+            "⚠️ **指定陪玩通知異常**\n"
+            f"指定人員：<@{staff_id}>\n"
+            f"原因：{reason}\n"
+            "指定名額仍會保留，請客服確認是否需要聯絡本人或調整訂單。\n"
+            f"前往原派單：{dispatch_jump_url}",
+            allowed_mentions=discord.AllowedMentions(
+                users=False,
+                roles=False,
+                everyone=False,
+                replied_user=False,
+            ),
+        )
+    except (discord.Forbidden, discord.HTTPException):
+        return
+
+
 async def send_specified_staff_dispatch_dms(
     guild: discord.Guild,
     *,
@@ -333,6 +365,12 @@ async def send_specified_staff_dispatch_dms(
 
         if member is None:
             failed.append(staff_id)
+            await _notify_specified_dispatch_failure(
+                guild,
+                staff_id=staff_id,
+                reason="找不到伺服器成員",
+                dispatch_jump_url=dispatch_jump_url,
+            )
             continue
 
         member_role_ids = {
@@ -346,6 +384,12 @@ async def send_specified_staff_dispatch_dms(
             required_game_role_ids,
         ):
             failed.append(staff_id)
+            await _notify_specified_dispatch_failure(
+                guild,
+                staff_id=staff_id,
+                reason="目前不符合此訂單的職位／遊戲資格",
+                dispatch_jump_url=dispatch_jump_url,
+            )
             continue
 
         try:
@@ -361,6 +405,12 @@ async def send_specified_staff_dispatch_dms(
             sent.append(staff_id)
         except (discord.Forbidden, discord.HTTPException):
             failed.append(staff_id)
+            await _notify_specified_dispatch_failure(
+                guild,
+                staff_id=staff_id,
+                reason="Discord 私訊無法送達",
+                dispatch_jump_url=dispatch_jump_url,
+            )
 
     return sent, failed
 

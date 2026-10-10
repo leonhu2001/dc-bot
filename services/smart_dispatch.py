@@ -7,12 +7,21 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from services.dispatch_presence import get_online_dispatch_worker_ids
+from core.discord_settings import (
+    SMART_DISPATCH_SECOND_WAVE_SECONDS,
+    SMART_DISPATCH_FULL_EXPANSION_SECONDS,
+)
+from services.dispatch_presence import (
+    get_online_dispatch_worker_ids,
+    get_recent_dispatch_worker_ids,
+)
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
 logger = logging.getLogger(__name__)
-FIRST_EXPANSION_SECONDS = 180
-FULL_EXPANSION_SECONDS = 360
+# 兩個 runtime 共用「從訂單建立起算」的時間，避免 180/360 與
+# 240/420 兩套語意再次漂移。
+FIRST_EXPANSION_SECONDS = SMART_DISPATCH_SECOND_WAVE_SECONDS
+FULL_EXPANSION_SECONDS = SMART_DISPATCH_FULL_EXPANSION_SECONDS
 
 def _db_path(db_file: str | Path | None = None) -> Path:
     if db_file is not None:
@@ -448,8 +457,15 @@ def rank_dispatch_candidates(
         db_file=db_file,
         now_taipei=now_taipei,
     )
-    online = set(
+    active_online = set(
         get_online_dispatch_worker_ids(
+            candidate_ids=deduped,
+            db_file=db_file,
+            now=now_taipei,
+        )
+    )
+    recent_online = set(
+        get_recent_dispatch_worker_ids(
             candidate_ids=deduped,
             db_file=db_file,
             now=now_taipei,
@@ -469,7 +485,10 @@ def rank_dispatch_candidates(
 
         return (
             0 if worker_id in specified else 1,
-            0 if worker_id in online else 1,
+            # 活躍（90 秒內）優先，其次保留 5 分鐘內曾在大廳的人，
+            # 避免切分頁/短暫斷線就立刻被當成完全離線。
+            0 if worker_id in active_online else 1,
+            0 if worker_id in recent_online else 1,
             0 if worker_id in priority else 1,
             int(item.get("active_count") or 0),
             int(item.get("today_count") or 0),

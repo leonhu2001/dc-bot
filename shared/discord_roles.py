@@ -1,12 +1,7 @@
-ADMIN_ROLE_IDS = {
-    "1131128849443328030",
-    "1482084782031638548",
-}
-
-WORKER_ROLE_IDS = {
-    "1503701170504339458",
-    "1503706721883783218",
-}
+from core.discord_settings import (
+    DASHBOARD_ADMIN_ROLE_IDS as ADMIN_ROLE_IDS,
+    DASHBOARD_WORKER_ROLE_IDS as WORKER_ROLE_IDS,
+)
 
 
 def has_admin_role(role_ids: list[str] | set[str]) -> bool:

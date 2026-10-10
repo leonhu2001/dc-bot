@@ -270,12 +270,12 @@ def get_vip_room_whitelist_user_ids(owner_id: int) -> set[int]:
 
 
 def build_vip_whitelist_overwrite() -> discord.PermissionOverwrite:
-    """白名單最小權限：可見、進語音、說話、在語音聊天室打字。"""
+    """白名單權限：可見、進語音、說話、開視訊/直播、在語音聊天室打字。"""
     return discord.PermissionOverwrite(
         view_channel=True,
         connect=True,
         speak=True,
-        stream=False,
+        stream=True,
         use_voice_activation=True,
         send_messages=True,
         read_message_history=True,
@@ -353,6 +353,40 @@ async def sync_vip_whitelist_permissions(
             continue
 
         await grant_vip_whitelist_access(voice_channel, member)
+
+
+async def sync_all_existing_vip_whitelist_permissions(
+    guild: discord.Guild,
+) -> int:
+    """Re-apply whitelist permissions to every tracked existing VIP room.
+
+    This is intentionally idempotent and is run on bot ready so permission
+    policy changes (such as enabling video/stream) reach rooms that were
+    created before the deploy.
+    """
+    try:
+        from core.database import list_vip_voice_rooms
+    except Exception:
+        return 0
+
+    updated = 0
+    for row in list_vip_voice_rooms():
+        try:
+            owner_id = int(row.get("owner_id") or 0)
+            channel_id = int(row.get("channel_id") or 0)
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not owner_id or not channel_id:
+            continue
+
+        channel = guild.get_channel(channel_id)
+        if not isinstance(channel, discord.VoiceChannel):
+            continue
+
+        await sync_vip_whitelist_permissions(channel, owner_id)
+        updated += 1
+
+    return updated
 
 
 def build_play_lobby_overwrites(guild: discord.Guild) -> dict:

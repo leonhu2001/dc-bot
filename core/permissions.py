@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import discord
 
-
-# 總管：客服之上的整店管理層。即使舊 bot.py 仍把歷史 MANAGER_ROLE_ID
-# 指向客服，這個固定角色仍可作為客服權限的 superset 使用。
-GENERAL_MANAGER_ROLE_ID = 1537067761141030972
+from core.discord_settings import GENERAL_MANAGER_ROLE_ID
 
 CUSTOMER_ROLE_ID: int | None = None
 EXAMINER_ROLE_ID: int | None = None

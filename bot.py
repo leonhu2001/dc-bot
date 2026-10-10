@@ -445,6 +445,7 @@ from views.voice import (
     grant_play_voice_room_chat_access,
     revoke_play_voice_room_chat_access,
     sync_vip_whitelist_permissions,
+    sync_all_existing_vip_whitelist_permissions,
 )
 
 from views.panels import (
@@ -4402,6 +4403,14 @@ async def on_ready():
         print(f"Sync error: {e}", flush=True)
 
     print(f"Logged in as {bot.user}", flush=True)
+
+    # VIP_POLICY_STARTUP_SYNC_V1
+    try:
+        vip_sync_guild = bot.get_guild(GUILD_ID)
+        if vip_sync_guild is not None:
+            await sync_all_existing_vip_whitelist_permissions(vip_sync_guild)
+    except Exception as exc:
+        print(f"[VIP] failed to refresh existing VIP whitelist permissions: {exc}")
 
 
 # ========= Slash 指令 =========

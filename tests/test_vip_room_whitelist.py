@@ -73,7 +73,7 @@ def test_vip_whitelist_overwrite_is_minimal():
     assert overwrite.send_messages is True
     assert overwrite.read_message_history is True
 
-    assert overwrite.stream is False
+    assert overwrite.stream is True
     assert overwrite.attach_files is False
     assert overwrite.add_reactions is False
     assert overwrite.use_external_emojis is False

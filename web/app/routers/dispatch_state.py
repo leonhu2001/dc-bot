@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from services.dispatch_presence import (
+    RECENT_ONLINE_TIMEOUT_SECONDS,
     count_online_dispatch_workers,
     get_online_dispatch_support_ids,
 )
@@ -45,8 +46,14 @@ def get_sqlite_path() -> str:
 
 
 def _dispatch_presence_snapshot() -> dict:
+    active_count = count_online_dispatch_workers()
+    recent_total = count_online_dispatch_workers(
+        timeout_seconds=RECENT_ONLINE_TIMEOUT_SECONDS,
+    )
     return {
-        "online_companion_count": count_online_dispatch_workers(),
+        "online_companion_count": active_count,
+        "recent_companion_count": max(active_count, recent_total),
+        "recent_only_companion_count": max(0, recent_total - active_count),
         "online_support_count": len(get_online_dispatch_support_ids()),
     }
 

@@ -6,7 +6,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_ONLINE_TIMEOUT_SECONDS = 90
+from core.discord_settings import (
+    DISPATCH_ACTIVE_TIMEOUT_SECONDS,
+    DISPATCH_RECENT_TIMEOUT_SECONDS,
+)
+
+DEFAULT_ONLINE_TIMEOUT_SECONDS = DISPATCH_ACTIVE_TIMEOUT_SECONDS
+RECENT_ONLINE_TIMEOUT_SECONDS = DISPATCH_RECENT_TIMEOUT_SECONDS
 MIN_TOUCH_INTERVAL_SECONDS = 20
 _ENSURED_DB_PATHS: set[str] = set()
 
@@ -188,6 +194,58 @@ def get_online_dispatch_worker_ids(
             result.append(worker_key)
 
     return result
+
+
+def get_recent_dispatch_worker_ids(
+    *,
+    candidate_ids: Iterable[str | int] | None = None,
+    db_file: str | Path | None = None,
+    now: datetime | None = None,
+) -> list[str]:
+    """Return workers seen within the wider 5-minute recent-presence window."""
+    return get_online_dispatch_worker_ids(
+        timeout_seconds=RECENT_ONLINE_TIMEOUT_SECONDS,
+        candidate_ids=candidate_ids,
+        db_file=db_file,
+        now=now,
+    )
+
+
+def classify_dispatch_presence(
+    candidate_ids: Iterable[str | int],
+    *,
+    db_file: str | Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, str]:
+    """Classify candidates as active, recent, or offline.
+
+    active: <= 90 seconds; recent: > 90 seconds and <= 5 minutes; offline: older.
+    """
+    ids = list(dict.fromkeys(
+        str(item)
+        for item in candidate_ids
+        if str(item).strip()
+    ))
+    active = set(get_online_dispatch_worker_ids(
+        candidate_ids=ids,
+        db_file=db_file,
+        now=now,
+    ))
+    recent = set(get_recent_dispatch_worker_ids(
+        candidate_ids=ids,
+        db_file=db_file,
+        now=now,
+    ))
+    return {
+        worker_id: (
+            "active"
+            if worker_id in active
+            else "recent"
+            if worker_id in recent
+            else "offline"
+        )
+        for worker_id in ids
+    }
 
 
 def count_online_dispatch_workers(
