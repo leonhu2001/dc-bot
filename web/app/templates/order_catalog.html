@@ -523,7 +523,7 @@
                     </h3>
 
                     <p>
-                        確認指定人員、點數福利與附加需求後，
+                        確認指定人員、點數／累積福利與附加需求後，
                         即可建立正式訂單。
                     </p>
 
@@ -633,6 +633,17 @@
                         選擇後由伺服器重新驗證資格
                     </small>
 
+                </label>
+
+
+                <label class="order-checkout-control">
+                    <span>累積福利</span>
+                    <select id="mw-checkout-benefit">
+                        <option value="">不使用累積福利</option>
+                    </select>
+                    <small id="mw-checkout-benefit-note">
+                        只有已持有、且符合目前商品與人數規格的福利才會顯示
+                    </small>
                 </label>
 
 
@@ -907,7 +918,7 @@
 
 
 <script
-    src="/static/js/mw_order_quote.js?v=3c3b2r3-simple-checkout"
+    src="/static/js/mw_order_quote.js?v=loyalty-20261010?v=3c3b2r3-simple-checkout"
     defer
 ></script>
 

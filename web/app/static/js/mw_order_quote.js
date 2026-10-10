@@ -133,6 +133,18 @@
         );
 
 
+    const benefitSelect =
+        byId(
+            "mw-checkout-benefit"
+        );
+
+
+    const benefitNote =
+        byId(
+            "mw-checkout-benefit-note"
+        );
+
+
     const pointNote =
         byId(
             "mw-checkout-point-note"
@@ -896,6 +908,66 @@
     }
 
 
+    function renderBenefitOptions(
+        items
+    ) {
+
+        if (!benefitSelect) {
+            return;
+        }
+
+        const previous =
+            String(
+                benefitSelect.value
+                || ""
+            );
+
+        benefitSelect.innerHTML =
+            '<option value="">不使用累積福利</option>';
+
+        (items || []).forEach(
+            item => {
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+                option.value =
+                    String(
+                        item.id
+                        || ""
+                    );
+                option.textContent =
+                    String(
+                        item.display_name
+                        || item.benefit_label
+                        || "累積福利"
+                    );
+                benefitSelect.append(
+                    option
+                );
+            }
+        );
+
+        if (
+            Array.from(benefitSelect.options)
+                .some(option => option.value === previous)
+        ) {
+            benefitSelect.value =
+                previous;
+        } else {
+            benefitSelect.value =
+                "";
+        }
+
+        if (benefitNote) {
+            benefitNote.textContent =
+                items && items.length
+                    ? `目前有 ${items.length} 張符合這個方案的累積福利券`
+                    : "目前沒有符合這個商品與人數規格的累積福利券";
+        }
+    }
+
+
     function renderCheckoutOptions(
         data
     ) {
@@ -937,6 +1009,12 @@
 
         renderPointOptions(
             data.point_options
+        );
+
+
+        renderBenefitOptions(
+            data.benefit_options
+            || []
         );
 
 
@@ -1137,6 +1215,15 @@
 
 
         if (
+            finance.loyalty_service_note
+        ) {
+            notes.push(
+                finance.loyalty_service_note
+            );
+        }
+
+
+        if (
             finance.wallet_use_amount
             > 0
         ) {
@@ -1233,6 +1320,11 @@
             point_item_key:
                 pointSelect.value
                 || null,
+
+            benefit_coupon_id:
+                benefitSelect?.value
+                    ? Number(benefitSelect.value)
+                    : null,
 
             use_wallet: false,
 
@@ -1763,6 +1855,14 @@
     );
 
 
+    benefitSelect?.addEventListener(
+        "change",
+        async () => {
+            await refreshCheckoutPreview();
+        }
+    );
+
+
     useWallet?.addEventListener(
         "change",
         refreshCheckoutPreview
@@ -1870,6 +1970,13 @@
             if (pointSelect) {
 
                 pointSelect.value =
+                    "";
+            }
+
+
+            if (benefitSelect) {
+
+                benefitSelect.value =
                     "";
             }
 
@@ -2066,6 +2173,11 @@
             point_item_key:
                 pointSelect?.value
                 || null,
+
+            benefit_coupon_id:
+                benefitSelect?.value
+                    ? Number(benefitSelect.value)
+                    : null,
 
             use_wallet: false,
 

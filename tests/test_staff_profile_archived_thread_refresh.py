@@ -61,7 +61,7 @@ def _patch_profile_rendering(monkeypatch):
     )
 
 
-def test_archived_public_profile_thread_is_reopened_and_left_active(monkeypatch):
+def test_archived_public_profile_thread_is_reopened_then_rearchived(monkeypatch):
     _patch_profile_rendering(monkeypatch)
     thread = _FakeThread(archived=True)
 
@@ -75,7 +75,7 @@ def test_archived_public_profile_thread_is_reopened_and_left_active(monkeypatch)
 
     assert refreshed is True
     assert [call["archived"] for call in thread.edit_calls] == [False]
-    assert thread.archived is False
+    assert thread.archived is True
     assert len(thread.message.edits) == 1
 
 

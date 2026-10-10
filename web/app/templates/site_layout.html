@@ -491,17 +491,6 @@ html {
                                 我的專區
                             </a>
 
-                            <a href="/me/orders">
-                                我的訂單
-                            </a>
-
-                            <a href="/me#favorites">
-                                我的收藏
-                            </a>
-
-                            <a href="/me#vip">
-                                點數 / VIP
-                            </a>
 
                             {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
                                 <div class="account-divider"></div>
@@ -570,7 +559,6 @@ html {
 
             {% if user %}
                 <a href="/me">我的專區</a>
-                <a href="/me/orders">我的訂單</a>
 
                 {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
                     <a href="/employee">員工中心</a>

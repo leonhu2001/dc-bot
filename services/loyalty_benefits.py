@@ -369,6 +369,30 @@ def release_coupon(
         return int(result.rowcount or 0) == 1
 
 
+
+def restore_coupon(
+    coupon_id: int,
+    *,
+    customer_id: str | int | None = None,
+    db_file: str | Path | None = None,
+) -> bool:
+    """Return a reserved/used loyalty coupon after an order cancellation."""
+    ensure_loyalty_tables(db_file)
+    params: list[Any] = [int(coupon_id)]
+    sql = (
+        "UPDATE loyalty_coupons "
+        "SET status='available', reservation_key=NULL, reserved_at=NULL, "
+        "used_order_key=NULL, used_at=NULL "
+        "WHERE id=? AND status IN ('reserved','used')"
+    )
+    if customer_id is not None:
+        sql += " AND customer_discord_id=?"
+        params.append(str(customer_id))
+    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+        result = conn.execute(sql, params)
+        conn.commit()
+        return int(result.rowcount or 0) == 1
+
 def record_paid_service(
     *,
     customer_id: str | int,

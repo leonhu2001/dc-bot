@@ -783,6 +783,40 @@ async def redeem_order_point_benefit_on_payment(
     return f"點數福利已扣 {info['cost']} 點：{info['name']}（{before_points} → {after_points}）"
 
 
+def precheck_order_loyalty_coupon_for_payment(data: dict, customer_id: int) -> None:
+    coupon_id = _to_int(data.get("selected_loyalty_coupon_id"), None)
+    if coupon_id is None:
+        return
+    from services.loyalty_benefits import validate_coupon_for_order
+    validate_coupon_for_order(
+        coupon_id, customer_id=customer_id,
+        rule_key=str(data.get("order_rule_key") or ""),
+        player_count=_to_int(data.get("player_count"), 1) or 1,
+        allow_reserved=True,
+    )
+
+
+def consume_order_loyalty_coupon_on_payment(data: dict, customer_id: int, channel_id: int) -> str | None:
+    coupon_id = _to_int(data.get("selected_loyalty_coupon_id"), None)
+    if coupon_id is None:
+        return None
+    from services.loyalty_benefits import consume_coupon
+    used_order_key = (
+        f"WEB-{int(data['web_order_id'])}"
+        if _to_int(data.get("web_order_id"), None) is not None
+        else f"DC-{int(channel_id)}"
+    )
+    coupon = consume_coupon(
+        coupon_id, customer_id=customer_id, used_order_key=used_order_key,
+    )
+    data["loyalty_coupon_used"] = True
+    data["loyalty_coupon_used_at"] = get_taipei_now_iso()
+    data["loyalty_coupon_name"] = str(coupon.get("display_name") or data.get("loyalty_coupon_name") or "累積福利")
+    remember_order_data(channel_id, data)
+    save_bot_data()
+    return f"累積福利已套用：{data['loyalty_coupon_name']}"
+
+
 def _order_requires_credentials(data: dict | None) -> bool:
     if not isinstance(data, dict):
         return False
@@ -1561,9 +1595,11 @@ async def finalize_accepted_pending_payment(
                 customer_member = None
 
         order_point_benefit_result = None
+        order_loyalty_benefit_result = None
 
         try:
             precheck_order_point_benefit_for_payment(data, customer_id)
+            precheck_order_loyalty_coupon_for_payment(data, customer_id)
         except ValueError as exc:
             data.pop("payment_finalizing", None)
             remember_order_data(channel_id, data)
@@ -1625,6 +1661,17 @@ async def finalize_accepted_pending_payment(
                 await interaction.followup.send(message, ephemeral=True)
             else:
                 await interaction.response.send_message(message, ephemeral=True)
+            return
+
+        try:
+            order_loyalty_benefit_result = consume_order_loyalty_coupon_on_payment(
+                data, customer_id, channel_id
+            )
+        except ValueError as exc:
+            data.pop("payment_finalizing", None)
+            remember_order_data(channel_id, data)
+            save_bot_data()
+            await interaction.followup.send(str(exc), ephemeral=True)
             return
 
         data["amount"] = amount
@@ -1840,6 +1887,8 @@ async def finalize_accepted_pending_payment(
             response_text += f"\n交易收據已產生：{data.get('receipt_id')}"
         if order_point_benefit_result:
             response_text += f"\n\n{order_point_benefit_result}"
+        if order_loyalty_benefit_result:
+            response_text += f"\n\n{order_loyalty_benefit_result}"
         if reward_result:
             response_text += f"\n\n{reward_result}"
 
@@ -2289,6 +2338,13 @@ async def delete_dispatch_claim_panel_for_order(
 ):
     """取消票口時，一併刪除派單頻道對應的接單面板，並清除保存資料。"""
     data = SELF_SERVICE_ORDER_SELECTIONS.get(order_channel_id, {})
+    coupon_id = _to_int(data.get("selected_loyalty_coupon_id"), None)
+    if coupon_id is not None:
+        try:
+            from services.loyalty_benefits import restore_coupon
+            restore_coupon(coupon_id, customer_id=data.get("customer_id"))
+        except Exception as exc:
+            print(f"[loyalty] 取消訂單退回福利券失敗 channel_id={order_channel_id}: {exc}")
     dispatch_message_id = _to_int(data.get("dispatch_message_id"))
     dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
 
@@ -2412,6 +2468,34 @@ async def lock_dispatch_claim_panel(guild: discord.Guild, order_channel_id: int)
     data["status"] = "closed"
     data["closed_at"] = get_taipei_now_iso()
     data["quantity"] = quantity
+
+    try:
+        from services.loyalty_benefits import record_paid_service
+        source_order_key = (
+            f"WEB-{int(data['web_order_id'])}"
+            if _to_int(data.get("web_order_id"), None) is not None
+            else f"DC-{int(order_channel_id)}"
+        )
+        loyalty_result = record_paid_service(
+            customer_id=customer_id or data.get("customer_id") or 0,
+            rule_key=str(data.get("order_rule_key") or ""),
+            player_count=_to_int(data.get("player_count"), 1) or 1,
+            paid_units=float(quantity),
+            source_order_key=source_order_key,
+            completed_at=data["closed_at"],
+        )
+        issued = loyalty_result.get("issued") or []
+        if issued:
+            reward_lines = "\n".join(
+                f"・**{coupon.get('display_name') or '累積福利'}**"
+                for coupon in issued
+            )
+            await source_channel.send(
+                f"<@{customer_id}> 🎁 **累積福利已達標！**\n{reward_lines}\n下次點同商品、同人數規格時即可使用，陪玩可以重新選。",
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            )
+    except Exception as exc:
+        print(f"[loyalty] 結單累積失敗 channel_id={order_channel_id}: {type(exc).__name__}: {exc}")
     data["dispatch_channel_id"] = dispatch_channel_id
 
     locked_any = False

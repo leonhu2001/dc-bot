@@ -225,6 +225,12 @@ def final_server_preview(
             )
             or None,
 
+        "benefit_coupon_id":
+            payload.get(
+                "benefit_coupon_id"
+            )
+            or None,
+
         "use_wallet":
             bool(
                 payload.get(
