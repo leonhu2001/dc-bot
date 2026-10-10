@@ -9,12 +9,14 @@ from web.app.services.site_data import get_member_summary
 
 
 MEMBER_PORTAL_CHANNEL_ID = 1558395213406412801
-MEMBER_PORTAL_MARKER = "mawan_member_portal_orders_v1"
+# Hidden footer marker lets the sync job find and update the existing panel without
+# exposing an internal identifier such as MAWAN_MEMBER_PORTAL_V1 to customers.
+MEMBER_PORTAL_MARKER = "\u200b"
 MEMBER_PORTAL_URL = "https://mowanentertainment.com/me"
 
 
 def build_member_portal_embed() -> discord.Embed:
-    return discord.Embed(
+    embed = discord.Embed(
         title="👤 我的專區",
         description=(
             "查詢訂單、錢包、點數 / VIP 與會員福利。\n"
@@ -22,6 +24,8 @@ def build_member_portal_embed() -> discord.Embed:
         ),
         color=discord.Color.purple(),
     )
+    embed.set_footer(text=MEMBER_PORTAL_MARKER)
+    return embed
 
 
 def _member_id(interaction: discord.Interaction) -> str:
@@ -53,7 +57,7 @@ class MemberPortalView(discord.ui.View):
         label="我的訂單",
         emoji="📋",
         style=discord.ButtonStyle.primary,
-        custom_id=MEMBER_PORTAL_MARKER,
+        custom_id="mawan_member_portal_orders_v1",
         row=0,
     )
     async def orders(self, interaction: discord.Interaction, button: discord.ui.Button):
