@@ -7,14 +7,35 @@ from typing import Any
 
 CONFIG_FILE = Path(__file__).resolve().parent.parent / "config.json"
 
-# 仍由 bot.py 呼叫 config_* 載入設定，但這類已搬動過的營運頻道 ID
-# 在這裡提供單一 canonical default，避免舊 bot.py fallback 重新生效。
-#
-# DISPATCH_ONLINE_CHANNEL_ID 是歷史相容鍵；目前代表「女陪在線」頻道。
-# 男陪在線頻道由 views.dispatch_presence 讀取 DISPATCH_MALE_ONLINE_CHANNEL_ID。
+# Discord / operational settings are kept here as canonical defaults so role IDs,
+# channel IDs, presence windows, and dispatch cadence do not drift across modules.
+# config.json may override any of these values when a deployment needs a different
+# guild-specific setting.
 CANONICAL_INT_DEFAULTS = {
     "DISPATCH_ONLINE_CHANNEL_ID": 1538270157057691660,
     "DISPATCH_MALE_ONLINE_CHANNEL_ID": 1538270089785245856,
+    "SMART_DISPATCH_ALERT_CHANNEL_ID": 1555881625844191322,
+    "GENERAL_MANAGER_ROLE_ID": 1537067761141030972,
+    "FEMALE_COMPANION_ROLE_ID": 1482080315798192210,
+    "MALE_COMPANION_ROLE_ID": 1500751059239440575,
+    "DISPATCH_ACTIVE_TIMEOUT_SECONDS": 90,
+    "DISPATCH_RECENT_TIMEOUT_SECONDS": 300,
+    "SMART_DISPATCH_PUBLIC_OPEN_SECONDS": 60,
+    "SMART_DISPATCH_SECOND_WAVE_SECONDS": 240,
+    "SMART_DISPATCH_FULL_EXPANSION_SECONDS": 420,
+    "SMART_DISPATCH_REPEAT_REMINDER_SECONDS": 600,
+    "SMART_DISPATCH_LOOP_SECONDS": 10,
+}
+
+CANONICAL_INT_LIST_DEFAULTS = {
+    "ADMIN_ROLE_IDS": [
+        1131128849443328030,
+        1482084782031638548,
+    ],
+    "WORKER_ROLE_IDS": [
+        1503701170504339458,
+        1503706721883783218,
+    ],
 }
 
 # 已部署過的舊值在讀取 config.json 時做一次真正的設定遷移並寫回檔案，
@@ -118,11 +139,12 @@ def config_int(key: str, default: int) -> int:
 
 
 def config_int_list(key: str, default: list[int]) -> list[int]:
-    value = config_value(key, default)
+    effective_default = list(CANONICAL_INT_LIST_DEFAULTS.get(key, default))
+    value = config_value(key, effective_default)
 
     if not isinstance(value, list):
         print(f"config.json 的 {key} 必須是陣列，已使用預設值。")
-        return list(default)
+        return effective_default
 
     result: list[int] = []
     for item in value:
@@ -131,7 +153,7 @@ def config_int_list(key: str, default: list[int]) -> list[int]:
         except (TypeError, ValueError):
             print(f"config.json 的 {key} 內含無效 ID：{item}，已略過。")
 
-    return result if result else list(default)
+    return result if result else effective_default
 
 
 def config_str(key: str, default: str) -> str:
