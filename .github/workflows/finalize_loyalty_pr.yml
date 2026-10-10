@@ -1,0 +1,32 @@
+name: Temporary finalize loyalty PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.head_ref == 'feat/member-benefits-loyalty-portal' && !contains(github.event.pull_request.head.label, '[loyalty-finalized]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/member-benefits-loyalty-portal
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply final corrections
+        run: PYTHONPATH=. python tools/finalize_loyalty_patch.py
+      - name: Commit branch changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Finalize loyalty portal integration [loyalty-finalized]"
+          git push origin HEAD:feat/member-benefits-loyalty-portal
