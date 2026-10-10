@@ -106,3 +106,27 @@ def create_all_tables() -> None:
 
     from services.loyalty_benefits import ensure_loyalty_tables
     ensure_loyalty_tables(engine)
+
+    # One-time production data corrections live behind idempotent repair keys.
+    # They are not business-rule overrides and are safe to call on every init.
+    try:
+        from services.data_repairs import apply_known_data_repairs
+
+        for result in apply_known_data_repairs():
+            status = str(result.get("status") or "")
+            if status not in {"not_found", "already_applied"}:
+                print(
+                    "[data-repair] "
+                    f"{result.get('repair_key')} status={status} "
+                    f"order_id={result.get('order_id')} "
+                    f"delta={result.get('delta')} "
+                    f"reason={result.get('reason', '')}",
+                    flush=True,
+                )
+    except Exception as exc:
+        # Never take both Web and Bot offline because a historical correction
+        # could not run. The repair transaction rolls back and will retry later.
+        print(
+            f"[data-repair] init failed: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
