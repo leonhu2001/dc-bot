@@ -1,0 +1,67 @@
+name: Prepare VIP role reconciliation
+
+on:
+  push:
+    branches:
+      - tmp/reconcile-vip-roles-on-startup
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: tmp/reconcile-vip-roles-on-startup
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install targeted test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install 'pytest<9,>=8.3'
+      - name: Add one-time reconciliation for already processed VIP changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('services/vip_review_runtime.py')
+          source = path.read_text(encoding='utf-8')
+
+          old = '_LAST_REVIEW_SCAN_MONOTONIC = 0.0\n'
+          new = '_LAST_REVIEW_SCAN_MONOTONIC = 0.0\n_VIP_ROLE_RECONCILED_ONCE = False\n'
+          assert old in source
+          source = source.replace(old, new, 1)
+
+          anchor = '''async def _process_pending_actions(bot: discord.Client) -> None:\n    rows = claim_pending_vip_review_actions(limit=20)\n    for row in rows:\n        await _process_action(bot, row)\n\n\n'''
+          insert = '''async def _process_pending_actions(bot: discord.Client) -> None:\n    rows = claim_pending_vip_review_actions(limit=20)\n    for row in rows:\n        await _process_action(bot, row)\n\n\nasync def _reconcile_existing_reset_vip_roles(bot: discord.Client) -> int | None:\n    \"\"\"Repair Discord roles for manual/downgraded VIP records once after startup.\n\n    Actions completed before the role-sync bug was fixed are already marked done, so\n    they will not be replayed from the queue.  This one-time reconciliation uses the\n    same effective-level sync path without changing VIP progress or creating a new\n    review action.\n    \"\"\"\n    items = rewards.iter_customer_reward_items()\n    if not items:\n        return None\n\n    synced = 0\n    for customer_id, data in items:\n        if not isinstance(data, dict):\n            continue\n        if not bool(data.get(\"vip_progress_reset_active\")):\n            continue\n\n        try:\n            await _sync_member_benefits(bot, int(customer_id), data)\n            synced += 1\n        except Exception:\n            print(\n                \"[vip-review] role reconciliation failed \"\n                f\"user={customer_id}\\n{traceback.format_exc()}\",\n                flush=True,\n            )\n\n    return synced\n\n\n'''
+          assert anchor in source
+          source = source.replace(anchor, insert, 1)
+
+          old_tick = '''    global _LAST_REVIEW_SCAN_MONOTONIC\n\n    await _process_pending_actions(bot)\n\n    now_monotonic = time.monotonic()\n'''
+          new_tick = '''    global _LAST_REVIEW_SCAN_MONOTONIC, _VIP_ROLE_RECONCILED_ONCE\n\n    await _process_pending_actions(bot)\n\n    if not _VIP_ROLE_RECONCILED_ONCE:\n        try:\n            synced = await _reconcile_existing_reset_vip_roles(bot)\n            if synced is not None:\n                _VIP_ROLE_RECONCILED_ONCE = True\n                if synced:\n                    print(\n                        f\"[vip-review] reconciled Discord VIP roles count={synced}\",\n                        flush=True,\n                    )\n        except Exception:\n            print(\n                f\"[vip-review] startup role reconciliation failed\\n{traceback.format_exc()}\",\n                flush=True,\n            )\n\n    now_monotonic = time.monotonic()\n'''
+          assert old_tick in source
+          source = source.replace(old_tick, new_tick, 1)
+          path.write_text(source, encoding='utf-8')
+
+          test = Path('tests/test_vip_review_role_reconciliation.py')
+          test.write_text('''import asyncio\n\nfrom services import vip_review_runtime\n\n\ndef test_reconcile_only_syncs_records_with_active_vip_reset(monkeypatch):\n    rows = [\n        (\"1001\", {\"vip_progress_reset_active\": True}),\n        (\"1002\", {\"vip_progress_reset_active\": False}),\n        (\"1003\", {\"vip_progress_reset_active\": True}),\n    ]\n    calls = []\n\n    monkeypatch.setattr(\n        vip_review_runtime.rewards,\n        \"iter_customer_reward_items\",\n        lambda: rows,\n    )\n\n    async def fake_sync(bot, customer_id, data):\n        calls.append((customer_id, data))\n\n    monkeypatch.setattr(vip_review_runtime, \"_sync_member_benefits\", fake_sync)\n\n    synced = asyncio.run(\n        vip_review_runtime._reconcile_existing_reset_vip_roles(object())\n    )\n\n    assert synced == 2\n    assert [customer_id for customer_id, _ in calls] == [1001, 1003]\n\n\ndef test_reconcile_waits_until_reward_data_is_loaded(monkeypatch):\n    monkeypatch.setattr(\n        vip_review_runtime.rewards,\n        \"iter_customer_reward_items\",\n        lambda: [],\n    )\n\n    result = asyncio.run(\n        vip_review_runtime._reconcile_existing_reset_vip_roles(object())\n    )\n\n    assert result is None\n''', encoding='utf-8')
+
+          Path('.github/workflows/tmp_reconcile_vip_roles.yml').unlink()
+          PY
+      - name: Run VIP reconciliation regression tests
+        run: |
+          python -m pytest -q \
+            tests/test_vip_role_sync_effective_level.py \
+            tests/test_vip_review_role_reconciliation.py
+      - name: Commit prepared fix to temporary branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Reconcile Discord VIP roles after startup'
+          git push origin HEAD:tmp/reconcile-vip-roles-on-startup
