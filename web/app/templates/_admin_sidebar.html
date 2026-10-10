@@ -23,17 +23,10 @@
         </a>
 
         <a
-            class="{% if _p == '/admin/customer-center' or _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') or _p.startswith('/admin/search/customer/') %}active{% endif %}"
+            class="{% if _p.startswith('/admin/customer-center') or _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') or _p.startswith('/admin/search/customer/') %}active{% endif %}"
             href="/admin/customer-center"
         >
             客戶中心
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/customer-center/vip') %}active{% endif %}"
-            href="/admin/customer-center/vip"
-        >
-            ↳ VIP 管理
         </a>
 
         <a

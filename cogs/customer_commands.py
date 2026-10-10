@@ -13,6 +13,7 @@ from services.rewards import (
     get_customer_notes,
     format_customer_notes_for_staff,
 )
+from views.member_portal import BlackDiamondRedemptionControlView
 
 
 class CustomerCommands(commands.Cog):
@@ -144,4 +145,8 @@ class CustomerCommands(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    # 黑鑽兌換票口的客服按鈕必須持久註冊，Bot 重啟後舊票口仍可完成 / 取消。
+    if not getattr(bot, "_black_diamond_redemption_view_registered", False):
+        bot.add_view(BlackDiamondRedemptionControlView())
+        bot._black_diamond_redemption_view_registered = True
     await bot.add_cog(CustomerCommands(bot))

@@ -10,8 +10,13 @@ import services.rewards as rewards
 from core.discord_settings import (
     CUSTOMER_SERVICE_REVIEW_CHANNEL_ID,
     CUSTOMER_SERVICE_ROLE_ID,
+    VIP_MONTHLY_ANNOUNCEMENT_CHANNEL_ID,
 )
 from core.vip_levels import BASE_MEMBER_LEVELS
+from services.vip_monthly_benefits import (
+    mark_month_announcement_sent,
+    sync_current_month_vip_benefits,
+)
 from services.vip_review_store import (
     build_vip_retention_status,
     build_vip_review_snapshot,
@@ -61,6 +66,20 @@ async def _get_review_channel(bot: discord.Client):
     if channel is None or not hasattr(channel, "send"):
         raise RuntimeError(
             f"找不到客服審核通知頻道 {CUSTOMER_SERVICE_REVIEW_CHANNEL_ID}"
+        )
+    return channel
+
+
+async def _get_monthly_announcement_channel(bot: discord.Client):
+    channel = bot.get_channel(VIP_MONTHLY_ANNOUNCEMENT_CHANNEL_ID)
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(VIP_MONTHLY_ANNOUNCEMENT_CHANNEL_ID)
+        except Exception:
+            channel = None
+    if channel is None or not hasattr(channel, "send"):
+        raise RuntimeError(
+            f"找不到 VIP 月福利公告頻道 {VIP_MONTHLY_ANNOUNCEMENT_CHANNEL_ID}"
         )
     return channel
 
@@ -320,11 +339,58 @@ async def _scan_and_notify(bot: discord.Client) -> None:
     mark_digest_sent(today)
 
 
+async def _sync_monthly_benefits_and_announce(bot: discord.Client) -> None:
+    result = sync_current_month_vip_benefits()
+    if result.get("issued_count"):
+        print(
+            "[vip-monthly] issued "
+            f"month={result['month_key']} count={result['issued_count']} "
+            f"eligible={result['eligible_customer_count']}",
+            flush=True,
+        )
+
+    if not result.get("announcement_needed"):
+        return
+
+    channel = await _get_monthly_announcement_channel(bot)
+    month = str(result.get("month_key") or "")
+    try:
+        year_text, month_text = month.split("-", 1)
+        display_month = f"{int(year_text)} 年 {int(month_text)} 月"
+    except Exception:
+        display_month = month
+
+    embed = discord.Embed(
+        title=f"👑 {display_month} VIP 每月福利已刷新",
+        description=(
+            "新月份 VIP 專屬福利次數已恢復。\n"
+            "白金以上會員可於「我的專區 → 我的福利」查看本月折現券；"
+            "黑鑽會員的每月尊享兌換也已重新開放。"
+        ),
+        color=discord.Color.gold(),
+    )
+    embed.add_field(
+        name="每月福利規則",
+        value=(
+            "• 200T / 500T VIP 折現券依目前會員等級發放\n"
+            "• 黑鑽尊享福利每月 1 次，可二選一兌換\n"
+            "• 月度福利不累積，未使用次數不會帶到下個月"
+        ),
+        inline=False,
+    )
+    embed.set_footer(text="保級已到期、進入待審核的會員會暫停新月份福利；恢復有效後會補發當月應有福利。")
+
+    await channel.send(embed=embed)
+    mark_month_announcement_sent(month)
+    print(f"[vip-monthly] announcement sent month={month}", flush=True)
+
+
 async def process_vip_review_tick(bot: discord.Client) -> None:
     """Process queued staff actions immediately and throttle review scans.
 
     This function is called from the existing top-up worker. It never performs
     an automatic downgrade; only explicit queued staff actions can mutate VIP.
+    The same throttled tick also keeps monthly VIP benefits idempotently synced.
     """
     global _LAST_REVIEW_SCAN_MONOTONIC
 
@@ -338,6 +404,15 @@ async def process_vip_review_tick(bot: discord.Client) -> None:
         return
 
     _LAST_REVIEW_SCAN_MONOTONIC = now_monotonic
+
+    try:
+        await _sync_monthly_benefits_and_announce(bot)
+    except Exception:
+        print(
+            f"[vip-monthly] sync/announcement failed\n{traceback.format_exc()}",
+            flush=True,
+        )
+
     try:
         await _scan_and_notify(bot)
     except Exception:
