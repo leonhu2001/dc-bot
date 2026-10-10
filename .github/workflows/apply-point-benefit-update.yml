@@ -143,8 +143,10 @@ jobs:
         run: python -m pip install -r requirements.txt -r web/requirements-web.txt pytest
 
       - name: Run targeted tests
+        env:
+          PYTHONPATH: .
         run: |
-          pytest -q \
+          python -m pytest -q \
             tests/test_checkout_point_benefits.py \
             tests/test_order_discounts.py \
             tests/test_checkout_preview_structure.py
