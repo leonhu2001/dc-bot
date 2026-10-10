@@ -9,31 +9,19 @@ from web.app.services.site_data import get_member_summary
 
 
 MEMBER_PORTAL_CHANNEL_ID = 1558395213406412801
-MEMBER_PORTAL_MARKER = "MAWAN_MEMBER_PORTAL_V1"
+MEMBER_PORTAL_MARKER = "mawan_member_portal_orders_v1"
 MEMBER_PORTAL_URL = "https://mowanentertainment.com/me"
 
 
 def build_member_portal_embed() -> discord.Embed:
-    embed = discord.Embed(
-        title="我的專區",
+    return discord.Embed(
+        title="👤 我的專區",
         description=(
-            "這裡可以直接查自己的訂單、錢包、點數 / VIP 與會員福利。\n"
-            "按鈕查詢結果只會顯示給你自己，不會洗頻道。"
+            "查詢訂單、錢包、點數 / VIP 與會員福利。\n"
+            "查詢結果僅自己可見。"
         ),
         color=discord.Color.purple(),
     )
-    embed.add_field(
-        name="會員功能",
-        value="訂單狀態 · 錢包 / 儲值 · 點數 / VIP · 我的福利",
-        inline=False,
-    )
-    embed.add_field(
-        name="官網完整專區",
-        value=f"{MEMBER_PORTAL_URL}",
-        inline=False,
-    )
-    embed.set_footer(text=MEMBER_PORTAL_MARKER)
-    return embed
 
 
 def _member_id(interaction: discord.Interaction) -> str:
@@ -51,11 +39,21 @@ def _format_progress(item: dict) -> str:
 class MemberPortalView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="網站專區",
+                emoji="🌐",
+                style=discord.ButtonStyle.link,
+                url=MEMBER_PORTAL_URL,
+                row=0,
+            )
+        )
 
     @discord.ui.button(
         label="我的訂單",
+        emoji="📋",
         style=discord.ButtonStyle.primary,
-        custom_id="mawan_member_portal_orders_v1",
+        custom_id=MEMBER_PORTAL_MARKER,
         row=0,
     )
     async def orders(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -74,7 +72,7 @@ class MemberPortalView(discord.ui.View):
         if not lines:
             lines.append("目前沒有訂單紀錄。")
         embed = discord.Embed(
-            title="我的訂單",
+            title="📋 我的訂單",
             description="\n".join(lines),
             color=discord.Color.blurple(),
         )
@@ -92,6 +90,7 @@ class MemberPortalView(discord.ui.View):
 
     @discord.ui.button(
         label="錢包 / 儲值",
+        emoji="💰",
         style=discord.ButtonStyle.secondary,
         custom_id="mawan_member_portal_wallet_v1",
         row=0,
@@ -99,7 +98,7 @@ class MemberPortalView(discord.ui.View):
     async def wallet(self, interaction: discord.Interaction, button: discord.ui.Button):
         member = get_member_summary(_member_id(interaction))
         embed = discord.Embed(
-            title="我的錢包",
+            title="💰 我的錢包",
             color=discord.Color.gold(),
         )
         embed.add_field(
@@ -116,6 +115,7 @@ class MemberPortalView(discord.ui.View):
 
     @discord.ui.button(
         label="點數 / VIP",
+        emoji="👑",
         style=discord.ButtonStyle.secondary,
         custom_id="mawan_member_portal_vip_v1",
         row=0,
@@ -131,7 +131,7 @@ class MemberPortalView(discord.ui.View):
         else:
             progress_text = "已達最高 VIP 等級"
         embed = discord.Embed(
-            title="點數 / VIP",
+            title="👑 點數 / VIP",
             color=discord.Color.gold(),
         )
         embed.add_field(
@@ -158,6 +158,7 @@ class MemberPortalView(discord.ui.View):
 
     @discord.ui.button(
         label="我的福利",
+        emoji="🎁",
         style=discord.ButtonStyle.success,
         custom_id="mawan_member_portal_benefits_v1",
         row=0,
@@ -167,7 +168,7 @@ class MemberPortalView(discord.ui.View):
         coupons = benefits.get("coupons") or []
         progress = benefits.get("progress") or []
         embed = discord.Embed(
-            title="我的福利",
+            title="🎁 我的福利",
             color=discord.Color.green(),
         )
         if coupons:
