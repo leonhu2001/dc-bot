@@ -1,0 +1,47 @@
+name: Apply member benefits patch
+
+on:
+  push:
+    branches:
+      - feature/member-benefits-portal
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-member-benefits.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/member-benefits-portal
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Apply patch
+        run: python tools/apply_member_benefits_portal.py
+
+      - name: Compile changed Python
+        run: |
+          python -m compileall -q bot.py cogs services shared views web/app tests
+
+      - name: Commit generated changes
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py cogs services shared views web/app tests
+          git commit -m "Implement member benefits and portal flow"
+          git push origin HEAD:feature/member-benefits-portal
