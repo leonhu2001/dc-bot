@@ -30,10 +30,9 @@ def test_loyalty_coupons_have_ninety_day_expiry():
     assert "SET status = 'expired'" in source
 
 
-def test_cs_payout_base_excludes_point_and_loyalty_service_value():
+def test_cs_payout_recalculation_uses_separate_base():
     source = (ROOT / "web/app/services/order_service.py").read_text(encoding="utf-8")
-    assert 'finance.get("point_service_value")' in source
-    assert 'finance.get("benefit_service_value")' in source
+    assert 'gifted_service = _amount("point_service_value") + _amount("benefit_service_value")' in source
     assert "customer_service_total_amount=_customer_service_payout_base(order)" in source
 
 
