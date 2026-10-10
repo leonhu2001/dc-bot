@@ -37,6 +37,7 @@ VIP_REVIEW_URL = "https://mowanentertainment.com/admin/customer-center/vip?view=
 VIP_REVIEW_SCAN_SECONDS = 300
 VIP_DAILY_DIGEST_HOUR = 10
 _LAST_REVIEW_SCAN_MONOTONIC = 0.0
+_VIP_ROLE_RECONCILED_ONCE = False
 
 
 def _now() -> datetime:
@@ -238,6 +239,38 @@ async def _process_pending_actions(bot: discord.Client) -> None:
         await _process_action(bot, row)
 
 
+async def _reconcile_existing_reset_vip_roles(bot: discord.Client) -> int | None:
+    """Repair Discord roles for manual/downgraded VIP records once after startup.
+
+    Actions completed before the role-sync bug was fixed are already marked done, so
+    they will not be replayed from the queue.  This one-time reconciliation uses the
+    same effective-level sync path without changing VIP progress or creating a new
+    review action.
+    """
+    items = rewards.iter_customer_reward_items()
+    if not items:
+        return None
+
+    synced = 0
+    for customer_id, data in items:
+        if not isinstance(data, dict):
+            continue
+        if not bool(data.get("vip_progress_reset_active")):
+            continue
+
+        try:
+            await _sync_member_benefits(bot, int(customer_id), data)
+            synced += 1
+        except Exception:
+            print(
+                "[vip-review] role reconciliation failed "
+                f"user={customer_id}\n{traceback.format_exc()}",
+                flush=True,
+            )
+
+    return synced
+
+
 def _level_summary(rows: list[dict]) -> str:
     counts: dict[str, int] = {}
     for row in rows:
@@ -392,9 +425,25 @@ async def process_vip_review_tick(bot: discord.Client) -> None:
     an automatic downgrade; only explicit queued staff actions can mutate VIP.
     The same throttled tick also keeps monthly VIP benefits idempotently synced.
     """
-    global _LAST_REVIEW_SCAN_MONOTONIC
+    global _LAST_REVIEW_SCAN_MONOTONIC, _VIP_ROLE_RECONCILED_ONCE
 
     await _process_pending_actions(bot)
+
+    if not _VIP_ROLE_RECONCILED_ONCE:
+        try:
+            synced = await _reconcile_existing_reset_vip_roles(bot)
+            if synced is not None:
+                _VIP_ROLE_RECONCILED_ONCE = True
+                if synced:
+                    print(
+                        f"[vip-review] reconciled Discord VIP roles count={synced}",
+                        flush=True,
+                    )
+        except Exception:
+            print(
+                f"[vip-review] startup role reconciliation failed\n{traceback.format_exc()}",
+                flush=True,
+            )
 
     now_monotonic = time.monotonic()
     if (
