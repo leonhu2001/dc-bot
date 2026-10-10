@@ -1,11 +1,14 @@
+from core.config import config_int_list
+
+
 ADMIN_ROLE_IDS = {
-    "1131128849443328030",
-    "1482084782031638548",
+    str(role_id)
+    for role_id in config_int_list("ADMIN_ROLE_IDS", [])
 }
 
 WORKER_ROLE_IDS = {
-    "1503701170504339458",
-    "1503706721883783218",
+    str(role_id)
+    for role_id in config_int_list("WORKER_ROLE_IDS", [])
 }
 
 
