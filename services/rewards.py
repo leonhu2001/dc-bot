@@ -519,21 +519,25 @@ async def fetch_member_safely(guild: discord.Guild, user_id: int) -> discord.Mem
         return None
 
 async def sync_vip_tier_roles(guild, member, data: dict) -> list[str]:
-    """依累積消費同步 VIP 階級，只保留最高符合的 VIP 身分組。"""
+    """依目前實際生效的 VIP 階級同步 Discord 身分組。"""
     notices: list[str] = []
 
     if guild is None or member is None or not _VIP_ROLE_TIERS:
         return notices
 
+    # Discord 身分組必須跟「有效 VIP 階級」一致，不能只用歷史累積消費。
+    # 正常會員的有效階級仍由累積消費決定；人工/保級降階後則尊重
+    # vip_level_index + reset baseline，避免剛降階就被 total_spent 拉回高階。
+    effective_level = get_effective_member_level(data)
     try:
-        total_spent = int(data.get("total_spent", 0) or 0)
+        effective_threshold = int(effective_level.get("threshold", 0) or 0)
     except Exception:
-        total_spent = 0
+        effective_threshold = 0
 
     target_tier = None
     for tier in _VIP_ROLE_TIERS:
         try:
-            if total_spent >= int(tier.get("threshold", 0) or 0):
+            if effective_threshold >= int(tier.get("threshold", 0) or 0):
                 target_tier = tier
         except Exception:
             continue
