@@ -57,9 +57,14 @@
             '[href="/me/wallet"]'
         )
     ) {
-        const vipLink = accountDropdown.querySelector(
-            '[href="/me#vip"]'
+        const logoutLink = accountDropdown.querySelector(
+            '[href="/auth/logout"]'
         );
+
+        const logoutDivider =
+            logoutLink
+                ? logoutLink.previousElementSibling
+                : null;
 
         const walletLink = document.createElement(
             "a"
@@ -68,10 +73,20 @@
         walletLink.href = "/me/wallet";
         walletLink.textContent = "我的錢包 / 儲值";
 
-        if (vipLink) {
+        if (
+            logoutDivider
+            && logoutDivider.classList.contains(
+                "account-divider"
+            )
+        ) {
             accountDropdown.insertBefore(
                 walletLink,
-                vipLink
+                logoutDivider
+            );
+        } else if (logoutLink) {
+            accountDropdown.insertBefore(
+                walletLink,
+                logoutLink
             );
         } else {
             accountDropdown.appendChild(
