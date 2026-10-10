@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from urllib.parse import quote
+import sqlite3
+from pathlib import Path
 
 import discord
 from discord.ext import commands
@@ -15,21 +16,57 @@ from services.rewards import (
 )
 from services.wallet_service import get_wallet_balance
 from shared.db import engine
-from views.staff_profiles import get_staff_profile, list_customer_favorites
 
 
 MEMBER_PORTAL_CHANNEL_ID = int(os.getenv("MEMBER_PORTAL_CHANNEL_ID", "1558395213406412801"))
 MEMBER_PORTAL_MARKER = "MAWAN_MEMBER_PORTAL_V1"
 WEBSITE_PORTAL_URL = "https://mowanentertainment.com/me"
+WEB_DB = Path(__file__).resolve().parents[1] / "web_dashboard.db"
 
 
 def _embed(title: str, description: str = "") -> discord.Embed:
     return discord.Embed(title=title, description=description, color=discord.Color.gold())
 
 
+def _favorite_names(customer_id: int | str, *, limit: int = 15) -> list[str]:
+    try:
+        with sqlite3.connect(WEB_DB, timeout=15) as conn:
+            conn.row_factory = sqlite3.Row
+            table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='staff_favorites'"
+            ).fetchone()
+            if table is None:
+                return []
+            rows = conn.execute(
+                """
+                SELECT
+                    sf.staff_discord_id,
+                    COALESCE(NULLIF(sp.display_name, ''), NULLIF(sf.staff_display_name, ''), sf.staff_discord_id) AS display_name
+                FROM staff_favorites sf
+                LEFT JOIN staff_profiles sp
+                  ON sp.staff_discord_id = sf.staff_discord_id
+                WHERE sf.customer_discord_id = ?
+                ORDER BY sf.id DESC
+                LIMIT ?
+                """,
+                (str(customer_id), max(1, int(limit))),
+            ).fetchall()
+            return [str(row["display_name"] or row["staff_discord_id"]) for row in rows]
+    except sqlite3.Error:
+        return []
+
+
 class MemberPortalView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="網站我的專區",
+                style=discord.ButtonStyle.link,
+                url=WEBSITE_PORTAL_URL,
+                row=1,
+            )
+        )
 
     @discord.ui.button(label="會員 / 點數", style=discord.ButtonStyle.secondary, custom_id="member_portal:member")
     async def member(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -63,10 +100,8 @@ class MemberPortalView(discord.ui.View):
             for item in progress[:10]:
                 current = float(item.get("paid_units") or 0)
                 threshold = float(item.get("threshold_units") or 0)
-                current_text = f"{current:g}"
-                threshold_text = f"{threshold:g}"
                 lines.append(
-                    f"・{item.get('label')}：{current_text}/{threshold_text} {item.get('unit_label')} → {item.get('reward_label')}"
+                    f"・{item.get('label')}：{current:g}/{threshold:g} {item.get('unit_label')} → {item.get('reward_label')}"
                 )
             embed.add_field(name="累積進度", value="\n".join(lines), inline=False)
         else:
@@ -100,21 +135,12 @@ class MemberPortalView(discord.ui.View):
 
     @discord.ui.button(label="我的收藏", style=discord.ButtonStyle.secondary, custom_id="member_portal:favorites")
     async def favorites(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            ids = list_customer_favorites(interaction.user.id)
-        except Exception:
-            ids = []
-        lines = []
-        for staff_id in ids[:15]:
-            profile = get_staff_profile(staff_id) or {}
-            name = str(profile.get("display_name") or profile.get("name") or staff_id)
-            lines.append(f"・{name}")
-        embed = _embed("我的收藏", "\n".join(lines) if lines else "目前還沒有收藏陪玩。")
+        names = _favorite_names(interaction.user.id)
+        embed = _embed(
+            "我的收藏",
+            "\n".join(f"・{name}" for name in names) if names else "目前還沒有收藏陪玩。",
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="網站我的專區", style=discord.ButtonStyle.link, url=WEBSITE_PORTAL_URL, row=1)
-    async def website(self, interaction: discord.Interaction, button: discord.ui.Button):
-        pass
 
 
 def build_panel_embed() -> discord.Embed:
