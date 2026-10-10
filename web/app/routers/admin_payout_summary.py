@@ -266,7 +266,7 @@ def fetch_rows(
     status: str | None = "unpaid",
 ):
     ensure_worker_tip_table()
-    ensure_internal_transfer_tables()
+    ensure_internal_transfer_tables(db_path())
     role = normalize_role(role)
     status = normalize_payout_status(status)
     people: dict[str, dict] = {}
@@ -527,7 +527,7 @@ def _audit_payout_state(
 
 
 def get_summary_month_options() -> list[dict]:
-    ensure_internal_transfer_tables()
+    ensure_internal_transfer_tables(db_path())
     conn = sqlite3.connect(db_path())
     conn.row_factory = sqlite3.Row
     try:
@@ -588,7 +588,7 @@ def update_summary_payout_status(
     target_status: str,
 ) -> None:
     ensure_worker_tip_table()
-    ensure_internal_transfer_tables()
+    ensure_internal_transfer_tables(db_path())
     month = normalize_summary_month(month)
     role = str(role or "all").strip()
     target_status = "paid" if target_status == "paid" else "unpaid"
@@ -662,7 +662,7 @@ def update_summary_person_payout_status(
     target_status: str,
 ):
     ensure_worker_tip_table()
-    ensure_internal_transfer_tables()
+    ensure_internal_transfer_tables(db_path())
     person_id = str(person_id or "").strip()
     if not person_id:
         return
@@ -889,9 +889,7 @@ async def admin_payout_summary(
     rows, totals = fetch_rows(month, role, q, status)
     unpaid_rows, unpaid_totals = fetch_rows(month, role, q, "unpaid")
     paid_rows, paid_totals = fetch_rows(month, role, q, "paid")
-    summary_rows = attach_staff_avatars_to_summary_rows(
-        build_combined_summary_rows(unpaid_rows, paid_rows)
-    )
+    summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)
 
     return templates.TemplateResponse(
         request=request,
