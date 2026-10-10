@@ -19,10 +19,47 @@ HOURLY_THRESHOLD = 10.0
 HOURLY_BONUS = 0.5
 GAME_THRESHOLD = 20.0
 GAME_BONUS = 1.0
+COUPON_VALID_DAYS = 90
 
 ACTIVE = "active"
 RESERVED = "reserved"
 REDEEMED = "redeemed"
+EXPIRED = "expired"
+
+
+def _parse_coupon_time(value: object) -> datetime | None:
+    raw = str(value or "").strip().replace("Z", "+00:00")
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TAIPEI_TZ)
+    return dt.astimezone(TAIPEI_TZ)
+
+
+def _coupon_expiry_iso(issued_at: object = None) -> str:
+    base = _parse_coupon_time(issued_at) or datetime.now(TAIPEI_TZ)
+    return (base + timedelta(days=COUPON_VALID_DAYS)).isoformat(timespec="seconds")
+
+
+def _coupon_expiry_text(value: object) -> str:
+    dt = _parse_coupon_time(value)
+    return dt.strftime("%Y/%m/%d") if dt else ""
+
+
+def _expire_active_coupons(conn) -> int:
+    now = datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
+    result = conn.execute(text("""
+        UPDATE customer_benefit_coupons
+        SET status = 'expired'
+        WHERE status = 'active'
+          AND expires_at IS NOT NULL
+          AND expires_at <= :now
+    """), {"now": now})
+    return int(result.rowcount or 0)
 
 
 def ensure_loyalty_tables(bind=engine) -> None:
@@ -57,6 +94,7 @@ def ensure_loyalty_tables(bind=engine) -> None:
                 status TEXT NOT NULL DEFAULT 'active',
                 source TEXT NOT NULL DEFAULT 'loyalty',
                 issued_at TEXT NOT NULL,
+                expires_at TEXT,
                 reserved_order_id INTEGER,
                 redeemed_order_id INTEGER,
                 redeemed_at TEXT
@@ -71,6 +109,29 @@ def ensure_loyalty_tables(bind=engine) -> None:
             ON customer_benefit_coupons(reserved_order_id)
             WHERE reserved_order_id IS NOT NULL AND status = 'reserved'
         """))
+        coupon_columns = {
+            str(row[1])
+            for row in conn.execute(text("PRAGMA table_info(customer_benefit_coupons)")).fetchall()
+        }
+        if "expires_at" not in coupon_columns:
+            conn.execute(text("ALTER TABLE customer_benefit_coupons ADD COLUMN expires_at TEXT"))
+
+        missing_expiry = conn.execute(text("""
+            SELECT id, issued_at
+            FROM customer_benefit_coupons
+            WHERE expires_at IS NULL OR TRIM(expires_at) = ''
+        """)).mappings().all()
+        for row in missing_expiry:
+            conn.execute(text("""
+                UPDATE customer_benefit_coupons
+                SET expires_at = :expires_at
+                WHERE id = :coupon_id
+            """), {
+                "coupon_id": int(row["id"]),
+                "expires_at": _coupon_expiry_iso(row.get("issued_at")),
+            })
+        _expire_active_coupons(conn)
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS loyalty_order_events (
                 order_id INTEGER PRIMARY KEY,
@@ -141,6 +202,7 @@ def list_customer_loyalty(customer_id: str | int) -> dict[str, Any]:
     ensure_loyalty_tables()
     customer = str(customer_id)
     with engine.begin() as conn:
+        _expire_active_coupons(conn)
         coupon_rows = conn.execute(text("""
             SELECT *
             FROM customer_benefit_coupons
@@ -160,6 +222,7 @@ def list_customer_loyalty(customer_id: str | int) -> dict[str, Any]:
     for raw in coupon_rows:
         row = dict(raw)
         row["title"] = _coupon_title(row)
+        row["expires_at_text"] = _coupon_expiry_text(row.get("expires_at"))
         coupons.append(row)
 
     progress = []
@@ -196,6 +259,7 @@ def list_applicable_coupons(
     ensure_loyalty_tables()
     scope = loyalty_scope_key(rule_key, player_count)
     with engine.begin() as conn:
+        _expire_active_coupons(conn)
         rows = conn.execute(text("""
             SELECT *
             FROM customer_benefit_coupons
@@ -211,6 +275,7 @@ def list_applicable_coupons(
     for raw in rows:
         row = dict(raw)
         row["title"] = _coupon_title(row)
+        row["expires_at_text"] = _coupon_expiry_text(row.get("expires_at"))
         result.append(row)
     return result
 
@@ -231,6 +296,7 @@ def get_applicable_coupon(
         return None
     scope = loyalty_scope_key(rule_key, player_count)
     with engine.begin() as conn:
+        _expire_active_coupons(conn)
         row = conn.execute(text("""
             SELECT *
             FROM customer_benefit_coupons
@@ -248,6 +314,7 @@ def get_applicable_coupon(
         return None
     result = dict(row)
     result["title"] = _coupon_title(result)
+    result["expires_at_text"] = _coupon_expiry_text(result.get("expires_at"))
     return result
 
 
@@ -308,11 +375,13 @@ def reserve_coupon_in_session(
           AND customer_discord_id = :customer_id
           AND scope_key = :scope_key
           AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > :now)
     """), {
         "order_id": int(order_id),
         "coupon_id": int(coupon_id),
         "customer_id": str(customer_id),
         "scope_key": scope,
+        "now": datetime.now(TAIPEI_TZ).isoformat(timespec="seconds"),
     })
     if int(result.rowcount or 0) != 1:
         raise ValueError("這張福利券已被使用、保留，或不適用這個方案。請重新整理後再試。")
@@ -347,12 +416,17 @@ def reserve_coupon_for_order(
 def release_coupon_for_order(order_id: int) -> int:
     ensure_loyalty_tables()
     with engine.begin() as conn:
+        now = datetime.now(TAIPEI_TZ).isoformat(timespec="seconds")
         result = conn.execute(text("""
             UPDATE customer_benefit_coupons
-            SET status = 'active', reserved_order_id = NULL
+            SET status = CASE
+                    WHEN expires_at IS NOT NULL AND expires_at <= :now THEN 'expired'
+                    ELSE 'active'
+                END,
+                reserved_order_id = NULL
             WHERE reserved_order_id = :order_id
               AND status = 'reserved'
-        """), {"order_id": int(order_id)})
+        """), {"order_id": int(order_id), "now": now})
         return int(result.rowcount or 0)
 
 
@@ -529,16 +603,17 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
                 "updated_at": now,
             })
 
+            expires_at = _coupon_expiry_iso(now)
             for _ in range(issued_count):
                 result = conn.execute(text("""
                     INSERT INTO customer_benefit_coupons (
                         customer_discord_id, scope_key, rule_key, rule_label,
                         pricing_type, player_count, benefit_kind, benefit_units,
-                        status, source, issued_at
+                        status, source, issued_at, expires_at
                     ) VALUES (
                         :customer_id, :scope_key, :rule_key, :rule_label,
                         :pricing_type, :player_count, :benefit_kind, :benefit_units,
-                        'active', 'loyalty', :issued_at
+                        'active', 'loyalty', :issued_at, :expires_at
                     )
                 """), {
                     "customer_id": customer_id,
@@ -550,6 +625,7 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
                     "benefit_kind": policy["benefit_kind"],
                     "benefit_units": policy["benefit_units"],
                     "issued_at": now,
+                    "expires_at": expires_at,
                 })
                 coupon_id = int(result.lastrowid or 0)
                 coupon = {
@@ -560,6 +636,8 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
                     "player_count": player_count,
                     "benefit_kind": policy["benefit_kind"],
                     "benefit_units": policy["benefit_units"],
+                    "expires_at": expires_at,
+                    "expires_at_text": _coupon_expiry_text(expires_at),
                 }
                 coupon["title"] = _coupon_title(coupon)
                 issued_coupons.append(coupon)

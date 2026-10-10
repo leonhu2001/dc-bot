@@ -489,6 +489,43 @@ def get_payout_override(
     )
 
 
+def _customer_service_payout_base(order: WebOrder) -> int:
+    """Return the payout base for CS, excluding free service funded by the store.
+
+    Point/cross-order benefits can increase the workers' service value, but they
+    do not create additional CS commission. Existing VIP and store-funded cash
+    discounts keep their current accounting behavior.
+    """
+    worker_base = max(
+        0,
+        int(
+            getattr(order, "payout_base_amount", None)
+            or getattr(order, "amount", 0)
+            or 0
+        ),
+    )
+
+    try:
+        snapshot = json.loads(str(getattr(order, "price_snapshot_json", None) or "{}"))
+    except Exception:
+        snapshot = {}
+
+    if not isinstance(snapshot, dict):
+        return worker_base
+
+    preview = snapshot.get("preview") if isinstance(snapshot.get("preview"), dict) else snapshot
+    finance = preview.get("finance") if isinstance(preview, dict) and isinstance(preview.get("finance"), dict) else {}
+
+    def _amount(name: str) -> int:
+        try:
+            return max(0, int(round(float(finance.get(name) or 0))))
+        except (TypeError, ValueError):
+            return 0
+
+    gifted_service = _amount("point_service_value") + _amount("benefit_service_value")
+    return max(0, worker_base - gifted_service)
+
+
 def recalculate_order_payouts(db: Session, order_id: int) -> None:
     order = db.get(WebOrder, order_id)
 
@@ -529,6 +566,7 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         ),
         worker_discord_ids=worker_ids,
         named_bonus_worker_ids=named_bonus_worker_ids,
+        customer_service_total_amount=_customer_service_payout_base(order),
     )
 
     overrides = {

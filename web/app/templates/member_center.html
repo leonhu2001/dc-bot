@@ -1,580 +1,174 @@
 {% extends "site_layout.html" %}
 
+{% block head %}
+<link rel="stylesheet" href="/static/css/member_center_v2.css?v=20261010-1">
+{% endblock %}
+
 {% block content %}
-
-<section class="member-hero">
-    <div class="member-shell">
-
-        <div class="member-profile-card">
-
-            <div class="member-avatar-large">
+<section class="mc-hero">
+    <div class="mc-shell mc-hero-grid">
+        <div class="mc-identity">
+            <div class="mc-avatar">
                 {% if user.avatar %}
-                    <img
-                        src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=256"
-                        alt=""
-                    >
+                    <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=256" alt="">
                 {% else %}
-                    <span>
-                        {{ (user.display_name or user.global_name or user.username or 'M')[:1] }}
-                    </span>
+                    <span>{{ (user.display_name or user.global_name or user.username or 'M')[:1] }}</span>
                 {% endif %}
             </div>
-
-            <div class="member-profile-copy">
-
-                <div class="section-eyebrow">
-                    MY PORTAL
-                </div>
-
-                <h1>
-                    {{ user.display_name or user.global_name or user.username }}
-                </h1>
-
-                <p>
-                    Discord ID · {{ user.id }}
-                </p>
-
-                <div class="member-role-row">
-
-                    <span class="role-chip">
-                        {{ member.vip_name }}
-                    </span>
-
-                    {% if user.is_worker or user.is_companion %}
-                        <span class="role-chip role-chip-staff">
-                            員工
-                        </span>
-                    {% endif %}
-
-                    {% if user.is_customer_service %}
-                        <span class="role-chip role-chip-service">
-                            客服
-                        </span>
-                    {% endif %}
-
+            <div class="mc-identity-copy">
+                <div class="mc-kicker">MY MOWAN</div>
+                <h1>{{ user.display_name or user.global_name or user.username }}</h1>
+                <p>把訂單、會員、錢包與福利集中在同一個地方。</p>
+                <div class="mc-chip-row">
+                    <span class="mc-chip mc-chip-gold">{{ member.vip_name }}</span>
+                    {% if user.is_worker or user.is_companion %}<span class="mc-chip">員工</span>{% endif %}
+                    {% if user.is_customer_service %}<span class="mc-chip">客服</span>{% endif %}
                 </div>
             </div>
-
         </div>
 
-
-        <div class="member-quick-actions">
-
-            {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
-                <a
-                    class="member-action-card"
-                    href="/employee"
-                >
-                    <small>EMPLOYEE</small>
-                    <strong>員工中心</strong>
-                    <span>
-                        派單、分潤與員工功能 →
-                    </span>
-                </a>
+        <aside class="mc-status-card">
+            <div class="mc-status-head">
+                <div>
+                    <small>MEMBERSHIP</small>
+                    <strong>{{ member.vip_name }}</strong>
+                </div>
+                <span>{{ member.total_spent_text }}</span>
+            </div>
+            <div class="mc-progress"><i style="width: {{ member.vip_progress.percent }}%"></i></div>
+            {% if member.vip_progress.next_name %}
+                <p>距 {{ member.vip_progress.next_name }} 尚差 <b>{{ "{:,}".format(member.vip_progress.remaining) }}T</b></p>
+            {% else %}
+                <p>已達最高 VIP 等級</p>
             {% endif %}
-
-            {% if user.is_customer_service %}
-                <a
-                    class="member-action-card member-action-service"
-                    href="/service"
-                >
-                    <small>SERVICE</small>
-                    <strong>客服後台</strong>
-                    <span>
-                        訂單、人員、薪資與管理 →
-                    </span>
-                </a>
-            {% endif %}
-
-            <a
-                class="member-action-card"
-                href="/me/orders"
-            >
-                <small>ORDERS</small>
-                <strong>我的訂單</strong>
-                <span>
-                    查看目前進度、付款與歷史 →
-                </span>
-            </a>
-
-            <a
-                class="member-action-card"
-                href="/order"
-            >
-                <small>ORDER</small>
-                <strong>前往點單</strong>
-                <span>
-                    查看服務與方案 →
-                </span>
-            </a>
-
-            <a class="member-action-card" href="/me/wallet">
-                <small>WALLET</small><strong>錢包・儲值</strong>
-                <span>查看餘額、儲值與紀錄 →</span>
-            </a>
-
-            <a class="member-action-card" href="/me#favorites">
-                <small>FAVORITES</small><strong>我的收藏</strong>
-                <span>查看收藏的陪玩 →</span>
-            </a>
-
-            <a class="member-action-card" href="/me#vip">
-                <small>MEMBERSHIP</small><strong>點數 / VIP</strong>
-                <span>查看點數、等級與升級進度 →</span>
-            </a>
-
-            <a class="member-action-card" href="/me#benefits">
-                <small>BENEFITS</small><strong>我的福利</strong>
-                <span>查看福利券與累積進度 →</span>
-            </a>
-
-        </div>
+            <div class="mc-mini-stats">
+                <div><small>錢包</small><strong>{{ member.wallet_balance_text }}</strong></div>
+                <div><small>點數</small><strong>{{ "{:,}".format(member.points) }}</strong></div>
+                <div><small>福利券</small><strong>{{ benefits.active_count }}</strong></div>
+            </div>
+        </aside>
     </div>
 </section>
 
-
-<section class="site-section member-dashboard">
-
+<section class="mc-shell mc-main">
     {% if request.query_params.get('denied') %}
-        <div class="member-alert">
-            目前 Discord 身分組沒有該入口權限。
-            系統已重新確認你的伺服器身分。
-        </div>
+        <div class="mc-alert">目前 Discord 身分組沒有該入口權限，系統已重新確認你的伺服器身分。</div>
     {% endif %}
 
+    <nav class="mc-shortcuts" aria-label="會員功能">
+        <a href="/order"><span>＋</span><b>立即下單</b><small>選服務與陪玩</small></a>
+        <a href="/me/orders"><span>▣</span><b>我的訂單</b><small>{{ portal.open_count }} 張進行中</small></a>
+        <a href="/me/wallet"><span>◈</span><b>錢包・儲值</b><small>{{ member.wallet_balance_text }}</small></a>
+        <a href="#benefits"><span>◇</span><b>我的福利</b><small>{{ benefits.active_count }} 張可用</small></a>
+        <a href="#favorites"><span>♡</span><b>我的收藏</b><small>{{ member.favorite_count }} 位</small></a>
+        <a href="#vip"><span>◆</span><b>點數 / VIP</b><small>{{ "{:,}".format(member.points) }} 點</small></a>
+    </nav>
 
-    <div class="section-heading">
+    {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
+    <div class="mc-staff-strip">
+        <span>你同時擁有店內身分</span>
         <div>
-            <div class="section-eyebrow">
-                OVERVIEW
-            </div>
-
-            <h2>
-                我的魔丸
-            </h2>
+            <a href="/employee">員工中心 →</a>
+            {% if user.is_customer_service %}<a href="/service">客服後台 →</a>{% endif %}
         </div>
     </div>
+    {% endif %}
 
-
-    <div class="member-stat-grid">
-
-        <article class="member-stat-card">
-            <small>
-                ACTIVE ORDERS
-            </small>
-
-            <strong>
-                {{ portal.open_count }}
-            </strong>
-
-            <span>
-                目前進行中的訂單
-            </span>
-
-            <a
-                href="/me/orders"
-                class="button button-primary"
-                style="min-height:34px;padding:0 14px;margin-top:14px;border-radius:10px;font-size:12px;"
-            >
-                查看我的訂單
-            </a>
-        </article>
-
-        <article class="member-stat-card">
-            <small>
-                VIP LEVEL
-            </small>
-
-            <strong class="member-stat-name">
-                {{ member.vip_name }}
-            </strong>
-
-            {% if member.vip_progress.next_name %}
-                <span>
-                    距 {{ member.vip_progress.next_name }}
-                    尚差 {{ "{:,}".format(member.vip_progress.remaining) }}T
-                </span>
-            {% else %}
-                <span>
-                    已達最高 VIP 等級
-                </span>
-            {% endif %}
-        </article>
-
-
-        <article class="member-stat-card">
-            <small>
-                POINTS
-            </small>
-
-            <strong>
-                {{ "{:,}".format(member.points) }}
-            </strong>
-
-            <span>
-                目前可用點數
-            </span>
-        </article>
-
-
-        <article class="member-stat-card">
-            <small>
-                WALLET
-            </small>
-
-            <strong>
-                {{ member.wallet_balance_text }}
-            </strong>
-
-            <span>
-                魔丸錢包餘額
-            </span>
-
-            <a
-                href="/me/wallet"
-                class="button button-primary"
-                style="min-height:34px;padding:0 14px;margin-top:14px;border-radius:10px;font-size:12px;"
-            >
-                立即儲值
-            </a>
-        </article>
-
-
-        <article class="member-stat-card">
-            <small>
-                BENEFITS
-            </small>
-
-            <strong>
-                {{ benefits.active_count }}
-            </strong>
-
-            <span>
-                可用福利券
-            </span>
-
-            <a href="/me#benefits" class="button button-primary" style="min-height:34px;padding:0 14px;margin-top:14px;border-radius:10px;font-size:12px;">
-                查看我的福利
-            </a>
-        </article>
-
-
-        <article class="member-stat-card">
-            <small>
-                ORDERS
-            </small>
-
-            <strong>
-                {{ member.completed_orders }}
-            </strong>
-
-            <span>
-                已完成訂單
-            </span>
-        </article>
-
+    <div class="mc-section-title">
+        <div><small>AT A GLANCE</small><h2>現在最重要的</h2></div>
     </div>
 
-
-    <section class="member-vip-progress">
-
-        <div class="member-vip-progress-head">
-
-            <div>
-                <small>
-                    TOTAL SPENT
-                </small>
-
-                <strong>
-                    累積有效消費
-                    {{ member.total_spent_text }}
-                </strong>
+    <div class="mc-focus-grid">
+        <section class="mc-card mc-card-primary">
+            <div class="mc-card-head">
+                <div><small>ORDERS</small><h3>訂單狀態</h3></div>
+                <a href="/me/orders">查看全部 →</a>
             </div>
-
-            {% if member.vip_progress.next_name %}
-                <span>
-                    下一級 · {{ member.vip_progress.next_name }}
-                </span>
-            {% else %}
-                <span>
-                    BLACK DIAMOND
-                </span>
-            {% endif %}
-
-        </div>
-
-        <div class="member-progress-track">
-            <div
-                class="member-progress-fill"
-                style="width: {{ member.vip_progress.percent }}%"
-            ></div>
-        </div>
-
-    </section>
-
-
-    <div class="member-panels">
-
-        <section
-            class="member-panel"
-            id="orders"
-        >
-            <div class="member-panel-head">
-                <div>
-                    <small>
-                        RECENT ORDERS
-                    </small>
-
-                    <h3>
-                        最近訂單
-                    </h3>
-                </div>
-
-                <a href="/me/orders">
-                    查看全部 →
-                </a>
+            <div class="mc-order-count">
+                <strong>{{ portal.open_count }}</strong>
+                <span>目前進行中</span>
             </div>
-
             {% if member.recent_orders %}
-
-                <div class="member-order-list">
-
-                    {% for order in member.recent_orders %}
-
-                        <a
-                            class="member-order-row"
-                            href="/me/orders/{{ order.id }}"
-                            style="color:inherit;text-decoration:none;"
-                        >
-
-                            <div>
-                                <small>
-                                    {{ order.order_no }}
-                                </small>
-
-                                <strong>
-                                    {{ order.item }}
-                                </strong>
-
-                                <span>
-                                    {{ order.created_at }}
-                                </span>
-                            </div>
-
-                            <div class="member-order-meta">
-                                <span
-                                    class="order-status status-{{ order.status }}"
-                                >
-                                    {{ order.status_label }}
-                                </span>
-
-                                <strong>
-                                    {{ order.amount_text }}
-                                </strong>
-                            </div>
-
-                        </a>
-
-                    {% endfor %}
-
+                <div class="mc-order-list">
+                {% for order in member.recent_orders[:3] %}
+                    <a href="/me/orders/{{ order.id }}" class="mc-order-row">
+                        <div><small>{{ order.order_no }}</small><b>{{ order.item }}</b><span>{{ order.created_at }}</span></div>
+                        <div><em class="status-{{ order.status }}">{{ order.status_label }}</em><strong>{{ order.amount_text }}</strong></div>
+                    </a>
+                {% endfor %}
                 </div>
-
             {% else %}
-
-                <div class="member-empty">
-                    <span class="member-empty-icon">
-                        ◈
-                    </span>
-
-                    <strong>
-                        還沒有訂單紀錄
-                    </strong>
-
-                    <p>
-                        完成點單後，最近訂單會顯示在這裡。
-                    </p>
-                </div>
-
+                <div class="mc-empty"><b>還沒有訂單</b><span>第一次下單後，進度會直接出現在這裡。</span><a href="/order">去看看服務 →</a></div>
             {% endif %}
-
         </section>
 
-
-        <section
-            class="member-panel"
-            id="favorites"
-        >
-            <div class="member-panel-head">
-                <div>
-                    <small>
-                        FAVORITES
-                    </small>
-
-                    <h3>
-                        我的收藏
-                    </h3>
-                </div>
-
-                <a href="/staff">
-                    找陪玩 →
-                </a>
+        <section class="mc-card" id="benefits">
+            <div class="mc-card-head">
+                <div><small>BENEFITS</small><h3>我的福利</h3></div>
+                <a href="/order">使用福利 →</a>
             </div>
-
-            {% if member.favorite_profiles %}
-
-                <div class="member-favorite-list">
-
-                    {% for staff in member.favorite_profiles %}
-
-                        <a
-                            class="member-favorite-row"
-                            href="/staff/{{ staff.staff_id }}"
-                        >
-                            <img
-                                src="{{ staff.avatar_url }}"
-                                alt=""
-                            >
-
-                            <div>
-                                <strong>
-                                    {{ staff.display_name }}
-                                </strong>
-
-                                <span>
-                                    {{ staff.role_title }}
-                                </span>
-                            </div>
-
-                            <b>→</b>
-                        </a>
-
-                    {% endfor %}
-
-                </div>
-
-            {% else %}
-
-                <div class="member-empty">
-                    <span class="member-empty-icon">
-                        ♡
-                    </span>
-
-                    <strong>
-                        還沒有收藏陪玩
-                    </strong>
-
-                    <p>
-                        到陪玩陣容找找看今晚想一起玩的人。
-                    </p>
-                </div>
-
-            {% endif %}
-
-        </section>
-
-
-        <section class="member-panel member-panel-wide" id="benefits">
-            <div class="member-panel-head">
-                <div>
-                    <small>BENEFITS</small>
-                    <h3>我的福利</h3>
-                </div>
-                <a href="/order">前往點單 →</a>
-            </div>
-
             {% if benefits.coupons %}
-                <div class="member-order-list">
-                    {% for coupon in benefits.coupons %}
-                        <div class="member-order-row">
-                            <div>
-                                <small>AVAILABLE COUPON</small>
-                                <strong>{{ coupon.title }}</strong>
-                                <span>獲得時間 · {{ coupon.issued_at }}</span>
-                            </div>
-                            <div class="member-order-meta"><strong>可使用</strong></div>
-                        </div>
-                    {% endfor %}
+                <div class="mc-coupon-stack">
+                {% for coupon in benefits.coupons[:4] %}
+                    <div class="mc-coupon">
+                        <div><small>AVAILABLE</small><b>{{ coupon.title }}</b></div>
+                        <span>有效至 {{ coupon.expires_at_text or '—' }}</span>
+                    </div>
+                {% endfor %}
                 </div>
+            {% elif benefits.progress %}
+                <div class="mc-empty compact"><b>還差一點就有福利</b><span>完成付費服務後會自動累積，不需要另外登記。</span></div>
+            {% else %}
+                <div class="mc-empty compact"><b>目前沒有福利紀錄</b><span>開始消費後才顯示累積中的商品，不會列一排 0 進度。</span></div>
             {% endif %}
 
             {% if benefits.progress %}
-                <div class="member-benefit-row" style="margin-top:14px;">
-                    {% for item in benefits.progress %}
-                        <div>
-                            <span>{{ item.title }}</span>
-                            <strong>{{ item.progress_text }} {{ '局' if item.pricing_type == 'game' else '小時' }}</strong>
-                            <span>達標自動發 {{ '+1 局' if item.pricing_type == 'game' else '+30 分鐘' }}</span>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            {% if not benefits.has_anything %}
-                <div class="member-empty">
-                    <span class="member-empty-icon">◇</span>
-                    <strong>目前還沒有累積進度</strong>
-                    <p>完成符合活動的付費服務後，才會開始顯示進度；0 進度的商品不會全部列在這裡。</p>
+                <div class="mc-progress-list">
+                {% for item in benefits.progress[:4] %}
+                    <div>
+                        <span>{{ item.title }}</span>
+                        <b>{{ item.progress_text }} {{ '局' if item.pricing_type == 'game' else '小時' }}</b>
+                        <small>達標送 {{ '+1 局' if item.pricing_type == 'game' else '+30 分鐘' }}</small>
+                    </div>
+                {% endfor %}
                 </div>
             {% endif %}
         </section>
+    </div>
 
-
-        <section
-            class="member-panel member-panel-wide"
-            id="vip"
-        >
-            <div class="member-panel-head">
-                <div>
-                    <small>
-                        MEMBERSHIP
-                    </small>
-
-                    <h3>
-                        VIP 會員
-                    </h3>
-                </div>
-
-                <a href="/vip">
-                    查看完整 VIP 制度 →
-                </a>
+    <div class="mc-lower-grid">
+        <section class="mc-card" id="favorites">
+            <div class="mc-card-head">
+                <div><small>FAVORITES</small><h3>我的收藏</h3></div>
+                <a href="/staff">找陪玩 →</a>
             </div>
-
-            <div class="member-benefit-row">
-
-                <div>
-                    <span>
-                        目前等級
-                    </span>
-
-                    <strong>
-                        {{ member.vip_name }}
-                    </strong>
+            {% if member.favorite_profiles %}
+                <div class="mc-favorite-grid">
+                {% for staff in member.favorite_profiles[:6] %}
+                    <a href="/staff/{{ staff.staff_id }}">
+                        <img src="{{ staff.avatar_url }}" alt="">
+                        <div><b>{{ staff.display_name }}</b><span>{{ staff.role_title }}</span></div>
+                        <i>→</i>
+                    </a>
+                {% endfor %}
                 </div>
-
-                <div>
-                    <span>
-                        累積有效消費
-                    </span>
-
-                    <strong>
-                        {{ member.total_spent_text }}
-                    </strong>
-                </div>
-
-                <div>
-                    <span>
-                        收藏陪玩
-                    </span>
-
-                    <strong>
-                        {{ member.favorite_count }}
-                    </strong>
-                </div>
-
-            </div>
+            {% else %}
+                <div class="mc-empty compact"><b>還沒有收藏陪玩</b><span>收藏後，下次找人會快很多。</span></div>
+            {% endif %}
         </section>
 
+        <section class="mc-card" id="vip">
+            <div class="mc-card-head">
+                <div><small>VIP & POINTS</small><h3>會員進度</h3></div>
+                <a href="/vip">完整制度 →</a>
+            </div>
+            <div class="mc-vip-summary">
+                <div><span>目前等級</span><b>{{ member.vip_name }}</b></div>
+                <div><span>累積有效消費</span><b>{{ member.total_spent_text }}</b></div>
+                <div><span>目前可用點數</span><b>{{ "{:,}".format(member.points) }} 點</b></div>
+                <div><span>已完成訂單</span><b>{{ member.completed_orders }}</b></div>
+            </div>
+        </section>
     </div>
 </section>
-
 {% endblock %}
