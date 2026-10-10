@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 
+from web.app.routers import admin_centers
 from web.app.services.admin_customer_loyalty import enrich_customer_rows, load_customer_loyalty
 
 
@@ -8,6 +9,17 @@ def _make_db(path: Path) -> None:
     with sqlite3.connect(path) as conn:
         conn.executescript(
             """
+            CREATE TABLE web_orders (
+                id INTEGER PRIMARY KEY,
+                customer_discord_id TEXT,
+                customer_display_name TEXT,
+                status TEXT,
+                amount INTEGER,
+                customer_pay_amount INTEGER,
+                created_at TEXT,
+                updated_at TEXT
+            );
+
             CREATE TABLE customer_loyalty_progress (
                 customer_discord_id TEXT NOT NULL,
                 scope_key TEXT NOT NULL,
@@ -37,6 +49,12 @@ def _make_db(path: Path) -> None:
                 source TEXT NOT NULL DEFAULT 'loyalty',
                 issued_at TEXT NOT NULL
             );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO web_orders
+            VALUES (1,'100','老闆A','closed',500,450,'2026-10-11','2026-10-11')
             """
         )
         conn.execute(
@@ -107,3 +125,22 @@ def test_enrich_customer_rows_keeps_customer_center_fields(tmp_path: Path):
     assert rows[1]["loyalty_progress"] == []
     assert rows[1]["loyalty_coupon_counts"]["active"] == 0
     assert rows[1]["loyalty_has_anything"] is False
+
+
+def test_customer_center_snapshot_includes_loyalty_progress(tmp_path: Path, monkeypatch):
+    web_db = tmp_path / "web_dashboard.db"
+    _make_db(web_db)
+
+    monkeypatch.setattr(admin_centers, "WEB_DB", web_db)
+    monkeypatch.setattr(admin_centers, "BOT_DB", tmp_path / "missing_bot.db")
+
+    snapshot = admin_centers._customer_snapshot(include_wallets=False)
+    row = snapshot["rows"][0]
+
+    assert row["customer_discord_id"] == "100"
+    assert row["completed_spend"] == 450
+    assert [item["progress_text"] for item in row["loyalty_progress"]] == [
+        "14 / 20局",
+        "6 / 10H",
+    ]
+    assert row["loyalty_coupon_counts"]["active"] == 1
