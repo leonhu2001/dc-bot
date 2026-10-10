@@ -204,7 +204,7 @@ def test_buy_8_get_1_and_prices():
     assert calculate_price(lol, quantity=8, player_count=1).service_quantity == 9
 
 
-def test_new_game_orders_allow_points_except_extra_game_and_unusable_specify_fee():
+def test_new_game_orders_split_hourly_and_game_point_rewards():
     common = dict(point_balance=999, quantity=1, has_specified_staff=False)
 
     for rule_key in ("valorant_entertain_ng", "lol_entertain_ng"):
@@ -216,13 +216,13 @@ def test_new_game_orders_allow_points_except_extra_game_and_unusable_specify_fee
 
         assert point_item_status(
             rule_key=rule_key,
-            point_item_key="extra_10",
+            point_item_key="extra_hour_30m",
             **common,
         )["allowed"] is True
 
         assert point_item_status(
             rule_key=rule_key,
-            point_item_key="extra_15",
+            point_item_key="extra_game_1",
             **common,
         )["allowed"] is False
 
@@ -234,8 +234,7 @@ def test_new_game_orders_allow_points_except_extra_game_and_unusable_specify_fee
         )["allowed"] is False
 
 
-
-def test_game_priced_point_time_benefits_become_one_and_two_games():
+def test_game_priced_point_rewards_are_one_and_two_games_only():
     options = {
         item["key"]: item
         for item in list_point_options(
@@ -246,21 +245,24 @@ def test_game_priced_point_time_benefits_become_one_and_two_games():
         )
     }
 
-    assert options["extra_10"]["allowed"] is True
-    assert options["extra_10"]["name"] == "加一局"
-    assert options["extra_10"]["kind"] == "extra_games"
-    assert options["extra_10"]["games"] == 1
+    assert options["extra_game_1"]["allowed"] is True
+    assert options["extra_game_1"]["name"] == "加 1 局"
+    assert options["extra_game_1"]["kind"] == "extra_games"
+    assert options["extra_game_1"]["games"] == 1
+    assert options["extra_game_1"]["cost"] == 40
 
-    assert options["extra_30"]["allowed"] is True
-    assert options["extra_30"]["name"] == "加兩局"
-    assert options["extra_30"]["kind"] == "extra_games"
-    assert options["extra_30"]["games"] == 2
+    assert options["extra_game_2"]["allowed"] is True
+    assert options["extra_game_2"]["name"] == "加 2 局"
+    assert options["extra_game_2"]["kind"] == "extra_games"
+    assert options["extra_game_2"]["games"] == 2
+    assert options["extra_game_2"]["cost"] == 70
 
-    # 原本的「加場一場保撤」仍然不適用特戰英豪 / 英雄聯盟。
-    assert options["extra_15"]["allowed"] is False
+    assert "extra_hour_30m" not in options
+    assert "extra_hour_1h" not in options
+    assert "extra_15" not in options
 
 
-def test_hourly_point_time_benefits_keep_original_time_units():
+def test_hourly_point_rewards_are_30_minutes_and_one_hour_only():
     options = {
         item["key"]: item
         for item in list_point_options(
@@ -271,13 +273,18 @@ def test_hourly_point_time_benefits_keep_original_time_units():
         )
     }
 
-    assert options["extra_10"]["name"] == "加時 30 分鐘"
-    assert options["extra_10"]["kind"] == "extra_hours"
-    assert options["extra_10"]["hours"] == 0.5
+    assert options["extra_hour_30m"]["name"] == "加時 30 分鐘"
+    assert options["extra_hour_30m"]["kind"] == "extra_hours"
+    assert options["extra_hour_30m"]["hours"] == 0.5
+    assert options["extra_hour_30m"]["cost"] == 60
 
-    assert options["extra_30"]["name"] == "加時 1 小時"
-    assert options["extra_30"]["kind"] == "extra_hours"
-    assert options["extra_30"]["hours"] == 1
+    assert options["extra_hour_1h"]["name"] == "加時 1 小時"
+    assert options["extra_hour_1h"]["kind"] == "extra_hours"
+    assert options["extra_hour_1h"]["hours"] == 1
+    assert options["extra_hour_1h"]["cost"] == 110
+
+    assert "extra_game_1" not in options
+    assert "extra_game_2" not in options
 
 
 def test_all_new_game_orders_have_exact_receiver_roles():
