@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
 from web.app.services.internal_transfers import (
@@ -42,7 +43,7 @@ def _display_name(user: dict) -> str:
     )
 
 
-def _refresh_employee_user(request: Request) -> dict | None:
+async def _refresh_employee_user(request: Request) -> dict | None:
     user = request.session.get("user")
     if not user:
         return None
@@ -52,7 +53,7 @@ def _refresh_employee_user(request: Request) -> dict | None:
         return None
 
     try:
-        role_ids = get_member_role_ids(discord_id)
+        role_ids = await run_in_threadpool(get_member_role_ids, discord_id)
         access = get_dashboard_access(role_ids)
     except Exception:
         # 牽涉薪資的操作不能沿用過期權限。
@@ -87,7 +88,7 @@ def _is_reviewer(user: dict) -> bool:
 
 @router.get("/employee/internal-transfers")
 async def internal_transfer_page(request: Request):
-    user = _refresh_employee_user(request)
+    user = await _refresh_employee_user(request)
     if not user:
         if request.session.get("user"):
             return RedirectResponse("/no-access", status_code=303)
@@ -101,11 +102,17 @@ async def internal_transfer_page(request: Request):
     employees = list_internal_employees(include_balances=reviewer)
     rows = list_internal_transfers(user_id, include_all=reviewer)
 
-    pending_reviews = [row for row in rows if row.get("status") == "pending"] if reviewer else []
+    pending_reviews = (
+        [row for row in rows if row.get("status") == "pending"]
+        if reviewer
+        else []
+    )
     my_rows = [
-        row for row in rows
+        row
+        for row in rows
         if not reviewer
-        or user_id in {
+        or user_id
+        in {
             str(row.get("from_employee_discord_id") or ""),
             str(row.get("to_employee_discord_id") or ""),
             str(row.get("created_by_discord_id") or ""),
@@ -131,7 +138,7 @@ async def internal_transfer_page(request: Request):
 
 @router.post("/employee/internal-transfers")
 async def create_transfer(request: Request):
-    user = _refresh_employee_user(request)
+    user = await _refresh_employee_user(request)
     if not user:
         return RedirectResponse("/no-access", status_code=303)
 
@@ -170,7 +177,7 @@ async def create_transfer(request: Request):
 
 @router.post("/employee/internal-transfers/{transfer_id}/approve")
 async def approve_transfer(transfer_id: int, request: Request):
-    user = _refresh_employee_user(request)
+    user = await _refresh_employee_user(request)
     if not user:
         return RedirectResponse("/no-access", status_code=303)
 
@@ -193,7 +200,7 @@ async def approve_transfer(transfer_id: int, request: Request):
 
 @router.post("/employee/internal-transfers/{transfer_id}/reject")
 async def reject_transfer(transfer_id: int, request: Request):
-    user = _refresh_employee_user(request)
+    user = await _refresh_employee_user(request)
     if not user:
         return RedirectResponse("/no-access", status_code=303)
 
@@ -216,7 +223,7 @@ async def reject_transfer(transfer_id: int, request: Request):
 
 @router.post("/employee/internal-transfers/{transfer_id}/cancel")
 async def cancel_transfer(transfer_id: int, request: Request):
-    user = _refresh_employee_user(request)
+    user = await _refresh_employee_user(request)
     if not user:
         return RedirectResponse("/no-access", status_code=303)
 
