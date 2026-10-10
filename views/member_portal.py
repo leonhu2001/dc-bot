@@ -10,7 +10,7 @@ from web.app.services.site_data import get_member_summary
 
 MEMBER_PORTAL_CHANNEL_ID = 1558395213406412801
 # Hidden footer marker lets the sync job find and update the existing panel without
-# exposing an internal identifier such as MAWAN_MEMBER_PORTAL_V1 to customers.
+# exposing an internal identifier to customers.
 MEMBER_PORTAL_MARKER = "\u200b"
 MEMBER_PORTAL_URL = "https://mowanentertainment.com/me"
 
@@ -37,7 +37,34 @@ def _format_progress(item: dict) -> str:
     unit = "局" if pricing_type == "game" else "小時"
     current = float(item.get("progress_units") or 0)
     threshold = float(item.get("threshold_units") or 0)
-    return f"{item.get('title') or item.get('rule_label')}：{current:g}/{threshold:g} {unit}"
+    return f"{item.get('title') or item.get('rule_label')}：**{current:g} / {threshold:g} {unit}**"
+
+
+def _status_icon(status: object) -> str:
+    text = str(status or "").strip()
+    lowered = text.lower()
+    if "完成" in text or lowered in {"completed", "closed", "done"}:
+        return "✅"
+    if "取消" in text or "退款" in text or lowered in {"cancelled", "canceled", "refunded"}:
+        return "❌"
+    if "進行" in text or "服務" in text or lowered in {"active", "in_progress", "servicing"}:
+        return "🎮"
+    if "待" in text or "付款" in text or lowered in {"pending", "awaiting_payment", "unpaid"}:
+        return "⏳"
+    return "•"
+
+
+def _link_view(label: str, url: str) -> discord.ui.View:
+    view = discord.ui.View(timeout=300)
+    view.add_item(
+        discord.ui.Button(
+            label=label,
+            emoji="🌐",
+            style=discord.ButtonStyle.link,
+            url=url,
+        )
+    )
+    return view
 
 
 class MemberPortalView(discord.ui.View):
@@ -69,31 +96,34 @@ class MemberPortalView(discord.ui.View):
         recent = portal.get("recent_orders") or []
         lines = []
         for order in recent[:5]:
+            status = order.get("status_label") or order.get("status") or "未知"
             lines.append(
-                f"**{order.get('order_no') or '訂單'}**｜{order.get('item') or '服務'}｜"
-                f"{order.get('status_label') or order.get('status') or '未知'}｜{order.get('amount_text') or '0T'}"
+                f"{_status_icon(status)} **{order.get('order_no') or '訂單'}**\n"
+                f"{order.get('item') or '服務'}｜{status}｜{order.get('amount_text') or '0T'}"
             )
-        if not lines:
-            lines.append("目前沒有訂單紀錄。")
+
         embed = discord.Embed(
             title="📋 我的訂單",
-            description="\n".join(lines),
             color=discord.Color.blurple(),
         )
         embed.add_field(
-            name="目前進行中",
-            value=str(int(portal.get("open_count") or 0)),
-            inline=True,
-        )
-        embed.add_field(
-            name="完整紀錄",
-            value=f"{MEMBER_PORTAL_URL}/orders",
+            name="訂單摘要",
+            value=f"進行中：**{int(portal.get('open_count') or 0)}**",
             inline=False,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        embed.add_field(
+            name="最近 5 筆",
+            value="\n\n".join(lines) if lines else "目前沒有訂單紀錄。",
+            inline=False,
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=_link_view("查看完整訂單", f"{MEMBER_PORTAL_URL}/orders"),
+            ephemeral=True,
+        )
 
     @discord.ui.button(
-        label="錢包 / 儲值",
+        label="我的錢包",
         emoji="💰",
         style=discord.ButtonStyle.secondary,
         custom_id="mawan_member_portal_wallet_v1",
@@ -103,19 +133,22 @@ class MemberPortalView(discord.ui.View):
         member = get_member_summary(_member_id(interaction))
         embed = discord.Embed(
             title="💰 我的錢包",
+            description=(
+                "目前可用餘額\n"
+                f"**{member.get('wallet_balance_text') or '0T'}**"
+            ),
             color=discord.Color.gold(),
         )
         embed.add_field(
-            name="目前餘額",
-            value=str(member.get("wallet_balance_text") or "0T"),
+            name="儲值",
+            value="請使用 Discord 的儲值中心。",
             inline=False,
         )
-        embed.add_field(
-            name="儲值 / 紀錄",
-            value=f"{MEMBER_PORTAL_URL}/wallet",
-            inline=False,
+        await interaction.response.send_message(
+            embed=embed,
+            view=_link_view("查看錢包紀錄", f"{MEMBER_PORTAL_URL}/wallet"),
+            ephemeral=True,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(
         label="點數 / VIP",
@@ -130,22 +163,24 @@ class MemberPortalView(discord.ui.View):
         next_name = str(vip_progress.get("next_name") or "").strip()
         if next_name:
             progress_text = (
-                f"下一級：{next_name}｜尚差 {int(vip_progress.get('remaining') or 0):,}T"
+                f"下一級：**{next_name}**\n"
+                f"尚差：**{int(vip_progress.get('remaining') or 0):,}T**"
             )
         else:
-            progress_text = "已達最高 VIP 等級"
+            progress_text = "已達最高 VIP 等級 👑"
+
         embed = discord.Embed(
             title="👑 點數 / VIP",
             color=discord.Color.gold(),
         )
         embed.add_field(
             name="目前等級",
-            value=str(member.get("vip_name") or "普通魔丸"),
+            value=f"**{member.get('vip_name') or '普通魔丸'}**",
             inline=True,
         )
         embed.add_field(
             name="可用點數",
-            value=f"{int(member.get('points') or 0):,} 點",
+            value=f"**{int(member.get('points') or 0):,} 點**",
             inline=True,
         )
         embed.add_field(
@@ -153,12 +188,11 @@ class MemberPortalView(discord.ui.View):
             value=progress_text,
             inline=False,
         )
-        embed.add_field(
-            name="完整專區",
-            value=f"{MEMBER_PORTAL_URL}#vip",
-            inline=False,
+        await interaction.response.send_message(
+            embed=embed,
+            view=_link_view("查看 VIP 專區", f"{MEMBER_PORTAL_URL}#vip"),
+            ephemeral=True,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(
         label="我的福利",
@@ -177,15 +211,19 @@ class MemberPortalView(discord.ui.View):
         )
         if coupons:
             embed.add_field(
-                name=f"可用福利券（{len(coupons)}）",
+                name=f"可用福利券 · {len(coupons)} 張",
                 value="\n".join(
-                    f"• {item.get('title')}｜有效至 {item.get('expires_at_text') or '—'}"
+                    f"🎟️ **{item.get('title')}**\n有效至 {item.get('expires_at_text') or '—'}"
                     for item in coupons[:10]
                 ),
                 inline=False,
             )
         else:
-            embed.add_field(name="可用福利券", value="目前沒有可用福利券。", inline=False)
+            embed.add_field(
+                name="可用福利券",
+                value="目前沒有可用福利券。",
+                inline=False,
+            )
 
         if progress:
             embed.add_field(
@@ -196,12 +234,11 @@ class MemberPortalView(discord.ui.View):
         else:
             embed.add_field(
                 name="累積進度",
-                value="完成符合活動的付費服務後，這裡才會開始顯示進度。",
+                value="尚未開始累積。\n完成符合活動的付費服務後才會顯示。",
                 inline=False,
             )
-        embed.add_field(
-            name="官網",
-            value=f"{MEMBER_PORTAL_URL}#benefits",
-            inline=False,
+        await interaction.response.send_message(
+            embed=embed,
+            view=_link_view("查看我的福利", f"{MEMBER_PORTAL_URL}#benefits"),
+            ephemeral=True,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
