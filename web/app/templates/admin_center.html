@@ -18,12 +18,20 @@
 .center-actions{display:flex;gap:8px;flex-wrap:wrap}
 .center-list{display:grid;gap:8px}
 .center-row{display:grid;grid-template-columns:minmax(180px,1.3fr) repeat(3,minmax(100px,.7fr)) auto;gap:10px;align-items:center;padding:12px 13px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.018);text-decoration:none;color:inherit}
+.customer-row{grid-template-columns:minmax(180px,1.25fr) repeat(4,minmax(105px,.68fr)) auto}
 .center-row:hover{border-color:rgba(223,183,92,.24);background:rgba(223,183,92,.035)}
 .center-row strong{display:block}.center-row small{display:block;margin-top:3px;color:var(--r5-muted,#969289);word-break:break-all}
 .center-cell span{display:block;color:var(--r5-muted,#969289);font-size:10px}.center-cell b{display:block;margin-top:3px;font-size:12px}
+.center-loyalty-cell details{margin-top:6px}
+.center-loyalty-cell summary{cursor:pointer;color:var(--r5-gold-soft,#f2d68d);font-size:11px;font-weight:800;list-style:none}
+.center-loyalty-cell summary::-webkit-details-marker{display:none}
+.loyalty-detail-list{display:grid;gap:6px;margin-top:7px;min-width:240px;max-width:380px}
+.loyalty-detail-item{padding:7px 8px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(0,0,0,.12)}
+.loyalty-detail-item strong{font-size:11px;line-height:1.35}.loyalty-detail-item small{font-size:10px;line-height:1.45}
+.loyalty-coupon-history{padding-top:3px;font-size:10px}
 .center-review{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.018)}
 .center-review p{margin:6px 0 0;white-space:pre-wrap}
-@media(max-width:1050px){.center-stats{grid-template-columns:repeat(2,1fr)}.center-row{grid-template-columns:1fr 1fr}}
+@media(max-width:1050px){.center-stats{grid-template-columns:repeat(2,1fr)}.center-row{grid-template-columns:1fr 1fr}.loyalty-detail-list{min-width:0;max-width:none}}
 @media(max-width:650px){.center-stats{grid-template-columns:1fr 1fr}.center-row{grid-template-columns:1fr}.center-actions .button{flex:1}.center-filter-form{grid-template-columns:1fr!important}}
 </style>
 
@@ -129,7 +137,7 @@
         <div class="section-title-row">
             <div>
                 <h2>客戶概況</h2>
-                <p class="muted-text">客戶資料、錢包、VIP 與評價集中查看；客戶明細仍保留完整訂單與備註功能。</p>
+                <p class="muted-text">客戶資料、錢包、VIP、累積福利與評價集中查看；客戶明細仍保留完整訂單與備註功能。</p>
             </div>
             <div class="center-actions">
                 <a class="button" href="/admin/customer-center/vip">👑 VIP 會員管理</a>
@@ -162,7 +170,7 @@
 
         <div class="center-list" style="margin-top:12px;">
         {% for row in snapshot.rows %}
-            <div class="center-row">
+            <div class="center-row customer-row">
                 <div>
                     <strong>{{ row.customer_display_name }}</strong>
                     <small>{{ row.customer_discord_id }}</small>
@@ -174,6 +182,31 @@
                     <small>完成 {{ row.completed_count }} ｜ 取消 {{ row.cancelled_count }}</small>
                 </div>
                 <div class="center-cell"><span>完成消費</span><b>{{ "{:,}".format(row.completed_spend or 0) }}T</b></div>
+                <div class="center-cell center-loyalty-cell">
+                    <span>累積福利</span>
+                    {% if row.loyalty_progress %}
+                    <b>{{ row.loyalty_progress|length }} 組進度</b>
+                    {% else %}
+                    <b>尚無進度</b>
+                    {% endif %}
+                    <small>可用券 {{ row.loyalty_coupon_counts.active or 0 }} ｜ 使用中 {{ row.loyalty_coupon_counts.reserved or 0 }}</small>
+                    {% if row.loyalty_has_anything %}
+                    <details>
+                        <summary>查看福利明細</summary>
+                        <div class="loyalty-detail-list">
+                            {% for progress in row.loyalty_progress %}
+                            <div class="loyalty-detail-item">
+                                <strong>{{ progress.title }}</strong>
+                                <small>{{ progress.progress_text }} ｜ 達標送 {{ progress.benefit_text }}</small>
+                            </div>
+                            {% else %}
+                            <div class="loyalty-detail-item"><small>目前沒有未完成的累積進度。</small></div>
+                            {% endfor %}
+                            <small class="loyalty-coupon-history">已兌換 {{ row.loyalty_coupon_counts.redeemed or 0 }} ｜ 已過期 {{ row.loyalty_coupon_counts.expired or 0 }}</small>
+                        </div>
+                    </details>
+                    {% endif %}
+                </div>
                 {% if is_manager %}
                 <div class="center-cell"><span>錢包</span><b>{{ "{:,}".format(row.wallet_balance or 0) }}T</b></div>
                 {% else %}
