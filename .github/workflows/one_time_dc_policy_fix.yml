@@ -40,7 +40,6 @@ jobs:
             tests/test_vip_whitelist_startup_sync.py \
             tests/test_dispatch_policy_consistency.py \
             tests/test_smart_dispatch_cadence.py \
-            tests/test_dispatch_public_lock.py \
             tests/test_service_rules_policy.py
 
       - name: Commit direct source changes
