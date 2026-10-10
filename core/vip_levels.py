@@ -124,6 +124,18 @@ VIP_ROLE_TIERS: list[dict[str, int | str]] = [
 VIP_ROLE_IDS: list[int] = [int(level["role_id"]) for level in VIP_LEVELS]
 SILVER_MEMBER_ROLE_ID: int = int(VIP_LEVELS[0]["role_id"])
 
+# VIP 保級以「最近一次實際消費」為基準；各階級採不同保留天數。
+# 這裡是單一規則來源，後台顯示、待審核判斷與 Discord 提醒共用。
+VIP_RETENTION_DAYS: dict[str, int] = {
+    "普通魔丸": 0,
+    "銀級魔丸": 30,
+    "金級魔丸": 45,
+    "白金魔丸": 60,
+    "鑽石魔丸": 90,
+    "白鑽魔丸": 120,
+    "黑鑽魔丸": 180,
+}
+
 # 儲值回饋依「本次儲值完成後」的有效 VIP 等級計算。
 # 銀級 / 金級尚未有儲值返利，因此為 0%。
 VIP_TOPUP_REBATE_PERCENT: dict[str, int] = {
@@ -230,6 +242,10 @@ def get_vip_discount_pay_rate(
 
 def get_topup_rebate_percent(level_name: str | None) -> int:
     return int(VIP_TOPUP_REBATE_PERCENT.get(str(level_name or "普通魔丸"), 0))
+
+
+def get_vip_retention_days(level_name: str | None) -> int:
+    return int(VIP_RETENTION_DAYS.get(str(level_name or "普通魔丸"), 0))
 
 
 def has_active_vip_progress_reset(data: dict) -> bool:
