@@ -18,11 +18,15 @@ from shared.models import (
     WorkerPayoutOverride,
 )
 from web.app.services.checkout_preview import calculate_point_service_value
-from web.app.services.order_service import recalculate_order_payouts
+from web.app.services.order_service import (
+    _customer_service_payout_base,
+    recalculate_order_payouts,
+)
 
 
 REPAIR_TABLE = "one_time_data_repairs"
 MO20261007003_REPAIR_KEY = "2026-10-10:MO20261007003:point-extra-hour-payout-v1"
+MO20261007003_CS_REPAIR_KEY = "2026-10-10:MO20261007003:exclude-gifted-hour-from-cs-v1"
 
 
 def ensure_data_repair_table(bind=engine) -> None:
@@ -369,13 +373,122 @@ def repair_mo20261007003_point_hour_payout(db: Session) -> dict[str, Any]:
     }
 
 
+
+def repair_mo20261007003_customer_service_payout(db: Session) -> dict[str, Any]:
+    """Remove the point-gifted hour from CS commission without touching workers."""
+    repair_key = MO20261007003_CS_REPAIR_KEY
+    if _repair_already_applied(db, repair_key):
+        return {"status": "already_applied", "repair_key": repair_key}
+
+    order = db.scalar(
+        select(WebOrder)
+        .where(WebOrder.bot_order_no == "MO20261007003")
+        .limit(1)
+    )
+    if order is None:
+        return {"status": "not_found", "repair_key": repair_key}
+
+    rows = list(
+        db.scalars(
+            select(CustomerServicePayout)
+            .where(CustomerServicePayout.order_id == int(order.id))
+            .order_by(CustomerServicePayout.id.asc())
+        ).all()
+    )
+    if not rows:
+        return {
+            "status": "skipped",
+            "repair_key": repair_key,
+            "order_id": int(order.id),
+            "reason": "no customer-service payout row",
+        }
+
+    for row in rows:
+        if str(row.payout_status or "").strip().lower() == PayoutStatus.PAID.value or row.paid_at is not None:
+            return {
+                "status": "skipped",
+                "repair_key": repair_key,
+                "order_id": int(order.id),
+                "reason": "customer-service payout already paid",
+            }
+
+    cs_base = _customer_service_payout_base(order)
+    before = [
+        {
+            "id": int(row.id),
+            "rate": float(row.rate or 0),
+            "payout_amount": float(row.payout_amount or 0),
+        }
+        for row in rows
+    ]
+
+    for row in rows:
+        row.payout_amount = cs_base * float(row.rate or 0)
+
+    db.flush()
+    after = [
+        {
+            "id": int(row.id),
+            "rate": float(row.rate or 0),
+            "payout_amount": float(row.payout_amount or 0),
+        }
+        for row in rows
+    ]
+
+    db.add(
+        AdminAuditLog(
+            admin_discord_id="system",
+            action="data_repair_exclude_gifted_service_from_cs_payout",
+            target_type="order",
+            target_id=str(int(order.id)),
+            before_json=json.dumps(
+                {"order_no": "MO20261007003", "customer_service_payouts": before},
+                ensure_ascii=False,
+            ),
+            after_json=json.dumps(
+                {
+                    "order_no": "MO20261007003",
+                    "customer_service_payout_base": cs_base,
+                    "customer_service_payouts": after,
+                },
+                ensure_ascii=False,
+            ),
+            created_at=datetime.utcnow(),
+        )
+    )
+    db.execute(
+        text(
+            f"INSERT INTO {REPAIR_TABLE} (repair_key, applied_at, note) "
+            "VALUES (:repair_key, :applied_at, :note)"
+        ),
+        {
+            "repair_key": repair_key,
+            "applied_at": datetime.utcnow().isoformat(timespec="seconds"),
+            "note": (
+                "MO20261007003 CS commission reset to paid-service base; "
+                f"cs_base={cs_base}T."
+            ),
+        },
+    )
+
+    return {
+        "status": "applied",
+        "repair_key": repair_key,
+        "order_id": int(order.id),
+        "customer_service_payout_base": cs_base,
+        "before": before,
+        "after": after,
+    }
+
+
 def apply_known_data_repairs() -> list[dict[str, Any]]:
     ensure_data_repair_table()
     db = SessionLocal()
     try:
-        result = repair_mo20261007003_point_hour_payout(db)
+        point_result = repair_mo20261007003_point_hour_payout(db)
+        cs_result = repair_mo20261007003_customer_service_payout(db)
         db.commit()
-        return [result]
+        return [point_result, cs_result]
     except Exception:
         db.rollback()
         raise

@@ -325,12 +325,21 @@ class StaffSyncCog(commands.Cog):
         self.security_maintenance_loop.start()
         self.staff_profile_refresh_event_loop.start()
         self.loyalty_benefit_loop.start()
+        # cogs.staff_sync is loaded by bot.py during its first on_ready. A listener
+        # registered at that point does not receive the event already in progress,
+        # so schedule the panel sync explicitly as soon as this cog is constructed.
+        self.member_portal_panel_task = asyncio.create_task(
+            self._ensure_member_portal_panel()
+        )
 
     def cog_unload(self) -> None:
         self.sync_staff_members_loop.cancel()
         self.security_maintenance_loop.cancel()
         self.staff_profile_refresh_event_loop.cancel()
         self.loyalty_benefit_loop.cancel()
+        task = getattr(self, "member_portal_panel_task", None)
+        if task is not None and not task.done():
+            task.cancel()
 
     async def _sync_once(self) -> dict:
         def run_sync() -> dict:
@@ -459,8 +468,9 @@ class StaffSyncCog(commands.Cog):
             )
 
 
-    @commands.Cog.listener()
-    async def on_ready(self) -> None:
+    async def _ensure_member_portal_panel(self) -> None:
+        await self.bot.wait_until_ready()
+
         if not getattr(self.bot, "_member_portal_view_registered", False):
             self.bot.add_view(MemberPortalView())
             self.bot._member_portal_view_registered = True
@@ -469,9 +479,22 @@ class StaffSyncCog(commands.Cog):
         if channel is None:
             try:
                 channel = await self.bot.fetch_channel(MEMBER_PORTAL_CHANNEL_ID)
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                channel = None
-        if not isinstance(channel, discord.TextChannel) or self.bot.user is None:
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+                print(
+                    f"[member-portal] channel fetch failed id={MEMBER_PORTAL_CHANNEL_ID}: {exc}",
+                    flush=True,
+                )
+                return
+
+        if not isinstance(channel, discord.TextChannel):
+            print(
+                f"[member-portal] unsupported channel type id={MEMBER_PORTAL_CHANNEL_ID} "
+                f"type={type(channel).__name__}",
+                flush=True,
+            )
+            return
+
+        if self.bot.user is None:
             return
 
         existing = None
@@ -482,16 +505,39 @@ class StaffSyncCog(commands.Cog):
                 if str(message.embeds[0].footer.text or "") == MEMBER_PORTAL_MARKER:
                     existing = message
                     break
-        except (discord.Forbidden, discord.HTTPException):
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            print(
+                f"[member-portal] history read failed channel={channel.id}: {exc}",
+                flush=True,
+            )
             return
 
         try:
             if existing is None:
-                await channel.send(embed=build_member_portal_embed(), view=MemberPortalView())
+                message = await channel.send(
+                    embed=build_member_portal_embed(),
+                    view=MemberPortalView(),
+                )
+                print(
+                    f"[member-portal] panel created channel={channel.id} message={message.id}",
+                    flush=True,
+                )
             else:
-                await existing.edit(embed=build_member_portal_embed(), view=MemberPortalView())
+                await existing.edit(
+                    embed=build_member_portal_embed(),
+                    view=MemberPortalView(),
+                )
+                print(
+                    f"[member-portal] panel refreshed channel={channel.id} message={existing.id}",
+                    flush=True,
+                )
         except (discord.Forbidden, discord.HTTPException) as exc:
             print(f"[member-portal] panel refresh failed: {exc}", flush=True)
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        # Covers later Discord reconnects as well as the explicit startup task.
+        await self._ensure_member_portal_panel()
 
 
     @commands.Cog.listener()

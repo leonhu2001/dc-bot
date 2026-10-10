@@ -173,7 +173,10 @@ class MemberPortalView(discord.ui.View):
         if coupons:
             embed.add_field(
                 name=f"可用福利券（{len(coupons)}）",
-                value="\n".join(f"• {item.get('title')}" for item in coupons[:10]),
+                value="\n".join(
+                    f"• {item.get('title')}｜有效至 {item.get('expires_at_text') or '—'}"
+                    for item in coupons[:10]
+                ),
                 inline=False,
             )
         else:

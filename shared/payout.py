@@ -49,18 +49,29 @@ def calculate_order_payout(
     worker_base_rate: float = WORKER_BASE_PAYOUT_RATE,
     customer_service_rate: float = CUSTOMER_SERVICE_PAYOUT_RATE,
     named_bonus_rate: float = WORKER_NAMED_BONUS_RATE,
+    customer_service_total_amount: int | None = None,
 ) -> OrderPayoutResult:
+    customer_service_amount = (
+        max(0, int(total_amount or 0))
+        if customer_service_total_amount is None
+        else max(0, int(customer_service_total_amount or 0))
+    )
+
     if total_amount <= 0:
+        customer_service_payout = calculate_customer_service_payout(
+            customer_service_amount,
+            customer_service_rate,
+        )
         return OrderPayoutResult(
             total_amount=0,
             worker_count=0,
             worker_base_rate=worker_base_rate,
             customer_service_rate=customer_service_rate,
             named_bonus_rate=named_bonus_rate,
-            customer_service_payout=0,
+            customer_service_payout=customer_service_payout,
             worker_payouts=[],
             total_worker_payout=0,
-            total_payout=0,
+            total_payout=customer_service_payout,
         )
 
     unique_worker_ids = []
@@ -82,7 +93,7 @@ def calculate_order_payout(
 
     if worker_count <= 0:
         customer_service_payout = calculate_customer_service_payout(
-            total_amount,
+            customer_service_amount,
             customer_service_rate,
         )
 
@@ -127,7 +138,7 @@ def calculate_order_payout(
         )
 
     customer_service_payout = calculate_customer_service_payout(
-        total_amount,
+        customer_service_amount,
         customer_service_rate,
     )
 
