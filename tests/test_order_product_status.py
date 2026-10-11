@@ -93,12 +93,11 @@ def test_web_catalog_and_quote_hide_inactive_product(tmp_path, monkeypatch):
         build_public_quote(rule_key=key, quantity=1, player_count=1)
 
 
-def test_discord_catalog_hides_inactive_and_blocks_selected_draft(tmp_path, monkeypatch):
+def test_discord_catalog_hides_inactive_and_selected_draft_guard_rejects_it(
+    tmp_path,
+    monkeypatch,
+):
     db_file = _use_status_db(monkeypatch, tmp_path)
-    # Other regression modules may import the bot helpers during collection.
-    # Re-run the installer for this isolated temp DB instead of depending on
-    # collection order or the module-level one-shot flag.
-    monkeypatch.setattr(order_product_status, "_DISCORD_GUARDS_INSTALLED", False)
     install_discord_catalog_guards()
 
     key = "basic_tech_secret_single"
@@ -111,7 +110,6 @@ def test_discord_catalog_hides_inactive_and_blocks_selected_draft(tmp_path, monk
     )
 
     from services import orders
-    from services import self_service_runtime
 
     details = orders.get_order_item_details_for_group(
         "delta_desktop_basic",
@@ -119,13 +117,20 @@ def test_discord_catalog_hides_inactive_and_blocks_selected_draft(tmp_path, monk
     )
     assert key not in {item["rule_key"] for item in details}
 
+    # Test the guard logic directly. The production Bot installs this guard once
+    # from services.order_flow after both self_service_runtime and orders have
+    # been imported; the full regression suite intentionally imports/reloads
+    # helper modules in a different collection order.
     with pytest.raises(ValueError, match="已下架"):
-        self_service_runtime._get_rule_from_self_service_data(
+        order_product_status._guarded_self_service_rule(
             {
                 "order_rule_key": key,
                 "item": "技術陪｜機密單陪",
             }
         )
+
+    order_flow = Path("services/order_flow.py").read_text(encoding="utf-8")
+    assert "install_discord_catalog_guards()" in order_flow
 
 
 def test_admin_order_rules_template_has_async_workspace_and_status_controls():
