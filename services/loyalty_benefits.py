@@ -25,6 +25,7 @@ ACTIVE = "active"
 RESERVED = "reserved"
 REDEEMED = "redeemed"
 EXPIRED = "expired"
+REVOKED = "revoked"
 
 
 def _parse_coupon_time(value: object) -> datetime | None:
@@ -73,6 +74,7 @@ def ensure_loyalty_tables(bind=engine) -> None:
                 pricing_type TEXT NOT NULL,
                 player_count INTEGER NOT NULL DEFAULT 1,
                 progress_units REAL NOT NULL DEFAULT 0,
+                debt_units REAL NOT NULL DEFAULT 0,
                 threshold_units REAL NOT NULL,
                 benefit_kind TEXT NOT NULL,
                 benefit_units REAL NOT NULL,
@@ -80,6 +82,16 @@ def ensure_loyalty_tables(bind=engine) -> None:
                 PRIMARY KEY (customer_discord_id, scope_key)
             )
         """))
+        progress_columns = {
+            str(row[1])
+            for row in conn.execute(text("PRAGMA table_info(customer_loyalty_progress)")).fetchall()
+        }
+        if "debt_units" not in progress_columns:
+            conn.execute(text(
+                "ALTER TABLE customer_loyalty_progress "
+                "ADD COLUMN debt_units REAL NOT NULL DEFAULT 0"
+            ))
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS customer_benefit_coupons (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -796,6 +808,392 @@ def _repair_companion_loyalty_v2(conn) -> None:
     })
 
 
+def _append_reconcile_note(existing: object, marker: str) -> str:
+    note = str(existing or "").strip()
+    if not note:
+        return marker
+    parts = [part.strip() for part in note.split(";") if part.strip()]
+    if marker not in parts:
+        parts.append(marker)
+    return ";".join(parts)
+
+
+def _loyalty_bucket_from_order(row: dict[str, Any]) -> dict[str, Any] | None:
+    customer_id = str(row.get("customer_discord_id") or "").strip()
+    rule_key = str(row.get("order_rule_key") or "").strip()
+    policy = loyalty_policy_for_rule(rule_key)
+    if (
+        not customer_id
+        or str(row.get("status") or "").strip().lower() != "closed"
+        or policy is None
+        or not _event_time_is_in_scope(row)
+        or _qualifying_paid_amount(row) <= 0
+    ):
+        return None
+
+    rule = _rule_for_key(rule_key)
+    player_count = _extract_player_count(row)
+    companion_count = _service_companion_count(rule, player_count)
+    return {
+        "customer_id": customer_id,
+        "scope_key": loyalty_scope_key(rule_key, player_count),
+        "rule_key": rule_key,
+        "rule_label": _loyalty_display_label(
+            rule_key,
+            getattr(rule, "label", rule_key),
+        ),
+        "pricing_type": str(policy["pricing_type"]),
+        "threshold_units": float(policy["threshold_units"]),
+        "benefit_kind": str(policy["benefit_kind"]),
+        "benefit_units": float(policy["benefit_units"]),
+        "paid_units": float(
+            max(0, int(row.get("quantity") or 0)) * companion_count
+        ),
+    }
+
+
+def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> dict[str, Any]:
+    """Rebuild one customer's loyalty pools from current closed orders.
+
+    Unused over-issued rewards are revoked. Redeemed/reserved rewards are never
+    clawed back; when an edit makes them exceed the customer's earned total,
+    debt_units makes future service units pay back that difference before new
+    progress can earn another reward.
+    """
+    customer = str(customer_id or "").strip()
+    if not customer:
+        return {"customer_id": "", "scopes": 0, "revoked": 0, "issued": 0}
+
+    progress_columns = {
+        str(row[1])
+        for row in conn.execute(text("PRAGMA table_info(customer_loyalty_progress)")).fetchall()
+    }
+    if "debt_units" not in progress_columns:
+        conn.execute(text(
+            "ALTER TABLE customer_loyalty_progress "
+            "ADD COLUMN debt_units REAL NOT NULL DEFAULT 0"
+        ))
+
+    now = get_taipei_now_iso()
+    _expire_active_coupons(conn)
+
+    # Existing events are markers for idempotency. Reset this customer's markers
+    # first, then rewrite them from the current source-of-truth order rows.
+    event_rows = conn.execute(text("""
+        SELECT order_id, note
+        FROM loyalty_order_events
+        WHERE customer_discord_id = :customer_id
+    """), {"customer_id": customer}).mappings().all()
+    for event in event_rows:
+        conn.execute(text("""
+            UPDATE loyalty_order_events
+            SET scope_key = NULL,
+                paid_units = 0,
+                processed_at = :processed_at,
+                note = :note
+            WHERE order_id = :order_id
+        """), {
+            "order_id": int(event["order_id"]),
+            "processed_at": now,
+            "note": _append_reconcile_note(event.get("note"), "admin_reconciled"),
+        })
+
+    order_rows = conn.execute(text("""
+        SELECT id, customer_discord_id, order_rule_key, quantity,
+               amount, original_amount, customer_pay_amount,
+               status, created_at, updated_at, closed_at,
+               price_snapshot_json, ticket_channel_id
+        FROM web_orders
+        WHERE customer_discord_id = :customer_id
+          AND status = 'closed'
+        ORDER BY id ASC
+    """), {"customer_id": customer}).mappings().all()
+
+    buckets: dict[str, dict[str, Any]] = {}
+    for raw in order_rows:
+        row = dict(raw)
+        bucket = _loyalty_bucket_from_order(row)
+        note = "admin_reconciled"
+        scope = None
+        paid_units = 0.0
+        if bucket is not None:
+            scope = str(bucket["scope_key"])
+            paid_units = float(bucket["paid_units"])
+            aggregate = buckets.get(scope)
+            if aggregate is None:
+                aggregate = dict(bucket)
+                aggregate["paid_units"] = 0.0
+                buckets[scope] = aggregate
+            aggregate["paid_units"] = float(aggregate.get("paid_units") or 0) + paid_units
+        elif not str(row.get("customer_discord_id") or "").strip():
+            note = "admin_reconciled;missing_customer"
+        elif not _event_time_is_in_scope(row):
+            note = "admin_reconciled;before_program_start"
+        elif loyalty_policy_for_rule(str(row.get("order_rule_key") or "").strip()) is None:
+            note = "admin_reconciled;rule_not_eligible"
+        elif _qualifying_paid_amount(row) <= 0:
+            note = "admin_reconciled;no_paid_amount"
+
+        conn.execute(text("""
+            INSERT INTO loyalty_order_events (
+                order_id, customer_discord_id, scope_key, paid_units,
+                issued_coupon_count, processed_at, note
+            ) VALUES (
+                :order_id, :customer_id, :scope_key, :paid_units,
+                0, :processed_at, :note
+            )
+            ON CONFLICT(order_id) DO UPDATE SET
+                customer_discord_id = excluded.customer_discord_id,
+                scope_key = excluded.scope_key,
+                paid_units = excluded.paid_units,
+                processed_at = excluded.processed_at,
+                note = excluded.note
+        """), {
+            "order_id": int(row["id"]),
+            "customer_id": customer,
+            "scope_key": scope,
+            "paid_units": paid_units,
+            "processed_at": now,
+            "note": note,
+        })
+
+    scope_meta: dict[str, dict[str, Any]] = {
+        scope: dict(bucket) for scope, bucket in buckets.items()
+    }
+
+    progress_rows = conn.execute(text("""
+        SELECT *
+        FROM customer_loyalty_progress
+        WHERE customer_discord_id = :customer_id
+    """), {"customer_id": customer}).mappings().all()
+    for raw in progress_rows:
+        row = dict(raw)
+        scope = str(row.get("scope_key") or "").strip()
+        if not scope or scope in scope_meta:
+            continue
+        scope_meta[scope] = {
+            "customer_id": customer,
+            "scope_key": scope,
+            "rule_key": str(row.get("rule_key") or ""),
+            "rule_label": str(row.get("rule_label") or row.get("rule_key") or "福利"),
+            "pricing_type": str(row.get("pricing_type") or ""),
+            "threshold_units": float(row.get("threshold_units") or 0),
+            "benefit_kind": str(row.get("benefit_kind") or ""),
+            "benefit_units": float(row.get("benefit_units") or 0),
+            "paid_units": 0.0,
+        }
+
+    coupon_meta_rows = conn.execute(text("""
+        SELECT scope_key, rule_key, rule_label, pricing_type,
+               benefit_kind, benefit_units
+        FROM customer_benefit_coupons
+        WHERE customer_discord_id = :customer_id
+          AND source = 'loyalty'
+        ORDER BY id ASC
+    """), {"customer_id": customer}).mappings().all()
+    for raw in coupon_meta_rows:
+        row = dict(raw)
+        scope = str(row.get("scope_key") or "").strip()
+        if not scope or scope in scope_meta:
+            continue
+        rule_key = str(row.get("rule_key") or "").strip()
+        policy = loyalty_policy_for_rule(rule_key)
+        if policy is None:
+            continue
+        scope_meta[scope] = {
+            "customer_id": customer,
+            "scope_key": scope,
+            "rule_key": rule_key,
+            "rule_label": _loyalty_display_label(rule_key, row.get("rule_label")),
+            "pricing_type": str(row.get("pricing_type") or policy["pricing_type"]),
+            "threshold_units": float(policy["threshold_units"]),
+            "benefit_kind": str(row.get("benefit_kind") or policy["benefit_kind"]),
+            "benefit_units": float(row.get("benefit_units") or policy["benefit_units"]),
+            "paid_units": 0.0,
+        }
+
+    revoked_total = 0
+    issued_total = 0
+
+    for scope, meta in scope_meta.items():
+        threshold = float(meta.get("threshold_units") or 0)
+        if threshold <= 0:
+            continue
+        total_units = float((buckets.get(scope) or {}).get("paid_units") or 0)
+        earned_count = max(0, int(total_units // threshold))
+        remainder = max(0.0, total_units - earned_count * threshold)
+
+        coupons = [
+            dict(row)
+            for row in conn.execute(text("""
+                SELECT *
+                FROM customer_benefit_coupons
+                WHERE customer_discord_id = :customer_id
+                  AND scope_key = :scope_key
+                  AND source = 'loyalty'
+                ORDER BY issued_at ASC, id ASC
+            """), {
+                "customer_id": customer,
+                "scope_key": scope,
+            }).mappings().all()
+        ]
+        protected = [
+            row for row in coupons
+            if str(row.get("status") or "").lower() in {RESERVED, REDEEMED}
+        ]
+        expired = [
+            row for row in coupons
+            if str(row.get("status") or "").lower() == EXPIRED
+        ]
+        active = [
+            row for row in coupons
+            if str(row.get("status") or "").lower() == ACTIVE
+        ]
+
+        target_nonprotected = max(0, earned_count - len(protected))
+        keep_expired = min(len(expired), target_nonprotected)
+        revoke_expired = expired[keep_expired:]
+        target_active = max(0, target_nonprotected - keep_expired)
+
+        excess_active = max(0, len(active) - target_active)
+        # Revoke newest active rewards first so the oldest valid reward remains FIFO.
+        revoke_active = list(reversed(active))[:excess_active]
+        revoke_rows = revoke_expired + revoke_active
+        if revoke_rows:
+            ids = [int(row["id"]) for row in revoke_rows]
+            placeholders = ",".join(str(value) for value in ids)
+            result = conn.execute(text(f"""
+                UPDATE customer_benefit_coupons
+                SET status = 'revoked',
+                    reserved_order_id = NULL
+                WHERE id IN ({placeholders})
+                  AND status IN ('active', 'expired')
+            """))
+            revoked_total += int(result.rowcount or 0)
+
+        active_after = max(0, len(active) - excess_active)
+        missing_active = max(0, target_active - active_after)
+        expires_at = _coupon_expiry_iso(now)
+        for _ in range(missing_active):
+            conn.execute(text("""
+                INSERT INTO customer_benefit_coupons (
+                    customer_discord_id, scope_key, rule_key, rule_label,
+                    pricing_type, player_count, benefit_kind, benefit_units,
+                    status, source, issued_at, expires_at
+                ) VALUES (
+                    :customer_id, :scope_key, :rule_key, :rule_label,
+                    :pricing_type, 1, :benefit_kind, :benefit_units,
+                    'active', 'loyalty', :issued_at, :expires_at
+                )
+            """), {
+                "customer_id": customer,
+                "scope_key": scope,
+                "rule_key": str(meta.get("rule_key") or ""),
+                "rule_label": str(meta.get("rule_label") or meta.get("rule_key") or "福利"),
+                "pricing_type": str(meta.get("pricing_type") or ""),
+                "benefit_kind": str(meta.get("benefit_kind") or ""),
+                "benefit_units": float(meta.get("benefit_units") or 0),
+                "issued_at": now,
+                "expires_at": expires_at,
+            })
+            issued_total += 1
+
+        debt_units = max(0.0, len(protected) * threshold - total_units)
+        progress_units = 0.0 if debt_units > 0.0001 else remainder
+        current_bucket = buckets.get(scope)
+
+        if current_bucket is None and progress_units <= 0.0001 and debt_units <= 0.0001:
+            conn.execute(text("""
+                DELETE FROM customer_loyalty_progress
+                WHERE customer_discord_id = :customer_id
+                  AND scope_key = :scope_key
+            """), {"customer_id": customer, "scope_key": scope})
+            continue
+
+        conn.execute(text("""
+            INSERT INTO customer_loyalty_progress (
+                customer_discord_id, scope_key, rule_key, rule_label,
+                pricing_type, player_count, progress_units, debt_units,
+                threshold_units, benefit_kind, benefit_units, updated_at
+            ) VALUES (
+                :customer_id, :scope_key, :rule_key, :rule_label,
+                :pricing_type, 1, :progress_units, :debt_units,
+                :threshold_units, :benefit_kind, :benefit_units, :updated_at
+            )
+            ON CONFLICT(customer_discord_id, scope_key) DO UPDATE SET
+                rule_key = excluded.rule_key,
+                rule_label = excluded.rule_label,
+                pricing_type = excluded.pricing_type,
+                player_count = 1,
+                progress_units = excluded.progress_units,
+                debt_units = excluded.debt_units,
+                threshold_units = excluded.threshold_units,
+                benefit_kind = excluded.benefit_kind,
+                benefit_units = excluded.benefit_units,
+                updated_at = excluded.updated_at
+        """), {
+            "customer_id": customer,
+            "scope_key": scope,
+            "rule_key": str(meta.get("rule_key") or ""),
+            "rule_label": str(meta.get("rule_label") or meta.get("rule_key") or "福利"),
+            "pricing_type": str(meta.get("pricing_type") or ""),
+            "progress_units": progress_units,
+            "debt_units": debt_units,
+            "threshold_units": threshold,
+            "benefit_kind": str(meta.get("benefit_kind") or ""),
+            "benefit_units": float(meta.get("benefit_units") or 0),
+            "updated_at": now,
+        })
+
+    return {
+        "customer_id": customer,
+        "scopes": len(scope_meta),
+        "revoked": revoked_total,
+        "issued": issued_total,
+    }
+
+
+def reconcile_loyalty_after_order_edit_in_connection(
+    conn,
+    *,
+    order_id: int,
+    previous_customer_id: str | int | None = None,
+) -> dict[str, Any]:
+    """Reconcile old/new customer pools after an admin changes an order."""
+    row = conn.execute(text("""
+        SELECT customer_discord_id, status
+        FROM web_orders
+        WHERE id = :order_id
+        LIMIT 1
+    """), {"order_id": int(order_id)}).mappings().first()
+    if row is None:
+        return {"customers": [], "revoked": 0, "issued": 0}
+
+    current_customer = str(row.get("customer_discord_id") or "").strip()
+    current_status = str(row.get("status") or "").strip().lower()
+    previous_customer = str(previous_customer_id or "").strip()
+
+    if current_status != "closed":
+        conn.execute(text(
+            "DELETE FROM loyalty_order_events WHERE order_id = :order_id"
+        ), {"order_id": int(order_id)})
+
+    customers = []
+    for customer in (previous_customer, current_customer):
+        if customer and customer not in customers:
+            customers.append(customer)
+
+    summaries = [
+        reconcile_customer_loyalty_in_connection(conn, customer)
+        for customer in customers
+    ]
+    return {
+        "customers": customers,
+        "revoked": sum(int(item.get("revoked") or 0) for item in summaries),
+        "issued": sum(int(item.get("issued") or 0) for item in summaries),
+    }
+
+
 def process_closed_order(order_id: int) -> dict[str, Any] | None:
     """Idempotently accrue one closed order and issue any earned coupons."""
     ensure_loyalty_tables()
@@ -846,8 +1244,8 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
                 max(0, int(row.get("quantity") or 0)) * companion_count
             )
             threshold = float(policy["threshold_units"])
-            previous = conn.execute(text("""
-                SELECT progress_units
+            progress_row = conn.execute(text("""
+                SELECT progress_units, debt_units
                 FROM customer_loyalty_progress
                 WHERE customer_discord_id = :customer_id
                   AND scope_key = :scope_key
@@ -855,9 +1253,13 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
             """), {
                 "customer_id": customer_id,
                 "scope_key": scope,
-            }).scalar()
-            total = float(previous or 0) + paid_units
-            issued_count = int(total // threshold)
+            }).mappings().first()
+            previous = float(progress_row.get("progress_units") or 0) if progress_row else 0.0
+            debt_before = float(progress_row.get("debt_units") or 0) if progress_row else 0.0
+            debt_after = max(0.0, debt_before - paid_units)
+            credited_units = max(0.0, paid_units - debt_before)
+            total = previous + credited_units
+            issued_count = max(0, int(total // threshold))
             remainder = total - issued_count * threshold
             rule_label = _loyalty_display_label(
                 rule_key,
@@ -867,16 +1269,17 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
             conn.execute(text("""
                 INSERT INTO customer_loyalty_progress (
                     customer_discord_id, scope_key, rule_key, rule_label,
-                    pricing_type, player_count, progress_units, threshold_units,
+                    pricing_type, player_count, progress_units, debt_units, threshold_units,
                     benefit_kind, benefit_units, updated_at
                 ) VALUES (
                     :customer_id, :scope_key, :rule_key, :rule_label,
-                    :pricing_type, :player_count, :progress_units, :threshold_units,
+                    :pricing_type, :player_count, :progress_units, :debt_units, :threshold_units,
                     :benefit_kind, :benefit_units, :updated_at
                 )
                 ON CONFLICT(customer_discord_id, scope_key) DO UPDATE SET
                     rule_label = excluded.rule_label,
                     progress_units = excluded.progress_units,
+                    debt_units = excluded.debt_units,
                     threshold_units = excluded.threshold_units,
                     benefit_kind = excluded.benefit_kind,
                     benefit_units = excluded.benefit_units,
@@ -889,6 +1292,7 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
                 "pricing_type": policy["pricing_type"],
                 "player_count": player_count,
                 "progress_units": remainder,
+                "debt_units": debt_after,
                 "threshold_units": threshold,
                 "benefit_kind": policy["benefit_kind"],
                 "benefit_units": policy["benefit_units"],

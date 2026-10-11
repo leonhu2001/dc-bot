@@ -116,6 +116,7 @@ def test_load_customer_loyalty_formats_progress_coupon_counts_and_new_benefit_la
         "reserved": 1,
         "redeemed": 1,
         "expired": 1,
+        "revoked": 0,
         "other": 0,
     }
     assert len(snapshot["active_coupons"]) == 1
