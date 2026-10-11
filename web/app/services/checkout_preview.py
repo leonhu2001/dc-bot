@@ -1325,22 +1325,28 @@ def calculate_checkout_financials(
 
     effective_specify_fee = max(0, specify_fee - point_waived_specify)
     after_point = max(0, after_vip - point_cash_discount)
-    subtotal = max(0, after_point + effective_specify_fee)
+    benefit_discount_amount = (
+        min(after_point, benefit_service_value)
+        if benefit_coupon
+        else 0
+    )
+    after_benefit = max(0, after_point - benefit_discount_amount)
+    subtotal = max(0, after_benefit + effective_specify_fee)
     wallet_use = min(wallet_balance, subtotal) if use_wallet else 0
     remaining = max(0, subtotal - wallet_use)
 
-    # All point rewards are funded by the store. Customer discounts and free
-    # specify do not lower worker payout, while point-added time/games add the
-    # equivalent discounted service value to the payout base.
+    # Point rewards and loyalty benefits are store-funded. A loyalty benefit
+    # only lowers what the customer pays; it must not reduce worker payout or
+    # add phantom service time to the payout base.
     payout_base = max(
         0,
-        after_vip + specify_fee + point_service_value + benefit_service_value,
+        after_vip + specify_fee + point_service_value,
     )
     point_store_absorbed = max(
         0,
         point_cash_discount + point_waived_specify + point_service_value,
     )
-    benefit_store_absorbed = benefit_service_value if benefit_coupon else 0
+    benefit_store_absorbed = benefit_discount_amount
 
     return {
         "service_amount": service_amount,
@@ -1353,7 +1359,7 @@ def calculate_checkout_financials(
         "percent_discount_amount": vip_discount_amount,
         "service_after_vip": after_vip,
         "specify_fee": specify_fee,
-        "cash_coupon_amount": 0,
+        "cash_coupon_amount": benefit_discount_amount,
         "fixed_discount_amount": 0,
         "point_cash_discount": point_cash_discount,
         "point_discount_coupon_amount": point_cash_discount,
@@ -1366,6 +1372,7 @@ def calculate_checkout_financials(
         "benefit_coupon_title": (str(benefit_coupon.get("title") or "") if benefit_coupon else ""),
         "benefit_service_note": coupon_service_note(benefit_coupon),
         "benefit_service_value": benefit_service_value,
+        "benefit_discount_amount": benefit_discount_amount,
         "benefit_store_absorbed_amount": benefit_store_absorbed,
         "subtotal_before_wallet": subtotal,
         "customer_pay_amount": subtotal,

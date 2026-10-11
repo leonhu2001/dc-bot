@@ -143,6 +143,14 @@ def ensure_loyalty_tables(bind=engine) -> None:
                 note TEXT
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS loyalty_migrations (
+                migration_key TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL,
+                note TEXT
+            )
+        """))
+        _repair_companion_loyalty_v2(conn)
 
 
 def _rule_for_key(rule_key: str):
@@ -178,24 +186,86 @@ def loyalty_policy_for_rule(rule_key: str) -> dict[str, Any] | None:
     return None
 
 
+_LOYALTY_SCOPE_FAMILY_ALIASES = {
+    # 同一個遊戲／服務只是陪玩席位數不同，必須共用同一個老闆福利池。
+    "basic_entertain_single": "basic_entertain",
+    "basic_entertain_double": "basic_entertain",
+    "basic_mobile_entertain_single": "basic_mobile_entertain",
+    "basic_mobile_entertain_double": "basic_mobile_entertain",
+}
+_LOYALTY_COMPANION_MIGRATION_KEY = "20261011_companion_service_units_v2"
+
+
+def _canonical_loyalty_rule_key(rule_key: str) -> str:
+    key = str(rule_key or "").strip()
+    return _LOYALTY_SCOPE_FAMILY_ALIASES.get(key, key)
+
+
+def _service_companion_count(rule: Any, player_count: int = 1) -> int:
+    requested = max(1, int(player_count or 1))
+    if rule is None:
+        return requested
+    required = getattr(rule, "required_staff_count", 1)
+    if str(required) == "player_count":
+        return requested
+    try:
+        return max(1, int(required or 1))
+    except (TypeError, ValueError):
+        return requested if bool(getattr(rule, "player_count_enabled", False)) else 1
+
+
+def _extract_player_count(row: dict[str, Any]) -> int:
+    try:
+        import json
+
+        snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))
+        if isinstance(snapshot, dict):
+            preview = (
+                snapshot.get("preview")
+                if isinstance(snapshot.get("preview"), dict)
+                else snapshot
+            )
+            quote = (
+                preview.get("quote")
+                if isinstance(preview, dict)
+                and isinstance(preview.get("quote"), dict)
+                else {}
+            )
+            input_data = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else {}
+            return max(1, int(quote.get("player_count") or input_data.get("player_count") or 1))
+    except Exception:
+        pass
+    return 1
+
+
+def _loyalty_display_label(rule_key: str, fallback: object = "") -> str:
+    label = str(fallback or rule_key or "").strip()
+    for suffix in ("｜單陪", "｜雙陪", "｜三陪", "｜四陪"):
+        if label.endswith(suffix):
+            label = label[: -len(suffix)]
+            break
+    return label or str(rule_key or "")
+
+
 def loyalty_scope_key(rule_key: str, player_count: int = 1) -> str:
+    # player_count intentionally does not participate in the scope. A customer
+    # owns one progress pool per game/service family, regardless of 1/2/3/4陪.
+    _ = player_count
     rule = _rule_for_key(rule_key)
-    players = max(1, int(player_count or 1))
-    if rule is None or not bool(getattr(rule, "player_count_enabled", False)):
-        players = 1
-    return f"{str(rule_key)}|players:{players}"
+    category = str(getattr(rule, "category", "") or "unknown").strip()
+    family = _canonical_loyalty_rule_key(rule_key)
+    return f"{category}|{family}"
 
 
 def _coupon_title(row: dict[str, Any]) -> str:
     kind = str(row.get("benefit_kind") or "")
     units = float(row.get("benefit_units") or 0)
     if kind == "extra_hours":
-        benefit = "+30 分鐘" if abs(units - 0.5) < 0.001 else f"+{units:g} 小時"
+        benefit = "折抵 30 分鐘額度" if abs(units - 0.5) < 0.001 else f"折抵 {units:g} 小時額度"
     else:
-        benefit = f"+{int(round(units))} 局"
-    players = max(1, int(row.get("player_count") or 1))
-    suffix = f"｜{players}位" if players > 1 else ""
-    return f"{row.get('rule_label') or row.get('rule_key')}｜{benefit}{suffix}"
+        benefit = f"折抵 {int(round(units))} 局額度"
+    label = _loyalty_display_label(str(row.get("rule_key") or ""), row.get("rule_label"))
+    return f"{label}｜{benefit}"
 
 
 def list_customer_loyalty(customer_id: str | int) -> dict[str, Any]:
@@ -232,9 +302,9 @@ def list_customer_loyalty(customer_id: str | int) -> dict[str, Any]:
         threshold = float(row.get("threshold_units") or 1)
         row["progress_text"] = f"{current:g} / {threshold:g}"
         row["percent"] = max(0, min(100, int(round(current / threshold * 100))))
-        players = max(1, int(row.get("player_count") or 1))
-        row["title"] = str(row.get("rule_label") or row.get("rule_key")) + (
-            f"｜{players}位" if players > 1 else ""
+        row["title"] = _loyalty_display_label(
+            str(row.get("rule_key") or ""),
+            row.get("rule_label"),
         )
         progress.append(row)
 
@@ -324,9 +394,11 @@ def calculate_coupon_service_value(
     player_count: int,
     coupon: dict[str, Any] | None,
 ) -> int:
-    """Store-funded worker payout value, always based on normal list price.
+    """Cash value of one customer benefit service-unit credit at list price.
 
-    VIP/customer discounts never lower the value of gifted work.
+    One benefit hour/game always means one companion's service unit. Multi-
+    companion orders therefore redeem the same credit proportionally instead
+    of multiplying the coupon by the number of companions.
     """
     if not coupon:
         return 0
@@ -335,14 +407,17 @@ def calculate_coupon_service_value(
         return 0
     kind = str(coupon.get("benefit_kind") or "")
     units = float(coupon.get("benefit_units") or 0)
-    if units <= 0:
+    if units <= 0 or kind not in {"extra_hours", "extra_games"}:
         return 0
-    if kind not in {"extra_hours", "extra_games"}:
-        return 0
-    per_unit = max(0, int(getattr(rule, "price", 0) or 0))
+
+    requested_players = max(1, int(player_count or 1))
+    companion_count = _service_companion_count(rule, requested_players)
+    order_unit_price = max(0, int(getattr(rule, "price", 0) or 0))
     if bool(getattr(rule, "price_multiply_player_count", False)):
-        per_unit *= max(1, int(player_count or 1))
-    return max(0, int(round(per_unit * units)))
+        order_unit_price *= requested_players
+
+    per_companion_unit = order_unit_price / max(1, companion_count)
+    return max(0, int(round(per_companion_unit * units)))
 
 
 def coupon_service_note(coupon: dict[str, Any] | None) -> str:
@@ -351,8 +426,9 @@ def coupon_service_note(coupon: dict[str, Any] | None) -> str:
     kind = str(coupon.get("benefit_kind") or "")
     units = float(coupon.get("benefit_units") or 0)
     if kind == "extra_hours":
-        return "福利券：服務時間 +30 分鐘" if abs(units - 0.5) < 0.001 else f"福利券：服務時間 +{units:g} 小時"
-    return f"福利券：服務局數 +{int(round(units))} 局"
+        amount = "30 分鐘" if abs(units - 0.5) < 0.001 else f"{units:g} 小時"
+        return f"福利券：折抵 {amount} 服務額度"
+    return f"福利券：折抵 {int(round(units))} 局服務額度"
 
 
 def reserve_coupon_in_session(
@@ -496,6 +572,230 @@ def _qualifying_paid_amount(row: dict[str, Any]) -> int:
     return max(0, amount)
 
 
+def _repair_companion_loyalty_v2(conn) -> None:
+    """One-time repair for progress created before companion service units.
+
+    Only orders that already have loyalty_order_events are recalculated. Orders
+    not yet processed remain untouched so the normal close-order flow can issue
+    rewards exactly once after deployment.
+    """
+    applied = conn.execute(text("""
+        SELECT migration_key
+        FROM loyalty_migrations
+        WHERE migration_key = :migration_key
+        LIMIT 1
+    """), {"migration_key": _LOYALTY_COMPANION_MIGRATION_KEY}).first()
+    if applied is not None:
+        return
+
+    has_orders = conn.execute(text("""
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'web_orders'
+        LIMIT 1
+    """)).first()
+    if has_orders is None:
+        conn.execute(text("""
+            INSERT INTO loyalty_migrations (migration_key, applied_at, note)
+            VALUES (:migration_key, :applied_at, 'no_web_orders_table')
+        """), {
+            "migration_key": _LOYALTY_COMPANION_MIGRATION_KEY,
+            "applied_at": get_taipei_now_iso(),
+        })
+        return
+
+    now = get_taipei_now_iso()
+
+    # Existing coupons keep their status/order links, but become usable across
+    # companion counts inside the same canonical game/service scope.
+    coupon_rows = conn.execute(text("""
+        SELECT id, rule_key, rule_label, player_count
+        FROM customer_benefit_coupons
+    """)).mappings().all()
+    for raw in coupon_rows:
+        row = dict(raw)
+        rule_key = str(row.get("rule_key") or "").strip()
+        if loyalty_policy_for_rule(rule_key) is None:
+            continue
+        scope = loyalty_scope_key(rule_key, int(row.get("player_count") or 1))
+        conn.execute(text("""
+            UPDATE customer_benefit_coupons
+            SET scope_key = :scope_key,
+                rule_label = :rule_label
+            WHERE id = :coupon_id
+        """), {
+            "scope_key": scope,
+            "rule_label": _loyalty_display_label(rule_key, row.get("rule_label")),
+            "coupon_id": int(row["id"]),
+        })
+
+    # Old progress rows were split by player count. Remove eligible rows and
+    # rebuild them from already-processed closed orders so double/triple/quad
+    # orders receive the missing multiplier without double-counting.
+    progress_rows = conn.execute(text("""
+        SELECT customer_discord_id, scope_key, rule_key
+        FROM customer_loyalty_progress
+    """)).mappings().all()
+    for raw in progress_rows:
+        rule_key = str(raw.get("rule_key") or "").strip()
+        if loyalty_policy_for_rule(rule_key) is None:
+            continue
+        conn.execute(text("""
+            DELETE FROM customer_loyalty_progress
+            WHERE customer_discord_id = :customer_id
+              AND scope_key = :scope_key
+        """), {
+            "customer_id": str(raw.get("customer_discord_id") or ""),
+            "scope_key": str(raw.get("scope_key") or ""),
+        })
+
+    order_rows = conn.execute(text("""
+        SELECT o.id, o.customer_discord_id, o.order_rule_key, o.quantity,
+               o.amount, o.original_amount, o.customer_pay_amount,
+               o.status, o.created_at, o.updated_at, o.closed_at,
+               o.price_snapshot_json, o.ticket_channel_id
+        FROM web_orders o
+        INNER JOIN loyalty_order_events e ON e.order_id = o.id
+        WHERE o.status = 'closed'
+        ORDER BY o.id ASC
+    """)).mappings().all()
+
+    aggregates: dict[tuple[str, str], dict[str, Any]] = {}
+    for raw in order_rows:
+        row = dict(raw)
+        customer_id = str(row.get("customer_discord_id") or "").strip()
+        rule_key = str(row.get("order_rule_key") or "").strip()
+        policy = loyalty_policy_for_rule(rule_key)
+        if (
+            not customer_id
+            or policy is None
+            or not _event_time_is_in_scope(row)
+            or _qualifying_paid_amount(row) <= 0
+        ):
+            continue
+
+        rule = _rule_for_key(rule_key)
+        player_count = _extract_player_count(row)
+        companion_count = _service_companion_count(rule, player_count)
+        paid_units = float(max(0, int(row.get("quantity") or 0)) * companion_count)
+        scope = loyalty_scope_key(rule_key, player_count)
+        key = (customer_id, scope)
+        bucket = aggregates.setdefault(key, {
+            "customer_id": customer_id,
+            "scope_key": scope,
+            "rule_key": rule_key,
+            "rule_label": _loyalty_display_label(
+                rule_key,
+                getattr(rule, "label", rule_key),
+            ),
+            "pricing_type": policy["pricing_type"],
+            "threshold_units": float(policy["threshold_units"]),
+            "benefit_kind": policy["benefit_kind"],
+            "benefit_units": float(policy["benefit_units"]),
+            "paid_units": 0.0,
+        })
+        bucket["paid_units"] = float(bucket["paid_units"]) + paid_units
+
+        conn.execute(text("""
+            UPDATE loyalty_order_events
+            SET scope_key = :scope_key,
+                paid_units = :paid_units,
+                note = CASE
+                    WHEN note IS NULL OR TRIM(note) = '' THEN 'companion_units_v2'
+                    ELSE note || ';companion_units_v2'
+                END
+            WHERE order_id = :order_id
+        """), {
+            "scope_key": scope,
+            "paid_units": paid_units,
+            "order_id": int(row["id"]),
+        })
+
+    for bucket in aggregates.values():
+        total = float(bucket["paid_units"])
+        threshold = float(bucket["threshold_units"])
+        earned_count = int(total // threshold) if threshold > 0 else 0
+        remainder = total - earned_count * threshold if threshold > 0 else 0.0
+
+        existing_count = int(conn.execute(text("""
+            SELECT COUNT(*)
+            FROM customer_benefit_coupons
+            WHERE customer_discord_id = :customer_id
+              AND scope_key = :scope_key
+              AND source = 'loyalty'
+        """), {
+            "customer_id": bucket["customer_id"],
+            "scope_key": bucket["scope_key"],
+        }).scalar() or 0)
+
+        missing_count = max(0, earned_count - existing_count)
+        expires_at = _coupon_expiry_iso(now)
+        for _ in range(missing_count):
+            conn.execute(text("""
+                INSERT INTO customer_benefit_coupons (
+                    customer_discord_id, scope_key, rule_key, rule_label,
+                    pricing_type, player_count, benefit_kind, benefit_units,
+                    status, source, issued_at, expires_at
+                ) VALUES (
+                    :customer_id, :scope_key, :rule_key, :rule_label,
+                    :pricing_type, 1, :benefit_kind, :benefit_units,
+                    'active', 'loyalty', :issued_at, :expires_at
+                )
+            """), {
+                "customer_id": bucket["customer_id"],
+                "scope_key": bucket["scope_key"],
+                "rule_key": bucket["rule_key"],
+                "rule_label": bucket["rule_label"],
+                "pricing_type": bucket["pricing_type"],
+                "benefit_kind": bucket["benefit_kind"],
+                "benefit_units": bucket["benefit_units"],
+                "issued_at": now,
+                "expires_at": expires_at,
+            })
+
+        conn.execute(text("""
+            INSERT INTO customer_loyalty_progress (
+                customer_discord_id, scope_key, rule_key, rule_label,
+                pricing_type, player_count, progress_units, threshold_units,
+                benefit_kind, benefit_units, updated_at
+            ) VALUES (
+                :customer_id, :scope_key, :rule_key, :rule_label,
+                :pricing_type, 1, :progress_units, :threshold_units,
+                :benefit_kind, :benefit_units, :updated_at
+            )
+            ON CONFLICT(customer_discord_id, scope_key) DO UPDATE SET
+                rule_key = excluded.rule_key,
+                rule_label = excluded.rule_label,
+                pricing_type = excluded.pricing_type,
+                player_count = 1,
+                progress_units = excluded.progress_units,
+                threshold_units = excluded.threshold_units,
+                benefit_kind = excluded.benefit_kind,
+                benefit_units = excluded.benefit_units,
+                updated_at = excluded.updated_at
+        """), {
+            "customer_id": bucket["customer_id"],
+            "scope_key": bucket["scope_key"],
+            "rule_key": bucket["rule_key"],
+            "rule_label": bucket["rule_label"],
+            "pricing_type": bucket["pricing_type"],
+            "progress_units": remainder,
+            "threshold_units": threshold,
+            "benefit_kind": bucket["benefit_kind"],
+            "benefit_units": bucket["benefit_units"],
+            "updated_at": now,
+        })
+
+    conn.execute(text("""
+        INSERT INTO loyalty_migrations (migration_key, applied_at, note)
+        VALUES (:migration_key, :applied_at, :note)
+    """), {
+        "migration_key": _LOYALTY_COMPANION_MIGRATION_KEY,
+        "applied_at": now,
+        "note": f"repaired_scopes={len(aggregates)}",
+    })
+
+
 def process_closed_order(order_id: int) -> dict[str, Any] | None:
     """Idempotently accrue one closed order and issue any earned coupons."""
     ensure_loyalty_tables()
@@ -538,24 +838,13 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
         elif _qualifying_paid_amount(row) <= 0:
             note = "no_paid_amount"
         else:
-            player_count = 1
-            try:
-                import json
-                snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))
-                if isinstance(snapshot, dict):
-                    preview = snapshot.get("preview") if isinstance(snapshot.get("preview"), dict) else snapshot
-                    quote = preview.get("quote") if isinstance(preview, dict) and isinstance(preview.get("quote"), dict) else {}
-                    input_data = snapshot.get("input") if isinstance(snapshot.get("input"), dict) else {}
-                    player_count = int(quote.get("player_count") or input_data.get("player_count") or 1)
-            except Exception:
-                player_count = 1
-
+            player_count = _extract_player_count(row)
             rule = _rule_for_key(rule_key)
-            if rule is None or not bool(getattr(rule, "player_count_enabled", False)):
-                player_count = 1
-            player_count = max(1, player_count)
+            companion_count = _service_companion_count(rule, player_count)
             scope = loyalty_scope_key(rule_key, player_count)
-            paid_units = float(max(0, int(row.get("quantity") or 0)))
+            paid_units = float(
+                max(0, int(row.get("quantity") or 0)) * companion_count
+            )
             threshold = float(policy["threshold_units"])
             previous = conn.execute(text("""
                 SELECT progress_units
@@ -570,7 +859,10 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
             total = float(previous or 0) + paid_units
             issued_count = int(total // threshold)
             remainder = total - issued_count * threshold
-            rule_label = str(getattr(rule, "label", rule_key))
+            rule_label = _loyalty_display_label(
+                rule_key,
+                getattr(rule, "label", rule_key),
+            )
             now = get_taipei_now_iso()
             conn.execute(text("""
                 INSERT INTO customer_loyalty_progress (
