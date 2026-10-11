@@ -72,7 +72,7 @@ def test_manager_created_product_appears_in_public_catalog(
     invalidate_rule_override_cache()
 
 
-def test_manager_rename_updates_builtin_public_catalog(
+def test_manager_rename_updates_builtin_public_and_discord_catalogs(
     tmp_path,
     monkeypatch,
 ):
@@ -100,10 +100,10 @@ def test_manager_rename_updates_builtin_public_catalog(
     )
     invalidate_rule_override_cache()
 
-    groups = get_grouped_order_catalog("delta_desktop_fun")
+    web_groups = get_grouped_order_catalog("delta_desktop_fun")
     renamed = next(
         item
-        for item in groups
+        for item in web_groups
         if item["label"] == "一命通關"
     )
     variant = next(
@@ -119,7 +119,28 @@ def test_manager_rename_updates_builtin_public_catalog(
             option["rule_key"] == key
             for option in item["variants"]
         )
-        for item in groups
+        for item in web_groups
     )
+
+    from services.orders import (
+        ORDER_ITEM_GROUPS_BY_CATEGORY,
+        get_order_item_details_for_group,
+    )
+
+    discord_groups = ORDER_ITEM_GROUPS_BY_CATEGORY.get("delta_desktop_fun")
+    assert "一命通關" in discord_groups
+    assert "已讀亂回" not in discord_groups
+
+    discord_details = get_order_item_details_for_group(
+        "delta_desktop_fun",
+        "一命通關",
+    )
+    discord_variant = next(
+        item
+        for item in discord_details
+        if item["rule_key"] == key
+    )
+    assert discord_variant["label"] == "一命通關"
+    assert discord_variant["item"] == "一命通關"
 
     invalidate_rule_override_cache()
