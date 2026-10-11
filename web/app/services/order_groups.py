@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.order_rule_store import (
+    get_active_override,
+    get_custom_rule_definition,
+)
 from services.order_rules import (
     CATEGORY_LABELS,
     ORDER_RULES,
@@ -352,6 +356,31 @@ for _prefix, _category, _game_label in _GAME_TEACHING_GROUPS:
     })
 
 
+def _presentation_intro(rule_key: str) -> str:
+    """Read customer-facing intro copy without mixing it into pricing rules."""
+    key = str(rule_key or "").strip()
+    if not key:
+        return ""
+
+    try:
+        active = get_active_override(key)
+        payload = (active or {}).get("payload") or {}
+        if isinstance(payload, dict) and "intro" in payload:
+            return str(payload.get("intro") or "").strip()
+    except Exception:
+        pass
+
+    try:
+        custom = get_custom_rule_definition(key)
+        payload = (custom or {}).get("payload") or {}
+        if isinstance(payload, dict):
+            return str(payload.get("intro") or "").strip()
+    except Exception:
+        pass
+
+    return ""
+
+
 def _to_int(
     value: Any,
     default: int = 0,
@@ -563,6 +592,7 @@ def _variant_data(
                 rule.note
                 or ""
             ),
+        "intro": _presentation_intro(rule_key),
     }
 
 
@@ -772,17 +802,14 @@ def _current_group_specs() -> list[dict]:
         spec = grouped.get(group_key)
 
         if spec is None:
-            note = str(
-                getattr(rule, "note", "")
-                or ""
-            ).strip()
+            intro = _presentation_intro(key)
             spec = {
                 "key": f"admin_{key}",
                 "category": category,
                 "label": group_label,
                 "selector_label": "方案",
                 "description": (
-                    note
+                    intro
                     or "選擇適合你的方案。"
                 ),
                 "variants": [],
