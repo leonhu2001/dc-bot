@@ -950,8 +950,8 @@ _add_game_service_rule(category="lol", key="lol_elite_ranked", label="英雄聯�
 
 
 # ========= APEX Legends 陪玩 =========
-# 價格依「陪玩階級 × 老闆目前段位」決定，積分場每人每小時 +50T。
-# 網站以前台勾選積分場呈現；Discord 則直接使用獨立的積分 rule。
+# 新制價格只看「陪玩階級 × 模式」，不再依老闆目前段位調整。
+# NG / 積分皆為每人每小時計價；指定每位 +100T，單筆 2H 以上免指定費。
 APEX_GAME_ROLES = ("apex_diamond", "apex_master", "apex_predator")
 
 
@@ -998,9 +998,62 @@ def _add_apex_service_rule(
     ))
 
 
-_APEX_SERVICE_SPECS = (
-    # key prefix, display label, allowed service roles, allowed game roles,
-    # customer-rank prices: (suffix, label, hourly price)
+# 新下單使用的固定價目。所有價格皆為「每人 / H」。
+_APEX_ACTIVE_SERVICE_SPECS = (
+    ("apex_entertain", "娛樂陪", 300, 350, COMPANION_ROLES, ()),
+    (
+        "apex_diamond",
+        "鑽石陪",
+        400,
+        450,
+        (),
+        ("apex_diamond", "apex_master", "apex_predator"),
+    ),
+    (
+        "apex_master",
+        "大師陪",
+        500,
+        550,
+        (),
+        ("apex_master", "apex_predator"),
+    ),
+    (
+        "apex_predator",
+        "頂獵陪",
+        600,
+        650,
+        (),
+        ("apex_predator",),
+    ),
+)
+
+for (
+    _apex_prefix,
+    _apex_service_label,
+    _apex_ng_price,
+    _apex_ranked_price,
+    _apex_service_roles,
+    _apex_game_roles,
+) in _APEX_ACTIVE_SERVICE_SPECS:
+    _add_apex_service_rule(
+        key=f"{_apex_prefix}_ng",
+        label=f"APEX｜{_apex_service_label}｜NG",
+        price=_apex_ng_price,
+        allowed_service_roles=_apex_service_roles,
+        allowed_game_roles=_apex_game_roles,
+    )
+    _add_apex_service_rule(
+        key=f"{_apex_prefix}_ranked",
+        label=f"APEX｜{_apex_service_label}｜積分",
+        price=_apex_ranked_price,
+        allowed_service_roles=_apex_service_roles,
+        allowed_game_roles=_apex_game_roles,
+    )
+
+
+# 舊「依老闆段位」規則保留供歷史訂單、舊存單與舊標籤回查；
+# 新的 Web / Discord 自助下單不再引用這些 key。
+_APEX_LEGACY_SERVICE_SPECS = (
     (
         "apex_entertain",
         "娛樂陪",
@@ -1052,7 +1105,7 @@ for (
     _apex_service_roles,
     _apex_game_roles,
     _apex_rank_prices,
-) in _APEX_SERVICE_SPECS:
+) in _APEX_LEGACY_SERVICE_SPECS:
     for _rank_suffix, _rank_label, _hourly_price in _apex_rank_prices:
         _add_apex_service_rule(
             key=f"{_apex_prefix}_{_rank_suffix}",
