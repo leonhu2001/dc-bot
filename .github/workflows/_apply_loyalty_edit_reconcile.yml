@@ -21,6 +21,18 @@ jobs:
       - name: Apply targeted patch
         run: python scripts/_apply_loyalty_edit_reconcile.py
 
+      - name: Normalize patched files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in [
+              "tests/test_loyalty_benefits.py",
+              "tests/test_admin_customer_loyalty.py",
+          ]:
+              path = Path(name)
+              path.write_text(path.read_text(encoding="utf-8").rstrip() + "\n", encoding="utf-8")
+          PY
+
       - name: Validate formatting
         run: git diff --check
 
