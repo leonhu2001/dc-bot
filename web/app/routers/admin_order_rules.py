@@ -20,6 +20,7 @@ from services.order_rule_store import (
     create_custom_order_rule,
     ensure_order_rule_store,
     get_active_override,
+    get_custom_rule_definition,
     list_rule_versions,
     publish_rule_override,
     reset_rule_override,
@@ -276,6 +277,36 @@ def _parse_int(value, *, field: str) -> int:
         raise ValueError(f"{field} 必須是整數。") from exc
 
 
+def _presentation_intro_from_store(rule_key: str) -> str:
+    key = str(rule_key or "").strip()
+    if not key:
+        return ""
+
+    try:
+        active = get_active_override(key)
+        active_payload = (active or {}).get("payload") or {}
+        if isinstance(active_payload, dict) and "intro" in active_payload:
+            return str(active_payload.get("intro") or "").strip()
+    except Exception:
+        pass
+
+    try:
+        custom = get_custom_rule_definition(key)
+        custom_payload = (custom or {}).get("payload") or {}
+        if isinstance(custom_payload, dict):
+            return str(custom_payload.get("intro") or "").strip()
+    except Exception:
+        pass
+
+    return ""
+
+
+def _payload_with_presentation(rule_key: str, rule: OrderRule) -> dict:
+    payload = rule_to_override_payload(rule)
+    payload["intro"] = _presentation_intro_from_store(rule_key)
+    return payload
+
+
 def _payload_from_form_base(payload: dict, form) -> dict:
     payload = dict(payload)
 
@@ -286,6 +317,7 @@ def _payload_from_form_base(payload: dict, form) -> dict:
     payload["pricing_type"] = str(form.get("pricing_type") or "").strip()
     payload["unit_label"] = str(form.get("unit_label") or "").strip() or "單"
     payload["note"] = str(form.get("note") or "").strip()
+    payload["intro"] = str(form.get("intro") or "").strip()
 
     if not payload["label"]:
         raise ValueError("商品名稱不能空白。")
@@ -367,7 +399,7 @@ def _apply_fun_free_specify_policy(category: str, payload: dict) -> dict:
 def _payload_from_form(rule_key: str, form) -> dict:
     current = ORDER_RULES[str(rule_key)]
     payload = _payload_from_form_base(
-        rule_to_override_payload(current),
+        _payload_with_presentation(str(rule_key), current),
         form,
     )
     return _apply_fun_free_specify_policy(str(current.category), payload)
@@ -381,6 +413,7 @@ def _new_product_payload(category: str, form) -> dict:
         pricing_type="fixed",
     )
     payload = rule_to_override_payload(seed)
+    payload["intro"] = ""
 
     # 新增商品不預設「所有人都可接」，避免忘記設定資格就直接上線。
     payload["allowed_roles"] = []
@@ -516,7 +549,7 @@ async def _render(
     )
 
     effective_payload = (
-        rule_to_override_payload(selected_rule)
+        _payload_with_presentation(selected_key, selected_rule)
         if selected_rule is not None
         else {}
     )
@@ -608,11 +641,13 @@ async def admin_order_rule_create(
             category,
             payload,
         )
+        stored_payload = rule_to_override_payload(rule)
+        stored_payload["intro"] = str(payload.get("intro") or "").strip()
 
         result = create_custom_order_rule(
             rule_key=rule_key,
             category=category,
-            payload=rule_to_override_payload(rule),
+            payload=stored_payload,
             actor_discord_id=str(user.get("id") or ""),
             actor_display_name=_display_name(user),
         )
@@ -626,7 +661,7 @@ async def admin_order_rule_create(
             before=None,
             after={
                 "category": category,
-                **rule_to_override_payload(rule),
+                **stored_payload,
                 "version": int(result["version"]),
                 "is_active": True,
             },
@@ -716,7 +751,10 @@ async def admin_order_rule_preview(
         payload = _payload_from_form(rule_key, form)
         preview_rule_override(rule_key, payload)
 
-        current_payload = rule_to_override_payload(ORDER_RULES[rule_key])
+        current_payload = _payload_with_presentation(
+            rule_key,
+            ORDER_RULES[rule_key],
+        )
         diff = _diff_payload(current_payload, payload)
         if not diff:
             return _redirect(
@@ -758,11 +796,16 @@ async def admin_order_rule_publish(
             raise ValueError("規則預覽資料格式錯誤。")
 
         rule = preview_rule_override(rule_key, payload)
-        before_payload = rule_to_override_payload(ORDER_RULES[rule_key])
+        before_payload = _payload_with_presentation(
+            rule_key,
+            ORDER_RULES[rule_key],
+        )
+        published_payload = rule_to_override_payload(rule)
+        published_payload["intro"] = str(payload.get("intro") or "").strip()
 
         result = publish_rule_override(
             rule_key=rule_key,
-            payload=rule_to_override_payload(rule),
+            payload=published_payload,
             actor_discord_id=str(user.get("id") or ""),
             actor_display_name=_display_name(user),
             expected_active_version=int(expected_active_version),
@@ -776,7 +819,7 @@ async def admin_order_rule_publish(
             target_id=rule_key,
             before=before_payload,
             after={
-                **rule_to_override_payload(rule),
+                **published_payload,
                 "version": int(result["version"]),
             },
         )
@@ -818,7 +861,10 @@ async def admin_order_rule_rollback(
             raise ValueError("找不到可回復的版本。")
 
         preview_rule_override(rule_key, target["payload"])
-        before_payload = rule_to_override_payload(ORDER_RULES[rule_key])
+        before_payload = _payload_with_presentation(
+            rule_key,
+            ORDER_RULES[rule_key],
+        )
 
         result = rollback_rule_override(
             rule_key=rule_key,
@@ -829,7 +875,7 @@ async def admin_order_rule_rollback(
         )
         invalidate_rule_override_cache()
 
-        after_rule = preview_rule_override(rule_key, result["payload"])
+        preview_rule_override(rule_key, result["payload"])
         write_sqlite_audit_log(
             admin_discord_id=str(user.get("id") or ""),
             action="rollback_order_rule",
@@ -837,7 +883,7 @@ async def admin_order_rule_rollback(
             target_id=rule_key,
             before=before_payload,
             after={
-                **rule_to_override_payload(after_rule),
+                **result["payload"],
                 "version": int(result["version"]),
                 "source_version": int(target_version),
             },
@@ -868,8 +914,12 @@ async def admin_order_rule_reset(
         return _redirect(error="這個規則只保留給歷史資料，後台不開放修改。")
 
     try:
-        before_payload = rule_to_override_payload(ORDER_RULES[rule_key])
+        before_payload = _payload_with_presentation(
+            rule_key,
+            ORDER_RULES[rule_key],
+        )
         base_payload = rule_to_override_payload(get_base_rule(rule_key))
+        base_payload["intro"] = ""
 
         result = reset_rule_override(
             rule_key=rule_key,

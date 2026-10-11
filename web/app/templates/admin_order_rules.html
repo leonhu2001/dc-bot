@@ -171,10 +171,24 @@
         </section>
 
         <section class="rule-editor-section">
-            <label class="rule-field">
-                <span>備註</span>
-                <textarea name="note" rows="3" placeholder="可留空"></textarea>
-            </label>
+            <div class="rule-section-heading">
+                <div>
+                    <h3>前台文案</h3>
+                    <p class="muted-text">備註放商品卡外層；簡介只有顧客點進商品後才會看到。</p>
+                </div>
+            </div>
+            <div class="rule-form-grid rule-form-grid--4">
+                <label class="rule-field rule-field--wide">
+                    <span>備註（商品卡外層）</span>
+                    <textarea name="note" rows="2" maxlength="160" placeholder="短句即可，例如：需連撤五把・1000w 無保底"></textarea>
+                    <small class="muted-text">建議 1～2 行；前台會再限制摘要長度，避免把卡片撐高。</small>
+                </label>
+                <label class="rule-field rule-field--wide">
+                    <span>簡介（點進商品後）</span>
+                    <textarea name="intro" rows="5" placeholder="完整玩法、規則與注意事項，可換行"></textarea>
+                    <small class="muted-text">可放完整規則，點「開始設定」後才會顯示。</small>
+                </label>
+            </div>
         </section>
 
         <div class="new-product-actions">
@@ -411,7 +425,24 @@
                 </section>
 
                 <section class="rule-editor-section">
-                    <label class="rule-field"><span>備註</span><textarea name="note" rows="3">{{ payload.get('note', '') }}</textarea></label>
+                    <div class="rule-section-heading">
+                        <div>
+                            <h3>前台文案</h3>
+                            <p class="muted-text">備註顯示在商品卡外層；簡介只顯示在點進商品後的設定視窗。</p>
+                        </div>
+                    </div>
+                    <div class="rule-form-grid rule-form-grid--4">
+                        <label class="rule-field rule-field--wide">
+                            <span>備註（商品卡外層）</span>
+                            <textarea name="note" rows="2" maxlength="160">{{ payload.get('note', '') }}</textarea>
+                            <small class="muted-text">建議 1～2 行；前台會再限制摘要長度。</small>
+                        </label>
+                        <label class="rule-field rule-field--wide">
+                            <span>簡介（點進商品後）</span>
+                            <textarea name="intro" rows="5">{{ payload.get('intro', '') }}</textarea>
+                            <small class="muted-text">適合放完整玩法、規則與注意事項，可換行。</small>
+                        </label>
+                    </div>
                 </section>
 
                 <div class="rule-save-bar">
@@ -552,6 +583,7 @@
 .rule-field > span { display:block; margin-bottom:6px; color:var(--r5-gold-soft,#f2d68d); font-size:11px; font-weight:750; }
 .rule-field input,.rule-field select,.rule-field textarea { width:100%; min-width:0; box-sizing:border-box; }
 .rule-field textarea { resize:vertical; }
+.rule-field small { display:block; margin-top:6px; line-height:1.55; }
 .rule-toggle-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
 .rule-toggle-grid label { display:flex; align-items:center; gap:8px; min-height:40px; padding:9px 10px; border:1px solid rgba(255,255,255,.065); border-radius:9px; background:rgba(255,255,255,.016); }
 .rule-inline-note { display:flex; align-items:center; gap:10px; margin-top:10px; padding:9px 10px; border-left:2px solid rgba(216,174,73,.45); background:rgba(216,174,73,.035); }
