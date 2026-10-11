@@ -30,10 +30,20 @@ def test_loyalty_coupons_have_ninety_day_expiry():
     assert "SET status = 'expired'" in source
 
 
-def test_cs_payout_recalculation_uses_separate_base():
-    source = (ROOT / "web/app/services/order_service.py").read_text(encoding="utf-8")
-    assert 'gifted_service = _amount("point_service_value") + _amount("benefit_service_value")' in source
-    assert "customer_service_total_amount=_customer_service_payout_base(order)" in source
+def test_cs_payout_recalculation_uses_shared_separate_base_rule():
+    shared_source = (ROOT / "shared/payout.py").read_text(encoding="utf-8")
+    order_source = (ROOT / "web/app/services/order_service.py").read_text(encoding="utf-8")
+    reconciliation_source = (
+        ROOT / "web/app/services/accounting_reconciliation.py"
+    ).read_text(encoding="utf-8")
+
+    assert "def calculate_customer_service_payout_base_amount(" in shared_source
+    assert 'point_service_value' in shared_source
+    assert 'benefit_service_value' in shared_source
+    assert "calculate_customer_service_payout_base_amount(" in order_source
+    assert "customer_service_total_amount=_customer_service_payout_base(order)" in order_source
+    assert "calculate_customer_service_payout_base_amount(" in reconciliation_source
+    assert "customer_service_total_amount=(" in reconciliation_source
 
 
 def test_member_center_uses_recomposed_dashboard():
