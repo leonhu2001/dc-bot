@@ -262,47 +262,44 @@ GROUP_SPECS = [
         "key": "apex_entertain",
         "category": "apex",
         "label": "APEX｜娛樂陪",
-        "selector_label": "老闆目前段位",
-        "description": "需男陪／女陪 + APEX身分組；可選單陪或雙陪，積分場每人每小時 +50T；買 5 送 1；指定每位 +100T，2 小時以上免指定費。",
+        "selector_label": "模式",
+        "description": "需男陪／女陪 + APEX身分組；NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
         "variants": [
-            ("apex_entertain_platinum", "白金以下"),
-            ("apex_entertain_diamond", "鑽石"),
-            ("apex_entertain_master", "大師 / 頂獵"),
+            ("apex_entertain_ng", "NG"),
+            ("apex_entertain_ranked", "積分"),
         ],
     },
     {
         "key": "apex_diamond",
         "category": "apex",
         "label": "APEX｜鑽石陪",
-        "selector_label": "老闆目前段位",
-        "description": "需 APEX身分組 + 鑽石／大師／頂獵階級；可選單陪或雙陪，積分場每人每小時 +50T；買 5 送 1；指定每位 +100T，2 小時以上免指定費。",
+        "selector_label": "模式",
+        "description": "需 APEX身分組 + 鑽石／大師／頂獵階級；NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
         "variants": [
-            ("apex_diamond_platinum", "白金以下"),
-            ("apex_diamond_diamond", "鑽石"),
+            ("apex_diamond_ng", "NG"),
+            ("apex_diamond_ranked", "積分"),
         ],
     },
     {
         "key": "apex_master",
         "category": "apex",
         "label": "APEX｜大師陪",
-        "selector_label": "老闆目前段位",
-        "description": "需 APEX身分組 + 大師／頂獵階級；可選單陪或雙陪，積分場每人每小時 +50T；買 5 送 1；指定每位 +100T，2 小時以上免指定費。",
+        "selector_label": "模式",
+        "description": "需 APEX身分組 + 大師／頂獵階級；NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
         "variants": [
-            ("apex_master_platinum", "白金以下"),
-            ("apex_master_diamond", "鑽石"),
-            ("apex_master_master", "大師 / 頂獵"),
+            ("apex_master_ng", "NG"),
+            ("apex_master_ranked", "積分"),
         ],
     },
     {
         "key": "apex_predator",
         "category": "apex",
         "label": "APEX｜頂獵陪",
-        "selector_label": "老闆目前段位",
-        "description": "需 APEX身分組 + 頂獵階級；可選單陪或雙陪，積分場每人每小時 +50T；買 5 送 1；指定每位 +100T，2 小時以上免指定費。",
+        "selector_label": "模式",
+        "description": "需 APEX身分組 + 頂獵階級；NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
         "variants": [
-            ("apex_predator_platinum", "白金以下"),
-            ("apex_predator_diamond", "鑽石"),
-            ("apex_predator_master", "大師 / 頂獵"),
+            ("apex_predator_ng", "NG"),
+            ("apex_predator_ranked", "積分"),
         ],
     },
 
@@ -472,19 +469,6 @@ def _variant_data(
         quantity_enabled = True
         min_quantity = 1
         max_quantity = 7
-
-    elif (
-        str(rule.category) == "apex"
-        and not str(rule_key).endswith("_ranked")
-    ):
-        customer_adjustments = [
-            {
-                "key": "ranked",
-                "label": "積分場（每人每小時）",
-                "amount": 50,
-                "amount_mode": "quantity_x_player_count",
-            },
-        ]
 
     roles = get_allowed_role_labels(rule)
 
