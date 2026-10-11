@@ -9,7 +9,7 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "rebate_2": "・儲值返利2%",
     "monthly_coupon_200": "・每月一張折現券200T",
     "priority_order": "・優先排單",
-    "familiar_worker": "・優先安排熟悉打手",
+    "familiar_worker": "・優先安排熟悉／收藏陪玩",
     "rebate_3": "・儲值返利3%",
     "discount_96": "・體驗單、趣味單外全館96折",
     "rebate_4": "・儲值返利4%",
@@ -27,7 +27,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "name": "銀級魔丸",
         "threshold": 2000,
         "role_id": 1516575040206929920,
-        "benefit_keys": ["vip_room"],
+        "benefit_keys": ["vip_room", "priority_cs"],
     },
     {
         "name": "金級魔丸",
