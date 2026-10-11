@@ -95,9 +95,9 @@
         }
     }
 
-    // ORDER_RULE_NOTE_STOREFRONT
-    // 後台「備註」就是顧客看的商品規則：單方案卡片顯示摘要，
-    // 點進商品後顯示完整內容；多方案則跟著目前選到的方案切換。
+    // ORDER_RULE_PRESENTATION_STOREFRONT
+    // 「備註」只顯示在商品卡外層；「簡介」只在點進商品後顯示。
+    // 多方案商品若備註完全相同，外層可共用；簡介則跟著方案切換。
     const orderGroupsNode = document.getElementById(
         "mw-order-groups-data"
     );
@@ -122,7 +122,7 @@
             )
         );
 
-        const normalizeNote = (value) =>
+        const normalizeCopy = (value) =>
             String(value || "")
                 .replace(/\r\n?/g, "\n")
                 .split("\n")
@@ -132,19 +132,19 @@
                 .trim();
 
         const summarizeNote = (value) => {
-            const full = normalizeNote(value);
+            const full = normalizeCopy(value);
 
             if (!full) {
                 return "";
             }
 
             const lines = full.split("\n");
-            const visibleLines = lines.slice(0, 4);
+            const visibleLines = lines.slice(0, 2);
             let summary = visibleLines.join("\n");
             let truncated = lines.length > visibleLines.length;
 
-            if (summary.length > 140) {
-                summary = summary.slice(0, 140).trimEnd();
+            if (summary.length > 90) {
+                summary = summary.slice(0, 90).trimEnd();
                 truncated = true;
             }
 
@@ -159,12 +159,19 @@
                     ? group.variants
                     : [];
 
-                if (variants.length !== 1) {
-                    return;
-                }
+                const notes = variants
+                    .map((variant) => normalizeCopy(variant?.note))
+                    .filter(Boolean);
 
-                const note = normalizeNote(
-                    variants[0]?.note
+                const note = (
+                    variants.length === 1
+                        ? (notes[0] || "")
+                        : (
+                            notes.length === variants.length
+                            && notes.every((item) => item === notes[0])
+                                ? notes[0]
+                                : ""
+                        )
                 );
 
                 if (!note) {
@@ -195,7 +202,7 @@
         );
         let activeOrderGroupKey = "";
 
-        const syncDialogRuleNote = () => {
+        const syncDialogIntro = () => {
             if (!dialogDescription) {
                 return;
             }
@@ -216,12 +223,12 @@
                 Number(variantSelect?.selectedIndex || 0)
             );
             const variant = variants[index] || variants[0] || null;
-            const note = normalizeNote(
-                variant?.note
+            const intro = normalizeCopy(
+                variant?.intro
             );
 
             dialogDescription.textContent =
-                note
+                intro
                 || String(group.description || "選擇適合你的方案。");
             dialogDescription.style.whiteSpace = "pre-line";
         };
@@ -238,7 +245,7 @@
                             activeOrderGroupKey = String(
                                 openButton.dataset.orderGroup || ""
                             );
-                            syncDialogRuleNote();
+                            syncDialogIntro();
                         }
                     );
                 }
@@ -246,7 +253,7 @@
 
         variantSelect?.addEventListener(
             "change",
-            syncDialogRuleNote
+            syncDialogIntro
         );
     }
 })();
