@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from services import order_rule_store
+from services import order_product_status, order_rule_store
 from services.order_product_status import (
     StatusAwareHiddenRuleKeys,
     ensure_order_product_status_store,
@@ -95,6 +95,10 @@ def test_web_catalog_and_quote_hide_inactive_product(tmp_path, monkeypatch):
 
 def test_discord_catalog_hides_inactive_and_blocks_selected_draft(tmp_path, monkeypatch):
     db_file = _use_status_db(monkeypatch, tmp_path)
+    # Other regression modules may import the bot helpers during collection.
+    # Re-run the installer for this isolated temp DB instead of depending on
+    # collection order or the module-level one-shot flag.
+    monkeypatch.setattr(order_product_status, "_DISCORD_GUARDS_INSTALLED", False)
     install_discord_catalog_guards()
 
     key = "basic_tech_secret_single"
