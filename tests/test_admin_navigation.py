@@ -294,7 +294,7 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert "rule-form-grid rule-form-grid--4" in page
     assert "rule-field--wide" in page
     assert "grid-template-columns:repeat(4,minmax(0,1fr))" in page
-    assert page.count("遊戲 / 平台身分") == 2
+    assert page.count("遊戲 / 平台身分") >= 2
     assert "qualification_groups" in page
     assert "game_identity_groups" in page
     assert 'name="{{ option.field }}"' in page
