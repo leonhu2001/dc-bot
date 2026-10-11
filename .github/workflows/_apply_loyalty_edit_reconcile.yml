@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply targeted patch
-        run: python scripts/_apply_loyalty_edit_reconcile.py
+        run: python scripts/_apply_loyalty_edit_reconcile_v2.py
 
       - name: Normalize patched files
         run: |
