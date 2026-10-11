@@ -22,7 +22,10 @@ from services.vip_review_store import (
 from web.app.services.accounting_reconciliation import (
     build_accounting_reconciliation_snapshot,
 )
-from web.app.services.admin_customer_loyalty import enrich_customer_rows
+from web.app.services.admin_customer_loyalty import (
+    enrich_customer_rows,
+    load_customer_loyalty_detail,
+)
 from web.app.services.audit_trail import write_sqlite_audit_log
 from web.app.services.role_catalog import STAFF_ROLE_FILTERS
 
@@ -637,6 +640,59 @@ async def staff_center(
 @router.get("/admin/customer-center")
 async def customer_center(request: Request, q: str = ""):
     return await _render(request, center="customers", q=q)
+
+
+@router.get("/admin/customer-center/{customer_id}/benefits")
+async def customer_benefits_detail(request: Request, customer_id: str):
+    user = _current_admin(request)
+    if user is None:
+        return RedirectResponse("/no-access", status_code=303)
+
+    customer_id = str(customer_id or "").strip()
+    if not customer_id:
+        return RedirectResponse("/admin/customer-center", status_code=303)
+
+    loyalty = await run_in_threadpool(
+        lambda: load_customer_loyalty_detail(WEB_DB, customer_id)
+    )
+
+    display_name = customer_id
+    if WEB_DB.exists():
+        try:
+            with _connect(WEB_DB) as conn:
+                if _table_exists(conn, "web_orders"):
+                    row = conn.execute(
+                        """
+                        SELECT MAX(
+                            COALESCE(
+                                NULLIF(customer_display_name, ''),
+                                customer_discord_id
+                            )
+                        ) AS customer_display_name
+                        FROM web_orders
+                        WHERE customer_discord_id = ?
+                        """,
+                        (customer_id,),
+                    ).fetchone()
+                    if row is not None and row["customer_display_name"]:
+                        display_name = str(row["customer_display_name"])
+        except sqlite3.Error:
+            pass
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_customer_benefits.html",
+        context={
+            "title": f"{display_name}・福利明細",
+            "user": user,
+            "customer": {
+                "id": customer_id,
+                "display_name": display_name,
+            },
+            "loyalty": loyalty,
+            "is_manager": bool(user.get("is_manager")),
+        },
+    )
 
 
 @router.get("/admin/customer-center/vip")

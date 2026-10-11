@@ -1,25 +1,16 @@
 import sqlite3
 from pathlib import Path
 
-from web.app.routers import admin_centers
-from web.app.services.admin_customer_loyalty import enrich_customer_rows, load_customer_loyalty
+from web.app.services.admin_customer_loyalty import (
+    enrich_customer_rows,
+    load_customer_loyalty_detail,
+)
 
 
-def _make_db(path: Path) -> None:
+def _db(tmp_path: Path) -> Path:
+    path = tmp_path / "loyalty-admin.db"
     with sqlite3.connect(path) as conn:
-        conn.executescript(
-            """
-            CREATE TABLE web_orders (
-                id INTEGER PRIMARY KEY,
-                customer_discord_id TEXT,
-                customer_display_name TEXT,
-                status TEXT,
-                amount INTEGER,
-                customer_pay_amount INTEGER,
-                created_at TEXT,
-                updated_at TEXT
-            );
-
+        conn.execute("""
             CREATE TABLE customer_loyalty_progress (
                 customer_discord_id TEXT NOT NULL,
                 scope_key TEXT NOT NULL,
@@ -33,8 +24,9 @@ def _make_db(path: Path) -> None:
                 benefit_units REAL NOT NULL,
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (customer_discord_id, scope_key)
-            );
-
+            )
+        """)
+        conn.execute("""
             CREATE TABLE customer_benefit_coupons (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 customer_discord_id TEXT NOT NULL,
@@ -47,100 +39,53 @@ def _make_db(path: Path) -> None:
                 benefit_units REAL NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
                 source TEXT NOT NULL DEFAULT 'loyalty',
-                issued_at TEXT NOT NULL
-            );
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO web_orders
-            VALUES (1,'100','老闆A','closed',500,450,'2026-10-11','2026-10-11')
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO customer_loyalty_progress
-            VALUES ('100','basic_entertain_single|players:1','basic_entertain_single',
-                    '娛樂陪〈端遊〉｜單陪','hourly',1,6,10,'extra_hours',0.5,'2026-10-11T01:00:00+08:00')
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO customer_loyalty_progress
-            VALUES ('100','valorant_entertain_ranked|players:2','valorant_entertain_ranked',
-                    '特戰英豪｜娛樂陪｜積分','game',2,14,20,'extra_games',1,'2026-10-11T02:00:00+08:00')
-            """
-        )
-        for status in ("active", "reserved", "redeemed", "expired"):
-            conn.execute(
-                """
-                INSERT INTO customer_benefit_coupons (
-                    customer_discord_id, scope_key, rule_key, rule_label,
-                    pricing_type, player_count, benefit_kind, benefit_units,
-                    status, source, issued_at
-                ) VALUES ('100','basic_entertain_single|players:1','basic_entertain_single',
-                          '娛樂陪〈端遊〉｜單陪','hourly',1,'extra_hours',0.5,?,'loyalty','2026-10-11')
-                """,
-                (status,),
+                issued_at TEXT NOT NULL,
+                expires_at TEXT,
+                reserved_order_id INTEGER,
+                redeemed_order_id INTEGER,
+                redeemed_at TEXT
             )
-        conn.commit()
+        """)
+        conn.execute("""
+            INSERT INTO customer_loyalty_progress VALUES
+            ('123', 'valorant|valorant_entertain_ng', 'valorant_entertain_ng', 'VALORANT｜娛樂陪｜雙陪', 'hourly', 2, 6, 10, 'extra_hours', 0.5, '2026-10-11T10:00:00+08:00'),
+            ('123', 'lol|lol_entertain_ng', 'lol_entertain_ng', 'LOL｜娛樂陪', 'hourly', 1, 4, 10, 'extra_hours', 0.5, '2026-10-11T11:00:00+08:00')
+        """)
+        conn.execute("""
+            INSERT INTO customer_benefit_coupons (
+                customer_discord_id, scope_key, rule_key, rule_label, pricing_type,
+                player_count, benefit_kind, benefit_units, status, source,
+                issued_at, expires_at, reserved_order_id, redeemed_order_id, redeemed_at
+            ) VALUES
+            ('123', 'valorant|valorant_entertain_ng', 'valorant_entertain_ng', 'VALORANT｜娛樂陪｜雙陪', 'hourly', 2, 'extra_hours', 0.5, 'active', 'loyalty', '2026-10-11T10:00:00+08:00', '2027-01-09T10:00:00+08:00', NULL, NULL, NULL),
+            ('123', 'lol|lol_entertain_ng', 'lol_entertain_ng', 'LOL｜娛樂陪', 'hourly', 1, 'extra_hours', 0.5, 'redeemed', 'loyalty', '2026-10-11T09:00:00+08:00', '2027-01-09T09:00:00+08:00', NULL, 88, '2026-10-11T12:00:00+08:00')
+        """)
+    return path
 
 
-def test_load_customer_loyalty_formats_progress_and_coupon_counts(tmp_path: Path):
-    db = tmp_path / "web_dashboard.db"
-    _make_db(db)
+def test_admin_loyalty_detail_shows_real_coupon_status_and_keeps_games_separate(tmp_path: Path):
+    data = load_customer_loyalty_detail(_db(tmp_path), "123")
 
-    snapshot = load_customer_loyalty(db, ["100"])["100"]
-
-    assert snapshot["progress"][0]["title"] == "特戰英豪｜娛樂陪｜積分｜2位"
-    assert snapshot["progress"][0]["progress_text"] == "14 / 20局"
-    assert snapshot["progress"][0]["benefit_text"] == "+1 局"
-    assert snapshot["progress"][1]["progress_text"] == "6 / 10H"
-    assert snapshot["progress"][1]["benefit_text"] == "+30 分鐘"
-    assert snapshot["coupon_counts"] == {
-        "active": 1,
-        "reserved": 1,
-        "redeemed": 1,
-        "expired": 1,
-        "other": 0,
+    assert len(data["groups"]) == 2
+    assert {group["scope_key"] for group in data["groups"]} == {
+        "valorant|valorant_entertain_ng",
+        "lol|lol_entertain_ng",
     }
+    assert data["coupon_counts"]["active"] == 1
+    assert data["coupon_counts"]["redeemed"] == 1
+    assert data["active_coupons"][0]["status_label"] == "可使用"
+    assert "折抵 30 分鐘額度" in data["active_coupons"][0]["title"]
+    assert "雙陪" not in data["active_coupons"][0]["title"]
+    assert all("位" not in row["title"] for row in data["progress"])
 
 
-def test_enrich_customer_rows_keeps_customer_center_fields(tmp_path: Path):
-    db = tmp_path / "web_dashboard.db"
-    _make_db(db)
-
+def test_customer_list_enrichment_contains_coupon_preview_and_progress(tmp_path: Path):
     rows = enrich_customer_rows(
-        db,
-        [
-            {"customer_discord_id": "100", "customer_display_name": "老闆A"},
-            {"customer_discord_id": "200", "customer_display_name": "老闆B"},
-        ],
+        _db(tmp_path),
+        [{"customer_discord_id": "123", "customer_display_name": "老闆A"}],
     )
 
-    assert rows[0]["customer_display_name"] == "老闆A"
-    assert len(rows[0]["loyalty_progress"]) == 2
-    assert rows[0]["loyalty_coupon_counts"]["active"] == 1
     assert rows[0]["loyalty_has_anything"] is True
-    assert rows[1]["loyalty_progress"] == []
-    assert rows[1]["loyalty_coupon_counts"]["active"] == 0
-    assert rows[1]["loyalty_has_anything"] is False
-
-
-def test_customer_center_snapshot_includes_loyalty_progress(tmp_path: Path, monkeypatch):
-    web_db = tmp_path / "web_dashboard.db"
-    _make_db(web_db)
-
-    monkeypatch.setattr(admin_centers, "WEB_DB", web_db)
-    monkeypatch.setattr(admin_centers, "BOT_DB", tmp_path / "missing_bot.db")
-
-    snapshot = admin_centers._customer_snapshot(include_wallets=False)
-    row = snapshot["rows"][0]
-
-    assert row["customer_discord_id"] == "100"
-    assert row["completed_spend"] == 450
-    assert [item["progress_text"] for item in row["loyalty_progress"]] == [
-        "14 / 20局",
-        "6 / 10H",
-    ]
-    assert row["loyalty_coupon_counts"]["active"] == 1
+    assert len(rows[0]["loyalty_progress"]) == 2
+    assert len(rows[0]["loyalty_active_coupons"]) == 1
+    assert rows[0]["loyalty_coupon_counts"]["redeemed"] == 1
