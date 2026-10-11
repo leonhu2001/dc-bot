@@ -284,20 +284,25 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert '"key": "female_companion"' in source
 
     assert "<h3>接單職位</h3>" not in page
-    # Existing-rule editor and new-product form both use the same taxonomy.
-    assert page.count("<h3>階級資格</h3>") == 2
+    # Existing-rule editor and new-product form both use the same taxonomy,
+    # now presented inside the redesigned rule workspace.
+    assert page.count("<h3>接單資格</h3>") == 2
     assert "＋ 新增商品" in page
     assert 'action="/admin/order-rules/create"' in page
     assert 'name="category"' in page
     assert 'class="panel compact-panel new-product-panel"' in page
-    assert 'class="new-product-grid"' in page
-    assert "new-product-field--wide" in page
-    assert "grid-template-columns: repeat(4, minmax(0, 1fr))" in page
-    assert "<h3>遊戲身分</h3>" in page
+    assert "rule-form-grid rule-form-grid--4" in page
+    assert "rule-field--wide" in page
+    assert "grid-template-columns:repeat(4,minmax(0,1fr))" in page
+    assert page.count("遊戲 / 平台身分") >= 2
     assert "qualification_groups" in page
     assert "game_identity_groups" in page
     assert 'name="{{ option.field }}"' in page
     assert 'name="required_game_roles"' in page
+    assert 'id="order-rule-sidebar"' in page
+    assert 'id="order-rule-workspace"' in page
+    assert "data-rule-search" in page
+    assert 'data-rule-filter="inactive"' in page
 
 
 def test_payout_summary_uses_shared_discord_avatar_resolver():
@@ -313,4 +318,3 @@ def test_payout_summary_uses_shared_discord_avatar_resolver():
         "summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)"
         in router
     )
-

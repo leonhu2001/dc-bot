@@ -10,6 +10,12 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from services.order_product_status import (
+    ensure_order_product_status_store,
+    get_order_product_status,
+    install_web_catalog_guards,
+    set_order_product_active,
+)
 from services.order_rule_store import (
     create_custom_order_rule,
     ensure_order_rule_store,
@@ -36,6 +42,11 @@ from services.order_rules import (
 )
 from web.app.services.audit_trail import write_sqlite_audit_log
 
+
+# main.py imports this router before the public site router. Install the live
+# availability guards here so the public catalog/quote helpers that site.py
+# imports afterwards already respect manager-controlled product status.
+install_web_catalog_guards()
 
 router = APIRouter(tags=["admin-order-rules"])
 
@@ -360,10 +371,7 @@ def _new_product_payload(category: str, form) -> dict:
 def _new_product_key(category: str) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     for _ in range(10):
-        key = (
-            f"admin_{category}_{stamp}_"
-            f"{secrets.token_hex(2)}"
-        )
+        key = f"admin_{category}_{stamp}_{secrets.token_hex(2)}"
         if key not in ORDER_RULES:
             return key
     raise RuntimeError("無法產生唯一商品代碼，請再試一次。")
@@ -372,6 +380,7 @@ def _new_product_key(category: str) -> str:
 def _rule_row(key: str) -> dict:
     rule = ORDER_RULES[key]
     meta = get_active_override(key)
+    status = get_order_product_status(key)
     return {
         "key": key,
         "category": rule.category,
@@ -391,6 +400,8 @@ def _rule_row(key: str) -> dict:
         "override_version": int((meta or {}).get("version") or 0),
         "is_overridden": bool(meta),
         "updated_at": str((meta or {}).get("updated_at") or ""),
+        "is_active": bool(status.get("is_active", True)),
+        "status_updated_at": str(status.get("updated_at") or ""),
     }
 
 
@@ -443,6 +454,7 @@ async def _render(
         )
 
     ensure_order_rule_store()
+    ensure_order_product_status_store()
 
     rule_rows = sorted(
         (
@@ -467,6 +479,11 @@ async def _render(
     selected_base = get_base_rule(selected_key) if selected_key else None
     active_meta = get_active_override(selected_key) if selected_key else None
     active_version = int((active_meta or {}).get("version") or 0)
+    selected_status = (
+        get_order_product_status(selected_key)
+        if selected_key
+        else {"is_active": True, "updated_at": ""}
+    )
 
     effective_payload = (
         rule_to_override_payload(selected_rule)
@@ -480,6 +497,8 @@ async def _render(
         else []
     )
 
+    active_count = sum(1 for row in rule_rows if row["is_active"])
+
     return templates.TemplateResponse(
         request=request,
         name="admin_order_rules.html",
@@ -487,10 +506,14 @@ async def _render(
             "title": "商品與規則",
             "user": user,
             "rules": rule_rows,
+            "active_rule_count": active_count,
+            "inactive_rule_count": len(rule_rows) - active_count,
             "category_labels": CATEGORY_LABELS,
             "selected_key": selected_key,
             "selected_rule": selected_rule,
             "selected_base": selected_base,
+            "selected_status": selected_status,
+            "selected_is_active": bool(selected_status.get("is_active", True)),
             "payload": preview_payload or effective_payload,
             "active_meta": active_meta,
             "active_version": active_version,
@@ -544,10 +567,7 @@ async def admin_order_rule_create(
         form = await request.form()
         category = str(form.get("category") or "").strip()
 
-        allowed_categories = {
-            key
-            for key, _label in ADMIN_PRODUCT_CATEGORIES
-        }
+        allowed_categories = {key for key, _label in ADMIN_PRODUCT_CATEGORIES}
         if category not in allowed_categories:
             raise ValueError("請選擇正確的商品分類。")
 
@@ -578,6 +598,7 @@ async def admin_order_rule_create(
                 "category": category,
                 **rule_to_override_payload(rule),
                 "version": int(result["version"]),
+                "is_active": True,
             },
         )
     except (ValueError, KeyError, RuntimeError) as exc:
@@ -589,6 +610,61 @@ async def admin_order_rule_create(
             f"已新增「{rule.label}」到 "
             f"{CATEGORY_LABELS.get(category, category)}。"
             " Web 與 DC Bot 會自動讀取。"
+        ),
+    )
+
+
+@router.post("/admin/order-rules/{rule_key}/status")
+async def admin_order_rule_status(
+    request: Request,
+    rule_key: str,
+):
+    user = _user(request)
+    if not user or not user.get("is_manager"):
+        return RedirectResponse("/admin", status_code=303)
+
+    if not _is_admin_editable_rule(rule_key):
+        return _redirect(error="這個規則只保留給歷史資料，後台不開放修改。")
+
+    try:
+        form = await request.form()
+        requested = str(form.get("is_active") or "").strip().lower()
+        is_active = requested in {"1", "true", "yes", "on"}
+        before_status = get_order_product_status(rule_key)
+
+        result = set_order_product_active(
+            rule_key=rule_key,
+            is_active=is_active,
+            actor_discord_id=str(user.get("id") or ""),
+            actor_display_name=_display_name(user),
+        )
+
+        write_sqlite_audit_log(
+            admin_discord_id=str(user.get("id") or ""),
+            action=(
+                "activate_order_rule"
+                if is_active
+                else "deactivate_order_rule"
+            ),
+            target_type="order_rule",
+            target_id=rule_key,
+            before={"is_active": bool(before_status.get("is_active", True))},
+            after={
+                "is_active": bool(result["is_active"]),
+                "updated_at": result["updated_at"],
+            },
+        )
+    except (ValueError, KeyError, RuntimeError) as exc:
+        return _redirect(rule_key=rule_key, error=str(exc))
+
+    rule = ORDER_RULES.get(rule_key)
+    label = str(getattr(rule, "label", rule_key) or rule_key)
+    return _redirect(
+        rule_key=rule_key,
+        ok=(
+            f"已重新上架「{label}」，Web 與 DC Bot 會自動恢復顯示。"
+            if is_active
+            else f"已下架「{label}」，新訂單將不再顯示此商品；歷史訂單不受影響。"
         ),
     )
 
