@@ -202,6 +202,12 @@
                             {% else %}
                             <div class="loyalty-detail-item"><small>目前沒有未完成的累積進度。</small></div>
                             {% endfor %}
+                            {% for coupon in row.loyalty_active_coupons[:3] %}
+                            <div class="loyalty-detail-item">
+                                <strong>{{ coupon.title }}</strong>
+                                <small>{{ coupon.status_label }} ｜ 到期 {{ coupon.expires_at_text }}</small>
+                            </div>
+                            {% endfor %}
                             <small class="loyalty-coupon-history">已兌換 {{ row.loyalty_coupon_counts.redeemed or 0 }} ｜ 已過期 {{ row.loyalty_coupon_counts.expired or 0 }}</small>
                         </div>
                     </details>
@@ -213,6 +219,7 @@
                 <div class="center-cell"><span>最近活動</span><b>{{ row.last_seen_at or '-' }}</b></div>
                 {% endif %}
                 <div class="center-actions">
+                    <a class="button secondary" href="/admin/customer-center/{{ row.customer_discord_id }}/benefits">福利明細</a>
                     <a class="button secondary" href="/admin/search/customer/{{ row.customer_discord_id }}?return_to=/admin/customer-center">客戶資料</a>
                     {% if is_manager %}
                     <a class="button secondary" href="/admin/wallets/{{ row.customer_discord_id }}?return_to=/admin/customer-center">錢包</a>

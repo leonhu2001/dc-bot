@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+
+{% block page_title %}客戶福利明細{% endblock %}
+
+{% block content %}
+<style>
+.benefit-page{display:grid;gap:14px}.benefit-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}.benefit-head h2{margin:0 0 5px}.benefit-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.benefit-stat{padding:14px;border:1px solid var(--r5-line,rgba(255,255,255,.08));border-radius:12px;background:var(--r5-panel,#11110f)}.benefit-stat span{display:block;color:var(--r5-muted,#969289);font-size:11px;font-weight:800}.benefit-stat strong{display:block;margin-top:6px;color:var(--r5-gold-soft,#f2d68d);font-size:25px}.benefit-group{display:grid;gap:10px;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.018)}.benefit-group-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.benefit-group-head h3{margin:0;font-size:17px}.benefit-progress{padding:11px;border:1px solid rgba(223,183,92,.18);border-radius:10px;background:rgba(223,183,92,.035)}.benefit-progress-top{display:flex;justify-content:space-between;gap:10px}.benefit-bar{height:7px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}.benefit-bar i{display:block;height:100%;background:var(--r5-gold,#dfb75c)}.coupon-list{display:grid;gap:8px}.coupon-row{display:grid;grid-template-columns:minmax(200px,1.3fr) 90px 150px 150px minmax(150px,.8fr);gap:10px;padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:10px;align-items:center}.coupon-row small,.benefit-progress small{color:var(--r5-muted,#969289)}.coupon-status{font-size:11px;font-weight:900}.coupon-status.active{color:#8fd7a7}.coupon-status.reserved{color:#f2d68d}.coupon-status.redeemed{color:#9bb9e8}.coupon-status.expired{color:#969289}.empty-benefit{padding:24px;text-align:center;color:var(--r5-muted,#969289);border:1px dashed rgba(255,255,255,.1);border-radius:12px}@media(max-width:980px){.benefit-stats{grid-template-columns:repeat(2,1fr)}.coupon-row{grid-template-columns:1fr 1fr}}@media(max-width:600px){.benefit-stats{grid-template-columns:1fr 1fr}.coupon-row{grid-template-columns:1fr}}
+</style>
+
+<div class="benefit-page">
+    <div class="panel compact-panel benefit-head">
+        <div>
+            <span class="eyebrow">CUSTOMER BENEFITS</span>
+            <h2>{{ customer.display_name }}</h2>
+            <p class="muted-text">{{ customer.id }}｜不同遊戲的累積與福利彼此獨立。</p>
+        </div>
+        <div class="center-actions">
+            <a class="button secondary" href="/admin/customer-center">← 返回客戶中心</a>
+            <a class="button secondary" href="/admin/search/customer/{{ customer.id }}?return_to=/admin/customer-center/{{ customer.id }}/benefits">客戶資料</a>
+        </div>
+    </div>
+
+    <div class="benefit-stats">
+        <div class="benefit-stat"><span>累積進度</span><strong>{{ loyalty.progress|length }}</strong></div>
+        <div class="benefit-stat"><span>可使用</span><strong>{{ loyalty.coupon_counts.active or 0 }}</strong></div>
+        <div class="benefit-stat"><span>使用中</span><strong>{{ loyalty.coupon_counts.reserved or 0 }}</strong></div>
+        <div class="benefit-stat"><span>已使用</span><strong>{{ loyalty.coupon_counts.redeemed or 0 }}</strong></div>
+        <div class="benefit-stat"><span>已過期</span><strong>{{ loyalty.coupon_counts.expired or 0 }}</strong></div>
+    </div>
+
+    {% for group in loyalty.groups %}
+    <section class="benefit-group">
+        <div class="benefit-group-head">
+            <h3>{{ group.title }}</h3>
+            <small class="muted-text">{{ group.scope_key }}</small>
+        </div>
+
+        {% for progress in group.progress %}
+        <div class="benefit-progress">
+            <div class="benefit-progress-top">
+                <strong>目前 {{ progress.progress_text }}</strong>
+                <small>達標後：{{ progress.benefit_text }}</small>
+            </div>
+            <div class="benefit-bar"><i style="width:{{ progress.percent }}%"></i></div>
+            <small>最近更新：{{ progress.updated_at_text }}</small>
+        </div>
+        {% endfor %}
+
+        {% if group.coupons %}
+        <div class="coupon-list">
+            {% for coupon in group.coupons %}
+            <div class="coupon-row">
+                <div><strong>{{ coupon.benefit_text }}</strong><small>券 #{{ coupon.id }}</small></div>
+                <div><span class="coupon-status {{ coupon.status }}">{{ coupon.status_label }}</span></div>
+                <div><small>取得時間</small><br>{{ coupon.issued_at_text }}</div>
+                <div><small>到期時間</small><br>{{ coupon.expires_at_text }}</div>
+                <div>
+                    {% if coupon.reserved_order_id %}<small>保留訂單 #{{ coupon.reserved_order_id }}</small>{% endif %}
+                    {% if coupon.redeemed_order_id %}<small>使用訂單 #{{ coupon.redeemed_order_id }}</small>{% endif %}
+                    {% if coupon.redeemed_at %}<small>使用時間 {{ coupon.redeemed_at_text }}</small>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif not group.progress %}
+        <div class="empty-benefit">這個遊戲目前沒有福利資料。</div>
+        {% endif %}
+    </section>
+    {% else %}
+    <div class="empty-benefit">這位客戶目前沒有跨單累積進度或福利券。</div>
+    {% endfor %}
+</div>
+{% endblock %}

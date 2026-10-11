@@ -2,7 +2,11 @@ import sqlite3
 from pathlib import Path
 
 from web.app.routers import admin_centers
-from web.app.services.admin_customer_loyalty import enrich_customer_rows, load_customer_loyalty
+from web.app.services.admin_customer_loyalty import (
+    enrich_customer_rows,
+    load_customer_loyalty,
+    load_customer_loyalty_detail,
+)
 
 
 def _make_db(path: Path) -> None:
@@ -47,7 +51,11 @@ def _make_db(path: Path) -> None:
                 benefit_units REAL NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
                 source TEXT NOT NULL DEFAULT 'loyalty',
-                issued_at TEXT NOT NULL
+                issued_at TEXT NOT NULL,
+                expires_at TEXT,
+                reserved_order_id INTEGER,
+                redeemed_order_id INTEGER,
+                redeemed_at TEXT
             );
             """
         )
@@ -60,14 +68,14 @@ def _make_db(path: Path) -> None:
         conn.execute(
             """
             INSERT INTO customer_loyalty_progress
-            VALUES ('100','basic_entertain_single|players:1','basic_entertain_single',
+            VALUES ('100','delta_desktop_fun|basic_entertain','basic_entertain_single',
                     '娛樂陪〈端遊〉｜單陪','hourly',1,6,10,'extra_hours',0.5,'2026-10-11T01:00:00+08:00')
             """
         )
         conn.execute(
             """
             INSERT INTO customer_loyalty_progress
-            VALUES ('100','valorant_entertain_ranked|players:2','valorant_entertain_ranked',
+            VALUES ('100','valorant|valorant_entertain_ranked','valorant_entertain_ranked',
                     '特戰英豪｜娛樂陪｜積分','game',2,14,20,'extra_games',1,'2026-10-11T02:00:00+08:00')
             """
         )
@@ -77,26 +85,32 @@ def _make_db(path: Path) -> None:
                 INSERT INTO customer_benefit_coupons (
                     customer_discord_id, scope_key, rule_key, rule_label,
                     pricing_type, player_count, benefit_kind, benefit_units,
-                    status, source, issued_at
-                ) VALUES ('100','basic_entertain_single|players:1','basic_entertain_single',
-                          '娛樂陪〈端遊〉｜單陪','hourly',1,'extra_hours',0.5,?,'loyalty','2026-10-11')
+                    status, source, issued_at, expires_at,
+                    reserved_order_id, redeemed_order_id, redeemed_at
+                ) VALUES ('100','delta_desktop_fun|basic_entertain','basic_entertain_single',
+                          '娛樂陪〈端遊〉｜雙陪','hourly',2,'extra_hours',0.5,?,'loyalty',
+                          '2026-10-11T03:00:00+08:00','2027-01-09T03:00:00+08:00',
+                          CASE WHEN ? = 'reserved' THEN 77 ELSE NULL END,
+                          CASE WHEN ? = 'redeemed' THEN 88 ELSE NULL END,
+                          CASE WHEN ? = 'redeemed' THEN '2026-10-11T04:00:00+08:00' ELSE NULL END)
                 """,
-                (status,),
+                (status, status, status, status),
             )
         conn.commit()
 
 
-def test_load_customer_loyalty_formats_progress_and_coupon_counts(tmp_path: Path):
+def test_load_customer_loyalty_formats_progress_coupon_counts_and_new_benefit_language(tmp_path: Path):
     db = tmp_path / "web_dashboard.db"
     _make_db(db)
 
     snapshot = load_customer_loyalty(db, ["100"])["100"]
 
-    assert snapshot["progress"][0]["title"] == "特戰英豪｜娛樂陪｜積分｜2位"
+    assert snapshot["progress"][0]["title"] == "特戰英豪｜娛樂陪｜積分"
     assert snapshot["progress"][0]["progress_text"] == "14 / 20局"
-    assert snapshot["progress"][0]["benefit_text"] == "+1 局"
+    assert snapshot["progress"][0]["benefit_text"] == "折抵 1 局額度"
+    assert snapshot["progress"][1]["title"] == "娛樂陪〈端遊〉"
     assert snapshot["progress"][1]["progress_text"] == "6 / 10H"
-    assert snapshot["progress"][1]["benefit_text"] == "+30 分鐘"
+    assert snapshot["progress"][1]["benefit_text"] == "折抵 30 分鐘額度"
     assert snapshot["coupon_counts"] == {
         "active": 1,
         "reserved": 1,
@@ -104,9 +118,12 @@ def test_load_customer_loyalty_formats_progress_and_coupon_counts(tmp_path: Path
         "expired": 1,
         "other": 0,
     }
+    assert len(snapshot["active_coupons"]) == 1
+    assert snapshot["active_coupons"][0]["title"] == "娛樂陪〈端遊〉｜折抵 30 分鐘額度"
+    assert "雙陪" not in snapshot["active_coupons"][0]["title"]
 
 
-def test_enrich_customer_rows_keeps_customer_center_fields(tmp_path: Path):
+def test_enrich_customer_rows_keeps_customer_center_fields_and_coupon_preview(tmp_path: Path):
     db = tmp_path / "web_dashboard.db"
     _make_db(db)
 
@@ -120,9 +137,11 @@ def test_enrich_customer_rows_keeps_customer_center_fields(tmp_path: Path):
 
     assert rows[0]["customer_display_name"] == "老闆A"
     assert len(rows[0]["loyalty_progress"]) == 2
+    assert len(rows[0]["loyalty_active_coupons"]) == 1
     assert rows[0]["loyalty_coupon_counts"]["active"] == 1
     assert rows[0]["loyalty_has_anything"] is True
     assert rows[1]["loyalty_progress"] == []
+    assert rows[1]["loyalty_active_coupons"] == []
     assert rows[1]["loyalty_coupon_counts"]["active"] == 0
     assert rows[1]["loyalty_has_anything"] is False
 
@@ -144,3 +163,24 @@ def test_customer_center_snapshot_includes_loyalty_progress(tmp_path: Path, monk
         "6 / 10H",
     ]
     assert row["loyalty_coupon_counts"]["active"] == 1
+    assert row["loyalty_active_coupons"][0]["status_label"] == "可使用"
+
+
+def test_admin_loyalty_detail_keeps_games_separate_and_exposes_order_references(tmp_path: Path):
+    db = tmp_path / "web_dashboard.db"
+    _make_db(db)
+
+    detail = load_customer_loyalty_detail(db, "100")
+
+    assert len(detail["groups"]) == 2
+    assert {group["scope_key"] for group in detail["groups"]} == {
+        "delta_desktop_fun|basic_entertain",
+        "valorant|valorant_entertain_ranked",
+    }
+    reserved = next(coupon for coupon in detail["coupons"] if coupon["status"] == "reserved")
+    redeemed = next(coupon for coupon in detail["coupons"] if coupon["status"] == "redeemed")
+    assert reserved["status_label"] == "使用中"
+    assert reserved["reserved_order_id"] == 77
+    assert redeemed["status_label"] == "已使用"
+    assert redeemed["redeemed_order_id"] == 88
+    assert redeemed["redeemed_at_text"].startswith("2026-10-11 04:00")
