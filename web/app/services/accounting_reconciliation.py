@@ -6,7 +6,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from shared.payout import calculate_order_payout
+from shared.payout import (
+    calculate_customer_service_payout_base_amount,
+    calculate_order_payout,
+)
 
 
 OPEN_ACCOUNTING_ORDER_STATUSES = {"active", "stored", "closed"}
@@ -763,6 +766,7 @@ def _check_payouts(
             status,
             amount,
             payout_base_amount,
+            price_snapshot_json,
             payment_method,
             customer_service_discord_id,
             customer_service_display_name
@@ -958,6 +962,12 @@ def _check_payouts(
             total_amount=payout_base,
             worker_discord_ids=worker_ids,
             named_bonus_worker_ids=named_bonus_ids,
+            customer_service_total_amount=(
+                calculate_customer_service_payout_base_amount(
+                    payout_base_amount=payout_base,
+                    price_snapshot_json=order.get("price_snapshot_json"),
+                )
+            ),
         )
 
         expected_by_worker = {

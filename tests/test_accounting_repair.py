@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import pytest
@@ -639,3 +640,45 @@ def test_recognize_historical_discount_rejects_overpayment(
     finally:
         db.close()
 
+
+def test_recalculate_unpaid_payouts_uses_store_funded_service_exclusion_for_cs():
+    db = _make_session()
+    try:
+        _seed_order(db)
+        order = db.get(WebOrder, 1)
+        assert order is not None
+        order.amount = 200
+        order.customer_pay_amount = 200
+        order.payout_base_amount = 300
+        order.price_snapshot_json = json.dumps(
+            {
+                "preview": {
+                    "finance": {
+                        "point_service_value": 60,
+                        "benefit_service_value": 40,
+                    }
+                }
+            }
+        )
+        db.flush()
+
+        apply_accounting_repair_in_session(
+            db,
+            order_id=1,
+            action=RECALCULATE_UNPAID_PAYOUTS,
+            actor={"id": "manager-1"},
+        )
+        db.flush()
+
+        worker = db.scalar(
+            select(WorkerPayout).where(WorkerPayout.order_id == 1)
+        )
+        cs = db.scalar(
+            select(CustomerServicePayout).where(CustomerServicePayout.order_id == 1)
+        )
+        assert worker is not None
+        assert worker.final_payout == 240
+        assert cs is not None
+        assert cs.payout_amount == 10
+    finally:
+        db.close()

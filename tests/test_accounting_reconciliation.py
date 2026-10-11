@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 
@@ -145,6 +146,7 @@ def _create_web_db(path: Path) -> None:
                 amount INTEGER NOT NULL DEFAULT 0,
                 customer_pay_amount INTEGER,
                 payout_base_amount INTEGER,
+                price_snapshot_json TEXT,
                 payment_method TEXT,
                 customer_service_discord_id TEXT,
                 customer_service_display_name TEXT,
@@ -663,3 +665,48 @@ def test_legacy_tip_reference_is_warning_when_financial_linkage_matches(tmp_path
     assert issue["severity"] == "warning"
     assert "舊格式" in issue["title"]
 
+
+def test_store_funded_service_value_does_not_create_false_cs_payout_mismatch(tmp_path):
+    root = _healthy_root(tmp_path)
+    snapshot_json = json.dumps(
+        {
+            "preview": {
+                "finance": {
+                    "point_service_value": 60,
+                    "benefit_service_value": 40,
+                }
+            }
+        }
+    )
+
+    with sqlite3.connect(root / "web_dashboard.db") as conn:
+        conn.execute(
+            """
+            UPDATE web_orders
+            SET amount = 200,
+                customer_pay_amount = 200,
+                payout_base_amount = 300,
+                price_snapshot_json = ?
+            WHERE id = 1
+            """,
+            (snapshot_json,),
+        )
+        conn.execute(
+            "UPDATE worker_payouts SET final_payout = 240 WHERE order_id = 1"
+        )
+        conn.execute(
+            "UPDATE customer_service_payouts SET payout_amount = 10 WHERE order_id = 1"
+        )
+
+    snapshot = build_accounting_reconciliation_snapshot(root)
+    order_issues = [
+        issue
+        for issue in snapshot["issues"]
+        if issue.get("order_id") == 1
+    ]
+    assert "worker_payout_amount_mismatch" not in {
+        issue["code"] for issue in order_issues
+    }
+    assert "customer_service_payout_amount_mismatch" not in {
+        issue["code"] for issue in order_issues
+    }

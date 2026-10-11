@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 
@@ -39,6 +40,56 @@ def calculate_customer_service_payout(
         return 0
 
     return total_amount * customer_service_rate
+
+
+def calculate_customer_service_payout_base_amount(
+    *,
+    payout_base_amount: int,
+    price_snapshot_json=None,
+) -> int:
+    """Return the amount eligible for customer-service commission.
+
+    Store-funded free service (points / cross-order benefit service value)
+    still counts toward companion payout value, but must not create extra
+    customer-service commission. This pure helper is the single source used by
+    payout creation, safe repair, and accounting reconciliation.
+    """
+    base = max(0, int(payout_base_amount or 0))
+
+    if isinstance(price_snapshot_json, dict):
+        snapshot = price_snapshot_json
+    else:
+        try:
+            snapshot = json.loads(str(price_snapshot_json or "{}"))
+        except Exception:
+            snapshot = {}
+
+    if not isinstance(snapshot, dict):
+        return base
+
+    preview = (
+        snapshot.get("preview")
+        if isinstance(snapshot.get("preview"), dict)
+        else snapshot
+    )
+    finance = (
+        preview.get("finance")
+        if isinstance(preview, dict)
+        and isinstance(preview.get("finance"), dict)
+        else {}
+    )
+
+    def _amount(name: str) -> int:
+        try:
+            return max(0, int(round(float(finance.get(name) or 0))))
+        except (TypeError, ValueError):
+            return 0
+
+    store_funded_service = (
+        _amount("point_service_value")
+        + _amount("benefit_service_value")
+    )
+    return max(0, base - store_funded_service)
 
 
 def calculate_order_payout(
