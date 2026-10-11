@@ -3341,6 +3341,7 @@ async def admin_order_workspace_edit_r8(
     if closed_date and not _mw_r8_re.fullmatch(r"\d{4}-\d{2}-\d{2}", closed_date):
         return _mw4a2r6_redirect(order_id,request=request, error="結案日期格式必須是 YYYY-MM-DD。")
 
+    loyalty_reconciled = False
     db = SessionLocal()
 
     try:
@@ -3611,6 +3612,18 @@ async def admin_order_workspace_edit_r8(
             db.flush()
             _mw_r8_restore_payout_status(db, int(order_id), payout_snapshot)
 
+        if previous_status == "closed" or status == "closed":
+            from services.loyalty_benefits import (
+                reconcile_loyalty_after_order_edit_in_connection,
+            )
+
+            reconcile_loyalty_after_order_edit_in_connection(
+                db.connection(),
+                order_id=int(order_id),
+                previous_customer_id=old_customer_discord_id,
+            )
+            loyalty_reconciled = True
+
         after_row = db.execute(
             text("SELECT * FROM web_orders WHERE id = :order_id LIMIT 1"),
             {"order_id": int(order_id)},
@@ -3641,7 +3654,15 @@ async def admin_order_workspace_edit_r8(
     finally:
         db.close()
 
-    return _mw4a2r6_redirect(order_id,request=request, message="訂單資料已更新。")
+    return _mw4a2r6_redirect(
+        order_id,
+        request=request,
+        message=(
+            "訂單資料已更新，福利進度已重新對帳。"
+            if loyalty_reconciled
+            else "訂單資料已更新。"
+        ),
+    )
 
 
 @router.post("/admin/order-workspace/{order_id}/add-worker")

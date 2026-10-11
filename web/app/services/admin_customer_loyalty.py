@@ -5,12 +5,13 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-KNOWN_STATUSES = ("active", "reserved", "redeemed", "expired")
+KNOWN_STATUSES = ("active", "reserved", "redeemed", "expired", "revoked")
 STATUS_LABELS = {
     "active": "可使用",
     "reserved": "使用中",
     "redeemed": "已使用",
     "expired": "已過期",
+    "revoked": "已收回",
 }
 
 
@@ -72,6 +73,7 @@ def _empty_customer_data() -> dict[str, Any]:
             "reserved": 0,
             "redeemed": 0,
             "expired": 0,
+            "revoked": 0,
             "other": 0,
         },
         "groups": [],
