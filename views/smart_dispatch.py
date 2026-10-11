@@ -479,6 +479,32 @@ def _ordered_remaining_candidate_ids(
     ]
 
 
+def _merge_wave_notification_ids(
+    unresolved_specified: Iterable[str | int],
+    general_ids: Iterable[str | int],
+    *,
+    unrestricted_missing: int,
+) -> list[str]:
+    """Keep reserved specified slots isolated from public dispatch targets.
+
+    Specified workers are always reminded while their reserved slot is open.
+    General candidates are added only when the order actually has an
+    unrestricted slot still missing. This prevents fully specified orders from
+    leaking into public/full reminder waves.
+    """
+    specified = [
+        str(item)
+        for item in unresolved_specified
+        if str(item).strip()
+    ]
+    general = (
+        [str(item) for item in general_ids if str(item).strip()]
+        if int(unrestricted_missing or 0) > 0
+        else []
+    )
+    return list(dict.fromkeys([*specified, *general]))
+
+
 async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
     from shared.order_acceptance import WAITING_ACCEPTANCE, get_acceptance_state
 
@@ -669,10 +695,11 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             )
                         ]
 
-                    reminder_ids = list(dict.fromkeys([
-                        *unresolved_specified,
-                        *second_ids,
-                    ]))
+                    reminder_ids = _merge_wave_notification_ids(
+                        unresolved_specified,
+                        second_ids,
+                        unrestricted_missing=unrestricted_missing,
+                    )
 
                     if reminder_ids:
                         lines = [
@@ -706,12 +733,13 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                # T+60 秒：公開接單正式開放，這時才發第一輪智慧派單通知。
+                # T+60 秒：第一輪通知。全指定單仍只提醒尚未接單的指定人員；
+                # 只有確實存在未填的公開名額時，才加入一般候選人。
                 if age >= PUBLIC_ACCEPTANCE_OPEN_SECONDS and stage < 1:
-                    first_ids: list[str] = []
+                    general_first_ids: list[str] = []
 
                     if unrestricted_missing > 0:
-                        first_ids = [
+                        general_first_ids = [
                             str(worker_id)
                             for worker_id in (plan.get("notified_candidate_ids") or [])
                             if (
@@ -723,8 +751,8 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                     # 若舊 plan 沒有預先保留第一輪名單，仍從排名中補出一批，
                     # 避免部署切換當下的等待單被漏通知。
-                    if unrestricted_missing > 0 and not first_ids:
-                        first_ids = [
+                    if unrestricted_missing > 0 and not general_first_ids:
+                        general_first_ids = [
                             worker_id
                             for worker_id in next_candidate_batch(
                                 plan.get("ranked_candidate_ids") or [],
@@ -738,14 +766,20 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             )
                         ]
 
-                    if unrestricted_missing > 0 and not first_ids:
-                        first_ids = list(remaining_general_ids)
+                    if unrestricted_missing > 0 and not general_first_ids:
+                        general_first_ids = list(remaining_general_ids)
+
+                    first_ids = _merge_wave_notification_ids(
+                        unresolved_specified,
+                        general_first_ids,
+                        unrestricted_missing=unrestricted_missing,
+                    )
 
                     if first_ids:
                         lines = [
                             "🟢 **新單已開放接單｜第一輪通知**",
                             f"WEB-{order_id} 目前尚缺 **{missing} 人**。",
-                            "開放接單通知："
+                            "第一輪通知："
                             + " ".join(
                                 f"<@{worker_id}>"
                                 for worker_id in first_ids
@@ -773,7 +807,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     mark_smart_dispatch_stage(
                         order_id,
                         stage=1,
-                        newly_notified_ids=first_ids,
+                        newly_notified_ids=general_first_ids,
                     )
                     continue
 
@@ -798,10 +832,11 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     if seconds_since_update < REPEAT_REMINDER_SECONDS:
                         continue
 
-                    repeat_ids = list(dict.fromkeys([
-                        *unresolved_specified,
-                        *remaining_general_ids,
-                    ]))
+                    repeat_ids = _merge_wave_notification_ids(
+                        unresolved_specified,
+                        remaining_general_ids,
+                        unrestricted_missing=unrestricted_missing,
+                    )
 
                     if repeat_ids:
                         lines = [
