@@ -422,6 +422,14 @@ def _dynamic_admin_group_label(rule) -> str:
     )
 
 
+def _effective_builtin_group_label(rule, fallback: str) -> str:
+    manager_label = str(
+        getattr(rule, "catalog_group_label", "")
+        or ""
+    ).strip()
+    return manager_label or str(fallback)
+
+
 def _dynamic_admin_group_labels(category: str | None) -> list[str]:
     result: list[str] = []
     for rule_key in _dynamic_admin_rule_keys(category):
@@ -436,8 +444,31 @@ def _dynamic_admin_group_labels(category: str | None) -> list[str]:
 
 class DynamicOrderItemGroups(dict):
     def get(self, category, default=None):
-        base = list(super().get(category, default or []))
-        for group_label in _dynamic_admin_group_labels(str(category or "")):
+        category_text = str(category or "")
+        catalog_groups = SELF_SERVICE_ORDER_CATALOG.get(category_text, [])
+        base: list[str] = []
+
+        if catalog_groups:
+            for group in catalog_groups:
+                fallback_label = str(group.get("label") or "")
+                details = list(group.get("details", []))
+
+                if not details and fallback_label and fallback_label not in base:
+                    base.append(fallback_label)
+
+                for detail in details:
+                    rule = ORDER_RULES.get(str(detail.get("rule_key") or ""))
+                    label = (
+                        _effective_builtin_group_label(rule, fallback_label)
+                        if rule is not None
+                        else fallback_label
+                    )
+                    if label and label not in base:
+                        base.append(label)
+        else:
+            base = list(super().get(category, default or []))
+
+        for group_label in _dynamic_admin_group_labels(category_text):
             if group_label not in base:
                 base.append(group_label)
         return base
@@ -474,6 +505,12 @@ def get_order_item_group_label(item_label: str | None) -> str | None:
         for group in groups:
             for detail in group.get("details", []):
                 if detail.get("rule_key") == key:
+                    rule = ORDER_RULES.get(str(key))
+                    if rule is not None:
+                        return _effective_builtin_group_label(
+                            rule,
+                            str(group["label"]),
+                        )
                     return str(group["label"])
 
     try:
@@ -513,14 +550,30 @@ def get_order_item_details_for_group(category: str | None, group_label: str | No
     group_text = str(group_label)
     result: list[dict] = []
 
-    # Keep built-in catalog entries first.  If a manager intentionally chooses
-    # the same second-level name, custom products join that existing group.
+    # Built-in products also honor manager-controlled second/third-level labels.
+    # A renamed variant therefore moves out of the hard-coded legacy group instead
+    # of leaving a stale option behind in the Web/DC self-service catalog.
     for group in SELF_SERVICE_ORDER_CATALOG.get(category_text, []):
-        if str(group.get("label")) != group_text:
-            continue
+        fallback_label = str(group.get("label") or "")
         for detail in group.get("details", []):
             item = dict(detail)
             rule = ORDER_RULES.get(str(item.get("rule_key") or ""))
+            effective_group = (
+                _effective_builtin_group_label(rule, fallback_label)
+                if rule is not None
+                else fallback_label
+            )
+            if effective_group != group_text:
+                continue
+
+            manager_group_label = (
+                str(getattr(rule, "catalog_group_label", "") or "").strip()
+                if rule is not None
+                else ""
+            )
+            if manager_group_label and rule is not None:
+                item["label"] = str(getattr(rule, "label", "") or item.get("label") or "")
+
             item["item"] = str(
                 getattr(rule, "label", "")
                 or item.get("label")
@@ -559,12 +612,25 @@ def get_order_item_detail_label(item_label: str | None) -> str | None:
 
     rule_key = ORDER_RULE_KEY_BY_LABEL.get(str(item_label))
     if rule_key is None:
+        for candidate_key, rule in ORDER_RULES.items():
+            if str(getattr(rule, "label", "")) == str(item_label):
+                rule_key = str(candidate_key)
+                break
+    if rule_key is None:
         return str(item_label)
 
     for groups in SELF_SERVICE_ORDER_CATALOG.values():
         for group in groups:
             for detail in group.get("details", []):
                 if detail.get("rule_key") == rule_key:
+                    rule = ORDER_RULES.get(str(rule_key))
+                    manager_group_label = (
+                        str(getattr(rule, "catalog_group_label", "") or "").strip()
+                        if rule is not None
+                        else ""
+                    )
+                    if manager_group_label and rule is not None:
+                        return str(getattr(rule, "label", "") or item_label)
                     return str(detail.get("label") or item_label)
 
     return str(item_label)
@@ -594,9 +660,9 @@ SPECIAL_COMPANION_ITEMS = {
 
 QUANTITY_SELECT_ITEMS = {
     detail["item"]
-    for category, groups in SELF_SERVICE_ORDER_CATALOG.items()
-    for group in groups
-    for detail in get_order_item_details_for_group(category, group["label"])
+    for category in SELF_SERVICE_ORDER_CATALOG
+    for group_label in ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, [])
+    for detail in get_order_item_details_for_group(category, group_label)
     if int(detail.get("max_quantity") or 1) > 1
 }
 
