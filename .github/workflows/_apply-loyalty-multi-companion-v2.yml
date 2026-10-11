@@ -1,0 +1,37 @@
+name: Apply loyalty multi companion v2
+
+on:
+  push:
+    branches:
+      - fix/loyalty-multi-companion-v2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'Implement multi-companion loyalty benefits'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/loyalty-multi-companion-v2
+
+      - name: Apply targeted patch
+        run: python scripts/_apply_loyalty_multi_companion_v2.py
+
+      - name: Validate patch formatting
+        run: |
+          git diff --check
+          python -m compileall -q services/loyalty_benefits.py web/app/services/checkout_preview.py tests/test_loyalty_companion_count.py tests/test_loyalty_checkout_discount.py
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/loyalty_benefits.py web/app/services/checkout_preview.py tests/test_loyalty_companion_count.py tests/test_loyalty_checkout_discount.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Implement multi-companion loyalty benefits"
+          git push origin HEAD:fix/loyalty-multi-companion-v2
