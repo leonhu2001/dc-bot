@@ -282,15 +282,74 @@ def _level_summary(rows: list[dict]) -> str:
     return "｜".join(parts) if parts else "無"
 
 
-def _candidate_lines(rows: list[dict], limit: int = 8) -> str:
+async def _customer_display_name(bot: discord.Client, customer_id: str) -> str:
+    customer_id_text = str(customer_id or "").strip()
+    if not customer_id_text.isdigit():
+        return "未知會員"
+
+    user_id = int(customer_id_text)
+
+    for guild in list(getattr(bot, "guilds", []) or []):
+        member = None
+        try:
+            member = guild.get_member(user_id)
+        except Exception:
+            member = None
+
+        if member is None:
+            try:
+                member = await guild.fetch_member(user_id)
+            except Exception:
+                member = None
+
+        if member is not None:
+            display_name = str(
+                getattr(member, "display_name", None)
+                or getattr(member, "name", None)
+                or ""
+            ).strip()
+            if display_name:
+                return display_name
+
+    user = None
+    try:
+        user = bot.get_user(user_id)
+    except Exception:
+        user = None
+
+    if user is None:
+        try:
+            user = await bot.fetch_user(user_id)
+        except Exception:
+            user = None
+
+    if user is not None:
+        display_name = str(
+            getattr(user, "global_name", None)
+            or getattr(user, "display_name", None)
+            or getattr(user, "name", None)
+            or ""
+        ).strip()
+        if display_name:
+            return display_name
+
+    return "未知會員"
+
+
+async def _candidate_lines(
+    bot: discord.Client,
+    rows: list[dict],
+    limit: int = 8,
+) -> str:
     lines = []
     for row in rows[:limit]:
         customer_id = str(row.get("customer_id") or "")
+        display_name = await _customer_display_name(bot, customer_id)
         overdue = int(row.get("days_overdue") or 0)
         current_level = str(row.get("current_level") or "VIP")
         suggested = str(row.get("suggested_level") or "普通魔丸")
         lines.append(
-            f"<@{customer_id}>｜{current_level} → {suggested}｜逾期 {overdue} 天"
+            f"{display_name}｜{current_level} → {suggested}｜逾期 {overdue} 天"
         )
     remaining = len(rows) - len(lines)
     if remaining > 0:
@@ -306,6 +365,7 @@ async def _send_review_message(
     description: str,
 ) -> None:
     channel = await _get_review_channel(bot)
+    candidate_lines = await _candidate_lines(bot, rows)
     embed = discord.Embed(
         title=title,
         description=description,
@@ -313,7 +373,7 @@ async def _send_review_message(
     )
     embed.add_field(name="待審核", value=f"**{len(rows)} 位**", inline=True)
     embed.add_field(name="階級分布", value=_level_summary(rows), inline=False)
-    embed.add_field(name="名單", value=_candidate_lines(rows), inline=False)
+    embed.add_field(name="名單", value=candidate_lines, inline=False)
     embed.set_footer(text="僅提醒，不會自動降階；實際變更需由客服 / 總管在後台確認。")
 
     view = discord.ui.View(timeout=None)
