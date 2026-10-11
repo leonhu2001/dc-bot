@@ -284,9 +284,11 @@ def _guarded_discord_details(
     group_text = str(group_label)
     result: list[dict] = []
 
+    # This function's code object is installed onto services.orders at runtime.
+    # Resolve the effective manager-controlled group/name there as well, otherwise
+    # the live availability guard would silently restore the old hard-coded label.
     for group in SELF_SERVICE_ORDER_CATALOG.get(category_text, []):
-        if str(group.get("label")) != group_text:
-            continue
+        fallback_label = str(group.get("label") or "")
         for detail in group.get("details", []):
             item = dict(detail)
             rule_key = str(item.get("rule_key") or "").strip()
@@ -296,9 +298,28 @@ def _guarded_discord_details(
                 or not is_order_product_active(rule_key)
             ):
                 continue
+
             rule = ORDER_RULES.get(rule_key)
             if rule is None:
                 continue
+
+            effective_group = _effective_builtin_group_label(
+                rule,
+                fallback_label,
+            )
+            if effective_group != group_text:
+                continue
+
+            manager_group_label = str(
+                getattr(rule, "catalog_group_label", "") or ""
+            ).strip()
+            if manager_group_label:
+                item["label"] = str(
+                    getattr(rule, "label", "")
+                    or item.get("label")
+                    or ""
+                )
+
             item["item"] = str(
                 getattr(rule, "label", "")
                 or item.get("label")
@@ -323,19 +344,42 @@ def _guarded_discord_details(
 
 
 def _guarded_dynamic_group_get(self, category, default=None):
-    base = list(dict.get(self, category, default or []))
+    category_text = str(category or "")
+    catalog_groups = SELF_SERVICE_ORDER_CATALOG.get(category_text, [])
+    candidate_labels: list[str] = []
+
+    if catalog_groups:
+        for group in catalog_groups:
+            fallback_label = str(group.get("label") or "")
+            details = list(group.get("details", []))
+
+            if (
+                not details
+                and fallback_label
+                and fallback_label not in candidate_labels
+            ):
+                candidate_labels.append(fallback_label)
+
+            for detail in details:
+                rule = ORDER_RULES.get(str(detail.get("rule_key") or ""))
+                label = (
+                    _effective_builtin_group_label(rule, fallback_label)
+                    if rule is not None
+                    else fallback_label
+                )
+                if label and label not in candidate_labels:
+                    candidate_labels.append(label)
+    else:
+        candidate_labels = list(dict.get(self, category, default or []))
+
+    for group_label in _dynamic_admin_group_labels(category_text):
+        if group_label not in candidate_labels:
+            candidate_labels.append(group_label)
+
     result = []
-
-    for group_label in base:
-        if get_order_item_details_for_group(category, group_label):
+    for group_label in candidate_labels:
+        if get_order_item_details_for_group(category_text, group_label):
             result.append(group_label)
-
-    for group_label in _dynamic_admin_group_labels(str(category or "")):
-        if group_label in result:
-            continue
-        if get_order_item_details_for_group(category, group_label):
-            result.append(group_label)
-
     return result
 
 
