@@ -200,27 +200,23 @@ SELF_SERVICE_ORDER_CATALOG: dict[str, list[dict]] = {
             "label": group_label,
             "details": [
                 {
-                    "label": f"{rank_label}｜{'單陪' if count == 1 else '雙陪'}",
-                    "value": f"{rank_value}_{count}",
-                    "rule_key": f"{rule_prefix}_{rank_value}{'_ranked' if ranked else ''}",
+                    "label": f"{mode_label}｜{'單陪' if count == 1 else '雙陪'}",
+                    "value": f"{mode_value}_{count}",
+                    "rule_key": f"{rule_prefix}_{mode_value}",
                     "player_count": count,
                     "quantity_unit": "小時",
                     "min_quantity": 1,
                     "max_quantity": 24,
                 }
-                for rank_label, rank_value in rank_options
+                for mode_label, mode_value in (("NG", "ng"), ("積分", "ranked"))
                 for count in (1, 2)
             ],
         }
-        for group_label, rule_prefix, ranked, rank_options in (
-            ("娛樂陪", "apex_entertain", False, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
-            ("娛樂陪 積分", "apex_entertain", True, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
-            ("鑽石陪", "apex_diamond", False, (("白金以下", "platinum"), ("鑽石", "diamond"))),
-            ("鑽石陪 積分", "apex_diamond", True, (("白金以下", "platinum"), ("鑽石", "diamond"))),
-            ("大師陪", "apex_master", False, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
-            ("大師陪 積分", "apex_master", True, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
-            ("頂獵陪", "apex_predator", False, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
-            ("頂獵陪 積分", "apex_predator", True, (("白金以下", "platinum"), ("鑽石", "diamond"), ("大師/頂獵", "master"))),
+        for group_label, rule_prefix in (
+            ("娛樂陪", "apex_entertain"),
+            ("鑽石陪", "apex_diamond"),
+            ("大師陪", "apex_master"),
+            ("頂獵陪", "apex_predator"),
         )
     ],
     "custom": [
