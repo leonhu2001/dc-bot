@@ -672,19 +672,55 @@ DYNAMIC_ADMIN_GROUP_LABEL = "後台新增商品"
 
 
 def _current_group_specs() -> list[dict]:
-    """Return static storefront groups plus live manager-created products.
+    """Return storefront groups using the effective manager-controlled names.
 
-    Custom rules live in SQLite and can be created without a Git deployment, so
-    this must be built at request time instead of mutating GROUP_SPECS at import.
-    Products with the same second-level category share one storefront card.
+    Built-in products used to keep the hard-coded GROUP_SPECS name forever, so
+    changing a product's second/third-level name in the manager page only changed
+    the rule itself while the public card still showed the old text.  A non-empty
+    catalog_group_label now means the manager intentionally moved/renamed that
+    built-in variant, so resolve both its group name and variant name live.
+
+    Custom rules still live in SQLite and can be created without a Git deploy, so
+    the final catalog is always rebuilt at request time.
     """
-    specs = [
-        {
-            **spec,
-            "variants": list(spec.get("variants", [])),
-        }
-        for spec in GROUP_SPECS
-    ]
+    specs: list[dict] = []
+
+    for source_spec in GROUP_SPECS:
+        base_variants: list[tuple[str, str]] = []
+        moved_variants: dict[str, list[tuple[str, str]]] = {}
+
+        for rule_key, public_label in source_spec.get("variants", []):
+            rule = ORDER_RULES.get(str(rule_key))
+            manager_group_label = (
+                str(getattr(rule, "catalog_group_label", "") or "").strip()
+                if rule is not None
+                else ""
+            )
+
+            if not manager_group_label:
+                base_variants.append((str(rule_key), str(public_label)))
+                continue
+
+            effective_label = str(
+                getattr(rule, "label", "")
+                or public_label
+            )
+            moved_variants.setdefault(manager_group_label, []).append(
+                (str(rule_key), effective_label)
+            )
+
+        if base_variants:
+            specs.append({
+                **source_spec,
+                "variants": base_variants,
+            })
+
+        for manager_group_label, variants in moved_variants.items():
+            specs.append({
+                **source_spec,
+                "label": manager_group_label,
+                "variants": variants,
+            })
 
     grouped = {
         (
