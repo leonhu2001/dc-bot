@@ -1,5 +1,7 @@
 import json
 import sqlite3
+
+import pytest
 from datetime import datetime, timezone, timedelta
 
 from services.vip_monthly_benefits import (
@@ -7,6 +9,7 @@ from services.vip_monthly_benefits import (
     MONTHLY_COUPON_200,
     MONTHLY_COUPON_500,
     OCTOBER_2026_USED_200_CUSTOMERS,
+    REVOKED,
     get_customer_vip_monthly_snapshot,
     mark_month_announcement_sent,
     redeem_black_diamond_choice,
@@ -216,3 +219,158 @@ def test_black_diamond_choice_reserve_release_and_redeem(tmp_path):
     )
     assert redeemed["black_diamond_available"] is False
     assert redeemed["black_diamond"]["status"] == "redeemed"
+
+
+def _rewrite_customer_data(bot_db, customer_id: str, mutate):
+    with sqlite3.connect(bot_db) as conn:
+        row = conn.execute(
+            "SELECT data_json FROM customers WHERE customer_id=?",
+            (str(customer_id),),
+        ).fetchone()
+        assert row is not None
+        data = json.loads(row[0])
+        mutate(data)
+        conn.execute(
+            "UPDATE customers SET data_json=? WHERE customer_id=?",
+            (json.dumps(data, ensure_ascii=False), str(customer_id)),
+        )
+        conn.commit()
+
+
+def test_downgrade_revokes_unused_higher_tier_monthly_benefits_and_reupgrade_restores(tmp_path):
+    bot_db = tmp_path / "bot.db"
+    web_db = tmp_path / "web_dashboard.db"
+    customer_id = "black-to-platinum"
+    _make_bot_db(
+        bot_db,
+        [
+            (
+                customer_id,
+                {
+                    "total_spent": 88888,
+                    "vip_level_index": 6,
+                    "last_order_at": "2026-11-05T10:00:00+08:00",
+                },
+            )
+        ],
+    )
+    now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
+
+    black = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert black["current_level"] == "黑鑽魔丸"
+    assert {row["benefit_key"] for row in black["cash_benefits"]} == {
+        MONTHLY_COUPON_200,
+        MONTHLY_COUPON_500,
+    }
+    assert black["black_diamond_available"] is True
+
+    def downgrade(data):
+        data["vip_level_index"] = 3
+        data["vip_progress_base_total_spent"] = 88888
+        data["vip_progress_reset_active"] = True
+        data["last_level_manual_fixed_at"] = "2026-11-05T11:00:00+08:00"
+
+    _rewrite_customer_data(bot_db, customer_id, downgrade)
+    platinum = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+
+    assert platinum["current_level"] == "白金魔丸"
+    assert [row["benefit_key"] for row in platinum["cash_benefits"]] == [
+        MONTHLY_COUPON_200
+    ]
+    assert platinum["black_diamond"] is None
+    assert platinum["black_diamond_entitled"] is False
+    assert platinum["black_diamond_available"] is False
+
+    raw = {
+        row["benefit_key"]: row["status"]
+        for row in _benefit_rows(web_db, customer_id, "2026-11")
+    }
+    assert raw[MONTHLY_COUPON_200] == "available"
+    assert raw[MONTHLY_COUPON_500] == REVOKED
+    assert raw[BLACK_DIAMOND_CHOICE] == REVOKED
+
+    with pytest.raises(ValueError, match="目前 VIP 等級沒有黑鑽尊享福利"):
+        reserve_black_diamond_choice(
+            customer_id,
+            "entertainment_2h",
+            now=now,
+            bot_db=bot_db,
+            web_db=web_db,
+        )
+
+    def upgrade_again(data):
+        data["vip_level_index"] = 6
+        data["vip_progress_reset_active"] = False
+        data.pop("vip_progress_base_total_spent", None)
+        data.pop("last_level_manual_fixed_at", None)
+
+    _rewrite_customer_data(bot_db, customer_id, upgrade_again)
+    restored = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert {row["benefit_key"] for row in restored["cash_benefits"]} == {
+        MONTHLY_COUPON_200,
+        MONTHLY_COUPON_500,
+    }
+    assert restored["black_diamond_available"] is True
+
+
+def test_releasing_reserved_black_benefit_after_downgrade_revokes_instead_of_reopening(tmp_path):
+    bot_db = tmp_path / "bot.db"
+    web_db = tmp_path / "web_dashboard.db"
+    customer_id = "reserved-then-downgraded"
+    _make_bot_db(
+        bot_db,
+        [
+            (
+                customer_id,
+                {
+                    "total_spent": 88888,
+                    "vip_level_index": 6,
+                    "last_order_at": "2026-11-05T10:00:00+08:00",
+                },
+            )
+        ],
+    )
+    now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
+    reserve_black_diamond_choice(
+        customer_id,
+        "entertainment_2h",
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+
+    def downgrade(data):
+        data["vip_level_index"] = 3
+        data["vip_progress_base_total_spent"] = 88888
+        data["vip_progress_reset_active"] = True
+        data["last_level_manual_fixed_at"] = "2026-11-05T11:00:00+08:00"
+
+    _rewrite_customer_data(bot_db, customer_id, downgrade)
+    assert release_black_diamond_choice(
+        customer_id,
+        month_key="2026-11",
+        now=now,
+        web_db=web_db,
+        bot_db=bot_db,
+    ) is True
+
+    raw = {
+        row["benefit_key"]: row["status"]
+        for row in _benefit_rows(web_db, customer_id, "2026-11")
+    }
+    assert raw[BLACK_DIAMOND_CHOICE] == REVOKED

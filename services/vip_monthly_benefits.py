@@ -17,6 +17,7 @@ DEFAULT_BOT_DB = ROOT / "bot.db"
 AVAILABLE = "available"
 RESERVED = "reserved"
 REDEEMED = "redeemed"
+REVOKED = "revoked"
 
 MONTHLY_COUPON_200 = "monthly_coupon_200"
 MONTHLY_COUPON_500 = "monthly_coupon_500"
@@ -164,12 +165,13 @@ def sync_current_month_vip_benefits(
     web_db: str | Path | None = None,
     bot_db: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Idempotently issue this month's VIP benefits to currently valid VIPs.
+    """Synchronize current-month benefits to each member's current tier.
 
-    Monthly rows are keyed by customer + month + benefit, so unused benefits
-    never carry into the next month. Existing rows are never revoked mid-month;
-    a member who is downgraded after issuance keeps that month's already-issued
-    benefit, while the next month uses the new tier.
+    Unused monthly benefits above the member's current effective tier are
+    revoked immediately. Redeemed benefits remain immutable history, and an
+    already-reserved black-diamond redemption may finish normally. If the
+    member becomes eligible again in the same month, a previously revoked
+    unused benefit is reactivated instead of issuing a duplicate row.
     """
     current = _normalize_now(now)
     month = _month_key(current)
@@ -179,60 +181,119 @@ def sync_current_month_vip_benefits(
 
     snapshot = build_vip_review_snapshot(
         db_file=_bot_db_path(bot_db),
-        view="vip",
+        view="all",
         now=current,
     )
-    vip_rows = list(snapshot.get("rows") or [])
+    member_rows = list(snapshot.get("rows") or [])
 
     issued = 0
+    revoked = 0
+    reactivated = 0
     eligible_customers = 0
     legacy_seeded = 0
     first_refresh = False
+    entitlement_by_customer: dict[str, set[str]] = {}
 
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         legacy_seeded = _seed_october_2026_used_200(conn, now_text=now_text)
 
-        for row in vip_rows:
-            if bool(row.get("is_due")):
-                # 到期進待審核者暫停「新月份」福利；既有當月福利不追回。
-                continue
-
+        for row in member_rows:
             customer_id = str(row.get("customer_id") or "").strip()
             if not customer_id:
                 continue
 
             keys = _benefit_keys_for_level(str(row.get("current_level") or ""))
-            if not keys:
-                continue
-            eligible_customers += 1
+            entitlement_by_customer[customer_id] = keys
 
+            if bool(row.get("is_due")) or not keys:
+                # Due members do not receive/reactivate a new benefit, but an
+                # already-issued current-tier benefit is not revoked only for
+                # becoming due. Tier eligibility remains the revocation rule.
+                continue
+
+            eligible_customers += 1
             for benefit_key in MONTHLY_BENEFIT_KEYS:
                 if benefit_key not in keys:
                     continue
-                cur = conn.execute(
+
+                existing = conn.execute(
                     """
-                    INSERT OR IGNORE INTO vip_monthly_benefits (
-                        customer_id,
-                        month_key,
-                        benefit_key,
-                        benefit_label,
-                        status,
-                        issued_at,
-                        updated_at,
-                        source
-                    ) VALUES (?, ?, ?, ?, 'available', ?, ?, 'system')
+                    SELECT id, status
+                    FROM vip_monthly_benefits
+                    WHERE customer_id=? AND month_key=? AND benefit_key=?
+                    LIMIT 1
                     """,
-                    (
-                        customer_id,
-                        month,
-                        benefit_key,
-                        BENEFIT_LABELS[benefit_key],
-                        now_text,
-                        now_text,
-                    ),
-                )
-                issued += int(cur.rowcount or 0)
+                    (customer_id, month, benefit_key),
+                ).fetchone()
+
+                if existing is None:
+                    cur = conn.execute(
+                        """
+                        INSERT INTO vip_monthly_benefits (
+                            customer_id,
+                            month_key,
+                            benefit_key,
+                            benefit_label,
+                            status,
+                            issued_at,
+                            updated_at,
+                            source
+                        ) VALUES (?, ?, ?, ?, 'available', ?, ?, 'system')
+                        """,
+                        (
+                            customer_id,
+                            month,
+                            benefit_key,
+                            BENEFIT_LABELS[benefit_key],
+                            now_text,
+                            now_text,
+                        ),
+                    )
+                    issued += int(cur.rowcount or 0)
+                elif str(existing["status"] or "") == REVOKED:
+                    cur = conn.execute(
+                        """
+                        UPDATE vip_monthly_benefits
+                        SET status='available',
+                            choice_key=NULL,
+                            reserved_at=NULL,
+                            reserved_channel_id=NULL,
+                            redeemed_at=NULL,
+                            updated_at=?
+                        WHERE id=? AND status='revoked'
+                        """,
+                        (now_text, int(existing["id"])),
+                    )
+                    reactivated += int(cur.rowcount or 0)
+
+        available_rows = conn.execute(
+            """
+            SELECT id, customer_id, benefit_key
+            FROM vip_monthly_benefits
+            WHERE month_key=? AND status='available'
+            """,
+            (month,),
+        ).fetchall()
+        for benefit_row in available_rows:
+            customer_id = str(benefit_row["customer_id"] or "")
+            benefit_key = str(benefit_row["benefit_key"] or "")
+            current_keys = entitlement_by_customer.get(customer_id, set())
+            if benefit_key in current_keys:
+                continue
+            cur = conn.execute(
+                """
+                UPDATE vip_monthly_benefits
+                SET status='revoked',
+                    choice_key=NULL,
+                    reserved_at=NULL,
+                    reserved_channel_id=NULL,
+                    updated_at=?
+                WHERE id=? AND status='available'
+                """,
+                (now_text, int(benefit_row["id"])),
+            )
+            revoked += int(cur.rowcount or 0)
 
         state = conn.execute(
             "SELECT month_key, refreshed_at, announced_at FROM vip_monthly_refresh_state WHERE month_key=?",
@@ -240,8 +301,6 @@ def sync_current_month_vip_benefits(
         ).fetchone()
         if state is None:
             first_refresh = True
-            # 2026/10 是制度中途上線月。福利照樣補發，但不在 10/10 補送一則
-            # 冒充「1 號刷新」的公告；11 月起則由 announced_at=NULL 正常補發公告。
             bootstrap_announced_at = (
                 now_text
                 if month == "2026-10" and current.day > 1
@@ -270,6 +329,8 @@ def sync_current_month_vip_benefits(
     return {
         "month_key": month,
         "issued_count": issued,
+        "revoked_count": revoked,
+        "reactivated_count": reactivated,
         "eligible_customer_count": eligible_customers,
         "legacy_seeded_count": legacy_seeded,
         "first_refresh": first_refresh,
@@ -360,14 +421,19 @@ def get_customer_vip_monthly_snapshot(
             (customer, month),
         ).fetchall()
 
-    by_key = {str(row["benefit_key"]): dict(row) for row in rows}
+    raw_by_key = {str(row["benefit_key"]): dict(row) for row in rows}
+    by_key = {
+        key: row
+        for key, row in raw_by_key.items()
+        if key in level_keys and str(row.get("status") or "") != REVOKED
+    }
     cash_rows = [
         by_key[key]
         for key in (MONTHLY_COUPON_200, MONTHLY_COUPON_500)
         if key in by_key
     ]
-    black_row = by_key.get(BLACK_DIAMOND_CHOICE)
     black_entitled = BLACK_DIAMOND_CHOICE in level_keys
+    black_row = by_key.get(BLACK_DIAMOND_CHOICE) if black_entitled else None
     black_suspended = bool(
         black_entitled
         and member_status.get("is_due")
@@ -385,7 +451,9 @@ def get_customer_vip_monthly_snapshot(
         "black_diamond_entitled": black_entitled,
         "black_diamond_suspended": black_suspended,
         "black_diamond_available": bool(
-            black_row and str(black_row.get("status")) == AVAILABLE
+            black_entitled
+            and black_row
+            and str(black_row.get("status")) == AVAILABLE
         ),
     }
 
@@ -409,6 +477,17 @@ def reserve_black_diamond_choice(
         bot_db=bot_db,
     )
     customer = str(customer_id)
+    member_status = _current_member_status(
+        customer,
+        now=current,
+        bot_db=bot_db,
+    )
+    current_keys = _benefit_keys_for_level(
+        str(member_status.get("current_level") or "普通魔丸")
+    )
+    if BLACK_DIAMOND_CHOICE not in current_keys:
+        raise ValueError("目前 VIP 等級沒有黑鑽尊享福利，無法兌換。")
+
     month = _month_key(current)
     now_text = current.isoformat(timespec="seconds")
 
@@ -484,14 +563,25 @@ def release_black_diamond_choice(
     month_key: str | None = None,
     now: datetime | None = None,
     web_db: str | Path | None = None,
+    bot_db: str | Path | None = None,
 ) -> bool:
     current = _normalize_now(now)
     month = str(month_key or _month_key(current))
+    customer = str(customer_id)
+    member_status = _current_member_status(
+        customer,
+        now=current,
+        bot_db=bot_db,
+    )
+    current_keys = _benefit_keys_for_level(
+        str(member_status.get("current_level") or "普通魔丸")
+    )
+    next_status = AVAILABLE if BLACK_DIAMOND_CHOICE in current_keys else REVOKED
     with sqlite3.connect(_web_db_path(web_db), timeout=15) as conn:
         cur = conn.execute(
             """
             UPDATE vip_monthly_benefits
-            SET status='available',
+            SET status=?,
                 choice_key=NULL,
                 reserved_at=NULL,
                 reserved_channel_id=NULL,
@@ -499,8 +589,9 @@ def release_black_diamond_choice(
             WHERE customer_id=? AND month_key=? AND benefit_key=? AND status='reserved'
             """,
             (
+                next_status,
                 current.isoformat(timespec="seconds"),
-                str(customer_id),
+                customer,
                 month,
                 BLACK_DIAMOND_CHOICE,
             ),
@@ -545,4 +636,5 @@ def benefit_status_label(status: str | None) -> str:
         AVAILABLE: "可使用",
         RESERVED: "兌換中",
         REDEEMED: "已使用",
+        REVOKED: "已失效（目前等級不符）",
     }.get(str(status or ""), str(status or "未知"))
