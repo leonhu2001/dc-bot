@@ -217,8 +217,8 @@ async def member_roulette_draw(
     }
 
 
-@router.get("/admin/roulette")
-async def admin_roulette(
+@router.get("/admin/fun-orders")
+async def admin_fun_orders(
     request: Request,
     message: str | None = None,
     error: str | None = None,
@@ -230,9 +230,9 @@ async def admin_roulette(
     orders = await run_in_threadpool(list_admin_roulette_orders)
     return TEMPLATES.TemplateResponse(
         request=request,
-        name="admin_roulette.html",
+        name="admin_fun_orders.html",
         context={
-            "title": "輪盤管理｜魔丸娛樂",
+            "title": "趣味單管理｜魔丸娛樂",
             "user": user,
             "orders": orders,
             "message": message,
@@ -241,6 +241,21 @@ async def admin_roulette(
     )
 
 
+@router.get("/admin/roulette")
+async def admin_roulette_legacy_redirect(
+    message: str | None = None,
+    error: str | None = None,
+):
+    query = []
+    if message:
+        query.append("message=" + quote(message, safe=""))
+    if error:
+        query.append("error=" + quote(error, safe=""))
+    suffix = "?" + "&".join(query) if query else ""
+    return RedirectResponse(url="/admin/fun-orders" + suffix, status_code=303)
+
+
+@router.post("/admin/fun-orders/roulette/{order_id}/grant")
 @router.post("/admin/roulette/{order_id}/grant")
 async def admin_roulette_grant(
     request: Request,
@@ -262,7 +277,7 @@ async def admin_roulette_grant(
         )
     except (LookupError, ValueError) as exc:
         return RedirectResponse(
-            url=f"/admin/roulette?error={quote(str(exc), safe='')}",
+            url=f"/admin/fun-orders?error={quote(str(exc), safe='')}",
             status_code=303,
         )
 
@@ -274,6 +289,6 @@ async def admin_roulette_grant(
         message += " Discord 提示發送失敗，但補發次數已生效。"
 
     return RedirectResponse(
-        url=f"/admin/roulette?message={quote(message, safe='')}",
+        url=f"/admin/fun-orders?message={quote(message, safe='')}",
         status_code=303,
     )
