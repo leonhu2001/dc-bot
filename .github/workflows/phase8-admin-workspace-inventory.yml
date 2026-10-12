@@ -1,0 +1,25 @@
+name: Phase8 admin workspace inventory
+
+on:
+  push:
+    branches:
+      - refactor/phase8-admin-workspace-data-20261013
+    paths:
+      - tools/phase8_admin_workspace_inventory.py
+      - .github/workflows/phase8-admin-workspace-inventory.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase8-admin-workspace-data-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Inventory admin workspace data boundary
+        run: python tools/phase8_admin_workspace_inventory.py
