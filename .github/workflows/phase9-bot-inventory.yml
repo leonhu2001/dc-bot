@@ -1,0 +1,25 @@
+name: Phase9 bot runtime inventory
+
+on:
+  push:
+    branches:
+      - refactor/phase9-bot-runtime-20261013
+    paths:
+      - tools/phase9_bot_inventory.py
+      - .github/workflows/phase9-bot-inventory.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase9-bot-runtime-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Inventory bot responsibilities
+        run: python tools/phase9_bot_inventory.py
