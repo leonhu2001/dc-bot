@@ -1,0 +1,54 @@
+name: Phase4 extract reorder runtime
+
+on:
+  push:
+    branches:
+      - refactor/phase4-reorder-runtime-20261013
+    paths:
+      - tools/phase4_extract_reorder.py
+      - .github/workflows/phase4-extract-reorder.yml
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-ci-web.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase4-reorder-runtime-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install project dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Extract reorder runtime
+        run: python tools/phase4_extract_reorder.py
+      - name: Validate extraction
+        run: |
+          python -m compileall -q services tests
+          python -m pytest -q tests/test_runtime_extraction_boundaries.py tests/test_architecture_growth_budget.py
+          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
+      - name: Commit extraction
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py services/self_service_reorder.py tests/test_runtime_extraction_boundaries.py tests/test_architecture_growth_budget.py
+          if git diff --cached --quiet; then
+            echo "No reorder extraction changes"
+            exit 0
+          fi
+          git commit -m "Extract self-service reorder runtime"
+          git pull --rebase origin refactor/phase4-reorder-runtime-20261013
+          git push origin HEAD:refactor/phase4-reorder-runtime-20261013
