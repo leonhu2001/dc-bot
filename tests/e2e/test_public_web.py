@@ -78,23 +78,25 @@ def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> N
     open_first_order_dialog(page)
 
     quantity_field = page.locator("#mw-quantity-field")
+    quantity_plus = page.locator("#mw-quantity-plus")
     player_field = page.locator("#mw-player-field")
+    player_plus = page.locator("#mw-player-plus")
 
-    if quantity_field.is_visible():
+    if quantity_field.is_visible() and quantity_plus.is_enabled():
         before_quantity = page.locator("#mw-quantity").inner_text()
-        page.locator("#mw-quantity-plus").click()
+        quantity_plus.click()
         expect(page.locator("#mw-quantity")).not_to_have_text(before_quantity)
         expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
         return
 
-    if player_field.is_visible():
+    if player_field.is_visible() and player_plus.is_enabled():
         before_players = page.locator("#mw-player-count").inner_text()
-        page.locator("#mw-player-plus").click()
+        player_plus.click()
         expect(page.locator("#mw-player-count")).not_to_have_text(before_players)
         expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
         return
 
-    pytest.skip("First public order group has no adjustable stepper")
+    pytest.skip("First public order group has no enabled adjustable stepper")
 
 
 def test_order_catalog_has_no_mobile_horizontal_overflow(page: Page) -> None:
