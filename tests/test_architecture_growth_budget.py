@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 # the guard prevents unrelated features from silently making them larger again.
 MAX_BYTES = {
     "bot.py": 273_000,
-    "services/order_runtime.py": 87_000,
+    "services/order_runtime.py": 62_000,
+    "services/order_storage_runtime.py": 32_000,
     "services/order_payment_runtime.py": 27_000,
     "services/order_credential_runtime.py": 23_500,
     "services/order_point_redemption.py": 7_000,
