@@ -1,0 +1,52 @@
+name: Phase3 fix static extraction tests
+
+on:
+  push:
+    branches:
+      - refactor/phase3-csp-modules-20261013
+    paths:
+      - tools/phase3_fix_static_asset_tests.py
+      - .github/workflows/phase3-fix-static-tests.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-ci-web.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase3-csp-modules-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install project dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Align regression tests
+        run: python tools/phase3_fix_static_asset_tests.py
+      - name: Run affected tests
+        run: |
+          python -m pytest -q tests/test_admin_navigation.py tests/test_admin_order_rule_filter_ui.py tests/test_order_product_status.py tests/test_sqlite_datetime_adapters.py
+      - name: Commit regression alignment
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/test_admin_navigation.py tests/test_admin_order_rule_filter_ui.py tests/test_order_product_status.py
+          if git diff --cached --quiet; then
+            echo "No regression alignment changes"
+            exit 0
+          fi
+          git commit -m "Align tests with extracted static assets"
+          git pull --rebase origin refactor/phase3-csp-modules-20261013
+          git push origin HEAD:refactor/phase3-csp-modules-20261013
