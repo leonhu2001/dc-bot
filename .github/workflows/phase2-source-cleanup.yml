@@ -1,0 +1,42 @@
+name: Phase2 source cleanup
+
+on:
+  push:
+    branches:
+      - refactor/phase2-runtime-assets-20261013
+    paths:
+      - tools/phase2_source_cleanup.py
+      - .github/workflows/phase2-source-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase2-runtime-assets-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Apply deterministic cleanup
+        run: python tools/phase2_source_cleanup.py
+      - name: Compile changed sources
+        run: python -m compileall -q bot.py cogs core services shared views web/app tools
+      - name: Commit cleanup
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No cleanup changes to commit"
+            exit 0
+          fi
+          git commit -m "Modernize UTC timestamps and retire order patch asset"
+          git pull --rebase origin refactor/phase2-runtime-assets-20261013
+          git push origin HEAD:refactor/phase2-runtime-assets-20261013
