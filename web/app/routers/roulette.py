@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -10,24 +11,22 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from web.app.services import roulette_service
-
-
-# 正式輪盤沿用後台既有商品，不再由程式自動建立第二個商品。
-# 商品價格、接單資格、人數、折扣與其他設定一律以後台這筆規則為準。
-ROULETTE_RULE_KEY = "admin_delta_desktop_fun_20261007053129_91eb"
-roulette_service.ROULETTE_RULE_KEY = ROULETTE_RULE_KEY
-
-# 只初始化輪盤結果表；禁止在 Web 啟動時新增 / 覆寫商品設定。
-draw_roulette = roulette_service.draw_roulette
-get_roulette_context = roulette_service.get_roulette_context
-roulette_service.ensure_roulette_draw_tables()
+from web.app.services.roulette_service import (
+    draw_roulette,
+    ensure_roulette_feature,
+    get_roulette_context,
+    notify_ready_roulette_orders,
+)
 
 
 router = APIRouter(tags=["roulette"])
 TEMPLATES = Jinja2Templates(
     directory=str(Path(__file__).resolve().parents[1] / "templates")
 )
+_ROULETTE_READY_TASK: asyncio.Task | None = None
+
+# 只初始化輪盤資料表與舊誤建商品清理；正式商品設定仍完全由後台管理。
+ensure_roulette_feature()
 
 
 class RouletteDrawPayload(BaseModel):
@@ -42,6 +41,49 @@ def _session_user(request: Request) -> dict | None:
 
 def _customer_id(user: dict | None) -> str:
     return str((user or {}).get("id") or "").strip()
+
+
+async def _roulette_ready_worker() -> None:
+    while True:
+        try:
+            sent = await run_in_threadpool(notify_ready_roulette_orders)
+            if sent:
+                print(
+                    f"[roulette] sent ready ticket prompts: {sent}",
+                    flush=True,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(
+                "[roulette] ready notification worker failed: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+        await asyncio.sleep(10)
+
+
+@router.on_event("startup")
+async def start_roulette_ready_worker() -> None:
+    global _ROULETTE_READY_TASK
+    ensure_roulette_feature()
+    if _ROULETTE_READY_TASK is None or _ROULETTE_READY_TASK.done():
+        _ROULETTE_READY_TASK = asyncio.create_task(_roulette_ready_worker())
+
+
+@router.on_event("shutdown")
+async def stop_roulette_ready_worker() -> None:
+    global _ROULETTE_READY_TASK
+    if _ROULETTE_READY_TASK is None:
+        return
+
+    _ROULETTE_READY_TASK.cancel()
+    try:
+        await _ROULETTE_READY_TASK
+    except asyncio.CancelledError:
+        pass
+    _ROULETTE_READY_TASK = None
 
 
 @router.get("/me/orders/{order_id}/roulette")
