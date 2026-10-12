@@ -8,11 +8,16 @@ ROOT = Path(__file__).resolve().parents[1]
 # These are ceilings, not targets. Existing large modules should shrink over time;
 # the guard prevents unrelated features from silently making them larger again.
 MAX_BYTES = {
-    "bot.py": 276_000,
-    "services/order_runtime.py": 129_000,
-    "services/self_service_runtime.py": 146_000,
+    "bot.py": 273_000,
+    "services/order_runtime.py": 108_000,
+    "services/order_credential_runtime.py": 23_500,
+    "services/order_point_redemption.py": 7_000,
+    "services/self_service_runtime.py": 113_000,
+    "services/self_service_financials.py": 42_000,
     "web/app/main.py": 18_500,
-    "web/app/routers/admin.py": 102_000,
+    "web/app/routers/admin.py": 14_000,
+    "web/app/routers/admin_dashboard.py": 29_000,
+    "web/app/routers/admin_order_workspace.py": 68_000,
     "views/review.py": 95_500,
 }
 
