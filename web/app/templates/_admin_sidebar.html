@@ -36,22 +36,12 @@
             財務中心
         </a>
 
-        <a href="/employee/internal-transfers">
-            內部轉帳審核
-        </a>
-
         <a
             class="{% if _p.startswith('/admin/support-center') or _p.startswith('/admin/tickets') or _p.startswith('/admin/support-calls') or _p.startswith('/admin/ai-support-knowledge') %}active{% endif %}"
             href="/admin/support-center"
         >
             客服中心
         </a>
-
-        {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
-        <a id="order-report-review-nav-admin" href="/dispatch/reports/review">
-            報單審核
-        </a>
-        {% endif %}
 
         <a
             class="{% if _p.startswith('/admin/order-rules') %}active{% endif %}"
