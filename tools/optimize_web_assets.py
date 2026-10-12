@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+
+from PIL import Image, ImageSequence
+
+
+ROOT = Path(__file__).resolve().parents[1]
+IMG_DIR = ROOT / "web" / "app" / "static" / "img"
+
+
+@dataclass(frozen=True)
+class StaticAsset:
+    source: str
+    target: str
+    animated: bool = False
+    lossless: bool = False
+    quality: int = 90
+
+
+ASSETS = (
+    StaticAsset(
+        source="home_hero_mascot_final.png",
+        target="home_hero_mascot_final.webp",
+        quality=92,
+    ),
+    StaticAsset(
+        source="staff_profile_bg_gothic_hall.png",
+        target="staff_profile_bg_gothic_hall.webp",
+        quality=90,
+    ),
+    StaticAsset(
+        source="server_logo.gif",
+        target="server_logo.webp",
+        animated=True,
+        lossless=True,
+        quality=100,
+    ),
+)
+
+
+def _frame_durations(image: Image.Image) -> list[int]:
+    durations: list[int] = []
+    for frame in ImageSequence.Iterator(image):
+        durations.append(int(frame.info.get("duration", image.info.get("duration", 0)) or 0))
+    return durations
+
+
+def _convert_static(source: Path, target: Path, asset: StaticAsset) -> None:
+    with Image.open(source) as image:
+        image.load()
+        source_size = image.size
+        source_mode = image.mode
+        has_alpha = "A" in source_mode or "transparency" in image.info
+
+        working = image.convert("RGBA" if has_alpha else "RGB")
+        working.save(
+            target,
+            format="WEBP",
+            quality=asset.quality,
+            method=6,
+            lossless=asset.lossless,
+        )
+
+    with Image.open(target) as converted:
+        converted.load()
+        if converted.size != source_size:
+            raise RuntimeError(f"size changed for {asset.source}: {source_size} -> {converted.size}")
+
+
+def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> None:
+    with Image.open(source) as image:
+        source_frames = int(getattr(image, "n_frames", 1) or 1)
+        if source_frames <= 1:
+            raise RuntimeError(f"expected animated source: {asset.source}")
+
+        source_loop = int(image.info.get("loop", 0) or 0)
+        durations = _frame_durations(image)
+        frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(image)]
+        source_size = image.size
+
+    frames[0].save(
+        target,
+        format="WEBP",
+        save_all=True,
+        append_images=frames[1:],
+        duration=durations,
+        loop=source_loop,
+        lossless=asset.lossless,
+        quality=asset.quality,
+        method=6,
+        minimize_size=True,
+    )
+
+    with Image.open(target) as converted:
+        converted_frames = int(getattr(converted, "n_frames", 1) or 1)
+        converted_loop = int(converted.info.get("loop", 0) or 0)
+        converted_durations = _frame_durations(converted)
+        converted_size = converted.size
+
+    if converted_frames != source_frames:
+        raise RuntimeError(
+            f"animation frame count changed for {asset.source}: "
+            f"{source_frames} -> {converted_frames}"
+        )
+    if converted_loop != source_loop:
+        raise RuntimeError(
+            f"animation loop changed for {asset.source}: {source_loop} -> {converted_loop}"
+        )
+    if converted_size != source_size:
+        raise RuntimeError(
+            f"animation dimensions changed for {asset.source}: {source_size} -> {converted_size}"
+        )
+
+    source_total = sum(durations)
+    converted_total = sum(converted_durations)
+    tolerance = max(20, source_frames * 2)
+    if abs(converted_total - source_total) > tolerance:
+        raise RuntimeError(
+            f"animation duration changed for {asset.source}: "
+            f"{source_total}ms -> {converted_total}ms"
+        )
+
+
+def optimize_assets(assets: Iterable[StaticAsset] = ASSETS) -> None:
+    for asset in assets:
+        source = IMG_DIR / asset.source
+        target = IMG_DIR / asset.target
+        if not source.is_file():
+            raise FileNotFoundError(source)
+
+        before = source.stat().st_size
+        if asset.animated:
+            _convert_animated(source, target, asset)
+        else:
+            _convert_static(source, target, asset)
+
+        after = target.stat().st_size
+        if after >= before:
+            target.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"optimized asset is not smaller: {asset.source} {before} -> {after}"
+            )
+
+        reduction = (1 - (after / before)) * 100
+        print(
+            f"ASSET_OK {asset.source} -> {asset.target} "
+            f"{before} -> {after} bytes ({reduction:.1f}% smaller)"
+        )
+
+
+if __name__ == "__main__":
+    optimize_assets()
