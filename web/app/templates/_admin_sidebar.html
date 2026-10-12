@@ -54,6 +54,13 @@
             商品與規則
         </a>
 
+        <a
+            class="{% if _p.startswith('/admin/roulette') %}active{% endif %}"
+            href="/admin/roulette"
+        >
+            輪盤管理
+        </a>
+
         {% if user and user.is_manager %}
         <a
             class="{% if _p.startswith('/admin/ai-operations') %}active{% endif %}"

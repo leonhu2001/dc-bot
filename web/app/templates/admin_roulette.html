@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
+<script src="/static/js/csrf.js?v=1"></script>
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
+<style>
+.roulette-page{padding:0 0 48px}.roulette-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:18px}.roulette-head h2{margin:0 0 4px;font-size:28px}.roulette-head p{margin:0;color:#777}.roulette-grid{display:grid;gap:14px}.roulette-card{border:1px solid #ddd;border-radius:18px;background:#fff;padding:18px;box-shadow:0 8px 28px rgba(0,0,0,.04)}.roulette-card-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.roulette-order-no{font-weight:900;font-size:18px}.roulette-customer{margin-top:5px;color:#666;font-size:14px}.roulette-status{padding:7px 10px;border-radius:999px;background:#f0f2f5;font-size:12px;font-weight:800;white-space:nowrap}.roulette-status.active{background:#e9f8ef;color:#1d7042}.roulette-status.stored{background:#fff5d8;color:#7d5a00}.roulette-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.roulette-stat{border:1px solid #e8e8e8;border-radius:13px;padding:12px;background:#fafafa}.roulette-stat small{display:block;color:#777;margin-bottom:5px}.roulette-stat strong{font-size:18px}.roulette-stat .gold{color:#a87816}.roulette-actions{display:grid;grid-template-columns:110px minmax(180px,1fr) auto;gap:10px;align-items:end;margin-top:14px;padding-top:14px;border-top:1px solid #eee}.roulette-actions label{display:grid;gap:6px;font-size:12px;color:#666}.roulette-actions input{width:100%;padding:10px 11px;border:1px solid #ccc;border-radius:10px;background:#fff}.roulette-actions button{padding:11px 16px;border:0;border-radius:10px;background:#151515;color:#fff;font-weight:900;cursor:pointer}.roulette-actions button:disabled{opacity:.4;cursor:not-allowed}.roulette-note{margin-top:9px;color:#777;font-size:12px;line-height:1.6}.roulette-history{margin-top:13px}.roulette-history summary{cursor:pointer;font-weight:800}.roulette-history-list{display:grid;gap:8px;margin-top:10px}.roulette-history-row{display:grid;grid-template-columns:100px 1fr 110px 160px;gap:10px;padding:9px 11px;border-radius:10px;background:#f7f7f7;font-size:13px}.roulette-grant{color:#666;font-size:12px}.roulette-link{display:inline-flex;margin-top:10px;font-size:13px;text-decoration:none}.notice{padding:12px 14px;border-radius:12px;margin-bottom:14px}.notice.success{background:#eaf8ef;color:#246942}.notice.error{background:#fff0f0;color:#9d2b2b}.empty{padding:32px;text-align:center;color:#777;border:1px dashed #ccc;border-radius:16px}@media(max-width:900px){.roulette-summary{grid-template-columns:1fr 1fr}.roulette-actions{grid-template-columns:1fr}.roulette-history-row{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body class="mw-r5-admin">
+<div class="mw-r5-shell">
+    {% include "_admin_sidebar.html" %}
+    <section class="mw-r5-main-host">
+        <header class="mw-r5-page-header">
+            <div class="mw-r5-kicker">ROULETTE OPERATIONS</div>
+            <h1>輪盤管理</h1>
+            <p>查看最終保底、補發抽取次數與保留每次補抽歷史。</p>
+        </header>
+        {% include "_admin_backbar.html" %}
+        <div class="mw-r5-legacy-body roulette-page">
+            {% if message %}<div class="notice success">{{ message }}</div>{% endif %}
+            {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+            <div class="roulette-head"><div><h2>俄羅斯輪盤訂單</h2><p>補抽後以最新一次結果作為本單最終保底，舊結果不刪除。</p></div></div>
+            <div class="roulette-grid">
+            {% if orders %}
+                {% for order in orders %}
+                <article class="roulette-card">
+                    <div class="roulette-card-top">
+                        <div>
+                            <div class="roulette-order-no">{{ order.order_no }}</div>
+                            <div class="roulette-customer">{{ order.customer_name }} · {{ order.customer_discord_id or '無 Discord ID' }}</div>
+                            <a class="roulette-link" href="/admin/order-workspace/{{ order.id }}">前往訂單工作區 →</a>
+                        </div>
+                        <span class="roulette-status {{ order.status }}">{% if order.status == 'active' %}進行中{% elif order.status == 'stored' %}存單中{% elif order.status == 'closed' %}已結單{% elif order.status in ['cancelled','canceled'] %}已取消{% else %}{{ order.status }}{% endif %}</span>
+                    </div>
+                    <div class="roulette-summary">
+                        <div class="roulette-stat"><small>目前最終保底</small><strong class="gold">{% if order.final_draw %}{{ "{:,}".format(order.final_draw.prize) }} 萬{% else %}尚未抽取{% endif %}</strong></div>
+                        <div class="roulette-stat"><small>最新落點</small><strong>{% if order.final_draw %}{{ order.final_draw.number }} 號{% if order.final_draw.is_jackpot %} · JACKPOT{% endif %}{% else %}—{% endif %}</strong></div>
+                        <div class="roulette-stat"><small>剩餘可補抽</small><strong>{{ order.remaining }} 次</strong></div>
+                        <div class="roulette-stat"><small>已產生結果</small><strong>{{ order.attempt_count }} 次</strong></div>
+                    </div>
+                    <form class="roulette-actions" method="post" action="/admin/roulette/{{ order.id }}/grant">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <label>補發次數<input type="number" name="count" value="1" min="1" max="10" required></label>
+                        <label>補發原因<input type="text" name="reason" maxlength="500" placeholder="例：網頁異常／客服核准重抽" required></label>
+                        <button type="submit" {% if order.status not in ['active','stored'] %}disabled{% endif %}>補發輪盤次數</button>
+                    </form>
+                    <div class="roulette-note">僅「進行中 / 存單中」可補發。補發不會刪除舊結果；老闆下一次抽完後，最新結果才會覆蓋為最終保底。</div>
+                    {% if order.history or order.grants %}
+                    <details class="roulette-history">
+                        <summary>查看補抽歷史與客服補發紀錄</summary>
+                        <div class="roulette-history-list">
+                            {% if order.final_draw %}<div class="roulette-history-row"><strong>目前結果</strong><span>{{ order.final_draw.selection_label }}</span><span>{{ order.final_draw.number }} 號</span><span>{{ "{:,}".format(order.final_draw.prize) }} 萬</span></div>{% endif %}
+                            {% for draw in order.history %}<div class="roulette-history-row"><strong>舊結果</strong><span>{{ draw.selection_label }}</span><span>{{ draw.number }} 號</span><span>{{ "{:,}".format(draw.prize) }} 萬</span></div>{% endfor %}
+                            {% for grant in order.grants %}<div class="roulette-grant">補發 +{{ grant.count }} 次 · {{ grant.reason }}{% if grant.granted_by_display_name %} · {{ grant.granted_by_display_name }}{% endif %} · {{ grant.created_at }}{% if grant.notification_status == 'failed' %} · ⚠ Discord 通知失敗{% endif %}</div>{% endfor %}
+                        </div>
+                    </details>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            {% else %}<div class="empty">目前沒有俄羅斯輪盤訂單。</div>{% endif %}
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>
