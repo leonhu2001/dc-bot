@@ -17,20 +17,24 @@ def _fail_on_uncaught_page_errors(page: Page):
     assert errors == [], "Uncaught browser errors: " + " | ".join(errors)
 
 
+def open_order_catalog(page: Page):
+    response = page.goto(f"{BASE_URL}/order", wait_until="domcontentloaded")
+    assert response is not None and response.ok
+    expect(page.locator(".order3-store")).to_be_visible()
+    return response
+
+
 def test_home_and_order_catalog_render(page: Page) -> None:
     home = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert home is not None and home.ok
     expect(page.locator("body")).to_be_visible()
 
-    order = page.goto(f"{BASE_URL}/order", wait_until="networkidle")
-    assert order is not None and order.ok
+    open_order_catalog(page)
     expect(page.locator("body")).to_be_visible()
-    expect(page.locator(".order3-store")).to_be_visible()
 
 
 def test_order_dialog_can_open_and_close(page: Page) -> None:
-    response = page.goto(f"{BASE_URL}/order", wait_until="networkidle")
-    assert response is not None and response.ok
+    open_order_catalog(page)
 
     open_buttons = page.locator(".order3-open")
     if open_buttons.count() == 0:
@@ -47,8 +51,7 @@ def test_order_dialog_can_open_and_close(page: Page) -> None:
 
 def test_order_catalog_has_no_mobile_horizontal_overflow(page: Page) -> None:
     page.set_viewport_size({"width": 390, "height": 844})
-    response = page.goto(f"{BASE_URL}/order", wait_until="networkidle")
-    assert response is not None and response.ok
+    open_order_catalog(page)
 
     widths = page.evaluate(
         """() => ({
