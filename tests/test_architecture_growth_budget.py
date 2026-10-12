@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Canonical import paths are now thin facades.  Existing implementations are
+# Canonical import paths are now thin facades. Existing implementations are
 # isolated under *_legacy and may only shrink while responsibilities are moved
 # into focused services/views.
 MAX_BYTES = {
@@ -18,6 +18,12 @@ MAX_BYTES = {
     "web/app/routers/admin_legacy.py": 102_000,
     "views/review.py": 95_500,
 }
+
+LEGACY_IMPORT_TOKENS = (
+    "services.order_runtime_legacy",
+    "services.self_service_runtime_legacy",
+    "web.app.routers.admin_legacy",
+)
 
 
 def test_legacy_runtime_files_do_not_grow() -> None:
@@ -56,3 +62,40 @@ def test_canonical_runtime_files_are_facades_not_new_implementation_hosts() -> N
         source = (ROOT / relative_path).read_text(encoding="utf-8")
         assert "sys.modules[__name__] = _legacy" in source, relative_path
         assert source.count("\n") < 40, relative_path
+
+
+def test_application_code_does_not_bypass_canonical_legacy_facades() -> None:
+    offenders: list[str] = []
+    roots = (
+        ROOT / "bot.py",
+        ROOT / "cogs",
+        ROOT / "core",
+        ROOT / "services",
+        ROOT / "shared",
+        ROOT / "views",
+        ROOT / "web" / "app",
+    )
+    facade_paths = {
+        ROOT / "services" / "order_runtime.py",
+        ROOT / "services" / "self_service_runtime.py",
+        ROOT / "web" / "app" / "routers" / "admin.py",
+    }
+
+    files: list[Path] = []
+    for root in roots:
+        if root.is_file():
+            files.append(root)
+        else:
+            files.extend(root.rglob("*.py"))
+
+    for path in files:
+        if path in facade_paths or path.name.endswith("_legacy.py"):
+            continue
+        source = path.read_text(encoding="utf-8")
+        if any(token in source for token in LEGACY_IMPORT_TOKENS):
+            offenders.append(str(path.relative_to(ROOT)))
+
+    assert not offenders, (
+        "application code must import canonical facade paths, not *_legacy: "
+        + ", ".join(offenders)
+    )
