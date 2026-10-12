@@ -9,19 +9,16 @@ from typing import Any
 
 import requests
 
-from services.order_rule_store import (
-    create_custom_order_rule,
-    ensure_order_rule_store,
-    get_custom_rule_definition,
-)
-from services.order_rules import invalidate_rule_override_cache
 from web.app.config import config
 
 
-ROULETTE_RULE_KEY = "fun_russian_roulette"
+ROULETTE_RULE_KEY = "admin_delta_desktop_fun_20261007053129_91eb"
+LEGACY_ROULETTE_RULE_KEY = "fun_russian_roulette"
+ROULETTE_RULE_KEYS = {ROULETTE_RULE_KEY, LEGACY_ROULETTE_RULE_KEY}
 ROULETTE_RULES_VERSION = "roulette-v1-2026-10-12"
 ROULETTE_ITEM_LABEL = "俄羅斯輪盤"
 DRAW_ALLOWED_STATUSES = {"active", "stored"}
+SITE_BASE_URL = "https://mowanentertainment.com"
 
 RED_NUMBERS = {
     1, 3, 5, 7, 9,
@@ -96,63 +93,65 @@ def ensure_roulette_draw_tables(db_file: str | Path | None = None) -> None:
 
             CREATE UNIQUE INDEX IF NOT EXISTS ux_roulette_draws_order
             ON roulette_draws(order_id);
+
+            CREATE TABLE IF NOT EXISTS roulette_ready_notifications (
+                order_id INTEGER PRIMARY KEY,
+                status TEXT NOT NULL DEFAULT 'pending',
+                message_id TEXT,
+                notified_at TEXT,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                last_error TEXT,
+                updated_at TEXT NOT NULL
+            );
             """
         )
         conn.commit()
 
 
-def _bootstrap_order_rule() -> None:
-    ensure_order_rule_store()
-    if get_custom_rule_definition(ROULETTE_RULE_KEY) is not None:
-        return
+def _deactivate_legacy_bootstrap_rule(
+    db_file: str | Path | None = None,
+) -> bool:
+    """Hide only the old system-generated duplicate roulette product.
 
-    payload = {
-        "label": ROULETTE_ITEM_LABEL,
-        "pricing_type": "fixed",
-        "price": 1200,
-        "unit_label": "單",
-        "allowed_roles": [
-            "top_protector",
-            "female_protector",
-            "male_protector",
-        ],
-        "required_staff_count": 2,
-        "min_quantity": 1,
-        "max_quantity": 1,
-        "allow_specify": False,
-        "catalog_group_label": ROULETTE_ITEM_LABEL,
-        "vip_discount_allowed": False,
-        "point_benefits_allowed": False,
-        "loyalty_benefits_enabled": False,
-        "required_game_roles": ["delta_desktop"],
-        "note": (
-            "付款完成後於官網抽取一次保底；結果產生後永久鎖定，"
-            "以網站紀錄為準。"
-        ),
-        "intro": (
-            "完成付款後可進行一次保底輪盤。未命中保底 1,200 萬；"
-            "最高為單押 0 命中 JACKPOT 7,000 萬。"
-        ),
-    }
+    The real product is manager-created and remains fully controlled from the
+    order-rules admin page. This cleanup never touches a manually-created row.
+    """
+    path = _db_path(db_file)
+    if not path.exists():
+        return False
 
-    try:
-        create_custom_order_rule(
-            rule_key=ROULETTE_RULE_KEY,
-            category="delta_desktop_fun",
-            payload=payload,
-            actor_discord_id="system",
-            actor_display_name="Mowan Roulette Bootstrap",
+    with sqlite3.connect(path, timeout=15) as conn:
+        table = conn.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type='table' AND name='custom_order_rules'
+            LIMIT 1
+            """
+        ).fetchone()
+        if table is None:
+            return False
+
+        cursor = conn.execute(
+            """
+            UPDATE custom_order_rules
+            SET is_active = 0
+            WHERE rule_key = ?
+              AND is_active = 1
+              AND (
+                    created_by_discord_id = 'system'
+                 OR created_by_display_name = 'Mowan Roulette Bootstrap'
+              )
+            """,
+            (LEGACY_ROULETTE_RULE_KEY,),
         )
-    except ValueError as exc:
-        if "已存在" not in str(exc):
-            raise
-
-    invalidate_rule_override_cache()
+        conn.commit()
+        return bool(cursor.rowcount)
 
 
-def ensure_roulette_feature() -> None:
-    ensure_roulette_draw_tables()
-    _bootstrap_order_rule()
+def ensure_roulette_feature(db_file: str | Path | None = None) -> None:
+    ensure_roulette_draw_tables(db_file)
+    _deactivate_legacy_bootstrap_rule(db_file)
 
 
 def _number(value: Any) -> int:
@@ -324,7 +323,7 @@ def _load_order(
 
 def _is_roulette_order(order: dict[str, Any]) -> bool:
     rule_key = str(order.get("order_rule_key") or "").strip()
-    if rule_key == ROULETTE_RULE_KEY:
+    if rule_key in ROULETTE_RULE_KEYS:
         return True
     return ROULETTE_ITEM_LABEL in str(order.get("item") or "")
 
@@ -358,7 +357,11 @@ def _draw_from_row(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         "mode": str(data.get("mode") or ""),
         "selection": selection_data.get("selection"),
         "selection_label": str(data.get("selection_label") or ""),
-        "covered_numbers": [int(n) for n in covered if str(n).lstrip("-").isdigit()],
+        "covered_numbers": [
+            int(n)
+            for n in covered
+            if str(n).lstrip("-").isdigit()
+        ],
         "number": int(data.get("landed_number") or 0),
         "hit": bool(data.get("hit")),
         "prize": int(data.get("guarantee_million") or 1200),
@@ -396,7 +399,11 @@ def get_roulette_context(
     elif status in DRAW_ALLOWED_STATUSES:
         can_draw = True
         reason = ""
-    elif status in {"pending_cs_dispatch", "waiting_acceptance", "accepted_pending_pay"}:
+    elif status in {
+        "pending_cs_dispatch",
+        "waiting_acceptance",
+        "accepted_pending_pay",
+    }:
         can_draw = False
         reason = "付款完成後即可進行一次保底輪盤。"
     elif status in {"closed", "cancelled", "canceled"}:
@@ -414,9 +421,16 @@ def get_roulette_context(
     }
 
 
-def _notification_embed(order: dict[str, Any], draw: dict[str, Any]) -> dict[str, Any]:
+def _notification_embed(
+    order: dict[str, Any],
+    draw: dict[str, Any],
+) -> dict[str, Any]:
     jackpot = bool(draw.get("is_jackpot"))
-    title = "🎰 JACKPOT！俄羅斯輪盤結果" if jackpot else "🎲 俄羅斯輪盤｜保底結果"
+    title = (
+        "🎰 JACKPOT！俄羅斯輪盤結果"
+        if jackpot
+        else "🎲 俄羅斯輪盤｜保底結果"
+    )
     description = (
         "單押 0 命中，觸發特殊大獎。"
         if jackpot
@@ -425,16 +439,21 @@ def _notification_embed(order: dict[str, Any], draw: dict[str, Any]) -> dict[str
     return {
         "title": title,
         "description": description,
-        "color": 0xE0BA64 if not jackpot else 0x45B96B,
+        "color": 0x45B96B if jackpot else 0xE0BA64,
         "fields": [
             {
                 "name": "訂單",
-                "value": str(order.get("bot_order_no") or f"WEB-{order.get('id')}"),
+                "value": str(
+                    order.get("bot_order_no")
+                    or f"WEB-{order.get('id')}"
+                ),
                 "inline": True,
             },
             {
                 "name": "下注",
-                "value": str(draw.get("selection_label") or "未紀錄")[:1024],
+                "value": str(
+                    draw.get("selection_label") or "未紀錄"
+                )[:1024],
                 "inline": True,
             },
             {
@@ -454,24 +473,34 @@ def _notification_embed(order: dict[str, Any], draw: dict[str, Any]) -> dict[str
     }
 
 
-def _send_discord_notification(order: dict[str, Any], draw: dict[str, Any]) -> str:
+def _discord_headers() -> dict[str, str]:
+    token = str(config.DISCORD_BOT_TOKEN or "").strip()
+    if not token:
+        raise RuntimeError("DISCORD_BOT_TOKEN is not configured")
+    return {
+        "Authorization": f"Bot {token}",
+        "Content-Type": "application/json",
+    }
+
+
+def _send_discord_notification(
+    order: dict[str, Any],
+    draw: dict[str, Any],
+) -> str:
     ticket_channel_id = str(order.get("ticket_channel_id") or "").strip()
     if not ticket_channel_id:
         raise RuntimeError("訂單尚未綁定 Discord 票口。")
 
-    token = str(config.DISCORD_BOT_TOKEN or "").strip()
-    if not token:
-        raise RuntimeError("DISCORD_BOT_TOKEN is not configured")
-
     customer_id = str(order.get("customer_discord_id") or "").strip()
-    content = f"<@{customer_id}> 保底輪盤已完成。" if customer_id else "保底輪盤已完成。"
+    content = (
+        f"<@{customer_id}> 保底輪盤已完成。"
+        if customer_id
+        else "保底輪盤已完成。"
+    )
 
     response = requests.post(
         f"{DISCORD_API_BASE}/channels/{ticket_channel_id}/messages",
-        headers={
-            "Authorization": f"Bot {token}",
-            "Content-Type": "application/json",
-        },
+        headers=_discord_headers(),
         json={
             "content": content,
             "embeds": [_notification_embed(order, draw)],
@@ -483,9 +512,220 @@ def _send_discord_notification(order: dict[str, Any], draw: dict[str, Any]) -> s
         timeout=15,
     )
     if response.status_code not in {200, 201}:
-        raise RuntimeError(f"Discord notification HTTP {response.status_code}")
+        raise RuntimeError(
+            f"Discord notification HTTP {response.status_code}"
+        )
 
     return str(response.json().get("id") or "").strip()
+
+
+def _roulette_url(order_id: int) -> str:
+    return f"{SITE_BASE_URL}/me/orders/{int(order_id)}/roulette"
+
+
+def _send_ready_notification(order: dict[str, Any]) -> str:
+    ticket_channel_id = str(order.get("ticket_channel_id") or "").strip()
+    if not ticket_channel_id:
+        raise RuntimeError("訂單尚未綁定 Discord 票口。")
+
+    order_id = int(order.get("id") or 0)
+    if order_id <= 0:
+        raise RuntimeError("輪盤訂單缺少 order_id。")
+
+    customer_id = str(order.get("customer_discord_id") or "").strip()
+    order_no = str(order.get("bot_order_no") or f"WEB-{order_id}")
+    url = _roulette_url(order_id)
+
+    response = requests.post(
+        f"{DISCORD_API_BASE}/channels/{ticket_channel_id}/messages",
+        headers=_discord_headers(),
+        json={
+            "content": (
+                f"<@{customer_id}> 🎰 **俄羅斯輪盤已開放抽取**"
+                if customer_id
+                else "🎰 **俄羅斯輪盤已開放抽取**"
+            ),
+            "embeds": [
+                {
+                    "title": "保底輪盤已解鎖",
+                    "description": (
+                        "付款已完成，現在可以前往官網選擇下注方式並抽取保底。\n"
+                        "**每張訂單只能產生 1 次結果，抽出後會永久鎖定。**"
+                    ),
+                    "color": 0xE0BA64,
+                    "fields": [
+                        {
+                            "name": "訂單",
+                            "value": order_no,
+                            "inline": True,
+                        },
+                        {
+                            "name": "操作",
+                            "value": "按下方按鈕前往輪盤頁面",
+                            "inline": True,
+                        },
+                    ],
+                    "footer": {
+                        "text": f"MW Roulette · WEB-{order_id}"
+                    },
+                }
+            ],
+            "components": [
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 5,
+                            "label": "前往輪盤抽取保底",
+                            "emoji": {"name": "🎰"},
+                            "url": url,
+                        }
+                    ],
+                }
+            ],
+            "allowed_mentions": {
+                "parse": [],
+                "users": [customer_id] if customer_id else [],
+            },
+        },
+        timeout=15,
+    )
+    if response.status_code not in {200, 201}:
+        body = str(response.text or "")[:300]
+        raise RuntimeError(
+            f"Discord roulette-ready HTTP {response.status_code}: {body}"
+        )
+
+    return str(response.json().get("id") or "").strip()
+
+
+def notify_ready_roulette_orders(
+    *,
+    db_file: str | Path | None = None,
+    limit: int = 20,
+) -> int:
+    """Send one ticket prompt once a roulette order becomes paid/active.
+
+    This is intentionally driven from canonical Web order status, so wallet,
+    bank transfer, and payment-review approvals all follow the same behavior.
+    """
+    ensure_roulette_feature(db_file)
+    safe_limit = max(1, min(int(limit or 20), 100))
+
+    with _connect(db_file) as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                customer_discord_id,
+                bot_order_no,
+                ticket_channel_id,
+                item,
+                status,
+                order_rule_key
+            FROM web_orders
+            WHERE status IN ('active', 'stored')
+              AND ticket_channel_id IS NOT NULL
+              AND TRIM(CAST(ticket_channel_id AS TEXT)) <> ''
+              AND (
+                    order_rule_key IN (?, ?)
+                 OR item LIKE ?
+              )
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            (
+                ROULETTE_RULE_KEY,
+                LEGACY_ROULETTE_RULE_KEY,
+                f"%{ROULETTE_ITEM_LABEL}%",
+                safe_limit,
+            ),
+        ).fetchall()
+
+    sent = 0
+
+    for raw_row in rows:
+        order = dict(raw_row)
+        order_id = int(order.get("id") or 0)
+        if order_id <= 0:
+            continue
+
+        with _connect(db_file) as conn:
+            existing = conn.execute(
+                """
+                SELECT status
+                FROM roulette_ready_notifications
+                WHERE order_id = ?
+                LIMIT 1
+                """,
+                (order_id,),
+            ).fetchone()
+
+            if existing is not None and str(existing["status"] or "") == "sent":
+                continue
+
+            conn.execute(
+                """
+                INSERT INTO roulette_ready_notifications (
+                    order_id,
+                    status,
+                    attempts,
+                    updated_at
+                )
+                VALUES (?, 'pending', 0, ?)
+                ON CONFLICT(order_id)
+                DO UPDATE SET
+                    attempts = roulette_ready_notifications.attempts + 1,
+                    updated_at = excluded.updated_at
+                """,
+                (order_id, _now_iso()),
+            )
+            conn.commit()
+
+        try:
+            message_id = _send_ready_notification(order)
+        except Exception as exc:
+            with _connect(db_file) as conn:
+                conn.execute(
+                    """
+                    UPDATE roulette_ready_notifications
+                    SET status = 'failed',
+                        last_error = ?,
+                        updated_at = ?
+                    WHERE order_id = ?
+                    """,
+                    (
+                        f"{type(exc).__name__}: {exc}"[:1000],
+                        _now_iso(),
+                        order_id,
+                    ),
+                )
+                conn.commit()
+            continue
+
+        with _connect(db_file) as conn:
+            conn.execute(
+                """
+                UPDATE roulette_ready_notifications
+                SET status = 'sent',
+                    message_id = ?,
+                    notified_at = ?,
+                    last_error = NULL,
+                    updated_at = ?
+                WHERE order_id = ?
+                """,
+                (
+                    message_id,
+                    _now_iso(),
+                    _now_iso(),
+                    order_id,
+                ),
+            )
+            conn.commit()
+        sent += 1
+
+    return sent
 
 
 def _mark_notification(
@@ -555,7 +795,11 @@ def draw_roulette(
             status = str(order.get("status") or "").strip().lower()
             if status not in DRAW_ALLOWED_STATUSES:
                 conn.rollback()
-                if status in {"pending_cs_dispatch", "waiting_acceptance", "accepted_pending_pay"}:
+                if status in {
+                    "pending_cs_dispatch",
+                    "waiting_acceptance",
+                    "accepted_pending_pay",
+                }:
                     raise PermissionError("付款完成後才會開放保底輪盤。")
                 raise PermissionError("這張訂單目前不能進行保底輪盤。")
 
