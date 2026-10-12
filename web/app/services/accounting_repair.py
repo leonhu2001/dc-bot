@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import json
 import sqlite3
 from datetime import datetime
@@ -274,7 +275,7 @@ def _recognize_historical_discount(
                 },
                 ensure_ascii=False,
             ),
-            created_at=datetime.utcnow(),
+            created_at=utc_now_naive(),
         )
     )
 
@@ -395,7 +396,7 @@ def _queue_wallet_order_reconciliation(
                 },
                 ensure_ascii=False,
             ),
-            created_at=datetime.utcnow(),
+            created_at=utc_now_naive(),
         )
     )
 
@@ -634,7 +635,7 @@ def _write_audit_log(
                 },
                 ensure_ascii=False,
             ),
-            created_at=datetime.utcnow(),
+            created_at=utc_now_naive(),
         )
     )
 

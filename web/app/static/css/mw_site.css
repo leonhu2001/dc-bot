@@ -10257,7 +10257,7 @@ This prevents an incompatible order from flashing briefly.
         0;
 
     background-image:
-        url("/static/img/staff_profile_bg_gothic_hall.png?v=1");
+        url("/static/img/staff_profile_bg_gothic_hall.webp?v=1");
 
     background-size:
         cover;

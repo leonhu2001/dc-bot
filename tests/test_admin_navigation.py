@@ -159,15 +159,17 @@ def test_nested_drilldowns_preserve_return_destination():
         encoding="utf-8"
     )
     routers = ROOT / "web" / "app" / "routers"
-    admin_source = (routers / "admin.py").read_text(encoding="utf-8")
+    workspace_source = (routers / "admin_order_workspace.py").read_text(
+        encoding="utf-8"
+    )
     search_source = (routers / "admin_global_search.py").read_text(
         encoding="utf-8"
     )
 
     assert "request.query_params.get('return_to', '') | urlencode" in order_page
     assert 'name="return_to"' in wallet_page
-    assert "request: Request | None = None" in admin_source
-    assert 'params["return_to"] = return_to' in admin_source
+    assert "request: Request | None = None" in workspace_source
+    assert 'params["return_to"] = return_to' in workspace_source
     assert "child_return_param" in customer_360
     assert "child_return_param" in search_source
 

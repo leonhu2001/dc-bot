@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -28,7 +29,7 @@ def _connect(database_path: str | None = None) -> sqlite3.Connection:
 
 
 def _now_text() -> str:
-    return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
+    return (utc_now_naive() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def ensure_internal_transfer_tables(database_path: str | None = None) -> None:

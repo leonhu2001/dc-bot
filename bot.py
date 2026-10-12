@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 import os
 from dotenv import load_dotenv
 
@@ -461,6 +462,19 @@ from views.welcome import (
 )
 
 import discord
+
+from services.ticket_identity import (
+    configure_ticket_identity,
+    _clean_ticket_channel_part,
+    build_ticket_channel_name,
+    safe_channel_name,
+    rename_ticket_channel,
+    is_agree_answer,
+    get_recruit_info_from_channel,
+    get_recruit_member_id_from_channel,
+    remove_recruit_applicant_role,
+    get_order_customer_id_from_channel,
+)
 from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
@@ -808,135 +822,26 @@ vip_group = app_commands.Group(name="vip", description="VIP / 會員管理")
 
 # ========= 工具函式 =========
 
-def _clean_ticket_channel_part(value: str, *, fallback: str = "user") -> str:
-    clean = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(value))
-    clean = re.sub(r"-+", "-", clean).strip("-")
-    return clean or fallback
-
-
-def build_ticket_channel_name(prefix: str, member: discord.Member | None = None, *, display_name: str | None = None) -> str:
-    raw_name = display_name or (member.display_name if member is not None else None) or "user"
-    prefix_part = _clean_ticket_channel_part(prefix, fallback="ticket")
-    name_part = _clean_ticket_channel_part(raw_name, fallback="user")
-    date_part = get_taipei_now().strftime("%m%d")
-    return f"{prefix_part}-{name_part}-{date_part}"[:90]
-
-
-def safe_channel_name(prefix: str, member: discord.Member) -> str:
-    return build_ticket_channel_name(prefix, member)
-
-
-async def rename_ticket_channel(
-    channel: discord.abc.GuildChannel | None,
-    prefix: str,
-    member: discord.Member | None = None,
-    *,
-    display_name: str | None = None,
-) -> None:
-    if not isinstance(channel, discord.TextChannel):
-        return
-
-    new_name = build_ticket_channel_name(prefix, member, display_name=display_name)
-
-    if channel.name == new_name:
-        return
-
-    try:
-        await channel.edit(name=new_name, reason=f"Ticket status changed: {prefix}")
-    except discord.Forbidden:
-        print(f"Bot 權限不足，無法更改票口名稱：{channel.id} -> {new_name}")
-    except discord.HTTPException as e:
-        print(f"更改票口名稱失敗：{channel.id} -> {new_name}：{e}")
-
-
-def is_agree_answer(text: str) -> bool:
-    answer = text.strip().lower()
-
-    agree_words = {
-        "是",
-        "有",
-        "已詳閱",
-        "已詳讀",
-        "已閱讀",
-        "我已詳閱",
-        "我已詳讀",
-        "我已閱讀",
-        "同意",
-        "yes",
-        "y",
-        "ok",
-        "okay",
-    }
-
-    return answer in agree_words
 
 
 
-def get_recruit_info_from_channel(channel: discord.TextChannel) -> tuple[str, str]:
-    if not channel.topic:
-        return "未紀錄暱稱", "未紀錄職位"
-
-    data = {}
-
-    for part in channel.topic.split(";"):
-        if "=" in part:
-            key, value = part.split("=", 1)
-            data[key.strip()] = value.strip()
-
-    nickname = data.get("recruit_nickname", "未紀錄暱稱")
-    position = data.get("recruit_position", "未紀錄職位")
-
-    return nickname, position
 
 
-def get_recruit_member_id_from_channel(channel: discord.TextChannel) -> int | None:
-    """從入職票口 topic 讀取申請人 ID。"""
-    if not channel.topic:
-        return None
-
-    data = {}
-
-    for part in channel.topic.split(";"):
-        if "=" in part:
-            key, value = part.split("=", 1)
-            data[key.strip()] = value.strip()
-
-    recruit_member_id = data.get("recruit_member_id")
-
-    if recruit_member_id is None:
-        return None
-
-    try:
-        return int(recruit_member_id)
-    except ValueError:
-        return None
 
 
-async def remove_recruit_applicant_role(guild: discord.Guild | None, channel: discord.abc.GuildChannel | None):
-    """入職票口關閉時收回申請人暫時身分組。"""
-    if guild is None or not isinstance(channel, discord.TextChannel):
-        return
 
-    recruit_member_id = get_recruit_member_id_from_channel(channel)
 
-    if recruit_member_id is None:
-        return
 
-    member = guild.get_member(recruit_member_id)
-    role = guild.get_role(RECRUIT_APPLICANT_ROLE_ID)
 
-    if member is None or role is None:
-        return
 
-    if role not in member.roles:
-        return
 
-    try:
-        await member.remove_roles(role, reason="Recruit ticket closed")
-    except discord.Forbidden:
-        print("Bot 權限不足，無法收回入職申請暫時身分組。請確認 Bot 身分組位置高於該身分組。")
-    except discord.HTTPException as e:
-        print(f"收回入職申請暫時身分組失敗：{e}")
+
+
+
+
+configure_ticket_identity(
+    recruit_applicant_role_id=RECRUIT_APPLICANT_ROLE_ID,
+)
 
 
 configure_support_views(
@@ -958,33 +863,6 @@ configure_web_support_bridge(
 )
 
 
-def get_order_customer_id_from_channel(channel: discord.TextChannel) -> int | None:
-    """
-    優先從頻道 topic 讀取點單顧客 ID。
-    若是舊票口沒有 topic，會嘗試從頻道名稱最後一段讀取 ID。
-    頻道名稱格式通常會是：下單-名字-使用者ID
-    """
-    if channel.topic:
-        data = {}
-
-        for part in channel.topic.split(";"):
-            if "=" in part:
-                key, value = part.split("=", 1)
-                data[key.strip()] = value.strip()
-
-        customer_id = data.get("order_customer_id")
-
-        if customer_id is not None:
-            try:
-                return int(customer_id)
-            except ValueError:
-                pass
-
-    try:
-        possible_id = channel.name.rsplit("-", 1)[-1]
-        return int(possible_id)
-    except ValueError:
-        return None
 
 
 
@@ -1197,7 +1075,7 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
                     order_id = int(order.id)
 
                     if not getattr(order, "closed_at", None):
-                        order.closed_at = datetime.utcnow() + timedelta(hours=8)
+                        order.closed_at = utc_now_naive() + timedelta(hours=8)
 
                     recalculate_order_payouts(db, order.id)
                     db.commit()

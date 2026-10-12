@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -498,7 +499,7 @@ def build_my_payout_rows(discord_id: str, *, month: str = "", status: str = "all
 
 
 def _taipei_current_month() -> str:
-    return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m")
+    return (utc_now_naive() + timedelta(hours=8)).strftime("%Y-%m")
 
 
 def _salary_category(role_label: str | None) -> tuple[str, str]:

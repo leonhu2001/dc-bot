@@ -46,3 +46,12 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 11. `bot.py`、`order_runtime.py`、`self_service_runtime.py`、Web `admin.py`、`views/review.py` 都有 regression growth budget；新功能若撞到上限，必須先抽出責任區塊而不是提高上限。
 12. Python regression 之外，公開首頁與點單流程必須通過 Playwright browser smoke；至少驗證頁面可載入、點單 Dialog 可操作，以及 390px 手機寬度不產生水平溢出。
 13. 前端臨時 `*_fix.js` / runtime CSS injection 不作為新功能的落點；碰到既有 patch 時優先把行為移回正式 controller / stylesheet，再刪除 patch。
+
+## Phase 2 extraction boundaries (2026-10-13)
+
+- Discord order credential UI/runtime lives in `services/order_credential_runtime.py`; credential persistence remains in `services/order_credentials.py`.
+- Point-benefit payment redemption lives in `services/order_point_redemption.py`.
+- Self-service pricing, manual adjustment, VIP discount, and point-benefit financial calculation live in `services/self_service_financials.py`.
+- Ticket naming/topic identity helpers live in `services/ticket_identity.py`, not the `bot.py` entrypoint.
+- Admin dashboard and order workspace are separate routers; `web/app/routers/admin.py` is a thin action/router composition layer.
+- Patch-style frontend assets (`*_fix.js` / `*_fix.css`) have no allow-list. Additions must be implemented in canonical controllers/styles instead.

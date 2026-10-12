@@ -18,12 +18,9 @@ STATIC = ROOT / "web" / "app" / "static"
 MAX_INLINE_STYLE_BLOCKS = 26
 MAX_INLINE_SCRIPT_BLOCKS = 19
 
-# The only remaining *_fix asset is a temporary compatibility loader for the
-# canonical order UI module. Runtime behavior must not be added back to it, and
-# no additional patch-style assets may be introduced.
-ALLOWED_LEGACY_PATCH_ASSETS = {
-    "js/mw_order_form_fix.js",
-}
+# Patch-style frontend assets are fully retired. Keep this set empty so a new
+# *_fix.js / *_fix.css fails the static audit instead of becoming permanent debt.
+ALLOWED_LEGACY_PATCH_ASSETS: set[str] = set()
 
 STATIC_REF_RE = re.compile(
     r'''(?:src|href)\s*=\s*["'](/static/[^"'?#]+)(?:[?#][^"']*)?["']''',

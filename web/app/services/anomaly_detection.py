@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import sqlite3
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -132,7 +133,7 @@ def _parse_datetime(value: Any) -> datetime | None:
             return None
 
     if parsed.tzinfo is None:
-        # SQLAlchemy models in shared/models.py use datetime.utcnow and SQLite
+        # SQLAlchemy models in shared/models.py use utc_now_naive and SQLite
         # CURRENT_TIMESTAMP also stores UTC. Explicit ISO workflow tables already
         # include their timezone offsets.
         parsed = parsed.replace(tzinfo=UTC_TZ)

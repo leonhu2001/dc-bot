@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 from sqlalchemy import select
 
 from shared.db import SessionLocal
@@ -14,7 +15,7 @@ from shared.order_state import (
 def _web_order_closed_at_now():
     """網站訂單結單時間：使用台北時間。"""
     from datetime import datetime, timedelta
-    return datetime.utcnow() + timedelta(hours=8)
+    return utc_now_naive() + timedelta(hours=8)
 
 def _to_text_id(value) -> str | None:
     if value is None:
@@ -423,7 +424,7 @@ def sync_web_worker_claim_from_dispatch(
         else:
             if assignment is not None:
                 assignment.is_active = False
-                assignment.removed_at = datetime.utcnow()
+                assignment.removed_at = utc_now_naive()
                 assignment.has_named_bonus = False
 
         db.flush()
@@ -499,7 +500,7 @@ def sync_dispatch_claims_to_web(
             for assignment in assignments
         }
 
-        now = datetime.utcnow()
+        now = utc_now_naive()
 
         for worker_id, role_type in desired.items():
             display_name = worker_display_names.get(worker_id) or worker_id
@@ -665,7 +666,7 @@ def apply_discord_claim_event_to_web(
         elif action == "unclaim":
             if assignment is not None:
                 assignment.is_active = False
-                assignment.removed_at = datetime.utcnow()
+                assignment.removed_at = utc_now_naive()
 
         else:
             raise ValueError(f"unknown action: {action}")
