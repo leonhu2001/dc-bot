@@ -1,4 +1,70 @@
 {% extends "layout.html" %}
+{% block page_title %}報單審核{% endblock %}
 {% block content %}
-<div class="card"><h1>報單審核</h1><p>功能建置中。</p></div>
+<link rel="stylesheet" href="/static/css/order_reports.css?v=2">
+<section class="report-shell">
+  <div class="report-hero">
+    <div>
+      <p class="report-kicker">REPORT REVIEW</p>
+      <h2>報單審核</h2>
+      <p>未報單可以直接提醒接單人員；已送出的報單則在這裡確認掛名、直播、錄影與備註。</p>
+    </div>
+    <div class="report-hero-actions">
+      <span class="report-badge report-badge-pending">待審 {{ pending_report_review_count }}</span>
+      <a class="report-button report-button-secondary" href="/dispatch/reports">我的報單</a>
+    </div>
+  </div>
+
+  {% if message %}<div class="report-alert report-alert-success">{{ message }}</div>{% endif %}
+  {% if error %}<div class="report-alert report-alert-danger">{{ error }}</div>{% endif %}
+
+  <form method="get" class="report-filter-bar">
+    <input type="search" name="q" value="{{ q }}" placeholder="搜尋訂單、老闆、陪玩、單別">
+    <select name="status">
+      <option value="actionable" {% if status_filter == 'actionable' %}selected{% endif %}>待處理</option>
+      <option value="missing" {% if status_filter == 'missing' %}selected{% endif %}>未報單</option>
+      <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>待審核</option>
+      <option value="changes_requested" {% if status_filter == 'changes_requested' %}selected{% endif %}>需修改</option>
+      <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>已報單</option>
+    </select>
+    <button class="report-button report-button-secondary" type="submit">篩選</button>
+  </form>
+
+  {% if reports %}
+    <div class="report-list">
+      {% for row in reports %}
+        <article class="report-card report-card-{{ row.report_status }}">
+          <div class="report-card-main">
+            <div class="report-card-title-row">
+              <div>
+                <p class="report-kicker">{{ row.bot_order_no or ('WEB-' ~ row.id) }}</p>
+                <h3>{{ row.customer_display_name or '未記錄老闆' }}</h3>
+              </div>
+              <span class="report-badge report-badge-{{ row.report_status }}">{{ status_labels.get(row.report_status, row.report_status) }}</span>
+            </div>
+            <div class="report-meta-grid report-meta-grid-four">
+              <div><span>服務</span><strong>{{ row.category }}｜{{ row.item }}</strong></div>
+              <div><span>接單人員</span><strong>{{ row.worker_names or '未指派' }}</strong></div>
+              <div><span>結單時間</span><strong>{{ row.closed_at or row.updated_at or '—' }}</strong></div>
+              <div><span>提交者</span><strong>{{ row.submitted_by_display_name or ('舊制自動完成' if row.is_legacy else '尚未填寫') }}</strong></div>
+            </div>
+            {% if row.report_status == 'missing' %}
+              <p class="report-muted">尚未收到報單，可進入詳情重新私訊提醒。</p>
+            {% elif row.report_status == 'changes_requested' and row.review_note %}
+              <div class="report-alert report-alert-warning"><strong>退回原因：</strong>{{ row.review_note }}</div>
+            {% endif %}
+          </div>
+          <div class="report-card-action">
+            <a class="report-button {% if row.report_status in ['missing','pending','changes_requested'] %}report-button-primary{% else %}report-button-secondary{% endif %}" href="/dispatch/reports/review/{{ row.id }}">查看審核</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="report-empty">
+      <strong>目前沒有待處理報單</strong>
+      <p>這裡會集中顯示未報單、待審核與退回修改的訂單。</p>
+    </div>
+  {% endif %}
+</section>
 {% endblock %}
