@@ -23,6 +23,7 @@ from web.app.services.roulette_service import (
     draw_roulette,
     ensure_roulette_feature,
     get_roulette_context,
+    normalize_bet,
     notify_ready_roulette_orders,
 )
 
@@ -173,6 +174,8 @@ async def member_roulette_draw(
         raise HTTPException(status_code=401, detail="請先登入。")
 
     try:
+        # 先完整驗證下注內容，再動補抽額度。避免異常 payload 消耗掉補發次數。
+        normalize_bet(payload.mode, payload.selection)
         context = await run_in_threadpool(
             get_roulette_context,
             customer_id,
