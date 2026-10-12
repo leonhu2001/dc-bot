@@ -15,6 +15,10 @@
       --gold:#dfb75c;
       --gold-2:#f1cf7b;
       --green:#8fca9f;
+      --tier-1200:#344252;
+      --tier-1500:#985a33;
+      --tier-2000:#d09a37;
+      --tier-2500:#a72839;
       --shadow:0 30px 90px rgba(0,0,0,.38);
     }
     *{box-sizing:border-box}
@@ -25,13 +29,13 @@
       var(--bg)}
     a{color:inherit}
     button{font:inherit}
-    .page{width:min(1040px,calc(100% - 32px));margin:0 auto;padding:36px 0 72px}
+    .page{width:min(1080px,calc(100% - 32px));margin:0 auto;padding:36px 0 72px}
     .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:32px}
     .brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:900;letter-spacing:.08em}
     .brand-mark{width:36px;height:36px;border-radius:12px;border:1px solid rgba(223,183,92,.32);display:grid;place-items:center;background:rgba(223,183,92,.08);color:var(--gold);font-size:18px}
     .back{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:rgba(243,239,230,.72);background:rgba(255,255,255,.025)}
     .back:hover{border-color:rgba(223,183,92,.4);color:var(--text)}
-    .hero{display:grid;grid-template-columns:minmax(0,.86fr) minmax(380px,1.14fr);gap:24px;align-items:stretch}
+    .hero{display:grid;grid-template-columns:minmax(0,.8fr) minmax(430px,1.2fr);gap:24px;align-items:stretch}
     .copy,.game{border:1px solid var(--line);border-radius:28px;background:linear-gradient(150deg,rgba(22,22,24,.98),rgba(11,11,12,.98));box-shadow:var(--shadow)}
     .copy{padding:clamp(28px,4vw,42px);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
     .copy:after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;right:-110px;top:-110px;background:radial-gradient(circle,rgba(223,183,92,.16),transparent 67%);pointer-events:none}
@@ -40,31 +44,34 @@
     .lead{margin:0;color:rgba(243,239,230,.68);font-size:16px;line-height:1.85}
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
     .chip{padding:8px 10px;border:1px solid rgba(223,183,92,.22);border-radius:999px;background:rgba(223,183,92,.06);color:#ead091;font-size:12px;font-weight:800}
-    .game{padding:26px;display:flex;flex-direction:column;min-height:610px}
+    .game{padding:26px;display:flex;flex-direction:column;min-height:690px}
     .game-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
     .order-no{font-size:13px;color:rgba(243,239,230,.48);margin-top:7px}
     .status{padding:8px 11px;border-radius:999px;border:1px solid rgba(143,202,159,.25);background:rgba(143,202,159,.07);color:#a9d8b5;font-weight:850;font-size:12px;white-space:nowrap}
     .status.locked{border-color:rgba(223,183,92,.25);background:rgba(223,183,92,.07);color:var(--gold-2)}
-    .cylinder-wrap{display:grid;place-items:center;flex:1;padding:26px 0 18px;min-height:350px;perspective:900px}
-    .cylinder{position:relative;width:min(320px,72vw);aspect-ratio:1;border-radius:50%;border:2px solid rgba(223,183,92,.38);background:
-      radial-gradient(circle at center,rgba(223,183,92,.13) 0 14%,transparent 14.5%),
-      radial-gradient(circle at 38% 31%,rgba(255,255,255,.04),transparent 22%),
-      linear-gradient(145deg,#222225,#0e0e0f 68%);
-      box-shadow:inset 0 0 0 12px rgba(255,255,255,.018),inset 0 0 0 22px rgba(0,0,0,.32),0 26px 50px rgba(0,0,0,.36);
-      transition:transform .35s ease;
-    }
-    .cylinder.spinning{animation:spin 1.8s cubic-bezier(.12,.68,.15,1) forwards}
-    @keyframes spin{0%{transform:rotate(0)}70%{transform:rotate(1260deg) scale(1.03)}100%{transform:rotate(1440deg)}}
-    .chamber{position:absolute;width:23%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.11);background:radial-gradient(circle at 38% 30%,#2a2a2d,#0b0b0c 66%);box-shadow:inset 0 0 18px rgba(0,0,0,.85),0 2px 0 rgba(255,255,255,.025);color:rgba(243,239,230,.26);font-size:25px;font-weight:950;transition:border-color .25s ease,box-shadow .25s ease,color .25s ease,background .25s ease}
-    .chamber[data-slot="1"]{left:38.5%;top:8%}
-    .chamber[data-slot="2"]{right:11%;top:26%}
-    .chamber[data-slot="3"]{right:11%;bottom:25%}
-    .chamber[data-slot="4"]{left:38.5%;bottom:8%}
-    .chamber[data-slot="5"]{left:11%;bottom:25%}
-    .chamber[data-slot="6"]{left:11%;top:26%}
-    .chamber.hit{border-color:rgba(223,183,92,.75);color:#211b0d;background:radial-gradient(circle at 38% 30%,#ffe5a0,#c99b3e 66%);box-shadow:0 0 0 6px rgba(223,183,92,.08),0 0 46px rgba(223,183,92,.36);font-size:0}
-    .chamber.hit::after{content:"✦";font-size:25px}
-    .needle{position:absolute;left:50%;top:-17px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:18px solid var(--gold);filter:drop-shadow(0 3px 7px rgba(223,183,92,.38))}
+
+    .wheel-area{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:18px 0 14px}
+    .wheel-stage{position:relative;width:min(390px,78vw);aspect-ratio:1;display:grid;place-items:center;filter:drop-shadow(0 24px 34px rgba(0,0,0,.42))}
+    .wheel-stage:before{content:"";position:absolute;inset:1.5%;border-radius:50%;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.08),transparent 28%),linear-gradient(145deg,#754622,#2f1b0d 62%,#1b1109);border:2px solid rgba(241,207,123,.46);box-shadow:inset 0 0 0 9px rgba(0,0,0,.26),inset 0 0 26px rgba(0,0,0,.52)}
+    .wheel-rotor{position:absolute;inset:7%;border-radius:50%;transition:transform 3.4s cubic-bezier(.12,.72,.08,1);will-change:transform;transform:rotate(0deg)}
+    .wheel-rotor svg{display:block;width:100%;height:100%;overflow:visible}
+    .slot-path{stroke:rgba(252,234,190,.56);stroke-width:.7;vector-effect:non-scaling-stroke;transition:filter .22s ease,stroke-width .22s ease,opacity .22s ease}
+    .slot-path.selected{stroke:#fff1b7;stroke-width:2.3;filter:drop-shadow(0 0 5px rgba(255,221,129,.9));opacity:1}
+    .wheel-inner-ring{fill:#143d2a;stroke:rgba(242,208,126,.65);stroke-width:1.5}
+    .wheel-core{fill:url(#coreGradient);stroke:#f0c86f;stroke-width:1.5}
+    .wheel-hub{fill:url(#hubGradient);stroke:#f6dc99;stroke-width:1.4}
+    .wheel-arm{stroke:#e7c26b;stroke-width:4;stroke-linecap:round;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+    .wheel-knob{fill:#f4d98f;stroke:#8b6326;stroke-width:1.1}
+    .pointer{position:absolute;z-index:5;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:23px solid #f3cf72;filter:drop-shadow(0 4px 8px rgba(0,0,0,.65))}
+    .pointer:before{content:"";position:absolute;width:8px;height:16px;border-radius:6px;background:#f3cf72;left:-4px;top:-27px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+
+    .legend{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:15px}
+    .legend-item{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.022);min-width:0}
+    .legend-swatch{width:14px;height:14px;border-radius:4px;flex:0 0 14px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+    .legend-copy{min-width:0}
+    .legend-copy strong{display:block;font-size:12px;color:#f4efe3;white-space:nowrap}
+    .legend-copy span{display:block;margin-top:2px;font-size:10px;color:rgba(243,239,230,.42);white-space:nowrap}
+
     .result{min-height:92px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.023);display:flex;align-items:center;justify-content:space-between;gap:18px}
     .result small{display:block;color:rgba(243,239,230,.45);font-size:11px;letter-spacing:.12em;font-weight:850}
     .result strong{display:block;margin-top:5px;font-size:24px}
@@ -77,6 +84,7 @@
     .primary:disabled{cursor:not-allowed;opacity:.44}
     .secondary{border:1px solid var(--line);background:rgba(255,255,255,.025);color:rgba(243,239,230,.72)}
     .secondary:hover{border-color:rgba(223,183,92,.32);color:var(--text)}
+
     .rules{margin-top:24px;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.022);overflow:hidden}
     details{border-bottom:1px solid var(--line)}
     details:last-child{border-bottom:0}
@@ -86,15 +94,12 @@
     details[open] summary::after{content:"−"}
     .rule-body{padding:0 22px 22px;color:rgba(243,239,230,.63);font-size:14px;line-height:1.85}
     .rule-body b{color:#f2d791}
-    .prob-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:14px}
-    .prob{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.022)}
-    .prob strong{display:block;color:var(--gold-2)}
-    .prob span{display:block;margin-top:3px;color:rgba(243,239,230,.43);font-size:11px}
     .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);opacity:0;pointer-events:none;padding:11px 15px;border-radius:12px;border:1px solid rgba(223,183,92,.25);background:#171511;color:#f0d18c;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:.25s ease}
     .toast.show{opacity:1;transform:translate(-50%,0)}
-    @media(max-width:860px){.hero{grid-template-columns:1fr}.game{min-height:560px}.prob-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media(max-width:520px){.page{width:min(100% - 20px,1040px);padding-top:18px}.topbar{margin-bottom:20px}.copy,.game{border-radius:21px}.copy{padding:25px 21px}.game{padding:20px}.brand span:last-child{display:none}.result{align-items:flex-start;flex-direction:column}.result-value{white-space:normal}.actions{flex-direction:column}.prob-grid{grid-template-columns:1fr 1fr}}
-    @media(prefers-reduced-motion:reduce){.cylinder.spinning{animation:none}.primary:hover:not(:disabled){transform:none}}
+
+    @media(max-width:900px){.hero{grid-template-columns:1fr}.game{min-height:660px}.wheel-stage{width:min(400px,80vw)}}
+    @media(max-width:560px){.page{width:min(100% - 20px,1080px);padding-top:18px}.topbar{margin-bottom:20px}.copy,.game{border-radius:21px}.copy{padding:25px 21px}.game{padding:20px}.brand span:last-child{display:none}.legend{grid-template-columns:1fr 1fr}.result{align-items:flex-start;flex-direction:column}.result-value{white-space:normal}.actions{flex-direction:column}}
+    @media(prefers-reduced-motion:reduce){.wheel-rotor{transition-duration:.01ms}.primary:hover:not(:disabled){transform:none}}
   </style>
 </head>
 <body>
@@ -108,9 +113,9 @@
       <article class="copy">
         <div class="eyebrow">RUSSIAN ROULETTE</div>
         <h1>俄羅斯輪盤<br>保底抽取</h1>
-        <p class="lead">轉動一次六格輪盤，抽出本張趣味單的最終保底。結果確定後即鎖定。</p>
+        <p class="lead">轉動一次輪盤，依指針最後停下的色塊決定本張趣味單保底。結果確定後即鎖定。</p>
         <div class="chips">
-          <span class="chip">六格等機率</span>
+          <span class="chip">37 格輪盤</span>
           <span class="chip">每單 1 次</span>
           <span class="chip">抽完即鎖定</span>
         </div>
@@ -125,15 +130,60 @@
           <span id="status" class="status">可抽 1 次</span>
         </div>
 
-        <div class="cylinder-wrap">
-          <div id="cylinder" class="cylinder" aria-label="六格保底輪盤">
-            <div class="chamber" data-slot="1">?</div>
-            <div class="chamber" data-slot="2">?</div>
-            <div class="chamber" data-slot="3">?</div>
-            <div class="chamber" data-slot="4">?</div>
-            <div class="chamber" data-slot="5">?</div>
-            <div class="chamber" data-slot="6">?</div>
-            <div class="needle" aria-hidden="true"></div>
+        <div class="wheel-area">
+          <div class="wheel-stage" aria-label="37 格保底輪盤">
+            <div class="pointer" aria-hidden="true"></div>
+            <div id="wheelRotor" class="wheel-rotor">
+              <svg viewBox="-110 -110 220 220" role="img" aria-label="保底色塊輪盤">
+                <defs>
+                  <radialGradient id="coreGradient" cx="35%" cy="28%" r="74%">
+                    <stop offset="0%" stop-color="#b77a3a"/>
+                    <stop offset="50%" stop-color="#6e3f20"/>
+                    <stop offset="100%" stop-color="#2d1b10"/>
+                  </radialGradient>
+                  <radialGradient id="hubGradient" cx="35%" cy="30%" r="70%">
+                    <stop offset="0%" stop-color="#fff0b5"/>
+                    <stop offset="48%" stop-color="#d2a44d"/>
+                    <stop offset="100%" stop-color="#77521d"/>
+                  </radialGradient>
+                </defs>
+                <circle r="105" fill="#2b180d" stroke="#e0b45c" stroke-width="2"/>
+                <g id="segments"></g>
+                <circle class="wheel-inner-ring" r="66"/>
+                <circle class="wheel-core" r="52"/>
+                <g aria-hidden="true">
+                  <line class="wheel-arm" x1="0" y1="-41" x2="0" y2="41"/>
+                  <line class="wheel-arm" x1="-35.5" y1="-20.5" x2="35.5" y2="20.5"/>
+                  <line class="wheel-arm" x1="-35.5" y1="20.5" x2="35.5" y2="-20.5"/>
+                  <circle class="wheel-knob" cx="0" cy="-42" r="4.6"/>
+                  <circle class="wheel-knob" cx="0" cy="42" r="4.6"/>
+                  <circle class="wheel-knob" cx="36.5" cy="21" r="4.6"/>
+                  <circle class="wheel-knob" cx="-36.5" cy="-21" r="4.6"/>
+                  <circle class="wheel-knob" cx="36.5" cy="-21" r="4.6"/>
+                  <circle class="wheel-knob" cx="-36.5" cy="21" r="4.6"/>
+                  <circle class="wheel-hub" r="10"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <div class="legend" aria-label="色塊保底圖例">
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:var(--tier-1200)"></span>
+              <div class="legend-copy"><strong>1,200 萬</strong><span>17 格 · 45.9%</span></div>
+            </div>
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:var(--tier-1500)"></span>
+              <div class="legend-copy"><strong>1,500 萬</strong><span>11 格 · 29.7%</span></div>
+            </div>
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:var(--tier-2000)"></span>
+              <div class="legend-copy"><strong>2,000 萬</strong><span>7 格 · 18.9%</span></div>
+            </div>
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:var(--tier-2500)"></span>
+              <div class="legend-copy"><strong>2,500 萬</strong><span>2 格 · 5.4%</span></div>
+            </div>
           </div>
         </div>
 
@@ -147,7 +197,7 @@
         </div>
 
         <div class="actions">
-          <button id="drawButton" class="primary" type="button">轉動六格輪盤</button>
+          <button id="drawButton" class="primary" type="button">轉動輪盤</button>
           <button id="resetButton" class="secondary" type="button">測試重置</button>
         </div>
       </article>
@@ -157,19 +207,13 @@
       <details>
         <summary>玩法規則</summary>
         <div class="rule-body">
-          本玩法取自俄羅斯輪盤的<b>六格隨機</b>概念，僅作數位趣味抽取。每張符合資格的訂單可抽 <b>1 次</b>，結果確定後不可重抽；正式上線時會與訂單綁定並同步至 Discord 票口。
+          每張符合資格的訂單可轉動輪盤 <b>1 次</b>。輪盤共有 37 個等大小色塊，依指針最後停下的色塊決定本單保底；結果產生後即鎖定，不可重新抽取。
         </div>
       </details>
       <details>
-        <summary>本次保底獎池</summary>
+        <summary>保底機率</summary>
         <div class="rule-body">
-          六格機率相同，其中一格為最高保底。
-          <div class="prob-grid">
-            <div class="prob"><strong>1,200 萬</strong><span>2 格 · 33.3%</span></div>
-            <div class="prob"><strong>1,500 萬</strong><span>2 格 · 33.3%</span></div>
-            <div class="prob"><strong>2,000 萬</strong><span>1 格 · 16.7%</span></div>
-            <div class="prob"><strong>2,500 萬</strong><span>1 格 · 16.7%</span></div>
-          </div>
+          <b>1,200 萬</b> 17 格、<b>1,500 萬</b> 11 格、<b>2,000 萬</b> 7 格、<b>2,500 萬</b> 2 格。最高保底約為 5.4% 機率。
         </div>
       </details>
     </section>
@@ -181,18 +225,23 @@
     (() => {
       "use strict";
 
-      const STORAGE_KEY = "mowan_rr_demo_v3";
-      const chambers = [
-        { value: 1200, label: "保底確定", jackpot: false },
-        { value: 1200, label: "保底確定", jackpot: false },
-        { value: 1500, label: "保底確定", jackpot: false },
-        { value: 1500, label: "保底確定", jackpot: false },
-        { value: 2000, label: "高額保底", jackpot: false },
-        { value: 2500, label: "最高保底", jackpot: true }
+      const STORAGE_KEY = "mowan_rr_demo_v4";
+      const SLOT_VALUES = [
+        1200,1500,2000,1200,1500,1200,2500,1200,2000,1500,
+        1200,1500,1200,2000,1200,1500,1200,2000,1200,1500,
+        1200,1500,1200,2000,1200,1500,2500,1200,1500,1200,
+        2000,1200,1500,1200,2000,1500,1200
       ];
+      const COLORS = {
+        1200: "#344252",
+        1500: "#985a33",
+        2000: "#d09a37",
+        2500: "#a72839"
+      };
+      const STEP = 360 / SLOT_VALUES.length;
 
-      const cylinder = document.getElementById("cylinder");
-      const holes = Array.from(document.querySelectorAll(".chamber"));
+      const rotor = document.getElementById("wheelRotor");
+      const segments = document.getElementById("segments");
       const drawButton = document.getElementById("drawButton");
       const resetButton = document.getElementById("resetButton");
       const status = document.getElementById("status");
@@ -200,21 +249,63 @@
       const resultSub = document.getElementById("resultSub");
       const resultValue = document.getElementById("resultValue");
       const toast = document.getElementById("toast");
-
       let drawing = false;
+      let currentRotation = 0;
+
+      function polar(radius, angleDeg) {
+        const angle = angleDeg * Math.PI / 180;
+        return [radius * Math.cos(angle), radius * Math.sin(angle)];
+      }
+
+      function ringSlicePath(startDeg, endDeg, innerRadius, outerRadius) {
+        const [ox1, oy1] = polar(outerRadius, startDeg);
+        const [ox2, oy2] = polar(outerRadius, endDeg);
+        const [ix2, iy2] = polar(innerRadius, endDeg);
+        const [ix1, iy1] = polar(innerRadius, startDeg);
+        return [
+          `M ${ox1.toFixed(3)} ${oy1.toFixed(3)}`,
+          `A ${outerRadius} ${outerRadius} 0 0 1 ${ox2.toFixed(3)} ${oy2.toFixed(3)}`,
+          `L ${ix2.toFixed(3)} ${iy2.toFixed(3)}`,
+          `A ${innerRadius} ${innerRadius} 0 0 0 ${ix1.toFixed(3)} ${iy1.toFixed(3)}`,
+          "Z"
+        ].join(" ");
+      }
+
+      function buildWheel() {
+        const ns = "http://www.w3.org/2000/svg";
+        SLOT_VALUES.forEach((value, index) => {
+          const center = -90 + index * STEP;
+          const path = document.createElementNS(ns, "path");
+          path.setAttribute("d", ringSlicePath(center - STEP / 2, center + STEP / 2, 69, 100));
+          path.setAttribute("fill", COLORS[value]);
+          path.setAttribute("class", "slot-path");
+          path.dataset.index = String(index);
+          path.dataset.value = String(value);
+          segments.appendChild(path);
+        });
+      }
 
       function randomIndex() {
         if (window.crypto && window.crypto.getRandomValues) {
           const bucket = new Uint32Array(1);
-          const max = Math.floor(0x100000000 / chambers.length) * chambers.length;
+          const max = Math.floor(0x100000000 / SLOT_VALUES.length) * SLOT_VALUES.length;
           let n;
           do {
             window.crypto.getRandomValues(bucket);
             n = bucket[0];
           } while (n >= max);
-          return n % chambers.length;
+          return n % SLOT_VALUES.length;
         }
-        return Math.floor(Math.random() * chambers.length);
+        return Math.floor(Math.random() * SLOT_VALUES.length);
+      }
+
+      function randomUnit() {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const bucket = new Uint32Array(1);
+          window.crypto.getRandomValues(bucket);
+          return bucket[0] / 0x100000000;
+        }
+        return Math.random();
       }
 
       function showToast(message) {
@@ -232,11 +323,21 @@
         }
       }
 
+      function markSelected(index) {
+        document.querySelectorAll(".slot-path").forEach((path, i) => {
+          path.classList.toggle("selected", i === Number(index));
+        });
+      }
+
       function renderLocked(state) {
-        holes.forEach((hole, i) => hole.classList.toggle("hit", i === Number(state.index)));
+        currentRotation = Number(state.rotation) || (-Number(state.index) * STEP);
+        rotor.style.transition = "none";
+        rotor.style.transform = `rotate(${currentRotation}deg)`;
+        requestAnimationFrame(() => { rotor.style.transition = ""; });
+        markSelected(state.index);
         status.textContent = "結果已鎖定";
         status.classList.add("locked");
-        resultTitle.textContent = state.label || "保底已確定";
+        resultTitle.textContent = Number(state.value) === 2500 ? "最高保底" : "保底確定";
         resultValue.textContent = `${Number(state.value).toLocaleString("zh-TW")} 萬`;
         resultSub.textContent = `抽取時間：${state.drawnAt || "已記錄"}`;
         drawButton.textContent = "本單已完成抽取";
@@ -244,40 +345,50 @@
       }
 
       function renderFresh() {
-        holes.forEach(hole => hole.classList.remove("hit"));
+        currentRotation = 0;
+        rotor.style.transition = "none";
+        rotor.style.transform = "rotate(0deg)";
+        requestAnimationFrame(() => { rotor.style.transition = ""; });
+        markSelected(-1);
         status.textContent = "可抽 1 次";
         status.classList.remove("locked");
         resultTitle.textContent = "尚未抽取";
         resultValue.textContent = "—";
         resultSub.textContent = "本張訂單可抽取 1 次。";
-        drawButton.textContent = "轉動六格輪盤";
+        drawButton.textContent = "轉動輪盤";
         drawButton.disabled = false;
       }
 
-      async function draw() {
+      function draw() {
         if (drawing) return;
         const existing = readState();
         if (existing) {
           renderLocked(existing);
-          showToast("這張測試單已抽過。")
+          showToast("這張測試單已抽過。");
           return;
         }
 
         drawing = true;
         drawButton.disabled = true;
         drawButton.textContent = "輪盤轉動中…";
-        holes.forEach(hole => hole.classList.remove("hit"));
-        cylinder.classList.remove("spinning");
-        void cylinder.offsetWidth;
-        cylinder.classList.add("spinning");
+        markSelected(-1);
 
         const index = randomIndex();
-        const result = chambers[index];
+        const value = SLOT_VALUES[index];
+        const jitter = (randomUnit() - .5) * STEP * .5;
+        const normalizedRotation = -index * STEP + jitter;
+        const spins = 6 + Math.floor(randomUnit() * 3);
+        const targetRotation = currentRotation + spins * 360 + normalizedRotation;
+
+        rotor.style.transition = "transform 3.4s cubic-bezier(.12,.72,.08,1)";
+        requestAnimationFrame(() => {
+          rotor.style.transform = `rotate(${targetRotation}deg)`;
+        });
+
         const state = {
           index,
-          value: result.value,
-          label: result.label,
-          jackpot: result.jackpot,
+          value,
+          rotation: normalizedRotation,
           drawnAt: new Intl.DateTimeFormat("zh-TW", {
             year: "numeric", month: "2-digit", day: "2-digit",
             hour: "2-digit", minute: "2-digit", second: "2-digit",
@@ -290,19 +401,23 @@
         } catch (_) {}
 
         window.setTimeout(() => {
-          cylinder.classList.remove("spinning");
+          currentRotation = normalizedRotation;
+          rotor.style.transition = "none";
+          rotor.style.transform = `rotate(${normalizedRotation}deg)`;
+          requestAnimationFrame(() => { rotor.style.transition = ""; });
           renderLocked(state);
           drawing = false;
-          showToast(`保底確定：${result.value.toLocaleString("zh-TW")} 萬`);
-        }, 1850);
+          showToast(`保底確定：${value.toLocaleString("zh-TW")} 萬`);
+        }, 3450);
       }
 
+      buildWheel();
       drawButton.addEventListener("click", draw);
       resetButton.addEventListener("click", () => {
         if (drawing) return;
         localStorage.removeItem(STORAGE_KEY);
         renderFresh();
-        showToast("測試已重置。")
+        showToast("測試已重置。");
       });
 
       const initial = readState();
