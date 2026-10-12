@@ -1,0 +1,47 @@
+name: Phase3 CSP nonce
+
+on:
+  push:
+    branches:
+      - refactor/phase3-csp-modules-20261013
+    paths:
+      - tools/phase3_apply_csp_nonce.py
+      - .github/workflows/phase3-csp-nonce.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase3-csp-modules-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install "Jinja2>=3.1,<4" fastapi requests
+      - name: Apply CSP nonce migration
+        run: python tools/phase3_apply_csp_nonce.py
+      - name: Compile and audit CSP migration
+        run: |
+          python -m compileall -q web/app tools tests
+          python tools/audit_templates.py
+          python -m pytest -q tests/test_http_security.py
+      - name: Commit CSP nonce migration
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/app/main.py web/app/services/http_security.py web/app/templates tools/audit_templates.py tests/test_http_security.py
+          if git diff --cached --quiet; then
+            echo "No CSP changes"
+            exit 0
+          fi
+          git commit -m "Harden CSP with request nonces"
+          git pull --rebase origin refactor/phase3-csp-modules-20261013
+          git push origin HEAD:refactor/phase3-csp-modules-20261013
