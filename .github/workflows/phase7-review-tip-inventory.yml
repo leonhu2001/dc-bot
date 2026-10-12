@@ -1,0 +1,25 @@
+name: Phase7 review tip inventory
+
+on:
+  push:
+    branches:
+      - refactor/phase7-review-tips-20261013
+    paths:
+      - tools/phase7_review_tip_inventory.py
+      - .github/workflows/phase7-review-tip-inventory.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase7-review-tips-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Inventory worker-tip boundary
+        run: python tools/phase7_review_tip_inventory.py
