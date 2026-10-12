@@ -27,8 +27,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Pillow
-        run: python -m pip install "Pillow>=11,<13"
+      - name: Install image tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webp
+          python -m pip install "Pillow>=11,<13"
 
       - name: Convert and verify assets
         run: python tools/optimize_web_assets.py
