@@ -55,10 +55,10 @@
         </a>
 
         <a
-            class="{% if _p.startswith('/admin/roulette') %}active{% endif %}"
-            href="/admin/roulette"
+            class="{% if _p.startswith('/admin/fun-orders') or _p.startswith('/admin/roulette') %}active{% endif %}"
+            href="/admin/fun-orders"
         >
-            輪盤管理
+            趣味單管理
         </a>
 
         {% if user and user.is_manager %}
