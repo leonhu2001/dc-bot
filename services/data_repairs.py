@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 from typing import Any
@@ -260,7 +261,7 @@ def repair_mo20261007003_point_hour_payout(db: Session) -> dict[str, Any]:
             ),
             {
                 "repair_key": repair_key,
-                "applied_at": datetime.utcnow().isoformat(timespec="seconds"),
+                "applied_at": utc_now_naive().isoformat(timespec="seconds"),
                 "note": "No delta required; payout base already includes current one-hour point value.",
             },
         )
@@ -347,7 +348,7 @@ def repair_mo20261007003_point_hour_payout(db: Session) -> dict[str, Any]:
                 },
                 ensure_ascii=False,
             ),
-            created_at=datetime.utcnow(),
+            created_at=utc_now_naive(),
         )
     )
     db.execute(
@@ -356,7 +357,7 @@ def repair_mo20261007003_point_hour_payout(db: Session) -> dict[str, Any]:
         ),
         {
             "repair_key": repair_key,
-            "applied_at": datetime.utcnow().isoformat(timespec="seconds"),
+            "applied_at": utc_now_naive().isoformat(timespec="seconds"),
             "note": f"MO20261007003 current +1h point payout applied; payout-base delta={delta}T.",
         },
     )
@@ -453,7 +454,7 @@ def repair_mo20261007003_customer_service_payout(db: Session) -> dict[str, Any]:
                 },
                 ensure_ascii=False,
             ),
-            created_at=datetime.utcnow(),
+            created_at=utc_now_naive(),
         )
     )
     db.execute(
@@ -463,7 +464,7 @@ def repair_mo20261007003_customer_service_payout(db: Session) -> dict[str, Any]:
         ),
         {
             "repair_key": repair_key,
-            "applied_at": datetime.utcnow().isoformat(timespec="seconds"),
+            "applied_at": utc_now_naive().isoformat(timespec="seconds"),
             "note": (
                 "MO20261007003 CS commission reset to paid-service base; "
                 f"cs_base={cs_base}T."

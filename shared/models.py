@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 from datetime import datetime
 from enum import Enum
 
@@ -51,7 +52,7 @@ class WebUser(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_worker: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
@@ -92,12 +93,12 @@ class WebOrder(Base):
 
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
     )
 
     assignments: Mapped[list["OrderAssignment"]] = relationship(
@@ -125,7 +126,7 @@ class OrderAssignment(Base):
 
     has_named_bonus: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     removed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     order: Mapped["WebOrder"] = relationship(back_populates="assignments")
@@ -156,11 +157,11 @@ class WorkerPayout(Base):
 
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
     )
 
     order: Mapped["WebOrder"] = relationship(back_populates="payouts")
@@ -181,11 +182,11 @@ class WorkerPayoutOverride(Base):
     created_by_discord_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_by_display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
     )
 
 
@@ -206,11 +207,11 @@ class CustomerServicePayout(Base):
 
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
     )
 
 
@@ -227,7 +228,7 @@ class PayoutRule(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
 
 
 class SyncEvent(Base):
@@ -244,7 +245,7 @@ class SyncEvent(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
@@ -260,7 +261,7 @@ class OrderStateHistory(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     actor_discord_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
 
 
 class AdminAuditLog(Base):
@@ -276,4 +277,4 @@ class AdminAuditLog(Base):
     before_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     after_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)

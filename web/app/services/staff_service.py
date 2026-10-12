@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 
@@ -176,7 +177,7 @@ def upsert_staff_member(
     role_ids: list[str],
     synced_at: datetime | None = None,
 ) -> WebStaffMember:
-    synced_at = synced_at or datetime.utcnow()
+    synced_at = synced_at or utc_now_naive()
     discord_id = str(discord_id)
     role_ids = [str(role_id) for role_id in role_ids]
 
@@ -233,7 +234,7 @@ def refresh_staff_members_if_stale(
             )
         ).scalar_one_or_none()
 
-        now = datetime.utcnow()
+        now = utc_now_naive()
 
         if latest is not None:
             age_seconds = (

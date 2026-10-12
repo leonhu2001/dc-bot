@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 import os
 from dotenv import load_dotenv
 
@@ -1197,7 +1198,7 @@ def sync_web_order_closed_from_bot(ticket_channel_id, dispatch_message_id=None) 
                     order_id = int(order.id)
 
                     if not getattr(order, "closed_at", None):
-                        order.closed_at = datetime.utcnow() + timedelta(hours=8)
+                        order.closed_at = utc_now_naive() + timedelta(hours=8)
 
                     recalculate_order_payouts(db, order.id)
                     db.commit()

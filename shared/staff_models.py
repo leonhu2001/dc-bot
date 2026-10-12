@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 
@@ -22,7 +23,7 @@ class WebStaffMember(Base):
     is_companion: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 # === receiver role display helpers start ===

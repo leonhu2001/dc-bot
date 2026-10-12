@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 import asyncio
 import os
 import sqlite3
@@ -758,7 +759,7 @@ class StaffSyncCog(commands.Cog):
     async def sync_staff_members_loop(self) -> None:
         try:
             result = await self._sync_once()
-            now_text = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+            now_text = utc_now_naive().strftime("%Y-%m-%d %H:%M:%S UTC")
             print(
                 "Discord staff auto sync complete "
                 f"at {now_text}: "

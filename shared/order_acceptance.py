@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -86,7 +87,7 @@ class AcceptanceState:
 
 
 def _now_text() -> str:
-    return datetime.utcnow().isoformat(timespec="seconds")
+    return utc_now_naive().isoformat(timespec="seconds")
 
 
 def _json_list(values: list[str] | tuple[str, ...] | set[str] | None) -> str:
@@ -348,7 +349,7 @@ def is_public_acceptance_locked(
         current = (
             datetime.now(created.tzinfo)
             if created.tzinfo is not None
-            else datetime.utcnow()
+            else utc_now_naive()
         )
     elif created.tzinfo is not None and current.tzinfo is None:
         current = current.replace(tzinfo=created.tzinfo)

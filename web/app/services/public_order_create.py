@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import hashlib
 import inspect
 import json
@@ -388,7 +389,7 @@ def _reserve_request_key(
 ) -> int | None:
 
     now = (
-        datetime.utcnow()
+        utc_now_naive()
         .isoformat(
             timespec="seconds"
         )
@@ -594,7 +595,7 @@ def _rule_snapshot(
     snapshot[
         "_captured_at"
     ] = (
-        datetime.utcnow()
+        utc_now_naive()
         .isoformat(
             timespec="seconds"
         )
@@ -1012,7 +1013,7 @@ def _write_acceptance_meta(
 
 
     now = (
-        datetime.utcnow()
+        utc_now_naive()
         .isoformat(
             timespec="seconds"
         )
@@ -1334,7 +1335,7 @@ def persist_final_order(
 
         "created_at":
             (
-                datetime.utcnow()
+                utc_now_naive()
                 .isoformat(
                     timespec="seconds"
                 )
@@ -1720,7 +1721,7 @@ def persist_final_order(
 
 
     now = (
-        datetime.utcnow()
+        utc_now_naive()
         .isoformat(
             timespec="seconds"
         )
@@ -2372,7 +2373,7 @@ def _mw_debit_points(
                 ),
 
             "created_at":
-                datetime.utcnow()
+                utc_now_naive()
                     .isoformat(
                         timespec="seconds"
                     ),
@@ -2531,7 +2532,7 @@ def _mw_debit_wallet(
         params[
             "updated_at"
         ] = (
-            datetime.utcnow()
+            utc_now_naive()
             .isoformat(
                 timespec="seconds"
             )
@@ -2621,7 +2622,7 @@ def _mw_debit_wallet(
                 after,
 
             "created_at":
-                datetime.utcnow()
+                utc_now_naive()
                 .isoformat(
                     timespec="seconds"
                 ),
@@ -2895,7 +2896,7 @@ def validate_persistence_dry_run(
 
     request_key = (
         "phase3c1-dry-run-"
-        + datetime.utcnow()
+        + utc_now_naive()
             .strftime(
                 "%Y%m%d%H%M%S%f"
             )

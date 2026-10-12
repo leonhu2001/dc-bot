@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 from typing import Any
@@ -151,7 +152,7 @@ def purge_authorized_test_orders(bind) -> dict[str, Any]:
                 "created_at",
             }
             if required.issubset(audit_columns):
-                now = datetime.utcnow()
+                now = utc_now_naive()
                 for deleted in deleted_orders:
                     conn.execute(
                         text(
@@ -184,7 +185,7 @@ def purge_authorized_test_orders(bind) -> dict[str, Any]:
                         },
                     )
 
-        applied_at = datetime.utcnow().isoformat(timespec="seconds")
+        applied_at = utc_now_naive().isoformat(timespec="seconds")
         note = (
             "Purged authorised roulette test orders: "
             + ", ".join(item["order_no"] for item in deleted_orders)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 
@@ -81,7 +82,7 @@ def mark_web_sync_event_done(event_id: int) -> None:
 
         event.status = SyncEventStatus.DONE.value
         event.error_message = None
-        event.processed_at = datetime.utcnow()
+        event.processed_at = utc_now_naive()
         db.commit()
     finally:
         db.close()
@@ -97,7 +98,7 @@ def mark_web_sync_event_failed(event_id: int, error_message: str) -> None:
 
         event.retry_count = int(event.retry_count or 0) + 1
         event.error_message = str(error_message)[:3000]
-        event.processed_at = datetime.utcnow()
+        event.processed_at = utc_now_naive()
 
         if event.retry_count >= 5:
             event.status = SyncEventStatus.FAILED.value

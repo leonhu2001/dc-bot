@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import csv
 import io
 import sqlite3
@@ -1073,7 +1074,7 @@ def _report_period(
     period: str | None,
 ) -> tuple[str, str | None, str, str | None, str | None, str | None]:
     period = str(period or "quarter").strip().lower()
-    now = datetime.utcnow() + timedelta(hours=8)
+    now = utc_now_naive() + timedelta(hours=8)
 
     if period == "all":
         return "all", None, "全部期間", None, None, None

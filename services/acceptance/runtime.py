@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import asyncio
 from pathlib import Path
 from typing import Any, Mapping
@@ -802,7 +803,7 @@ async def process_acceptance_sync_events_once() -> None:
                 .values(
                     status=SyncEventStatus.PROCESSING.value,
                     retry_count=int(event.retry_count or 0) + 1,
-                    processed_at=datetime.utcnow(),
+                    processed_at=utc_now_naive(),
                 )
             )
             db.commit()
@@ -815,7 +816,7 @@ async def process_acceptance_sync_events_once() -> None:
                 # flow. Mark them consumed instead of leaving them pending forever.
                 event.status = SyncEventStatus.DONE.value
                 event.error_message = None
-                event.processed_at = datetime.utcnow()
+                event.processed_at = utc_now_naive()
                 db.commit()
                 continue
 
@@ -867,12 +868,12 @@ async def process_acceptance_sync_events_once() -> None:
 
                 event.status = SyncEventStatus.DONE.value
                 event.error_message = None
-                event.processed_at = datetime.utcnow()
+                event.processed_at = utc_now_naive()
                 db.commit()
             except Exception as exc:
                 event.status = SyncEventStatus.FAILED.value
                 event.error_message = f"{type(exc).__name__}: {exc}"
-                event.processed_at = datetime.utcnow()
+                event.processed_at = utc_now_naive()
                 db.commit()
                 print(f"[acceptance-sync] 處理網站接單事件失敗 event_id={event.id}: {exc}")
     finally:

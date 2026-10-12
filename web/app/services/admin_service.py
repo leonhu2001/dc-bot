@@ -1,3 +1,4 @@
+from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 
@@ -204,7 +205,7 @@ def remove_worker_from_order(
 
     assignment.is_active = False
     assignment.has_named_bonus = False
-    assignment.removed_at = datetime.utcnow()
+    assignment.removed_at = utc_now_naive()
 
     db.flush()
 
@@ -422,7 +423,7 @@ def set_worker_payout_status(
     }
 
     payout.payout_status = status
-    payout.paid_at = datetime.utcnow() if status == PayoutStatus.PAID.value else None
+    payout.paid_at = utc_now_naive() if status == PayoutStatus.PAID.value else None
 
     write_admin_audit_log(
         db,
@@ -465,7 +466,7 @@ def set_customer_service_payout_status(
     }
 
     payout.payout_status = status
-    payout.paid_at = datetime.utcnow() if status == PayoutStatus.PAID.value else None
+    payout.paid_at = utc_now_naive() if status == PayoutStatus.PAID.value else None
 
     write_admin_audit_log(
         db,

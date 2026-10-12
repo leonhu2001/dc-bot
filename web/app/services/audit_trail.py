@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.time_utils import utc_now_naive
 import json
 import sqlite3
 from datetime import datetime
@@ -248,7 +249,7 @@ def write_sqlite_audit_log(
                 str(target_id) if target_id is not None else None,
                 _json_text(before_payload),
                 _json_text(after_payload),
-                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f"),
+                utc_now_naive().strftime("%Y-%m-%d %H:%M:%S.%f"),
             ),
         )
         conn.commit()
