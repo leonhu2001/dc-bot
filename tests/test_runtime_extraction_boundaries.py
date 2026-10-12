@@ -1,5 +1,7 @@
 from pathlib import Path
 
+# Phase 2 contract: moved responsibilities stay physically separated while the
+# parent runtimes keep their existing public import/configuration surface.
 from services.acceptance import runtime as acceptance_runtime
 from services.web_sync import runtime as web_sync_runtime
 from services import (
