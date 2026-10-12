@@ -112,4 +112,9 @@ def test_csp_uses_nonce_without_script_unsafe_inline():
     )
     assert "'nonce-abc123'" in script_directive
     assert "'unsafe-inline'" not in script_directive
-    assert "style-src 'self' 'unsafe-inline'" in policy
+    style_directive = next(
+        part.strip() for part in policy.split(";")
+        if part.strip().startswith("style-src ")
+    )
+    assert style_directive == "style-src 'self'"
+    assert "'unsafe-inline'" not in style_directive

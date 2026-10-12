@@ -39,8 +39,8 @@ def build_content_security_policy(nonce: str) -> str:
     if not safe_nonce:
         raise ValueError("CSP nonce is required")
 
-    # Executable inline JavaScript is nonce-bound. style-src keeps unsafe-inline
-    # temporarily only for audited legacy style attributes; <style> blocks are gone.
+    # Inline JavaScript is nonce-bound and template style attributes are eliminated.
+    # Both executable code and styles therefore load only from trusted self-hosted assets.
     return "; ".join(
         (
             "default-src 'self'",
@@ -49,7 +49,7 @@ def build_content_security_policy(nonce: str) -> str:
             "frame-ancestors 'none'",
             "form-action 'self'",
             f"script-src 'self' 'nonce-{safe_nonce}'",
-            "style-src 'self' 'unsafe-inline'",
+            "style-src 'self'",
             "img-src 'self' data: https:",
             "font-src 'self' data:",
             "connect-src 'self'",

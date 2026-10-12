@@ -79,9 +79,9 @@
     </div>
 
     {% if health.alerts %}
-    <div style="margin-top:14px;">
+    <div class="mw-inline-c53ea1da2385">
         {% for alert in health.alerts %}
-        <p class="muted-text" style="margin:6px 0;">
+        <p class="muted-text mw-inline-5c2df38eed07">
             {% if alert.severity == 'critical' %}🔴{% else %}🟠{% endif %}
             {{ alert.message }}
         </p>
@@ -160,7 +160,7 @@
         <div><span>可安全修復</span><strong>{{ snapshot.repairable_count }}</strong></div>
     </div>
 
-    <form method="get" action="/admin/anomalies" style="margin-top:14px;">
+    <form method="get" action="/admin/anomalies" class="mw-inline-c53ea1da2385">
         <input type="hidden" name="days" value="{{ operations.days }}">
         <div class="order-meta compact-meta">
             <div>
@@ -181,7 +181,7 @@
                 </select>
             </div>
         </div>
-        <div style="margin-top:10px;">
+        <div class="mw-inline-df928149c547">
             <button class="button secondary" type="submit">套用篩選</button>
             <a class="button secondary" href="/admin/anomalies">清除</a>
         </div>
@@ -224,13 +224,13 @@
                 {% endif %}
             </div>
 
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+            <div class="mw-inline-c0be9b0fc30c">
                 {% if issue.repairable and issue.repair_action %}
                 <form
                     method="post"
                     action="/admin/anomalies/repair" data-confirm-message="確定執行「{{ issue.repair_label or '安全修復' }}」嗎？系統會在執行前再次驗證最新資料。"
-                    style="margin:0;"
-                >
+                   
+                 class="mw-inline-ab79ea2b8573">
                     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                     <input type="hidden" name="action" value="{{ issue.repair_action }}">
                     {% if issue.repair_target_id is not none %}
@@ -253,9 +253,9 @@
             </div>
 
             {% if issue.repair_block_reason %}
-            <p class="muted-text" style="margin-top:10px;">🔒 {{ issue.repair_block_reason }}</p>
+            <p class="muted-text mw-inline-df928149c547">🔒 {{ issue.repair_block_reason }}</p>
             {% elif not issue.repairable %}
-            <p class="muted-text" style="margin-top:10px;">需要人工判斷，系統不會自動改資料。</p>
+            <p class="muted-text mw-inline-df928149c547">需要人工判斷，系統不會自動改資料。</p>
             {% endif %}
         </article>
         {% endfor %}
@@ -285,7 +285,7 @@
     <div class="admin-order-list compact-list">
         {% for row in audit_logs %}
         <article class="admin-order-card compact-order-card">
-            <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div class="mw-inline-09adb47b2690">
                 <div>
                     <strong>{{ row.action }}</strong>
                     <p class="muted-text">

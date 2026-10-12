@@ -16,7 +16,7 @@ STATIC = ROOT / "web" / "app" / "static"
 # remaining inline blocks are dynamic bootstrap/data blocks and may only decrease.
 MAX_INLINE_STYLE_BLOCKS = 0
 MAX_INLINE_SCRIPT_BLOCKS = 7
-MAX_INLINE_STYLE_ATTRIBUTES = 107
+MAX_INLINE_STYLE_ATTRIBUTES = 0
 MAX_INLINE_EVENT_ATTRIBUTES = 0
 
 # Patch-style frontend assets are fully retired. Keep this set empty so a new

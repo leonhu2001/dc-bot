@@ -1,0 +1,68 @@
+/* Canonicalized from historical template style attributes. */
+/* Keep this file loaded after page styles so extracted local declarations preserve intent. */
+.mw-inline-04523ff455a2{display:none !important}
+.mw-inline-08a9d93e244e{border-top:0;padding-top:3px}
+.mw-inline-092af903b212{white-space:pre-wrap}
+.mw-inline-09adb47b2690{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mw-inline-0c1b1a60146f{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px}
+.mw-inline-0c1ef480b109{text-align:center;color:var(--mw-muted,#a7a0b5);padding:24px}
+.mw-inline-0ee7f66ad9c0{margin-top:12px}
+.mw-inline-15cb69550799{text-decoration:none;color:inherit}
+.mw-inline-161d174efbf8{display:flex;gap:10px;flex-wrap:wrap}
+.mw-inline-16748cb4f9b2{max-width:900px;margin:0 auto;padding-top:48px}
+.mw-inline-1f0e25aadf4c{opacity:.72}
+.mw-inline-219cab7641ad{padding:12px 14px;border-radius:12px}
+.mw-inline-25297c237fd3{grid-column: span 3}
+.mw-inline-2a8451b4cf3f{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px}
+.mw-inline-2bdf8e45fdfc{margin-top:18px}
+.mw-inline-2c3d836b9c3c{display:grid;gap:14px}
+.mw-inline-2eeb30cb2518{background:var(--green)}
+.mw-inline-301647f5065e{margin-top:6px}
+.mw-inline-36a4bd620285{display:grid;gap:10px;margin-bottom:18px}
+.mw-inline-3a0cd904d0db{min-width:260px;min-height:40px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:#090908;color:#f4f2eb;padding:8px 10px}
+.mw-inline-429aa7a34f50{left:77.778%}
+.mw-inline-42a6ced8b67e{margin-bottom:14px}
+.mw-inline-43a97fe4943c{margin-top:8px}
+.mw-inline-4bb937eae360{min-height:48px;padding:0 14px;border-radius:12px}
+.mw-inline-51265b83061d{white-space:pre-wrap;margin:6px 0 0}
+.mw-inline-51377a917eb3{grid-column:1/-1}
+.mw-inline-58d79896fb98{justify-content:center;opacity:.72}
+.mw-inline-5bae0321e6b1{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+.mw-inline-5c2df38eed07{margin:6px 0}
+.mw-inline-5cfa59e042e2{opacity:.72;margin:0}
+.mw-inline-5f326564a568{text-align:right}
+.mw-inline-611a40b78cc5{color:var(--muted);font-size:12px}
+.mw-inline-61c45e03d75a{display:flex;align-items:center;gap:8px;min-height:42px}
+.mw-inline-67460662f976{margin:0 0 14px 0}
+.mw-inline-6d00fde40182{grid-column: span 2}
+.mw-inline-6d16aaf2b6da{display:grid;gap:12px}
+.mw-inline-75be3216d07d{grid-column:1 / -1}
+.mw-inline-7c8d69cb6e6e{background:var(--red)}
+.mw-inline-8e26c5f7a105{margin-bottom:8px}
+.mw-inline-8fd2c712060c{left:61.111%}
+.mw-inline-92c18f6bdac1{margin-top:16px}
+.mw-inline-99b9ba53aa94{justify-content:center}
+.mw-inline-a0925a28f0a3{margin-top:0}
+.mw-inline-ab79ea2b8573{margin:0}
+.mw-inline-b5c6c3c63328{display: contents}
+.mw-inline-b922c89f16f9{margin-bottom:10px}
+.mw-inline-c0be9b0fc30c{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.mw-inline-c53ea1da2385{margin-top:14px}
+.mw-inline-c69e4fb9cd4f{background:#151619}
+.mw-inline-d0cb022ba49e{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mw-inline-d3f008f56a3b{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.4fr) minmax(150px,.5fr) auto;gap:10px}
+.mw-inline-d5b74ece89c8{max-width:1100px;margin:0 auto;padding-top:48px}
+.mw-inline-df928149c547{margin-top:10px}
+.mw-inline-e2db9e0a1a29{white-space:pre-wrap;line-height:1.85}
+.mw-inline-e3da2ddf2b73{color:var(--gold2)}
+.mw-inline-f9284286b562{left:100%}
+.mw-inline-fa769ae03572{margin-bottom:0}
+.mw-inline-ffc574ef6a4c{padding:34px;text-align:center}
+.mw-native-progress{display:block;width:100%;padding:0;border:0;overflow:hidden;appearance:none;-webkit-appearance:none}
+.mw-native-progress::-webkit-progress-bar{background:rgba(255,255,255,.07)}
+.mw-native-progress::-webkit-progress-value{background:var(--r5-gold,var(--site-gold,#d6b05a))}
+.mw-native-progress::-moz-progress-bar{background:var(--r5-gold,var(--site-gold,#d6b05a))}
+.mw-benefit-progress{height:7px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.07)}
+.mw-member-progress{height:8px;margin-top:14px;border-radius:999px;background:rgba(255,255,255,.08)}
+.mw-share-progress{height:7px;margin-top:6px;border-radius:999px;background:rgba(255,255,255,.065)}
+.mw-share-progress-spaced{margin-top:14px}

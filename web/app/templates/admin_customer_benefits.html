@@ -39,7 +39,7 @@
                 <strong>目前 {{ progress.progress_text }}</strong>
                 <small>達標後：{{ progress.benefit_text }}</small>
             </div>
-            <div class="benefit-bar"><i style="width:{{ progress.percent }}%"></i></div>
+            <progress class="mw-native-progress mw-benefit-progress" max="100" value="{{ progress.percent }}">{{ progress.percent }}%</progress>
             <small>最近更新：{{ progress.updated_at_text }}</small>
         </div>
         {% endfor %}

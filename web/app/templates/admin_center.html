@@ -29,7 +29,7 @@
                 <p class="muted-text">人員名錄與個人牆放在同一個入口；一般查人、看資格與個人牆狀態不用再切兩個側欄頁。</p>
             </div>
             <div class="center-actions">
-                <form method="post" action="/admin/staff/sync" style="margin:0;">
+                <form method="post" action="/admin/staff/sync" class="mw-inline-ab79ea2b8573">
                     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                     <button class="button secondary" type="submit">同步 Discord 人員</button>
                 </form>
@@ -46,7 +46,7 @@
     </div>
 
     <div class="panel compact-panel">
-        <form method="get" action="/admin/staff-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.4fr) minmax(150px,.5fr) auto;gap:10px;">
+        <form method="get" action="/admin/staff-center" class="admin-add-worker-form center-filter-form mw-inline-d3f008f56a3b">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
             <select class="input" name="status">
                 <option value="active" {% if status == 'active' %}selected{% endif %}>在職</option>
@@ -64,7 +64,7 @@
             <button class="button" type="submit">篩選</button>
         </form>
 
-        <div class="center-list" style="margin-top:12px;">
+        <div class="center-list mw-inline-0ee7f66ad9c0">
         {% for row in snapshot.rows %}
             <div class="center-row">
                 <div>
@@ -139,12 +139,12 @@
     </div>
 
     <div class="panel compact-panel">
-        <form method="get" action="/admin/customer-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;">
+        <form method="get" action="/admin/customer-center" class="admin-add-worker-form center-filter-form mw-inline-5bae0321e6b1">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋客戶名稱或 Discord ID">
             <button class="button" type="submit">搜尋</button>
         </form>
 
-        <div class="center-list" style="margin-top:12px;">
+        <div class="center-list mw-inline-0ee7f66ad9c0">
         {% for row in snapshot.rows %}
             <div class="center-row customer-row">
                 <div>
@@ -310,7 +310,7 @@
         <div class="section-title-row">
             <div><h2>票口紀錄</h2><p class="muted-text">直接在客服中心搜尋封存票口，不再另外進一個重複清單頁。</p></div>
         </div>
-        <form method="get" action="/admin/support-center" class="admin-add-worker-form center-filter-form" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px;">
+        <form method="get" action="/admin/support-center" class="admin-add-worker-form center-filter-form mw-inline-2a8451b4cf3f">
             <input class="input" name="q" value="{{ q }}" placeholder="搜尋訂單號、客戶、客服、Ticket 或聊天內容">
             <button class="button" type="submit">搜尋票口</button>
         </form>

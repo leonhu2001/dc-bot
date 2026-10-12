@@ -107,7 +107,7 @@
         <div><span>已完成數量</span><strong>{{ customer.vip.completed_orders }}</strong></div>
     </div>
     {% if customer.topups %}
-        <div class="admin-order-list compact-list" style="margin-top:14px;">
+        <div class="admin-order-list compact-list mw-inline-c53ea1da2385">
             {% for item in customer.topups[:20] %}
                 <article class="admin-order-card compact-order-card">
                     <div class="order-card-header">
@@ -139,7 +139,7 @@
                     <div class="order-meta compact-meta">
                         <div><span>訂單</span><strong>{{ tx.order_no or '-' }}</strong></div>
                         <div><span>操作人</span><strong>{{ tx.operator_display_name or tx.operator_discord_id or '-' }}</strong></div>
-                        <div style="grid-column: span 2;"><span>備註</span><strong>{{ tx.note or '-' }}</strong></div>
+                        <div class="mw-inline-6d00fde40182"><span>備註</span><strong>{{ tx.note or '-' }}</strong></div>
                     </div>
                 </article>
             {% endfor %}
