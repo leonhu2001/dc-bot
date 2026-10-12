@@ -8,17 +8,24 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "web" / "app" / "templates"
 
 BLOCK_RE = re.compile(r"<(style|script)(?:\s[^>]*)?>(.*?)</\1>", re.I | re.S)
+STYLE_ATTR_RE = re.compile(r"\sstyle\s*=", re.I)
+EVENT_ATTR_RE = re.compile(r"\son[a-z0-9_-]+\s*=", re.I)
 
 
 def audit_inline_blocks() -> None:
     print("=== INLINE TEMPLATE BLOCKS ===")
     totals = {"style": 0, "script": 0}
+    style_attrs = 0
+    event_attrs = 0
     for path in sorted(TEMPLATES.glob("*.html")):
         text = path.read_text(encoding="utf-8")
         matches = list(BLOCK_RE.finditer(text))
-        if not matches:
-            continue
-        print(f"\n{path.relative_to(ROOT)}")
+        current_style_attrs = len(STYLE_ATTR_RE.findall(text))
+        current_event_attrs = len(EVENT_ATTR_RE.findall(text))
+        style_attrs += current_style_attrs
+        event_attrs += current_event_attrs
+        if matches or current_style_attrs or current_event_attrs:
+            print(f"\n{path.relative_to(ROOT)} style_attrs={current_style_attrs} event_attrs={current_event_attrs}")
         for index, match in enumerate(matches, 1):
             kind = match.group(1).lower()
             body = match.group(2)
@@ -30,7 +37,10 @@ def audit_inline_blocks() -> None:
                 f"  {kind}#{index}: lines={len(body.splitlines())} chars={len(body)} "
                 f"jinja={'yes' if has_jinja else 'no'} preview={preview!r}"
             )
-    print(f"\nTOTAL style={totals['style']} script={totals['script']}")
+    print(
+        f"\nTOTAL style={totals['style']} script={totals['script']} "
+        f"style_attrs={style_attrs} event_attrs={event_attrs}"
+    )
 
 
 def audit_module(path_text: str) -> None:
@@ -48,8 +58,25 @@ def audit_module(path_text: str) -> None:
         print(f"{start:5d}-{end:5d} {length:5d} {kind:16s} {name}")
 
 
+def audit_growth_budget() -> None:
+    print("\n=== ARCHITECTURE GROWTH BUDGET ===")
+    namespace: dict[str, object] = {}
+    budget_path = ROOT / "tests" / "test_architecture_growth_budget.py"
+    exec(compile(budget_path.read_text(encoding="utf-8"), str(budget_path), "exec"), namespace)
+    max_bytes = namespace.get("MAX_BYTES", {})
+    for rel_path, limit in max_bytes.items():
+        path = ROOT / rel_path
+        if not path.exists():
+            print(f"MISSING {rel_path} limit={limit}")
+            continue
+        size = path.stat().st_size
+        state = "PASS" if size <= limit else "FAIL"
+        print(f"{state} {rel_path} size={size} limit={limit} delta={size-limit}")
+
+
 def main() -> None:
     audit_inline_blocks()
+    audit_growth_budget()
     for name in [
         "bot.py",
         "views/review.py",
