@@ -47,6 +47,12 @@
             客服中心
         </a>
 
+        {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
+        <a id="order-report-review-nav-admin" href="/dispatch/reports/review">
+            報單審核
+        </a>
+        {% endif %}
+
         <a
             class="{% if _p.startswith('/admin/order-rules') %}active{% endif %}"
             href="/admin/order-rules"
