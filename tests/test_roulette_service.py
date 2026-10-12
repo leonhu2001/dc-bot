@@ -2,11 +2,16 @@ import sqlite3
 
 import pytest
 
+from web.app.services import roulette_service
 from web.app.services.roulette_service import (
+    LEGACY_ROULETTE_RULE_KEY,
+    ROULETTE_RULE_KEY,
     corner_numbers,
     draw_roulette,
     ensure_roulette_draw_tables,
+    ensure_roulette_feature,
     normalize_bet,
+    notify_ready_roulette_orders,
     resolve_roulette_result,
     six_line_numbers,
 )
@@ -80,8 +85,9 @@ def test_order_can_only_draw_once(tmp_path):
             INSERT INTO web_orders (
                 id, customer_discord_id, order_rule_key,
                 item, status, bot_order_no, ticket_channel_id
-            ) VALUES (1, '123', 'fun_russian_roulette', '俄羅斯輪盤', 'active', 'MO1', '456')
-            """
+            ) VALUES (1, '123', ?, '俄羅斯輪盤', 'active', 'MO1', '456')
+            """,
+            (ROULETTE_RULE_KEY,),
         )
         conn.commit()
 
@@ -112,3 +118,107 @@ def test_order_can_only_draw_once(tmp_path):
     with sqlite3.connect(db) as conn:
         count = conn.execute("SELECT COUNT(*) FROM roulette_draws").fetchone()[0]
     assert count == 1
+
+
+def test_ready_prompt_is_sent_once_for_paid_order(tmp_path, monkeypatch):
+    db = tmp_path / "roulette-ready.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            CREATE TABLE web_orders (
+                id INTEGER PRIMARY KEY,
+                customer_discord_id TEXT,
+                order_rule_key TEXT,
+                item TEXT,
+                status TEXT,
+                bot_order_no TEXT,
+                ticket_channel_id TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO web_orders (
+                id, customer_discord_id, order_rule_key,
+                item, status, bot_order_no, ticket_channel_id
+            ) VALUES (9, '123', ?, '俄羅斯輪盤', 'active', 'MO9', '456')
+            """,
+            (ROULETTE_RULE_KEY,),
+        )
+        conn.commit()
+
+    calls = []
+
+    class Response:
+        status_code = 200
+        text = ""
+
+        @staticmethod
+        def json():
+            return {"id": "999"}
+
+    def fake_post(url, *, headers, json, timeout):
+        calls.append((url, headers, json, timeout))
+        return Response()
+
+    monkeypatch.setattr(roulette_service.config, "DISCORD_BOT_TOKEN", "test-token")
+    monkeypatch.setattr(roulette_service.requests, "post", fake_post)
+
+    assert notify_ready_roulette_orders(db_file=db) == 1
+    assert notify_ready_roulette_orders(db_file=db) == 0
+    assert len(calls) == 1
+
+    payload = calls[0][2]
+    button = payload["components"][0]["components"][0]
+    assert button["label"] == "前往輪盤抽取保底"
+    assert button["url"].endswith("/me/orders/9/roulette")
+
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT status, message_id FROM roulette_ready_notifications WHERE order_id = 9"
+        ).fetchone()
+    assert row == ("sent", "999")
+
+
+def test_only_system_generated_legacy_product_is_deactivated(tmp_path):
+    db = tmp_path / "roulette-cleanup.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            CREATE TABLE custom_order_rules (
+                rule_key TEXT PRIMARY KEY,
+                is_active INTEGER NOT NULL,
+                created_by_discord_id TEXT,
+                created_by_display_name TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO custom_order_rules (
+                rule_key, is_active, created_by_discord_id, created_by_display_name
+            ) VALUES (?, 1, 'system', 'Mowan Roulette Bootstrap')
+            """,
+            (LEGACY_ROULETTE_RULE_KEY,),
+        )
+        conn.execute(
+            """
+            INSERT INTO custom_order_rules (
+                rule_key, is_active, created_by_discord_id, created_by_display_name
+            ) VALUES (?, 1, 'owner', 'Manager')
+            """,
+            (ROULETTE_RULE_KEY,),
+        )
+        conn.commit()
+
+    ensure_roulette_feature(db)
+
+    with sqlite3.connect(db) as conn:
+        rows = dict(
+            conn.execute(
+                "SELECT rule_key, is_active FROM custom_order_rules"
+            ).fetchall()
+        )
+
+    assert rows[LEGACY_ROULETTE_RULE_KEY] == 0
+    assert rows[ROULETTE_RULE_KEY] == 1
