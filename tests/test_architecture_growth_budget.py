@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+# These are ceilings, not targets. Existing large modules should shrink over time;
+# the guard prevents unrelated features from silently making them larger again.
+MAX_BYTES = {
+    "bot.py": 276_000,
+    "services/order_runtime.py": 129_000,
+    "services/self_service_runtime.py": 146_000,
+    "web/app/routers/admin.py": 102_000,
+    "views/review.py": 95_500,
+}
+
+
+def test_legacy_runtime_files_do_not_grow() -> None:
+    oversized: list[str] = []
+    for relative_path, limit in MAX_BYTES.items():
+        size = (ROOT / relative_path).stat().st_size
+        if size > limit:
+            oversized.append(f"{relative_path}: {size} > {limit}")
+
+    assert not oversized, (
+        "Large legacy modules grew instead of being extracted:\n"
+        + "\n".join(oversized)
+    )
+
+
+def test_new_services_do_not_import_bot_entrypoint() -> None:
+    offenders: list[str] = []
+    for path in (ROOT / "services").rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if "import bot" in source or "from bot import" in source:
+            offenders.append(str(path.relative_to(ROOT)))
+
+    assert not offenders, (
+        "services must depend on explicit APIs, not bot.py globals: "
+        + ", ".join(offenders)
+    )
