@@ -15,10 +15,17 @@ from web.app.config import config
 ROULETTE_RULE_KEY = "admin_delta_desktop_fun_20261007053129_91eb"
 LEGACY_ROULETTE_RULE_KEY = "fun_russian_roulette"
 ROULETTE_RULE_KEYS = {ROULETTE_RULE_KEY, LEGACY_ROULETTE_RULE_KEY}
-ROULETTE_RULES_VERSION = "roulette-v1-2026-10-12"
+ROULETTE_RULES_VERSION = "roulette-v2-2026-10-12"
 ROULETTE_ITEM_LABEL = "俄羅斯輪盤"
 DRAW_ALLOWED_STATUSES = {"active", "stored"}
 SITE_BASE_URL = "https://mowanentertainment.com"
+
+BASE_GUARANTEE_MILLION = 1200
+SAFE_GUARANTEE_MILLION = 1300
+SIX_LINE_GUARANTEE_MILLION = 1500
+CORNER_GUARANTEE_MILLION = 1700
+SINGLE_GUARANTEE_MILLION = 2200
+JACKPOT_GUARANTEE_MILLION = 2500
 
 RED_NUMBERS = {
     1, 3, 5, 7, 9,
@@ -275,17 +282,17 @@ def resolve_roulette_result(
         hit = landed in set(int(n) for n in bet["covered_numbers"])
 
     if not hit:
-        guarantee = 1200
+        guarantee = BASE_GUARANTEE_MILLION
     elif mode_value == "safe":
-        guarantee = 1500
+        guarantee = SAFE_GUARANTEE_MILLION
     elif mode_value == "six":
-        guarantee = 2000
+        guarantee = SIX_LINE_GUARANTEE_MILLION
     elif mode_value == "corner":
-        guarantee = 2500
+        guarantee = CORNER_GUARANTEE_MILLION
     elif int(bet["selection"]) == 0:
-        guarantee = 7000
+        guarantee = JACKPOT_GUARANTEE_MILLION
     else:
-        guarantee = 6000
+        guarantee = SINGLE_GUARANTEE_MILLION
 
     is_jackpot = bool(
         hit
@@ -364,7 +371,7 @@ def _draw_from_row(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         ],
         "number": int(data.get("landed_number") or 0),
         "hit": bool(data.get("hit")),
-        "prize": int(data.get("guarantee_million") or 1200),
+        "prize": int(data.get("guarantee_million") or BASE_GUARANTEE_MILLION),
         "is_jackpot": bool(data.get("is_jackpot")),
         "drawn_at": _format_time(data.get("created_at")),
         "notification_status": str(data.get("notification_status") or ""),
@@ -463,7 +470,7 @@ def _notification_embed(
             },
             {
                 "name": "最終保底",
-                "value": f"**{int(draw.get('prize') or 1200):,} 萬**",
+                "value": f"**{int(draw.get('prize') or BASE_GUARANTEE_MILLION):,} 萬**",
                 "inline": False,
             },
         ],
