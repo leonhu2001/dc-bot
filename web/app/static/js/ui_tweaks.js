@@ -203,8 +203,7 @@
     const style = document.createElement("style");
     style.id = "order-report-history-status-style";
     style.textContent = `
-      .history-report-state{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px}
-      .history-report-state-label{color:rgba(255,255,255,.48);font-size:11px;font-weight:800}
+      .history-report-state{display:flex;align-items:center;flex-wrap:wrap;margin-top:7px}
       .history-report-state-badge{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;line-height:1.1;white-space:nowrap}
       .history-report-state-badge[data-status="missing"]{border-color:rgba(239,94,94,.44);background:rgba(239,94,94,.09);color:#ffd7df}
       .history-report-state-badge[data-status="pending"]{border-color:rgba(240,188,75,.44);background:rgba(240,188,75,.09);color:#ffe3a3}
@@ -273,7 +272,7 @@
         if (!wrapper) {
           wrapper = document.createElement("div");
           wrapper.className = "history-report-state";
-          wrapper.innerHTML = '<span class="history-report-state-label">報單</span><span class="history-report-state-badge"></span>';
+          wrapper.innerHTML = '<span class="history-report-state-badge"></span>';
           statusCell.appendChild(wrapper);
         }
 
