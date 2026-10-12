@@ -6,6 +6,7 @@ from services.acceptance import runtime as acceptance_runtime
 from services.web_sync import runtime as web_sync_runtime
 from services import (
     order_credential_runtime,
+    order_payment_runtime,
     order_point_redemption,
     order_runtime,
     self_service_financials,
@@ -24,6 +25,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(self_service_runtime.configure_self_service_runtime)
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
+    assert callable(order_payment_runtime.configure_order_payment_runtime)
     assert callable(self_service_financials.configure_self_service_financials)
     assert callable(self_service_reorder.configure_self_service_reorder)
     assert callable(ticket_identity.configure_ticket_identity)
@@ -86,7 +88,16 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
         encoding="utf-8"
     )
 
-    assert "async def finalize_accepted_pending_payment" in order_source
+    payment_source = Path("services/order_payment_runtime.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "async def finalize_accepted_pending_payment" not in order_source
+    assert callable(order_runtime.finalize_accepted_pending_payment)
+    assert "async def finalize_accepted_pending_payment" in payment_source
+    assert "def configure_order_payment_runtime" in payment_source
+    assert "import bot" not in payment_source
+    assert "from bot import" not in payment_source
     assert "class DispatchClaimView" in order_source
     assert "class OrderCredentialModal" not in order_source
     assert "async def redeem_order_point_benefit_on_payment" not in order_source
