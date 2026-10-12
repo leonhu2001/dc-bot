@@ -310,17 +310,8 @@ def test_operations_report_zero_previous_window_keeps_history_context(
     assert report_without_history["comparison_history_exists"] is False
 
 def test_report_period_uses_full_calendar_day_for_comparison(monkeypatch):
-    class FixedDateTime(datetime):
-        @classmethod
-        def utcnow(cls):
-            # Taipei time becomes 2026-10-01 23:09.
-            return cls(2026, 10, 1, 15, 9, 0)
-
-    monkeypatch.setattr(
-        report_module,
-        "datetime",
-        FixedDateTime,
-    )
+    fixed_now = datetime(2026, 10, 1, 15, 9, 0)
+    monkeypatch.setattr(report_module, "utc_now_naive", lambda: fixed_now)
 
     (
         period,
