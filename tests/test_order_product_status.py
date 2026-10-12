@@ -136,12 +136,15 @@ def test_discord_catalog_hides_inactive_and_selected_draft_guard_rejects_it(
 def test_admin_order_rules_template_has_async_workspace_and_status_controls():
     template = Path("web/app/templates/admin_order_rules.html").read_text(encoding="utf-8")
     router = Path("web/app/routers/admin_order_rules.py").read_text(encoding="utf-8")
+    rule_js = Path("web/app/static/js/pages/admin_order_rules_inline_1.js").read_text(
+        encoding="utf-8"
+    )
 
     assert 'id="order-rule-sidebar"' in template
     assert 'id="order-rule-workspace"' in template
     assert "data-rule-search" in template
     assert 'data-rule-filter="inactive"' in template
     assert 'data-form-kind="status"' in template
-    assert "尚未發布的修改" in template
-    assert "fetchPage" in template
+    assert "尚未發布的修改" in rule_js
+    assert "fetchPage" in rule_js
     assert '@router.post("/admin/order-rules/{rule_key}/status")' in router

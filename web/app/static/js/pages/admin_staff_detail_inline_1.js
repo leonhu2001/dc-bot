@@ -1,0 +1,1 @@
+async function save(f){let r=await fetch(f.action,{method:"POST",body:new FormData(f),credentials:"same-origin"});if(!r.ok){alert("儲存失敗");return}location.reload()}for(let id of ["pf","vis"]){document.getElementById(id).addEventListener("submit",function(e){e.preventDefault();save(this)})}

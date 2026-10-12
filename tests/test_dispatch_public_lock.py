@@ -1,10 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, text
 
 from shared import order_acceptance
 from shared.order_state import WAITING_ACCEPTANCE
+
+
+def _naive_utc_now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _setup_waiting_order(monkeypatch, *, specified_staff_ids=()):
@@ -71,7 +75,7 @@ def test_specified_staff_can_claim_during_first_minute(monkeypatch):
 def test_public_staff_can_claim_after_first_minute(monkeypatch):
     engine = _setup_waiting_order(monkeypatch)
     unlocked_at = (
-        datetime.utcnow()
+        _naive_utc_now()
         - timedelta(seconds=order_acceptance.PUBLIC_ACCEPTANCE_LOCK_SECONDS + 1)
     ).isoformat(timespec="seconds")
 
@@ -100,7 +104,7 @@ def test_public_staff_can_claim_after_first_minute(monkeypatch):
 def test_public_lock_uses_original_meta_created_at_on_updates(monkeypatch):
     engine = _setup_waiting_order(monkeypatch)
     original_created_at = (
-        datetime.utcnow()
+        _naive_utc_now()
         - timedelta(minutes=5)
     ).isoformat(timespec="seconds")
 

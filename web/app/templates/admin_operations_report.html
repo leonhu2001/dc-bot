@@ -140,7 +140,7 @@
   </section>
 </div>
 
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (function(){
  const trendLabels={{ report.daily_labels|tojson }}, trendValues={{ report.daily_values|tojson }};
  const pieLabels={{ report.service_labels|tojson }}, pieValues={{ report.service_values|tojson }};

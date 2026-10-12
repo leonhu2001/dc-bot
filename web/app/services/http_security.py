@@ -28,23 +28,32 @@ MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/payouts/summary/person-status",
 )
 
-# Legacy templates still contain inline style/script. Keep unsafe-inline until
-# the audited debt reaches zero, while locking down the other high-risk sources.
-CONTENT_SECURITY_POLICY = "; ".join(
-    (
-        "default-src 'self'",
-        "base-uri 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "form-action 'self'",
-        "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https:",
-        "font-src 'self' data:",
-        "connect-src 'self'",
-        "upgrade-insecure-requests",
+def build_content_security_policy(nonce: str) -> str:
+    nonce_value = str(nonce or "").strip()
+    script_src = "script-src 'self'"
+    if nonce_value:
+        script_src += f" 'nonce-{nonce_value}'"
+
+    return "; ".join(
+        (
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "form-action 'self'",
+            script_src,
+            "script-src-attr 'none'",
+            "style-src 'self'",
+            "style-src-elem 'self'",
+            # A small number of legacy/dynamic style attributes still exist.
+            # Keep this scoped to attributes instead of allowing inline <style>.
+            "style-src-attr 'unsafe-inline'",
+            "img-src 'self' data: https:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "upgrade-insecure-requests",
+        )
     )
-)
 
 
 def is_admin_path(path: str) -> bool:
