@@ -4,18 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>俄羅斯輪盤・保底抽取 DEMO｜魔丸娛樂</title>
+  <title>俄羅斯輪盤・保底抽取｜魔丸娛樂</title>
   <style>
     :root{
       --bg:#080809;
       --panel:#111113;
-      --panel-2:#171719;
       --text:#f3efe6;
       --muted:rgba(243,239,230,.58);
       --line:rgba(255,255,255,.09);
       --gold:#dfb75c;
       --gold-2:#f1cf7b;
-      --danger:#e26f68;
       --green:#8fca9f;
       --shadow:0 30px 90px rgba(0,0,0,.38);
     }
@@ -27,23 +25,21 @@
       var(--bg)}
     a{color:inherit}
     button{font:inherit}
-    .page{width:min(1120px,calc(100% - 32px));margin:0 auto;padding:36px 0 72px}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:42px}
+    .page{width:min(1040px,calc(100% - 32px));margin:0 auto;padding:36px 0 72px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:32px}
     .brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:900;letter-spacing:.08em}
     .brand-mark{width:36px;height:36px;border-radius:12px;border:1px solid rgba(223,183,92,.32);display:grid;place-items:center;background:rgba(223,183,92,.08);color:var(--gold);font-size:18px}
     .back{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:rgba(243,239,230,.72);background:rgba(255,255,255,.025)}
     .back:hover{border-color:rgba(223,183,92,.4);color:var(--text)}
-    .hero{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(340px,.94fr);gap:28px;align-items:stretch}
+    .hero{display:grid;grid-template-columns:minmax(0,.86fr) minmax(380px,1.14fr);gap:24px;align-items:stretch}
     .copy,.game{border:1px solid var(--line);border-radius:28px;background:linear-gradient(150deg,rgba(22,22,24,.98),rgba(11,11,12,.98));box-shadow:var(--shadow)}
-    .copy{padding:clamp(28px,4vw,48px);position:relative;overflow:hidden}
+    .copy{padding:clamp(28px,4vw,42px);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
     .copy:after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;right:-110px;top:-110px;background:radial-gradient(circle,rgba(223,183,92,.16),transparent 67%);pointer-events:none}
     .eyebrow{color:var(--gold);font-size:11px;font-weight:950;letter-spacing:.19em}
-    h1{font-size:clamp(42px,7vw,78px);line-height:.95;margin:13px 0 18px;letter-spacing:-.045em}
-    .lead{margin:0;max-width:660px;color:rgba(243,239,230,.68);font-size:16px;line-height:1.9}
+    h1{font-size:clamp(42px,6vw,68px);line-height:.98;margin:13px 0 18px;letter-spacing:-.045em}
+    .lead{margin:0;color:rgba(243,239,230,.68);font-size:16px;line-height:1.85}
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
     .chip{padding:8px 10px;border:1px solid rgba(223,183,92,.22);border-radius:999px;background:rgba(223,183,92,.06);color:#ead091;font-size:12px;font-weight:800}
-    .safe-note{margin-top:26px;padding:15px 16px;border:1px solid rgba(226,111,104,.18);border-radius:15px;background:rgba(226,111,104,.055);color:rgba(243,239,230,.66);font-size:13px;line-height:1.7}
-    .safe-note strong{color:#f0aaa4}
     .game{padding:26px;display:flex;flex-direction:column;min-height:610px}
     .game-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
     .order-no{font-size:13px;color:rgba(243,239,230,.48);margin-top:7px}
@@ -60,16 +56,15 @@
     .cylinder.spinning{animation:spin 1.8s cubic-bezier(.12,.68,.15,1) forwards}
     @keyframes spin{0%{transform:rotate(0)}70%{transform:rotate(1260deg) scale(1.03)}100%{transform:rotate(1440deg)}}
     .chamber{position:absolute;width:23%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.11);background:radial-gradient(circle at 38% 30%,#2a2a2d,#0b0b0c 66%);box-shadow:inset 0 0 18px rgba(0,0,0,.85),0 2px 0 rgba(255,255,255,.025);color:rgba(243,239,230,.26);font-size:25px;font-weight:950;transition:border-color .25s ease,box-shadow .25s ease,color .25s ease,background .25s ease}
-    .chamber:nth-child(1){left:38.5%;top:8%}
-    .chamber:nth-child(2){right:11%;top:26%}
-    .chamber:nth-child(3){right:11%;bottom:25%}
-    .chamber:nth-child(4){left:38.5%;bottom:8%}
-    .chamber:nth-child(5){left:11%;bottom:25%}
-    .chamber:nth-child(6){left:11%;top:26%}
-    .chamber.hit{border-color:rgba(223,183,92,.75);color:#211b0d;background:radial-gradient(circle at 38% 30%,#ffe5a0,#c99b3e 66%);box-shadow:0 0 0 6px rgba(223,183,92,.08),0 0 46px rgba(223,183,92,.36)}
-    .chamber.hit::after{content:"✦"}
-    .chamber.hit{font-size:0}
-    .needle{position:absolute;left:50%;top:-17px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:0;border-bottom:18px solid var(--gold);filter:drop-shadow(0 3px 7px rgba(223,183,92,.38))}
+    .chamber[data-slot="1"]{left:38.5%;top:8%}
+    .chamber[data-slot="2"]{right:11%;top:26%}
+    .chamber[data-slot="3"]{right:11%;bottom:25%}
+    .chamber[data-slot="4"]{left:38.5%;bottom:8%}
+    .chamber[data-slot="5"]{left:11%;bottom:25%}
+    .chamber[data-slot="6"]{left:11%;top:26%}
+    .chamber.hit{border-color:rgba(223,183,92,.75);color:#211b0d;background:radial-gradient(circle at 38% 30%,#ffe5a0,#c99b3e 66%);box-shadow:0 0 0 6px rgba(223,183,92,.08),0 0 46px rgba(223,183,92,.36);font-size:0}
+    .chamber.hit::after{content:"✦";font-size:25px}
+    .needle{position:absolute;left:50%;top:-17px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:18px solid var(--gold);filter:drop-shadow(0 3px 7px rgba(223,183,92,.38))}
     .result{min-height:92px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.023);display:flex;align-items:center;justify-content:space-between;gap:18px}
     .result small{display:block;color:rgba(243,239,230,.45);font-size:11px;letter-spacing:.12em;font-weight:850}
     .result strong{display:block;margin-top:5px;font-size:24px}
@@ -79,29 +74,27 @@
     .primary,.secondary{width:100%;border-radius:14px;padding:14px 16px;font-weight:950;cursor:pointer}
     .primary{border:1px solid rgba(223,183,92,.35);background:linear-gradient(180deg,#e7c370,#c99f48);color:#17130b;box-shadow:0 10px 25px rgba(223,183,92,.12)}
     .primary:hover:not(:disabled){filter:brightness(1.05);transform:translateY(-1px)}
-    .primary:disabled{cursor:not-allowed;opacity:.44;filter:grayscale(.2)}
+    .primary:disabled{cursor:not-allowed;opacity:.44}
     .secondary{border:1px solid var(--line);background:rgba(255,255,255,.025);color:rgba(243,239,230,.72)}
     .secondary:hover{border-color:rgba(223,183,92,.32);color:var(--text)}
-    .fine{margin:10px 0 0;text-align:center;color:rgba(243,239,230,.4);font-size:11px;line-height:1.6}
-    .rules{margin-top:28px;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.022);overflow:hidden}
+    .rules{margin-top:24px;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.022);overflow:hidden}
     details{border-bottom:1px solid var(--line)}
     details:last-child{border-bottom:0}
-    summary{list-style:none;cursor:pointer;padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;font-weight:900}
+    summary{list-style:none;cursor:pointer;padding:19px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;font-weight:900}
     summary::-webkit-details-marker{display:none}
     summary::after{content:"＋";color:var(--gold);font-size:20px}
     details[open] summary::after{content:"−"}
-    .rule-body{padding:0 22px 22px;color:rgba(243,239,230,.63);font-size:14px;line-height:1.9}
+    .rule-body{padding:0 22px 22px;color:rgba(243,239,230,.63);font-size:14px;line-height:1.85}
     .rule-body b{color:#f2d791}
     .prob-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:14px}
     .prob{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.022)}
     .prob strong{display:block;color:var(--gold-2)}
     .prob span{display:block;margin-top:3px;color:rgba(243,239,230,.43);font-size:11px}
-    .footer-note{margin-top:20px;color:rgba(243,239,230,.38);font-size:11px;text-align:center;line-height:1.7}
     .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);opacity:0;pointer-events:none;padding:11px 15px;border-radius:12px;border:1px solid rgba(223,183,92,.25);background:#171511;color:#f0d18c;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:.25s ease}
     .toast.show{opacity:1;transform:translate(-50%,0)}
     @media(max-width:860px){.hero{grid-template-columns:1fr}.game{min-height:560px}.prob-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media(max-width:520px){.page{width:min(100% - 20px,1120px);padding-top:18px}.topbar{margin-bottom:20px}.copy,.game{border-radius:21px}.copy{padding:25px 21px}.game{padding:20px}.brand span:last-child{display:none}.result{align-items:flex-start;flex-direction:column}.result-value{white-space:normal}.actions{flex-direction:column}.prob-grid{grid-template-columns:1fr 1fr}}
-    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.cylinder.spinning{animation:none}.primary:hover:not(:disabled){transform:none}}
+    @media(max-width:520px){.page{width:min(100% - 20px,1040px);padding-top:18px}.topbar{margin-bottom:20px}.copy,.game{border-radius:21px}.copy{padding:25px 21px}.game{padding:20px}.brand span:last-child{display:none}.result{align-items:flex-start;flex-direction:column}.result-value{white-space:normal}.actions{flex-direction:column}.prob-grid{grid-template-columns:1fr 1fr}}
+    @media(prefers-reduced-motion:reduce){.cylinder.spinning{animation:none}.primary:hover:not(:disabled){transform:none}}
   </style>
 </head>
 <body>
@@ -113,22 +106,20 @@
 
     <section class="hero">
       <article class="copy">
-        <div class="eyebrow">RUSSIAN ROULETTE · GUARANTEE DRAW</div>
+        <div class="eyebrow">RUSSIAN ROULETTE</div>
         <h1>俄羅斯輪盤<br>保底抽取</h1>
-        <p class="lead">把「六格轉輪、一次隨機」做成三角洲趣味單的保底抽取。正式版會綁定訂單與付款狀態，抽完立即鎖定，結果同步回訂單。</p>
+        <p class="lead">轉動一次六格輪盤，抽出本張趣味單的最終保底。結果確定後即鎖定。</p>
         <div class="chips">
           <span class="chip">六格等機率</span>
           <span class="chip">每單 1 次</span>
           <span class="chip">抽完即鎖定</span>
-          <span class="chip">DEMO 平均 1,300 萬</span>
         </div>
-        <div class="safe-note"><strong>安全提醒：</strong>現實中的俄羅斯輪盤可能造成致命傷害，沒有安全玩法。本站僅借用名稱與「六格隨機」概念作為數位趣味抽取，不鼓勵任何現實模仿。</div>
       </article>
 
       <article class="game">
         <div class="game-head">
           <div>
-            <div class="eyebrow">ORDER DRAW · DEMO</div>
+            <div class="eyebrow">ORDER DRAW · TEST</div>
             <div class="order-no">DEMO-MO20261012-RR</div>
           </div>
           <span id="status" class="status">可抽 1 次</span>
@@ -136,13 +127,13 @@
 
         <div class="cylinder-wrap">
           <div id="cylinder" class="cylinder" aria-label="六格保底輪盤">
+            <div class="chamber" data-slot="1">?</div>
+            <div class="chamber" data-slot="2">?</div>
+            <div class="chamber" data-slot="3">?</div>
+            <div class="chamber" data-slot="4">?</div>
+            <div class="chamber" data-slot="5">?</div>
+            <div class="chamber" data-slot="6">?</div>
             <div class="needle" aria-hidden="true"></div>
-            <div class="chamber">?</div>
-            <div class="chamber">?</div>
-            <div class="chamber">?</div>
-            <div class="chamber">?</div>
-            <div class="chamber">?</div>
-            <div class="chamber">?</div>
           </div>
         </div>
 
@@ -150,53 +141,38 @@
           <div>
             <small>GUARANTEE RESULT</small>
             <strong id="resultTitle">尚未抽取</strong>
-            <div id="resultSub" class="sub">結果確定後會永久鎖定於本張訂單。</div>
+            <div id="resultSub" class="sub">本張訂單可抽取 1 次。</div>
           </div>
           <div id="resultValue" class="result-value">—</div>
         </div>
 
         <div class="actions">
           <button id="drawButton" class="primary" type="button">轉動六格輪盤</button>
-          <button id="resetButton" class="secondary" type="button">DEMO 重置</button>
+          <button id="resetButton" class="secondary" type="button">測試重置</button>
         </div>
-        <p class="fine">DEMO 使用瀏覽器 localStorage 模擬「抽完上鎖」。正式版會改由伺服器資料庫判定，重新整理也無法重抽。</p>
       </article>
     </section>
 
     <section class="rules" aria-label="玩法規則">
-      <details open>
-        <summary>這個玩法跟真正的俄羅斯輪盤差在哪？</summary>
+      <details>
+        <summary>玩法規則</summary>
         <div class="rule-body">
-          常見的傳統描述是：<b>六格轉輪中只有一格是「中彈」結果，先隨機轉動，再進行一次或輪流嘗試</b>。它不是一套有官方統一規章的遊戲，不同版本會有「每次重轉」或「只轉一次」等差異。因為現實行為高度危險，魔丸版本只保留「六格、一次隨機、結果不可重來」三個概念。
+          本玩法取自俄羅斯輪盤的<b>六格隨機</b>概念，僅作數位趣味抽取。每張符合資格的訂單可抽 <b>1 次</b>，結果確定後不可重抽；正式上線時會與訂單綁定並同步至 Discord 票口。
         </div>
       </details>
       <details>
-        <summary>魔丸版保底規則</summary>
+        <summary>本次保底獎池</summary>
         <div class="rule-body">
-          每張符合資格的趣味單在付款完成後取得 <b>1 次抽取資格</b>。六格等機率，每次只抽一格；結果由系統決定並立即寫入訂單。關頁、重新整理、換裝置或重複開網址，都不能改變已抽出的結果。正式版會在 Discord 訂單票口同步通知抽取結果。
-        </div>
-      </details>
-      <details>
-        <summary>目前 DEMO 的六格保底</summary>
-        <div class="rule-body">
-          這版先用「一格金彈＝最高保底」來保留 1/6 的主題感；不是最終定案，之後可直接改成你要的數值與機率。
+          六格機率相同，其中一格為最高保底。
           <div class="prob-grid">
             <div class="prob"><strong>1,000 萬</strong><span>2 格 · 33.3%</span></div>
             <div class="prob"><strong>1,200 萬</strong><span>2 格 · 33.3%</span></div>
             <div class="prob"><strong>1,400 萬</strong><span>1 格 · 16.7%</span></div>
-            <div class="prob"><strong>2,000 萬</strong><span>金彈 1 格 · 16.7%</span></div>
+            <div class="prob"><strong>2,000 萬</strong><span>1 格 · 16.7%</span></div>
           </div>
         </div>
       </details>
-      <details>
-        <summary>正式版會怎麼上鎖？</summary>
-        <div class="rule-body">
-          真正上線後不會相信前端按鈕，而是以訂單資料庫的 <b>allowed_uses / used_uses / result</b> 為準。伺服器會先決定並儲存結果，再回傳動畫；即使同時開兩個分頁，也只能有第一個成功寫入的請求消耗抽取次數。
-        </div>
-      </details>
     </section>
-
-    <div class="footer-note">Prototype only · 魔丸娛樂｜這個 DEMO 不會修改任何真實訂單、錢包、薪資或 Discord 資料。</div>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -205,14 +181,14 @@
     (() => {
       "use strict";
 
-      const STORAGE_KEY = "mowan_rr_demo_v1";
+      const STORAGE_KEY = "mowan_rr_demo_v2";
       const chambers = [
-        { value: 1000, label: "安全下莊", jackpot: false },
-        { value: 1000, label: "安全下莊", jackpot: false },
-        { value: 1200, label: "加碼保底", jackpot: false },
-        { value: 1200, label: "加碼保底", jackpot: false },
+        { value: 1000, label: "保底確定", jackpot: false },
+        { value: 1000, label: "保底確定", jackpot: false },
+        { value: 1200, label: "保底確定", jackpot: false },
+        { value: 1200, label: "保底確定", jackpot: false },
         { value: 1400, label: "高額保底", jackpot: false },
-        { value: 2000, label: "金彈 JACKPOT", jackpot: true }
+        { value: 2000, label: "最高保底", jackpot: true }
       ];
 
       const cylinder = document.getElementById("cylinder");
@@ -262,10 +238,8 @@
         status.classList.add("locked");
         resultTitle.textContent = state.label || "保底已確定";
         resultValue.textContent = `${Number(state.value).toLocaleString("zh-TW")} 萬`;
-        resultSub.textContent = state.jackpot
-          ? "抽中唯一金彈格；正式版會同步通知 Discord 票口。"
-          : `抽取時間：${state.drawnAt || "已記錄"}`;
-        drawButton.textContent = "本單已使用完抽取次數";
+        resultSub.textContent = `抽取時間：${state.drawnAt || "已記錄"}`;
+        drawButton.textContent = "本單已完成抽取";
         drawButton.disabled = true;
       }
 
@@ -275,7 +249,7 @@
         status.classList.remove("locked");
         resultTitle.textContent = "尚未抽取";
         resultValue.textContent = "—";
-        resultSub.textContent = "結果確定後會永久鎖定於本張訂單。";
+        resultSub.textContent = "本張訂單可抽取 1 次。";
         drawButton.textContent = "轉動六格輪盤";
         drawButton.disabled = false;
       }
@@ -285,7 +259,7 @@
         const existing = readState();
         if (existing) {
           renderLocked(existing);
-          showToast("這張 DEMO 已抽過，結果保持不變。")
+          showToast("這張測試單已抽過。")
           return;
         }
 
@@ -319,7 +293,7 @@
           cylinder.classList.remove("spinning");
           renderLocked(state);
           drawing = false;
-          showToast(result.jackpot ? "金彈！2,000 萬保底。" : `保底確定：${result.value.toLocaleString("zh-TW")} 萬`);
+          showToast(`保底確定：${result.value.toLocaleString("zh-TW")} 萬`);
         }, 1850);
       }
 
@@ -328,7 +302,7 @@
         if (drawing) return;
         localStorage.removeItem(STORAGE_KEY);
         renderFresh();
-        showToast("DEMO 已重置，可以重新測試。")
+        showToast("測試已重置。")
       });
 
       const initial = readState();
