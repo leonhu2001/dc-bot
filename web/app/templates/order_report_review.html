@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+
+{% block page_title %}報單審核{% endblock %}
+
+{% block content %}
+<style>
+.review-page{display:grid;gap:18px}.review-hero,.review-card,.review-stat{border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.02)),rgba(8,11,19,.94);box-shadow:0 20px 58px rgba(0,0,0,.28)}.review-hero{border-radius:26px;padding:24px;display:grid;gap:12px}.review-kicker{margin:0;color:var(--mw-gold,#f5c66b);font-size:12px;font-weight:950;letter-spacing:.16em}.review-hero h2{margin:0;font-size:clamp(28px,4vw,44px);letter-spacing:.06em}.review-hero p{margin:0;color:var(--mw-muted,#a7a0b5);line-height:1.75}.review-filters{display:flex;gap:8px;flex-wrap:wrap}.review-filter{border:1px solid rgba(245,198,107,.22);background:rgba(245,198,107,.06);color:#ffe4a7;border-radius:999px;padding:8px 12px;text-decoration:none;font-size:12px;font-weight:900}.review-filter.active{background:rgba(245,198,107,.18);border-color:rgba(245,198,107,.5);color:#fff4d5}.review-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.review-stat{border-radius:20px;padding:17px}.review-stat span{display:block;color:var(--mw-muted,#a7a0b5);font-size:12px;font-weight:850}.review-stat strong{display:block;margin-top:8px;font-size:32px}.review-list{display:grid;gap:14px}.review-card{border-radius:24px;padding:18px;display:grid;gap:15px;scroll-margin-top:24px}.review-card.is-focus{outline:2px solid rgba(245,198,107,.62);box-shadow:0 0 0 5px rgba(245,198,107,.08),0 20px 58px rgba(0,0,0,.28)}.review-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.review-head h3{margin:4px 0 0;font-size:20px}.review-status{display:inline-flex;border:1px solid rgba(245,198,107,.28);background:rgba(245,198,107,.08);color:#ffe2a0;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:950;white-space:nowrap}.review-status.submitted{border-color:rgba(117,232,255,.28);background:rgba(117,232,255,.08);color:#c9f8ff}.review-status.changes_requested{border-color:rgba(255,169,89,.32);background:rgba(255,169,89,.1);color:#ffe1b5}.review-status.approved{border-color:rgba(114,242,166,.32);background:rgba(114,242,166,.09);color:#d9ffe8}.review-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.review-meta>div,.review-block{border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.035);border-radius:16px;padding:12px}.review-meta span,.review-label{display:block;color:var(--mw-muted,#a7a0b5);font-size:12px;font-weight:800}.review-meta strong{display:block;margin-top:6px;word-break:break-word}.review-workers{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.review-worker{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(245,198,107,.22);background:rgba(245,198,107,.07);border-radius:999px;padding:7px 10px;font-size:13px;font-weight:900}.review-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.review-summary>div{border:1px solid rgba(255,255,255,.075);border-radius:15px;padding:12px;background:rgba(255,255,255,.025)}.review-summary strong{display:block;margin-top:5px}.review-alert{border:1px solid rgba(255,169,89,.3);background:rgba(255,169,89,.09);color:#ffe2bc;border-radius:16px;padding:12px 14px;line-height:1.65}.review-form{display:grid;gap:12px}.review-edit-grid{display:grid;grid-template-columns:1.2fr .8fr .8fr;gap:10px}.review-field{border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.16);border-radius:17px;padding:13px}.review-field h4{margin:0 0 8px;font-size:14px}.review-options{display:flex;gap:8px;flex-wrap:wrap}.review-option{display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px 10px;cursor:pointer;font-weight:850}.review-option input{accent-color:#f5c66b}.review-note{width:100%;min-height:86px;resize:vertical;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(0,0,0,.27);color:#f4f0e8;padding:11px 12px;box-sizing:border-box}.review-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}.review-button{border:1px solid rgba(245,198,107,.4);background:linear-gradient(135deg,rgba(245,198,107,.22),rgba(207,62,62,.15));color:#fff3d1;border-radius:999px;padding:10px 16px;font-weight:950;cursor:pointer}.review-button.secondary{border-color:rgba(255,169,89,.35);background:rgba(255,169,89,.08);color:#ffe1b5}.review-button.remind{border-color:rgba(117,232,255,.28);background:rgba(117,232,255,.07);color:#c9f8ff}.review-empty{border:1px dashed rgba(255,255,255,.14);border-radius:22px;padding:28px;text-align:center;color:var(--mw-muted,#a7a0b5)}.review-notice{padding:12px 14px;border-radius:14px;font-weight:850}.review-notice.success{border:1px solid rgba(114,242,166,.28);background:rgba(114,242,166,.09);color:#d9ffe8}.review-notice.error{border:1px solid rgba(255,107,138,.3);background:rgba(255,107,138,.09);color:#ffd6df}@media(max-width:900px){.review-stats,.review-meta,.review-summary,.review-edit-grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.review-stats,.review-meta,.review-summary,.review-edit-grid{grid-template-columns:1fr}.review-head{flex-direction:column}.review-actions{justify-content:stretch}.review-button{width:100%}}
+</style>
+
+<div class="review-page">
+    <section class="review-hero">
+        <p class="review-kicker">REPORT REVIEW</p>
+        <h2>報單審核</h2>
+        <p>待填寫可以直接提醒接單人員；待審核可在這裡修正後通過。只有「通過」才會把掛名寫進正式接單紀錄並重算薪資。</p>
+        <div class="review-filters">
+            {% for value, label in [('open','待處理'),('pending','待填寫'),('submitted','待審核'),('changes_requested','需修改'),('approved','已完成'),('all','全部')] %}
+                <a class="review-filter {% if current_status == value %}active{% endif %}" href="/reports/review?status={{ value }}{% if focus_order_id %}&order_id={{ focus_order_id }}{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if message %}<div class="review-notice success">{{ message }}</div>{% endif %}
+    {% if error %}<div class="review-notice error">{{ error }}</div>{% endif %}
+
+    <section class="review-stats">
+        <div class="review-stat"><span>待填寫</span><strong>{{ counts.pending or 0 }}</strong></div>
+        <div class="review-stat"><span>待審核</span><strong>{{ counts.submitted or 0 }}</strong></div>
+        <div class="review-stat"><span>需修改</span><strong>{{ counts.changes_requested or 0 }}</strong></div>
+        <div class="review-stat"><span>已完成</span><strong>{{ counts.approved or 0 }}</strong></div>
+    </section>
+
+    <section class="review-list">
+        {% for report in reports %}
+            <article class="review-card {% if focus_order_id and report.order_id == focus_order_id %}is-focus{% endif %}" id="review-{{ report.order_id }}">
+                <div class="review-head">
+                    <div><p class="review-kicker">{{ report.bot_order_no or ("WEB-" ~ report.order_id) }}</p><h3>{{ report.category }}｜{{ report.item }}</h3></div>
+                    <span class="review-status {{ report.status }}">{{ report.status_label }}</span>
+                </div>
+
+                <div class="review-meta">
+                    <div><span>老闆</span><strong>{{ report.customer_display_name or "未記錄" }}</strong></div>
+                    <div><span>結單時間</span><strong>{{ report.closed_at_text or "未記錄" }}</strong></div>
+                    <div><span>訂單金額</span><strong>{{ report.customer_pay_amount if report.customer_pay_amount is not none else report.amount }}T</strong></div>
+                    <div><span>提交者</span><strong>{{ report.submitted_by_display_name or "尚未提交" }}{% if report.submitted_at_text %}<br>{{ report.submitted_at_text }}{% endif %}</strong></div>
+                </div>
+
+                <div class="review-block">
+                    <span class="review-label">接單人員</span>
+                    <div class="review-workers">{% for worker in report.workers %}<span class="review-worker">{{ worker.worker_display_name }}{% if worker.has_named_bonus %} · 掛名{% endif %}</span>{% endfor %}</div>
+                </div>
+
+                {% if report.status == 'pending' %}
+                    <div class="review-alert">這張單尚未有人送出報單。可以直接私訊所有接單人員提醒填寫。</div>
+                    <form method="post" action="/reports/review/{{ report.order_id }}/remind" class="review-actions">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
+                        <button class="review-button remind" type="submit">私訊提醒接單人員</button>
+                    </form>
+                {% elif report.status == 'changes_requested' %}
+                    <div class="review-alert"><strong>已退回：</strong>{{ report.review_note or "請接單人員修改後重新送出。" }}</div>
+                    <form method="post" action="/reports/review/{{ report.order_id }}/remind" class="review-actions">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
+                        <button class="review-button remind" type="submit">再次私訊提醒</button>
+                    </form>
+                {% elif report.status == 'submitted' %}
+                    <form method="post" action="/reports/review/{{ report.order_id }}/action" class="review-form">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
+                        <div class="review-edit-grid">
+                            <div class="review-field">
+                                <h4>掛名人員</h4>
+                                <div class="review-options">
+                                    {% for worker in report.workers %}
+                                        <label class="review-option"><input type="checkbox" name="named_worker_ids" value="{{ worker.worker_discord_id }}" {% if worker.has_named_bonus %}checked{% endif %}>{{ worker.worker_display_name }}</label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="review-field">
+                                <h4>直播</h4>
+                                <div class="review-options">
+                                    <label class="review-option"><input type="radio" name="streamed" value="yes" required {% if report.streamed %}checked{% endif %}>有</label>
+                                    <label class="review-option"><input type="radio" name="streamed" value="no" required {% if not report.streamed %}checked{% endif %}>沒有</label>
+                                </div>
+                            </div>
+                            <div class="review-field">
+                                <h4>保留錄影</h4>
+                                <div class="review-options">
+                                    <label class="review-option"><input type="radio" name="recording_saved" value="yes" required {% if report.recording_saved %}checked{% endif %}>有</label>
+                                    <label class="review-option"><input type="radio" name="recording_saved" value="no" required {% if not report.recording_saved %}checked{% endif %}>沒有</label>
+                                </div>
+                            </div>
+                        </div>
+                        <textarea class="review-note" name="review_note" placeholder="審核備註；若要退回修改，這裡必填原因。"></textarea>
+                        <div class="review-actions">
+                            <button class="review-button secondary" type="submit" name="action" value="request_changes">退回修改</button>
+                            <button class="review-button" type="submit" name="action" value="approve">確認通過並套用掛名</button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="review-summary">
+                        <div><span class="review-label">直播</span><strong>{{ "有" if report.streamed else "沒有" }}</strong></div>
+                        <div><span class="review-label">保留錄影</span><strong>{{ "有" if report.recording_saved else "沒有" }}</strong></div>
+                        <div><span class="review-label">審核者</span><strong>{{ report.reviewed_by_display_name or "—" }}{% if report.reviewed_at_text %}<br>{{ report.reviewed_at_text }}{% endif %}</strong></div>
+                    </div>
+                    {% if report.review_note %}<div class="review-alert">備註：{{ report.review_note }}</div>{% endif %}
+                {% endif %}
+            </article>
+        {% else %}
+            <div class="review-empty">目前沒有符合這個篩選條件的報單。</div>
+        {% endfor %}
+    </section>
+</div>
+
+{% if focus_order_id %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const target = document.getElementById("review-{{ focus_order_id }}");
+    if (target) window.setTimeout(() => target.scrollIntoView({behavior:"smooth", block:"center"}), 80);
+});
+</script>
+{% endif %}
+{% endblock %}
