@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY = ROOT / "web" / "app" / "static" / "js" / "mw_order_form_fix.js"
 CONTROLLER = ROOT / "web" / "app" / "static" / "js" / "mw_order_ui.js"
+GUARD = ROOT / "web" / "app" / "static" / "js" / "mw_order_guard.js"
 STYLES = ROOT / "web" / "app" / "static" / "css" / "order_ui.css"
 
 
@@ -31,8 +32,15 @@ def test_extraction_preserves_legacy_rule_and_player_fallbacks() -> None:
     assert 'event.key === "Escape"' in source
 
 
-def test_order_form_styles_are_not_runtime_style_text() -> None:
-    source = CONTROLLER.read_text(encoding="utf-8")
+def test_order_styles_are_canonical_and_guard_skips_runtime_injection() -> None:
+    loader = LEGACY.read_text(encoding="utf-8")
+    controller = CONTROLLER.read_text(encoding="utf-8")
+    guard = GUARD.read_text(encoding="utf-8")
     css = STYLES.read_text(encoding="utf-8")
-    assert "document.createElement(\"style\")" not in source
+
+    assert "document.createElement(\"style\")" not in controller
+    assert 'const cssId = "mw-role-filter-style"' in loader
+    assert '"mw-role-filter-style"' in guard
     assert "#mw-extra-requirements" in css
+    assert ".mw-role-filter-hidden" in css
+    assert ".mw-role-filter-loading" in css
