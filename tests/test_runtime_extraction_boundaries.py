@@ -58,13 +58,19 @@ def test_large_runtime_implementations_no_longer_live_in_bot():
     assert "class WebsiteOrderCsConfirmView" in web_source
     assert "async def _process_web_order_created_event" in web_source
 
-    order_source = Path("services/order_runtime.py").read_text(
+    order_facade = Path("services/order_runtime.py").read_text(encoding="utf-8")
+    self_service_facade = Path("services/self_service_runtime.py").read_text(
         encoding="utf-8"
     )
-    self_service_source = Path("services/self_service_runtime.py").read_text(
+    order_source = Path("services/order_runtime_legacy.py").read_text(
+        encoding="utf-8"
+    )
+    self_service_source = Path("services/self_service_runtime_legacy.py").read_text(
         encoding="utf-8"
     )
 
+    assert "sys.modules[__name__] = _legacy" in order_facade
+    assert "sys.modules[__name__] = _legacy" in self_service_facade
     assert "async def finalize_accepted_pending_payment" in order_source
     assert "class DispatchClaimView" in order_source
     assert "def calculate_self_service_financials" in self_service_source
