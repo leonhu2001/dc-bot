@@ -24,6 +24,18 @@ def open_order_catalog(page: Page):
     return response
 
 
+def open_first_order_dialog(page: Page):
+    open_order_catalog(page)
+    open_buttons = page.locator(".order3-open")
+    if open_buttons.count() == 0:
+        pytest.skip("No public order groups are available in this fixture")
+
+    open_buttons.first.click()
+    dialog = page.locator("#mw-order-dialog")
+    expect(dialog).to_be_visible()
+    return dialog
+
+
 def test_home_and_order_catalog_render(page: Page) -> None:
     home = page.goto(f"{BASE_URL}/", wait_until="domcontentloaded")
     assert home is not None and home.ok
@@ -34,19 +46,53 @@ def test_home_and_order_catalog_render(page: Page) -> None:
 
 
 def test_order_dialog_can_open_and_close(page: Page) -> None:
-    open_order_catalog(page)
-
-    open_buttons = page.locator(".order3-open")
-    if open_buttons.count() == 0:
-        pytest.skip("No public order groups are available in this fixture")
-
-    open_buttons.first.click()
-    dialog = page.locator("#mw-order-dialog")
-    expect(dialog).to_be_visible()
+    dialog = open_first_order_dialog(page)
     expect(page.locator("#mw-dialog-title")).not_to_have_text("")
 
     page.locator("#mw-dialog-close").click()
     expect(dialog).not_to_be_visible()
+
+
+def test_order_dialog_escape_uses_canonical_close_behavior(page: Page) -> None:
+    dialog = open_first_order_dialog(page)
+    page.keyboard.press("Escape")
+    expect(dialog).not_to_be_visible()
+
+
+def test_order_dialog_populates_rule_and_local_quote(page: Page) -> None:
+    open_first_order_dialog(page)
+
+    variant = page.locator("#mw-variant")
+    expect(variant).to_be_visible()
+    assert variant.locator("option").count() >= 1
+
+    expect(page.locator("#mw-dialog-title")).not_to_have_text("")
+    expect(page.locator("#mw-rule-key")).not_to_have_text("—")
+    expect(page.locator("#mw-total")).to_have_text(r"\d[\d,]*T")
+    expect(page.locator("#mw-total-detail")).not_to_have_text("選擇方案後即時計算")
+
+
+def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> None:
+    open_first_order_dialog(page)
+
+    quantity_field = page.locator("#mw-quantity-field")
+    player_field = page.locator("#mw-player-field")
+
+    if quantity_field.is_visible():
+        before_quantity = page.locator("#mw-quantity").inner_text()
+        page.locator("#mw-quantity-plus").click()
+        expect(page.locator("#mw-quantity")).not_to_have_text(before_quantity)
+        expect(page.locator("#mw-total")).to_have_text(r"\d[\d,]*T")
+        return
+
+    if player_field.is_visible():
+        before_players = page.locator("#mw-player-count").inner_text()
+        page.locator("#mw-player-plus").click()
+        expect(page.locator("#mw-player-count")).not_to_have_text(before_players)
+        expect(page.locator("#mw-total")).to_have_text(r"\d[\d,]*T")
+        return
+
+    pytest.skip("First public order group has no adjustable stepper")
 
 
 def test_order_catalog_has_no_mobile_horizontal_overflow(page: Page) -> None:
@@ -62,6 +108,25 @@ def test_order_catalog_has_no_mobile_horizontal_overflow(page: Page) -> None:
     )
     assert widths["body"] <= widths["inner"] + 2
     assert widths["root"] <= widths["inner"] + 2
+
+
+def test_order_dialog_has_no_mobile_horizontal_overflow(page: Page) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    open_first_order_dialog(page)
+
+    widths = page.evaluate(
+        """() => {
+            const dialog = document.querySelector("#mw-order-dialog");
+            const shell = dialog?.querySelector(".order3-dialog-shell");
+            return {
+                inner: window.innerWidth,
+                dialog: dialog?.scrollWidth || 0,
+                shell: shell?.scrollWidth || 0,
+            };
+        }"""
+    )
+    assert widths["dialog"] <= widths["inner"] + 2
+    assert widths["shell"] <= widths["inner"] + 2
 
 
 def test_health_endpoint_stays_public(page: Page) -> None:
