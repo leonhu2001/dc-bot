@@ -8,18 +8,28 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
-STYLE_RE = re.compile(r"<style(?:\s|>)", re.I)
-SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.I)
+STYLE_RE = re.compile(r"<style(?:\s[^>]*)?>(.*?)</style>", re.I | re.S)
+SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>", re.I | re.S)
 CSS_REF_RE = re.compile(r'''href\s*=\s*["'](/static/[^"'?#]+\.css)(?:[?#][^"']*)?["']''', re.I)
 JS_REF_RE = re.compile(r'''src\s*=\s*["'](/static/[^"'?#]+\.js)(?:[?#][^"']*)?["']''', re.I)
+
+
+def block_kind(body: str) -> str:
+    dynamic = "{{" in body or "{%" in body or "{#" in body
+    return "dynamic" if dynamic else "static"
+
 
 print("== INLINE DEBT BY TEMPLATE ==")
 for path in sorted(TEMPLATES.glob("*.html")):
     text = path.read_text(encoding="utf-8-sig")
-    styles = len(STYLE_RE.findall(text))
-    scripts = len(SCRIPT_RE.findall(text))
+    styles = STYLE_RE.findall(text)
+    scripts = SCRIPT_RE.findall(text)
     if styles or scripts:
-        print(f"{path.name}: style={styles} script={scripts} bytes={path.stat().st_size}")
+        print(f"{path.name}: style={len(styles)} script={len(scripts)} bytes={path.stat().st_size}")
+        for index, body in enumerate(styles, start=1):
+            print(f"  STYLE#{index}: {block_kind(body)} bytes={len(body.encode('utf-8'))}")
+        for index, body in enumerate(scripts, start=1):
+            print(f"  SCRIPT#{index}: {block_kind(body)} bytes={len(body.encode('utf-8'))}")
 
 print("\n== STATIC CSS BY SIZE ==")
 for path in sorted((STATIC / "css").glob("*.css"), key=lambda p: p.stat().st_size, reverse=True):
