@@ -1,0 +1,291 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/love_delta.css?v=1">
+{% endblock %}
+
+{% block content %}
+{% set ld = love_delta %}
+{% set plan = ld.plan %}
+{% set state = ld.state %}
+{% set viewer = ld.viewer %}
+<section class="ld-page" id="loveDeltaRoot" data-role="{{ viewer.role }}">
+    <div class="ld-ambient" id="ldAmbient"></div>
+    <div class="ld-ambient-next" id="ldAmbientNext"></div>
+
+    <div class="ld-shell" id="ldPanel">
+        <div class="ld-topline">
+            <div class="ld-brand">
+                <div class="ld-logo">♡</div>
+                <div>
+                    <h1>戀與三角洲</h1>
+                    <small>互動攻略進度</small>
+                </div>
+            </div>
+            {% if viewer.role == 'boss' %}
+            <a class="ld-back-link" href="/me/orders/{{ ld.order.id }}">返回訂單</a>
+            {% else %}
+            <a class="ld-back-link" href="/dispatch">返回接單大廳</a>
+            {% endif %}
+        </div>
+
+        <div class="ld-context">
+            <div>
+                目前身份 <strong id="ldViewerRole">{{ '老闆' if viewer.role == 'boss' else '女陪' }}</strong>
+                ・ {{ ld.order.order_no }}
+            </div>
+            <span class="ld-live">共同進度已連線</span>
+        </div>
+
+        <section class="ld-hero">
+            <div class="ld-hero-head">
+                <div>
+                    <div class="ld-eyebrow">AFFECTION ROUTE</div>
+                    <h2>{{ plan.label }}方案</h2>
+                </div>
+                <div class="ld-order-no">{{ ld.order.order_no }}</div>
+            </div>
+
+            <div class="ld-plan">
+                <div>
+                    <small>目前方案</small>
+                    <strong>{{ plan.label }}</strong>
+                </div>
+                <div class="ld-plan-meta">
+                    <span>起始好感 <b>{{ plan.initial_affection|int }}</b></span>
+                    <span class="ld-plan-price">{{ "{:,}".format(plan.price) }}T</span>
+                </div>
+            </div>
+
+            <div class="ld-score-row">
+                <div>
+                    <div class="ld-score-label">目前好感度</div>
+                    <div class="ld-score"><b id="ldScore">{{ state.affection }}</b> <span>/ 100</span></div>
+                </div>
+                <div class="ld-round">
+                    <div>第 <strong id="ldRound">{{ state.round_no }}</strong> 局</div>
+                    <div>本局正分 <strong id="ldRoundPositive">{{ state.round_positive }}</strong></div>
+                </div>
+            </div>
+
+            <div class="ld-track" aria-label="好感度進度">
+                <div class="ld-track-fill" id="ldTrackFill"></div>
+            </div>
+            <div class="ld-markers">
+                <div class="ld-marker" style="left:61.111%"><b>30</b><span>句末助詞</span></div>
+                <div class="ld-marker" style="left:77.778%"><b>60</b><span>特殊稱呼</span></div>
+                <div class="ld-marker is-end" style="left:100%"><b>100</b><span>完成</span></div>
+            </div>
+            <div class="ld-complete-banner" id="ldCompleteBanner">💗 好感度已滿｜最終結局已解鎖</div>
+        </section>
+
+        <div class="ld-layout">
+            <main>
+                <section class="ld-card ld-only-boss" id="ldBossGuessCard">
+                    <div class="ld-guess">
+                        <div class="ld-guess-head">
+                            <h3>🎯 老闆設定本局答案</h3>
+                            <span class="ld-status-chip" id="ldBossGuessStatus">尚未鎖定</span>
+                        </div>
+                        <div class="ld-guess-fields">
+                            <input id="ldHintCategory" placeholder="類別提示（選填）" autocomplete="off">
+                            <input id="ldHintQuality" placeholder="品質提示（選填）" autocomplete="off">
+                            <input id="ldBossAnswer" placeholder="老闆最想要的物資" autocomplete="off">
+                        </div>
+                        <div class="ld-row" style="margin-top:8px">
+                            <button class="ld-primary" id="ldLockBossGuess" type="button">鎖定本局答案</button>
+                            <button class="ld-secondary" id="ldClearBossGuess" type="button">清除</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="ld-card ld-only-companion" id="ldCompanionGuessCard">
+                    <div class="ld-guess">
+                        <div class="ld-guess-head">
+                            <h3>🎯 女陪共同猜測</h3>
+                            <span class="ld-status-chip" id="ldCompanionGuessStatus">尚未鎖定</span>
+                        </div>
+                        <div class="ld-two" style="margin-bottom:8px">
+                            <div class="ld-hidden-answer">類別提示：<b id="ldShowHintCategory">未提供</b></div>
+                            <div class="ld-hidden-answer">品質提示：<b id="ldShowHintQuality">未提供</b></div>
+                        </div>
+                        <div class="ld-hidden-answer" style="margin-bottom:8px">老闆答案：🔒 本局結算前不顯示</div>
+                        <input id="ldCompanionGuess" placeholder="兩位女陪統一答案" autocomplete="off">
+                        <div class="ld-row" style="margin-top:8px">
+                            <button class="ld-primary" id="ldLockCompanionGuess" type="button">鎖定共同答案</button>
+                            <button class="ld-secondary" id="ldClearCompanionGuess" type="button">清除</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="ld-card">
+                    <div class="ld-section">
+                        <h3>🎁 摸出物資並送給老闆</h3>
+                        <div class="ld-event-grid">
+                            <button class="ld-event" type="button" data-ld-event="item_gold"><strong>金色物資 / 紫卡</strong><span class="ld-points">+3</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_small_red"><strong>小紅 / 金卡</strong><span class="ld-points">+8</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_big_red"><strong>大紅 / 紅卡</strong><span class="ld-points">+15</span></button>
+                            <button class="ld-event" type="button" data-ld-event="item_heart_tear"><strong>心 / 淚</strong><span class="ld-points">+30</span></button>
+                        </div>
+                    </div>
+
+                    <div class="ld-section">
+                        <h3>⚔️ 遊戲事件</h3>
+                        <div class="ld-event-grid" id="ldCombatEvents">
+                            <button class="ld-event" type="button" data-ld-event="squad_wipe"><strong>女陪一打三滅隊</strong><span class="ld-points">+10</span></button>
+                            <button class="ld-event" type="button" data-ld-event="four_same"><strong>四個同款小金 / 紅</strong><span class="ld-points">指定下局</span></button>
+                        </div>
+                        <div class="ld-event-grid" id="ldRescueButtons" style="margin-top:8px"></div>
+                    </div>
+
+                    <div class="ld-section">
+                        <h3>📦 本局撤離價值</h3>
+                        <div class="ld-value-grid" id="ldValueGrid">
+                            <button class="ld-value is-active" type="button" data-tier="0"><b>未達 300W</b><span>+0</span></button>
+                            <button class="ld-value" type="button" data-tier="300"><b>300W+</b><span>+4</span></button>
+                            <button class="ld-value" type="button" data-tier="600"><b>600W+</b><span>+8</span></button>
+                            <button class="ld-value" type="button" data-tier="900"><b>900W+</b><span>+12</span></button>
+                        </div>
+                    </div>
+
+                    <div class="ld-section">
+                        <h3>🚫 禁語</h3>
+                        <div class="ld-only-boss">
+                            <div class="ld-three">
+                                <input id="ldBan1" placeholder="禁語 1" autocomplete="off">
+                                <input id="ldBan2" placeholder="禁語 2" autocomplete="off">
+                                <input id="ldBan3" placeholder="禁語 3" autocomplete="off">
+                            </div>
+                            <div class="ld-row" style="margin-top:8px">
+                                <button class="ld-primary" id="ldSaveBans" type="button">儲存禁語</button>
+                                <span class="ld-helper" id="ldBanEditHint"></span>
+                            </div>
+                        </div>
+                        <div class="ld-only-companion ld-two" style="margin-bottom:8px">
+                            <div class="ld-readout">禁語 1：<b id="ldBanRead1">未設定</b></div>
+                            <div class="ld-readout">禁語 2：<b id="ldBanRead2">未設定</b></div>
+                            <div class="ld-readout" style="grid-column:1/-1">禁語 3：<b id="ldBanRead3">未設定</b></div>
+                        </div>
+                        <div class="ld-event-grid" id="ldBanButtons" style="margin-top:8px"></div>
+                    </div>
+
+                    <div class="ld-section">
+                        <h3>✨ 好感度解鎖</h3>
+                        <div class="ld-only-boss ld-two">
+                            <div class="ld-setting-box" id="ldSuffixBox">
+                                <input id="ldSuffix" placeholder="30 解鎖：句末助詞" autocomplete="off">
+                                <button class="ld-primary" id="ldSaveSuffix" type="button" style="margin-top:8px">儲存句末助詞</button>
+                            </div>
+                            <div class="ld-setting-box" id="ldNicknameBox">
+                                <input id="ldNickname" placeholder="60 解鎖：特殊稱呼" autocomplete="off">
+                                <button class="ld-primary" id="ldSaveNickname" type="button" style="margin-top:8px">儲存特殊稱呼</button>
+                            </div>
+                        </div>
+                        <div class="ld-only-companion ld-two">
+                            <div class="ld-readout">句末助詞：<b id="ldSuffixRead">尚未解鎖</b></div>
+                            <div class="ld-readout">特殊稱呼：<b id="ldNicknameRead">尚未解鎖</b></div>
+                        </div>
+                        <div class="ld-event-grid" style="margin-top:8px">
+                            <button class="ld-event" id="ldMissSuffix" type="button" data-ld-event="miss_suffix"><strong>忘記句末助詞</strong><span class="ld-points is-minus">-2</span></button>
+                        </div>
+                    </div>
+
+                    <div class="ld-section">
+                        <h3>🎮 下一局指定</h3>
+                        <div class="ld-readout" id="ldCurrentDesignation">本局沒有指定幹員或槍械。</div>
+                        <div class="ld-only-boss ld-setting-box" id="ldLoadoutBox" style="margin-top:8px">
+                            <div class="ld-two">
+                                <input id="ldAgent" placeholder="指定幹員" autocomplete="off">
+                                <input id="ldWeapon" placeholder="指定槍械" autocomplete="off">
+                            </div>
+                            <button class="ld-primary" id="ldSaveLoadout" type="button" style="margin-top:8px">儲存下局指定</button>
+                        </div>
+                        <div class="ld-readout" id="ldNextDesignation" style="margin-top:8px">尚未指定下一局。</div>
+                    </div>
+
+                    <div class="ld-section">
+                        <button class="ld-secondary" id="ldUndo" type="button">↩ 撤銷上一個事件</button>
+                    </div>
+
+                    <div class="ld-settle-dock">
+                        <div class="ld-settle-label">本局結束</div>
+                        <div class="ld-settle-grid">
+                            <button class="ld-settle-action is-success" type="button" data-settle="success">✓ 成功撤離</button>
+                            <button class="ld-settle-action is-fail" type="button" data-settle="fail">× 撤離失敗</button>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <aside>
+                <section class="ld-card ld-side-card">
+                    <h3>本局狀態</h3>
+                    <div class="ld-state-list">
+                        <div class="ld-state-row"><span>身份</span><b>{{ '老闆' if viewer.role == 'boss' else '女陪' }}</b></div>
+                        <div class="ld-state-row"><span>物資答案</span><b id="ldBossLockSide">尚未鎖定</b></div>
+                        <div class="ld-state-row"><span>女陪猜測</span><b id="ldCompanionLockSide">尚未鎖定</b></div>
+                        <div class="ld-state-row"><span>句末助詞</span><b id="ldSuffixSide">尚未解鎖</b></div>
+                        <div class="ld-state-row"><span>特殊稱呼</span><b id="ldNicknameSide">尚未解鎖</b></div>
+                    </div>
+                </section>
+                <section class="ld-card">
+                    <h3>最近操作</h3>
+                    <div class="ld-log" id="ldLog"></div>
+                </section>
+            </aside>
+        </div>
+    </div>
+
+    <div class="ld-intro" id="ldIntro" {% if state.started %}hidden{% endif %}>
+        <div class="ld-intro-card">
+            <div class="ld-intro-mark">♡</div>
+            <div class="ld-intro-eyebrow">LOVE DELTA</div>
+            <h2>戀與三角洲</h2>
+            {% if viewer.role == 'boss' %}
+                <p>本次攻略已綁定 {{ plan.label }}方案。<br>按下開始後，共同進度正式啟動。</p>
+            {% else %}
+                <p>你已加入這張攻略。<br>等待老闆啟動後就會一起進入面板。</p>
+            {% endif %}
+            <div class="ld-intro-plan">{{ plan.label }}・起始好感 {{ plan.initial_affection|int }}</div>
+            {% if viewer.role == 'boss' and not ld.read_only %}
+                <button class="ld-start-button" id="ldStart" type="button">開始攻略</button>
+                <div class="ld-intro-note">開始後老闆與本單女陪會共用同一份進度。</div>
+            {% elif viewer.role == 'companion' and not ld.read_only %}
+                <button class="ld-start-button" id="ldStart" type="button" disabled>等待老闆開始攻略</button>
+                <div class="ld-intro-note">老闆開始後會自動進入，不用重新整理。</div>
+            {% else %}
+                <button class="ld-start-button" id="ldStart" type="button" disabled>此訂單已結束</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ld-modal-backdrop" id="ldSettleModal" aria-hidden="true">
+        <div class="ld-modal" role="dialog" aria-modal="true" aria-labelledby="ldSettleTitle">
+            <h3 id="ldSettleTitle">本局結算</h3>
+            <div class="ld-modal-result" id="ldGuessResult">雙方答案會在結算時自動比對。</div>
+            <div class="ld-section">
+                <h3>撤離價值</h3>
+                <div class="ld-value-grid" id="ldModalValueGrid">
+                    <button class="ld-value is-active" type="button" data-modal-tier="0"><b>未達 300W</b><span>+0</span></button>
+                    <button class="ld-value" type="button" data-modal-tier="300"><b>300W+</b><span>+4</span></button>
+                    <button class="ld-value" type="button" data-modal-tier="600"><b>600W+</b><span>+8</span></button>
+                    <button class="ld-value" type="button" data-modal-tier="900"><b>900W+</b><span>+12</span></button>
+                </div>
+            </div>
+            <div class="ld-modal-footer">
+                <button class="ld-secondary" id="ldCancelSettle" type="button">返回</button>
+                <button class="ld-primary" id="ldConfirmSettle" type="button">確認並進入下一局</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ld-toast" id="ldToast" role="status"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.LOVE_DELTA_BOOTSTRAP = {{ love_delta|tojson }};
+</script>
+<script src="/static/js/love_delta.js?v=1" defer></script>
+{% endblock %}
