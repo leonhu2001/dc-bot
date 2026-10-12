@@ -1,4 +1,112 @@
 {% extends "layout.html" %}
+{% block page_title %}填寫報單{% endblock %}
 {% block content %}
-<div class="card"><h1>填寫報單</h1><p>功能建置中。</p></div>
+<link rel="stylesheet" href="/static/css/order_reports.css?v=2">
+<section class="report-shell report-detail-shell">
+  <div class="report-hero report-hero-compact">
+    <div>
+      <p class="report-kicker">{{ detail.bot_order_no or ('WEB-' ~ detail.id) }}</p>
+      <h2>{{ detail.category }}｜{{ detail.item }}</h2>
+      <p>系統已帶入訂單資料，你只需要確認掛名、直播、錄影與備註。</p>
+    </div>
+    <span class="report-badge report-badge-{{ detail.report_status }}">{{ status_labels.get(detail.report_status, detail.report_status) }}</span>
+  </div>
+
+  {% if message %}<div class="report-alert report-alert-success">{{ message }}</div>{% endif %}
+  {% if error %}<div class="report-alert report-alert-danger">{{ error }}</div>{% endif %}
+  {% if detail.report_status == 'changes_requested' and detail.review_note %}
+    <div class="report-alert report-alert-warning"><strong>客服退回原因：</strong>{{ detail.review_note }}</div>
+  {% endif %}
+  {% if detail.is_legacy %}
+    <div class="report-alert report-alert-info">這是舊制結單，系統已直接標記為「已報單」，不需要補填。</div>
+  {% elif detail.report_status == 'pending' %}
+    <div class="report-alert report-alert-info">此單已由 {{ detail.submitted_by_display_name or '隊友' }} 送出，等待客服審核；同單其他人不用重複填寫。</div>
+  {% elif detail.report_status == 'approved' %}
+    <div class="report-alert report-alert-success">這張報單已完成客服審核，目前為唯讀。</div>
+  {% endif %}
+
+  <div class="report-order-summary">
+    <div><span>老闆</span><strong>{{ detail.customer_display_name or '未記錄' }}</strong></div>
+    <div><span>單別</span><strong>{{ detail.item }}</strong></div>
+    <div><span>結單時間</span><strong>{{ detail.closed_at or detail.updated_at or '—' }}</strong></div>
+    <div><span>訂單金額</span><strong>{{ detail.amount or 0 }}T</strong></div>
+  </div>
+
+  <form method="post" class="report-form">
+    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+    <fieldset class="report-form-fieldset" {% if readonly %}disabled{% endif %}>
+      <div class="report-section">
+        <div class="report-section-head">
+          <div><p class="report-kicker">NAMED BONUS</p><h3>掛名確認</h3></div>
+          <span class="report-muted">每位接單人員都要確認</span>
+        </div>
+        <div class="report-worker-list">
+          {% for worker in workers %}
+            {% set named_value = worker.reported_named_bonus if worker.reported_named_bonus is not none else worker.current_named_bonus %}
+            <label class="report-worker-row">
+              <div>
+                <strong>{{ worker.worker_display_name or worker.worker_discord_id }}</strong>
+                <small>{{ worker.worker_discord_id }}</small>
+              </div>
+              <select name="named_{{ worker.worker_discord_id }}" required>
+                <option value="0" {% if not named_value %}selected{% endif %}>無掛名</option>
+                <option value="1" {% if named_value %}selected{% endif %}>有掛名</option>
+              </select>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="report-two-column">
+        <div class="report-section">
+          <p class="report-kicker">LIVE</p>
+          <h3>是否開直播</h3>
+          <div class="report-choice-grid">
+            <label><input type="radio" name="streamed" value="0" required {% if detail.streamed == 0 %}checked{% endif %}> 沒有</label>
+            <label><input type="radio" name="streamed" value="1" required {% if detail.streamed == 1 %}checked{% endif %}> 有</label>
+          </div>
+        </div>
+
+        <div class="report-section">
+          <p class="report-kicker">RECORDING</p>
+          <h3>是否保留錄影</h3>
+          <div class="report-choice-grid">
+            <label><input type="radio" name="recording_saved" value="0" required {% if detail.recording_saved == 0 %}checked{% endif %}> 未保留</label>
+            <label><input type="radio" name="recording_saved" value="1" required {% if detail.recording_saved == 1 %}checked{% endif %}> 有保留</label>
+          </div>
+          <label class="report-field">
+            <span>錄影保留者（選填）</span>
+            <input type="text" name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}" placeholder="例如：玉米">
+          </label>
+        </div>
+      </div>
+
+      <div class="report-section">
+        <p class="report-kicker">NOTE</p>
+        <h3>備註</h3>
+        <label class="report-field">
+          <span>特殊狀況、掛名／直播／錄影補充都可以寫在這裡（選填）</span>
+          <textarea name="note" rows="5" maxlength="1000" placeholder="最多 1000 字">{{ detail.note or '' }}</textarea>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="report-action-bar">
+      <a class="report-button report-button-secondary" href="/dispatch/reports">返回報單列表</a>
+      {% if support_can_manage %}<a class="report-button report-button-secondary" href="/dispatch/reports/review/{{ detail.id }}">客服審核視角</a>{% endif %}
+      {% if not readonly %}<button class="report-button report-button-primary" type="submit">送出審核</button>{% endif %}
+    </div>
+  </form>
+
+  {% if detail.audit %}
+    <div class="report-section">
+      <div class="report-section-head"><div><p class="report-kicker">HISTORY</p><h3>報單紀錄</h3></div></div>
+      <div class="report-audit-list">
+        {% for row in detail.audit %}
+          <div><strong>{{ row.actor_display_name or '系統' }}</strong><span>{{ row.action }}{% if row.note %}｜{{ row.note }}{% endif %}</span><time>{{ row.created_at }}</time></div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</section>
 {% endblock %}
