@@ -37,7 +37,7 @@
 <div class="grid"><section><div class="card"><h2>近期服務訂單</h2>{% for o in recent_orders %}<a class="row" href="/admin/order-workspace/{{ o.id }}?return_to=/admin/staff/{{ member.discord_id }}"><span class="g">{{ o.order_no }}</span><span>{{ o.item }}</span><span>{{ o.amount }}T</span><span class="m">{{ o.status_label }}</span></a>{% else %}<div class="item m">目前沒有服務訂單。</div>{% endfor %}</div>
 <div class="card"><h2>最近評價</h2>{% for r in review_stats.recent %}<div class="item"><span class="g">{{ r.rating if r.rating is not none else "—" }} / 5</span><br>{{ r.comment or "沒有文字內容" }}<br><span class="m">{{ r.created_at }}</span></div>{% else %}<div class="item m">尚無公開評價。</div>{% endfor %}</div></section>
 </div></main></div>
-<script>async function save(f){let r=await fetch(f.action,{method:"POST",body:new FormData(f),credentials:"same-origin"});if(!r.ok){alert("儲存失敗");return}location.reload()}for(let id of ["pf","vis"]){document.getElementById(id).addEventListener("submit",function(e){e.preventDefault();save(this)})}</script>
+<script src="/static/js/pages/admin_staff_detail_inline_1.js?v=20261013"></script>
 
 
         </div>
