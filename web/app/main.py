@@ -1,10 +1,8 @@
-import csv
-import io
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
-from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse, RedirectResponse, Response
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
@@ -49,7 +47,17 @@ from web.app.routers.ticket_archives import router as ticket_archives_router
 from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
-from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
+from web.app.services.discord_service import get_member_role_ids
+from web.app.services.health_check import check_runtime_dependencies
+from web.app.services.http_security import (
+    CONTENT_SECURITY_POLICY,
+    apply_live_access,
+    csrf_source_allowed,
+    is_admin_path,
+    is_manager_only_admin_path,
+    revoke_staff_access,
+    sanitize_csv_response,
+)
 from web.app.services.marketing_funnel import ensure_marketing_tables
 from web.app.services.rate_limit import rate_limit_allowed
 from web.app.services.web_security import (
@@ -67,179 +75,6 @@ TEMPLATES_DIR = APP_DIR / "templates"
 STATIC_DIR = APP_DIR / "static"
 
 app = FastAPI(title="MW Worker Dashboard")
-
-# ---------------------------------------------------------------------------
-# Security policy helpers
-# ---------------------------------------------------------------------------
-
-_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-_MANAGER_ONLY_ADMIN_PREFIXES = (
-    "/admin/wallets",
-    "/admin/audit",
-    "/admin/system",
-    "/admin/anomalies",
-    "/admin/accounting-reconciliation",
-    "/admin/marketing",
-    "/admin/ai-support-knowledge",
-    "/admin/ai-operations",
-    "/admin/order-rules",
-    # 客服可以查看分潤與匯出資料；只有下列會改發放狀態的端點限總管。
-    "/admin/payouts/summary/mark-paid",
-    "/admin/payouts/summary/mark-unpaid",
-    "/admin/payouts/summary/person-status",
-)
-
-# 目前模板仍有不少 inline style/script，因此 CSP 保留 unsafe-inline，
-# 但把 object/frame/base/form/connect 等高風險來源收緊，不破壞現有 UI。
-_CONTENT_SECURITY_POLICY = "; ".join(
-    (
-        "default-src 'self'",
-        "base-uri 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "form-action 'self'",
-        "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https:",
-        "font-src 'self' data:",
-        "connect-src 'self'",
-        "upgrade-insecure-requests",
-    )
-)
-
-
-def _is_admin_path(path: str) -> bool:
-    return path == "/admin" or path.startswith("/admin/")
-
-
-def _is_manager_only_admin_path(path: str) -> bool:
-    return any(
-        path == prefix or path.startswith(prefix + "/")
-        for prefix in _MANAGER_ONLY_ADMIN_PREFIXES
-    )
-
-
-def _origin_from_referer(value: str) -> str:
-    try:
-        parsed = urlsplit(str(value or ""))
-    except Exception:
-        return ""
-
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return ""
-    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
-
-
-def _csrf_source_allowed(request: Request) -> bool:
-    if request.method.upper() not in _UNSAFE_METHODS:
-        return True
-
-    fetch_site = str(request.headers.get("sec-fetch-site") or "").lower().strip()
-    if fetch_site == "cross-site":
-        return False
-
-    allowed_origins = {origin.rstrip("/") for origin in config.WEB_ALLOWED_ORIGINS}
-
-    origin = str(request.headers.get("origin") or "").strip().rstrip("/")
-    if origin:
-        return origin in allowed_origins
-
-    referer_origin = _origin_from_referer(request.headers.get("referer") or "")
-    if referer_origin:
-        return referer_origin in allowed_origins
-
-    # Browser state-changing requests must identify a same-site source. This also
-    # blocks blind form POST CSRF even when a client omits Origin.
-    return False
-
-
-def _apply_live_access(user: dict, role_ids: list[str]) -> dict:
-    access = get_dashboard_access(role_ids)
-    is_manager = bool(
-        access.get("is_manager", False)
-        or access.get("is_admin", False)
-    )
-    is_customer_service = bool(access.get("is_customer_service", False))
-    is_admin = bool(is_manager or is_customer_service)
-    is_worker = bool(access.get("is_worker", False))
-    is_companion = bool(access.get("is_companion", False))
-
-    user.update(
-        {
-            "role_ids": list(role_ids),
-            "is_manager": is_manager,
-            # 舊 route 相容：營運後台仍接受總管或客服。
-            "is_admin": is_admin,
-            "is_customer_service": is_customer_service,
-            "is_worker": is_worker,
-            "is_companion": is_companion,
-            "is_employee": bool(
-                is_manager
-                or is_customer_service
-                or is_worker
-                or is_companion
-            ),
-        }
-    )
-    return user
-
-
-def _revoke_staff_access(user: dict) -> dict:
-    user.update(
-        {
-            "role_ids": [],
-            "is_manager": False,
-            "is_admin": False,
-            "is_customer_service": False,
-            "is_worker": False,
-            "is_companion": False,
-            "is_employee": False,
-        }
-    )
-    return user
-
-
-def _safe_csv_cell(value: str) -> str:
-    text = str(value or "")
-    check = text.lstrip()
-    if (
-        check.startswith(("=", "+", "-", "@"))
-        or text.startswith(("\t", "\r", "\n"))
-    ):
-        return "'" + text
-    return text
-
-
-async def _sanitize_csv_response(response):
-    content_type = str(response.headers.get("content-type") or "").lower()
-    if "text/csv" not in content_type or not hasattr(response, "body_iterator"):
-        return response
-
-    chunks: list[bytes] = []
-    async for chunk in response.body_iterator:
-        if isinstance(chunk, str):
-            chunks.append(chunk.encode("utf-8"))
-        else:
-            chunks.append(bytes(chunk))
-
-    raw = b"".join(chunks)
-    text = raw.decode("utf-8-sig", errors="replace").lstrip("\ufeff")
-
-    source = io.StringIO(text)
-    output = io.StringIO(newline="")
-    writer = csv.writer(output)
-    for row in csv.reader(source):
-        writer.writerow([_safe_csv_cell(cell) for cell in row])
-
-    payload = b"\xef\xbb\xbf" + output.getvalue().encode("utf-8")
-    headers = dict(response.headers)
-    headers.pop("content-length", None)
-
-    return Response(
-        content=payload,
-        status_code=response.status_code,
-        headers=headers,
-    )
 
 
 @app.middleware("http")
@@ -261,7 +96,10 @@ async def security_and_refresh_access(request: Request, call_next):
             headers={"Allow": "POST"},
         )
 
-    if not _csrf_source_allowed(request):
+    if not csrf_source_allowed(
+        request,
+        allowed_origins=config.WEB_ALLOWED_ORIGINS,
+    ):
         return PlainTextResponse("CSRF source validation failed", status_code=403)
 
     expected_csrf = ensure_csrf_token(request.session)
@@ -280,7 +118,7 @@ async def security_and_refresh_access(request: Request, call_next):
                 status_code=403,
             )
 
-    if _is_admin_path(request.url.path):
+    if is_admin_path(request.url.path):
         user = request.session.get("user")
 
         if user:
@@ -288,21 +126,21 @@ async def security_and_refresh_access(request: Request, call_next):
             discord_id = str(refreshed_user.get("id") or "").strip()
 
             if not discord_id:
-                refreshed_user = _revoke_staff_access(refreshed_user)
+                refreshed_user = revoke_staff_access(refreshed_user)
             else:
                 try:
                     role_ids = await run_in_threadpool(
                         get_member_role_ids,
                         discord_id,
                     )
-                    refreshed_user = _apply_live_access(
+                    refreshed_user = apply_live_access(
                         refreshed_user,
                         role_ids,
                     )
                 except Exception as exc:
                     # Security-sensitive paths fail closed. Do not preserve stale
                     # manager/customer-service privileges when Discord is unavailable.
-                    refreshed_user = _revoke_staff_access(refreshed_user)
+                    refreshed_user = revoke_staff_access(refreshed_user)
                     print(
                         "[admin_access_refresh_failed]",
                         type(exc).__name__,
@@ -311,7 +149,7 @@ async def security_and_refresh_access(request: Request, call_next):
             request.session["user"] = refreshed_user
 
             if (
-                _is_manager_only_admin_path(request.url.path)
+                is_manager_only_admin_path(request.url.path)
                 and not refreshed_user.get("is_manager")
             ):
                 return PlainTextResponse(
@@ -353,7 +191,7 @@ async def security_and_refresh_access(request: Request, call_next):
                 )
 
     response = await call_next(request)
-    response = await _sanitize_csv_response(response)
+    response = await sanitize_csv_response(response)
 
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -362,7 +200,7 @@ async def security_and_refresh_access(request: Request, call_next):
         "Strict-Transport-Security",
         "max-age=31536000",
     )
-    response.headers.setdefault("Content-Security-Policy", _CONTENT_SECURITY_POLICY)
+    response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
     response.headers.setdefault(
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=(), payment=()",
@@ -475,9 +313,22 @@ async def no_access(request: Request):
 
 @app.get("/health")
 async def health():
+    try:
+        checks = await run_in_threadpool(
+            check_runtime_dependencies,
+            STATIC_DIR,
+        )
+    except Exception as exc:
+        print("[health_check_failed]", type(exc).__name__)
+        raise HTTPException(
+            status_code=503,
+            detail="service not ready",
+        ) from exc
+
     return {
         "ok": True,
         "service": "mw-worker-dashboard",
+        **checks,
     }
 
 

@@ -12,10 +12,18 @@ ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
-# Legacy baseline on 2026-10-13. The project still needs CSP unsafe-inline, but
-# new changes may only reduce these counts, never increase them.
-MAX_INLINE_STYLE_BLOCKS = 28
-MAX_INLINE_SCRIPT_BLOCKS = 20
+# Debt budget after the 2026-10-13 public-layout extraction. The project still
+# needs CSP unsafe-inline on legacy pages, but new changes may only reduce these
+# counts, never increase them.
+MAX_INLINE_STYLE_BLOCKS = 26
+MAX_INLINE_SCRIPT_BLOCKS = 19
+
+# The only remaining *_fix asset is a temporary compatibility loader for the
+# canonical order UI module. Runtime behavior must not be added back to it, and
+# no additional patch-style assets may be introduced.
+ALLOWED_LEGACY_PATCH_ASSETS = {
+    "js/mw_order_form_fix.js",
+}
 
 STATIC_REF_RE = re.compile(
     r'''(?:src|href)\s*=\s*["'](/static/[^"'?#]+)(?:[?#][^"']*)?["']''',
@@ -23,6 +31,7 @@ STATIC_REF_RE = re.compile(
 )
 INLINE_STYLE_RE = re.compile(r"<style(?:\s|>)", re.IGNORECASE)
 INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.IGNORECASE)
+PATCH_ASSET_RE = re.compile(r"(?:^|/)[^/]*_fix\.(?:js|css)$", re.IGNORECASE)
 
 
 def title(text: str) -> None:
@@ -88,6 +97,24 @@ def main() -> None:
 
     if not missing_static:
         print("ALL_REFERENCED_STATIC_FILES_EXIST")
+
+    title("PATCH_ASSET_DEBT")
+    patch_assets = sorted(
+        path.relative_to(STATIC).as_posix()
+        for path in STATIC.rglob("*")
+        if path.is_file()
+        and PATCH_ASSET_RE.search(path.relative_to(STATIC).as_posix())
+    )
+    unexpected_patch_assets = sorted(
+        set(patch_assets) - ALLOWED_LEGACY_PATCH_ASSETS
+    )
+    print("PATCH_ASSETS:", patch_assets)
+    print("ALLOWED_LEGACY_PATCH_ASSETS:", sorted(ALLOWED_LEGACY_PATCH_ASSETS))
+    if unexpected_patch_assets:
+        errors.append(
+            "patch-style frontend assets are forbidden: "
+            + ", ".join(unexpected_patch_assets)
+        )
 
     title("CSP_DEBT")
     print("INLINE_STYLE_BLOCKS:", inline_style_count)
