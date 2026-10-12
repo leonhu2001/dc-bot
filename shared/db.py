@@ -1,4 +1,6 @@
 from collections.abc import Generator
+from datetime import date, datetime
+import sqlite3
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -8,6 +10,22 @@ from web.app.config import config
 
 class Base(DeclarativeBase):
     pass
+
+
+def register_sqlite_datetime_adapters() -> None:
+    """Keep SQLite datetime persistence explicit on Python 3.12+.
+
+    Python's implicit sqlite3 date/datetime adapters are deprecated. The
+    project intentionally stores naive UTC datetimes as ISO text, so register
+    that behavior explicitly instead of relying on the interpreter default.
+    """
+
+    sqlite3.register_adapter(date, lambda value: value.isoformat())
+    sqlite3.register_adapter(datetime, lambda value: value.isoformat(" "))
+
+
+if config.DATABASE_URL.startswith("sqlite"):
+    register_sqlite_datetime_adapters()
 
 
 engine = create_engine(
