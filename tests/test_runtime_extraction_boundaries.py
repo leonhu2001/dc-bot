@@ -2,7 +2,14 @@ from pathlib import Path
 
 from services.acceptance import runtime as acceptance_runtime
 from services.web_sync import runtime as web_sync_runtime
-from services import order_runtime, self_service_runtime
+from services import (
+    order_credential_runtime,
+    order_point_redemption,
+    order_runtime,
+    self_service_financials,
+    self_service_runtime,
+    ticket_identity,
+)
 
 
 def test_extracted_runtime_modules_import_without_importing_bot():
@@ -12,6 +19,10 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(web_sync_runtime._process_web_order_created_event)
     assert callable(order_runtime.configure_order_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime)
+    assert callable(order_credential_runtime.configure_order_credentials)
+    assert callable(order_point_redemption.configure_order_point_redemption)
+    assert callable(self_service_financials.configure_self_service_financials)
+    assert callable(ticket_identity.configure_ticket_identity)
     assert callable(order_runtime.finalize_accepted_pending_payment)
     assert callable(self_service_runtime.calculate_self_service_financials)
 
@@ -58,18 +69,60 @@ def test_large_runtime_implementations_no_longer_live_in_bot():
     assert "class WebsiteOrderCsConfirmView" in web_source
     assert "async def _process_web_order_created_event" in web_source
 
-    order_source = Path("services/order_runtime.py").read_text(
+
+def test_phase2_order_runtime_responsibilities_are_physically_extracted():
+    order_source = Path("services/order_runtime.py").read_text(encoding="utf-8")
+    credentials_source = Path("services/order_credential_runtime.py").read_text(
         encoding="utf-8"
     )
-    self_service_source = Path("services/self_service_runtime.py").read_text(
+    redemption_source = Path("services/order_point_redemption.py").read_text(
+        encoding="utf-8"
+    )
+    persistence_source = Path("services/order_credentials.py").read_text(
         encoding="utf-8"
     )
 
     assert "async def finalize_accepted_pending_payment" in order_source
     assert "class DispatchClaimView" in order_source
-    assert "def calculate_self_service_financials" in self_service_source
+    assert "class OrderCredentialModal" not in order_source
+    assert "async def redeem_order_point_benefit_on_payment" not in order_source
+
+    assert "class OrderCredentialModal" in credentials_source
+    assert "async def ensure_order_credential_request" in credentials_source
+    assert "async def redeem_order_point_benefit_on_payment" in redemption_source
+
+    # Persistence and Discord UI/runtime are intentionally separate services.
+    assert "def ensure_order_credential_tables" in persistence_source
+    assert "def configure_order_credentials" not in persistence_source
+    assert "from services.order_credentials import" in credentials_source
+
+
+def test_phase2_self_service_financials_are_physically_extracted():
+    self_service_source = Path("services/self_service_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    financials_source = Path("services/self_service_financials.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def calculate_self_service_financials" not in self_service_source
+    assert "def calculate_manual_price_adjustment" not in self_service_source
     assert "class SelfServiceOrderView" in self_service_source
     assert "async def build_reorder_self_service_draft" in self_service_source
+
+    assert "def calculate_self_service_financials" in financials_source
+    assert "def calculate_manual_price_adjustment" in financials_source
+    assert "def add_self_service_financial_breakdown_fields" in financials_source
+
+
+def test_bot_ticket_identity_helpers_are_extracted():
+    bot_source = Path("bot.py").read_text(encoding="utf-8")
+    helper_source = Path("services/ticket_identity.py").read_text(encoding="utf-8")
+
+    assert "def build_ticket_channel_name" not in bot_source
+    assert "def get_order_customer_id_from_channel" not in bot_source
+    assert "def build_ticket_channel_name" in helper_source
+    assert "def get_order_customer_id_from_channel" in helper_source
 
 
 def test_runtime_configure_binds_remaining_legacy_dependencies():
