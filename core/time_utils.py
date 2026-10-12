@@ -1,6 +1,16 @@
 from datetime import datetime, timezone, timedelta
 
 
+def utc_now_naive() -> datetime:
+    """Return current UTC as a naive datetime for legacy DB compatibility.
+
+    Existing SQLite columns and state-machine comparisons store UTC without a
+    timezone suffix.  Using datetime.now(timezone.utc) avoids the deprecated
+    datetime.utcnow() API while preserving that on-disk representation.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def get_taipei_now() -> datetime:
     taipei_tz = timezone(timedelta(hours=8))
     return datetime.now(taipei_tz)
