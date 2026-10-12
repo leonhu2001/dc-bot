@@ -7,422 +7,361 @@
   <title>俄羅斯輪盤・保底抽取｜魔丸娛樂</title>
   <style>
     :root{
-      --bg:#080809;
-      --panel:#111113;
-      --text:#f3efe6;
-      --muted:rgba(243,239,230,.58);
-      --line:rgba(255,255,255,.09);
-      --gold:#dfb75c;
-      --gold-2:#f1cf7b;
-      --green:#8fca9f;
-      --tier-1200:#344252;
-      --tier-1500:#985a33;
-      --tier-2000:#d09a37;
-      --tier-2500:#a72839;
-      --shadow:0 30px 90px rgba(0,0,0,.38);
+      --bg:#080809;--panel:#111113;--panel2:#171719;--text:#f3efe6;--muted:rgba(243,239,230,.58);
+      --line:rgba(255,255,255,.09);--gold:#dfb75c;--gold2:#f1cf7b;--green:#087a48;
+      --red:#c92d35;--black:#171719;--shadow:0 30px 90px rgba(0,0,0,.38)
     }
     *{box-sizing:border-box}
     html{background:var(--bg);color:var(--text);font-family:Inter,"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
     body{margin:0;min-height:100vh;background:
       radial-gradient(circle at 88% 4%,rgba(223,183,92,.09),transparent 28%),
-      radial-gradient(circle at 8% 78%,rgba(223,183,92,.04),transparent 22%),
-      var(--bg)}
-    a{color:inherit}
-    button{font:inherit}
-    .page{width:min(1080px,calc(100% - 32px));margin:0 auto;padding:36px 0 72px}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:32px}
+      radial-gradient(circle at 8% 78%,rgba(223,183,92,.04),transparent 22%),var(--bg)}
+    a{color:inherit}button{font:inherit}
+    .page{width:min(1240px,calc(100% - 32px));margin:0 auto;padding:32px 0 70px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}
     .brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:900;letter-spacing:.08em}
     .brand-mark{width:36px;height:36px;border-radius:12px;border:1px solid rgba(223,183,92,.32);display:grid;place-items:center;background:rgba(223,183,92,.08);color:var(--gold);font-size:18px}
     .back{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:rgba(243,239,230,.72);background:rgba(255,255,255,.025)}
-    .back:hover{border-color:rgba(223,183,92,.4);color:var(--text)}
-    .hero{display:grid;grid-template-columns:minmax(0,.8fr) minmax(430px,1.2fr);gap:24px;align-items:stretch}
-    .copy,.game{border:1px solid var(--line);border-radius:28px;background:linear-gradient(150deg,rgba(22,22,24,.98),rgba(11,11,12,.98));box-shadow:var(--shadow)}
-    .copy{padding:clamp(28px,4vw,42px);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
-    .copy:after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;right:-110px;top:-110px;background:radial-gradient(circle,rgba(223,183,92,.16),transparent 67%);pointer-events:none}
-    .eyebrow{color:var(--gold);font-size:11px;font-weight:950;letter-spacing:.19em}
-    h1{font-size:clamp(42px,6vw,68px);line-height:.98;margin:13px 0 18px;letter-spacing:-.045em}
-    .lead{margin:0;color:rgba(243,239,230,.68);font-size:16px;line-height:1.85}
-    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
-    .chip{padding:8px 10px;border:1px solid rgba(223,183,92,.22);border-radius:999px;background:rgba(223,183,92,.06);color:#ead091;font-size:12px;font-weight:800}
-    .game{padding:26px;display:flex;flex-direction:column;min-height:690px}
-    .game-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
-    .order-no{font-size:13px;color:rgba(243,239,230,.48);margin-top:7px}
+    .shell{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(390px,.85fr);gap:22px}
+    .card{border:1px solid var(--line);border-radius:25px;background:linear-gradient(150deg,rgba(22,22,24,.98),rgba(11,11,12,.98));box-shadow:var(--shadow)}
+    .bet-card{padding:25px}.wheel-card{padding:25px;display:flex;flex-direction:column}
+    .eyebrow{color:var(--gold);font-size:11px;font-weight:950;letter-spacing:.18em}
+    h1{font-size:clamp(34px,5vw,56px);line-height:1;margin:10px 0 10px;letter-spacing:-.04em}
+    .lead{margin:0;color:rgba(243,239,230,.62);font-size:14px;line-height:1.75}
+    .mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:22px}
+    .mode{padding:13px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.025);color:rgba(243,239,230,.74);cursor:pointer;text-align:left}
+    .mode strong{display:block;color:#f4efe4;font-size:14px}.mode span{display:block;margin-top:4px;color:rgba(243,239,230,.43);font-size:11px}
+    .mode.active{border-color:rgba(223,183,92,.5);background:rgba(223,183,92,.09);box-shadow:inset 0 0 0 1px rgba(223,183,92,.1)}
+    .mode:disabled{opacity:.52;cursor:not-allowed}
+    .bet-help{margin:15px 0 11px;padding:12px 14px;border:1px solid rgba(223,183,92,.13);border-radius:13px;background:rgba(223,183,92,.04);color:rgba(243,239,230,.62);font-size:12px;line-height:1.7}
+    .table-wrap{overflow-x:auto;padding-bottom:3px}
+    .bet-table{min-width:640px;padding:14px;border-radius:20px;background:linear-gradient(150deg,#087547,#054c30);border:2px solid rgba(245,235,207,.72);box-shadow:inset 0 0 32px rgba(0,0,0,.2)}
+    .number-board{display:grid;grid-template-columns:62px 1fr;gap:7px}
+    .zero-cell,.num-cell,.outside-bet{border:2px solid rgba(255,255,255,.78);color:white;font-weight:950;cursor:pointer;position:relative;transition:.15s ease}
+    .zero-cell{border-radius:28px 8px 8px 28px;display:grid;place-items:center;font-size:24px;background:#087a48;min-height:150px}
+    .numbers{display:grid;grid-template-columns:repeat(12,minmax(42px,1fr));grid-template-rows:repeat(3,48px)}
+    .num-cell{display:grid;place-items:center;font-size:17px;border-radius:4px}
+    .num-cell.red{background:var(--red)}.num-cell.black{background:#111214}
+    .num-cell.selected,.outside-bet.selected,.zero-cell.selected{z-index:2;outline:4px solid #f4d06f;outline-offset:-4px;box-shadow:0 0 0 2px rgba(255,245,197,.82),0 0 20px rgba(244,208,111,.5)}
+    .num-cell.winner,.zero-cell.winner{box-shadow:inset 0 0 0 4px #fff,0 0 24px rgba(255,255,255,.6)}
+    .chip-dot{position:absolute;width:22px;height:22px;border-radius:50%;right:-8px;top:-8px;background:radial-gradient(circle at 35% 30%,#ffe7a1,#c89535 65%,#654315);border:2px solid #fff0bd;box-shadow:0 3px 8px rgba(0,0,0,.45);z-index:5}
+    .outside{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:7px}
+    .outside-bet{min-height:44px;border-radius:7px;background:rgba(4,79,48,.85);display:grid;place-items:center;font-size:12px}
+    .outside-bet.red{background:#b8202d}.outside-bet.black{background:#131416}
+    .selection{margin-top:13px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}
+    .selection small{display:block;color:rgba(243,239,230,.4);font-size:10px;letter-spacing:.12em}.selection strong{display:block;margin-top:4px;font-size:14px}
+    .selection-prize{text-align:right;color:var(--gold2);font-weight:950;white-space:nowrap}
+    .wheel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
     .status{padding:8px 11px;border-radius:999px;border:1px solid rgba(143,202,159,.25);background:rgba(143,202,159,.07);color:#a9d8b5;font-weight:850;font-size:12px;white-space:nowrap}
-    .status.locked{border-color:rgba(223,183,92,.25);background:rgba(223,183,92,.07);color:var(--gold-2)}
-
-    .wheel-area{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:18px 0 14px}
+    .status.locked{border-color:rgba(223,183,92,.25);background:rgba(223,183,92,.07);color:var(--gold2)}
+    .wheel-zone{display:grid;place-items:center;flex:1;padding:16px 0 10px}
     .wheel-stage{position:relative;width:min(390px,78vw);aspect-ratio:1;display:grid;place-items:center;filter:drop-shadow(0 24px 34px rgba(0,0,0,.42))}
-    .wheel-stage:before{content:"";position:absolute;inset:1.5%;border-radius:50%;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.08),transparent 28%),linear-gradient(145deg,#754622,#2f1b0d 62%,#1b1109);border:2px solid rgba(241,207,123,.46);box-shadow:inset 0 0 0 9px rgba(0,0,0,.26),inset 0 0 26px rgba(0,0,0,.52)}
-    .wheel-rotor{position:absolute;inset:7%;border-radius:50%;transition:transform 3.4s cubic-bezier(.12,.72,.08,1);will-change:transform;transform:rotate(0deg)}
-    .wheel-rotor svg{display:block;width:100%;height:100%;overflow:visible}
-    .slot-path{stroke:rgba(252,234,190,.56);stroke-width:.7;vector-effect:non-scaling-stroke;transition:filter .22s ease,stroke-width .22s ease,opacity .22s ease}
-    .slot-path.selected{stroke:#fff1b7;stroke-width:2.3;filter:drop-shadow(0 0 5px rgba(255,221,129,.9));opacity:1}
-    .wheel-inner-ring{fill:#143d2a;stroke:rgba(242,208,126,.65);stroke-width:1.5}
-    .wheel-core{fill:url(#coreGradient);stroke:#f0c86f;stroke-width:1.5}
-    .wheel-hub{fill:url(#hubGradient);stroke:#f6dc99;stroke-width:1.4}
-    .wheel-arm{stroke:#e7c26b;stroke-width:4;stroke-linecap:round;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
-    .wheel-knob{fill:#f4d98f;stroke:#8b6326;stroke-width:1.1}
-    .pointer{position:absolute;z-index:5;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:23px solid #f3cf72;filter:drop-shadow(0 4px 8px rgba(0,0,0,.65))}
-    .pointer:before{content:"";position:absolute;width:8px;height:16px;border-radius:6px;background:#f3cf72;left:-4px;top:-27px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
-
-    .legend{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:15px}
-    .legend-item{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.022);min-width:0}
-    .legend-swatch{width:14px;height:14px;border-radius:4px;flex:0 0 14px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
-    .legend-copy{min-width:0}
-    .legend-copy strong{display:block;font-size:12px;color:#f4efe3;white-space:nowrap}
-    .legend-copy span{display:block;margin-top:2px;font-size:10px;color:rgba(243,239,230,.42);white-space:nowrap}
-
-    .result{min-height:92px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.023);display:flex;align-items:center;justify-content:space-between;gap:18px}
-    .result small{display:block;color:rgba(243,239,230,.45);font-size:11px;letter-spacing:.12em;font-weight:850}
-    .result strong{display:block;margin-top:5px;font-size:24px}
-    .result .sub{margin-top:5px;color:rgba(243,239,230,.48);font-size:12px}
-    .result-value{font-size:clamp(30px,5vw,46px);font-weight:950;color:var(--gold-2);white-space:nowrap}
-    .actions{display:flex;gap:10px;margin-top:12px}
-    .primary,.secondary{width:100%;border-radius:14px;padding:14px 16px;font-weight:950;cursor:pointer}
+    .wheel-stage:before{content:"";position:absolute;inset:1%;border-radius:50%;background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.08),transparent 28%),linear-gradient(145deg,#754622,#2f1b0d 62%,#1b1109);border:2px solid rgba(241,207,123,.46);box-shadow:inset 0 0 0 9px rgba(0,0,0,.26),inset 0 0 26px rgba(0,0,0,.52)}
+    .wheel-rotor{position:absolute;inset:7%;border-radius:50%;will-change:transform;transform:rotate(0deg);transition:transform 4.7s cubic-bezier(.08,.68,.08,1)}
+    .wheel-rotor svg{width:100%;height:100%;display:block;overflow:visible}
+    .slot{stroke:rgba(252,234,190,.7);stroke-width:.75;vector-effect:non-scaling-stroke}
+    .slot.winning{stroke:#fff5c8;stroke-width:2.4;filter:drop-shadow(0 0 4px rgba(255,236,154,.95))}
+    .wheel-number{fill:#fff;font-size:7px;font-weight:900;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:rgba(0,0,0,.45);stroke-width:.8}
+    .wheel-inner{fill:#0c5b39;stroke:#e3bd6b;stroke-width:1.4}.wheel-core{fill:url(#wood);stroke:#e3bd6b;stroke-width:1.4}
+    .hub{fill:url(#goldHub);stroke:#fff0b4;stroke-width:1.1}.arm{stroke:#e7c26b;stroke-width:4;stroke-linecap:round}.knob{fill:#f4d98f;stroke:#76501e;stroke-width:1}
+    .ball-orbit{position:absolute;inset:9%;border-radius:50%;z-index:6;pointer-events:none;will-change:transform;transition:transform 4.85s cubic-bezier(.08,.67,.07,1)}
+    .ball{position:absolute;left:50%;top:0;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle at 35% 30%,#fff,#e9e5dc 48%,#9f9b92 100%);box-shadow:0 2px 8px rgba(0,0,0,.7),0 0 4px rgba(255,255,255,.7);transition:top .55s cubic-bezier(.2,.9,.25,1)}
+    .ball-orbit.settling .ball,.ball-orbit.locked .ball{top:8%}
+    .legend-mini{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px;color:rgba(243,239,230,.5);font-size:11px}
+    .legend-mini span{display:inline-flex;align-items:center;gap:5px}.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+    .result{min-height:96px;padding:16px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.023);display:flex;align-items:center;justify-content:space-between;gap:18px}
+    .result small{display:block;color:rgba(243,239,230,.45);font-size:10px;letter-spacing:.12em;font-weight:850}
+    .result strong{display:block;margin-top:5px;font-size:22px}.result .sub{margin-top:5px;color:rgba(243,239,230,.48);font-size:12px;line-height:1.5}
+    .result-value{font-size:clamp(30px,4vw,44px);font-weight:950;color:var(--gold2);white-space:nowrap}
+    .actions{display:flex;gap:10px;margin-top:12px}.primary,.secondary{width:100%;border-radius:14px;padding:14px 16px;font-weight:950;cursor:pointer}
     .primary{border:1px solid rgba(223,183,92,.35);background:linear-gradient(180deg,#e7c370,#c99f48);color:#17130b;box-shadow:0 10px 25px rgba(223,183,92,.12)}
-    .primary:hover:not(:disabled){filter:brightness(1.05);transform:translateY(-1px)}
-    .primary:disabled{cursor:not-allowed;opacity:.44}
-    .secondary{border:1px solid var(--line);background:rgba(255,255,255,.025);color:rgba(243,239,230,.72)}
-    .secondary:hover{border-color:rgba(223,183,92,.32);color:var(--text)}
-
-    .rules{margin-top:24px;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.022);overflow:hidden}
-    details{border-bottom:1px solid var(--line)}
-    details:last-child{border-bottom:0}
-    summary{list-style:none;cursor:pointer;padding:19px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;font-weight:900}
-    summary::-webkit-details-marker{display:none}
-    summary::after{content:"＋";color:var(--gold);font-size:20px}
-    details[open] summary::after{content:"−"}
-    .rule-body{padding:0 22px 22px;color:rgba(243,239,230,.63);font-size:14px;line-height:1.85}
-    .rule-body b{color:#f2d791}
-    .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);opacity:0;pointer-events:none;padding:11px 15px;border-radius:12px;border:1px solid rgba(223,183,92,.25);background:#171511;color:#f0d18c;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:.25s ease}
-    .toast.show{opacity:1;transform:translate(-50%,0)}
-
-    @media(max-width:900px){.hero{grid-template-columns:1fr}.game{min-height:660px}.wheel-stage{width:min(400px,80vw)}}
-    @media(max-width:560px){.page{width:min(100% - 20px,1080px);padding-top:18px}.topbar{margin-bottom:20px}.copy,.game{border-radius:21px}.copy{padding:25px 21px}.game{padding:20px}.brand span:last-child{display:none}.legend{grid-template-columns:1fr 1fr}.result{align-items:flex-start;flex-direction:column}.result-value{white-space:normal}.actions{flex-direction:column}}
-    @media(prefers-reduced-motion:reduce){.wheel-rotor{transition-duration:.01ms}.primary:hover:not(:disabled){transform:none}}
+    .primary:disabled{opacity:.42;cursor:not-allowed}.secondary{border:1px solid var(--line);background:rgba(255,255,255,.025);color:rgba(243,239,230,.72)}
+    .rules{margin-top:22px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.022);overflow:hidden}
+    details{border-bottom:1px solid var(--line)}details:last-child{border-bottom:0}
+    summary{list-style:none;cursor:pointer;padding:17px 20px;display:flex;align-items:center;justify-content:space-between;font-weight:900}summary::-webkit-details-marker{display:none}
+    summary::after{content:"＋";color:var(--gold);font-size:19px}details[open] summary::after{content:"−"}
+    .rule-body{padding:0 20px 20px;color:rgba(243,239,230,.63);font-size:13px;line-height:1.8}.rule-body b{color:#f2d791}
+    .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);opacity:0;pointer-events:none;padding:11px 15px;border-radius:12px;border:1px solid rgba(223,183,92,.25);background:#171511;color:#f0d18c;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:.25s ease;z-index:20}.toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(max-width:980px){.shell{grid-template-columns:1fr}.wheel-card{min-height:650px}.wheel-stage{width:min(410px,82vw)}}
+    @media(max-width:600px){.page{width:min(100% - 18px,1240px);padding-top:18px}.topbar{margin-bottom:18px}.card{border-radius:20px}.bet-card,.wheel-card{padding:18px}.brand span:last-child{display:none}.mode-tabs{grid-template-columns:1fr}.result{align-items:flex-start;flex-direction:column}.actions{flex-direction:column}}
+    @media(prefers-reduced-motion:reduce){.wheel-rotor,.ball-orbit,.ball{transition-duration:.01ms!important}}
   </style>
 </head>
 <body>
-  <main class="page">
-    <div class="topbar">
-      <a class="brand" href="/me"><span class="brand-mark">魔</span><span>魔丸娛樂</span></a>
-      <a class="back" href="/me">← 返回我的專區</a>
-    </div>
+<main class="page">
+  <div class="topbar">
+    <a class="brand" href="/me"><span class="brand-mark">魔</span><span>魔丸娛樂</span></a>
+    <a class="back" href="/me">← 返回我的專區</a>
+  </div>
 
-    <section class="hero">
-      <article class="copy">
-        <div class="eyebrow">RUSSIAN ROULETTE</div>
-        <h1>俄羅斯輪盤<br>保底抽取</h1>
-        <p class="lead">轉動一次輪盤，依指針最後停下的色塊決定本張趣味單保底。結果確定後即鎖定。</p>
-        <div class="chips">
-          <span class="chip">37 格輪盤</span>
-          <span class="chip">每單 1 次</span>
-          <span class="chip">抽完即鎖定</span>
-        </div>
-      </article>
+  <section class="shell">
+    <article class="card bet-card">
+      <div class="eyebrow">PLACE YOUR BET</div>
+      <h1>選擇你的<br>幸運落點</h1>
+      <p class="lead">下注不會另外扣款，只決定你要挑戰哪一種保底。未命中仍有 1,200 萬基本保底。</p>
 
-      <article class="game">
-        <div class="game-head">
-          <div>
-            <div class="eyebrow">ORDER DRAW · TEST</div>
-            <div class="order-no">DEMO-MO20261012-RR</div>
+      <div class="mode-tabs">
+        <button class="mode active" data-mode="safe"><strong>穩健｜1,500 萬</strong><span>紅黑／單雙／大小 · 18/37</span></button>
+        <button class="mode" data-mode="six"><strong>進階｜2,000 萬</strong><span>六線 · 6/37</span></button>
+        <button class="mode" data-mode="corner"><strong>豪賭｜2,500 萬</strong><span>四角 · 4/37</span></button>
+      </div>
+
+      <div id="betHelp" class="bet-help">選一個外圍下注：紅／黑、單／雙、1–18／19–36。</div>
+
+      <div class="table-wrap">
+        <div class="bet-table">
+          <div class="number-board">
+            <button id="zeroCell" class="zero-cell" data-number="0">0</button>
+            <div id="numbers" class="numbers"></div>
           </div>
-          <span id="status" class="status">可抽 1 次</span>
-        </div>
-
-        <div class="wheel-area">
-          <div class="wheel-stage" aria-label="37 格保底輪盤">
-            <div class="pointer" aria-hidden="true"></div>
-            <div id="wheelRotor" class="wheel-rotor">
-              <svg viewBox="-110 -110 220 220" role="img" aria-label="保底色塊輪盤">
-                <defs>
-                  <radialGradient id="coreGradient" cx="35%" cy="28%" r="74%">
-                    <stop offset="0%" stop-color="#b77a3a"/>
-                    <stop offset="50%" stop-color="#6e3f20"/>
-                    <stop offset="100%" stop-color="#2d1b10"/>
-                  </radialGradient>
-                  <radialGradient id="hubGradient" cx="35%" cy="30%" r="70%">
-                    <stop offset="0%" stop-color="#fff0b5"/>
-                    <stop offset="48%" stop-color="#d2a44d"/>
-                    <stop offset="100%" stop-color="#77521d"/>
-                  </radialGradient>
-                </defs>
-                <circle r="105" fill="#2b180d" stroke="#e0b45c" stroke-width="2"/>
-                <g id="segments"></g>
-                <circle class="wheel-inner-ring" r="66"/>
-                <circle class="wheel-core" r="52"/>
-                <g aria-hidden="true">
-                  <line class="wheel-arm" x1="0" y1="-41" x2="0" y2="41"/>
-                  <line class="wheel-arm" x1="-35.5" y1="-20.5" x2="35.5" y2="20.5"/>
-                  <line class="wheel-arm" x1="-35.5" y1="20.5" x2="35.5" y2="-20.5"/>
-                  <circle class="wheel-knob" cx="0" cy="-42" r="4.6"/>
-                  <circle class="wheel-knob" cx="0" cy="42" r="4.6"/>
-                  <circle class="wheel-knob" cx="36.5" cy="21" r="4.6"/>
-                  <circle class="wheel-knob" cx="-36.5" cy="-21" r="4.6"/>
-                  <circle class="wheel-knob" cx="36.5" cy="-21" r="4.6"/>
-                  <circle class="wheel-knob" cx="-36.5" cy="21" r="4.6"/>
-                  <circle class="wheel-hub" r="10"/>
-                </g>
-              </svg>
-            </div>
-          </div>
-
-          <div class="legend" aria-label="色塊保底圖例">
-            <div class="legend-item">
-              <span class="legend-swatch" style="background:var(--tier-1200)"></span>
-              <div class="legend-copy"><strong>1,200 萬</strong><span>17 格 · 45.9%</span></div>
-            </div>
-            <div class="legend-item">
-              <span class="legend-swatch" style="background:var(--tier-1500)"></span>
-              <div class="legend-copy"><strong>1,500 萬</strong><span>11 格 · 29.7%</span></div>
-            </div>
-            <div class="legend-item">
-              <span class="legend-swatch" style="background:var(--tier-2000)"></span>
-              <div class="legend-copy"><strong>2,000 萬</strong><span>7 格 · 18.9%</span></div>
-            </div>
-            <div class="legend-item">
-              <span class="legend-swatch" style="background:var(--tier-2500)"></span>
-              <div class="legend-copy"><strong>2,500 萬</strong><span>2 格 · 5.4%</span></div>
-            </div>
+          <div id="outside" class="outside">
+            <button class="outside-bet" data-bet="low">1–18</button>
+            <button class="outside-bet" data-bet="even">EVEN</button>
+            <button class="outside-bet red" data-bet="red">RED</button>
+            <button class="outside-bet black" data-bet="black">BLACK</button>
+            <button class="outside-bet" data-bet="odd">ODD</button>
+            <button class="outside-bet" data-bet="high">19–36</button>
           </div>
         </div>
+      </div>
 
-        <div class="result" aria-live="polite">
-          <div>
-            <small>GUARANTEE RESULT</small>
-            <strong id="resultTitle">尚未抽取</strong>
-            <div id="resultSub" class="sub">本張訂單可抽取 1 次。</div>
+      <div class="selection">
+        <div><small>YOUR BET</small><strong id="selectionText">尚未下注</strong></div>
+        <div id="selectionPrize" class="selection-prize">—</div>
+      </div>
+    </article>
+
+    <article class="card wheel-card">
+      <div class="wheel-head">
+        <div><div class="eyebrow">ROULETTE · TEST</div><div style="margin-top:6px;color:rgba(243,239,230,.45);font-size:12px">DEMO-MO20261012-RR</div></div>
+        <span id="status" class="status">待下注</span>
+      </div>
+
+      <div class="wheel-zone">
+        <div class="wheel-stage" aria-label="歐式輪盤">
+          <div id="wheelRotor" class="wheel-rotor">
+            <svg viewBox="-110 -110 220 220" role="img" aria-label="歐式輪盤">
+              <defs>
+                <radialGradient id="wood" cx="35%" cy="28%" r="74%"><stop offset="0%" stop-color="#b77a3a"/><stop offset="50%" stop-color="#6e3f20"/><stop offset="100%" stop-color="#2d1b10"/></radialGradient>
+                <radialGradient id="goldHub" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#fff0b5"/><stop offset="48%" stop-color="#d2a44d"/><stop offset="100%" stop-color="#77521d"/></radialGradient>
+              </defs>
+              <circle r="105" fill="#2b180d" stroke="#e0b45c" stroke-width="2"/>
+              <g id="segments"></g>
+              <g id="wheelNumbers"></g>
+              <circle class="wheel-inner" r="66"/>
+              <circle class="wheel-core" r="51"/>
+              <g aria-hidden="true">
+                <line class="arm" x1="0" y1="-40" x2="0" y2="40"/><line class="arm" x1="-35" y1="-20" x2="35" y2="20"/><line class="arm" x1="-35" y1="20" x2="35" y2="-20"/>
+                <circle class="knob" cx="0" cy="-42" r="4.5"/><circle class="knob" cx="0" cy="42" r="4.5"/><circle class="knob" cx="36" cy="21" r="4.5"/><circle class="knob" cx="-36" cy="-21" r="4.5"/><circle class="knob" cx="36" cy="-21" r="4.5"/><circle class="knob" cx="-36" cy="21" r="4.5"/>
+                <circle class="hub" r="10"/>
+              </g>
+            </svg>
           </div>
-          <div id="resultValue" class="result-value">—</div>
+          <div id="ballOrbit" class="ball-orbit"><div class="ball"></div></div>
         </div>
-
-        <div class="actions">
-          <button id="drawButton" class="primary" type="button">轉動輪盤</button>
-          <button id="resetButton" class="secondary" type="button">測試重置</button>
+        <div class="legend-mini">
+          <span><i class="dot" style="background:var(--red)"></i>紅</span>
+          <span><i class="dot" style="background:#151619"></i>黑</span>
+          <span><i class="dot" style="background:#07814c"></i>0</span>
         </div>
-      </article>
-    </section>
+      </div>
 
-    <section class="rules" aria-label="玩法規則">
-      <details>
-        <summary>玩法規則</summary>
-        <div class="rule-body">
-          每張符合資格的訂單可轉動輪盤 <b>1 次</b>。輪盤共有 37 個等大小色塊，依指針最後停下的色塊決定本單保底；結果產生後即鎖定，不可重新抽取。
-        </div>
-      </details>
-      <details>
-        <summary>保底機率</summary>
-        <div class="rule-body">
-          <b>1,200 萬</b> 17 格、<b>1,500 萬</b> 11 格、<b>2,000 萬</b> 7 格、<b>2,500 萬</b> 2 格。最高保底約為 5.4% 機率。
-        </div>
-      </details>
-    </section>
-  </main>
+      <div class="result" aria-live="polite">
+        <div><small>GUARANTEE RESULT</small><strong id="resultTitle">等待下注</strong><div id="resultSub" class="sub">選好下注方式後即可開始。</div></div>
+        <div id="resultValue" class="result-value">—</div>
+      </div>
+      <div class="actions">
+        <button id="drawButton" class="primary" type="button" disabled>確認下注・開始輪盤</button>
+        <button id="resetButton" class="secondary" type="button">測試重置</button>
+      </div>
+    </article>
+  </section>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <section class="rules">
+    <details>
+      <summary>保底規則</summary>
+      <div class="rule-body">
+        <b>穩健：</b>紅／黑、單／雙、1–18／19–36，命中為 1,500 萬。<br>
+        <b>進階：</b>六線覆蓋 6 個號碼，命中為 2,000 萬。<br>
+        <b>豪賭：</b>四角覆蓋 4 個號碼，命中為 2,500 萬。<br>
+        任一玩法未命中皆為 <b>1,200 萬</b>基本保底；0 不屬於紅黑、單雙與大小。
+      </div>
+    </details>
+    <details>
+      <summary>操作方式</summary>
+      <div class="rule-body">先選下注難度，再在下注桌選擇位置。確認後輪盤與小球只會完整轉動一次；小球最後落入的號碼即為結果，抽取後鎖定。</div>
+    </details>
+  </section>
+</main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script>
-    (() => {
-      "use strict";
+<script>
+(() => {
+  "use strict";
+  const STORAGE_KEY="mowan_rr_demo_v5";
+  const WHEEL=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+  const RED=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  const STEP=360/WHEEL.length;
+  const numbersEl=document.getElementById("numbers"),zeroCell=document.getElementById("zeroCell"),outside=document.getElementById("outside");
+  const modeButtons=[...document.querySelectorAll(".mode")],betHelp=document.getElementById("betHelp");
+  const selectionText=document.getElementById("selectionText"),selectionPrize=document.getElementById("selectionPrize");
+  const rotor=document.getElementById("wheelRotor"),ballOrbit=document.getElementById("ballOrbit"),segments=document.getElementById("segments"),wheelNumbers=document.getElementById("wheelNumbers");
+  const status=document.getElementById("status"),drawButton=document.getElementById("drawButton"),resetButton=document.getElementById("resetButton");
+  const resultTitle=document.getElementById("resultTitle"),resultSub=document.getElementById("resultSub"),resultValue=document.getElementById("resultValue"),toast=document.getElementById("toast");
+  let mode="safe",bet=null,drawing=false,locked=false;
 
-      const STORAGE_KEY = "mowan_rr_demo_v4";
-      const SLOT_VALUES = [
-        1200,1500,2000,1200,1500,1200,2500,1200,2000,1500,
-        1200,1500,1200,2000,1200,1500,1200,2000,1200,1500,
-        1200,1500,1200,2000,1200,1500,2500,1200,1500,1200,
-        2000,1200,1500,1200,2000,1500,1200
-      ];
-      const COLORS = {
-        1200: "#344252",
-        1500: "#985a33",
-        2000: "#d09a37",
-        2500: "#a72839"
-      };
-      const STEP = 360 / SLOT_VALUES.length;
-
-      const rotor = document.getElementById("wheelRotor");
-      const segments = document.getElementById("segments");
-      const drawButton = document.getElementById("drawButton");
-      const resetButton = document.getElementById("resetButton");
-      const status = document.getElementById("status");
-      const resultTitle = document.getElementById("resultTitle");
-      const resultSub = document.getElementById("resultSub");
-      const resultValue = document.getElementById("resultValue");
-      const toast = document.getElementById("toast");
-      let drawing = false;
-      let currentRotation = 0;
-
-      function polar(radius, angleDeg) {
-        const angle = angleDeg * Math.PI / 180;
-        return [radius * Math.cos(angle), radius * Math.sin(angle)];
-      }
-
-      function ringSlicePath(startDeg, endDeg, innerRadius, outerRadius) {
-        const [ox1, oy1] = polar(outerRadius, startDeg);
-        const [ox2, oy2] = polar(outerRadius, endDeg);
-        const [ix2, iy2] = polar(innerRadius, endDeg);
-        const [ix1, iy1] = polar(innerRadius, startDeg);
-        return [
-          `M ${ox1.toFixed(3)} ${oy1.toFixed(3)}`,
-          `A ${outerRadius} ${outerRadius} 0 0 1 ${ox2.toFixed(3)} ${oy2.toFixed(3)}`,
-          `L ${ix2.toFixed(3)} ${iy2.toFixed(3)}`,
-          `A ${innerRadius} ${innerRadius} 0 0 0 ${ix1.toFixed(3)} ${iy1.toFixed(3)}`,
-          "Z"
-        ].join(" ");
-      }
-
-      function buildWheel() {
-        const ns = "http://www.w3.org/2000/svg";
-        SLOT_VALUES.forEach((value, index) => {
-          const center = -90 + index * STEP;
-          const path = document.createElementNS(ns, "path");
-          path.setAttribute("d", ringSlicePath(center - STEP / 2, center + STEP / 2, 69, 100));
-          path.setAttribute("fill", COLORS[value]);
-          path.setAttribute("class", "slot-path");
-          path.dataset.index = String(index);
-          path.dataset.value = String(value);
-          segments.appendChild(path);
-        });
-      }
-
-      function randomIndex() {
-        if (window.crypto && window.crypto.getRandomValues) {
-          const bucket = new Uint32Array(1);
-          const max = Math.floor(0x100000000 / SLOT_VALUES.length) * SLOT_VALUES.length;
-          let n;
-          do {
-            window.crypto.getRandomValues(bucket);
-            n = bucket[0];
-          } while (n >= max);
-          return n % SLOT_VALUES.length;
-        }
-        return Math.floor(Math.random() * SLOT_VALUES.length);
-      }
-
-      function randomUnit() {
-        if (window.crypto && window.crypto.getRandomValues) {
-          const bucket = new Uint32Array(1);
-          window.crypto.getRandomValues(bucket);
-          return bucket[0] / 0x100000000;
-        }
-        return Math.random();
-      }
-
-      function showToast(message) {
-        toast.textContent = message;
-        toast.classList.add("show");
-        window.setTimeout(() => toast.classList.remove("show"), 1800);
-      }
-
-      function readState() {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          return raw ? JSON.parse(raw) : null;
-        } catch (_) {
-          return null;
-        }
-      }
-
-      function markSelected(index) {
-        document.querySelectorAll(".slot-path").forEach((path, i) => {
-          path.classList.toggle("selected", i === Number(index));
-        });
-      }
-
-      function renderLocked(state) {
-        currentRotation = Number(state.rotation) || (-Number(state.index) * STEP);
-        rotor.style.transition = "none";
-        rotor.style.transform = `rotate(${currentRotation}deg)`;
-        requestAnimationFrame(() => { rotor.style.transition = ""; });
-        markSelected(state.index);
-        status.textContent = "結果已鎖定";
-        status.classList.add("locked");
-        resultTitle.textContent = Number(state.value) === 2500 ? "最高保底" : "保底確定";
-        resultValue.textContent = `${Number(state.value).toLocaleString("zh-TW")} 萬`;
-        resultSub.textContent = `抽取時間：${state.drawnAt || "已記錄"}`;
-        drawButton.textContent = "本單已完成抽取";
-        drawButton.disabled = true;
-      }
-
-      function renderFresh() {
-        currentRotation = 0;
-        rotor.style.transition = "none";
-        rotor.style.transform = "rotate(0deg)";
-        requestAnimationFrame(() => { rotor.style.transition = ""; });
-        markSelected(-1);
-        status.textContent = "可抽 1 次";
-        status.classList.remove("locked");
-        resultTitle.textContent = "尚未抽取";
-        resultValue.textContent = "—";
-        resultSub.textContent = "本張訂單可抽取 1 次。";
-        drawButton.textContent = "轉動輪盤";
-        drawButton.disabled = false;
-      }
-
-      function draw() {
-        if (drawing) return;
-        const existing = readState();
-        if (existing) {
-          renderLocked(existing);
-          showToast("這張測試單已抽過。");
-          return;
-        }
-
-        drawing = true;
-        drawButton.disabled = true;
-        drawButton.textContent = "輪盤轉動中…";
-        markSelected(-1);
-
-        const index = randomIndex();
-        const value = SLOT_VALUES[index];
-        const jitter = (randomUnit() - .5) * STEP * .5;
-        const normalizedRotation = -index * STEP + jitter;
-        const spins = 6 + Math.floor(randomUnit() * 3);
-        const targetRotation = currentRotation + spins * 360 + normalizedRotation;
-
-        rotor.style.transition = "transform 3.4s cubic-bezier(.12,.72,.08,1)";
-        requestAnimationFrame(() => {
-          rotor.style.transform = `rotate(${targetRotation}deg)`;
-        });
-
-        const state = {
-          index,
-          value,
-          rotation: normalizedRotation,
-          drawnAt: new Intl.DateTimeFormat("zh-TW", {
-            year: "numeric", month: "2-digit", day: "2-digit",
-            hour: "2-digit", minute: "2-digit", second: "2-digit",
-            hour12: false
-          }).format(new Date())
-        };
-
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch (_) {}
-
-        window.setTimeout(() => {
-          currentRotation = normalizedRotation;
-          rotor.style.transition = "none";
-          rotor.style.transform = `rotate(${normalizedRotation}deg)`;
-          requestAnimationFrame(() => { rotor.style.transition = ""; });
-          renderLocked(state);
-          drawing = false;
-          showToast(`保底確定：${value.toLocaleString("zh-TW")} 萬`);
-        }, 3450);
-      }
-
-      buildWheel();
-      drawButton.addEventListener("click", draw);
-      resetButton.addEventListener("click", () => {
-        if (drawing) return;
-        localStorage.removeItem(STORAGE_KEY);
-        renderFresh();
-        showToast("測試已重置。");
+  function polar(r,a){const x=a*Math.PI/180;return [r*Math.cos(x),r*Math.sin(x)]}
+  function slicePath(s,e,ri,ro){const [a,b]=polar(ro,s),[c,d]=polar(ro,e),[f,g]=polar(ri,e),[h,i]=polar(ri,s);return `M ${a} ${b} A ${ro} ${ro} 0 0 1 ${c} ${d} L ${f} ${g} A ${ri} ${ri} 0 0 0 ${h} ${i} Z`}
+  function buildWheel(){
+    const ns="http://www.w3.org/2000/svg";
+    WHEEL.forEach((n,idx)=>{
+      const center=-90+idx*STEP,path=document.createElementNS(ns,"path");
+      path.setAttribute("d",slicePath(center-STEP/2,center+STEP/2,69,100));
+      path.setAttribute("fill",n===0?"#07814c":RED.has(n)?"#c92d35":"#151619");
+      path.setAttribute("class","slot");path.dataset.number=String(n);segments.appendChild(path);
+      const [x,y]=polar(85,center),t=document.createElementNS(ns,"text");
+      t.setAttribute("x",x);t.setAttribute("y",y);t.setAttribute("class","wheel-number");t.textContent=String(n);wheelNumbers.appendChild(t);
+    });
+  }
+  function buildBoard(){
+    for(let col=1;col<=12;col++){
+      [3,2,1].forEach(row=>{
+        const n=(col-1)*3+row,b=document.createElement("button");
+        b.type="button";b.className=`num-cell ${RED.has(n)?"red":"black"}`;b.dataset.number=String(n);b.textContent=String(n);
+        b.style.gridColumn=String(col);b.style.gridRow=String(4-row);numbersEl.appendChild(b);
       });
+    }
+  }
+  function cryptoInt(max){
+    if(window.crypto?.getRandomValues){const a=new Uint32Array(1),limit=Math.floor(0x100000000/max)*max;let n;do{crypto.getRandomValues(a);n=a[0]}while(n>=limit);return n%max}
+    return Math.floor(Math.random()*max);
+  }
+  function randomUnit(){if(window.crypto?.getRandomValues){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/0x100000000}return Math.random()}
+  function toastMsg(m){toast.textContent=m;toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),1800)}
+  function numberColor(n){return n===0?"green":RED.has(n)?"red":"black"}
+  function prizeForMode(){return mode==="safe"?1500:mode==="six"?2000:2500}
+  function helpForMode(){
+    if(mode==="safe") return "選一個外圍下注：紅／黑、單／雙、1–18／19–36。";
+    if(mode==="six") return "點任一號碼，系統會選取相鄰兩欄共 6 個號碼作為六線下注。";
+    return "點任一號碼，系統會以該位置建立相鄰 2×2 的四角下注。";
+  }
+  function clearMarks(){
+    document.querySelectorAll(".num-cell,.zero-cell,.outside-bet").forEach(x=>{x.classList.remove("selected","winner");x.querySelector(".chip-dot")?.remove()});
+  }
+  function addChip(el){if(!el)return;const c=document.createElement("i");c.className="chip-dot";el.appendChild(c)}
+  function selectedNumbersForSix(n){
+    const col=Math.ceil(n/3),start=Math.min(11,Math.max(1,col));
+    const out=[];for(let c=start;c<=start+1;c++)for(let r=1;r<=3;r++)out.push((c-1)*3+r);return out;
+  }
+  function selectedNumbersForCorner(n){
+    const col=Math.ceil(n/3),startCol=Math.min(11,Math.max(1,col)),row=((n-1)%3)+1,startRow=row===3?2:1;
+    return [startRow,startRow+1].flatMap(r=>[startCol,startCol+1].map(c=>(c-1)*3+r));
+  }
+  function betLabel(b){
+    if(!b)return "尚未下注";
+    if(b.type==="outside") return ({red:"紅色",black:"黑色",odd:"單數",even:"雙數",low:"1–18",high:"19–36"})[b.key];
+    return `${b.type==="six"?"六線":"四角"}｜${b.numbers.join("・")}`;
+  }
+  function renderBet(){
+    clearMarks();
+    if(bet){
+      if(bet.type==="outside"){
+        const el=document.querySelector(`.outside-bet[data-bet="${bet.key}"]`);el?.classList.add("selected");addChip(el);
+      }else{
+        bet.numbers.forEach(n=>document.querySelector(`.num-cell[data-number="${n}"]`)?.classList.add("selected"));
+        addChip(document.querySelector(`.num-cell[data-number="${bet.anchor}"]`));
+      }
+    }
+    selectionText.textContent=betLabel(bet);
+    selectionPrize.textContent=bet?`命中 ${prizeForMode().toLocaleString("zh-TW")} 萬`:"—";
+    drawButton.disabled=!bet||locked||drawing;
+    status.textContent=locked?"結果已鎖定":bet?"已下注":"待下注";
+    status.classList.toggle("locked",locked);
+  }
+  function setMode(next){
+    if(locked||drawing)return;
+    mode=next;bet=null;
+    modeButtons.forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+    outside.querySelectorAll("button").forEach(b=>b.disabled=mode!=="safe");
+    betHelp.textContent=helpForMode();renderBet();
+  }
+  function chooseNumber(n){
+    if(locked||drawing||mode==="safe"||n===0)return;
+    const nums=mode==="six"?selectedNumbersForSix(n):selectedNumbersForCorner(n);
+    bet={type:mode,anchor:n,numbers:nums};renderBet();
+  }
+  function chooseOutside(key){if(locked||drawing||mode!=="safe")return;bet={type:"outside",key};renderBet()}
+  function isHit(n,b){
+    if(!b)return false;
+    if(b.type==="six"||b.type==="corner")return b.numbers.includes(n);
+    if(n===0)return false;
+    if(b.key==="red")return RED.has(n);if(b.key==="black")return !RED.has(n);
+    if(b.key==="odd")return n%2===1;if(b.key==="even")return n%2===0;
+    if(b.key==="low")return n>=1&&n<=18;if(b.key==="high")return n>=19&&n<=36;
+    return false;
+  }
+  function saveState(s){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(s))}catch(_){}}
+  function readState(){try{const x=localStorage.getItem(STORAGE_KEY);return x?JSON.parse(x):null}catch(_){return null}}
+  function markWinner(n){
+    document.querySelectorAll(".slot").forEach(x=>x.classList.toggle("winning",Number(x.dataset.number)===n));
+    document.querySelectorAll(".num-cell,.zero-cell").forEach(x=>x.classList.toggle("winner",Number(x.dataset.number)===n));
+  }
+  function lockControls(){locked=true;modeButtons.forEach(b=>b.disabled=true);outside.querySelectorAll("button").forEach(b=>b.disabled=true);drawButton.disabled=true;drawButton.textContent="本單已完成抽取";renderBet()}
+  function renderResult(s){
+    mode=s.mode;bet=s.bet;
+    modeButtons.forEach(b=>b.classList.toggle("active",b.dataset.mode===mode));
+    betHelp.textContent=helpForMode();
+    rotor.style.transition="none";ballOrbit.style.transition="none";
+    rotor.style.transform=`rotate(${s.wheelRotation}deg)`;ballOrbit.style.transform=`rotate(${s.ballRotation}deg)`;ballOrbit.classList.add("locked");
+    requestAnimationFrame(()=>{rotor.style.transition="";ballOrbit.style.transition=""});
+    markWinner(s.number);
+    const hit=s.hit,prize=s.prize;
+    resultTitle.textContent=`${s.number} 號｜${hit?"命中":"未命中"}`;
+    resultValue.textContent=`${prize.toLocaleString("zh-TW")} 萬`;
+    resultSub.textContent=`${numberColor(s.number)==="red"?"紅":numberColor(s.number)==="black"?"黑":"綠"}色 · ${hit?betLabel(bet)+" 命中":"保留基本保底"} · ${s.drawnAt||""}`;
+    lockControls();
+  }
+  function spin(){
+    if(drawing||locked||!bet)return;
+    drawing=true;drawButton.disabled=true;drawButton.textContent="輪盤轉動中…";resultTitle.textContent="小球滾動中";resultSub.textContent="等待落點…";resultValue.textContent="—";markWinner(-1);
+    const n=cryptoInt(37),idx=WHEEL.indexOf(n),wheelTurns=5+cryptoInt(3),offset=randomUnit()*360;
+    const wheelRotation=wheelTurns*360+offset;
+    const desired=((idx*STEP+wheelRotation)%360+360)%360;
+    const ballRotation=desired-(7+cryptoInt(3))*360;
+    rotor.style.transition="transform 4.7s cubic-bezier(.08,.68,.08,1)";
+    ballOrbit.style.transition="transform 4.85s cubic-bezier(.08,.67,.07,1)";
+    ballOrbit.classList.remove("locked","settling");
+    requestAnimationFrame(()=>{rotor.style.transform=`rotate(${wheelRotation}deg)`;ballOrbit.style.transform=`rotate(${ballRotation}deg)`});
+    setTimeout(()=>ballOrbit.classList.add("settling"),4000);
+    const hit=isHit(n,bet),prize=hit?prizeForMode():1200;
+    const state={mode,bet,number:n,hit,prize,wheelRotation,ballRotation,drawnAt:new Intl.DateTimeFormat("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date())};
+    saveState(state);
+    setTimeout(()=>{
+      drawing=false;markWinner(n);
+      resultTitle.textContent=`${n} 號｜${hit?"命中":"未命中"}`;resultValue.textContent=`${prize.toLocaleString("zh-TW")} 萬`;
+      resultSub.textContent=hit?`${betLabel(bet)} 命中！`:`${betLabel(bet)} 未命中，保留 1,200 萬基本保底。`;
+      lockControls();toastMsg(hit?`命中！${prize.toLocaleString("zh-TW")} 萬保底`:`落在 ${n} 號｜1,200 萬保底`);
+    },4900);
+  }
+  function reset(){
+    if(drawing)return;localStorage.removeItem(STORAGE_KEY);locked=false;bet=null;mode="safe";
+    rotor.style.transition="none";ballOrbit.style.transition="none";rotor.style.transform="rotate(0deg)";ballOrbit.style.transform="rotate(0deg)";ballOrbit.classList.remove("settling","locked");
+    requestAnimationFrame(()=>{rotor.style.transition="";ballOrbit.style.transition=""});
+    modeButtons.forEach(b=>{b.disabled=false;b.classList.toggle("active",b.dataset.mode==="safe")});
+    outside.querySelectorAll("button").forEach(b=>b.disabled=false);
+    markWinner(-1);resultTitle.textContent="等待下注";resultSub.textContent="選好下注方式後即可開始。";resultValue.textContent="—";drawButton.textContent="確認下注・開始輪盤";betHelp.textContent=helpForMode();renderBet();toastMsg("測試已重置。");
+  }
 
-      const initial = readState();
-      if (initial) renderLocked(initial); else renderFresh();
-    })();
-  </script>
+  buildWheel();buildBoard();
+  modeButtons.forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.mode)));
+  numbersEl.addEventListener("click",e=>{const b=e.target.closest(".num-cell");if(b)chooseNumber(Number(b.dataset.number))});
+  zeroCell.addEventListener("click",()=>{});
+  outside.addEventListener("click",e=>{const b=e.target.closest(".outside-bet");if(b)chooseOutside(b.dataset.bet)});
+  drawButton.addEventListener("click",spin);resetButton.addEventListener("click",reset);
+
+  const saved=readState();
+  if(saved)renderResult(saved);else{setMode("safe");drawButton.textContent="確認下注・開始輪盤";}
+})();
+</script>
 </body>
 </html>
