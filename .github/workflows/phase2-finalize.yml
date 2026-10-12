@@ -23,11 +23,11 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install image tooling
+      - name: Install finalizer tooling
         run: |
           sudo apt-get update
           sudo apt-get install -y webp
-          python -m pip install "Pillow>=11,<13"
+          python -m pip install "Pillow>=11,<13" "Jinja2==3.1.6"
       - name: Finalize phase2 source and assets
         run: python tools/phase2_finalize.py
       - name: Compile and audit final tree
