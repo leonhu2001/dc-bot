@@ -165,10 +165,10 @@
         <div class="rule-body">
           六格機率相同，其中一格為最高保底。
           <div class="prob-grid">
-            <div class="prob"><strong>1,000 萬</strong><span>2 格 · 33.3%</span></div>
             <div class="prob"><strong>1,200 萬</strong><span>2 格 · 33.3%</span></div>
-            <div class="prob"><strong>1,400 萬</strong><span>1 格 · 16.7%</span></div>
+            <div class="prob"><strong>1,500 萬</strong><span>2 格 · 33.3%</span></div>
             <div class="prob"><strong>2,000 萬</strong><span>1 格 · 16.7%</span></div>
+            <div class="prob"><strong>2,500 萬</strong><span>1 格 · 16.7%</span></div>
           </div>
         </div>
       </details>
@@ -181,14 +181,14 @@
     (() => {
       "use strict";
 
-      const STORAGE_KEY = "mowan_rr_demo_v2";
+      const STORAGE_KEY = "mowan_rr_demo_v3";
       const chambers = [
-        { value: 1000, label: "保底確定", jackpot: false },
-        { value: 1000, label: "保底確定", jackpot: false },
         { value: 1200, label: "保底確定", jackpot: false },
         { value: 1200, label: "保底確定", jackpot: false },
-        { value: 1400, label: "高額保底", jackpot: false },
-        { value: 2000, label: "最高保底", jackpot: true }
+        { value: 1500, label: "保底確定", jackpot: false },
+        { value: 1500, label: "保底確定", jackpot: false },
+        { value: 2000, label: "高額保底", jackpot: false },
+        { value: 2500, label: "最高保底", jackpot: true }
       ];
 
       const cylinder = document.getElementById("cylinder");
