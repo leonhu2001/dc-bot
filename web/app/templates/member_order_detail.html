@@ -22,7 +22,17 @@
 .customer-roulette-actions{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:180px}
 .customer-roulette-actions small{color:rgba(235,232,222,.42);font-size:11px;text-align:right}
 .customer-roulette-disabled{min-height:48px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.08);border-radius:13px;color:rgba(235,232,222,.42);background:rgba(255,255,255,.025);font-size:14px;font-weight:650;cursor:not-allowed}
-@media(max-width:700px){.customer-order-detail-head{align-items:flex-start;flex-direction:column}.customer-detail-grid{grid-template-columns:1fr}.customer-roulette-head{align-items:flex-start;flex-direction:column}.customer-roulette-actions{align-items:stretch;width:100%}.customer-roulette-actions small{text-align:left}.customer-roulette-actions .button,.customer-roulette-disabled{width:100%}}
+.customer-love-delta-card{position:relative;overflow:hidden;border-color:rgba(201,96,145,.34);background:radial-gradient(circle at 90% -10%,rgba(210,98,152,.24),transparent 42%),radial-gradient(circle at 6% 110%,rgba(125,94,170,.20),transparent 40%),linear-gradient(145deg,rgba(44,30,43,.98),rgba(24,20,27,.98))}
+.customer-love-delta-card:after{content:"♡";position:absolute;right:24px;top:-42px;color:rgba(255,255,255,.055);font-size:150px;line-height:1;transform:rotate(8deg);pointer-events:none}
+.customer-love-delta-head{position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.customer-love-delta-copy .section-eyebrow{color:#d96d9c}
+.customer-love-delta-copy h2{margin:8px 0 7px;font-size:clamp(22px,4vw,31px)}
+.customer-love-delta-copy p{max-width:650px;margin:0;color:rgba(242,229,237,.68);font-size:14px;line-height:1.75}
+.customer-love-delta-actions{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:180px}
+.customer-love-delta-actions small{color:rgba(242,229,237,.48);font-size:11px;text-align:right}
+.customer-love-delta-actions .button-primary{border-color:rgba(216,104,153,.42);background:linear-gradient(135deg,#a6406f,#d25f91);color:#fff}
+.customer-love-delta-disabled{min-height:48px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.10);border-radius:13px;color:rgba(242,229,237,.46);background:rgba(255,255,255,.035);font-size:14px;font-weight:650;cursor:not-allowed}
+@media(max-width:700px){.customer-order-detail-head{align-items:flex-start;flex-direction:column}.customer-detail-grid{grid-template-columns:1fr}.customer-roulette-head,.customer-love-delta-head{align-items:flex-start;flex-direction:column}.customer-roulette-actions,.customer-love-delta-actions{align-items:stretch;width:100%}.customer-roulette-actions small,.customer-love-delta-actions small{text-align:left}.customer-roulette-actions .button,.customer-roulette-disabled,.customer-love-delta-actions .button,.customer-love-delta-disabled{width:100%}}
 </style>
 {% endblock %}
 
@@ -55,6 +65,17 @@
             <div class="customer-detail-item"><small>金額</small><strong>{{ order.amount_text }}</strong></div>
             <div class="customer-detail-item"><small>付款方式</small><strong>{{ order.payment_method }}</strong></div>
             <div class="customer-detail-item"><small>建立時間</small><strong>{{ order.created_at }}</strong></div>
+        </div>
+    </section>
+
+    <section class="customer-detail-card customer-love-delta-card" id="customerLoveDeltaCard" hidden>
+        <div class="customer-love-delta-head">
+            <div class="customer-love-delta-copy">
+                <div class="section-eyebrow">LOVE DELTA</div>
+                <h2>戀與三角洲</h2>
+                <p id="customerLoveDeltaCopy">正在確認本單攻略資格…</p>
+            </div>
+            <div class="customer-love-delta-actions" id="customerLoveDeltaActions"></div>
         </div>
     </section>
 
@@ -138,4 +159,74 @@
         {% endif %}
     </section>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const card = document.getElementById("customerLoveDeltaCard");
+    const copy = document.getElementById("customerLoveDeltaCopy");
+    const actions = document.getElementById("customerLoveDeltaActions");
+    if (!card || !copy || !actions) return;
+
+    fetch("/me/orders/{{ order.id }}/love-delta/entry", {
+        credentials: "same-origin",
+        cache: "no-store",
+    }).then(async (response) => {
+        if (!response.ok) return null;
+        return response.json();
+    }).then((data) => {
+        if (!data || !data.eligible) return;
+        card.hidden = false;
+        const plan = data.plan || {};
+        const planText = `${plan.label || ""}・起始好感 ${plan.initial_affection ?? "-"}`;
+
+        actions.replaceChildren();
+        if (data.available) {
+            copy.textContent = data.started
+                ? "攻略進度已建立。老闆與本單女陪會共用同一份即時進度。"
+                : "付款已完成。本單已開放戀與三角洲互動攻略。";
+            const link = document.createElement("a");
+            link.className = "button button-primary";
+            link.href = data.href;
+            link.textContent = data.started ? "繼續攻略" : "進入攻略";
+            const small = document.createElement("small");
+            small.textContent = planText;
+            actions.append(link, small);
+            return;
+        }
+
+        if (data.view_only) {
+            copy.textContent = "此訂單已結束，可進入查看保留的攻略紀錄。";
+            const link = document.createElement("a");
+            link.className = "button button-primary";
+            link.href = data.href;
+            link.textContent = "查看攻略紀錄";
+            const small = document.createElement("small");
+            small.textContent = planText;
+            actions.append(link, small);
+            return;
+        }
+
+        if (data.expired) {
+            copy.textContent = "此訂單已結束，且當時沒有啟動攻略。";
+            const disabled = document.createElement("span");
+            disabled.className = "customer-love-delta-disabled";
+            disabled.textContent = "沒有攻略紀錄";
+            const small = document.createElement("small");
+            small.textContent = planText;
+            actions.append(disabled, small);
+            return;
+        }
+
+        copy.textContent = "攻略資格已綁定這張訂單，付款完成後會自動開放。";
+        const disabled = document.createElement("span");
+        disabled.className = "customer-love-delta-disabled";
+        disabled.textContent = "付款完成後開放";
+        const small = document.createElement("small");
+        small.textContent = planText;
+        actions.append(disabled, small);
+    }).catch(() => {});
+})();
+</script>
 {% endblock %}
