@@ -12,11 +12,10 @@ ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
-# Debt budget after the 2026-10-13 public-layout extraction. The project still
-# needs CSP unsafe-inline on legacy pages, but new changes may only reduce these
-# counts, never increase them.
-MAX_INLINE_STYLE_BLOCKS = 26
-MAX_INLINE_SCRIPT_BLOCKS = 19
+# CSP debt budget. Static inline blocks have been extracted to canonical assets;
+# remaining inline blocks are dynamic bootstrap/data blocks and may only decrease.
+MAX_INLINE_STYLE_BLOCKS = 0
+MAX_INLINE_SCRIPT_BLOCKS = 7
 
 # Patch-style frontend assets are fully retired. Keep this set empty so a new
 # *_fix.js / *_fix.css fails the static audit instead of becoming permanent debt.

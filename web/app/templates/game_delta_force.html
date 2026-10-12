@@ -1,29 +1,7 @@
 {% extends "site_layout.html" %}
 
 {% block head %}
-<style>
-.delta-shell{width:min(1180px,calc(100% - 32px));margin:0 auto}
-.delta-hero{padding:88px 0 54px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:36px;align-items:center}
-.delta-kicker{color:#dfb75c;font-size:12px;font-weight:900;letter-spacing:.18em}
-.delta-hero h1{margin:10px 0 16px;font-size:clamp(42px,7vw,74px);line-height:1.02}
-.delta-hero p{max-width:720px;color:rgba(235,232,222,.68);line-height:1.85;font-size:15px}
-.delta-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
-.delta-card{border:1px solid rgba(223,183,92,.22);border-radius:24px;padding:26px;background:linear-gradient(145deg,rgba(31,28,22,.92),rgba(10,10,9,.96))}
-.delta-card strong{font-size:24px;display:block;margin-bottom:8px}
-.delta-card ul{margin:18px 0 0;padding-left:20px;color:rgba(235,232,222,.68);line-height:1.9}
-.delta-section{padding:42px 0}
-.delta-section-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:22px}
-.delta-section-head h2{margin:6px 0 0;font-size:clamp(28px,4vw,42px)}
-.delta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.delta-service{border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:22px;background:rgba(255,255,255,.025)}
-.delta-service small{color:#dfb75c}.delta-service h3{margin:8px 0;font-size:20px}.delta-service p{color:rgba(235,232,222,.62);line-height:1.7;min-height:54px}
-.delta-price{font-size:18px;font-weight:900;margin-top:14px}
-.delta-faq{display:grid;gap:10px}.delta-faq details{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;background:rgba(255,255,255,.02)}.delta-faq summary{cursor:pointer;font-weight:800}.delta-faq p{color:rgba(235,232,222,.65);line-height:1.8}
-.delta-cta{margin:44px 0 80px;padding:34px;border:1px solid rgba(223,183,92,.28);border-radius:24px;text-align:center;background:rgba(223,183,92,.06)}
-.delta-cta h2{margin:0 0 10px}.delta-cta p{color:rgba(235,232,222,.62)}
-@media(max-width:900px){.delta-hero{grid-template-columns:1fr}.delta-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:620px){.delta-hero{padding-top:56px}.delta-grid{grid-template-columns:1fr}.delta-section-head{align-items:flex-start;flex-direction:column}}
-</style>
+<link rel="stylesheet" href="/static/css/extracted/game_delta_force.css?v=20261013">
 {% endblock %}
 
 {% block content %}
