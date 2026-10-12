@@ -62,6 +62,10 @@ jobs:
             tools \
             scripts
 
+      - name: Audit templates and static references
+        run: |
+          python tools/audit_templates.py
+
       - name: Audit Python dependencies
         run: |
           python -m pip_audit -r requirements.txt
