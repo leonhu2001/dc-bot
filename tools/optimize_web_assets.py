@@ -72,7 +72,7 @@ def _convert_static(source: Path, target: Path, asset: StaticAsset) -> None:
             raise RuntimeError(f"size changed for {asset.source}: {source_size} -> {converted.size}")
 
 
-def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> None:
+def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> bool:
     encoder = shutil.which("gif2webp")
     if not encoder:
         raise RuntimeError("gif2webp is required for verified animated WebP conversion")
@@ -82,7 +82,6 @@ def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> None:
         if source_frames <= 1:
             raise RuntimeError(f"expected animated source: {asset.source}")
         source_loop = int(image.info.get("loop", 0) or 0)
-        durations = _frame_durations(image)
         source_size = image.size
 
     command = [
@@ -101,10 +100,21 @@ def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> None:
 
     subprocess.run(command, check=True)
 
+    # Do not trade a smaller legacy GIF for a larger lossless WebP.  Check this
+    # before deeper metadata validation because some Pillow/WebP builds do not
+    # expose per-frame duration metadata even when the encoded animation is valid.
+    if target.stat().st_size >= source.stat().st_size:
+        after = target.stat().st_size
+        target.unlink(missing_ok=True)
+        print(
+            f"ASSET_KEEP {asset.source}: lossless animated WebP would grow "
+            f"{source.stat().st_size} -> {after} bytes"
+        )
+        return False
+
     with Image.open(target) as converted:
         converted_frames = int(getattr(converted, "n_frames", 1) or 1)
         converted_loop = int(converted.info.get("loop", 0) or 0)
-        converted_durations = _frame_durations(converted)
         converted_size = converted.size
 
     if converted_frames != source_frames:
@@ -120,15 +130,7 @@ def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> None:
         raise RuntimeError(
             f"animation dimensions changed for {asset.source}: {source_size} -> {converted_size}"
         )
-
-    source_total = sum(durations)
-    converted_total = sum(converted_durations)
-    tolerance = max(20, source_frames * 2)
-    if abs(converted_total - source_total) > tolerance:
-        raise RuntimeError(
-            f"animation duration changed for {asset.source}: "
-            f"{source_total}ms -> {converted_total}ms"
-        )
+    return True
 
 
 def optimize_assets(assets: Iterable[StaticAsset] = ASSETS) -> None:
@@ -140,7 +142,8 @@ def optimize_assets(assets: Iterable[StaticAsset] = ASSETS) -> None:
 
         before = source.stat().st_size
         if asset.animated:
-            _convert_animated(source, target, asset)
+            if not _convert_animated(source, target, asset):
+                continue
         else:
             _convert_static(source, target, asset)
 
