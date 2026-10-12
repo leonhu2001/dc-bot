@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import json
 import os
+import uuid
 
 import pytest
+from itsdangerous import TimestampSigner
 from playwright.sync_api import Page, expect
 
 
@@ -17,11 +21,61 @@ def _fail_on_uncaught_page_errors(page: Page):
     assert errors == [], "Uncaught browser errors: " + " | ".join(errors)
 
 
+def add_customer_session(page: Page, *, suffix: str = "01") -> str:
+    """Install a real Starlette signed session without adding a test login route."""
+    secret = os.environ["WEB_SECRET_KEY"]
+    csrf_token = "e2e-csrf-" + uuid.uuid4().hex
+    customer_id = "99999999999999" + suffix[-4:].zfill(4)
+    session = {
+        "user": {
+            "id": customer_id,
+            "username": "E2E Customer",
+            "display_name": "E2E Customer",
+            "global_name": "E2E Customer",
+            "avatar": None,
+            "is_admin": False,
+            "is_manager": False,
+            "is_customer_service": False,
+            "is_employee": False,
+            "is_worker": False,
+            "is_companion": False,
+            "role_ids": [],
+        },
+        "csrf_token": csrf_token,
+    }
+    raw = base64.b64encode(
+        json.dumps(session, separators=(",", ":")).encode("utf-8")
+    )
+    signed = TimestampSigner(str(secret)).sign(raw).decode("utf-8")
+    page.context.add_cookies(
+        [
+            {
+                "name": "session",
+                "value": signed,
+                "url": BASE_URL,
+                "path": "/",
+                "httpOnly": True,
+                "sameSite": "Lax",
+            }
+        ]
+    )
+    return customer_id
+
+
 def open_order_catalog(page: Page):
     response = page.goto(f"{BASE_URL}/order", wait_until="domcontentloaded")
     assert response is not None and response.ok
     expect(page.locator(".order3-store")).to_be_visible()
     return response
+
+
+def open_first_order_dialog(page: Page) -> None:
+    open_buttons = page.locator(".order3-open")
+    if open_buttons.count() == 0:
+        pytest.skip("No public order groups are available in this fixture")
+    open_buttons.first.click()
+    expect(page.locator("#mw-order-dialog")).to_be_visible()
+    expect(page.locator("#mw-rule-key")).not_to_have_text("")
 
 
 def test_home_and_order_catalog_render(page: Page) -> None:
@@ -35,18 +89,56 @@ def test_home_and_order_catalog_render(page: Page) -> None:
 
 def test_order_dialog_can_open_and_close(page: Page) -> None:
     open_order_catalog(page)
+    open_first_order_dialog(page)
 
-    open_buttons = page.locator(".order3-open")
-    if open_buttons.count() == 0:
-        pytest.skip("No public order groups are available in this fixture")
-
-    open_buttons.first.click()
     dialog = page.locator("#mw-order-dialog")
-    expect(dialog).to_be_visible()
     expect(page.locator("#mw-dialog-title")).not_to_have_text("")
-
     page.locator("#mw-dialog-close").click()
     expect(dialog).not_to_be_visible()
+
+
+def test_authenticated_quote_checkout_and_formal_order(page: Page) -> None:
+    add_customer_session(page, suffix="101")
+    open_order_catalog(page)
+    open_first_order_dialog(page)
+
+    price_button = page.locator("#mw-next-step")
+    expect(price_button).to_be_visible()
+    price_button.click()
+
+    server_result = page.locator("#mw-server-result")
+    expect(server_result).to_be_visible(timeout=10_000)
+    expect(page.locator("#mw-server-total")).not_to_have_text("—")
+
+    checkout_button = page.locator("#mw-open-checkout")
+    expect(checkout_button).to_be_visible()
+    checkout_button.click()
+
+    checkout_panel = page.locator("#mw-checkout-panel")
+    checkout_summary = page.locator("#mw-checkout-summary")
+    expect(checkout_panel).to_be_visible(timeout=10_000)
+    expect(checkout_summary).to_be_visible(timeout=10_000)
+
+    # The real checkout controls must load even if this fixture has no points,
+    # loyalty coupon, wallet balance, or eligible specified staff.
+    expect(page.locator("#mw-checkout-point")).to_be_attached()
+    expect(page.locator("#mw-checkout-benefit")).to_be_attached()
+    expect(page.locator("#mw-co-total")).not_to_have_text("—")
+
+    extra = page.locator("#mw-extra-requirements")
+    extra.fill("E2E 正式下單流程測試")
+
+    terms = page.locator("#mw-checkout-terms")
+    terms.check()
+
+    final_button = page.locator("#mw-checkout-final")
+    expect(final_button).to_be_enabled()
+    final_button.click()
+
+    success = page.locator("#mw-checkout-success")
+    expect(success).to_be_visible(timeout=10_000)
+    expect(success).to_contain_text("訂單已建立")
+    expect(final_button).to_have_text("正式訂單已建立")
 
 
 def test_order_catalog_has_no_mobile_horizontal_overflow(page: Page) -> None:
