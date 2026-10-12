@@ -22,6 +22,15 @@ def test_order_form_behavior_lives_in_canonical_controller() -> None:
     assert "mw-fixed-player-count" in source
 
 
+def test_extraction_preserves_legacy_rule_and_player_fallbacks() -> None:
+    source = CONTROLLER.read_text(encoding="utf-8")
+    assert "direct.dataset?.ruleKey" in source
+    assert 'option?.getAttribute("data-rule-key")' in source
+    assert 'byId("mw-player-value")' in source
+    assert 'field.querySelector(".order3-stepper")' in source
+    assert 'event.key === "Escape"' in source
+
+
 def test_order_form_styles_are_not_runtime_style_text() -> None:
     source = CONTROLLER.read_text(encoding="utf-8")
     css = STYLES.read_text(encoding="utf-8")
