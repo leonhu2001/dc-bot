@@ -6,27 +6,22 @@ LEGACY = ROOT / "web" / "app" / "static" / "js" / "mw_order_form_fix.js"
 CONTROLLER = ROOT / "web" / "app" / "static" / "js" / "mw_order_ui.js"
 STYLES = ROOT / "web" / "app" / "static" / "css" / "order_ui.css"
 SITE_LAYOUT = ROOT / "web" / "app" / "templates" / "site_layout.html"
+ORDER_CATALOG = ROOT / "web" / "app" / "templates" / "order_catalog.html"
 EXTRA_PATCH = ROOT / "web" / "app" / "static" / "js" / "mw_order_extra_fix.js"
 
 
-def test_legacy_order_form_fix_is_only_a_compatibility_sentinel() -> None:
-    source = LEGACY.read_text(encoding="utf-8")
-    assert LEGACY.stat().st_size < 1_000
-    assert "__MAWAN_ORDER_UI_COMPAT_LOADER__" in source
-    assert "document.createElement" not in source
-    assert "appendChild" not in source
-    assert "mw_order_ui.js" not in source
-    assert "order_ui.css" not in source
+def test_legacy_order_patch_assets_are_fully_retired() -> None:
+    assert not LEGACY.exists()
+    assert not EXTRA_PATCH.exists()
+    catalog = ORDER_CATALOG.read_text(encoding="utf-8")
+    assert "mw_order_form_fix.js" not in catalog
+    assert "mw_order_extra_fix.js" not in catalog
 
 
 def test_canonical_order_assets_are_loaded_by_public_layout() -> None:
     source = SITE_LAYOUT.read_text(encoding="utf-8")
     assert '/static/js/mw_order_ui.js?v=20261013' in source
     assert '/static/css/order_ui.css?v=20261013' in source
-
-
-def test_obsolete_extra_patch_asset_is_removed() -> None:
-    assert not EXTRA_PATCH.exists()
 
 
 def test_order_form_behavior_lives_in_canonical_controller() -> None:
