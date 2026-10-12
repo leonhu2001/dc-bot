@@ -14,7 +14,7 @@
                 alt=""
                 loading="eager"
                 decoding="async"
-                onerror="this.parentElement.remove();"
+                data-remove-parent-on-error="true"
             >
         </div>
     {% endif %}
@@ -28,7 +28,7 @@
                 src="{{ profile.avatar_url }}"
                 alt="{{ profile.display_name }}"
                 decoding="async"
-                onerror="this.onerror=null;this.src='/static/img/server_logo.gif';this.classList.add('avatar-fallback');"
+                data-fallback-src="/static/img/server_logo.gif" data-fallback-class="avatar-fallback"
             >
 
             <span>

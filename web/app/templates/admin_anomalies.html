@@ -228,8 +228,7 @@
                 {% if issue.repairable and issue.repair_action %}
                 <form
                     method="post"
-                    action="/admin/anomalies/repair"
-                    onsubmit="return confirm('確定執行「{{ issue.repair_label or '安全修復' }}」嗎？系統會在執行前再次驗證最新資料。');"
+                    action="/admin/anomalies/repair" data-confirm-message="確定執行「{{ issue.repair_label or '安全修復' }}」嗎？系統會在執行前再次驗證最新資料。"
                     style="margin:0;"
                 >
                     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">

@@ -289,7 +289,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 window.LOVE_DELTA_BOOTSTRAP = {{ love_delta|tojson }};
 </script>
 <script src="/static/js/love_delta.js?v=1" defer></script>

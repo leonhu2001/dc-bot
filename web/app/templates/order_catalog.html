@@ -35,7 +35,7 @@
             <img
                 src="{{ selected_staff.avatar_url }}"
                 alt=""
-                onerror="this.onerror=null;this.src='/static/img/server_logo.gif';"
+                data-fallback-src="/static/img/server_logo.gif"
             >
 
             <div>
@@ -892,7 +892,7 @@
 </dialog>
 
 
-<script
+<script nonce="{{ request.state.csp_nonce }}"
     id="mw-order-groups-data"
     type="application/json"
 >
@@ -900,7 +900,7 @@
 </script>
 
 
-<script
+<script nonce="{{ request.state.csp_nonce }}"
     id="mw-order-context-data"
     type="application/json"
 >

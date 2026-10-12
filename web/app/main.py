@@ -50,11 +50,12 @@ from web.app.routers import admin_payouts_grouped
 from web.app.services.discord_service import get_member_role_ids
 from web.app.services.health_check import check_runtime_dependencies
 from web.app.services.http_security import (
-    CONTENT_SECURITY_POLICY,
     apply_live_access,
+    build_content_security_policy,
     csrf_source_allowed,
     is_admin_path,
     is_manager_only_admin_path,
+    new_csp_nonce,
     revoke_staff_access,
     sanitize_csv_response,
 )
@@ -79,6 +80,9 @@ app = FastAPI(title="MW Worker Dashboard")
 
 @app.middleware("http")
 async def security_and_refresh_access(request: Request, call_next):
+    csp_nonce = new_csp_nonce()
+    request.state.csp_nonce = csp_nonce
+
     allowed, retry_after = rate_limit_allowed(request)
     if not allowed:
         return PlainTextResponse(
@@ -200,7 +204,10 @@ async def security_and_refresh_access(request: Request, call_next):
         "Strict-Transport-Security",
         "max-age=31536000",
     )
-    response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        build_content_security_policy(csp_nonce),
+    )
     response.headers.setdefault(
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=(), payment=()",

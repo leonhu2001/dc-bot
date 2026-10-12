@@ -16,6 +16,8 @@ STATIC = ROOT / "web" / "app" / "static"
 # remaining inline blocks are dynamic bootstrap/data blocks and may only decrease.
 MAX_INLINE_STYLE_BLOCKS = 0
 MAX_INLINE_SCRIPT_BLOCKS = 7
+MAX_INLINE_STYLE_ATTRIBUTES = 107
+MAX_INLINE_EVENT_ATTRIBUTES = 0
 
 # Patch-style frontend assets are fully retired. Keep this set empty so a new
 # *_fix.js / *_fix.css fails the static audit instead of becoming permanent debt.
@@ -27,6 +29,12 @@ STATIC_REF_RE = re.compile(
 )
 INLINE_STYLE_RE = re.compile(r"<style(?:\s|>)", re.IGNORECASE)
 INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.IGNORECASE)
+INLINE_SCRIPT_WITHOUT_NONCE_RE = re.compile(
+    r"<script(?![^>]*\bsrc\s*=)(?![^>]*\bnonce\s*=)[^>]*>",
+    re.IGNORECASE,
+)
+INLINE_STYLE_ATTRIBUTE_RE = re.compile(r"\sstyle\s*=", re.IGNORECASE)
+INLINE_EVENT_ATTRIBUTE_RE = re.compile(r"\son[a-z0-9_-]+\s*=", re.IGNORECASE)
 PATCH_ASSET_RE = re.compile(r"(?:^|/)[^/]*_fix\.(?:js|css)$", re.IGNORECASE)
 
 
@@ -61,6 +69,9 @@ def main() -> None:
     errors: list[str] = []
     inline_style_count = 0
     inline_script_count = 0
+    inline_script_without_nonce_count = 0
+    inline_style_attribute_count = 0
+    inline_event_attribute_count = 0
     static_references: set[str] = set()
 
     for path in template_files:
@@ -81,6 +92,9 @@ def main() -> None:
 
         inline_style_count += len(INLINE_STYLE_RE.findall(source))
         inline_script_count += len(INLINE_SCRIPT_RE.findall(source))
+        inline_script_without_nonce_count += len(INLINE_SCRIPT_WITHOUT_NONCE_RE.findall(source))
+        inline_style_attribute_count += len(INLINE_STYLE_ATTRIBUTE_RE.findall(source))
+        inline_event_attribute_count += len(INLINE_EVENT_ATTRIBUTE_RE.findall(source))
         static_references.update(STATIC_REF_RE.findall(source))
 
     title("STATIC_REFERENCES")
@@ -117,6 +131,11 @@ def main() -> None:
     print("INLINE_SCRIPT_BLOCKS:", inline_script_count)
     print("MAX_INLINE_STYLE_BLOCKS:", MAX_INLINE_STYLE_BLOCKS)
     print("MAX_INLINE_SCRIPT_BLOCKS:", MAX_INLINE_SCRIPT_BLOCKS)
+    print("INLINE_SCRIPT_WITHOUT_NONCE:", inline_script_without_nonce_count)
+    print("INLINE_STYLE_ATTRIBUTES:", inline_style_attribute_count)
+    print("MAX_INLINE_STYLE_ATTRIBUTES:", MAX_INLINE_STYLE_ATTRIBUTES)
+    print("INLINE_EVENT_ATTRIBUTES:", inline_event_attribute_count)
+    print("MAX_INLINE_EVENT_ATTRIBUTES:", MAX_INLINE_EVENT_ATTRIBUTES)
 
     if inline_style_count > MAX_INLINE_STYLE_BLOCKS:
         errors.append(
@@ -127,6 +146,20 @@ def main() -> None:
         errors.append(
             "inline script debt increased: "
             f"{inline_script_count} > {MAX_INLINE_SCRIPT_BLOCKS}"
+        )
+    if inline_script_without_nonce_count:
+        errors.append(
+            f"inline script without CSP nonce: {inline_script_without_nonce_count}"
+        )
+    if inline_style_attribute_count > MAX_INLINE_STYLE_ATTRIBUTES:
+        errors.append(
+            "inline style attribute debt increased: "
+            f"{inline_style_attribute_count} > {MAX_INLINE_STYLE_ATTRIBUTES}"
+        )
+    if inline_event_attribute_count > MAX_INLINE_EVENT_ATTRIBUTES:
+        errors.append(
+            "inline event handler debt increased: "
+            f"{inline_event_attribute_count} > {MAX_INLINE_EVENT_ATTRIBUTES}"
         )
 
     title("ERRORS")

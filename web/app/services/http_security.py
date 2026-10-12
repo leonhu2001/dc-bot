@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import csv
 import io
+import secrets
 from collections.abc import Iterable
 from urllib.parse import urlsplit
 
@@ -28,23 +30,32 @@ MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/payouts/summary/person-status",
 )
 
-# Legacy templates still contain inline style/script. Keep unsafe-inline until
-# the audited debt reaches zero, while locking down the other high-risk sources.
-CONTENT_SECURITY_POLICY = "; ".join(
-    (
-        "default-src 'self'",
-        "base-uri 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "form-action 'self'",
-        "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https:",
-        "font-src 'self' data:",
-        "connect-src 'self'",
-        "upgrade-insecure-requests",
+def new_csp_nonce() -> str:
+    return base64.b64encode(secrets.token_bytes(18)).decode("ascii")
+
+
+def build_content_security_policy(nonce: str) -> str:
+    safe_nonce = str(nonce or "").strip()
+    if not safe_nonce:
+        raise ValueError("CSP nonce is required")
+
+    # Executable inline JavaScript is nonce-bound. style-src keeps unsafe-inline
+    # temporarily only for audited legacy style attributes; <style> blocks are gone.
+    return "; ".join(
+        (
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "form-action 'self'",
+            f"script-src 'self' 'nonce-{safe_nonce}'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: https:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "upgrade-insecure-requests",
+        )
     )
-)
 
 
 def is_admin_path(path: str) -> bool:

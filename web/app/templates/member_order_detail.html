@@ -130,7 +130,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (() => {
     const card = document.getElementById("customerLoveDeltaCard");
     const copy = document.getElementById("customerLoveDeltaCopy");

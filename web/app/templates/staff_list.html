@@ -64,7 +64,7 @@
                             alt="{{ profile.display_name }}"
                             loading="lazy"
                             decoding="async"
-                            onerror="this.onerror=null;this.src='/static/img/server_logo.gif';this.classList.add('avatar-fallback');"
+                            data-fallback-src="/static/img/server_logo.gif" data-fallback-class="avatar-fallback"
                         >
 
                         <span class="public-crew-role">

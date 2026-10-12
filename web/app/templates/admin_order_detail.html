@@ -709,7 +709,7 @@
                             <strong>{{ '客服補登' if claim.source.startswith('admin_web:') else '本人接單' }}</strong>
                         </div>
                         <div class="mw-r8-actions" style="margin-top:0;">
-                            <form method="post" action="/admin/order-workspace/{{ order.id }}/acceptance/{{ claim.staff_discord_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" onsubmit="return confirm('確定移除這位付款前接單人員？');">
+                            <form method="post" action="/admin/order-workspace/{{ order.id }}/acceptance/{{ claim.staff_discord_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" data-confirm-message="確定移除這位付款前接單人員？">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                 <button class="mw-r8-btn danger" type="submit">移除</button>
                             </form>
@@ -768,7 +768,7 @@
                             </form>
                         {% endif %}
 
-                        <form method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" onsubmit="return confirm('確定移除這位接單人員？');">
+                        <form method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" data-confirm-message="確定移除這位接單人員？">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="reason" value="客服後台訂單工作區移除">
                             <button class="mw-r8-btn danger" type="submit">移除</button>

@@ -395,7 +395,7 @@
                                     alt="{{ profile.display_name }}"
                                     loading="lazy"
                                     decoding="async"
-                                    onerror="this.onerror=null;this.src='/static/img/server_logo.gif';"
+                                    data-fallback-src="/static/img/server_logo.gif"
                                 >
                             {% endfor %}
                         </div>
