@@ -52,9 +52,10 @@ def add_customer_session(page: Page, *, suffix: str = "01") -> str:
             {
                 "name": "session",
                 "value": signed,
-                "url": BASE_URL,
+                "domain": "127.0.0.1",
                 "path": "/",
                 "httpOnly": True,
+                "secure": False,
                 "sameSite": "Lax",
             }
         ]
