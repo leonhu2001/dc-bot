@@ -15,8 +15,8 @@ STATIC = ROOT / "web" / "app" / "static"
 # Debt budget after the 2026-10-13 public-layout extraction. The project still
 # needs CSP unsafe-inline on legacy pages, but new changes may only reduce these
 # counts, never increase them.
-MAX_INLINE_STYLE_BLOCKS = 26
-MAX_INLINE_SCRIPT_BLOCKS = 19
+MAX_INLINE_STYLE_BLOCKS = 0
+MAX_INLINE_SCRIPT_BLOCKS = 7
 
 # Patch-style frontend assets are fully retired. Keep this set empty so a new
 # *_fix.js / *_fix.css fails the static audit instead of becoming permanent debt.
@@ -128,6 +128,22 @@ def main() -> None:
         errors.append(
             "inline script debt increased: "
             f"{inline_script_count} > {MAX_INLINE_SCRIPT_BLOCKS}"
+        )
+
+    inline_script_tag_re = re.compile(
+        r"<script(?![^>]*\bsrc\s*=)(?P<attrs>[^>]*)>",
+        re.IGNORECASE,
+    )
+    missing_nonce = []
+    for template_path in template_files:
+        source = template_path.read_text(encoding="utf-8-sig")
+        for match in inline_script_tag_re.finditer(source):
+            if not re.search(r"\bnonce\s*=", match.group("attrs") or "", re.IGNORECASE):
+                missing_nonce.append(template_path.name)
+    if missing_nonce:
+        errors.append(
+            "inline executable scripts missing CSP nonce: "
+            + ", ".join(sorted(set(missing_nonce)))
         )
 
     title("ERRORS")

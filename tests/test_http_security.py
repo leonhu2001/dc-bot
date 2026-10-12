@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from web.app.services.http_security import (
+    build_content_security_policy,
     csrf_source_allowed,
     is_admin_path,
     is_manager_only_admin_path,
@@ -101,3 +102,14 @@ def test_revoke_staff_access_clears_all_operational_privileges():
         "is_employee",
     ):
         assert result[key] is False
+
+
+def test_csp_nonce_policy_rejects_unsafe_inline_scripts():
+    policy = build_content_security_policy("abc123")
+
+    assert "script-src 'self' 'nonce-abc123'" in policy
+    assert "script-src-attr 'none'" in policy
+    assert "style-src-elem 'self'" in policy
+    assert "style-src-attr 'unsafe-inline'" in policy
+    assert "script-src 'self' 'unsafe-inline'" not in policy
+    assert "style-src 'self' 'unsafe-inline'" not in policy

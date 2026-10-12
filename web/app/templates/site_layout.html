@@ -93,7 +93,7 @@
     <meta name="twitter:image" content="{{ seo_data.get('image') or 'https://mowanentertainment.com/static/img/og-share.jpg?v=20260904-2' }}">
 
     {% for schema in seo_data.get("schemas", []) %}
-        <script type="application/ld+json">{{ schema|tojson }}</script>
+        <script nonce="{{ request.state.csp_nonce }}" type="application/ld+json">{{ schema|tojson }}</script>
     {% endfor %}
 
 </head>

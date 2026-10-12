@@ -15,7 +15,7 @@
 </section>
 <section class="rules"><details><summary>保底規則</summary><div class="rule-body"><b>穩健：</b>紅／黑、單／雙、1–18／19–36，命中 1,300 萬。<br><b>進階：</b>六線覆蓋 6 個號碼，命中 1,500 萬。<br><b>豪賭：</b>四角覆蓋 4 個號碼，命中 1,700 萬。<br><b>單押：</b>直接押 0–36 任一單號，一般單號命中 2,200 萬；單押 <b>0</b> 命中為 <b>JACKPOT 2,500 萬</b>。<br>任一玩法未命中皆為 <b>1,200 萬</b>基本保底；若沒有單押 0，球落 0 也視為未命中。</div></details><details><summary>操作方式</summary><div class="rule-body">先選下注難度，再在下注桌選擇位置。確認後輪盤與小球只完整轉動一次，小球最後落入的號碼即為結果。<b>結果產生後即永久鎖定，重新整理、重新開啟頁面都不會重抽。</b></div></details></section>
 </main><div id="toast" class="toast"></div>
-<script>
+<script nonce="{{ request.state.csp_nonce }}">
 (()=>{"use strict";
 const INITIAL_DRAW={{ draw|tojson }},CAN_DRAW={{ can_draw|tojson }},UNAVAILABLE_REASON={{ reason|tojson }},DRAW_URL="/me/orders/{{ order.id }}/roulette/draw";
 const WHEEL=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26],RED=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]),STEP=360/37;
