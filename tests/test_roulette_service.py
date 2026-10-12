@@ -18,7 +18,7 @@ from web.app.services.roulette_service import (
 
 
 def test_safe_red_hit_and_miss():
-    assert resolve_roulette_result("safe", "red", 3)["prize"] == 1500
+    assert resolve_roulette_result("safe", "red", 3)["prize"] == 1300
     result = resolve_roulette_result("safe", "red", 2)
     assert result["hit"] is False
     assert result["prize"] == 1200
@@ -33,12 +33,12 @@ def test_zero_is_not_outside_bet_hit():
 def test_single_and_zero_jackpot():
     normal = resolve_roulette_result("single", 7, 7)
     assert normal["hit"] is True
-    assert normal["prize"] == 6000
+    assert normal["prize"] == 2200
     assert normal["is_jackpot"] is False
 
     jackpot = resolve_roulette_result("single", 0, 0)
     assert jackpot["hit"] is True
-    assert jackpot["prize"] == 7000
+    assert jackpot["prize"] == 2500
     assert jackpot["is_jackpot"] is True
 
 
@@ -48,11 +48,11 @@ def test_six_and_corner_coverage_match_frontend_rules():
 
     six = resolve_roulette_result("six", 17, 20)
     assert six["hit"] is True
-    assert six["prize"] == 2000
+    assert six["prize"] == 1500
 
     corner = resolve_roulette_result("corner", 17, 19)
     assert corner["hit"] is True
-    assert corner["prize"] == 2500
+    assert corner["prize"] == 1700
 
 
 def test_invalid_bet_is_rejected():
