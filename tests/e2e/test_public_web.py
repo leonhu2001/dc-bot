@@ -91,7 +91,7 @@ def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> N
     )
 
     for field, value, plus in candidates:
-        if not field.is_visible():
+        if not field.is_visible() or not plus.is_enabled():
             continue
 
         before = value.inner_text()
@@ -100,15 +100,14 @@ def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> N
         after = value.inner_text()
 
         if after == before:
-            # Some variants intentionally expose a stepper while min == max;
-            # the production controller clamps the value instead of disabling
-            # the button. Try the next adjustable dimension before skipping.
+            # Some variants can still clamp a nominally enabled control to the
+            # same value. Try the next adjustable dimension before skipping.
             continue
 
         expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
         return
 
-    pytest.skip("First public order group has no stepper with an adjustable range")
+    pytest.skip("First public order group has no enabled stepper with an adjustable range")
 
 
 def test_order_catalog_has_no_mobile_horizontal_overflow(page: Page) -> None:
