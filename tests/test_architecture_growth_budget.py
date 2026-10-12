@@ -11,6 +11,7 @@ MAX_BYTES = {
     "bot.py": 276_000,
     "services/order_runtime.py": 129_000,
     "services/self_service_runtime.py": 146_000,
+    "web/app/main.py": 18_500,
     "web/app/routers/admin.py": 102_000,
     "views/review.py": 95_500,
 }
