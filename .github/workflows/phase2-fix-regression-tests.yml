@@ -1,0 +1,90 @@
+name: Phase2 fix regression tests
+
+on:
+  push:
+    branches:
+      - refactor/phase2-runtime-assets-20261013
+    paths:
+      - .github/workflows/phase2-fix-regression-tests.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase2-runtime-assets-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Update tests to canonical phase2 boundaries
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin_test = Path('tests/test_admin_navigation.py')
+          source = admin_test.read_text(encoding='utf-8')
+          old = '''    admin_source = (routers / "admin.py").read_text(encoding="utf-8")
+              search_source = (routers / "admin_global_search.py").read_text(
+                  encoding="utf-8"
+              )
+          '''
+          # Preserve exact indentation from the source by using direct smaller replacements.
+          source = source.replace(
+              '    admin_source = (routers / "admin.py").read_text(encoding="utf-8")\n',
+              '    workspace_source = (routers / "admin_order_workspace.py").read_text(\n'
+              '        encoding="utf-8"\n'
+              '    )\n',
+              1,
+          )
+          source = source.replace(
+              '    assert "request: Request | None = None" in admin_source\n'
+              '    assert \'params["return_to"] = return_to\' in admin_source\n',
+              '    assert "request: Request | None = None" in workspace_source\n'
+              '    assert \'params["return_to"] = return_to\' in workspace_source\n',
+              1,
+          )
+          admin_test.write_text(source, encoding='utf-8')
+
+          report_test = Path('tests/test_operations_report.py')
+          source = report_test.read_text(encoding='utf-8')
+          old = '''    class FixedDateTime(datetime):
+                  @classmethod
+                  def utcnow(cls):
+                      # Taipei time becomes 2026-10-01 23:09.
+                      return cls(2026, 10, 1, 15, 9, 0)
+
+              monkeypatch.setattr(
+                  report_module,
+                  "datetime",
+                  FixedDateTime,
+              )
+          '''
+          # Use precise source slice markers because this test intentionally follows the
+          # production clock abstraction rather than the deprecated datetime.utcnow API.
+          start = source.index('    class FixedDateTime(datetime):\n', source.index('def test_report_period_uses_full_calendar_day_for_comparison'))
+          end_marker = '    )\n\n    (\n        period,\n'
+          end = source.index(end_marker, start) + len('    )\n')
+          replacement = (
+              '    fixed_now = datetime(2026, 10, 1, 15, 9, 0)\n'
+              '    monkeypatch.setattr(report_module, "utc_now_naive", lambda: fixed_now)\n'
+          )
+          source = source[:start] + replacement + source[end:]
+          report_test.write_text(source, encoding='utf-8')
+          PY
+          python -m compileall -q tests/test_admin_navigation.py tests/test_operations_report.py
+          git rm .github/workflows/phase2-fix-regression-tests.yml
+      - name: Commit test-boundary fix
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Align regressions with phase2 module boundaries"
+          git pull --rebase origin refactor/phase2-runtime-assets-20261013
+          git push origin HEAD:refactor/phase2-runtime-assets-20261013
