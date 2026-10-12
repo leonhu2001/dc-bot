@@ -1,0 +1,1353 @@
+
+/* MAWAN_PORTAL_UNIFIED_20260903_V1 */
+
+:root {
+    --mw-u-bg:
+        #080807;
+
+    --mw-u-panel:
+        #11110f;
+
+    --mw-u-panel2:
+        #0d0d0c;
+
+    --mw-u-line:
+        rgba(
+            255,
+            255,
+            255,
+            .085
+        );
+
+    --mw-u-gold-line:
+        rgba(
+            223,
+            183,
+            92,
+            .27
+        );
+
+    --mw-u-gold:
+        #dfb75c;
+
+    --mw-u-gold2:
+        #f2d68d;
+
+    --mw-u-text:
+        #f3f1eb;
+
+    --mw-u-muted:
+        #8f8b82;
+
+    --mw-u-side:
+        164px;
+}
+
+
+/* ==========================================================
+   GLOBAL
+   ========================================================== */
+
+html,
+body {
+    min-height:
+        100%;
+}
+
+body {
+    margin:
+        0 !important;
+
+    color:
+        var(
+            --mw-u-text
+        ) !important;
+
+    background:
+        radial-gradient(
+            circle at 78% -8%,
+            rgba(
+                223,
+                183,
+                92,
+                .055
+            ),
+            transparent 30%
+        ),
+        var(
+            --mw-u-bg
+        ) !important;
+
+    font-family:
+        Inter,
+        "Noto Sans TC",
+        "Microsoft JhengHei",
+        system-ui,
+        sans-serif !important;
+
+    font-size:
+        13px;
+}
+
+
+/* ==========================================================
+   ONE SHELL
+   ========================================================== */
+
+.mw-unified-shell,
+.shell {
+    width:
+        100%;
+
+    min-height:
+        100vh;
+
+    display:
+        grid !important;
+
+    grid-template-columns:
+        var(
+            --mw-u-side
+        )
+        minmax(
+            0,
+            1fr
+        ) !important;
+
+    background:
+        transparent !important;
+}
+
+
+/* ==========================================================
+   ONE SIDEBAR
+   ========================================================== */
+
+.mw-unified-side {
+    position:
+        sticky;
+
+    top:
+        0;
+
+    z-index:
+        30;
+
+    height:
+        100vh;
+
+    padding:
+        16px 11px;
+
+    border-right:
+        1px solid
+        var(
+            --mw-u-line
+        );
+
+    background:
+        rgba(
+            6,
+            6,
+            5,
+            .985
+        );
+}
+
+.mw-unified-brand {
+    padding:
+        2px 9px 20px;
+}
+
+.mw-unified-brand small {
+    display:
+        block;
+
+    color:
+        var(
+            --mw-u-gold
+        );
+
+    font-size:
+        8px;
+
+    font-weight:
+        950;
+
+    letter-spacing:
+        .18em;
+}
+
+.mw-unified-brand strong {
+    display:
+        block;
+
+    margin-top:
+        6px;
+
+    color:
+        var(
+            --mw-u-text
+        );
+
+    font-size:
+        19px;
+
+    line-height:
+        1.2;
+}
+
+.mw-unified-nav {
+    display:
+        grid;
+
+    gap:
+        3px;
+}
+
+.mw-unified-nav a {
+    min-height:
+        35px;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    padding:
+        0 9px;
+
+    border:
+        1px solid
+        transparent;
+
+    border-radius:
+        8px;
+
+    color:
+        #918d84 !important;
+
+    background:
+        transparent !important;
+
+    font-size:
+        11px;
+
+    font-weight:
+        850;
+
+    text-decoration:
+        none !important;
+
+    transition:
+        color .15s ease,
+        border-color .15s ease,
+        background .15s ease;
+}
+
+.mw-unified-nav a:hover,
+.mw-unified-nav a:focus-visible {
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .18
+        );
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .045
+        ) !important;
+}
+
+.mw-unified-nav a.active {
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    border-color:
+        rgba(
+            223,
+            183,
+            92,
+            .28
+        );
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .07
+        ) !important;
+}
+
+
+/* ==========================================================
+   ONE MAIN SPACING
+   ========================================================== */
+
+.mw-unified-main,
+.main {
+    min-width:
+        0;
+
+    width:
+        100%;
+
+    padding:
+        18px 22px 42px !important;
+
+    background:
+        transparent !important;
+}
+
+.mw-unified-page-head {
+    min-height:
+        77px;
+
+    margin:
+        0 0 14px;
+
+    padding:
+        0;
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    align-items:
+        flex-start;
+
+    justify-content:
+        flex-start;
+}
+
+.mw-unified-page-kicker,
+.eyebrow {
+    margin:
+        0 !important;
+
+    color:
+        var(
+            --mw-u-gold
+        ) !important;
+
+    font-size:
+        8px !important;
+
+    font-weight:
+        950 !important;
+
+    line-height:
+        1.3;
+
+    letter-spacing:
+        .18em !important;
+
+    text-transform:
+        uppercase;
+}
+
+.mw-unified-page-title {
+    margin:
+        7px 0 0;
+
+    color:
+        var(
+            --mw-u-text
+        );
+
+    font-size:
+        33px;
+
+    font-weight:
+        950;
+
+    line-height:
+        1.08;
+
+    letter-spacing:
+        .015em;
+}
+
+.mw-unified-current-user {
+    margin-top:
+        7px;
+
+    color:
+        var(
+            --mw-u-muted
+        );
+
+    font-size:
+        10px;
+}
+
+.mw-unified-content {
+    display:
+        grid;
+
+    gap:
+        12px;
+
+    min-width:
+        0;
+}
+
+
+/* ==========================================================
+   STANDALONE NEW ADMIN PAGES
+   ========================================================== */
+
+body .shell > .mw-unified-side {
+    grid-column:
+        1;
+}
+
+body .shell > .main {
+    grid-column:
+        2;
+}
+
+body .main > .top {
+    min-height:
+        77px !important;
+
+    margin:
+        0 0 14px !important;
+
+    padding:
+        0 !important;
+
+    align-items:
+        flex-start !important;
+}
+
+body .main > .top h1,
+body .main h1 {
+    margin-top:
+        7px;
+
+    font-size:
+        33px;
+}
+
+body .main > .top .eyebrow {
+    margin-top:
+        0 !important;
+}
+
+
+/* ==========================================================
+   GENERIC PANELS / TABLES
+   ========================================================== */
+
+.panel,
+.card,
+.mw-page-card,
+.compact-panel {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+table {
+    color:
+        var(
+            --mw-u-text
+        );
+}
+
+th {
+    color:
+        var(
+            --mw-u-muted
+        ) !important;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            .012
+        ) !important;
+}
+
+td,
+th {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+}
+
+input,
+select,
+textarea {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+
+    color:
+        var(
+            --mw-u-text
+        ) !important;
+
+    background:
+        #090908 !important;
+}
+
+button,
+.button {
+    border-color:
+        var(
+            --mw-u-gold-line
+        ) !important;
+
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .065
+        ) !important;
+}
+
+
+/* ==========================================================
+   OLD ORDER HISTORY -> NEW BACKOFFICE LOOK
+   ========================================================== */
+
+.history-ledger-page {
+    gap:
+        12px !important;
+}
+
+.history-ledger-hero {
+    padding:
+        16px 18px !important;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        12px !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+.history-ledger-hero::after {
+    display:
+        none !important;
+}
+
+.history-ledger-title {
+    font-size:
+        25px !important;
+}
+
+.history-ledger-filter,
+.history-ledger-panel,
+.history-bulk-toolbar {
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        11px !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+.history-ledger-filter {
+    padding:
+        13px !important;
+
+    gap:
+        9px !important;
+}
+
+.history-ledger-stats {
+    gap:
+        8px !important;
+}
+
+.history-ledger-stat {
+    min-height:
+        88px !important;
+
+    padding:
+        13px !important;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        10px !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+.history-ledger-stat::after {
+    display:
+        none !important;
+}
+
+.history-ledger-stat strong {
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    font-size:
+        28px !important;
+}
+
+.history-ledger-head {
+    padding:
+        13px 15px !important;
+
+    background:
+        transparent !important;
+}
+
+.history-ledger-head h3 {
+    font-size:
+        16px !important;
+}
+
+.history-ledger-table th,
+.history-ledger-table td {
+    padding:
+        10px 11px !important;
+}
+
+
+/* ==========================================================
+   ADMIN PAYOUT SUMMARY
+   ========================================================== */
+
+.staff-summary-page {
+    gap:
+        12px !important;
+}
+
+.staff-summary-filter,
+.staff-summary-ledger-panel {
+    padding:
+        13px !important;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        11px !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+}
+
+.staff-summary-total-grid {
+    gap:
+        8px !important;
+}
+
+.staff-summary-total-card {
+    min-height:
+        88px !important;
+
+    padding:
+        13px !important;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        10px !important;
+
+    color:
+        var(
+            --mw-u-text
+        ) !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+.staff-summary-total-card::after {
+    display:
+        none !important;
+}
+
+.staff-summary-total-card span {
+    color:
+        var(
+            --mw-u-muted
+        ) !important;
+
+    font-size:
+        11px !important;
+}
+
+.staff-summary-total-card strong {
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    font-size:
+        28px !important;
+}
+
+.staff-summary-total-card small {
+    color:
+        var(
+            --mw-u-muted
+        ) !important;
+}
+
+.staff-summary-ledger-head {
+    padding:
+        13px 15px !important;
+}
+
+.staff-summary-ledger-head h2 {
+    font-size:
+        17px !important;
+}
+
+.staff-summary-table th,
+.staff-summary-table td {
+    padding:
+        10px 11px !important;
+
+    font-size:
+        12px !important;
+}
+
+
+/* ==========================================================
+   AUDIT
+   ========================================================== */
+
+.audit-details,
+.audit-json-grid pre {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+
+    background:
+        #090908 !important;
+}
+
+.admin-order-card {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+}
+
+
+/* ==========================================================
+   REVIEWS
+   ========================================================== */
+
+.mw-review-toolbar {
+    display:
+        grid;
+
+    grid-template-columns:
+        minmax(
+            260px,
+            1fr
+        )
+        180px
+        auto;
+
+    gap:
+        8px;
+
+    align-items:
+        end;
+
+    padding:
+        13px;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        );
+
+    border-radius:
+        11px;
+
+    background:
+        var(
+            --mw-u-panel
+        );
+}
+
+.mw-review-toolbar label {
+    display:
+        grid;
+
+    gap:
+        6px;
+
+    color:
+        var(
+            --mw-u-muted
+        );
+
+    font-size:
+        10px;
+
+    font-weight:
+        850;
+}
+
+.mw-review-toolbar input,
+.mw-review-toolbar select {
+    min-height:
+        37px;
+
+    padding:
+        0 10px;
+
+    border-radius:
+        8px;
+}
+
+.mw-review-summary {
+    padding:
+        11px 13px;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        );
+
+    border-radius:
+        10px;
+
+    color:
+        var(
+            --mw-u-muted
+        );
+
+    background:
+        var(
+            --mw-u-panel
+        );
+}
+
+.mw-review-panel {
+    overflow:
+        hidden;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        );
+
+    border-radius:
+        11px;
+
+    background:
+        var(
+            --mw-u-panel
+        );
+}
+
+.mw-review-table-wrap {
+    overflow-x:
+        auto;
+}
+
+.mw-review-table {
+    width:
+        100%;
+
+    min-width:
+        1150px;
+
+    border-collapse:
+        collapse;
+}
+
+.mw-review-table th,
+.mw-review-table td {
+    padding:
+        10px 11px;
+
+    border-bottom:
+        1px solid
+        var(
+            --mw-u-line
+        );
+
+    vertical-align:
+        top;
+
+    font-size:
+        11px;
+}
+
+.mw-review-table th {
+    text-align:
+        left;
+}
+
+.mw-review-comment {
+    max-width:
+        330px;
+
+    white-space:
+        pre-wrap;
+
+    color:
+        #c8c4ba;
+}
+
+.mw-review-actions {
+    display:
+        flex;
+
+    gap:
+        5px;
+
+    flex-wrap:
+        wrap;
+}
+
+.mw-review-actions form {
+    margin:
+        0;
+}
+
+.mw-review-actions button {
+    min-height:
+        31px;
+
+    padding:
+        0 8px;
+
+    border-radius:
+        7px;
+
+    cursor:
+        pointer;
+}
+
+
+/* ==========================================================
+   EMPLOYEE / PAYOUT
+   ========================================================== */
+
+.my-payout-page {
+    gap:
+        12px !important;
+}
+
+.my-payout-command {
+    gap:
+        10px !important;
+}
+
+.my-payout-card,
+.payout-summary-list-section,
+.my-payout-total-card,
+.summary-person-card {
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        11px !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+.my-payout-intro {
+    padding:
+        15px !important;
+}
+
+.my-payout-intro::after {
+    display:
+        none !important;
+}
+
+.my-payout-intro h2 {
+    font-size:
+        20px !important;
+}
+
+.my-payout-filter-card {
+    padding:
+        13px !important;
+}
+
+.my-payout-total-grid {
+    gap:
+        8px !important;
+}
+
+.my-payout-total-card {
+    min-height:
+        88px !important;
+
+    padding:
+        13px !important;
+}
+
+.my-payout-total-card strong {
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    font-size:
+        28px !important;
+}
+
+.summary-list-title {
+    font-size:
+        16px !important;
+}
+
+
+/* ==========================================================
+   DISPATCH
+   ========================================================== */
+
+.dispatch-shell {
+    gap:
+        12px !important;
+}
+
+.dispatch-hero,
+.dispatch-board {
+    gap:
+        10px !important;
+}
+
+.dispatch-panel,
+.dispatch-my-card,
+.dispatch-order-card,
+.dispatch-empty,
+.dispatch-meta-item,
+.dispatch-assignment {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+
+    background:
+        var(
+            --mw-u-panel
+        ) !important;
+
+    box-shadow:
+        none !important;
+}
+
+.dispatch-panel {
+    border-radius:
+        11px !important;
+}
+
+.dispatch-hero-main {
+    padding:
+        16px !important;
+}
+
+.dispatch-title {
+    font-size:
+        26px !important;
+}
+
+.dispatch-column {
+    padding:
+        13px !important;
+}
+
+.dispatch-column-head {
+    margin-bottom:
+        10px !important;
+
+    padding-bottom:
+        10px !important;
+}
+
+.dispatch-column-head h2 {
+    font-size:
+        16px !important;
+}
+
+.dispatch-stats {
+    gap:
+        8px !important;
+
+    padding:
+        12px !important;
+}
+
+.dispatch-stat {
+    padding:
+        12px !important;
+
+    border:
+        1px solid
+        var(
+            --mw-u-line
+        ) !important;
+
+    border-radius:
+        9px !important;
+
+    background:
+        var(
+            --mw-u-panel2
+        ) !important;
+}
+
+.dispatch-stat strong {
+    color:
+        var(
+            --mw-u-gold2
+        );
+
+    font-size:
+        28px !important;
+}
+
+.dispatch-tag,
+.dispatch-pill,
+.dispatch-chip {
+    border-color:
+        var(
+            --mw-u-gold-line
+        ) !important;
+
+    color:
+        var(
+            --mw-u-gold2
+        ) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .055
+        ) !important;
+}
+
+.dispatch-status {
+    border-color:
+        var(
+            --mw-u-line
+        ) !important;
+}
+
+.dispatch-payout {
+    border-color:
+        var(
+            --mw-u-gold-line
+        ) !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .04
+        ) !important;
+}
+
+.dispatch-button {
+    border-radius:
+        8px !important;
+
+    background:
+        rgba(
+            223,
+            183,
+            92,
+            .07
+        ) !important;
+}
+
+
+/* ==========================================================
+   STANDALONE EMPLOYEE PAGE
+   ========================================================== */
+
+body .shell .mw-unified-side + .main {
+    padding:
+        18px 22px 42px !important;
+}
+
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (
+    max-width: 760px
+) {
+
+    :root {
+        --mw-u-side:
+            100%;
+    }
+
+    .mw-unified-shell,
+    .shell {
+        display:
+            block !important;
+    }
+
+    .mw-unified-side {
+        position:
+            static;
+
+        width:
+            100%;
+
+        height:
+            auto;
+
+        padding:
+            12px;
+
+        border-right:
+            0;
+
+        border-bottom:
+            1px solid
+            var(
+                --mw-u-line
+            );
+    }
+
+    .mw-unified-brand {
+        padding-bottom:
+            12px;
+    }
+
+    .mw-unified-nav {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+
+    .mw-unified-main,
+    .main {
+        padding:
+            16px 12px 36px !important;
+    }
+
+    .mw-unified-page-title,
+    body .main h1 {
+        font-size:
+            29px !important;
+    }
+
+    .mw-review-toolbar {
+        grid-template-columns:
+            1fr;
+    }
+
+}
