@@ -12,9 +12,9 @@ ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
-# Legacy baseline on 2026-10-13. The project still needs CSP unsafe-inline, but
-# new changes may only reduce these counts, never increase them.
-MAX_INLINE_STYLE_BLOCKS = 28
+# Shrink-only CSP debt budget. The project still needs unsafe-inline for legacy
+# templates, but each extraction lowers this ceiling permanently.
+MAX_INLINE_STYLE_BLOCKS = 27
 MAX_INLINE_SCRIPT_BLOCKS = 20
 
 STATIC_REF_RE = re.compile(
