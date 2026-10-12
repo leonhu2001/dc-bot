@@ -1,0 +1,21 @@
+name: Phase5 payment inventory
+
+on:
+  push:
+    branches:
+      - refactor/phase5-order-payment-runtime-20261013
+    paths:
+      - tools/phase5_payment_inventory.py
+      - .github/workflows/phase5-payment-inventory.yml
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase5-order-payment-runtime-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python tools/phase5_payment_inventory.py
