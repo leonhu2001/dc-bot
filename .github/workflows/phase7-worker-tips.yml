@@ -6,6 +6,7 @@ on:
       - refactor/phase7-review-tips-20261013
     paths:
       - tools/phase7_extract_worker_tips.py
+      - tools/phase7_fix_worker_tip_store.py
       - .github/workflows/phase7-worker-tips.yml
 
 permissions:
@@ -33,14 +34,16 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -r web/requirements-web.txt
           python -m pip install -r requirements-dev.txt
-      - name: Compile extractor
-        run: python -m py_compile tools/phase7_extract_worker_tips.py
+      - name: Compile extractors
+        run: python -m py_compile tools/phase7_extract_worker_tips.py tools/phase7_fix_worker_tip_store.py
       - name: Extract worker-tip service and views
-        run: python tools/phase7_extract_worker_tips.py
+        run: |
+          python tools/phase7_extract_worker_tips.py
+          python tools/phase7_fix_worker_tip_store.py
       - name: Validate worker-tip extraction
         run: |
           python -m compileall -q services views tests
-          python -m pytest -q tests/test_worker_tip_extraction.py tests/test_architecture_growth_budget.py
+          python -m pytest -q tests/test_worker_tip_extraction.py tests/test_architecture_growth_budget.py tests/test_post_close_status.py
           python -m pytest -q tests/golden
           python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
       - name: Commit extracted worker-tip modules
