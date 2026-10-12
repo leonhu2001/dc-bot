@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
+import subprocess
 from typing import Iterable
 
 from PIL import Image, ImageSequence
@@ -71,28 +73,33 @@ def _convert_static(source: Path, target: Path, asset: StaticAsset) -> None:
 
 
 def _convert_animated(source: Path, target: Path, asset: StaticAsset) -> None:
+    encoder = shutil.which("gif2webp")
+    if not encoder:
+        raise RuntimeError("gif2webp is required for verified animated WebP conversion")
+
     with Image.open(source) as image:
         source_frames = int(getattr(image, "n_frames", 1) or 1)
         if source_frames <= 1:
             raise RuntimeError(f"expected animated source: {asset.source}")
-
         source_loop = int(image.info.get("loop", 0) or 0)
         durations = _frame_durations(image)
-        frames = [frame.convert("RGBA") for frame in ImageSequence.Iterator(image)]
         source_size = image.size
 
-    frames[0].save(
-        target,
-        format="WEBP",
-        save_all=True,
-        append_images=frames[1:],
-        duration=durations,
-        loop=source_loop,
-        lossless=asset.lossless,
-        quality=asset.quality,
-        method=6,
-        minimize_size=True,
-    )
+    command = [
+        encoder,
+        "-q",
+        str(asset.quality),
+        "-m",
+        "4",
+        "-mt",
+        str(source),
+        "-o",
+        str(target),
+    ]
+    if not asset.lossless:
+        command.insert(1, "-lossy")
+
+    subprocess.run(command, check=True)
 
     with Image.open(target) as converted:
         converted_frames = int(getattr(converted, "n_frames", 1) or 1)
