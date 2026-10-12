@@ -12,6 +12,11 @@ ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
+# Legacy baseline on 2026-10-13. The project still needs CSP unsafe-inline, but
+# new changes may only reduce these counts, never increase them.
+MAX_INLINE_STYLE_BLOCKS = 28
+MAX_INLINE_SCRIPT_BLOCKS = 20
+
 STATIC_REF_RE = re.compile(
     r'''(?:src|href)\s*=\s*["'](/static/[^"'?#]+)(?:[?#][^"']*)?["']''',
     re.IGNORECASE,
@@ -87,10 +92,19 @@ def main() -> None:
     title("CSP_DEBT")
     print("INLINE_STYLE_BLOCKS:", inline_style_count)
     print("INLINE_SCRIPT_BLOCKS:", inline_script_count)
-    print(
-        "NOTE: counts are informational while legacy templates still require "
-        "CSP unsafe-inline; new work should reduce rather than increase them."
-    )
+    print("MAX_INLINE_STYLE_BLOCKS:", MAX_INLINE_STYLE_BLOCKS)
+    print("MAX_INLINE_SCRIPT_BLOCKS:", MAX_INLINE_SCRIPT_BLOCKS)
+
+    if inline_style_count > MAX_INLINE_STYLE_BLOCKS:
+        errors.append(
+            "inline style debt increased: "
+            f"{inline_style_count} > {MAX_INLINE_STYLE_BLOCKS}"
+        )
+    if inline_script_count > MAX_INLINE_SCRIPT_BLOCKS:
+        errors.append(
+            "inline script debt increased: "
+            f"{inline_script_count} > {MAX_INLINE_SCRIPT_BLOCKS}"
+        )
 
     title("ERRORS")
     if missing_static:
