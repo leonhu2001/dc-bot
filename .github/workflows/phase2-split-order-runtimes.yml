@@ -1,0 +1,42 @@
+name: Phase2 split order runtimes
+
+on:
+  push:
+    branches:
+      - refactor/phase2-runtime-assets-20261013
+    paths:
+      - tools/phase2_split_order_runtimes.py
+      - .github/workflows/phase2-split-order-runtimes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase2-runtime-assets-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Split runtimes by responsibility
+        run: python tools/phase2_split_order_runtimes.py
+      - name: Compile generated runtime modules
+        run: python -m compileall -q services/order_runtime.py services/order_credentials.py services/order_point_redemption.py services/self_service_runtime.py services/self_service_financials.py bot.py
+      - name: Commit generated split
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/order_runtime.py services/order_credentials.py services/order_point_redemption.py services/self_service_runtime.py services/self_service_financials.py
+          if git diff --cached --quiet; then
+            echo "No runtime split changes to commit"
+            exit 0
+          fi
+          git commit -m "Split order credentials benefits and financial runtimes"
+          git pull --rebase origin refactor/phase2-runtime-assets-20261013
+          git push origin HEAD:refactor/phase2-runtime-assets-20261013
