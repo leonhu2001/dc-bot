@@ -1,0 +1,2 @@
+{% set status = report_status or 'not_required' %}
+{% if status == 'missing' %}<span class="order-report-badge order-report-badge--missing">未報單</span>{% elif status == 'pending' %}<span class="order-report-badge order-report-badge--pending">待審核</span>{% elif status == 'changes_requested' %}<span class="order-report-badge order-report-badge--changes">需修改</span>{% elif status == 'approved' %}<span class="order-report-badge order-report-badge--approved">已報單</span>{% endif %}
