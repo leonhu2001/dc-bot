@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+import re
 
 import pytest
 from playwright.sync_api import Page, expect
 
 
 BASE_URL = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+PRICE_TEXT_RE = re.compile(r"\d[\d,]*T")
 
 
 @pytest.fixture(autouse=True)
@@ -68,7 +70,7 @@ def test_order_dialog_populates_rule_and_local_quote(page: Page) -> None:
 
     expect(page.locator("#mw-dialog-title")).not_to_have_text("")
     expect(page.locator("#mw-rule-key")).not_to_have_text("—")
-    expect(page.locator("#mw-total")).to_have_text(r"\d[\d,]*T")
+    expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
     expect(page.locator("#mw-total-detail")).not_to_have_text("選擇方案後即時計算")
 
 
@@ -82,14 +84,14 @@ def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> N
         before_quantity = page.locator("#mw-quantity").inner_text()
         page.locator("#mw-quantity-plus").click()
         expect(page.locator("#mw-quantity")).not_to_have_text(before_quantity)
-        expect(page.locator("#mw-total")).to_have_text(r"\d[\d,]*T")
+        expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
         return
 
     if player_field.is_visible():
         before_players = page.locator("#mw-player-count").inner_text()
         page.locator("#mw-player-plus").click()
         expect(page.locator("#mw-player-count")).not_to_have_text(before_players)
-        expect(page.locator("#mw-total")).to_have_text(r"\d[\d,]*T")
+        expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
         return
 
     pytest.skip("First public order group has no adjustable stepper")
