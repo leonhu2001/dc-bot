@@ -107,55 +107,9 @@ def create_all_tables() -> None:
     from services.loyalty_benefits import ensure_loyalty_tables
     ensure_loyalty_tables(engine)
 
-    # Reporting is also part of the canonical schema so the close trigger is
+    # Reporting is part of the canonical schema so the close trigger is
     # installed even when the bot starts before the web dashboard. Existing
     # closed orders are backfilled as already reported before the trigger is
     # created; only future close transitions become missing reports.
     from web.app.services.order_reporting import ensure_order_reporting_tables
     ensure_order_reporting_tables(engine)
-
-    # One-time production data corrections live behind idempotent repair keys.
-    # They are not business-rule overrides and are safe to call on every init.
-    try:
-        from services.data_repairs import apply_known_data_repairs
-
-        for result in apply_known_data_repairs():
-            status = str(result.get("status") or "")
-            if status not in {"not_found", "already_applied"}:
-                print(
-                    "[data-repair] "
-                    f"{result.get('repair_key')} status={status} "
-                    f"order_id={result.get('order_id')} "
-                    f"delta={result.get('delta')} "
-                    f"reason={result.get('reason', '')}",
-                    flush=True,
-                )
-    except Exception as exc:
-        # Never take both Web and Bot offline because a historical correction
-        # could not run. The repair transaction rolls back and will retry later.
-        print(
-            f"[data-repair] init failed: {type(exc).__name__}: {exc}",
-            flush=True,
-        )
-
-    # Owner-authorised one-time cleanup for MO20261012001 / MO20261012002.
-    # This runs after the deploy backup, preserves wallet/payment ledger rows,
-    # and records an idempotent repair marker so future restarts do nothing.
-    try:
-        from services.authorized_order_cleanup import purge_authorized_test_orders
-
-        result = purge_authorized_test_orders(engine)
-        status = str(result.get("status") or "")
-        if status not in {"already_applied", "already_clean"}:
-            print(
-                "[test-order-cleanup] "
-                f"{result.get('repair_key')} status={status} "
-                f"deleted={result.get('deleted', [])} "
-                f"reason={result.get('reason', '')}",
-                flush=True,
-            )
-    except Exception as exc:
-        print(
-            f"[test-order-cleanup] init failed: {type(exc).__name__}: {exc}",
-            flush=True,
-        )

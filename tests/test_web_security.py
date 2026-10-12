@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, inspect as sa_inspect
 from services import order_credentials
 from web.app.routers.auth import _safe_return_path
 from web.app.services.customer_portal import get_customer_order
+from web.app.services.rate_limit import client_ip
 from web.app.services.web_security import (
     csrf_token_from_request_parts,
     csrf_tokens_match,
@@ -348,9 +349,8 @@ def test_order_credentials_store_access_metadata_but_never_secret_fields(
     assert "my-password" not in stored_text
     assert "my-account" not in stored_text
 
-def test_rate_limit_ip_supports_old_and_new_trusted_proxy_rollout():
-    from web.app.main import _client_ip
 
+def test_rate_limit_ip_supports_old_and_new_trusted_proxy_rollout():
     # Old Nginx config: X-Real-IP is Cloudflare's socket peer. In that case,
     # and only that case, the app may trust CF-Connecting-IP.
     old_proxy_request = SimpleNamespace(
@@ -360,7 +360,7 @@ def test_rate_limit_ip_supports_old_and_new_trusted_proxy_rollout():
         },
         client=SimpleNamespace(host="127.0.0.1"),
     )
-    assert _client_ip(old_proxy_request) == "203.0.113.20"
+    assert client_ip(old_proxy_request) == "203.0.113.20"
 
     # Direct-origin request with a forged CF header must keep the socket peer.
     direct_request = SimpleNamespace(
@@ -370,7 +370,7 @@ def test_rate_limit_ip_supports_old_and_new_trusted_proxy_rollout():
         },
         client=SimpleNamespace(host="127.0.0.1"),
     )
-    assert _client_ip(direct_request) == "198.51.100.25"
+    assert client_ip(direct_request) == "198.51.100.25"
 
     # New Nginx config has already normalized X-Real-IP to the visitor.
     new_proxy_request = SimpleNamespace(
@@ -380,7 +380,7 @@ def test_rate_limit_ip_supports_old_and_new_trusted_proxy_rollout():
         },
         client=SimpleNamespace(host="127.0.0.1"),
     )
-    assert _client_ip(new_proxy_request) == "203.0.113.30"
+    assert client_ip(new_proxy_request) == "203.0.113.30"
 
 
 def test_nginx_validates_cloudflare_before_setting_real_ip():
@@ -398,6 +398,7 @@ def test_nginx_validates_cloudflare_before_setting_real_ip():
     assert "proxy_set_header X-Forwarded-For $remote_addr;" in nginx
     assert "$proxy_add_x_forwarded_for" not in nginx
 
+
 def test_order_catalog_terms_link_is_not_nested_or_duplicated():
     template = Path("web/app/templates/order_catalog.html").read_text(
         encoding="utf-8"
@@ -409,4 +410,3 @@ def test_order_catalog_terms_link_is_not_nested_or_duplicated():
         'aria-hidden="true" data-web-payment-hidden="1" '
         'style="display:none !important;" aria-hidden="true"'
     ) not in template
-

@@ -1,8 +1,5 @@
-from collections import deque
 import csv
 import io
-import ipaddress
-import time
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
@@ -54,6 +51,7 @@ from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
 from web.app.services.marketing_funnel import ensure_marketing_tables
+from web.app.services.rate_limit import rate_limit_allowed
 from web.app.services.web_security import (
     csrf_token_from_request_parts,
     csrf_tokens_match,
@@ -90,56 +88,6 @@ _MANAGER_ONLY_ADMIN_PREFIXES = (
     "/admin/payouts/summary/mark-unpaid",
     "/admin/payouts/summary/person-status",
 )
-_RATE_BUCKETS: dict[tuple[str, str], deque[float]] = {}
-_RATE_REQUEST_COUNTER = 0
-
-_CLOUDFLARE_PROXY_NETWORKS = tuple(
-    ipaddress.ip_network(value)
-    for value in (
-        "103.21.244.0/22",
-        "103.22.200.0/22",
-        "103.31.4.0/22",
-        "104.16.0.0/13",
-        "104.24.0.0/14",
-        "108.162.192.0/18",
-        "131.0.72.0/22",
-        "141.101.64.0/18",
-        "162.158.0.0/15",
-        "172.64.0.0/13",
-        "173.245.48.0/20",
-        "188.114.96.0/20",
-        "190.93.240.0/20",
-        "197.234.240.0/22",
-        "198.41.128.0/17",
-        "2400:cb00::/32",
-        "2606:4700::/32",
-        "2803:f800::/32",
-        "2405:b500::/32",
-        "2405:8100::/32",
-        "2a06:98c0::/29",
-        "2c0f:f248::/32",
-    )
-)
-
-
-def _normalized_ip(value: str | None) -> str:
-    try:
-        return str(ipaddress.ip_address(str(value or "").strip()))
-    except ValueError:
-        return ""
-
-
-def _is_cloudflare_proxy_ip(value: str | None) -> bool:
-    normalized = _normalized_ip(value)
-    if not normalized:
-        return False
-
-    address = ipaddress.ip_address(normalized)
-    return any(
-        address.version == network.version
-        and address in network
-        for network in _CLOUDFLARE_PROXY_NETWORKS
-    )
 
 # 目前模板仍有不少 inline style/script，因此 CSP 保留 unsafe-inline，
 # 但把 object/frame/base/form/connect 等高風險來源收緊，不破壞現有 UI。
@@ -169,112 +117,6 @@ def _is_manager_only_admin_path(path: str) -> bool:
         path == prefix or path.startswith(prefix + "/")
         for prefix in _MANAGER_ONLY_ADMIN_PREFIXES
     )
-
-
-def _client_ip(request: Request) -> str:
-    # X-Real-IP is always overwritten by our Nginx proxy.
-    #
-    # New Nginx config: real-ip module has already replaced it with the visitor
-    # IP, so return it directly.
-    #
-    # Rollout compatibility with the previous Nginx config: X-Real-IP is still
-    # the Cloudflare edge IP. Only in that verified case may we read
-    # CF-Connecting-IP. A direct-origin caller cannot satisfy this condition by
-    # forging request headers because Nginx replaces X-Real-IP with its socket
-    # peer address.
-    real_ip = _normalized_ip(
-        request.headers.get("x-real-ip")
-    )
-
-    if real_ip and _is_cloudflare_proxy_ip(real_ip):
-        cloudflare_visitor_ip = _normalized_ip(
-            request.headers.get("cf-connecting-ip")
-        )
-        if cloudflare_visitor_ip:
-            return cloudflare_visitor_ip
-
-    if real_ip:
-        return real_ip
-
-    if request.client is not None:
-        socket_ip = _normalized_ip(request.client.host)
-        if socket_ip:
-            return socket_ip
-
-    return "unknown"
-
-
-def _rate_limit_spec(request: Request) -> tuple[str, int, int] | None:
-    path = request.url.path
-
-    if path == "/health" or path.startswith("/static/"):
-        return None
-
-    if path.startswith("/auth/"):
-        return ("auth", 30, 60)
-
-    if path.startswith("/api/support-chat"):
-        if request.method.upper() in _UNSAFE_METHODS:
-            return ("support-chat-write", 30, 60)
-        return ("support-chat-read", 120, 60)
-
-    if (
-        path.startswith("/admin/ai-operations")
-        and request.method.upper() in _UNSAFE_METHODS
-    ):
-        return ("ai-operations-write", 12, 60)
-
-    if path.startswith("/discord-avatar/"):
-        return ("avatar", 120, 60)
-
-    if (
-        request.method.upper() in _UNSAFE_METHODS
-        and is_sensitive_path(path)
-    ):
-        return ("sensitive-write", 20, 60)
-
-    if request.method.upper() in _UNSAFE_METHODS and _is_admin_path(path):
-        return ("admin-write", 60, 60)
-
-    if request.method.upper() in _UNSAFE_METHODS:
-        return ("write", 90, 60)
-
-    # Broad per-IP ceiling so scanners cannot issue unbounded dynamic requests.
-    return ("general", 600, 60)
-
-
-def _rate_limit_allowed(request: Request) -> tuple[bool, int]:
-    global _RATE_REQUEST_COUNTER
-
-    spec = _rate_limit_spec(request)
-    if spec is None:
-        return True, 0
-
-    bucket_name, limit, window_seconds = spec
-    now = time.monotonic()
-    cutoff = now - window_seconds
-    key = (_client_ip(request), bucket_name)
-    bucket = _RATE_BUCKETS.setdefault(key, deque())
-
-    while bucket and bucket[0] <= cutoff:
-        bucket.popleft()
-
-    if len(bucket) >= limit:
-        retry_after = max(1, int(window_seconds - (now - bucket[0])))
-        return False, retry_after
-
-    bucket.append(now)
-    _RATE_REQUEST_COUNTER += 1
-
-    # Keep attacker-created IP buckets bounded in memory.
-    if _RATE_REQUEST_COUNTER % 500 == 0 and len(_RATE_BUCKETS) > 2000:
-        for old_key, old_bucket in list(_RATE_BUCKETS.items()):
-            while old_bucket and old_bucket[0] <= cutoff:
-                old_bucket.popleft()
-            if not old_bucket:
-                _RATE_BUCKETS.pop(old_key, None)
-
-    return True, 0
 
 
 def _origin_from_referer(value: str) -> str:
@@ -402,7 +244,7 @@ async def _sanitize_csv_response(response):
 
 @app.middleware("http")
 async def security_and_refresh_access(request: Request, call_next):
-    allowed, retry_after = _rate_limit_allowed(request)
+    allowed, retry_after = rate_limit_allowed(request)
     if not allowed:
         return PlainTextResponse(
             "Too Many Requests",

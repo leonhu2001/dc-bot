@@ -20,7 +20,7 @@ jobs:
   test:
     name: Python checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     env:
       WEB_SECRET_KEY: ci-only-secret-key-not-for-production
@@ -62,6 +62,10 @@ jobs:
             tools \
             scripts
 
+      - name: Audit templates and static references
+        run: |
+          python tools/audit_templates.py
+
       - name: Audit Python dependencies
         run: |
           python -m pip_audit -r requirements.txt
@@ -77,4 +81,34 @@ jobs:
 
       - name: Run regression suite
         run: |
-          python -m pytest -q tests --ignore=tests/golden
+          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
+
+      - name: Install Chromium for browser tests
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run browser smoke flows
+        run: |
+          set -Eeuo pipefail
+          python -m uvicorn web.app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            >/tmp/dc-bot-web-ci.log 2>&1 &
+          WEB_PID=$!
+          trap 'kill "$WEB_PID" 2>/dev/null || true' EXIT
+
+          ready=0
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/dc-bot-web-ci.log
+            exit 1
+          fi
+
+          python -m pytest -q tests/e2e

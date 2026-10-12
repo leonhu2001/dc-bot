@@ -1,19 +1,39 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 
 from jinja2 import Environment, FileSystemLoader, TemplateSyntaxError
 
 
-ROOT = Path(os.environ.get("DC_BOT_ROOT", "/opt/dc-bot"))
+DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
+STATIC = ROOT / "web" / "app" / "static"
+
+# Legacy baseline on 2026-10-13. The project still needs CSP unsafe-inline, but
+# new changes may only reduce these counts, never increase them.
+MAX_INLINE_STYLE_BLOCKS = 28
+MAX_INLINE_SCRIPT_BLOCKS = 20
+
+STATIC_REF_RE = re.compile(
+    r'''(?:src|href)\s*=\s*["'](/static/[^"'?#]+)(?:[?#][^"']*)?["']''',
+    re.IGNORECASE,
+)
+INLINE_STYLE_RE = re.compile(r"<style(?:\s|>)", re.IGNORECASE)
+INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.IGNORECASE)
 
 
 def title(text: str) -> None:
     print("\n" + "=" * 100)
     print(text)
     print("=" * 100)
+
+
+def static_path_from_url(url: str) -> Path:
+    relative = url.removeprefix("/static/")
+    return STATIC / relative
 
 
 def main() -> None:
@@ -23,7 +43,6 @@ def main() -> None:
         raise SystemExit(f"templates folder not found: {TEMPLATES}")
 
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)))
-
     template_files = sorted(
         path
         for path in TEMPLATES.rglob("*")
@@ -35,9 +54,13 @@ def main() -> None:
     print("TEMPLATE_COUNT:", len(template_files))
 
     errors: list[str] = []
+    inline_style_count = 0
+    inline_script_count = 0
+    static_references: set[str] = set()
 
     for path in template_files:
         rel = path.relative_to(TEMPLATES).as_posix()
+        source = path.read_text(encoding="utf-8-sig")
 
         try:
             env.get_template(rel)
@@ -51,16 +74,50 @@ def main() -> None:
             print("ERROR:", message)
             errors.append(message)
 
+        inline_style_count += len(INLINE_STYLE_RE.findall(source))
+        inline_script_count += len(INLINE_SCRIPT_RE.findall(source))
+        static_references.update(STATIC_REF_RE.findall(source))
+
+    title("STATIC_REFERENCES")
+    missing_static: list[str] = []
+    for reference in sorted(static_references):
+        target = static_path_from_url(reference)
+        if not target.is_file():
+            missing_static.append(reference)
+            print("MISSING:", reference)
+
+    if not missing_static:
+        print("ALL_REFERENCED_STATIC_FILES_EXIST")
+
+    title("CSP_DEBT")
+    print("INLINE_STYLE_BLOCKS:", inline_style_count)
+    print("INLINE_SCRIPT_BLOCKS:", inline_script_count)
+    print("MAX_INLINE_STYLE_BLOCKS:", MAX_INLINE_STYLE_BLOCKS)
+    print("MAX_INLINE_SCRIPT_BLOCKS:", MAX_INLINE_SCRIPT_BLOCKS)
+
+    if inline_style_count > MAX_INLINE_STYLE_BLOCKS:
+        errors.append(
+            "inline style debt increased: "
+            f"{inline_style_count} > {MAX_INLINE_STYLE_BLOCKS}"
+        )
+    if inline_script_count > MAX_INLINE_SCRIPT_BLOCKS:
+        errors.append(
+            "inline script debt increased: "
+            f"{inline_script_count} > {MAX_INLINE_SCRIPT_BLOCKS}"
+        )
+
     title("ERRORS")
+    if missing_static:
+        errors.append(
+            "missing static references: " + ", ".join(missing_static)
+        )
 
     if errors:
         for error in errors:
             print("ERROR:", error)
-
         raise SystemExit(1)
 
     print("NONE")
-
     title("REPORT_DONE")
     print("TEMPLATE_AUDIT_PASS")
 

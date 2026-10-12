@@ -5,6 +5,8 @@ APP="${APP_DIR:-/opt/dc-bot}"
 BOT_SERVICE="${BOT_SERVICE:-dc-bot.service}"
 WEB_SERVICE="${WEB_SERVICE:-dc-bot-dashboard.service}"
 WEB_UNIT_PATH="${WEB_UNIT_PATH:-/etc/systemd/system/$WEB_SERVICE}"
+NGINX_CONFIG_SOURCE="$APP/nginx_dc_bot_dashboard.conf"
+NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-}"
 TARGET="${1:-}"
 
 if [ -z "$TARGET" ]; then
@@ -19,6 +21,20 @@ fi
 
 cd "$APP"
 
+# If the install path is not explicitly configured, use an existing common path
+# only. Never create a guessed Nginx site during a normal application deploy.
+if [ -z "$NGINX_CONFIG_PATH" ]; then
+    for candidate in \
+        /etc/nginx/sites-available/dc-bot-dashboard \
+        /etc/nginx/sites-available/dc-bot-dashboard.conf \
+        /etc/nginx/conf.d/dc-bot-dashboard.conf; do
+        if [ -e "$candidate" ]; then
+            NGINX_CONFIG_PATH="$candidate"
+            break
+        fi
+    done
+fi
+
 OLD_HEAD="$(git rev-parse HEAD)"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 DEPLOYED_AT="$(date --iso-8601=seconds)"
@@ -27,6 +43,7 @@ SOURCE_UPDATED=0
 DEPENDENCIES_UPDATED=0
 DEPENDENCY_SYNC_NEEDED=0
 WEB_UNIT_UPDATED=0
+NGINX_CONFIG_UPDATED=0
 
 restart_services() {
     local started_at finished_at elapsed_ms
@@ -69,6 +86,15 @@ rollback() {
         echo "Restoring previous web systemd unit..."
         install -m 0644 "$BACKUP/$WEB_SERVICE" "$WEB_UNIT_PATH"
         systemctl daemon-reload || true
+    fi
+
+    if [ "$NGINX_CONFIG_UPDATED" -eq 1 ] \
+        && [ -n "$NGINX_CONFIG_PATH" ] \
+        && [ -f "$BACKUP/nginx-dashboard.conf" ]; then
+        echo "Restoring previous Nginx config..."
+        install -m 0644 "$BACKUP/nginx-dashboard.conf" "$NGINX_CONFIG_PATH"
+        nginx -t || true
+        systemctl reload nginx || true
     fi
 
     if [ "$SOURCE_UPDATED" -eq 1 ]; then
@@ -127,6 +153,13 @@ if [ -f "$WEB_UNIT_PATH" ]; then
     echo "PASS: $WEB_SERVICE backup"
 else
     echo "WARN: $WEB_UNIT_PATH not found"
+fi
+
+if [ -n "$NGINX_CONFIG_PATH" ] && [ -f "$NGINX_CONFIG_PATH" ]; then
+    cp -L "$NGINX_CONFIG_PATH" "$BACKUP/nginx-dashboard.conf"
+    echo "PASS: Nginx config backup ($NGINX_CONFIG_PATH)"
+else
+    echo "WARN: managed Nginx config path not detected; Nginx sync will be skipped"
 fi
 
 "$APP/venv/bin/python" -m pip freeze > "$BACKUP/venv-freeze.txt"
@@ -216,7 +249,7 @@ echo
 
 echo "=== 7. OPTIONAL VPS TESTS ==="
 if /opt/dc-bot/venv/bin/python -c "import pytest" >/dev/null 2>&1; then
-    /opt/dc-bot/venv/bin/python -m pytest -q
+    /opt/dc-bot/venv/bin/python -m pytest -q --ignore=tests/e2e
 else
     echo "SKIP: pytest is intentionally not required on production VPS."
 fi
@@ -230,6 +263,20 @@ else
     install -m 0644 "$APP/dc-bot-dashboard.service" "$WEB_UNIT_PATH"
     systemctl daemon-reload
     echo "PASS: web systemd unit synchronized"
+fi
+
+echo
+echo "=== 7C. SYNC NGINX CONFIG ==="
+if [ -z "$NGINX_CONFIG_PATH" ]; then
+    echo "SKIP: managed Nginx config path not detected"
+elif cmp -s "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_PATH"; then
+    echo "SKIP: Nginx config unchanged"
+else
+    NGINX_CONFIG_UPDATED=1
+    install -m 0644 "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_PATH"
+    nginx -t
+    systemctl reload nginx
+    echo "PASS: Nginx config synchronized and reloaded"
 fi
 
 echo
@@ -322,6 +369,9 @@ echo "=== 11. FINAL CHECK ==="
 echo "HEAD: $(git rev-parse HEAD)"
 echo "Bot:  $(systemctl is-active "$BOT_SERVICE")"
 echo "Web:  $(systemctl is-active "$WEB_SERVICE")"
+if [ -n "$NGINX_CONFIG_PATH" ]; then
+    echo "Nginx: $(systemctl is-active nginx || true)"
+fi
 echo "Backup: $BACKUP"
 
 echo
