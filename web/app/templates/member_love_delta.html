@@ -115,11 +115,12 @@
                             <button class="ld-primary" id="ldLockCompanionGuess" type="button">鎖定共同答案</button>
                             <button class="ld-secondary" id="ldClearCompanionGuess" type="button">清除</button>
                         </div>
+                        <div class="ld-helper">計分、扣分與本局結算由老闆統一操作。</div>
                     </div>
                 </section>
 
                 <section class="ld-card">
-                    <div class="ld-section">
+                    <div class="ld-section ld-only-boss">
                         <h3>🎁 摸出物資並送給老闆</h3>
                         <div class="ld-event-grid">
                             <button class="ld-event" type="button" data-ld-event="item_gold"><strong>金色物資 / 紫卡</strong><span class="ld-points">+3</span></button>
@@ -129,7 +130,7 @@
                         </div>
                     </div>
 
-                    <div class="ld-section">
+                    <div class="ld-section ld-only-boss">
                         <h3>⚔️ 遊戲事件</h3>
                         <div class="ld-event-grid" id="ldCombatEvents">
                             <button class="ld-event" type="button" data-ld-event="squad_wipe"><strong>女陪一打三滅隊</strong><span class="ld-points">+10</span></button>
@@ -138,7 +139,7 @@
                         <div class="ld-event-grid" id="ldRescueButtons" style="margin-top:8px"></div>
                     </div>
 
-                    <div class="ld-section">
+                    <div class="ld-section ld-only-boss">
                         <h3>📦 本局撤離價值</h3>
                         <div class="ld-value-grid" id="ldValueGrid">
                             <button class="ld-value is-active" type="button" data-tier="0"><b>未達 300W</b><span>+0</span></button>
@@ -166,7 +167,9 @@
                             <div class="ld-readout">禁語 2：<b id="ldBanRead2">未設定</b></div>
                             <div class="ld-readout" style="grid-column:1/-1">禁語 3：<b id="ldBanRead3">未設定</b></div>
                         </div>
-                        <div class="ld-event-grid" id="ldBanButtons" style="margin-top:8px"></div>
+                        <div class="ld-only-boss">
+                            <div class="ld-event-grid" id="ldBanButtons" style="margin-top:8px"></div>
+                        </div>
                     </div>
 
                     <div class="ld-section">
@@ -185,8 +188,10 @@
                             <div class="ld-readout">句末助詞：<b id="ldSuffixRead">尚未解鎖</b></div>
                             <div class="ld-readout">特殊稱呼：<b id="ldNicknameRead">尚未解鎖</b></div>
                         </div>
-                        <div class="ld-event-grid" style="margin-top:8px">
-                            <button class="ld-event" id="ldMissSuffix" type="button" data-ld-event="miss_suffix"><strong>忘記句末助詞</strong><span class="ld-points is-minus">-2</span></button>
+                        <div class="ld-only-boss">
+                            <div class="ld-event-grid" style="margin-top:8px">
+                                <button class="ld-event" id="ldMissSuffix" type="button" data-ld-event="miss_suffix"><strong>忘記句末助詞</strong><span class="ld-points is-minus">-2</span></button>
+                            </div>
                         </div>
                     </div>
 
@@ -203,11 +208,11 @@
                         <div class="ld-readout" id="ldNextDesignation" style="margin-top:8px">尚未指定下一局。</div>
                     </div>
 
-                    <div class="ld-section">
+                    <div class="ld-section ld-only-boss">
                         <button class="ld-secondary" id="ldUndo" type="button">↩ 撤銷上一個事件</button>
                     </div>
 
-                    <div class="ld-settle-dock">
+                    <div class="ld-settle-dock ld-only-boss">
                         <div class="ld-settle-label">本局結束</div>
                         <div class="ld-settle-grid">
                             <button class="ld-settle-action is-success" type="button" data-settle="success">✓ 成功撤離</button>
