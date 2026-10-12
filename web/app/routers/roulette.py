@@ -10,21 +10,24 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from web.app.services.roulette_service import (
-    draw_roulette,
-    ensure_roulette_feature,
-    get_roulette_context,
-)
+from web.app.services import roulette_service
+
+
+# 正式輪盤沿用後台既有商品，不再由程式自動建立第二個商品。
+# 商品價格、接單資格、人數、折扣與其他設定一律以後台這筆規則為準。
+ROULETTE_RULE_KEY = "admin_delta_desktop_fun_20261007053129_91eb"
+roulette_service.ROULETTE_RULE_KEY = ROULETTE_RULE_KEY
+
+# 只初始化輪盤結果表；禁止在 Web 啟動時新增 / 覆寫商品設定。
+draw_roulette = roulette_service.draw_roulette
+get_roulette_context = roulette_service.get_roulette_context
+roulette_service.ensure_roulette_draw_tables()
 
 
 router = APIRouter(tags=["roulette"])
 TEMPLATES = Jinja2Templates(
     directory=str(Path(__file__).resolve().parents[1] / "templates")
 )
-
-# This router is imported while the Web app starts. The bootstrap is additive:
-# it creates the draw table and the initial product only when they do not exist.
-ensure_roulette_feature()
 
 
 class RouletteDrawPayload(BaseModel):
