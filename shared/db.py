@@ -130,3 +130,25 @@ def create_all_tables() -> None:
             f"[data-repair] init failed: {type(exc).__name__}: {exc}",
             flush=True,
         )
+
+    # Owner-authorised cleanup of the two cancelled roulette test orders made on
+    # 2026-10-12. This runs after the deploy backup and is idempotent. Accounting
+    # ledger rows are deliberately preserved by the cleanup implementation.
+    try:
+        from services.test_order_cleanup import purge_authorized_test_orders
+
+        result = purge_authorized_test_orders(engine)
+        status = str(result.get("status") or "")
+        if status not in {"already_applied", "already_clean"}:
+            print(
+                "[test-order-cleanup] "
+                f"{result.get('repair_key')} status={status} "
+                f"deleted={result.get('deleted', [])} "
+                f"reason={result.get('reason', '')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[test-order-cleanup] init failed: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
