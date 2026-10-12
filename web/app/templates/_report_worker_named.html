@@ -1,0 +1,1 @@
+{% for worker in workers %}<label class="report-worker-row"><span>{{ worker.worker_display_name or worker.worker_discord_id }}</span><select name="named_{{ worker.worker_discord_id }}"><option value="0">無掛名</option><option value="1">有掛名</option></select></label>{% endfor %}

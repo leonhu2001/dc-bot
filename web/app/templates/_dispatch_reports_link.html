@@ -1,0 +1,2 @@
+<a href="/dispatch/reports" class="btn btn-secondary">📋 報單系統</a>
+{% if support_can_manage %}<a href="/dispatch/reports/review" class="btn btn-secondary">✅ 報單審核{% if pending_report_review_count %} {{ pending_report_review_count }}{% endif %}</a>{% endif %}

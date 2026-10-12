@@ -1,0 +1,1 @@
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('[data-open-cs-backend]').forEach((el)=>{el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer');});});

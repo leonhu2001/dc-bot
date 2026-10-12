@@ -186,10 +186,145 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  function preserveDispatchDutyPage() {
+    if (window.location.pathname !== "/dispatch") return;
+
+    document
+      .querySelectorAll('.dispatch-support-duty a[href="/admin"]')
+      .forEach((link) => {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      });
+  }
+
+  function ensureOrderReportHistoryStyles() {
+    if (document.getElementById("order-report-history-status-style")) return;
+
+    const style = document.createElement("style");
+    style.id = "order-report-history-status-style";
+    style.textContent = `
+      .history-report-state{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px}
+      .history-report-state-label{color:rgba(255,255,255,.48);font-size:11px;font-weight:800}
+      .history-report-state-badge{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;line-height:1.1;white-space:nowrap}
+      .history-report-state-badge[data-status="missing"]{border-color:rgba(239,94,94,.44);background:rgba(239,94,94,.09);color:#ffd7df}
+      .history-report-state-badge[data-status="pending"]{border-color:rgba(240,188,75,.44);background:rgba(240,188,75,.09);color:#ffe3a3}
+      .history-report-state-badge[data-status="changes_requested"]{border-color:rgba(255,140,74,.46);background:rgba(255,140,74,.09);color:#ffd3b5}
+      .history-report-state-badge[data-status="approved"]{border-color:rgba(72,201,140,.4);background:rgba(72,201,140,.08);color:#d8ffe7}
+      .order-report-nav-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;padding:0 5px;border-radius:999px;background:rgba(245,198,107,.14);border:1px solid rgba(245,198,107,.28);color:#ffe3a3;font-size:11px;font-weight:950}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function collectAdminReportTargets() {
+    const pathname = window.location.pathname;
+    const targets = [];
+
+    if (pathname === "/admin") {
+      document.querySelectorAll(".order-row").forEach((row) => {
+        const link = row.querySelector('a.workspace[href^="/admin/order-workspace/"]');
+        const match = String(link?.getAttribute("href") || "").match(/\/admin\/order-workspace\/(\d+)/);
+        const statusCell = row.querySelector(".order-status-col");
+        if (match && statusCell) {
+          targets.push({ orderId: match[1], statusCell });
+        }
+      });
+      return targets;
+    }
+
+    if (pathname.startsWith("/admin/orders/history")) {
+      document
+        .querySelectorAll("button.history-dossier-toggle[data-dossier-target]")
+        .forEach((button) => {
+          const match = String(button.dataset.dossierTarget || "").match(/^dossier-(\d+)$/);
+          const row = button.closest("tr");
+          const statusCell = row?.querySelector("td:nth-child(7)");
+          if (match && statusCell) {
+            targets.push({ orderId: match[1], statusCell });
+          }
+        });
+    }
+
+    return targets;
+  }
+
+  async function syncAdminOrderReportStates() {
+    const targets = collectAdminReportTargets();
+    if (!targets.length) return;
+
+    ensureOrderReportHistoryStyles();
+    const orderIds = Array.from(new Set(targets.map((item) => item.orderId)));
+
+    try {
+      const response = await fetch(
+        `/dispatch/reports/statuses.json?order_ids=${encodeURIComponent(orderIds.join(","))}`,
+        { credentials: "same-origin", headers: { Accept: "application/json" } }
+      );
+      if (!response.ok) return;
+
+      const payload = await response.json();
+      const statuses = payload.statuses || {};
+      const labels = payload.labels || {};
+
+      targets.forEach(({ orderId, statusCell }) => {
+        const status = statuses[orderId];
+        if (!status) return;
+
+        let wrapper = statusCell.querySelector(".history-report-state");
+        if (!wrapper) {
+          wrapper = document.createElement("div");
+          wrapper.className = "history-report-state";
+          wrapper.innerHTML = '<span class="history-report-state-label">報單</span><span class="history-report-state-badge"></span>';
+          statusCell.appendChild(wrapper);
+        }
+
+        const badge = wrapper.querySelector(".history-report-state-badge");
+        if (badge) {
+          badge.dataset.status = status;
+          badge.textContent = labels[status] || status;
+        }
+      });
+    } catch (error) {
+      console.debug("[order-report] admin status unavailable", error);
+    }
+  }
+
+  async function syncOrderReportReviewCount() {
+    const links = Array.from(
+      document.querySelectorAll("#order-report-review-nav, #order-report-review-nav-admin")
+    );
+    if (!links.length) return;
+
+    ensureOrderReportHistoryStyles();
+
+    try {
+      const response = await fetch("/dispatch/reports/review-count.json", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const count = Number(payload.count || 0);
+
+      links.forEach((link) => {
+        link.querySelector(".order-report-nav-count")?.remove();
+        if (count <= 0) return;
+        const badge = document.createElement("span");
+        badge.className = "order-report-nav-count";
+        badge.textContent = String(count);
+        link.appendChild(badge);
+      });
+    } catch (error) {
+      console.debug("[order-report] review count unavailable", error);
+    }
+  }
+
   function run() {
     replaceVisibleText();
     simplifyStaffPage();
     setupOrderRulePublishFlow();
+    preserveDispatchDutyPage();
+    syncAdminOrderReportStates();
+    syncOrderReportReviewCount();
   }
 
   if (document.readyState === "loading") {
@@ -202,5 +337,6 @@
     replaceVisibleText();
     simplifyStaffPage();
     syncOrderRulePublishUi();
+    preserveDispatchDutyPage();
   }, 300);
 })();

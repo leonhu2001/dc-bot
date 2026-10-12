@@ -305,3 +305,9 @@ async def support_assign_companion(
         db.close()
 
     return redirect_to_dispatch(message=result_message)
+
+
+# Keep reporting under the same /dispatch workspace without duplicating the
+# dashboard authentication/session stack in a separate app.
+from web.app.routers.order_reports import router as order_reports_router
+router.include_router(order_reports_router)

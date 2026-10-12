@@ -107,6 +107,13 @@ def create_all_tables() -> None:
     from services.loyalty_benefits import ensure_loyalty_tables
     ensure_loyalty_tables(engine)
 
+    # Reporting is also part of the canonical schema so the close trigger is
+    # installed even when the bot starts before the web dashboard. Existing
+    # closed orders are backfilled as already reported before the trigger is
+    # created; only future close transitions become missing reports.
+    from web.app.services.order_reporting import ensure_order_reporting_tables
+    ensure_order_reporting_tables(engine)
+
     # One-time production data corrections live behind idempotent repair keys.
     # They are not business-rule overrides and are safe to call on every init.
     try:
