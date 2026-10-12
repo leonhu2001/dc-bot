@@ -19,10 +19,12 @@ MAX_BYTES = {
     "views/review.py": 95_500,
 }
 
+# Use the module basenames so both ``import services.x_legacy`` and
+# ``from services import x_legacy`` are caught.
 LEGACY_IMPORT_TOKENS = (
-    "services.order_runtime_legacy",
-    "services.self_service_runtime_legacy",
-    "web.app.routers.admin_legacy",
+    "order_runtime_legacy",
+    "self_service_runtime_legacy",
+    "admin_legacy",
 )
 
 
