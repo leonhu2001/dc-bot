@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>俄羅斯輪盤・保底抽取 DEMO｜魔丸娛樂</title>
+  <style>
+    :root{
+      --bg:#080809;
+      --panel:#111113;
+      --panel-2:#171719;
+      --text:#f3efe6;
+      --muted:rgba(243,239,230,.58);
+      --line:rgba(255,255,255,.09);
+      --gold:#dfb75c;
+      --gold-2:#f1cf7b;
+      --danger:#e26f68;
+      --green:#8fca9f;
+      --shadow:0 30px 90px rgba(0,0,0,.38);
+    }
+    *{box-sizing:border-box}
+    html{background:var(--bg);color:var(--text);font-family:Inter,"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+    body{margin:0;min-height:100vh;background:
+      radial-gradient(circle at 88% 4%,rgba(223,183,92,.09),transparent 28%),
+      radial-gradient(circle at 8% 78%,rgba(223,183,92,.04),transparent 22%),
+      var(--bg)}
+    a{color:inherit}
+    button{font:inherit}
+    .page{width:min(1120px,calc(100% - 32px));margin:0 auto;padding:36px 0 72px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:42px}
+    .brand{display:flex;align-items:center;gap:11px;text-decoration:none;font-weight:900;letter-spacing:.08em}
+    .brand-mark{width:36px;height:36px;border-radius:12px;border:1px solid rgba(223,183,92,.32);display:grid;place-items:center;background:rgba(223,183,92,.08);color:var(--gold);font-size:18px}
+    .back{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:rgba(243,239,230,.72);background:rgba(255,255,255,.025)}
+    .back:hover{border-color:rgba(223,183,92,.4);color:var(--text)}
+    .hero{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(340px,.94fr);gap:28px;align-items:stretch}
+    .copy,.game{border:1px solid var(--line);border-radius:28px;background:linear-gradient(150deg,rgba(22,22,24,.98),rgba(11,11,12,.98));box-shadow:var(--shadow)}
+    .copy{padding:clamp(28px,4vw,48px);position:relative;overflow:hidden}
+    .copy:after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;right:-110px;top:-110px;background:radial-gradient(circle,rgba(223,183,92,.16),transparent 67%);pointer-events:none}
+    .eyebrow{color:var(--gold);font-size:11px;font-weight:950;letter-spacing:.19em}
+    h1{font-size:clamp(42px,7vw,78px);line-height:.95;margin:13px 0 18px;letter-spacing:-.045em}
+    .lead{margin:0;max-width:660px;color:rgba(243,239,230,.68);font-size:16px;line-height:1.9}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
+    .chip{padding:8px 10px;border:1px solid rgba(223,183,92,.22);border-radius:999px;background:rgba(223,183,92,.06);color:#ead091;font-size:12px;font-weight:800}
+    .safe-note{margin-top:26px;padding:15px 16px;border:1px solid rgba(226,111,104,.18);border-radius:15px;background:rgba(226,111,104,.055);color:rgba(243,239,230,.66);font-size:13px;line-height:1.7}
+    .safe-note strong{color:#f0aaa4}
+    .game{padding:26px;display:flex;flex-direction:column;min-height:610px}
+    .game-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+    .order-no{font-size:13px;color:rgba(243,239,230,.48);margin-top:7px}
+    .status{padding:8px 11px;border-radius:999px;border:1px solid rgba(143,202,159,.25);background:rgba(143,202,159,.07);color:#a9d8b5;font-weight:850;font-size:12px;white-space:nowrap}
+    .status.locked{border-color:rgba(223,183,92,.25);background:rgba(223,183,92,.07);color:var(--gold-2)}
+    .cylinder-wrap{display:grid;place-items:center;flex:1;padding:26px 0 18px;min-height:350px;perspective:900px}
+    .cylinder{position:relative;width:min(320px,72vw);aspect-ratio:1;border-radius:50%;border:2px solid rgba(223,183,92,.38);background:
+      radial-gradient(circle at center,rgba(223,183,92,.13) 0 14%,transparent 14.5%),
+      radial-gradient(circle at 38% 31%,rgba(255,255,255,.04),transparent 22%),
+      linear-gradient(145deg,#222225,#0e0e0f 68%);
+      box-shadow:inset 0 0 0 12px rgba(255,255,255,.018),inset 0 0 0 22px rgba(0,0,0,.32),0 26px 50px rgba(0,0,0,.36);
+      transition:transform .35s ease;
+    }
+    .cylinder.spinning{animation:spin 1.8s cubic-bezier(.12,.68,.15,1) forwards}
+    @keyframes spin{0%{transform:rotate(0)}70%{transform:rotate(1260deg) scale(1.03)}100%{transform:rotate(1440deg)}}
+    .chamber{position:absolute;width:23%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.11);background:radial-gradient(circle at 38% 30%,#2a2a2d,#0b0b0c 66%);box-shadow:inset 0 0 18px rgba(0,0,0,.85),0 2px 0 rgba(255,255,255,.025);color:rgba(243,239,230,.26);font-size:25px;font-weight:950;transition:border-color .25s ease,box-shadow .25s ease,color .25s ease,background .25s ease}
+    .chamber:nth-child(1){left:38.5%;top:8%}
+    .chamber:nth-child(2){right:11%;top:26%}
+    .chamber:nth-child(3){right:11%;bottom:25%}
+    .chamber:nth-child(4){left:38.5%;bottom:8%}
+    .chamber:nth-child(5){left:11%;bottom:25%}
+    .chamber:nth-child(6){left:11%;top:26%}
+    .chamber.hit{border-color:rgba(223,183,92,.75);color:#211b0d;background:radial-gradient(circle at 38% 30%,#ffe5a0,#c99b3e 66%);box-shadow:0 0 0 6px rgba(223,183,92,.08),0 0 46px rgba(223,183,92,.36)}
+    .chamber.hit::after{content:"✦"}
+    .chamber.hit{font-size:0}
+    .needle{position:absolute;left:50%;top:-17px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:0;border-bottom:18px solid var(--gold);filter:drop-shadow(0 3px 7px rgba(223,183,92,.38))}
+    .result{min-height:92px;padding:17px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.023);display:flex;align-items:center;justify-content:space-between;gap:18px}
+    .result small{display:block;color:rgba(243,239,230,.45);font-size:11px;letter-spacing:.12em;font-weight:850}
+    .result strong{display:block;margin-top:5px;font-size:24px}
+    .result .sub{margin-top:5px;color:rgba(243,239,230,.48);font-size:12px}
+    .result-value{font-size:clamp(30px,5vw,46px);font-weight:950;color:var(--gold-2);white-space:nowrap}
+    .actions{display:flex;gap:10px;margin-top:12px}
+    .primary,.secondary{width:100%;border-radius:14px;padding:14px 16px;font-weight:950;cursor:pointer}
+    .primary{border:1px solid rgba(223,183,92,.35);background:linear-gradient(180deg,#e7c370,#c99f48);color:#17130b;box-shadow:0 10px 25px rgba(223,183,92,.12)}
+    .primary:hover:not(:disabled){filter:brightness(1.05);transform:translateY(-1px)}
+    .primary:disabled{cursor:not-allowed;opacity:.44;filter:grayscale(.2)}
+    .secondary{border:1px solid var(--line);background:rgba(255,255,255,.025);color:rgba(243,239,230,.72)}
+    .secondary:hover{border-color:rgba(223,183,92,.32);color:var(--text)}
+    .fine{margin:10px 0 0;text-align:center;color:rgba(243,239,230,.4);font-size:11px;line-height:1.6}
+    .rules{margin-top:28px;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.022);overflow:hidden}
+    details{border-bottom:1px solid var(--line)}
+    details:last-child{border-bottom:0}
+    summary{list-style:none;cursor:pointer;padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;font-weight:900}
+    summary::-webkit-details-marker{display:none}
+    summary::after{content:"＋";color:var(--gold);font-size:20px}
+    details[open] summary::after{content:"−"}
+    .rule-body{padding:0 22px 22px;color:rgba(243,239,230,.63);font-size:14px;line-height:1.9}
+    .rule-body b{color:#f2d791}
+    .prob-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:14px}
+    .prob{padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.022)}
+    .prob strong{display:block;color:var(--gold-2)}
+    .prob span{display:block;margin-top:3px;color:rgba(243,239,230,.43);font-size:11px}
+    .footer-note{margin-top:20px;color:rgba(243,239,230,.38);font-size:11px;text-align:center;line-height:1.7}
+    .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);opacity:0;pointer-events:none;padding:11px 15px;border-radius:12px;border:1px solid rgba(223,183,92,.25);background:#171511;color:#f0d18c;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:.25s ease}
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(max-width:860px){.hero{grid-template-columns:1fr}.game{min-height:560px}.prob-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:520px){.page{width:min(100% - 20px,1120px);padding-top:18px}.topbar{margin-bottom:20px}.copy,.game{border-radius:21px}.copy{padding:25px 21px}.game{padding:20px}.brand span:last-child{display:none}.result{align-items:flex-start;flex-direction:column}.result-value{white-space:normal}.actions{flex-direction:column}.prob-grid{grid-template-columns:1fr 1fr}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.cylinder.spinning{animation:none}.primary:hover:not(:disabled){transform:none}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a class="brand" href="/me"><span class="brand-mark">魔</span><span>魔丸娛樂</span></a>
+      <a class="back" href="/me">← 返回我的專區</a>
+    </div>
+
+    <section class="hero">
+      <article class="copy">
+        <div class="eyebrow">RUSSIAN ROULETTE · GUARANTEE DRAW</div>
+        <h1>俄羅斯輪盤<br>保底抽取</h1>
+        <p class="lead">把「六格轉輪、一次隨機」做成三角洲趣味單的保底抽取。正式版會綁定訂單與付款狀態，抽完立即鎖定，結果同步回訂單。</p>
+        <div class="chips">
+          <span class="chip">六格等機率</span>
+          <span class="chip">每單 1 次</span>
+          <span class="chip">抽完即鎖定</span>
+          <span class="chip">DEMO 平均 1,300 萬</span>
+        </div>
+        <div class="safe-note"><strong>安全提醒：</strong>現實中的俄羅斯輪盤可能造成致命傷害，沒有安全玩法。本站僅借用名稱與「六格隨機」概念作為數位趣味抽取，不鼓勵任何現實模仿。</div>
+      </article>
+
+      <article class="game">
+        <div class="game-head">
+          <div>
+            <div class="eyebrow">ORDER DRAW · DEMO</div>
+            <div class="order-no">DEMO-MO20261012-RR</div>
+          </div>
+          <span id="status" class="status">可抽 1 次</span>
+        </div>
+
+        <div class="cylinder-wrap">
+          <div id="cylinder" class="cylinder" aria-label="六格保底輪盤">
+            <div class="needle" aria-hidden="true"></div>
+            <div class="chamber">?</div>
+            <div class="chamber">?</div>
+            <div class="chamber">?</div>
+            <div class="chamber">?</div>
+            <div class="chamber">?</div>
+            <div class="chamber">?</div>
+          </div>
+        </div>
+
+        <div class="result" aria-live="polite">
+          <div>
+            <small>GUARANTEE RESULT</small>
+            <strong id="resultTitle">尚未抽取</strong>
+            <div id="resultSub" class="sub">結果確定後會永久鎖定於本張訂單。</div>
+          </div>
+          <div id="resultValue" class="result-value">—</div>
+        </div>
+
+        <div class="actions">
+          <button id="drawButton" class="primary" type="button">轉動六格輪盤</button>
+          <button id="resetButton" class="secondary" type="button">DEMO 重置</button>
+        </div>
+        <p class="fine">DEMO 使用瀏覽器 localStorage 模擬「抽完上鎖」。正式版會改由伺服器資料庫判定，重新整理也無法重抽。</p>
+      </article>
+    </section>
+
+    <section class="rules" aria-label="玩法規則">
+      <details open>
+        <summary>這個玩法跟真正的俄羅斯輪盤差在哪？</summary>
+        <div class="rule-body">
+          常見的傳統描述是：<b>六格轉輪中只有一格是「中彈」結果，先隨機轉動，再進行一次或輪流嘗試</b>。它不是一套有官方統一規章的遊戲，不同版本會有「每次重轉」或「只轉一次」等差異。因為現實行為高度危險，魔丸版本只保留「六格、一次隨機、結果不可重來」三個概念。
+        </div>
+      </details>
+      <details>
+        <summary>魔丸版保底規則</summary>
+        <div class="rule-body">
+          每張符合資格的趣味單在付款完成後取得 <b>1 次抽取資格</b>。六格等機率，每次只抽一格；結果由系統決定並立即寫入訂單。關頁、重新整理、換裝置或重複開網址，都不能改變已抽出的結果。正式版會在 Discord 訂單票口同步通知抽取結果。
+        </div>
+      </details>
+      <details>
+        <summary>目前 DEMO 的六格保底</summary>
+        <div class="rule-body">
+          這版先用「一格金彈＝最高保底」來保留 1/6 的主題感；不是最終定案，之後可直接改成你要的數值與機率。
+          <div class="prob-grid">
+            <div class="prob"><strong>1,000 萬</strong><span>2 格 · 33.3%</span></div>
+            <div class="prob"><strong>1,200 萬</strong><span>2 格 · 33.3%</span></div>
+            <div class="prob"><strong>1,400 萬</strong><span>1 格 · 16.7%</span></div>
+            <div class="prob"><strong>2,000 萬</strong><span>金彈 1 格 · 16.7%</span></div>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>正式版會怎麼上鎖？</summary>
+        <div class="rule-body">
+          真正上線後不會相信前端按鈕，而是以訂單資料庫的 <b>allowed_uses / used_uses / result</b> 為準。伺服器會先決定並儲存結果，再回傳動畫；即使同時開兩個分頁，也只能有第一個成功寫入的請求消耗抽取次數。
+        </div>
+      </details>
+    </section>
+
+    <div class="footer-note">Prototype only · 魔丸娛樂｜這個 DEMO 不會修改任何真實訂單、錢包、薪資或 Discord 資料。</div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "mowan_rr_demo_v1";
+      const chambers = [
+        { value: 1000, label: "安全下莊", jackpot: false },
+        { value: 1000, label: "安全下莊", jackpot: false },
+        { value: 1200, label: "加碼保底", jackpot: false },
+        { value: 1200, label: "加碼保底", jackpot: false },
+        { value: 1400, label: "高額保底", jackpot: false },
+        { value: 2000, label: "金彈 JACKPOT", jackpot: true }
+      ];
+
+      const cylinder = document.getElementById("cylinder");
+      const holes = Array.from(document.querySelectorAll(".chamber"));
+      const drawButton = document.getElementById("drawButton");
+      const resetButton = document.getElementById("resetButton");
+      const status = document.getElementById("status");
+      const resultTitle = document.getElementById("resultTitle");
+      const resultSub = document.getElementById("resultSub");
+      const resultValue = document.getElementById("resultValue");
+      const toast = document.getElementById("toast");
+
+      let drawing = false;
+
+      function randomIndex() {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const bucket = new Uint32Array(1);
+          const max = Math.floor(0x100000000 / chambers.length) * chambers.length;
+          let n;
+          do {
+            window.crypto.getRandomValues(bucket);
+            n = bucket[0];
+          } while (n >= max);
+          return n % chambers.length;
+        }
+        return Math.floor(Math.random() * chambers.length);
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        window.setTimeout(() => toast.classList.remove("show"), 1800);
+      }
+
+      function readState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function renderLocked(state) {
+        holes.forEach((hole, i) => hole.classList.toggle("hit", i === Number(state.index)));
+        status.textContent = "結果已鎖定";
+        status.classList.add("locked");
+        resultTitle.textContent = state.label || "保底已確定";
+        resultValue.textContent = `${Number(state.value).toLocaleString("zh-TW")} 萬`;
+        resultSub.textContent = state.jackpot
+          ? "抽中唯一金彈格；正式版會同步通知 Discord 票口。"
+          : `抽取時間：${state.drawnAt || "已記錄"}`;
+        drawButton.textContent = "本單已使用完抽取次數";
+        drawButton.disabled = true;
+      }
+
+      function renderFresh() {
+        holes.forEach(hole => hole.classList.remove("hit"));
+        status.textContent = "可抽 1 次";
+        status.classList.remove("locked");
+        resultTitle.textContent = "尚未抽取";
+        resultValue.textContent = "—";
+        resultSub.textContent = "結果確定後會永久鎖定於本張訂單。";
+        drawButton.textContent = "轉動六格輪盤";
+        drawButton.disabled = false;
+      }
+
+      async function draw() {
+        if (drawing) return;
+        const existing = readState();
+        if (existing) {
+          renderLocked(existing);
+          showToast("這張 DEMO 已抽過，結果保持不變。")
+          return;
+        }
+
+        drawing = true;
+        drawButton.disabled = true;
+        drawButton.textContent = "輪盤轉動中…";
+        holes.forEach(hole => hole.classList.remove("hit"));
+        cylinder.classList.remove("spinning");
+        void cylinder.offsetWidth;
+        cylinder.classList.add("spinning");
+
+        const index = randomIndex();
+        const result = chambers[index];
+        const state = {
+          index,
+          value: result.value,
+          label: result.label,
+          jackpot: result.jackpot,
+          drawnAt: new Intl.DateTimeFormat("zh-TW", {
+            year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", second: "2-digit",
+            hour12: false
+          }).format(new Date())
+        };
+
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (_) {}
+
+        window.setTimeout(() => {
+          cylinder.classList.remove("spinning");
+          renderLocked(state);
+          drawing = false;
+          showToast(result.jackpot ? "金彈！2,000 萬保底。" : `保底確定：${result.value.toLocaleString("zh-TW")} 萬`);
+        }, 1850);
+      }
+
+      drawButton.addEventListener("click", draw);
+      resetButton.addEventListener("click", () => {
+        if (drawing) return;
+        localStorage.removeItem(STORAGE_KEY);
+        renderFresh();
+        showToast("DEMO 已重置，可以重新測試。")
+      });
+
+      const initial = readState();
+      if (initial) renderLocked(initial); else renderFresh();
+    })();
+  </script>
+</body>
+</html>
