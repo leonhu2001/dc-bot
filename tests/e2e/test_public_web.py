@@ -70,13 +70,21 @@ def open_order_catalog(page: Page):
     return response
 
 
-def open_first_order_dialog(page: Page) -> None:
-    open_buttons = page.locator(".order3-open")
-    if open_buttons.count() == 0:
-        pytest.skip("No public order groups are available in this fixture")
-    open_buttons.first.click()
+def open_order_dialog(page: Page, *, group_key: str | None = None) -> None:
+    if group_key:
+        button = page.locator(f'.order3-open[data-order-group="{group_key}"]')
+        expect(button).to_have_count(1)
+    else:
+        buttons = page.locator(".order3-open")
+        if buttons.count() == 0:
+            pytest.skip("No public order groups are available in this fixture")
+        button = buttons.first
+
+    button.click()
     expect(page.locator("#mw-order-dialog")).to_be_visible()
-    expect(page.locator("#mw-rule-key")).not_to_have_text("")
+    rule_key = page.locator("#mw-rule-key")
+    expect(rule_key).not_to_have_text("")
+    expect(rule_key).not_to_have_text("—")
 
 
 def test_home_and_order_catalog_render(page: Page) -> None:
@@ -90,7 +98,7 @@ def test_home_and_order_catalog_render(page: Page) -> None:
 
 def test_order_dialog_can_open_and_close(page: Page) -> None:
     open_order_catalog(page)
-    open_first_order_dialog(page)
+    open_order_dialog(page)
 
     dialog = page.locator("#mw-order-dialog")
     expect(page.locator("#mw-dialog-title")).not_to_have_text("")
@@ -101,7 +109,12 @@ def test_order_dialog_can_open_and_close(page: Page) -> None:
 def test_authenticated_quote_checkout_and_formal_order(page: Page) -> None:
     add_customer_session(page, suffix="101")
     open_order_catalog(page)
-    open_first_order_dialog(page)
+
+    # tech_play/basic_tech_secret_single is a stable auto-priced product. Do
+    # not make this regression depend on whichever marketing group happens to
+    # sort first or on a manual-quote product being first.
+    open_order_dialog(page, group_key="tech_play")
+    expect(page.locator("#mw-rule-key")).to_have_text("basic_tech_secret_single")
 
     price_button = page.locator("#mw-next-step")
     expect(price_button).to_be_visible()
