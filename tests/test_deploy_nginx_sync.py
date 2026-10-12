@@ -20,4 +20,5 @@ def test_production_optional_pytest_does_not_require_browser_runtime() -> None:
 def test_static_assets_have_compression_and_browser_cache_policy() -> None:
     assert "gzip on;" in NGINX
     assert "location /static/" in NGINX
-    assert 'Cache-Control "public, max-age=604800"' in NGINX
+    assert "expires 1h;" in NGINX
+    assert 'Cache-Control "public, max-age=3600"' in NGINX
