@@ -9,6 +9,7 @@ from services import (
     order_point_redemption,
     order_runtime,
     self_service_financials,
+    self_service_reorder,
     self_service_runtime,
     ticket_identity,
 )
@@ -24,6 +25,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
     assert callable(self_service_financials.configure_self_service_financials)
+    assert callable(self_service_reorder.configure_self_service_reorder)
     assert callable(ticket_identity.configure_ticket_identity)
     assert callable(order_runtime.finalize_accepted_pending_payment)
     assert callable(self_service_runtime.calculate_self_service_financials)
@@ -109,8 +111,18 @@ def test_phase2_self_service_financials_are_physically_extracted():
 
     assert "def calculate_self_service_financials" not in self_service_source
     assert "def calculate_manual_price_adjustment" not in self_service_source
+    reorder_source = Path("services/self_service_reorder.py").read_text(
+        encoding="utf-8"
+    )
+
     assert "class SelfServiceOrderView" in self_service_source
-    assert "async def build_reorder_self_service_draft" in self_service_source
+    assert "async def build_reorder_self_service_draft" not in self_service_source
+    assert "async def create_reorder_ticket_from_closed_order" not in self_service_source
+    assert "async def build_reorder_self_service_draft" in reorder_source
+    assert "async def create_reorder_ticket_from_closed_order" in reorder_source
+    assert "def configure_self_service_reorder" in reorder_source
+    assert "import bot" not in reorder_source
+    assert "from bot import" not in reorder_source
 
     assert "def calculate_self_service_financials" in financials_source
     assert "def calculate_manual_price_adjustment" in financials_source
