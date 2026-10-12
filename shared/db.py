@@ -130,3 +130,25 @@ def create_all_tables() -> None:
             f"[data-repair] init failed: {type(exc).__name__}: {exc}",
             flush=True,
         )
+
+    # Owner-authorised one-time cleanup for MO20261012001 / MO20261012002.
+    # This runs after the deploy backup, preserves wallet/payment ledger rows,
+    # and records an idempotent repair marker so future restarts do nothing.
+    try:
+        from services.authorized_order_cleanup import purge_authorized_test_orders
+
+        result = purge_authorized_test_orders(engine)
+        status = str(result.get("status") or "")
+        if status not in {"already_applied", "already_clean"}:
+            print(
+                "[test-order-cleanup] "
+                f"{result.get('repair_key')} status={status} "
+                f"deleted={result.get('deleted', [])} "
+                f"reason={result.get('reason', '')}",
+                flush=True,
+            )
+    except Exception as exc:
+        print(
+            f"[test-order-cleanup] init failed: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
