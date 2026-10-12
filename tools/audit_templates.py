@@ -12,10 +12,11 @@ ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
-# Legacy baseline on 2026-10-13. The project still needs CSP unsafe-inline, but
-# new changes may only reduce these counts, never increase them.
-MAX_INLINE_STYLE_BLOCKS = 28
-MAX_INLINE_SCRIPT_BLOCKS = 20
+# Debt budget after the 2026-10-13 public-layout extraction. The project still
+# needs CSP unsafe-inline on legacy pages, but new changes may only reduce these
+# counts, never increase them.
+MAX_INLINE_STYLE_BLOCKS = 26
+MAX_INLINE_SCRIPT_BLOCKS = 19
 
 # The only remaining *_fix asset is a temporary compatibility loader for the
 # canonical order UI module. Runtime behavior must not be added back to it, and
