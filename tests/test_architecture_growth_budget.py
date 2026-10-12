@@ -21,7 +21,9 @@ MAX_BYTES = {
     "web/app/routers/admin.py": 14_000,
     "web/app/routers/admin_dashboard.py": 29_000,
     "web/app/routers/admin_order_workspace.py": 68_000,
-    "views/review.py": 95_500,
+    "views/review.py": 66_000,
+    "services/worker_tips.py": 11_000,
+    "views/worker_tips.py": 25_000,
 }
 
 
