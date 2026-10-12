@@ -3,15 +3,12 @@ from pathlib import Path
 
 def test_close_path_finalizes_claim_before_discord_fetch():
     root = Path(__file__).resolve().parents[1]
-    source = (root / "services" / "order_runtime.py").read_text(
+    source = (root / "services" / "order_storage_runtime.py").read_text(
         encoding="utf-8"
     )
 
     start = source.index("async def lock_dispatch_claim_panel")
-    end = source.index(
-        "def sync_web_order_status_from_bot",
-        start,
-    )
+    end = source.index("async def store_dispatch_claim_panel", start)
     block = source[start:end]
 
     finalize_index = block.index(

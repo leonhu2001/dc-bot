@@ -9,6 +9,7 @@ from services import (
     order_payment_runtime,
     order_point_redemption,
     order_runtime,
+    order_storage_runtime,
     self_service_financials,
     self_service_reorder,
     self_service_runtime,
@@ -22,6 +23,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(acceptance_runtime.process_acceptance_sync_events_once)
     assert callable(web_sync_runtime._process_web_order_created_event)
     assert callable(order_runtime.configure_order_runtime)
+    assert callable(order_storage_runtime.configure_order_storage_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime)
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
@@ -98,7 +100,20 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
     assert "def configure_order_payment_runtime" in payment_source
     assert "import bot" not in payment_source
     assert "from bot import" not in payment_source
+    storage_source = Path("services/order_storage_runtime.py").read_text(
+        encoding="utf-8"
+    )
+
     assert "class DispatchClaimView" in order_source
+    assert "async def lock_dispatch_claim_panel" not in order_source
+    assert "async def store_dispatch_claim_panel" not in order_source
+    assert "async def resume_stored_order" not in order_source
+    assert "async def lock_dispatch_claim_panel" in storage_source
+    assert "async def store_dispatch_claim_panel" in storage_source
+    assert "async def resume_stored_order" in storage_source
+    assert "def configure_order_storage_runtime" in storage_source
+    assert "import bot" not in storage_source
+    assert "from bot import" not in storage_source
     assert "class OrderCredentialModal" not in order_source
     assert "async def redeem_order_point_benefit_on_payment" not in order_source
 
