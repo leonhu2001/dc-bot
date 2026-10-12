@@ -1,0 +1,25 @@
+name: Phase3 debt audit
+
+on:
+  push:
+    branches:
+      - refactor/phase3-csp-runtime-20261013
+    paths:
+      - tools/phase3_audit.py
+      - .github/workflows/phase3-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase3-csp-runtime-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Audit remaining inline blocks and large modules
+        run: python tools/phase3_audit.py
