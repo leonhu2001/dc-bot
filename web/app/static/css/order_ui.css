@@ -1,0 +1,40 @@
+html.mw-order-open,
+body.mw-order-open {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+}
+
+#mw-adjustments-field {
+    cursor: text;
+}
+
+#mw-extra-requirements {
+    display: block;
+    width: 100%;
+    min-height: 82px;
+    box-sizing: border-box;
+    margin-top: 8px;
+    padding: 8px 0 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1.65;
+    resize: vertical;
+}
+
+#mw-extra-requirements::placeholder {
+    opacity: .36;
+}
+
+#mw-player-field.mw-fixed-player-count button {
+    opacity: .38;
+    cursor: not-allowed;
+}
+
+.mw-fixed-player-note {
+    margin-left: 7px;
+    opacity: .52;
+    font-size: 11px;
+}
