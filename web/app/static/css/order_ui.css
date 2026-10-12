@@ -38,3 +38,14 @@ body.mw-order-open {
     opacity: .52;
     font-size: 11px;
 }
+
+/* Canonical specified-staff eligibility states. mw_order_guard.js keeps a
+   compatibility check for this stylesheet id and no longer needs to inject
+   these rules at runtime. */
+.mw-role-filter-hidden {
+    display: none !important;
+}
+
+.mw-role-filter-loading {
+    visibility: hidden !important;
+}
