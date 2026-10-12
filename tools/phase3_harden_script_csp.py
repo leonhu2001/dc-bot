@@ -40,6 +40,10 @@ def harden_template(path: Path) -> bool:
         " onerror='this.parentElement.remove();'",
         ' data-remove-parent-on-error="true"',
     )
+    source = source.replace(
+        ' onerror="this.parentElement.remove();"',
+        ' data-remove-parent-on-error="true"',
+    )
 
     # Nonces are only needed for the seven remaining dynamic/data inline scripts.
     source = INLINE_SCRIPT_OPEN_RE.sub(
@@ -56,36 +60,41 @@ def harden_template(path: Path) -> bool:
 def ensure_handler_asset() -> None:
     target = STATIC / "js" / "csp_handlers.js"
     target.write_text(
-        '''(() => {\n'
-        '    "use strict";\n\n'
-        '    document.addEventListener("submit", (event) => {\n'
-        '        const form = event.target instanceof HTMLFormElement\n'
-        '            ? event.target\n'
-        '            : null;\n'
-        '        if (!form) return;\n'
-        '        const message = String(form.dataset.confirmMessage || "").trim();\n'
-        '        if (message && !window.confirm(message)) {\n'
-        '            event.preventDefault();\n'
-        '            event.stopImmediatePropagation();\n'
-        '        }\n'
-        '    }, true);\n\n'
-        '    document.addEventListener("error", (event) => {\n'
-        '        const image = event.target instanceof HTMLImageElement\n'
-        '            ? event.target\n'
-        '            : null;\n'
-        '        if (!image) return;\n\n'
-        '        if (image.dataset.removeParentOnError === "true") {\n'
-        '            image.parentElement?.remove();\n'
-        '            return;\n'
-        '        }\n\n'
-        '        const fallbackSrc = String(image.dataset.fallbackSrc || "").trim();\n'
-        '        if (!fallbackSrc || image.dataset.fallbackApplied === "true") return;\n'
-        '        image.dataset.fallbackApplied = "true";\n'
-        '        const fallbackClass = String(image.dataset.fallbackClass || "").trim();\n'
-        '        if (fallbackClass) image.classList.add(fallbackClass);\n'
-        '        image.src = fallbackSrc;\n'
-        '    }, true);\n'
-        '})();\n'''.replace("'\n        '", ""),
+        """(() => {
+    "use strict";
+
+    document.addEventListener("submit", (event) => {
+        const form = event.target instanceof HTMLFormElement
+            ? event.target
+            : null;
+        if (!form) return;
+        const message = String(form.dataset.confirmMessage || "").trim();
+        if (message && !window.confirm(message)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+
+    document.addEventListener("error", (event) => {
+        const image = event.target instanceof HTMLImageElement
+            ? event.target
+            : null;
+        if (!image) return;
+
+        if (image.dataset.removeParentOnError === "true") {
+            image.parentElement?.remove();
+            return;
+        }
+
+        const fallbackSrc = String(image.dataset.fallbackSrc || "").trim();
+        if (!fallbackSrc || image.dataset.fallbackApplied === "true") return;
+        image.dataset.fallbackApplied = "true";
+        const fallbackClass = String(image.dataset.fallbackClass || "").trim();
+        if (fallbackClass) image.classList.add(fallbackClass);
+        image.src = fallbackSrc;
+    }, true);
+})();
+""",
         encoding="utf-8",
     )
 
