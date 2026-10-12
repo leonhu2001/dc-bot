@@ -3,17 +3,19 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 
+from web.app.routers.love_delta import router as love_delta_router
 from web.app.routers.roulette import router as roulette_router
 
 
 router = APIRouter(tags=["admin-payouts-grouped-redirect"])
 
 # main.py already mounts this lightweight compatibility router. Include the
-# roulette feature router here as well so its member/admin endpoints and startup
-# notification worker are actually registered without duplicating application
-# bootstrap logic. This can be moved to a direct main.py include when the router
-# registry is next consolidated.
+# standalone fun-order feature routers here as well so their member/admin
+# endpoints are registered without duplicating application bootstrap logic.
+# This can be moved to direct main.py includes when the router registry is next
+# consolidated.
 router.include_router(roulette_router)
+router.include_router(love_delta_router)
 
 
 @router.get("/admin/payouts/grouped")
