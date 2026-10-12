@@ -1,0 +1,42 @@
+name: Phase2 split admin router
+
+on:
+  push:
+    branches:
+      - refactor/phase2-runtime-assets-20261013
+    paths:
+      - tools/phase2_split_admin_router.py
+      - .github/workflows/phase2-split-admin.yml
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase2-runtime-assets-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Split router by responsibility
+        run: python tools/phase2_split_admin_router.py
+      - name: Compile generated modules
+        run: python -m compileall -q web/app/routers/admin.py web/app/routers/admin_common.py web/app/routers/admin_dashboard.py web/app/routers/admin_order_workspace.py
+      - name: Commit generated split
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/app/routers/admin.py web/app/routers/admin_common.py web/app/routers/admin_dashboard.py web/app/routers/admin_order_workspace.py
+          if git diff --cached --quiet; then
+            echo "No admin split changes to commit"
+            exit 0
+          fi
+          git commit -m "Split admin dashboard and order workspace routers"
+          git pull --rebase origin refactor/phase2-runtime-assets-20261013
+          git push origin HEAD:refactor/phase2-runtime-assets-20261013
