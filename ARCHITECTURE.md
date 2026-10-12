@@ -34,7 +34,7 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 ## 修改規則
 
 1. 新功能不要再直接塞進 bot.py。
-2. 一次性 patch 成功後要刪除。
+2. 一次性 patch / repair 不得掛在 Web 或 Bot 的正常 startup；需要保留的歷史修復放在 `scripts/run_data_repairs.py` 顯式執行，完成且不再需要後應刪除。
 3. 正式設定與 token 不進 Git。
 4. 每次部署前都要 py_compile。
 5. 部署後要看 systemctl status 與 journalctl。
@@ -43,3 +43,6 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 8. runtime adapter 只能作為拆分過渡層，不允許新功能再依賴 bot.py globals；新功能必須直接使用 service/view 的明確 API。
 9. bot.py 只保留啟動、事件註冊、管理指令與尚未拆出的薄 orchestration；自助下單與訂單 runtime 不再新增實作到 bot.py。
 10. 之後若修改 order_runtime.py / self_service_runtime.py，優先把碰到的功能逐步改成明確 dependency API，而不是擴大 namespace adapter。
+11. `bot.py`、`order_runtime.py`、`self_service_runtime.py`、Web `admin.py`、`views/review.py` 都有 regression growth budget；新功能若撞到上限，必須先抽出責任區塊而不是提高上限。
+12. Python regression 之外，公開首頁與點單流程必須通過 Playwright browser smoke；至少驗證頁面可載入、點單 Dialog 可操作，以及 390px 手機寬度不產生水平溢出。
+13. 前端臨時 `*_fix.js` / runtime CSS injection 不作為新功能的落點；碰到既有 patch 時優先把行為移回正式 controller / stylesheet，再刪除 patch。
