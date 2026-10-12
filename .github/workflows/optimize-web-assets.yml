@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: refactor/phase2-runtime-assets-20261013
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -46,4 +47,5 @@ jobs:
             exit 0
           fi
           git commit -m "Optimize large web image assets [asset-opt]"
+          git pull --rebase origin refactor/phase2-runtime-assets-20261013
           git push origin HEAD:refactor/phase2-runtime-assets-20261013
