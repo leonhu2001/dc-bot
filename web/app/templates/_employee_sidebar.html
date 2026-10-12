@@ -7,6 +7,10 @@
   <nav class="mw-r5-nav">
     <a class="{% if _p == '/employee' or _p.startswith('/my/payouts') %}active{% endif %}" href="/employee">員工中心</a>
     <a class="{% if _p.startswith('/dispatch') %}active{% endif %}" href="/dispatch">接單大廳</a>
+    <a class="{% if _p == '/reports' or (_p.startswith('/reports/') and not _p.startswith('/reports/review')) %}active{% endif %}" href="/reports">報單系統</a>
+    {% if user and (user.get('is_admin') or user.get('is_customer_service') or user.get('is_manager')) %}
+      <a class="{% if _p.startswith('/reports/review') %}active{% endif %}" href="/reports/review">報單審核</a>
+    {% endif %}
     <a class="{% if _p.startswith('/employee/internal-transfers') %}active{% endif %}" href="/employee/internal-transfers">內部轉帳</a>
     <a href="/">返回官網</a>
   </nav>
