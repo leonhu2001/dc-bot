@@ -1,0 +1,26 @@
+name: Phase2 module inventory
+
+on:
+  push:
+    branches:
+      - refactor/phase2-runtime-assets-20261013
+    paths:
+      - tools/phase2_module_inventory.py
+      - .github/workflows/phase2-inventory.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase2-runtime-assets-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Print module boundaries
+        run: python tools/phase2_module_inventory.py
