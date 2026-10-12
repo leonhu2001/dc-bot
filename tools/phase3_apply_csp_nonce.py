@@ -84,38 +84,34 @@ if old_header not in main:
 main = main.replace(old_header, new_header, 1)
 main_path.write_text(main, encoding="utf-8")
 
-# Every executable inline script left after static extraction is dynamic Jinja and
-# must carry the request nonce. External scripts are intentionally untouched.
 templates = ROOT / "web/app/templates"
 inline_tag = re.compile(r"<script(?![^>]*\bsrc\s*=)(?P<attrs>[^>]*)>", re.I)
 updated_scripts = 0
 for path in sorted(templates.glob("*.html")):
     text = path.read_text(encoding="utf-8")
+
     def add_nonce(match: re.Match[str]) -> str:
-        nonlocal_dummy = None
-        del nonlocal_dummy
         global updated_scripts
         attrs = match.group("attrs") or ""
         if re.search(r"\bnonce\s*=", attrs, re.I):
             return match.group(0)
         updated_scripts += 1
         return '<script nonce="{{ request.state.csp_nonce }}"' + attrs + '>'
+
     text = inline_tag.sub(add_nonce, text)
     path.write_text(text, encoding="utf-8")
 
 if updated_scripts != 7:
     raise RuntimeError(f"expected to nonce 7 dynamic scripts, got {updated_scripts}")
 
-# Tighten the audit budget to the new baseline and require nonce coverage for
-# every remaining inline executable script.
 audit_path = ROOT / "tools/audit_templates.py"
 audit = audit_path.read_text(encoding="utf-8")
 audit = audit.replace("MAX_INLINE_STYLE_BLOCKS = 26", "MAX_INLINE_STYLE_BLOCKS = 0")
 audit = audit.replace("MAX_INLINE_SCRIPT_BLOCKS = 19", "MAX_INLINE_SCRIPT_BLOCKS = 7")
-marker = '''    if inline_script_blocks > MAX_INLINE_SCRIPT_BLOCKS:
+marker = '''    if inline_script_count > MAX_INLINE_SCRIPT_BLOCKS:
         errors.append(
             "inline script debt increased: "
-            f"{inline_script_blocks} > {MAX_INLINE_SCRIPT_BLOCKS}"
+            f"{inline_script_count} > {MAX_INLINE_SCRIPT_BLOCKS}"
         )
 '''
 addition = marker + '''
@@ -139,7 +135,6 @@ if marker not in audit:
     raise RuntimeError("audit CSP marker not found")
 audit_path.write_text(audit.replace(marker, addition, 1), encoding="utf-8")
 
-# Extend unit coverage for the generated policy rather than checking only headers indirectly.
 test_path = ROOT / "tests/test_http_security.py"
 test = test_path.read_text(encoding="utf-8")
 test = test.replace(
