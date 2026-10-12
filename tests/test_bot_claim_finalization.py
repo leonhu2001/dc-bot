@@ -3,9 +3,14 @@ from pathlib import Path
 
 def test_close_path_finalizes_claim_before_discord_fetch():
     root = Path(__file__).resolve().parents[1]
-    source = (root / "services" / "order_runtime.py").read_text(
+    facade = (root / "services" / "order_runtime.py").read_text(
         encoding="utf-8"
     )
+    source = (root / "services" / "order_runtime_legacy.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "sys.modules[__name__] = _legacy" in facade
 
     start = source.index("async def lock_dispatch_claim_panel")
     end = source.index(
