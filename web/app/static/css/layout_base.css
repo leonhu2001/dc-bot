@@ -1,0 +1,4 @@
+/* Shared structural rules that must load before component styles. */
+[hidden] {
+    display: none !important;
+}
