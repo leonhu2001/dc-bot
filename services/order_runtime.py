@@ -4,7 +4,7 @@ from typing import Any, Mapping
 
 import discord
 
-from services.order_credentials import (
+from services.order_credential_runtime import (
     configure_order_credentials,
     _order_requires_credentials,
     _credential_user_for_id,
