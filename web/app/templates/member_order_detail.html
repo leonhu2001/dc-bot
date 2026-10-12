@@ -14,11 +14,20 @@
 .customer-detail-staff{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .customer-detail-staff span{padding:7px 10px;border-radius:10px;background:rgba(255,255,255,.045)}
 .customer-detail-note{margin-top:10px;color:rgba(235,232,222,.62);line-height:1.7}
-@media(max-width:700px){.customer-order-detail-head{align-items:flex-start;flex-direction:column}.customer-detail-grid{grid-template-columns:1fr}}
+.customer-roulette-card{position:relative;overflow:hidden;border-color:rgba(223,183,92,.22);background:radial-gradient(circle at 88% 0%,rgba(223,183,92,.12),transparent 38%),linear-gradient(145deg,rgba(23,22,20,.98),rgba(11,11,12,.98))}
+.customer-roulette-card:after{content:"";position:absolute;width:220px;height:220px;right:-90px;bottom:-135px;border:1px solid rgba(223,183,92,.14);border-radius:50%;box-shadow:0 0 0 22px rgba(223,183,92,.025),0 0 0 48px rgba(223,183,92,.015);pointer-events:none}
+.customer-roulette-head{position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.customer-roulette-copy h2{margin:8px 0 7px;font-size:clamp(22px,4vw,31px)}
+.customer-roulette-copy p{max-width:650px;margin:0;color:rgba(235,232,222,.62);font-size:14px;line-height:1.75}
+.customer-roulette-actions{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:180px}
+.customer-roulette-actions small{color:rgba(235,232,222,.42);font-size:11px;text-align:right}
+.customer-roulette-disabled{min-height:48px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.08);border-radius:13px;color:rgba(235,232,222,.42);background:rgba(255,255,255,.025);font-size:14px;font-weight:650;cursor:not-allowed}
+@media(max-width:700px){.customer-order-detail-head{align-items:flex-start;flex-direction:column}.customer-detail-grid{grid-template-columns:1fr}.customer-roulette-head{align-items:flex-start;flex-direction:column}.customer-roulette-actions{align-items:stretch;width:100%}.customer-roulette-actions small{text-align:left}.customer-roulette-actions .button,.customer-roulette-disabled{width:100%}}
 </style>
 {% endblock %}
 
 {% block content %}
+{% set is_roulette_order = '俄羅斯輪盤' in (order.item or '') %}
 <section class="customer-order-detail">
     <div class="customer-order-detail-head">
         <div>
@@ -48,6 +57,39 @@
             <div class="customer-detail-item"><small>建立時間</small><strong>{{ order.created_at }}</strong></div>
         </div>
     </section>
+
+    {% if is_roulette_order %}
+    <section class="customer-detail-card customer-roulette-card">
+        <div class="customer-roulette-head">
+            <div class="customer-roulette-copy">
+                <div class="section-eyebrow">RUSSIAN ROULETTE</div>
+                <h2>本單保底輪盤</h2>
+                {% if order.status in ['active', 'stored'] %}
+                    <p>付款已完成。選擇下注方式後可進行一次保底輪盤；結果產生後會立即鎖定，並同步通知 Discord 訂單票口。</p>
+                {% elif order.status in ['closed'] %}
+                    <p>此訂單已結束。若本單曾完成輪盤，可進入查看已鎖定的結果。</p>
+                {% elif order.status in ['cancelled', 'canceled'] %}
+                    <p>此訂單已取消，輪盤不再開放抽取。</p>
+                {% else %}
+                    <p>輪盤資格已綁定這張訂單，付款完成後會自動開放一次抽取。</p>
+                {% endif %}
+            </div>
+            <div class="customer-roulette-actions">
+                {% if order.status in ['active', 'stored', 'closed'] %}
+                    <a class="button button-primary" href="/me/orders/{{ order.id }}/roulette">
+                        {% if order.status == 'closed' %}查看輪盤結果{% else %}前往抽取保底{% endif %}
+                    </a>
+                    <small>每張訂單僅能產生 1 次結果</small>
+                {% elif order.status in ['cancelled', 'canceled'] %}
+                    <span class="customer-roulette-disabled">訂單已取消</span>
+                {% else %}
+                    <span class="customer-roulette-disabled">付款完成後開放</span>
+                    <small>接單完成並付款後自動解鎖</small>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="customer-detail-card">
         <div class="section-eyebrow">PAYMENT</div>
