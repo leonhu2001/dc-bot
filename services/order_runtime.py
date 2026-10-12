@@ -37,28 +37,53 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
             continue
         globals()[name] = value
 
-    configure_order_credentials(
-        credential_owner_user_id=namespace["CREDENTIAL_OWNER_USER_ID"],
-        guild_id=namespace["GUILD_ID"],
-        self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-        to_int=namespace["_to_int"],
-        bot_instance=namespace["bot"],
-        fetch_member=namespace["fetch_member_safely"],
-        taipei_now_iso=namespace["get_taipei_now_iso"],
-        remember_data=namespace["remember_order_data"],
-        save_data=namespace["save_bot_data"],
-    )
-    configure_order_point_redemption(
-        customer_rewards=namespace["CUSTOMER_REWARDS"],
-        to_int=namespace["_to_int"],
-        current_reward_points=namespace["get_current_reward_points"],
-        customer_reward_data=namespace["get_customer_reward_data"],
-        order_point_item=namespace["get_order_point_item"],
-        taipei_now_iso=namespace["get_taipei_now_iso"],
-        remember_data=namespace["remember_order_data"],
-        save_data=namespace["save_bot_data"],
-        order_log_sender=namespace["send_order_log"],
-    )
+    credential_keys = {
+        "CREDENTIAL_OWNER_USER_ID",
+        "GUILD_ID",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "_to_int",
+        "bot",
+        "fetch_member_safely",
+        "get_taipei_now_iso",
+        "remember_order_data",
+        "save_bot_data",
+    }
+    if credential_keys.issubset(namespace):
+        configure_order_credentials(
+            credential_owner_user_id=namespace["CREDENTIAL_OWNER_USER_ID"],
+            guild_id=namespace["GUILD_ID"],
+            self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+            to_int=namespace["_to_int"],
+            bot_instance=namespace["bot"],
+            fetch_member=namespace["fetch_member_safely"],
+            taipei_now_iso=namespace["get_taipei_now_iso"],
+            remember_data=namespace["remember_order_data"],
+            save_data=namespace["save_bot_data"],
+        )
+
+    redemption_keys = {
+        "CUSTOMER_REWARDS",
+        "_to_int",
+        "get_current_reward_points",
+        "get_customer_reward_data",
+        "get_order_point_item",
+        "get_taipei_now_iso",
+        "remember_order_data",
+        "save_bot_data",
+        "send_order_log",
+    }
+    if redemption_keys.issubset(namespace):
+        configure_order_point_redemption(
+            customer_rewards=namespace["CUSTOMER_REWARDS"],
+            to_int=namespace["_to_int"],
+            current_reward_points=namespace["get_current_reward_points"],
+            customer_reward_data=namespace["get_customer_reward_data"],
+            order_point_item=namespace["get_order_point_item"],
+            taipei_now_iso=namespace["get_taipei_now_iso"],
+            remember_data=namespace["remember_order_data"],
+            save_data=namespace["save_bot_data"],
+            order_log_sender=namespace["send_order_log"],
+        )
 
     _CONFIGURED = True
 

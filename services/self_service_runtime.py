@@ -49,22 +49,34 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
     if callable(reorder_configurator):
         reorder_configurator(create_reorder_ticket_from_closed_order)
 
-    configure_self_service_financials(
-        order_point_benefit_specs=namespace["ORDER_POINT_BENEFIT_SPECS"],
-        point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
-        get_rule_from_data=_get_rule_from_self_service_data,
-        is_specify_preference=_is_specify_preference,
-        role_key_for_member=_role_key_for_member,
-        to_int=namespace["_to_int"],
-        store_absorbed_discount_allocator=namespace["allocate_store_absorbed_fixed_discount"],
-        current_reward_points=namespace["get_current_reward_points"],
-        customer_reward_data=namespace["get_customer_reward_data"],
-        effective_member_level=namespace["get_effective_member_level"],
-        self_service_quantity_unit=namespace["get_self_service_quantity_unit"],
-        self_service_staff_price=get_self_service_staff_price,
-        vip_discount_pay_rate=namespace["get_vip_discount_pay_rate"],
-        staff_price_required=is_self_service_staff_price_required,
-    )
+    financial_keys = {
+        "ORDER_POINT_BENEFIT_SPECS",
+        "POINT_REDEEM_ITEMS_BY_KEY",
+        "_to_int",
+        "allocate_store_absorbed_fixed_discount",
+        "get_current_reward_points",
+        "get_customer_reward_data",
+        "get_effective_member_level",
+        "get_self_service_quantity_unit",
+        "get_vip_discount_pay_rate",
+    }
+    if financial_keys.issubset(namespace):
+        configure_self_service_financials(
+            order_point_benefit_specs=namespace["ORDER_POINT_BENEFIT_SPECS"],
+            point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
+            get_rule_from_data=_get_rule_from_self_service_data,
+            is_specify_preference=_is_specify_preference,
+            role_key_for_member=_role_key_for_member,
+            to_int=namespace["_to_int"],
+            store_absorbed_discount_allocator=namespace["allocate_store_absorbed_fixed_discount"],
+            current_reward_points=namespace["get_current_reward_points"],
+            customer_reward_data=namespace["get_customer_reward_data"],
+            effective_member_level=namespace["get_effective_member_level"],
+            self_service_quantity_unit=namespace["get_self_service_quantity_unit"],
+            self_service_staff_price=get_self_service_staff_price,
+            vip_discount_pay_rate=namespace["get_vip_discount_pay_rate"],
+            staff_price_required=is_self_service_staff_price_required,
+        )
 
     _CONFIGURED = True
 
