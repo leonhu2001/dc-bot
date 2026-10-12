@@ -1,7 +1,7 @@
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -48,6 +48,7 @@ from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
 from web.app.services.discord_service import get_member_role_ids
+from web.app.services.health_check import check_runtime_dependencies
 from web.app.services.http_security import (
     CONTENT_SECURITY_POLICY,
     apply_live_access,
@@ -312,9 +313,22 @@ async def no_access(request: Request):
 
 @app.get("/health")
 async def health():
+    try:
+        checks = await run_in_threadpool(
+            check_runtime_dependencies,
+            STATIC_DIR,
+        )
+    except Exception as exc:
+        print("[health_check_failed]", type(exc).__name__)
+        raise HTTPException(
+            status_code=503,
+            detail="service not ready",
+        ) from exc
+
     return {
         "ok": True,
         "service": "mw-worker-dashboard",
+        **checks,
     }
 
 
