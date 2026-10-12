@@ -4,10 +4,12 @@ import pytest
 
 from web.app.services import roulette_service
 from web.app.services.roulette_service import (
+    LEGACY_ROULETTE_RULE_KEY,
     ROULETTE_RULE_KEY,
     corner_numbers,
     draw_roulette,
     ensure_roulette_draw_tables,
+    ensure_roulette_feature,
     normalize_bet,
     notify_ready_roulette_orders,
     resolve_roulette_result,
@@ -176,3 +178,47 @@ def test_ready_prompt_is_sent_once_for_paid_order(tmp_path, monkeypatch):
             "SELECT status, message_id FROM roulette_ready_notifications WHERE order_id = 9"
         ).fetchone()
     assert row == ("sent", "999")
+
+
+def test_only_system_generated_legacy_product_is_deactivated(tmp_path):
+    db = tmp_path / "roulette-cleanup.db"
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            CREATE TABLE custom_order_rules (
+                rule_key TEXT PRIMARY KEY,
+                is_active INTEGER NOT NULL,
+                created_by_discord_id TEXT,
+                created_by_display_name TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO custom_order_rules (
+                rule_key, is_active, created_by_discord_id, created_by_display_name
+            ) VALUES (?, 1, 'system', 'Mowan Roulette Bootstrap')
+            """,
+            (LEGACY_ROULETTE_RULE_KEY,),
+        )
+        conn.execute(
+            """
+            INSERT INTO custom_order_rules (
+                rule_key, is_active, created_by_discord_id, created_by_display_name
+            ) VALUES (?, 1, 'owner', 'Manager')
+            """,
+            (ROULETTE_RULE_KEY,),
+        )
+        conn.commit()
+
+    ensure_roulette_feature(db)
+
+    with sqlite3.connect(db) as conn:
+        rows = dict(
+            conn.execute(
+                "SELECT rule_key, is_active FROM custom_order_rules"
+            ).fetchall()
+        )
+
+    assert rows[LEGACY_ROULETTE_RULE_KEY] == 0
+    assert rows[ROULETTE_RULE_KEY] == 1
