@@ -1,0 +1,117 @@
+{% extends "layout.html" %}
+
+{% block page_title %}報單系統{% endblock %}
+
+{% block content %}
+<style>
+.report-page{display:grid;gap:18px}.report-hero,.report-card,.report-stat{border:1px solid rgba(255,255,255,.09);background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.02)),rgba(8,11,19,.94);box-shadow:0 20px 58px rgba(0,0,0,.28)}.report-hero{border-radius:26px;padding:24px;display:grid;gap:10px}.report-kicker{margin:0;color:var(--mw-gold,#f5c66b);font-size:12px;font-weight:950;letter-spacing:.16em}.report-hero h2{margin:0;font-size:clamp(28px,4vw,44px);letter-spacing:.06em}.report-hero p{margin:0;color:var(--mw-muted,#a7a0b5);line-height:1.8}.report-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.report-stat{border-radius:20px;padding:17px}.report-stat span{display:block;color:var(--mw-muted,#a7a0b5);font-size:12px;font-weight:850}.report-stat strong{display:block;margin-top:8px;font-size:32px}.report-list{display:grid;gap:14px}.report-card{border-radius:24px;padding:18px;display:grid;gap:16px;scroll-margin-top:24px}.report-card.is-focus{outline:2px solid rgba(245,198,107,.62);box-shadow:0 0 0 5px rgba(245,198,107,.08),0 20px 58px rgba(0,0,0,.28)}.report-card-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.report-card h3{margin:4px 0 0;font-size:20px}.report-status{display:inline-flex;align-items:center;border:1px solid rgba(245,198,107,.28);background:rgba(245,198,107,.08);color:#ffe2a0;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:950;white-space:nowrap}.report-status.submitted{border-color:rgba(117,232,255,.28);background:rgba(117,232,255,.08);color:#c9f8ff}.report-status.changes_requested{border-color:rgba(255,169,89,.32);background:rgba(255,169,89,.1);color:#ffe1b5}.report-status.approved{border-color:rgba(114,242,166,.32);background:rgba(114,242,166,.09);color:#d9ffe8}.report-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.report-meta>div,.report-section{border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.035);border-radius:16px;padding:12px}.report-meta span,.report-label{display:block;color:var(--mw-muted,#a7a0b5);font-size:12px;font-weight:800}.report-meta strong{display:block;margin-top:6px;word-break:break-word}.report-workers{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.report-worker{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(245,198,107,.22);background:rgba(245,198,107,.07);border-radius:999px;padding:7px 10px;font-size:13px;font-weight:900}.report-alert{border:1px solid rgba(255,169,89,.3);background:rgba(255,169,89,.09);color:#ffe2bc;border-radius:16px;padding:12px 14px;line-height:1.65}.report-form{display:grid;gap:14px}.report-choice-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:12px}.report-choice{border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px;background:rgba(0,0,0,.17)}.report-choice h4{margin:0 0 5px;font-size:15px}.report-choice p{margin:0 0 12px;color:var(--mw-muted,#a7a0b5);font-size:12px;line-height:1.55}.report-checks,.report-radios{display:flex;flex-wrap:wrap;gap:8px}.report-option{display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:9px 11px;background:rgba(255,255,255,.025);cursor:pointer;font-weight:850}.report-option input{accent-color:#f5c66b}.report-actions{display:flex;justify-content:flex-end}.report-submit{border:1px solid rgba(245,198,107,.42);background:linear-gradient(135deg,rgba(245,198,107,.24),rgba(207,62,62,.16));color:#fff4d5;border-radius:999px;padding:11px 20px;font-weight:950;cursor:pointer}.report-readonly{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.report-readonly>div{border:1px solid rgba(255,255,255,.075);border-radius:15px;padding:12px;background:rgba(255,255,255,.025)}.report-readonly strong{display:block;margin-top:5px}.report-empty{border:1px dashed rgba(255,255,255,.14);border-radius:22px;padding:28px;text-align:center;color:var(--mw-muted,#a7a0b5)}.report-notice{padding:12px 14px;border-radius:14px;font-weight:850}.report-notice.success{border:1px solid rgba(114,242,166,.28);background:rgba(114,242,166,.09);color:#d9ffe8}.report-notice.error{border:1px solid rgba(255,107,138,.3);background:rgba(255,107,138,.09);color:#ffd6df}@media(max-width:900px){.report-stats,.report-meta,.report-choice-grid,.report-readonly{grid-template-columns:1fr 1fr}}@media(max-width:620px){.report-stats,.report-meta,.report-choice-grid,.report-readonly{grid-template-columns:1fr}.report-card-head{flex-direction:column}.report-actions{justify-content:stretch}.report-submit{width:100%}}
+</style>
+
+<div class="report-page">
+    <section class="report-hero">
+        <p class="report-kicker">ORDER REPORT</p>
+        <h2>結單後，只補系統不知道的三件事</h2>
+        <p>老闆、單別、結單時間與接單人員都由系統帶入。你只要確認誰有掛名、是否有開直播、是否保留錄影即可。舊單不需要補填；新版上線後的新結單才會出現在這裡。</p>
+    </section>
+
+    {% if message %}<div class="report-notice success">{{ message }}</div>{% endif %}
+    {% if error %}<div class="report-notice error">{{ error }}</div>{% endif %}
+
+    <section class="report-stats">
+        <div class="report-stat"><span>待填寫</span><strong>{{ counts.pending or 0 }}</strong></div>
+        <div class="report-stat"><span>待審核</span><strong>{{ counts.submitted or 0 }}</strong></div>
+        <div class="report-stat"><span>需修改</span><strong>{{ counts.changes_requested or 0 }}</strong></div>
+        <div class="report-stat"><span>已完成</span><strong>{{ counts.approved or 0 }}</strong></div>
+    </section>
+
+    <section class="report-list">
+        {% for report in reports %}
+            <article class="report-card {% if focus_order_id and report.order_id == focus_order_id %}is-focus{% endif %}" id="report-{{ report.order_id }}">
+                <div class="report-card-head">
+                    <div>
+                        <p class="report-kicker">{{ report.bot_order_no or ("WEB-" ~ report.order_id) }}</p>
+                        <h3>{{ report.category }}｜{{ report.item }}</h3>
+                    </div>
+                    <span class="report-status {{ report.status }}">{{ report.status_label }}</span>
+                </div>
+
+                <div class="report-meta">
+                    <div><span>老闆</span><strong>{{ report.customer_display_name or "未記錄" }}</strong></div>
+                    <div><span>結單時間</span><strong>{{ report.closed_at_text or "未記錄" }}</strong></div>
+                    <div><span>訂單金額</span><strong>{{ report.customer_pay_amount if report.customer_pay_amount is not none else report.amount }}T</strong></div>
+                    <div><span>報單編號</span><strong>#{{ report.order_id }}</strong></div>
+                </div>
+
+                <div class="report-section">
+                    <span class="report-label">本單接單人員</span>
+                    <div class="report-workers">
+                        {% for worker in report.workers %}
+                            <span class="report-worker">{{ worker.worker_display_name }}{% if worker.has_named_bonus %} · 掛名{% endif %}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if report.status == 'changes_requested' %}
+                    <div class="report-alert"><strong>客服退回：</strong>{{ report.review_note or "請依客服指示修改後重新送出。" }}</div>
+                {% endif %}
+
+                {% if report.can_submit %}
+                    <form class="report-form" method="post" action="/reports/{{ report.order_id }}/submit">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token','') }}">
+                        <div class="report-choice-grid">
+                            <div class="report-choice">
+                                <h4>誰有掛名？</h4>
+                                <p>可複選；送客服審核通過後才會真正套用掛名加成。</p>
+                                <div class="report-checks">
+                                    {% for worker in report.workers %}
+                                        <label class="report-option">
+                                            <input type="checkbox" name="named_worker_ids" value="{{ worker.worker_discord_id }}" {% if worker.has_named_bonus %}checked{% endif %}>
+                                            {{ worker.worker_display_name }}
+                                        </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="report-choice">
+                                <h4>本單有開直播？</h4>
+                                <p>只記錄本單是否有直播，不需要貼連結。</p>
+                                <div class="report-radios">
+                                    <label class="report-option"><input type="radio" name="streamed" value="yes" required {% if report.status == 'changes_requested' and report.streamed %}checked{% endif %}>有</label>
+                                    <label class="report-option"><input type="radio" name="streamed" value="no" required {% if report.status == 'changes_requested' and not report.streamed %}checked{% endif %}>沒有</label>
+                                </div>
+                            </div>
+                            <div class="report-choice">
+                                <h4>有保留錄影？</h4>
+                                <p>用於後續客訴或爭議查核。</p>
+                                <div class="report-radios">
+                                    <label class="report-option"><input type="radio" name="recording_saved" value="yes" required {% if report.status == 'changes_requested' and report.recording_saved %}checked{% endif %}>有</label>
+                                    <label class="report-option"><input type="radio" name="recording_saved" value="no" required {% if report.status == 'changes_requested' and not report.recording_saved %}checked{% endif %}>沒有</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="report-actions"><button class="report-submit" type="submit">送出客服審核</button></div>
+                    </form>
+                {% else %}
+                    <div class="report-readonly">
+                        <div><span class="report-label">直播</span><strong>{{ "有" if report.streamed else "沒有" }}</strong></div>
+                        <div><span class="report-label">保留錄影</span><strong>{{ "有" if report.recording_saved else "沒有" }}</strong></div>
+                        <div><span class="report-label">提交者</span><strong>{{ report.submitted_by_display_name or "—" }}{% if report.submitted_at_text %}<br>{{ report.submitted_at_text }}{% endif %}</strong></div>
+                    </div>
+                    {% if report.status == 'submitted' %}<div class="report-alert" style="border-color:rgba(117,232,255,.26);background:rgba(117,232,255,.07);color:#c9f8ff">已送出，等待客服審核。其他接單人員不需要再重複報一次。</div>{% endif %}
+                    {% if report.status == 'approved' %}<div class="report-alert" style="border-color:rgba(114,242,166,.26);background:rgba(114,242,166,.07);color:#d9ffe8">客服已通過{% if report.reviewed_by_display_name %} · {{ report.reviewed_by_display_name }}{% endif %}{% if report.reviewed_at_text %} · {{ report.reviewed_at_text }}{% endif %}</div>{% endif %}
+                {% endif %}
+            </article>
+        {% else %}
+            <div class="report-empty">目前沒有需要你填寫，或你曾參與的新版報單。</div>
+        {% endfor %}
+    </section>
+</div>
+
+{% if focus_order_id %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const target = document.getElementById("report-{{ focus_order_id }}");
+    if (target) window.setTimeout(() => target.scrollIntoView({behavior:"smooth", block:"center"}), 80);
+});
+</script>
+{% endif %}
+{% endblock %}
