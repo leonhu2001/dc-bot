@@ -215,22 +215,44 @@
     document.head.appendChild(style);
   }
 
-  async function syncOrderHistoryReportStates() {
-    if (!window.location.pathname.startsWith("/admin/orders/history")) return;
+  function collectAdminReportTargets() {
+    const pathname = window.location.pathname;
+    const targets = [];
 
-    const buttons = Array.from(
-      document.querySelectorAll("button.history-dossier-toggle[data-dossier-target]")
-    );
-    const orderIds = buttons
-      .map((button) => {
-        const match = String(button.dataset.dossierTarget || "").match(/^dossier-(\d+)$/);
-        return match ? match[1] : null;
-      })
-      .filter(Boolean);
+    if (pathname === "/admin") {
+      document.querySelectorAll(".order-row").forEach((row) => {
+        const link = row.querySelector('a.workspace[href^="/admin/order-workspace/"]');
+        const match = String(link?.getAttribute("href") || "").match(/\/admin\/order-workspace\/(\d+)/);
+        const statusCell = row.querySelector(".order-status-col");
+        if (match && statusCell) {
+          targets.push({ orderId: match[1], statusCell });
+        }
+      });
+      return targets;
+    }
 
-    if (!orderIds.length) return;
+    if (pathname.startsWith("/admin/orders/history")) {
+      document
+        .querySelectorAll("button.history-dossier-toggle[data-dossier-target]")
+        .forEach((button) => {
+          const match = String(button.dataset.dossierTarget || "").match(/^dossier-(\d+)$/);
+          const row = button.closest("tr");
+          const statusCell = row?.querySelector("td:nth-child(7)");
+          if (match && statusCell) {
+            targets.push({ orderId: match[1], statusCell });
+          }
+        });
+    }
+
+    return targets;
+  }
+
+  async function syncAdminOrderReportStates() {
+    const targets = collectAdminReportTargets();
+    if (!targets.length) return;
 
     ensureOrderReportHistoryStyles();
+    const orderIds = Array.from(new Set(targets.map((item) => item.orderId)));
 
     try {
       const response = await fetch(
@@ -243,15 +265,9 @@
       const statuses = payload.statuses || {};
       const labels = payload.labels || {};
 
-      buttons.forEach((button) => {
-        const match = String(button.dataset.dossierTarget || "").match(/^dossier-(\d+)$/);
-        if (!match) return;
-        const status = statuses[match[1]];
+      targets.forEach(({ orderId, statusCell }) => {
+        const status = statuses[orderId];
         if (!status) return;
-
-        const row = button.closest("tr");
-        const statusCell = row?.querySelector("td:nth-child(7)");
-        if (!statusCell) return;
 
         let wrapper = statusCell.querySelector(".history-report-state");
         if (!wrapper) {
@@ -268,7 +284,7 @@
         }
       });
     } catch (error) {
-      console.debug("[order-report] history status unavailable", error);
+      console.debug("[order-report] admin status unavailable", error);
     }
   }
 
@@ -307,7 +323,7 @@
     simplifyStaffPage();
     setupOrderRulePublishFlow();
     preserveDispatchDutyPage();
-    syncOrderHistoryReportStates();
+    syncAdminOrderReportStates();
     syncOrderReportReviewCount();
   }
 
