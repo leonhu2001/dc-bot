@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ORDER_RUNTIME = ROOT / "services" / "order_runtime.py"
 DISPATCH_RUNTIME = ROOT / "services" / "order_dispatch_runtime.py"
 ARCH_TEST = ROOT / "tests" / "test_architecture_growth_budget.py"
+RUNTIME_BOUNDARY_TEST = ROOT / "tests" / "test_runtime_extraction_boundaries.py"
 BOUNDARY_TEST = ROOT / "tests" / "test_order_dispatch_runtime_boundary.py"
 
 TARGETS = (
@@ -143,6 +144,34 @@ def configure_order_dispatch_runtime(namespace: Mapping[str, Any]) -> None:
         1,
     )
     ARCH_TEST.write_text(arch, encoding="utf-8")
+
+    legacy_boundary = RUNTIME_BOUNDARY_TEST.read_text(encoding="utf-8")
+    old_storage = '''    storage_source = Path("services/order_storage_runtime.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "class DispatchClaimView" in order_source
+'''
+    new_storage = '''    storage_source = Path("services/order_storage_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    dispatch_source = Path("services/order_dispatch_runtime.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "class DispatchClaimView" not in order_source
+    assert callable(order_runtime.DispatchClaimView)
+    assert "class DispatchClaimView" in dispatch_source
+    assert "def configure_order_dispatch_runtime" in dispatch_source
+    assert "import bot" not in dispatch_source
+    assert "from bot import" not in dispatch_source
+'''
+    if old_storage not in legacy_boundary:
+        raise RuntimeError("legacy DispatchClaimView architecture assertion missing")
+    RUNTIME_BOUNDARY_TEST.write_text(
+        legacy_boundary.replace(old_storage, new_storage, 1),
+        encoding="utf-8",
+    )
 
     BOUNDARY_TEST.write_text(
         '''from __future__ import annotations
