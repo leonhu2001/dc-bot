@@ -221,25 +221,25 @@ async def revoke_order_credential_messages(
 
         if failed_count == 0:
             body = (
-                f"✅ **帳號資料已銷毀**\\n"
-                f"訂單：**{order_no}**\\n\\n"
-                "系統已撤回所有由魔丸娛樂機器人發送的帳號密碼訊息。\\n"
+                f"✅ **帳號資料已銷毀**\n"
+                f"訂單：**{order_no}**\n\n"
+                "系統已撤回所有由魔丸娛樂機器人發送的帳號密碼訊息。\n"
                 "本次帳號與密碼內容從未寫入魔丸娛樂資料庫；"
                 "系統只保留不含帳密的授權與撤回紀錄。"
             )
         else:
             body = (
-                f"⚠️ **帳號資料撤回未完全成功**\\n"
-                f"訂單：**{order_no}**\\n\\n"
-                f"已撤回 **{deleted_count}** 則，另有 **{failed_count}** 則 Discord 私訊目前無法確認撤回。\\n"
+                f"⚠️ **帳號資料撤回未完全成功**\n"
+                f"訂單：**{order_no}**\n\n"
+                f"已撤回 **{deleted_count}** 則，另有 **{failed_count}** 則 Discord 私訊目前無法確認撤回。\n"
                 "魔丸娛樂系統本身未保存帳號或密碼內容。"
             )
 
         if unique_recipient_lines:
-            body += "\\n\\n原授權人員：\\n" + "\\n".join(unique_recipient_lines)
+            body += "\n\n原授權人員：\n" + "\n".join(unique_recipient_lines)
 
         body += (
-            f"\\n\\n處理時間：{get_taipei_now_iso()}\\n"
+            f"\n\n處理時間：{get_taipei_now_iso()}\n"
             "🔒 為了最高帳號安全性，服務完成後仍建議更換密碼。"
         )
 
@@ -299,9 +299,9 @@ async def ensure_order_credential_request(
     embed = discord.Embed(
         title="🔐 代肝／代解登入資料",
         description=(
-            "此訂單需要登入您的遊戲帳號。\\n\\n"
+            "此訂單需要登入您的遊戲帳號。\n\n"
             "帳號與密碼**不會寫入魔丸娛樂資料庫**，只會在您送出時由機器人"
-            "直接私訊給目前接單人員與店長。\\n"
+            "直接私訊給目前接單人員與店長。\n"
             "結單或取消後，機器人會自動撤回這些帳密私訊；"
             "系統只保留不含帳密內容的授權／撤回紀錄。"
         ),
@@ -481,7 +481,7 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
             credential_embed = discord.Embed(
                 title="🔐 魔丸娛樂｜臨時帳號授權",
                 description=(
-                    "此登入資料僅限本訂單服務使用。\\n"
+                    "此登入資料僅限本訂單服務使用。\n"
                     "完成、取消或重新提交後，機器人會嘗試自動撤回本訊息。"
                 ),
                 color=discord.Color.orange(),
@@ -531,12 +531,12 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
         save_bot_data()
 
         receipt_text = (
-            f"🛡️ **帳號資料已安全交付**\\n"
-            f"訂單：**{order_no}**\\n\\n"
-            "目前取得本次帳號資料的人員：\\n"
-            + "\\n".join(delivered_display)
-            + "\\n\\n除上述人員外，機器人未將帳密送給其他店內成員。"
-            "\\n帳號與密碼內容未寫入魔丸娛樂資料庫；"
+            f"🛡️ **帳號資料已安全交付**\n"
+            f"訂單：**{order_no}**\n\n"
+            "目前取得本次帳號資料的人員：\n"
+            + "\n".join(delivered_display)
+            + "\n\n除上述人員外，機器人未將帳密送給其他店內成員。"
+            "\n帳號與密碼內容未寫入魔丸娛樂資料庫；"
             "結單或取消後機器人會自動撤回這些帳密私訊。"
         )
 
@@ -561,7 +561,7 @@ class OrderCredentialModal(discord.ui.Modal, title="代肝／代解登入資料"
                 pass
 
         await interaction.followup.send(
-            "登入資料已交付完成。\\n\\n" + "\\n".join(delivered_display),
+            "登入資料已交付完成。\n\n" + "\n".join(delivered_display),
             ephemeral=True,
         )
 
