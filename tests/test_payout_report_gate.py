@@ -129,8 +129,37 @@ def test_individual_paid_action_cannot_release_report_locked_salary(tmp_path, mo
         conn.close()
 
 
+def test_bulk_paid_action_cannot_release_report_locked_salary(tmp_path, monkeypatch):
+    from web.app.routers import admin_payout_summary as payout
+
+    db = tmp_path / "bulk-payout.db"
+    _make_db(db)
+    monkeypatch.setattr(payout, "db_path", lambda: str(db))
+    monkeypatch.setattr(payout, "summary_db_path", lambda: str(db))
+    monkeypatch.setattr(payout, "ensure_worker_tip_table", lambda: None)
+    monkeypatch.setattr(payout, "ensure_internal_transfer_tables", lambda *args, **kwargs: None)
+    monkeypatch.setattr(payout, "mark_bulk_adjustments", lambda **kwargs: None)
+
+    payout.update_summary_payout_status("2026-10", "worker", "paid")
+    conn = sqlite3.connect(db)
+    try:
+        assert conn.execute("SELECT payout_status FROM worker_payouts WHERE id=1").fetchone()[0] == "unpaid"
+        conn.execute("UPDATE order_reports SET status='approved' WHERE order_id=1")
+        conn.commit()
+    finally:
+        conn.close()
+
+    payout.update_summary_payout_status("2026-10", "worker", "paid")
+    conn = sqlite3.connect(db)
+    try:
+        assert conn.execute("SELECT payout_status FROM worker_payouts WHERE id=1").fetchone()[0] == "paid"
+    finally:
+        conn.close()
+
+
 def test_payout_summary_template_exposes_report_lock_state():
     from pathlib import Path
+
     source = (Path(__file__).resolve().parents[1] / "web/app/templates/admin_payout_summary.html").read_text(encoding="utf-8")
     assert "報單鎖定" in source
     assert "已發放（鎖定）" in source
