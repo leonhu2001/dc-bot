@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
+import subprocess
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +25,18 @@ def test_runtime_import_smoke_executes_all_critical_imports(capsys):
     assert "PASS: imported" in output
 
 
+def test_runtime_import_smoke_runs_as_deploy_invokes_it():
+    result = subprocess.run(
+        [sys.executable, str(SMOKE)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "PASS: imported" in result.stdout
+
+
 def test_deploy_runs_runtime_import_preflight_before_restart():
     source = DEPLOY.read_text(encoding="utf-8")
     preflight = '"$APP/venv/bin/python" "$APP/tools/runtime_import_smoke.py"'
@@ -40,3 +54,4 @@ def test_pre_restart_failure_does_not_restart_healthy_services_on_rollback():
 def test_runtime_import_smoke_script_keeps_explicit_import_loop():
     source = SMOKE.read_text(encoding="utf-8")
     assert "importlib.import_module(module_name)" in source
+    assert "sys.path.insert(0, str(ROOT))" in source
