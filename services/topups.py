@@ -5,7 +5,12 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from core.vip_levels import BASE_MEMBER_LEVELS, get_topup_rebate_percent
+from core.vip_levels import (
+    BASE_MEMBER_LEVELS,
+    VIP_TOPUP_REBATE_POLICY_CURRENT,
+    VIP_TOPUP_REBATE_POLICY_LEGACY,
+    get_topup_rebate_percent,
+)
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
 
@@ -14,10 +19,7 @@ TOPUP_PAYMENT_METHODS = {
     "jkopay": "街口支付",
     "staff_confirmed": "客服確認",
 }
-CUSTOMER_TOPUP_PAYMENT_METHODS = {
-    "bank_transfer",
-    "jkopay",
-}
+CUSTOMER_TOPUP_PAYMENT_METHODS = {"bank_transfer", "jkopay"}
 
 
 def normalize_topup_payment_method(value: str | None) -> str:
@@ -48,8 +50,7 @@ def _now_iso() -> str:
 def _db_path(db_file: str | Path | None = None) -> Path:
     if db_file is not None:
         return Path(db_file)
-    root = Path(__file__).resolve().parents[1]
-    return root / "bot.db"
+    return Path(__file__).resolve().parents[1] / "bot.db"
 
 
 def ensure_topup_tables(db_file: str | Path | None = None) -> None:
@@ -69,6 +70,7 @@ def ensure_topup_tables(db_file: str | Path | None = None) -> None:
                 payment_note TEXT,
                 source TEXT NOT NULL DEFAULT 'web',
                 status TEXT NOT NULL DEFAULT 'pending_payment',
+                policy_version TEXT NOT NULL DEFAULT 'legacy',
                 vip_total_before INTEGER,
                 vip_total_after INTEGER,
                 vip_level_before TEXT,
@@ -97,6 +99,11 @@ def ensure_topup_tables(db_file: str | Path | None = None) -> None:
         }
         if "payment_reference" not in columns:
             conn.execute("ALTER TABLE topup_orders ADD COLUMN payment_reference TEXT")
+        if "policy_version" not in columns:
+            # 所有既有資料皆保持 legacy；只有升級後新建的儲值單才寫入新制版本。
+            conn.execute(
+                "ALTER TABLE topup_orders ADD COLUMN policy_version TEXT NOT NULL DEFAULT 'legacy'"
+            )
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_topup_orders_customer ON topup_orders(customer_discord_id, id DESC)"
@@ -143,8 +150,8 @@ def create_topup_order(
             """
             INSERT INTO topup_orders (
                 customer_discord_id, customer_display_name, amount,
-                payment_method, source, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'pending_payment', ?, ?)
+                payment_method, source, status, policy_version, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?)
             """,
             (
                 str(customer_discord_id),
@@ -152,6 +159,7 @@ def create_topup_order(
                 amount,
                 payment_method,
                 source,
+                VIP_TOPUP_REBATE_POLICY_CURRENT,
                 now_text,
                 now_text,
             ),
@@ -202,9 +210,8 @@ def submit_topup_payment(
                 raise ValueError(f"{label}請輸入 5 位數字。")
             reference = digits
             legacy_bank_last5 = digits
-        else:
-            if not reference:
-                raise ValueError("請填寫付款辨識資訊。")
+        elif not reference:
+            raise ValueError("請填寫付款辨識資訊。")
 
         conn.execute(
             """
@@ -257,7 +264,6 @@ def approve_topup_order(
     operator_display_name: str | None,
     db_file: str | Path | None = None,
 ) -> dict[str, Any]:
-    """客服核准付款。真正錢包/VIP入帳由 Bot worker 執行。"""
     ensure_topup_tables(db_file)
     path = _db_path(db_file)
     now_text = _now_iso()
@@ -388,10 +394,16 @@ def get_pending_credit_topups(
         return [dict(row) for row in rows]
 
 
-def calculate_topup_preview(total_spent_before: int, amount: int) -> dict[str, Any]:
+def calculate_topup_preview(
+    total_spent_before: int,
+    amount: int,
+    *,
+    policy_version: str | None = None,
+) -> dict[str, Any]:
     total_spent_before = max(0, int(total_spent_before or 0))
     amount = max(0, int(amount or 0))
     total_after = total_spent_before + amount
+    policy = str(policy_version or VIP_TOPUP_REBATE_POLICY_CURRENT)
 
     def level_for(total: int) -> dict[str, Any]:
         current = dict(BASE_MEMBER_LEVELS[0])
@@ -404,9 +416,13 @@ def calculate_topup_preview(total_spent_before: int, amount: int) -> dict[str, A
 
     old_level = level_for(total_spent_before)
     new_level = level_for(total_after)
-    rebate_percent = get_topup_rebate_percent(str(new_level["name"]))
+    rebate_percent = get_topup_rebate_percent(
+        str(new_level["name"]),
+        policy_version=policy,
+    )
     rebate_amount = amount * rebate_percent // 100
     return {
+        "policy_version": policy,
         "vip_total_before": total_spent_before,
         "vip_total_after": total_after,
         "vip_level_before": str(old_level["name"]),
