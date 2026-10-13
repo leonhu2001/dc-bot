@@ -6,7 +6,7 @@
 
 {% if notice %}
 <div class="panel compact-panel">
-    <p class="muted-text" style="margin:0;">
+    <p class="muted-text csp-sa-1da9facb4d">
         {% if notice == 'approved' %}
             已核准並加入 AI 客服知識庫。
         {% elif notice == 'rejected' %}
@@ -131,19 +131,18 @@
                             <textarea class="input" name="answer" rows="5" maxlength="4000" required>{{ item.answer }}</textarea>
                         </label>
 
-                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <div class="csp-sa-1e90930a6f">
                             <button class="button" type="submit">核准加入知識庫</button>
                         </div>
                     </form>
 
-                    <form method="post"
-                          action="/admin/ai-support-knowledge/candidates/{{ item.id }}/reject"
-                          style="margin-top:10px;">
+                    <form class="csp-sa-d8a81eac84" method="post"
+                          action="/admin/ai-support-knowledge/candidates/{{ item.id }}/reject">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                         <button class="button secondary" type="submit">略過，不學這筆</button>
                     </form>
 
-                    <p class="muted-text" style="margin-bottom:0;">
+                    <p class="muted-text csp-sa-76084ee4e5">
                         建立：{{ item.created_at }} ｜ 最近更新：{{ item.updated_at }}
                     </p>
                 </article>
@@ -180,7 +179,7 @@
                         <span class="status-chip is-paid">AI 可引用</span>
                     </div>
 
-                    <p style="white-space:pre-wrap;">{{ item.answer }}</p>
+                    <p class="csp-sa-cbb0be9a89">{{ item.answer }}</p>
 
                     <p class="muted-text">
                         建立者：{{ item.created_by_display_name or item.created_by_discord_id or '-' }}

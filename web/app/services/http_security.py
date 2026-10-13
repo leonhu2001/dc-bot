@@ -45,9 +45,7 @@ def build_content_security_policy(nonce: str) -> str:
             "script-src-attr 'none'",
             "style-src 'self'",
             "style-src-elem 'self'",
-            # A small number of legacy/dynamic style attributes still exist.
-            # Keep this scoped to attributes instead of allowing inline <style>.
-            "style-src-attr 'unsafe-inline'",
+            "style-src-attr 'none'",
             "img-src 'self' data: https:",
             "font-src 'self' data:",
             "connect-src 'self'",

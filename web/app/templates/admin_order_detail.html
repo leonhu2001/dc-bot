@@ -671,7 +671,7 @@
                 標記為需注意訂單
             </label>
 
-            <label class="mw-r8-field" style="margin-top:12px;">
+            <label class="mw-r8-field csp-sa-9374e84210">
                 <span>注意原因</span>
                 <textarea name="attention_reason" maxlength="1000" placeholder="例如：等待客人回覆、付款異常、需客服後續確認">{{ order.attention_reason or '' }}</textarea>
             </label>
@@ -692,12 +692,12 @@
         </div>
 
         {% if acceptance_state %}
-            <div class="mw-r8-meta" style="margin-bottom:10px;">
+            <div class="mw-r8-meta csp-sa-af3fee87a1">
                 付款前接單進度：{{ acceptance_state.accepted_count }}/{{ acceptance_state.required_staff_count }}
                 {% if acceptance_state.is_full %}｜已滿員，可進入付款程序{% endif %}
             </div>
 
-            <div class="mw-r8-worker-list" style="margin-bottom:14px;">
+            <div class="mw-r8-worker-list csp-sa-a82d7062cc">
                 {% for claim in acceptance_state.claims %}
                     <div class="mw-r8-person-row">
                         <div class="mw-r8-person-name">
@@ -708,7 +708,7 @@
                             <span class="mw-r8-meta">付款前接單</span><br>
                             <strong>{{ '客服補登' if claim.source.startswith('admin_web:') else '本人接單' }}</strong>
                         </div>
-                        <div class="mw-r8-actions" style="margin-top:0;">
+                        <div class="mw-r8-actions csp-sa-291b7bbb01">
                             <form method="post" action="/admin/order-workspace/{{ order.id }}/acceptance/{{ claim.staff_discord_id }}/remove?return_to={{ request.query_params.get('return_to', '') | urlencode }}" onsubmit="return confirm('確定移除這位付款前接單人員？');">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                                 <button class="mw-r8-btn danger" type="submit">移除</button>
@@ -739,7 +739,7 @@
                         <strong>{{ '已發放' if row.payout_status == paid_status else '未發放' }}</strong>
                     </div>
 
-                    <div class="mw-r8-actions" style="margin-top:0;">
+                    <div class="mw-r8-actions csp-sa-291b7bbb01">
                         <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/named-bonus?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <label class="mw-r8-check">
@@ -783,7 +783,7 @@
         {% if not acceptance_state or not acceptance_state.is_full %}
             <form method="post" action="/admin/order-workspace/{{ order.id }}/add-worker?return_to={{ request.query_params.get('return_to', '') | urlencode }}" class="mw-r8-actions">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                <select name="worker_discord_id" required style="min-width:260px;min-height:40px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:#090908;color:#f4f2eb;padding:8px 10px;">
+                <select class="csp-sa-5838350552" name="worker_discord_id" required>
                     <option value="">{{ '補登付款前接單人員' if acceptance_state else '新增接單人員' }}</option>
                     {% for staff in worker_members %}
                         <option value="{{ staff.discord_id }}">
@@ -797,7 +797,7 @@
                 </button>
             </form>
             {% if acceptance_state %}
-                <div class="mw-r8-meta" style="margin-top:8px;">
+                <div class="mw-r8-meta csp-sa-b1ecc496e0">
                     客服補登會走和 Discord「接單」按鈕相同的付款前名單；補滿 {{ acceptance_state.required_staff_count }} 位後會自動開放付款。
                 </div>
             {% endif %}

@@ -1,6 +1,6 @@
 {% extends "site_layout.html" %}
 {% block content %}
-<section class="site-section" style="max-width:900px;margin:0 auto;padding-top:48px">
+<section class="site-section csp-sa-0d69debe1b">
   <div class="section-heading">
     <div><div class="section-eyebrow">TOPUP</div><h1>{{ topup.topup_no }}</h1></div>
     <p>{{ topup.payment_method_label }}｜{{ status_label }}</p>
@@ -19,43 +19,43 @@
   </section>
 
   {% if topup.status == 'pending_payment' or topup.status == 'pending_review' %}
-  <section class="member-panel member-panel-wide" style="margin-top:18px">
+  <section class="member-panel member-panel-wide csp-sa-e7673d9ced">
     <div class="member-panel-head"><div><small>PAYMENT</small><h3>{{ topup.payment_method_label }}</h3></div></div>
 
     {% if topup.payment_method == 'bank_transfer' %}
-    <div style="display:grid;gap:10px;margin-bottom:18px">
+    <div class="csp-sa-02481e9d07">
       <strong>國泰世華 013</strong>
       <strong>帳號：135700021419</strong>
-      <span style="opacity:.72">請完成付款後填寫銀行帳號末五碼，客服確認後才會正式入帳。</span>
+      <span class="csp-sa-6bacd54132">請完成付款後填寫銀行帳號末五碼，客服確認後才會正式入帳。</span>
     </div>
     {% elif topup.payment_method == 'jkopay' %}
-    <div style="display:grid;gap:10px;margin-bottom:18px">
+    <div class="csp-sa-02481e9d07">
       <strong>街口支付</strong>
       <strong>代碼：396</strong>
       <strong>帳號：900884222</strong>
-      <span style="opacity:.72">付款完成後填寫付款街口帳號末五碼，客服確認後才會正式入帳。</span>
+      <span class="csp-sa-6bacd54132">付款完成後填寫付款街口帳號末五碼，客服確認後才會正式入帳。</span>
     </div>
     {% endif %}
 
-    <form method="post" action="/me/wallet/topup/{{ topup.id }}/submit" style="display:grid;gap:12px">
+    <form class="csp-sa-fe3fb0d0fc" method="post" action="/me/wallet/topup/{{ topup.id }}/submit">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
       {% if topup.payment_method == 'bank_transfer' %}
-      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="銀行帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
+      <input class="csp-sa-4df9124237" name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="銀行帳號末五碼">
       {% elif topup.payment_method == 'jkopay' %}
-      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="街口帳號末五碼" style="min-height:48px;padding:0 14px;border-radius:12px">
+      <input class="csp-sa-4df9124237" name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" inputmode="numeric" minlength="5" maxlength="5" required placeholder="街口帳號末五碼">
       {% else %}
-      <input name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" maxlength="100" required placeholder="付款辨識資訊" style="min-height:48px;padding:0 14px;border-radius:12px">
+      <input class="csp-sa-4df9124237" name="payment_reference" value="{{ '' if topup.payment_reference_display == '—' else topup.payment_reference_display }}" maxlength="100" required placeholder="付款辨識資訊">
       {% endif %}
-      <textarea name="payment_note" rows="3" placeholder="付款備註（選填）" style="padding:12px 14px;border-radius:12px">{{ topup.payment_note or '' }}</textarea>
-      <button class="discord-login" type="submit" style="justify-content:center">我已完成付款</button>
+      <textarea class="csp-sa-2a909d2b1c" name="payment_note" rows="3" placeholder="付款備註（選填）">{{ topup.payment_note or '' }}</textarea>
+      <button class="discord-login csp-sa-842252d1fb" type="submit">我已完成付款</button>
     </form>
-    <form method="post" action="/me/wallet/topup/{{ topup.id }}/cancel" style="margin-top:10px">
+    <form class="csp-sa-d8a81eac84" method="post" action="/me/wallet/topup/{{ topup.id }}/cancel">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-      <button type="submit" class="discord-login" style="justify-content:center;opacity:.72">取消儲值單</button>
+      <button type="submit" class="discord-login csp-sa-09b780cffa">取消儲值單</button>
     </form>
   </section>
   {% elif topup.status == 'completed' %}
-  <section class="member-panel member-panel-wide" style="margin-top:18px">
+  <section class="member-panel member-panel-wide csp-sa-e7673d9ced">
     <div class="member-panel-head"><div><small>COMPLETED</small><h3>儲值完成</h3></div></div>
     <div class="member-benefit-row">
       <div><span>付款方式</span><strong>{{ topup.payment_method_label }}</strong></div>
@@ -67,6 +67,6 @@
   </section>
   {% endif %}
 
-  <div style="margin-top:18px"><a href="/me/wallet">← 返回我的錢包</a></div>
+  <div class="csp-sa-e7673d9ced"><a href="/me/wallet">← 返回我的錢包</a></div>
 </section>
 {% endblock %}

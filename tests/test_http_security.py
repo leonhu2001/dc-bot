@@ -110,6 +110,7 @@ def test_csp_nonce_policy_rejects_unsafe_inline_scripts():
     assert "script-src 'self' 'nonce-abc123'" in policy
     assert "script-src-attr 'none'" in policy
     assert "style-src-elem 'self'" in policy
-    assert "style-src-attr 'unsafe-inline'" in policy
+    assert "style-src-attr 'none'" in policy
+    assert "style-src-attr 'unsafe-inline'" not in policy
     assert "script-src 'self' 'unsafe-inline'" not in policy
     assert "style-src 'self' 'unsafe-inline'" not in policy
