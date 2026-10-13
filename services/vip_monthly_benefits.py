@@ -28,6 +28,13 @@ MONTHLY_BENEFIT_KEYS = (
     BLACK_DIAMOND_CHOICE,
 )
 
+# Monthly VIP assets are intended to reward active customers, not top-up-only
+# accounts. Issuance/reactivation requires at least one real completed service
+# purchase within this rolling window. Once issued for the month, crossing the
+# window later does not revoke it; tier eligibility and the monthly expiry still
+# control revocation.
+MONTHLY_BENEFIT_ACTIVITY_DAYS = 30
+
 BLACK_DIAMOND_CHOICES: dict[str, str] = {
     "secret_space_1000w": "機密航天保底 1000w",
     "entertainment_2h": "娛樂陪 2H",
@@ -93,6 +100,22 @@ def _benefit_keys_for_level(level_name: str) -> set[str]:
     return set()
 
 
+def _has_recent_real_consumption(row: dict[str, Any]) -> bool:
+    """Whether monthly benefits may be issued/reactivated for this member.
+
+    `last_order_at` is updated by completed service orders, while top-ups only
+    advance VIP cumulative value. Requiring this field therefore prevents a
+    top-up-only account from farming recurring monthly benefits.
+    """
+    if not str(row.get("last_order_at") or "").strip():
+        return False
+    try:
+        days = int(row.get("days_since_purchase"))
+    except (TypeError, ValueError):
+        return False
+    return 0 <= days <= MONTHLY_BENEFIT_ACTIVITY_DAYS
+
+
 def ensure_vip_monthly_tables(web_db: str | Path | None = None) -> None:
     path = _web_db_path(web_db)
     with sqlite3.connect(path, timeout=15) as conn:
@@ -140,15 +163,8 @@ def _seed_october_2026_used_200(
         cur = conn.execute(
             """
             INSERT OR IGNORE INTO vip_monthly_benefits (
-                customer_id,
-                month_key,
-                benefit_key,
-                benefit_label,
-                status,
-                redeemed_at,
-                issued_at,
-                updated_at,
-                source
+                customer_id, month_key, benefit_key, benefit_label, status,
+                redeemed_at, issued_at, updated_at, source
             ) VALUES (?, '2026-10', ?, ?, 'redeemed', ?, ?, ?, 'legacy_import')
             """,
             (
@@ -170,13 +186,12 @@ def sync_current_month_vip_benefits(
     web_db: str | Path | None = None,
     bot_db: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Synchronize current-month benefits to each member's current tier.
+    """Synchronize current-month benefits to active members' current tiers.
 
-    Unused monthly benefits above the member's current effective tier are
-    revoked immediately. Redeemed benefits remain immutable history, and an
-    already-reserved black-diamond redemption may finish normally. If the
-    member becomes eligible again in the same month, a previously revoked
-    unused benefit is reactivated instead of issuing a duplicate row.
+    New issuance/reactivation requires a real completed service purchase in the
+    last 30 days. Already-issued benefits are not revoked merely because that
+    activity window later expires; only loss of tier entitlement revokes an
+    unused benefit. Redeemed history remains immutable.
     """
     current = _normalize_now(now)
     month = _month_key(current)
@@ -203,7 +218,8 @@ def sync_current_month_vip_benefits(
         conn.row_factory = sqlite3.Row
         legacy_seeded = _seed_october_2026_used_200(conn, now_text=now_text)
 
-        for row in member_rows:
+        for raw in member_rows:
+            row = dict(raw)
             customer_id = str(row.get("customer_id") or "").strip()
             if not customer_id:
                 continue
@@ -211,10 +227,15 @@ def sync_current_month_vip_benefits(
             keys = _benefit_keys_for_level(str(row.get("current_level") or ""))
             entitlement_by_customer[customer_id] = keys
 
-            if bool(row.get("is_due")) or not keys:
-                # Due members do not receive/reactivate a new benefit, but an
-                # already-issued current-tier benefit is not revoked only for
-                # becoming due. Tier eligibility remains the revocation rule.
+            can_issue = (
+                bool(keys)
+                and not bool(row.get("is_due"))
+                and _has_recent_real_consumption(row)
+            )
+            if not can_issue:
+                # Inactivity blocks new issuance/reactivation only. Do not
+                # revoke an already-issued benefit while the member still owns
+                # the tier; the revocation pass below is intentionally tier-only.
                 continue
 
             eligible_customers += 1
@@ -236,14 +257,8 @@ def sync_current_month_vip_benefits(
                     cur = conn.execute(
                         """
                         INSERT INTO vip_monthly_benefits (
-                            customer_id,
-                            month_key,
-                            benefit_key,
-                            benefit_label,
-                            status,
-                            issued_at,
-                            updated_at,
-                            source
+                            customer_id, month_key, benefit_key, benefit_label,
+                            status, issued_at, updated_at, source
                         ) VALUES (?, ?, ?, ?, 'available', ?, ?, 'system')
                         """,
                         (
@@ -301,19 +316,19 @@ def sync_current_month_vip_benefits(
             revoked += int(cur.rowcount or 0)
 
         state = conn.execute(
-            "SELECT month_key, refreshed_at, announced_at FROM vip_monthly_refresh_state WHERE month_key=?",
+            "SELECT month_key, refreshed_at, announced_at "
+            "FROM vip_monthly_refresh_state WHERE month_key=?",
             (month,),
         ).fetchone()
         if state is None:
             first_refresh = True
             bootstrap_announced_at = (
-                now_text
-                if month == "2026-10" and current.day > 1
-                else None
+                now_text if month == "2026-10" and current.day > 1 else None
             )
             conn.execute(
                 """
-                INSERT INTO vip_monthly_refresh_state (month_key, refreshed_at, announced_at)
+                INSERT INTO vip_monthly_refresh_state
+                    (month_key, refreshed_at, announced_at)
                 VALUES (?, ?, ?)
                 """,
                 (month, now_text, bootstrap_announced_at),
@@ -383,6 +398,8 @@ def _current_member_status(
         "current_level": "普通魔丸",
         "current_index": 0,
         "is_due": False,
+        "last_order_at": None,
+        "days_since_purchase": None,
     }
 
 
@@ -439,16 +456,18 @@ def get_customer_vip_monthly_snapshot(
     ]
     black_entitled = BLACK_DIAMOND_CHOICE in level_keys
     black_row = by_key.get(BLACK_DIAMOND_CHOICE) if black_entitled else None
+    activity_eligible = _has_recent_real_consumption(member_status)
     black_suspended = bool(
         black_entitled
-        and member_status.get("is_due")
         and black_row is None
+        and (bool(member_status.get("is_due")) or not activity_eligible)
     )
 
     return {
         "month_key": month,
         "current_level": level_name,
         "is_due": bool(member_status.get("is_due")),
+        "monthly_activity_eligible": activity_eligible,
         "benefits": list(by_key.values()),
         "by_key": by_key,
         "cash_benefits": cash_rows,
@@ -471,7 +490,6 @@ def list_available_cash_benefits(
     bot_db: str | Path | None = None,
     ensure_synced: bool = True,
 ) -> list[dict[str, Any]]:
-    """Return current-month VIP cash vouchers that can be selected now."""
     snapshot = get_customer_vip_monthly_snapshot(
         customer_id,
         now=now,
@@ -489,7 +507,11 @@ def list_available_cash_benefits(
             continue
         item = dict(row)
         item["amount"] = amount
-        item["title"] = str(row.get("benefit_label") or BENEFIT_LABELS.get(benefit_key) or benefit_key)
+        item["title"] = str(
+            row.get("benefit_label")
+            or BENEFIT_LABELS.get(benefit_key)
+            or benefit_key
+        )
         result.append(item)
     return result
 
@@ -523,7 +545,6 @@ def reserve_cash_benefit_for_channel(
     web_db: str | Path | None = None,
     bot_db: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Atomically reserve one current-month VIP cash voucher for an order channel."""
     current = _normalize_now(now)
     sync_current_month_vip_benefits(now=current, web_db=web_db, bot_db=bot_db)
     month = _month_key(current)
@@ -536,15 +557,9 @@ def reserve_cash_benefit_for_channel(
         cur = conn.execute(
             """
             UPDATE vip_monthly_benefits
-            SET status='reserved',
-                reserved_at=?,
-                reserved_channel_id=?,
-                updated_at=?
-            WHERE id=?
-              AND customer_id=?
-              AND month_key=?
-              AND benefit_key IN (?, ?)
-              AND status='available'
+            SET status='reserved', reserved_at=?, reserved_channel_id=?, updated_at=?
+            WHERE id=? AND customer_id=? AND month_key=?
+              AND benefit_key IN (?, ?) AND status='available'
             """,
             (
                 now_text,
@@ -574,7 +589,6 @@ def release_cash_benefits_for_channel(
     web_db: str | Path | None = None,
     bot_db: str | Path | None = None,
 ) -> int:
-    """Release reserved VIP cash vouchers when an order is cancelled."""
     current = _normalize_now(now)
     current_month = _month_key(current)
     now_text = current.isoformat(timespec="seconds")
@@ -601,19 +615,19 @@ def release_cash_benefits_for_channel(
                 now=current,
                 bot_db=bot_db,
             )
-            eligible_keys = _benefit_keys_for_level(str(member_status.get("current_level") or "普通魔丸"))
+            eligible_keys = _benefit_keys_for_level(
+                str(member_status.get("current_level") or "普通魔丸")
+            )
             next_status = (
                 AVAILABLE
-                if str(row["month_key"]) == current_month and str(row["benefit_key"]) in eligible_keys
+                if str(row["month_key"]) == current_month
+                and str(row["benefit_key"]) in eligible_keys
                 else REVOKED
             )
             cur = conn.execute(
                 """
                 UPDATE vip_monthly_benefits
-                SET status=?,
-                    reserved_at=NULL,
-                    reserved_channel_id=NULL,
-                    updated_at=?
+                SET status=?, reserved_at=NULL, reserved_channel_id=NULL, updated_at=?
                 WHERE id=? AND status='reserved'
                 """,
                 (next_status, now_text, int(row["id"])),
@@ -629,7 +643,6 @@ def redeem_cash_benefits_for_channel(
     now: datetime | None = None,
     web_db: str | Path | None = None,
 ) -> int:
-    """Finalize reserved VIP cash vouchers when an order is closed."""
     current = _normalize_now(now)
     now_text = current.isoformat(timespec="seconds")
     path = _web_db_path(web_db)
@@ -638,14 +651,18 @@ def redeem_cash_benefits_for_channel(
         cur = conn.execute(
             """
             UPDATE vip_monthly_benefits
-            SET status='redeemed',
-                redeemed_at=?,
-                updated_at=?
+            SET status='redeemed', redeemed_at=?, updated_at=?
             WHERE reserved_channel_id=?
               AND benefit_key IN (?, ?)
               AND status='reserved'
             """,
-            (now_text, now_text, str(channel_id), MONTHLY_COUPON_200, MONTHLY_COUPON_500),
+            (
+                now_text,
+                now_text,
+                str(channel_id),
+                MONTHLY_COUPON_200,
+                MONTHLY_COUPON_500,
+            ),
         )
         conn.commit()
         return int(cur.rowcount or 0)
@@ -664,17 +681,9 @@ def reserve_black_diamond_choice(
         raise ValueError("不支援的黑鑽福利選項")
 
     current = _normalize_now(now)
-    sync_current_month_vip_benefits(
-        now=current,
-        web_db=web_db,
-        bot_db=bot_db,
-    )
+    sync_current_month_vip_benefits(now=current, web_db=web_db, bot_db=bot_db)
     customer = str(customer_id)
-    member_status = _current_member_status(
-        customer,
-        now=current,
-        bot_db=bot_db,
-    )
+    member_status = _current_member_status(customer, now=current, bot_db=bot_db)
     current_keys = _benefit_keys_for_level(
         str(member_status.get("current_level") or "普通魔丸")
     )
@@ -683,20 +692,14 @@ def reserve_black_diamond_choice(
 
     month = _month_key(current)
     now_text = current.isoformat(timespec="seconds")
-
     with sqlite3.connect(_web_db_path(web_db), timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         cur = conn.execute(
             """
             UPDATE vip_monthly_benefits
-            SET status='reserved',
-                choice_key=?,
-                reserved_at=?,
-                reserved_channel_id=NULL,
-                updated_at=?
-            WHERE customer_id=?
-              AND month_key=?
-              AND benefit_key=?
+            SET status='reserved', choice_key=?, reserved_at=?,
+                reserved_channel_id=NULL, updated_at=?
+            WHERE customer_id=? AND month_key=? AND benefit_key=?
               AND status='available'
             """,
             (
@@ -761,11 +764,7 @@ def release_black_diamond_choice(
     current = _normalize_now(now)
     month = str(month_key or _month_key(current))
     customer = str(customer_id)
-    member_status = _current_member_status(
-        customer,
-        now=current,
-        bot_db=bot_db,
-    )
+    member_status = _current_member_status(customer, now=current, bot_db=bot_db)
     current_keys = _benefit_keys_for_level(
         str(member_status.get("current_level") or "普通魔丸")
     )
@@ -774,11 +773,8 @@ def release_black_diamond_choice(
         cur = conn.execute(
             """
             UPDATE vip_monthly_benefits
-            SET status=?,
-                choice_key=NULL,
-                reserved_at=NULL,
-                reserved_channel_id=NULL,
-                updated_at=?
+            SET status=?, choice_key=NULL, reserved_at=NULL,
+                reserved_channel_id=NULL, updated_at=?
             WHERE customer_id=? AND month_key=? AND benefit_key=? AND status='reserved'
             """,
             (
@@ -807,9 +803,7 @@ def redeem_black_diamond_choice(
         cur = conn.execute(
             """
             UPDATE vip_monthly_benefits
-            SET status='redeemed',
-                redeemed_at=?,
-                updated_at=?
+            SET status='redeemed', redeemed_at=?, updated_at=?
             WHERE customer_id=? AND month_key=? AND benefit_key=? AND status='reserved'
             """,
             (

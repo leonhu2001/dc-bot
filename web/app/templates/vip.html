@@ -3,68 +3,12 @@
 {% block content %}
 
 {% set vip_levels = [
-    {
-        "key": "silver",
-        "name": "銀級魔丸",
-        "threshold": 2000,
-        "benefits": [
-            "專屬 VIP 身分組，可使用 VIP 專屬包廂",
-            "優先客服回覆",
-        ],
-    },
-    {
-        "key": "gold",
-        "name": "金級魔丸",
-        "threshold": 6000,
-        "benefits": [
-            "享有銀級魔丸所有福利",
-            "體驗單、趣味單外全館98折",
-            "可根據闆闆要求製作「自訂單」",
-        ],
-    },
-    {
-        "key": "platinum",
-        "name": "白金魔丸",
-        "threshold": 12000,
-        "benefits": [
-            "享有金級魔丸所有福利",
-            "儲值返利2%",
-            "每月一張折現券200T",
-            "優先排單",
-        ],
-    },
-    {
-        "key": "diamond",
-        "name": "鑽石魔丸",
-        "threshold": 25000,
-        "benefits": [
-            "享有白金魔丸所有福利",
-            "優先安排熟悉／收藏陪玩",
-            "儲值返利3%",
-            "體驗單、趣味單外全館96折",
-        ],
-    },
-    {
-        "key": "white_diamond",
-        "name": "白鑽魔丸",
-        "threshold": 50000,
-        "benefits": [
-            "享有鑽石魔丸所有福利",
-            "儲值返利4%",
-            "每月額外一張折現券500T",
-        ],
-    },
-    {
-        "key": "black_diamond",
-        "name": "黑鑽魔丸",
-        "threshold": 88888,
-        "benefits": [
-            "享有白鑽魔丸所有福利",
-            "每月一次免費「機密航天保底1000w」或娛樂陪 2H",
-            "儲值返利5%",
-            "體驗單、趣味單外全館94折",
-        ],
-    },
+    {"key": "silver", "name": "銀級魔丸", "threshold": 2000, "benefits": ["專屬 VIP 身分組，可使用 VIP 專屬包廂", "優先客服回覆"]},
+    {"key": "gold", "name": "金級魔丸", "threshold": 6000, "benefits": ["享有銀級魔丸所有福利", "體驗單、趣味單外全館98折", "可根據闆闆要求製作「自訂單」"]},
+    {"key": "platinum", "name": "白金魔丸", "threshold": 12000, "benefits": ["享有金級魔丸所有福利", "儲值返利1%", "每月一張折現券200T", "優先排單"]},
+    {"key": "diamond", "name": "鑽石魔丸", "threshold": 25000, "benefits": ["享有白金魔丸所有福利", "優先安排熟悉／收藏陪玩", "儲值返利2%", "體驗單、趣味單外全館96折"]},
+    {"key": "white_diamond", "name": "白鑽魔丸", "threshold": 50000, "benefits": ["享有鑽石魔丸所有福利", "儲值返利3%", "每月額外一張折現券500T"]},
+    {"key": "black_diamond", "name": "黑鑽魔丸", "threshold": 88888, "benefits": ["享有白鑽魔丸所有福利", "每月一次免費「機密航天保底1000w」或娛樂陪 2H", "儲值返利3%", "體驗單、趣味單外全館94折"]},
 ] %}
 
 {% set custom_order_rules = [
@@ -74,197 +18,74 @@
 
 {% set rebate_rules = [
     "儲值返利依本次儲值完成後的 VIP 等級計算。",
-    "成功儲值會計入 VIP 累積額度；使用已儲值的錢包餘額付款不會再次增加 VIP 累積，避免重複計算。",
-    "儲值後如需退款，僅能退錢包總金額的 95%；退款／取出後若累積額度不足目前等級門檻，VIP 等級將依規則調整。",
+    "成功儲值會計入 VIP 累積額度；使用錢包餘額付款不會重複累積。",
+    "退款以尚未使用的實付儲值本金為限，剩餘實付本金 100% 退回；儲值返利與活動贈額不折現，退款時一併取消。",
+    "儲值返利與活動贈額可用於一般消費，但不得用於雞腿／打賞。",
 ] %}
 
 {% set vip_rules = [
-    "高等級 VIP 可享有所有低等級福利。",
+    "高等級 VIP 可享有所有低等級福利；同類型儲值返利以目前等級比例計算，不重複累加。",
     "VIP 等級依系統累積額度計算；直接消費與成功儲值皆可累積，使用錢包付款不重複累積。",
     "VIP 保級以最近一次實際消費為基準：銀級 30 天、金級 45 天、白金 60 天、鑽石 90 天、白鑽 120 天、黑鑽 180 天。",
     "超過保級期限將進入 VIP 待審核；原則上每次下降一階，特殊情況可由管理員延長保護或調整。",
     "體驗單、趣味單及標示不適用 VIP 折扣之方案，不套用 VIP 折扣。",
     "VIP 折扣可與系統點數福利、跨單累積福利依結帳規則併用；其他活動／折扣碼是否可併用，以各活動說明為準。",
+    "每月 200T、500T 折現券及黑鑽尊享福利在發放／恢復資格時，須最近 30 天內至少完成一筆實際消費訂單；單純儲值不列入。",
+    "已取得的當月 VIP 月福利，不會僅因超過 30 天未消費而自動收回，仍以會員等級與當月效期為準。",
     "每月 200T、500T 折現券及黑鑽尊享福利僅限當月使用，未使用不累積至下月。",
     "VIP 降級後，超出目前等級的未使用月福利將失效；已使用福利不追回。",
-    "同月重新取得資格時，該月尚未使用且曾失效的福利會重新恢復，不重複發放。",
+    "同月重新取得資格時，該月尚未使用且曾失效的福利會依資格恢復，不重複發放。",
+    "儲值退款完成後，VIP 累積額度與等級會依退款後實際金額重新計算。",
     "所有 VIP 福利不得轉讓或折現。",
     "本店保有活動內容調整與最終解釋權。",
 ] %}
 
 <section class="vip-page-hero">
-
     <div class="vip-page-orbit"></div>
-
     <div class="vip-page-heading">
-
-        <div class="section-eyebrow">
-            MOWAN VIP
-        </div>
-
-        <h1>
-            魔丸會員制度
-        </h1>
-
-        <p>
-            依 VIP 累積額度解鎖會員等級。
-            高等級會員同時享有所有低等級福利。
-        </p>
-
-
+        <div class="section-eyebrow">MOWAN VIP</div>
+        <h1>魔丸會員制度</h1>
+        <p>依 VIP 累積額度解鎖會員等級。高等級會員同時享有所有低等級福利。</p>
         {% if member %}
-
-            <div class="vip-current-member">
-
-                <span>
-                    目前等級
-                </span>
-
-                <strong>
-                    {{ member.vip_name }}
-                </strong>
-
-                <small>
-                    VIP 累積額度
-                    {{ member.total_spent_text }}
-                </small>
-
-            </div>
-
+        <div class="vip-current-member">
+            <span>目前等級</span><strong>{{ member.vip_name }}</strong>
+            <small>VIP 累積額度 {{ member.total_spent_text }}</small>
+        </div>
         {% endif %}
-
     </div>
-
 </section>
-
 
 <section class="site-section vip-level-section">
-
     <div class="vip-level-grid">
-
         {% for level in vip_levels %}
-
-            <article
-                class="vip-level-card vip-{{ level.key }}"
-            >
-
-                <div class="vip-level-top">
-
-                    <span class="vip-level-number">
-                        0{{ loop.index }}
-                    </span>
-
-                    <small>
-                        VIP LEVEL
-                    </small>
-
-                </div>
-
-                <h2>
-                    {{ level.name }}
-                </h2>
-
-                <div class="vip-threshold">
-                    累積消費
-                    <strong>
-                        {{ "{:,}".format(level.threshold) }}T
-                    </strong>
-                    ↑
-                </div>
-
-                <ul>
-                    {% for benefit in level.benefits %}
-                        <li>
-                            {{ benefit }}
-                        </li>
-                    {% endfor %}
-                </ul>
-
-            </article>
-
+        <article class="vip-level-card vip-{{ level.key }}">
+            <div class="vip-level-top"><span class="vip-level-number">0{{ loop.index }}</span><small>VIP LEVEL</small></div>
+            <h2>{{ level.name }}</h2>
+            <div class="vip-threshold">累積消費 <strong>{{ "{:,}".format(level.threshold) }}T</strong> ↑</div>
+            <ul>{% for benefit in level.benefits %}<li>{{ benefit }}</li>{% endfor %}</ul>
+        </article>
         {% endfor %}
-
     </div>
-
 </section>
-
 
 <section class="site-section vip-rule-section">
-
     <div class="vip-rule-grid">
-
         <article class="vip-rule-card">
-
-            <div class="section-eyebrow">
-                CUSTOM ORDER
-            </div>
-
-            <h2>
-                自訂單
-            </h2>
-
-            <ul>
-                {% for rule in custom_order_rules %}
-                    <li>
-                        {{ rule }}
-                    </li>
-                {% endfor %}
-            </ul>
-
+            <div class="section-eyebrow">CUSTOM ORDER</div><h2>自訂單</h2>
+            <ul>{% for rule in custom_order_rules %}<li>{{ rule }}</li>{% endfor %}</ul>
         </article>
-
-
         <article class="vip-rule-card">
-
-            <div class="section-eyebrow">
-                TOP-UP REBATE
-            </div>
-
-            <h2>
-                儲值返利
-            </h2>
-
-            <ul>
-                {% for rule in rebate_rules %}
-                    <li>
-                        {{ rule }}
-                    </li>
-                {% endfor %}
-            </ul>
-
+            <div class="section-eyebrow">TOP-UP REBATE</div><h2>儲值返利</h2>
+            <ul>{% for rule in rebate_rules %}<li>{{ rule }}</li>{% endfor %}</ul>
         </article>
-
     </div>
-
 </section>
 
-
 <section class="site-section vip-general-section">
-
     <div class="vip-general-card">
-
-        <div>
-
-            <div class="section-eyebrow">
-                VIP POLICY
-            </div>
-
-            <h2>
-                VIP 規則
-            </h2>
-
-        </div>
-
-        <ol>
-            {% for rule in vip_rules %}
-                <li>
-                    {{ rule }}
-                </li>
-            {% endfor %}
-        </ol>
-
+        <div><div class="section-eyebrow">VIP POLICY</div><h2>VIP 規則</h2></div>
+        <ol>{% for rule in vip_rules %}<li>{{ rule }}</li>{% endfor %}</ol>
     </div>
-
 </section>
 
 {% endblock %}

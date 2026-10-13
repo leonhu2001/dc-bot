@@ -13,17 +13,17 @@ def test_platinum_topup_gets_same_transaction_rebate():
     preview = calculate_topup_preview(0, 12000)
     assert preview["vip_total_after"] == 12000
     assert preview["vip_level_after"] == "白金魔丸"
-    assert preview["rebate_percent"] == 2
-    assert preview["rebate_amount"] == 240
-    assert preview["credited_amount"] == 12240
+    assert preview["rebate_percent"] == 1
+    assert preview["rebate_amount"] == 120
+    assert preview["credited_amount"] == 12120
 
 
 def test_rebate_uses_level_after_current_topup():
     cases = [
-        (11999, 1, "白金魔丸", 2),
-        (24999, 1, "鑽石魔丸", 3),
-        (49999, 1, "白鑽魔丸", 4),
-        (88887, 1, "黑鑽魔丸", 5),
+        (11999, 1, "白金魔丸", 1),
+        (24999, 1, "鑽石魔丸", 2),
+        (49999, 1, "白鑽魔丸", 3),
+        (88887, 1, "黑鑽魔丸", 3),
     ]
 
     for before, amount, level_name, percent in cases:
