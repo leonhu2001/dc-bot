@@ -1,0 +1,123 @@
+name: Wallet payment runtime fix
+
+on:
+  push:
+    branches:
+      - fix/wallet-payment-method-runtime-20261013
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-wallet-fix.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Make payment constants canonical
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+          bot_path = root / 'bot.py'
+          order_runtime_path = root / 'services/order_runtime.py'
+          payment_runtime_path = root / 'services/order_payment_runtime.py'
+          test_path = root / 'tests/test_payment_method_runtime_contract.py'
+
+          bot = bot_path.read_text(encoding='utf-8')
+          import_anchor = 'from services.order_flow import (\n'
+          canonical_import = (
+              'from services.payment_methods import (\n'
+              '    PAYMENT_METHOD_OPTIONS,\n'
+              '    WALLET_PAYMENT_METHOD,\n'
+              ')\n'
+          )
+          if canonical_import not in bot:
+              if import_anchor not in bot:
+                  raise SystemExit('bot.py order_flow import anchor not found')
+              bot = bot.replace(import_anchor, canonical_import + import_anchor, 1)
+
+          pattern = re.compile(
+              r'\nPAYMENT_METHOD_OPTIONS = \[\n'
+              r'\s+"街口",\n'
+              r'\s+"轉帳",\n'
+              r'\s+"我的錢包",\n'
+              r'\]\n\n'
+              r'WALLET_PAYMENT_METHOD = "我的錢包"\n',
+              re.M,
+          )
+          bot, removed = pattern.subn('\n', bot, count=1)
+          if removed != 1:
+              raise SystemExit(f'expected one legacy payment constant block, removed {removed}')
+          bot_path.write_text(bot, encoding='utf-8')
+
+          order_runtime = order_runtime_path.read_text(encoding='utf-8')
+          canonical_line = 'from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD\n'
+          if canonical_line not in order_runtime:
+              anchor = 'import discord\n\n'
+              if anchor not in order_runtime:
+                  raise SystemExit('order_runtime discord import anchor not found')
+              order_runtime = order_runtime.replace(anchor, anchor + canonical_line + '\n', 1)
+          order_runtime = order_runtime.replace('        "WALLET_PAYMENT_METHOD",\n', '', 1)
+          order_runtime = order_runtime.replace(
+              '            wallet_payment_method=namespace["WALLET_PAYMENT_METHOD"],\n',
+              '',
+              1,
+          )
+          if 'wallet_payment_method=namespace["WALLET_PAYMENT_METHOD"]' in order_runtime:
+              raise SystemExit('order_runtime still injects wallet payment method')
+          order_runtime_path.write_text(order_runtime, encoding='utf-8')
+
+          payment_runtime = payment_runtime_path.read_text(encoding='utf-8')
+          payment_import = 'from services.payment_methods import WALLET_PAYMENT_METHOD\n'
+          if payment_import not in payment_runtime:
+              anchor = 'import discord\n\n'
+              if anchor not in payment_runtime:
+                  raise SystemExit('order_payment_runtime discord import anchor not found')
+              payment_runtime = payment_runtime.replace(anchor, anchor + payment_import + '\n', 1)
+          payment_runtime = payment_runtime.replace('    wallet_payment_method: str,\n', '', 1)
+          payment_runtime = payment_runtime.replace(
+              '    global WALLET_PAYMENT_METHOD, _build_receiver_text_from_claim_data, _to_int\n',
+              '    global _build_receiver_text_from_claim_data, _to_int\n',
+              1,
+          )
+          payment_runtime = payment_runtime.replace('    WALLET_PAYMENT_METHOD = str(wallet_payment_method)\n', '', 1)
+          if 'wallet_payment_method' in payment_runtime:
+              raise SystemExit('order_payment_runtime still depends on injected wallet payment method')
+          payment_runtime_path.write_text(payment_runtime, encoding='utf-8')
+
+          test_path.write_text(
+              '''from __future__ import annotations\n\nimport inspect\n\nfrom services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD\nfrom services import order_runtime\nfrom services import order_payment_runtime\n\n\ndef test_wallet_payment_method_is_canonical_and_available_without_runtime_injection():\n    assert WALLET_PAYMENT_METHOD == "我的錢包"\n    assert WALLET_PAYMENT_METHOD in PAYMENT_METHOD_OPTIONS\n    assert order_runtime.WALLET_PAYMENT_METHOD == WALLET_PAYMENT_METHOD\n    assert order_payment_runtime.WALLET_PAYMENT_METHOD == WALLET_PAYMENT_METHOD\n\n\ndef test_payment_runtime_configuration_no_longer_requires_wallet_label_injection():\n    parameters = inspect.signature(order_payment_runtime.configure_order_payment_runtime).parameters\n    assert "wallet_payment_method" not in parameters\n\n\ndef test_order_runtime_uses_canonical_payment_constants():\n    source = inspect.getsource(order_runtime)\n    assert "from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD" in source\n    assert 'wallet_payment_method=namespace["WALLET_PAYMENT_METHOD"]' not in source\n''',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Validate payment runtime fix
+        run: |
+          python -m pip install -q -r requirements.txt -r web/requirements-web.txt -r requirements-dev.txt
+          python -m compileall -q bot.py services tools web/app
+          python -m pytest -q tests/test_payment_method_runtime_contract.py tests/test_order_reporting.py
+          python tools/runtime_import_smoke.py
+
+      - name: Commit fix and remove one-shot workflow
+        run: |
+          rm .github/workflows/wallet_payment_runtime_fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py services/order_runtime.py services/order_payment_runtime.py services/payment_methods.py tests/test_payment_method_runtime_contract.py .github/workflows/wallet_payment_runtime_fix.yml
+          git commit -m "Fix wallet payment method runtime scope"
+          git push origin HEAD:fix/wallet-payment-method-runtime-20261013
