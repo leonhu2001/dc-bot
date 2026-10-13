@@ -6,6 +6,8 @@ from core import database, permissions, time_utils
 from services import orders, self_service_runtime, smart_dispatch
 
 
+# Phase 15 only moves dependencies whose canonical owner is already stable.
+# Runtime-owned helpers stay on the legacy boundary until their owner is extracted safely.
 def test_self_service_runtime_uses_canonical_module_owned_dependencies():
     assert self_service_runtime.json is json
     assert self_service_runtime.ORDER_CATEGORY_LABELS is orders.ORDER_CATEGORY_LABELS
