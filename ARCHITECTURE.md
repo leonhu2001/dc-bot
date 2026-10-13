@@ -55,3 +55,5 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 - Ticket naming/topic identity helpers live in `services/ticket_identity.py`, not the `bot.py` entrypoint.
 - Admin dashboard and order workspace are separate routers; `web/app/routers/admin.py` is a thin action/router composition layer.
 - Patch-style frontend assets (`*_fix.js` / `*_fix.css`) have no allow-list. Additions must be implemented in canonical controllers/styles instead.
+
+- Wallet persistence is canonical in `services/wallet_service.py`; Discord/Web layers may adapt identities or presentation, but must not open or mutate wallet tables directly.

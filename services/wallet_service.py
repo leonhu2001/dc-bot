@@ -126,6 +126,38 @@ def find_wallet_transaction(
         return dict(row) if row else None
 
 
+def get_wallet_transactions(
+    customer_id: str | int,
+    *,
+    limit: int = 10,
+    db_file: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return newest wallet transactions for one customer.
+
+    Persistence stays centralized here so Discord/Web callers do not open the
+    wallet tables independently.
+    """
+    ensure_wallet_tables(db_file)
+    path = _db_path(db_file)
+    safe_limit = max(1, min(int(limit or 10), 25))
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT
+                id, customer_discord_id, amount, balance_before, balance_after,
+                type, order_channel_id, order_no, operator_discord_id,
+                operator_display_name, note, created_at
+            FROM wallet_transactions
+            WHERE customer_discord_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (str(customer_id), safe_limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
 def adjust_wallet_balance(
     *,
     customer_id: str | int,
@@ -186,7 +218,10 @@ def adjust_wallet_balance(
         before = int(row["balance"] or 0) if row else 0
         after = before + amount
         if after < 0 and not allow_negative:
-            raise ValueError(f"錢包餘額不足，目前餘額 {before:,}T。")
+            raise ValueError(
+                f"錢包餘額不足，目前餘額 {before:,}T，"
+                f"無法扣除 {abs(amount):,}T。"
+            )
 
         now_text = get_taipei_now_iso()
         conn.execute(
