@@ -1,0 +1,115 @@
+/* Customer-service backoffice order/report status badges.
+   This stylesheet is intentionally scoped to /admin's legacy order table. */
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge {
+    min-height: 29px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 11px;
+    border: 1px solid rgba(170, 180, 200, .3);
+    border-radius: 999px;
+    background: rgba(170, 180, 200, .075);
+    color: #d8dee9;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    line-height: 1.15;
+    letter-spacing: .015em;
+    white-space: nowrap;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.pending {
+    border-color: rgba(240, 188, 75, .46);
+    background: rgba(240, 188, 75, .11);
+    color: #ffe2a0;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.waiting {
+    border-color: rgba(98, 168, 255, .45);
+    background: rgba(98, 168, 255, .105);
+    color: #cfe4ff;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.payment {
+    border-color: rgba(255, 174, 82, .48);
+    background: rgba(255, 174, 82, .11);
+    color: #ffd39b;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.active {
+    border-color: rgba(72, 201, 140, .48);
+    background: rgba(72, 201, 140, .11);
+    color: #caffe0;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.done {
+    border-color: rgba(98, 168, 255, .42);
+    background: rgba(98, 168, 255, .095);
+    color: #d4e7ff;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.stored {
+    border-color: rgba(170, 180, 200, .34);
+    background: rgba(170, 180, 200, .08);
+    color: #d8dee9;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .admin-order-status-badge.cancelled {
+    border-color: rgba(239, 94, 94, .48);
+    background: rgba(239, 94, 94, .105);
+    color: #ffd1d1;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .history-report-state {
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .history-report-state-badge {
+    min-height: 25px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 9px;
+    border: 1px solid rgba(170, 180, 200, .26);
+    border-radius: 999px;
+    background: rgba(170, 180, 200, .06);
+    color: #c8d0dd;
+    font-size: 12px !important;
+    font-weight: 750 !important;
+    line-height: 1.1;
+    letter-spacing: .01em;
+    white-space: nowrap;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .history-report-state-badge[data-status="missing"] {
+    border-color: rgba(239, 94, 94, .44);
+    background: rgba(239, 94, 94, .09);
+    color: #ffd1d8;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .history-report-state-badge[data-status="pending"] {
+    border-color: rgba(240, 188, 75, .44);
+    background: rgba(240, 188, 75, .09);
+    color: #ffe1a0;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .history-report-state-badge[data-status="changes_requested"] {
+    border-color: rgba(255, 140, 74, .46);
+    background: rgba(255, 140, 74, .095);
+    color: #ffd0b1;
+}
+
+body.mw-r5-admin .mw-r5-legacy-body .order-status-col .history-report-state-badge[data-status="approved"] {
+    border-color: rgba(72, 201, 140, .44);
+    background: rgba(72, 201, 140, .09);
+    color: #d1ffe3;
+}
