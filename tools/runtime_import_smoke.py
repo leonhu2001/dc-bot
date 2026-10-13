@@ -20,6 +20,7 @@ CRITICAL_RUNTIME_MODULES = (
     "services.order_credential_runtime",
     "services.order_point_redemption",
     "services.self_service_runtime",
+    "services.self_service_selection_runtime",
     "services.self_service_reorder",
     "services.self_service_financials",
     "services.worker_tips",
