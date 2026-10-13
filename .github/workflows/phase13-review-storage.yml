@@ -1,0 +1,53 @@
+name: Phase 13 review storage extraction
+
+on:
+  push:
+    branches:
+      - refactor/phase13-review-storage-20261013
+    paths:
+      - tools/phase13_extract_review_storage.py
+      - .github/workflows/phase13-review-storage.yml
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-phase13-web.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase13-review-storage-20261013
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Extract review persistence
+        run: python tools/phase13_extract_review_storage.py
+      - name: Validate extracted storage
+        run: |
+          python -m compileall -q bot.py services views tests tools
+          python tools/runtime_import_smoke.py
+          python -m pytest -q tests/test_review_storage_extraction.py tests/test_architecture_growth_budget.py tests/test_deploy_runtime_import_preflight.py tests/test_payment_review_runtime_import_boundary.py
+          python -m pytest -q tests/golden
+          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
+      - name: Commit extracted storage
+        run: |
+          set -Eeuo pipefail
+          rm -f tools/phase13_extract_review_storage.py .github/workflows/phase13-review-storage.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Extract review and favorite persistence"
+          git push origin HEAD:refactor/phase13-review-storage-20261013
