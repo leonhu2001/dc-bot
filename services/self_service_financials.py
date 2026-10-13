@@ -17,9 +17,31 @@ get_current_reward_points: Callable[..., int]
 get_customer_reward_data: Callable[..., Any]
 get_effective_member_level: Callable[..., Any]
 get_self_service_quantity_unit: Callable[..., Any]
-get_self_service_staff_price: Callable[..., Any]
 get_vip_discount_pay_rate: Callable[..., Any]
-is_self_service_staff_price_required: Callable[..., bool]
+
+
+def is_self_service_staff_price_required(rule) -> bool:
+    rule_key = str(getattr(rule, "key", "") or "").strip().lower()
+    pricing_type = str(getattr(rule, "pricing_type", "") or "").strip().lower()
+
+    return (
+        rule_key in {"farm_department_task", "custom_custom_order"}
+        or pricing_type in {"manual", "staff", "custom"}
+    )
+
+
+def get_self_service_staff_price(data: dict) -> int | None:
+    raw_amount = data.get("manual_staff_amount")
+
+    if raw_amount is None or str(raw_amount).strip() == "":
+        return None
+
+    try:
+        amount = int(float(str(raw_amount).strip().replace(",", "")))
+    except (TypeError, ValueError):
+        return None
+
+    return max(0, amount)
 
 
 def configure_self_service_financials(
@@ -35,9 +57,7 @@ def configure_self_service_financials(
     customer_reward_data: Callable[..., Any],
     effective_member_level: Callable[..., Any],
     self_service_quantity_unit: Callable[..., Any],
-    self_service_staff_price: Callable[..., Any],
     vip_discount_pay_rate: Callable[..., Any],
-    staff_price_required: Callable[..., bool],
 ) -> None:
     global ORDER_POINT_BENEFIT_SPECS
     global POINT_REDEEM_ITEMS_BY_KEY
@@ -50,9 +70,7 @@ def configure_self_service_financials(
     global get_customer_reward_data
     global get_effective_member_level
     global get_self_service_quantity_unit
-    global get_self_service_staff_price
     global get_vip_discount_pay_rate
-    global is_self_service_staff_price_required
 
     ORDER_POINT_BENEFIT_SPECS = order_point_benefit_specs
     POINT_REDEEM_ITEMS_BY_KEY = point_redeem_items_by_key
@@ -65,9 +83,7 @@ def configure_self_service_financials(
     get_customer_reward_data = customer_reward_data
     get_effective_member_level = effective_member_level
     get_self_service_quantity_unit = self_service_quantity_unit
-    get_self_service_staff_price = self_service_staff_price
     get_vip_discount_pay_rate = vip_discount_pay_rate
-    is_self_service_staff_price_required = staff_price_required
 
 
 def _format_plain_amount(amount: int | None) -> str:

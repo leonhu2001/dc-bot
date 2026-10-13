@@ -27,7 +27,9 @@ from services.self_service_financials import (
     get_customer_point_balance_for_order,
     get_order_point_item,
     get_selected_order_point_benefit,
+    get_self_service_staff_price,
     is_order_point_benefit_allowed_for_rule,
+    is_self_service_staff_price_required,
 )
 
 
@@ -83,7 +85,16 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
         "get_self_service_quantity_unit",
         "get_vip_discount_pay_rate",
     }
-    if financial_keys.issubset(namespace):
+    present_financial_keys = financial_keys.intersection(namespace)
+    missing_financial_keys = sorted(financial_keys.difference(namespace))
+
+    if present_financial_keys and missing_financial_keys:
+        raise RuntimeError(
+            "self-service financial runtime missing dependencies: "
+            + ", ".join(missing_financial_keys)
+        )
+
+    if not missing_financial_keys:
         configure_self_service_financials(
             order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
             point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
@@ -96,9 +107,7 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             customer_reward_data=namespace["get_customer_reward_data"],
             effective_member_level=namespace["get_effective_member_level"],
             self_service_quantity_unit=namespace["get_self_service_quantity_unit"],
-            self_service_staff_price=get_self_service_staff_price,
             vip_discount_pay_rate=namespace["get_vip_discount_pay_rate"],
-            staff_price_required=is_self_service_staff_price_required,
         )
 
     reorder_keys = {
@@ -1011,24 +1020,7 @@ def build_self_service_panel_embed(
     return add_self_service_quote_preview(embed, data, guild)
 
 # 指定陪玩 / 點數福利選擇 UI 已移至 services/self_service_selection_runtime.py
-
-def is_self_service_staff_price_required(rule) -> bool:
-    rule_key = str(getattr(rule, "key", "") or "")
-    pricing_type = str(getattr(rule, "pricing_type", "") or "").lower()
-
-    return (
-        rule_key in {"farm_department_task", "custom_custom_order"}
-        or pricing_type in {"manual", "staff", "custom"}
-    )
-
-
-def get_self_service_staff_price(data: dict) -> int | None:
-    amount = _to_int(data.get("manual_staff_amount"), None)
-
-    if amount is None:
-        return None
-
-    return max(0, int(amount))
+# 客服手動價格規則由 services/self_service_financials.py 單一維護。
 
 
 class SelfServiceStaffPriceModal(discord.ui.Modal, title="客服填寫訂單價格"):
@@ -1297,7 +1289,11 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
             await interaction.followup.send(str(exc), ephemeral=True)
             return
         except Exception as exc:
-            print(f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 channel_id={self.channel_id}: {exc}")
+            print(
+                f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 "
+                f"channel_id={self.channel_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
             await interaction.followup.send("送出等待接單失敗，請通知客服確認後台紀錄。", ephemeral=True)
             return
 
