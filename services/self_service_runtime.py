@@ -110,7 +110,6 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
     # the financial runtime.
     financial_keys = {
         "POINT_REDEEM_ITEMS_BY_KEY",
-        "_to_int",
         "allocate_store_absorbed_fixed_discount",
         "get_current_reward_points",
         "get_customer_reward_data",
@@ -134,7 +133,7 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             get_rule_from_data=_get_rule_from_self_service_data,
             is_specify_preference=_is_specify_preference,
             role_key_for_member=_role_key_for_member,
-            to_int=namespace["_to_int"],
+            to_int=_to_int,
             store_absorbed_discount_allocator=namespace["allocate_store_absorbed_fixed_discount"],
             current_reward_points=namespace["get_current_reward_points"],
             customer_reward_data=namespace["get_customer_reward_data"],
@@ -144,35 +143,30 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
         )
 
     reorder_keys = {
-        "ORDER_CATEGORY_LABELS",
         "ORDER_ITEM_GROUPS_BY_CATEGORY",
         "CUSTOMER_ROLE_ID",
         "CUSTOMER_CATEGORY_ID",
         "SELF_SERVICE_ORDER_SELECTIONS",
         "OrderControlView",
         "_get_order_rule_by_item_label",
-        "_to_int",
         "build_ticket_channel_name",
         "delete_order_row_from_db",
         "get_order_item_details_for_group",
         "get_order_item_group_label",
         "get_self_service_quantity_meta",
-        "get_taipei_now_iso",
-        "remember_order_data",
-        "save_bot_data",
         "send_order_log",
     }
     if reorder_keys.issubset(namespace):
         configure_self_service_reorder(
-            order_category_labels=namespace["ORDER_CATEGORY_LABELS"],
+            order_category_labels=ORDER_CATEGORY_LABELS,
             order_item_groups_by_category=namespace["ORDER_ITEM_GROUPS_BY_CATEGORY"],
             get_order_rule_by_item_label=namespace["_get_order_rule_by_item_label"],
             role_key_for_member=_role_key_for_member,
-            to_int=namespace["_to_int"],
+            to_int=_to_int,
             order_item_details_for_group=namespace["get_order_item_details_for_group"],
             order_item_group_label=namespace["get_order_item_group_label"],
             self_service_quantity_meta=namespace["get_self_service_quantity_meta"],
-            taipei_now_iso=namespace["get_taipei_now_iso"],
+            taipei_now_iso=get_taipei_now_iso,
             staff_price_required=is_self_service_staff_price_required,
             customer_role_id=namespace["CUSTOMER_ROLE_ID"],
             customer_category_id=namespace["CUSTOMER_CATEGORY_ID"],
@@ -180,8 +174,8 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             self_service_order_view=SelfServiceOrderView,
             panel_embed_builder=build_self_service_panel_embed,
             self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            remember_data=namespace["remember_order_data"],
-            save_data=namespace["save_bot_data"],
+            remember_data=remember_order_data,
+            save_data=save_bot_data,
             ticket_channel_name_builder=namespace["build_ticket_channel_name"],
             delete_order_row=namespace["delete_order_row_from_db"],
             order_log_sender=namespace["send_order_log"],
@@ -191,18 +185,16 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
     selection_keys = {
         "SELF_SERVICE_ORDER_SELECTIONS",
         "POINT_REDEEM_ITEMS",
-        "_to_int",
-        "remember_order_data",
     }
     if selection_keys.issubset(namespace):
         configure_self_service_selection_runtime(
             order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
             point_redeem_items=namespace["POINT_REDEEM_ITEMS"],
             role_key_for_member=_role_key_for_member,
-            remember_data=namespace["remember_order_data"],
+            remember_data=remember_order_data,
             panel_embed_builder=build_self_service_panel_embed,
             order_view_type=SelfServiceOrderView,
-            to_int=namespace["_to_int"],
+            to_int=_to_int,
             order_point_item_getter=get_order_point_item,
             customer_point_balance_getter=get_customer_point_balance_for_order,
             point_benefit_allowed_for_rule=is_order_point_benefit_allowed_for_rule,
