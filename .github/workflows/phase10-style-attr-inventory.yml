@@ -1,16 +1,22 @@
-name: Phase10 style attribute inventory
+name: Phase10 CSP migration artifact
 
 on:
   push:
     branches:
       - refactor/phase10-csp-style-attrs-20261013
     paths:
-      - tools/phase10_style_attr_inventory.py
+      - tools/phase10_remove_style_attrs.py
       - .github/workflows/phase10-style-attr-inventory.yml
 
 jobs:
-  inventory:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-phase10-web.db
     steps:
       - uses: actions/checkout@v7
         with:
@@ -18,5 +24,24 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Inventory style attributes and JS style operations
-        run: python tools/phase10_style_attr_inventory.py
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Build migrated tree
+        run: python tools/phase10_remove_style_attrs.py
+      - name: Validate migrated tree
+        run: |
+          python -m compileall -q web/app tools tests
+          python tools/audit_templates.py
+          python -m pytest -q tests/test_csp_style_attr_lockdown.py tests/test_http_security.py
+          python -m pytest -q tests/golden
+          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
+      - name: Pack migrated files
+        run: |
+          tar -czf /tmp/phase10-csp-tree.tgz web/app/templates web/app/static/css/csp_style_attrs.css web/app/static/js/csp_dynamic_styles.js web/app/services/http_security.py tools/audit_templates.py tests/test_csp_style_attr_lockdown.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase10-csp-tree
+          path: /tmp/phase10-csp-tree.tgz
