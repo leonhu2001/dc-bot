@@ -1,0 +1,147 @@
+name: Report status badge refactor
+
+on:
+  push:
+    branches:
+      - ui/report-status-badges
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Move report status styles into static CSS
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+          css_path = root / 'web/app/static/css/pages/layout_inline_1.css'
+          js_path = root / 'web/app/static/js/ui_tweaks.js'
+          test_path = root / 'tests/test_order_reporting.py'
+
+          css = css_path.read_text(encoding='utf-8').rstrip() + '\n\n'
+          marker = '/* Shared order-report status badges (CSP-safe static styles). */'
+          if marker not in css:
+              css += '''/* Shared order-report status badges (CSP-safe static styles). */
+.history-report-state {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 7px;
+}
+
+.history-report-state-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 999px;
+    padding: 4px 9px;
+    background: rgba(255, 255, 255, .04);
+    color: #e7e5e4;
+    font-size: 11px;
+    font-weight: 950;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.history-report-state-badge[data-status="missing"] {
+    border-color: rgba(239, 94, 94, .46);
+    background: rgba(239, 94, 94, .10);
+    color: #ffd7df;
+}
+
+.history-report-state-badge[data-status="pending"] {
+    border-color: rgba(240, 188, 75, .46);
+    background: rgba(240, 188, 75, .10);
+    color: #ffe3a3;
+}
+
+.history-report-state-badge[data-status="changes_requested"] {
+    border-color: rgba(255, 140, 74, .48);
+    background: rgba(255, 140, 74, .10);
+    color: #ffd3b5;
+}
+
+.history-report-state-badge[data-status="approved"] {
+    border-color: rgba(72, 201, 140, .44);
+    background: rgba(72, 201, 140, .09);
+    color: #d8ffe7;
+}
+
+.order-report-nav-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border: 1px solid rgba(245, 198, 107, .28);
+    border-radius: 999px;
+    background: rgba(245, 198, 107, .14);
+    color: #ffe3a3;
+    font-size: 11px;
+    font-weight: 950;
+}
+'''
+          css_path.write_text(css, encoding='utf-8')
+
+          js = js_path.read_text(encoding='utf-8')
+          pattern = re.compile(
+              r'\n  function ensureOrderReportHistoryStyles\(\) \{.*?\n  \}\n\n  function collectAdminReportTargets',
+              re.S,
+          )
+          js, count = pattern.subn('\n  function collectAdminReportTargets', js, count=1)
+          if count != 1:
+              raise SystemExit(f'expected one dynamic style helper, removed {count}')
+          js = js.replace('    ensureOrderReportHistoryStyles();\n', '')
+          if 'order-report-history-status-style' in js or 'document.createElement("style")' in js:
+              raise SystemExit('dynamic report status style injection still present')
+          js_path.write_text(js, encoding='utf-8')
+
+          tests = test_path.read_text(encoding='utf-8').rstrip() + '\n'
+          test_name = 'def test_reporting_status_badges_use_static_csp_safe_styles():'
+          if test_name not in tests:
+              tests += '''\n\ndef test_reporting_status_badges_use_static_csp_safe_styles():
+    root = Path(__file__).resolve().parents[1]
+    css_source = (root / "web/app/static/css/pages/layout_inline_1.css").read_text(encoding="utf-8")
+    ui_source = (root / "web/app/static/js/ui_tweaks.js").read_text(encoding="utf-8")
+
+    assert ".history-report-state-badge" in css_source
+    assert 'data-status="missing"' in css_source
+    assert 'data-status="pending"' in css_source
+    assert 'data-status="changes_requested"' in css_source
+    assert 'data-status="approved"' in css_source
+    assert ".order-report-nav-count" in css_source
+    assert "order-report-history-status-style" not in ui_source
+    assert 'document.createElement("style")' not in ui_source
+'''
+          test_path.write_text(tests, encoding='utf-8')
+          PY
+
+      - name: Validate targeted reporting tests
+        run: |
+          python -m pip install -q -r requirements.txt -r web/requirements-web.txt
+          pytest -q tests/test_order_reporting.py
+
+      - name: Commit refactor and remove one-shot workflow
+        run: |
+          rm .github/workflows/report_status_badges_refactor.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/app/static/css/pages/layout_inline_1.css web/app/static/js/ui_tweaks.js tests/test_order_reporting.py .github/workflows/report_status_badges_refactor.yml
+          git commit -m "Style report statuses as semantic badges"
+          git push origin HEAD:ui/report-status-badges
