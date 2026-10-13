@@ -1,0 +1,35 @@
+name: Fix payout report gate regression contract
+on:
+  push:
+    branches: [fix/payout-report-gate-20261014]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/payout-report-gate-20261014
+          fetch-depth: 0
+      - name: Update regression contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/test_admin_navigation.py')
+          source = path.read_text(encoding='utf-8')
+          old = 'summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)'
+          new = 'summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows, locked_rows)'
+          if source.count(old) != 1:
+              raise SystemExit(f'expected one old payout summary contract, got {source.count(old)}')
+          path.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit repair
+        run: |
+          rm -f .github/workflows/fix_payout_report_gate_test_once.yml
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "Update payout summary locked-row regression contract"
+          git push origin HEAD:fix/payout-report-gate-20261014
