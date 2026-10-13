@@ -6,16 +6,15 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "vip_room": "・專屬 VIP 身分組，可使用VIP專屬包廂",
     "priority_cs": "・優先客服回覆",
     "discount_98": "・體驗單、趣味單外全館98折",
+    "rebate_1": "・儲值返利1%",
     "rebate_2": "・儲值返利2%",
     "monthly_coupon_200": "・每月一張折現券200T",
     "priority_order": "・優先排單",
     "familiar_worker": "・優先安排熟悉／收藏陪玩",
     "rebate_3": "・儲值返利3%",
     "discount_96": "・體驗單、趣味單外全館96折",
-    "rebate_4": "・儲值返利4%",
     "monthly_coupon_500": "・每月額外一張折現券500T",
     "free_secret_space": "・每月一次免費「機密航天保底1000w」或娛樂陪 2H",
-    "rebate_5": "・儲值返利5%",
     "discount_94": "・體驗單、趣味單外全館94折",
     "custom_order": "・可根據闆闆要求製作\"自訂單\"",
 }
@@ -48,7 +47,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "vip_room",
             "priority_cs",
             "discount_98",
-            "rebate_2",
+            "rebate_1",
             "monthly_coupon_200",
             "priority_order",
             "custom_order",
@@ -64,7 +63,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "monthly_coupon_200",
             "priority_order",
             "familiar_worker",
-            "rebate_3",
+            "rebate_2",
             "discount_96",
             "custom_order",
         ],
@@ -80,7 +79,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "priority_order",
             "familiar_worker",
             "discount_96",
-            "rebate_4",
+            "rebate_3",
             "monthly_coupon_500",
             "custom_order",
         ],
@@ -97,7 +96,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
             "familiar_worker",
             "monthly_coupon_500",
             "free_secret_space",
-            "rebate_5",
+            "rebate_3",
             "discount_94",
             "custom_order",
         ],
@@ -137,15 +136,15 @@ VIP_RETENTION_DAYS: dict[str, int] = {
 }
 
 # 儲值回饋依「本次儲值完成後」的有效 VIP 等級計算。
-# 銀級 / 金級尚未有儲值返利，因此為 0%。
+# 2026-10-14 起採較保守的 1 / 2 / 3 / 3%，避免與 VIP 折扣、點數、月福利長期疊加過高。
 VIP_TOPUP_REBATE_PERCENT: dict[str, int] = {
     "普通魔丸": 0,
     "銀級魔丸": 0,
     "金級魔丸": 0,
-    "白金魔丸": 2,
-    "鑽石魔丸": 3,
-    "白鑽魔丸": 4,
-    "黑鑽魔丸": 5,
+    "白金魔丸": 1,
+    "鑽石魔丸": 2,
+    "白鑽魔丸": 3,
+    "黑鑽魔丸": 3,
 }
 
 
@@ -172,7 +171,7 @@ class _VipDiscountExcludedRuleKeys(frozenset):
     """Static exclusions plus each product's live VIP eligibility setting.
 
     checkout_preview imports this object directly and tests membership, while
-    Discord pricing goes through get_vip_discount_pay_rate.  Keeping the live
+    Discord pricing goes through get_vip_discount_pay_rate. Keeping the live
     product flag here makes both paths share exactly the same rule without a
     second hard-coded exclusion list.
     """
@@ -191,13 +190,8 @@ class _VipDiscountExcludedRuleKeys(frozenset):
 
             rule = ORDER_RULES.get(key)
             if rule is not None:
-                return not bool(
-                    getattr(rule, "vip_discount_allowed", True)
-                )
+                return not bool(getattr(rule, "vip_discount_allowed", True))
         except Exception:
-            # Fail open to the existing static VIP policy if product rules are
-            # temporarily unavailable.  The pricing path still has all legacy
-            # category/rule exclusions below.
             pass
 
         return False
@@ -221,12 +215,7 @@ def get_vip_discount_pay_rate(
     rule_key: str | None = None,
 ) -> int:
     """回傳訂單應套用的 VIP 折後比例；不適用時回傳 100。"""
-    rate = int(
-        VIP_DISCOUNT_PAY_RATES.get(
-            str(level_name or "普通魔丸"),
-            100,
-        )
-    )
+    rate = int(VIP_DISCOUNT_PAY_RATES.get(str(level_name or "普通魔丸"), 100))
 
     if rate >= 100:
         return 100
@@ -276,8 +265,6 @@ def has_active_vip_progress_reset(data: dict) -> bool:
     ):
         return True
 
-    # 舊資料若缺少手動調整 metadata，普通魔丸且基準正好等於
-    # 當前累積金額，仍視為剛被重置到普通等級，避免誤拉回歷史 VIP。
     try:
         stored_index = int(data.get("vip_level_index"))
     except (TypeError, ValueError):
@@ -288,11 +275,7 @@ def has_active_vip_progress_reset(data: dict) -> bool:
     except (TypeError, ValueError):
         total_spent = 0
 
-    return (
-        stored_index == 0
-        and base_total > 0
-        and base_total <= total_spent
-    )
+    return stored_index == 0 and base_total > 0 and base_total <= total_spent
 
 
 def build_vip_level_benefits() -> dict[str, str]:
