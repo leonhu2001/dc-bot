@@ -16,6 +16,7 @@ from services.vip_monthly_benefits import (
     release_black_diamond_choice,
     reserve_black_diamond_choice,
 )
+from services.wallet_service import get_wallet_balance_breakdown
 from web.app.config import config
 from web.app.services.customer_portal import build_customer_portal_snapshot
 from web.app.services.site_data import get_member_summary
@@ -462,14 +463,34 @@ class MemberPortalView(discord.ui.View):
         row=0,
     )
     async def wallet(self, interaction: discord.Interaction, button: discord.ui.Button):
-        member = get_member_summary(_member_id(interaction))
+        wallet = get_wallet_balance_breakdown(_member_id(interaction))
         embed = discord.Embed(
             title="💰 我的錢包",
-            description=(
-                "目前可用餘額\n"
-                f"**{member.get('wallet_balance_text') or '0T'}**"
-            ),
+            description=f"錢包總額\n**{int(wallet.get('balance') or 0):,}T**",
             color=discord.Color.gold(),
+        )
+        embed.add_field(
+            name="💳 實付本金",
+            value=f"**{int(wallet.get('principal_balance') or 0):,}T**",
+            inline=True,
+        )
+        embed.add_field(
+            name="🎁 VIP／活動贈額",
+            value=f"**{int(wallet.get('bonus_balance') or 0):,}T**",
+            inline=True,
+        )
+        embed.add_field(
+            name="可退款金額",
+            value=f"**{int(wallet.get('refundable_balance') or 0):,}T**",
+            inline=True,
+        )
+        embed.add_field(
+            name="使用規則",
+            value=(
+                "一般點單會先使用贈額，再扣實付本金。\n"
+                "雞腿／打賞只能使用實付本金；已使用贈額若尚未被本金消費沖抵，會先從退款額度扣除。"
+            ),
+            inline=False,
         )
         embed.add_field(
             name="儲值",
