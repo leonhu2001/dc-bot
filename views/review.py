@@ -760,7 +760,7 @@ class FavoriteCurrentMembersSelect(discord.ui.Select):
                     label=label,
                     value=staff_id,
                     description="已收藏" if already else "加入我的收藏",
-                    emoji="❤️" if already else "♡",
+                    emoji="❤️" if already else None,
                     default=False,
                 )
             )
