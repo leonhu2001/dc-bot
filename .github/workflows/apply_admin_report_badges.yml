@@ -1,0 +1,42 @@
+name: Apply admin report badges
+
+on:
+  push:
+    branches:
+      - fix/admin-report-status-badges
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-report-status-badges
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply source changes
+        run: python tools/apply_admin_report_badges.py
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      - name: Validate admin report badges
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m py_compile web/app/routers/admin_dashboard.py
+          python -m pytest -q tests/test_admin_navigation.py
+      - name: Commit patch and remove one-shot tooling
+        run: |
+          rm .github/workflows/apply_admin_report_badges.yml tools/apply_admin_report_badges.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Show canonical report status badges in admin overview"
+          git push
