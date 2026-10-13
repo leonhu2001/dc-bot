@@ -6,6 +6,7 @@ on:
       - refactor/phase10-csp-style-attrs-20261013
     paths:
       - tools/phase10_remove_style_attrs.py
+      - tools/phase10_update_http_security_test.py
       - .github/workflows/phase10-style-attr-inventory.yml
 
 jobs:
@@ -30,7 +31,9 @@ jobs:
           python -m pip install -r web/requirements-web.txt
           python -m pip install -r requirements-dev.txt
       - name: Build migrated tree
-        run: python tools/phase10_remove_style_attrs.py
+        run: |
+          python tools/phase10_remove_style_attrs.py
+          python tools/phase10_update_http_security_test.py
       - name: Validate migrated tree
         run: |
           python -m compileall -q web/app tools tests
@@ -40,7 +43,7 @@ jobs:
           python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
       - name: Pack migrated files
         run: |
-          tar -czf /tmp/phase10-csp-tree.tgz web/app/templates web/app/static/css/csp_style_attrs.css web/app/static/js/csp_dynamic_styles.js web/app/services/http_security.py tools/audit_templates.py tests/test_csp_style_attr_lockdown.py
+          tar -czf /tmp/phase10-csp-tree.tgz web/app/templates web/app/static/css/csp_style_attrs.css web/app/static/js/csp_dynamic_styles.js web/app/services/http_security.py tools/audit_templates.py tests/test_csp_style_attr_lockdown.py tests/test_http_security.py
       - uses: actions/upload-artifact@v4
         with:
           name: phase10-csp-tree
