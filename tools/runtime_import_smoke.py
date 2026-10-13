@@ -35,9 +35,8 @@ BOT_IMPORT_PREFIXES = (
     "views.",
 )
 
-# These aliases back bot.py compatibility adapters. They must stay explicit
-# imports from the canonical wallet service instead of depending on namespace
-# injection or startup side effects.
+# Extraction boundaries that must remain explicit in bot.py. This catches both
+# missing imports and accidental compatibility re-exports from the old runtime.
 REQUIRED_BOT_IMPORT_ALIASES = {
     "_wallet_ensure_tables": (
         "services.wallet_service",
@@ -54,6 +53,50 @@ REQUIRED_BOT_IMPORT_ALIASES = {
     "_wallet_get_transactions": (
         "services.wallet_service",
         "get_wallet_transactions",
+    ),
+    "_truncate_select_text": (
+        "services.self_service_selection_runtime",
+        "_truncate_select_text",
+    ),
+    "get_specified_staff_entries_for_rule": (
+        "services.self_service_selection_runtime",
+        "get_specified_staff_entries_for_rule",
+    ),
+    "_acknowledge_component_interaction": (
+        "services.self_service_selection_runtime",
+        "_acknowledge_component_interaction",
+    ),
+    "_edit_component_message": (
+        "services.self_service_selection_runtime",
+        "_edit_component_message",
+    ),
+    "SelfServiceSpecifiedStaffDropdown": (
+        "services.self_service_selection_runtime",
+        "SelfServiceSpecifiedStaffDropdown",
+    ),
+    "SelfServiceSpecifiedStaffPageButton": (
+        "services.self_service_selection_runtime",
+        "SelfServiceSpecifiedStaffPageButton",
+    ),
+    "SelfServiceSpecifiedStaffClearButton": (
+        "services.self_service_selection_runtime",
+        "SelfServiceSpecifiedStaffClearButton",
+    ),
+    "SelfServiceSpecifiedStaffDoneButton": (
+        "services.self_service_selection_runtime",
+        "SelfServiceSpecifiedStaffDoneButton",
+    ),
+    "SelfServicePointBenefitSelect": (
+        "services.self_service_selection_runtime",
+        "SelfServicePointBenefitSelect",
+    ),
+    "SelfServicePointBenefitView": (
+        "services.self_service_selection_runtime",
+        "SelfServicePointBenefitView",
+    ),
+    "SelfServiceSpecifiedStaffDropdownView": (
+        "services.self_service_selection_runtime",
+        "SelfServiceSpecifiedStaffDropdownView",
     ),
 }
 
