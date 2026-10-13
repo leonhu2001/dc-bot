@@ -136,6 +136,19 @@ def ensure_wallet_tables() -> None:
     ensure_wallet_service_tables(bot_db_path())
 
 
+def _decorate_wallet(data: dict) -> dict:
+    principal = max(0, int(data.get("principal_balance") or 0))
+    refund_offset = max(0, int(data.get("refund_offset_balance") or 0))
+    data["refundable_balance"] = max(0, principal - refund_offset)
+    data["balance_text"] = format_t_amount(data.get("balance"))
+    data["principal_balance_text"] = format_t_amount(principal)
+    data["bonus_balance_text"] = format_t_amount(data.get("bonus_balance"))
+    data["refund_offset_balance_text"] = format_t_amount(refund_offset)
+    data["refundable_balance_text"] = format_t_amount(data["refundable_balance"])
+    data["updated_at_text"] = format_wallet_datetime(data.get("updated_at"))
+    return data
+
+
 def fetch_wallets(keyword: str | None = None) -> list[dict]:
     ensure_wallet_tables()
     q = str(keyword or "").strip()
@@ -146,6 +159,7 @@ def fetch_wallets(keyword: str | None = None) -> list[dict]:
             w.balance,
             w.principal_balance,
             w.bonus_balance,
+            w.refund_offset_balance,
             w.updated_at,
             (
                 SELECT COUNT(*)
@@ -206,11 +220,7 @@ def fetch_wallets(keyword: str | None = None) -> list[dict]:
         data["customer_display_name"] = (
             display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
         )
-        data["balance_text"] = format_t_amount(data.get("balance"))
-        data["principal_balance_text"] = format_t_amount(data.get("principal_balance"))
-        data["bonus_balance_text"] = format_t_amount(data.get("bonus_balance"))
-        data["updated_at_text"] = format_wallet_datetime(data.get("updated_at"))
-        wallets.append(data)
+        wallets.append(_decorate_wallet(data))
     return wallets
 
 
@@ -227,7 +237,7 @@ def fetch_wallet_detail(
         wallet_row = conn.execute(
             """
             SELECT customer_discord_id, balance, principal_balance,
-                   bonus_balance, updated_at
+                   bonus_balance, refund_offset_balance, updated_at
             FROM customer_wallets
             WHERE customer_discord_id = ?
             """,
@@ -258,6 +268,7 @@ def fetch_wallet_detail(
             "balance": balance,
             "principal_balance": balance,
             "bonus_balance": 0,
+            "refund_offset_balance": 0,
             "updated_at": latest_tx["created_at"] if latest_tx is not None else None,
         }
 
@@ -266,10 +277,7 @@ def fetch_wallet_detail(
     wallet["customer_display_name"] = (
         display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
     )
-    wallet["balance_text"] = format_t_amount(wallet.get("balance"))
-    wallet["principal_balance_text"] = format_t_amount(wallet.get("principal_balance"))
-    wallet["bonus_balance_text"] = format_t_amount(wallet.get("bonus_balance"))
-    wallet["updated_at_text"] = format_wallet_datetime(wallet.get("updated_at"))
+    _decorate_wallet(wallet)
 
     transactions = []
     for row in tx_rows:
@@ -297,6 +305,8 @@ def fetch_wallet_refunds(customer_discord_id: str) -> list[dict]:
     )
     for refund in refunds:
         refund["amount_text"] = format_t_amount(refund.get("amount"))
+        refund["wallet_debit_text"] = format_t_amount(refund.get("wallet_debit_amount"))
+        refund["bonus_offset_text"] = format_t_amount(refund.get("bonus_offset_applied"))
         refund["bonus_revoked_text"] = format_t_amount(refund.get("bonus_revoked_amount"))
         refund["created_at_text"] = format_wallet_datetime(refund.get("created_at"))
         refund["completed_at_text"] = format_wallet_datetime(refund.get("completed_at"))

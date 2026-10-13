@@ -15,6 +15,7 @@
       <div><span>實付本金</span><strong>{{ "{:,}".format(wallet.principal_balance) }}T</strong></div>
       <div><span>VIP／活動贈額</span><strong>{{ "{:,}".format(wallet.bonus_balance) }}T</strong></div>
     </div>
+    <p class="csp-sa-1c331c237b">一般點單會先使用贈額，再扣實付本金；雞腿／打賞只能使用實付本金。若已使用贈額後申請退款，尚未由本金消費沖抵的部分會先從退款額度扣除。目前可退款 {{ "{:,}".format(wallet.refundable_balance) }}T。</p>
   </section>
 
   <div class="member-panels">

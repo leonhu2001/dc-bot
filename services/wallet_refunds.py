@@ -34,6 +34,8 @@ def ensure_wallet_refund_tables(db_file: str | Path | None = None) -> None:
                 requested_by_display_name TEXT,
                 note TEXT,
                 wallet_transaction_id INTEGER,
+                wallet_debit_amount INTEGER NOT NULL DEFAULT 0,
+                bonus_offset_applied INTEGER NOT NULL DEFAULT 0,
                 bonus_reversal_transaction_id INTEGER,
                 bonus_revoked_amount INTEGER NOT NULL DEFAULT 0,
                 vip_total_before INTEGER,
@@ -49,6 +51,20 @@ def ensure_wallet_refund_tables(db_file: str | Path | None = None) -> None:
             )
             """
         )
+        columns = {
+            str(row[1])
+            for row in conn.execute("PRAGMA table_info(wallet_refund_requests)").fetchall()
+        }
+        if "wallet_debit_amount" not in columns:
+            conn.execute(
+                "ALTER TABLE wallet_refund_requests "
+                "ADD COLUMN wallet_debit_amount INTEGER NOT NULL DEFAULT 0"
+            )
+        if "bonus_offset_applied" not in columns:
+            conn.execute(
+                "ALTER TABLE wallet_refund_requests "
+                "ADD COLUMN bonus_offset_applied INTEGER NOT NULL DEFAULT 0"
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_wallet_refunds_status "
             "ON wallet_refund_requests(status, id ASC)"
@@ -75,10 +91,10 @@ def create_wallet_refund_request(
         raise ValueError("退款金額必須大於 0。")
 
     breakdown = get_wallet_balance_breakdown(customer_discord_id, db_file)
-    principal = int(breakdown.get("principal_balance") or 0)
-    if amount > principal:
+    refundable = int(breakdown.get("refundable_balance") or 0)
+    if amount > refundable:
         raise ValueError(
-            f"退款只能使用尚未消費的實付本金，目前最多可退 {principal:,}T。"
+            f"目前最多可實退 {refundable:,}T；已使用但尚未由本金消費沖抵的贈額，會先從退款額度扣除。"
         )
 
     path = _db_path(db_file)
@@ -195,6 +211,8 @@ def mark_wallet_refund_completed(
     refund_id: int,
     *,
     wallet_transaction_id: int,
+    wallet_debit_amount: int,
+    bonus_offset_applied: int,
     bonus_reversal_transaction_id: int | None,
     bonus_revoked_amount: int,
     vip_total_before: int,
@@ -212,6 +230,8 @@ def mark_wallet_refund_completed(
             UPDATE wallet_refund_requests
             SET status='completed',
                 wallet_transaction_id=?,
+                wallet_debit_amount=?,
+                bonus_offset_applied=?,
                 bonus_reversal_transaction_id=?,
                 bonus_revoked_amount=?,
                 vip_total_before=?,
@@ -223,6 +243,8 @@ def mark_wallet_refund_completed(
             """,
             (
                 int(wallet_transaction_id),
+                max(0, int(wallet_debit_amount or 0)),
+                max(0, int(bonus_offset_applied or 0)),
                 int(bonus_reversal_transaction_id)
                 if bonus_reversal_transaction_id is not None
                 else None,

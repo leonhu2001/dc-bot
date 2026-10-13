@@ -28,6 +28,7 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
                 balance INTEGER NOT NULL DEFAULT 0,
                 principal_balance INTEGER NOT NULL DEFAULT 0,
                 bonus_balance INTEGER NOT NULL DEFAULT 0,
+                refund_offset_balance INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT
             )
             """
@@ -38,6 +39,7 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
         }
         added_principal = "principal_balance" not in wallet_columns
         added_bonus = "bonus_balance" not in wallet_columns
+        added_refund_offset = "refund_offset_balance" not in wallet_columns
         if added_principal:
             conn.execute(
                 "ALTER TABLE customer_wallets ADD COLUMN principal_balance INTEGER NOT NULL DEFAULT 0"
@@ -45,6 +47,10 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
         if added_bonus:
             conn.execute(
                 "ALTER TABLE customer_wallets ADD COLUMN bonus_balance INTEGER NOT NULL DEFAULT 0"
+            )
+        if added_refund_offset:
+            conn.execute(
+                "ALTER TABLE customer_wallets ADD COLUMN refund_offset_balance INTEGER NOT NULL DEFAULT 0"
             )
 
         # 2026-10-14 新制只向後生效。舊錢包無法可靠拆分過往本金與贈額，
@@ -163,25 +169,36 @@ def get_wallet_balance_breakdown(
     customer_id: str | int,
     db_file: str | Path | None = None,
 ) -> dict[str, int]:
-    """Return total, refundable/tip-eligible principal and non-cash bonus balances."""
+    """Return total, cash-backed principal, bonus and currently refundable cash."""
     ensure_wallet_tables(db_file)
     path = _db_path(db_file)
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
             """
-            SELECT balance, principal_balance, bonus_balance
+            SELECT balance, principal_balance, bonus_balance, refund_offset_balance
             FROM customer_wallets
             WHERE customer_discord_id=?
             """,
             (str(customer_id),),
         ).fetchone()
         if row is None:
-            return {"balance": 0, "principal_balance": 0, "bonus_balance": 0}
+            return {
+                "balance": 0,
+                "principal_balance": 0,
+                "bonus_balance": 0,
+                "refund_offset_balance": 0,
+                "refundable_balance": 0,
+            }
+        principal = int(row["principal_balance"] or 0)
+        refund_offset = max(0, int(row["refund_offset_balance"] or 0))
+        refundable = max(0, principal - refund_offset)
         return {
             "balance": int(row["balance"] or 0),
-            "principal_balance": int(row["principal_balance"] or 0),
+            "principal_balance": principal,
             "bonus_balance": int(row["bonus_balance"] or 0),
+            "refund_offset_balance": refund_offset,
+            "refundable_balance": refundable,
         }
 
 
@@ -189,14 +206,14 @@ def get_refundable_wallet_balance(
     customer_id: str | int,
     db_file: str | Path | None = None,
 ) -> int:
-    return int(get_wallet_balance_breakdown(customer_id, db_file)["principal_balance"])
+    return int(get_wallet_balance_breakdown(customer_id, db_file)["refundable_balance"])
 
 
 def get_tip_eligible_wallet_balance(
     customer_id: str | int,
     db_file: str | Path | None = None,
 ) -> int:
-    return get_refundable_wallet_balance(customer_id, db_file)
+    return int(get_wallet_balance_breakdown(customer_id, db_file)["principal_balance"])
 
 
 def find_wallet_transaction(
@@ -277,19 +294,21 @@ def _apply_bucket_change(
     *,
     principal_before: int,
     bonus_before: int,
+    refund_offset_before: int,
     amount: int,
     tx_type: str,
     allow_negative: bool,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     principal_after = int(principal_before)
     bonus_after = int(bonus_before)
+    refund_offset_after = max(0, int(refund_offset_before))
 
     if amount > 0:
         if tx_type in BONUS_CREDIT_TYPES:
             bonus_after += amount
         else:
             principal_after += amount
-        return principal_after, bonus_after
+        return principal_after, bonus_after, refund_offset_after
 
     debit = abs(int(amount))
     total_before = principal_before + bonus_before
@@ -305,11 +324,15 @@ def _apply_bucket_change(
                     "雞腿只能使用實付本金。"
                     f"目前可用本金 {principal_before:,}T，無法支付 {debit:,}T。"
                 )
+            refundable = max(0, principal_before - refund_offset_before)
             raise ValueError(
-                f"可退款實付本金不足，目前可退款 {principal_before:,}T。"
+                f"可退款實付本金不足，目前最多可退 {refundable:,}T。"
             )
         principal_after -= debit
-        return principal_after, bonus_after
+        # 雞腿與退款都會消耗實付本金；已使用贈額形成的退款抵扣額，
+        # 會隨本金真正被消費／退回而沖抵，避免之後再次重複扣除。
+        refund_offset_after = max(0, refund_offset_after - debit)
+        return principal_after, bonus_after, refund_offset_after
 
     if tx_type in BONUS_ONLY_DEBIT_TYPES:
         if debit > bonus_before and not allow_negative:
@@ -317,16 +340,21 @@ def _apply_bucket_change(
                 f"贈額不足，目前贈額 {bonus_before:,}T，無法撤銷 {debit:,}T。"
             )
         bonus_after -= debit
-        return principal_after, bonus_after
+        return principal_after, bonus_after, refund_offset_after
 
-    # 一般消費固定先使用實付本金，再使用贈額；避免先花贈額後把本金全額退回。
-    principal_used = min(max(0, principal_before), debit)
+    # 一般消費固定先使用贈額，再使用實付本金。
+    # 若只花到贈額，該金額暫列為退款抵扣；之後同一錢包有本金實際消費時會自動沖抵。
+    bonus_used = min(max(0, bonus_before), debit)
+    bonus_after -= bonus_used
+    remaining = debit - bonus_used
+    principal_used = remaining
     principal_after -= principal_used
-    remaining = debit - principal_used
-    if remaining > 0:
-        bonus_after -= remaining
 
-    return principal_after, bonus_after
+    refund_offset_after += bonus_used
+    if principal_used > 0:
+        refund_offset_after = max(0, refund_offset_after - principal_used)
+
+    return principal_after, bonus_after, refund_offset_after
 
 
 def adjust_wallet_balance(
@@ -400,7 +428,7 @@ def adjust_wallet_balance(
 
         row = conn.execute(
             """
-            SELECT balance, principal_balance, bonus_balance
+            SELECT balance, principal_balance, bonus_balance, refund_offset_balance
             FROM customer_wallets
             WHERE customer_discord_id=?
             """,
@@ -409,10 +437,12 @@ def adjust_wallet_balance(
         before = int(row["balance"] or 0) if row else 0
         principal_before = int(row["principal_balance"] or 0) if row else 0
         bonus_before = int(row["bonus_balance"] or 0) if row else 0
+        refund_offset_before = int(row["refund_offset_balance"] or 0) if row else 0
 
-        principal_after, bonus_after = _apply_bucket_change(
+        principal_after, bonus_after, refund_offset_after = _apply_bucket_change(
             principal_before=principal_before,
             bonus_before=bonus_before,
+            refund_offset_before=refund_offset_before,
             amount=amount,
             tx_type=normalized_type,
             allow_negative=allow_negative,
@@ -427,13 +457,15 @@ def adjust_wallet_balance(
         conn.execute(
             """
             INSERT INTO customer_wallets(
-                customer_discord_id, balance, principal_balance, bonus_balance, updated_at
-            ) VALUES(?,?,?,?,?)
+                customer_discord_id, balance, principal_balance, bonus_balance,
+                refund_offset_balance, updated_at
+            ) VALUES(?,?,?,?,?,?)
             ON CONFLICT(customer_discord_id)
             DO UPDATE SET
                 balance=excluded.balance,
                 principal_balance=excluded.principal_balance,
                 bonus_balance=excluded.bonus_balance,
+                refund_offset_balance=excluded.refund_offset_balance,
                 updated_at=excluded.updated_at
             """,
             (
@@ -441,6 +473,7 @@ def adjust_wallet_balance(
                 after,
                 principal_after,
                 bonus_after,
+                refund_offset_after,
                 now_text,
             ),
         )
@@ -474,6 +507,8 @@ def adjust_wallet_balance(
             "principal_after": principal_after,
             "bonus_before": bonus_before,
             "bonus_after": bonus_after,
+            "refund_offset_before": refund_offset_before,
+            "refund_offset_after": refund_offset_after,
             "type": normalized_type,
             "order_no": normalized_order_no,
             "order_channel_id": normalized_order_channel_id,
@@ -497,12 +532,14 @@ def adjust_wallet_balance(
                     "balance": before,
                     "principal_balance": principal_before,
                     "bonus_balance": bonus_before,
+                    "refund_offset_balance": refund_offset_before,
                 },
                 after={
                     "customer_discord_id": str(customer_id),
                     "balance": after,
                     "principal_balance": principal_after,
                     "bonus_balance": bonus_after,
+                    "refund_offset_balance": refund_offset_after,
                     "amount": amount,
                     "transaction_id": tx_id,
                     "transaction_type": normalized_type,

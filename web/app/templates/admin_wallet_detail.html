@@ -21,12 +21,20 @@
             <strong>{{ wallet.balance_text }}</strong>
         </article>
         <article class="wallet-detail-stat">
-            <span>可退款／可雞腿本金</span>
+            <span>實付本金／可雞腿</span>
             <strong>{{ wallet.principal_balance_text }}</strong>
+        </article>
+        <article class="wallet-detail-stat">
+            <span>目前可實退</span>
+            <strong>{{ wallet.refundable_balance_text }}</strong>
         </article>
         <article class="wallet-detail-stat">
             <span>VIP／活動贈額</span>
             <strong>{{ wallet.bonus_balance_text }}</strong>
+        </article>
+        <article class="wallet-detail-stat">
+            <span>已用贈額待抵扣</span>
+            <strong>{{ wallet.refund_offset_balance_text }}</strong>
         </article>
         <article class="wallet-detail-stat">
             <span>最後更新</span>
@@ -39,7 +47,7 @@
             <div>
                 <p class="order-no">REFUND</p>
                 <h3>儲值退款</h3>
-                <p>僅退尚未消費的實付本金。送出後由 Bot 回滾 VIP；現有未使用贈額會一併撤銷。</p>
+                <p>一般點單先使用贈額。退款只退目前可實退金額；已使用但尚未由本金消費沖抵的贈額會先扣除，未使用贈額則一併撤銷，Bot 同步回滾 VIP。</p>
             </div>
         </div>
         <form method="post" action="/admin/wallets/{{ wallet.customer_discord_id }}/refund" class="wallet-limit-form">
@@ -48,12 +56,12 @@
                 type="number"
                 name="amount"
                 min="1"
-                max="{{ wallet.principal_balance or 0 }}"
-                placeholder="退款本金"
+                max="{{ wallet.refundable_balance or 0 }}"
+                placeholder="實退金額"
                 required
             >
             <input type="text" name="note" maxlength="300" placeholder="退款原因／備註">
-            <button class="button" type="submit" {% if (wallet.principal_balance or 0) <= 0 %}disabled{% endif %}>送出退款</button>
+            <button class="button" type="submit" {% if (wallet.refundable_balance or 0) <= 0 %}disabled{% endif %}>送出退款</button>
         </form>
 
         {% if refunds %}
@@ -62,9 +70,11 @@
                 <thead>
                     <tr>
                         <th>建立時間</th>
-                        <th>退款本金</th>
+                        <th>實退</th>
+                        <th>本金扣除</th>
+                        <th>已用贈額抵扣</th>
+                        <th>撤銷未用贈額</th>
                         <th>狀態</th>
-                        <th>撤銷贈額</th>
                         <th>VIP</th>
                         <th>備註／錯誤</th>
                     </tr>
@@ -74,8 +84,10 @@
                     <tr>
                         <td>{{ refund.created_at_text }}</td>
                         <td>{{ refund.amount_text }}</td>
-                        <td><span class="wallet-pill">{{ refund.status }}</span></td>
+                        <td>{{ refund.wallet_debit_text }}</td>
+                        <td>{{ refund.bonus_offset_text }}</td>
                         <td>{{ refund.bonus_revoked_text }}</td>
+                        <td><span class="wallet-pill">{{ refund.status }}</span></td>
                         <td>
                             {% if refund.vip_level_before or refund.vip_level_after %}
                                 {{ refund.vip_level_before or "—" }} → {{ refund.vip_level_after or "—" }}

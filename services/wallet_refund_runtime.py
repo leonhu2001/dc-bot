@@ -184,6 +184,8 @@ async def process_pending_wallet_refunds(bot: discord.Client) -> None:
         operator_name = str(row.get("requested_by_display_name") or "").strip() or None
         refund_reference = f"WALLET-REFUND-{refund_id}"
         refund_tx = None
+        wallet_debit_amount = 0
+        bonus_offset_applied = 0
 
         try:
             refund_tx = find_wallet_transaction(
@@ -195,23 +197,41 @@ async def process_pending_wallet_refunds(bot: discord.Client) -> None:
             if refund_tx is None:
                 breakdown = get_wallet_balance_breakdown(customer_id)
                 principal = int(breakdown.get("principal_balance") or 0)
-                if amount <= 0 or amount > principal:
+                refundable = int(breakdown.get("refundable_balance") or 0)
+                bonus_offset_applied = int(breakdown.get("refund_offset_balance") or 0)
+                if amount <= 0 or amount > refundable:
                     raise ValueError(
-                        f"退款本金不足：申請 {amount:,}T，目前可退款本金 {principal:,}T。"
+                        f"退款額度不足：申請實退 {amount:,}T，目前最多可實退 {refundable:,}T。"
+                    )
+
+                # 一般點單會先花贈額。若贈額已先被使用、但還沒有足夠本金消費去沖抵，
+                # 退款時要連同這段抵扣一起從錢包本金移除，現金只退 request.amount。
+                wallet_debit_amount = amount + bonus_offset_applied
+                if wallet_debit_amount > principal:
+                    raise ValueError(
+                        f"退款本金不足：需扣除 {wallet_debit_amount:,}T，本金僅剩 {principal:,}T。"
                     )
 
                 refund_tx = adjust_wallet_balance(
                     customer_id=customer_id,
-                    amount=-amount,
+                    amount=-wallet_debit_amount,
                     tx_type="refund",
                     operator_discord_id=operator_id,
                     operator_display_name=operator_name,
                     order_no=refund_reference,
                     note=(
-                        f"儲值退款 {refund_reference}"
+                        f"儲值退款實退 {amount:,}T"
+                        + (
+                            f"｜已使用贈額抵扣 {bonus_offset_applied:,}T"
+                            if bonus_offset_applied > 0
+                            else ""
+                        )
                         + (f"｜{row.get('note')}" if str(row.get("note") or "").strip() else "")
                     ),
                 )
+            else:
+                wallet_debit_amount = abs(int(refund_tx.get("amount") or 0))
+                bonus_offset_applied = max(0, wallet_debit_amount - amount)
 
             bonus_reference = f"{refund_reference}:BONUS"
             bonus_tx = find_wallet_transaction(
@@ -248,6 +268,8 @@ async def process_pending_wallet_refunds(bot: discord.Client) -> None:
             mark_wallet_refund_completed(
                 refund_id,
                 wallet_transaction_id=int(refund_tx["id"]),
+                wallet_debit_amount=wallet_debit_amount,
+                bonus_offset_applied=bonus_offset_applied,
                 bonus_reversal_transaction_id=(
                     int(bonus_tx["id"]) if bonus_tx is not None else None
                 ),
@@ -267,9 +289,14 @@ async def process_pending_wallet_refunds(bot: discord.Client) -> None:
             if user is not None:
                 try:
                     message = (
-                        f"✅ 儲值退款已完成｜**{amount:,}T**\n"
+                        f"✅ 儲值退款已完成｜實退 **{amount:,}T**\n"
                         f"VIP：**{member_result['old_level']} → {member_result['new_level']}**"
                     )
+                    if bonus_offset_applied > 0:
+                        message += (
+                            f"\n已使用贈額抵扣：**{bonus_offset_applied:,}T**"
+                            "（避免贈額先消費後再全額退本金）"
+                        )
                     if bonus_revoked > 0:
                         message += f"\n已撤銷未使用贈額：**{bonus_revoked:,}T**"
                     await user.send(message)
