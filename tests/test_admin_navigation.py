@@ -322,6 +322,6 @@ def test_payout_summary_uses_shared_discord_avatar_resolver():
     assert '"staff-avatar-img"' in page
     assert "row.avatar_url" not in page
     assert (
-        "summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)"
+        "summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows, locked_rows)"
         in router
     )
