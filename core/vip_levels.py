@@ -122,6 +122,12 @@ VIP_TOPUP_REBATE_PERCENT_LEGACY: dict[str, int] = {
     "白鑽魔丸": 4,
     "黑鑽魔丸": 5,
 }
+VIP_TOPUP_REBATE_PUBLIC_LEVELS: tuple[str, ...] = (
+    "白金魔丸",
+    "鑽石魔丸",
+    "白鑽魔丸",
+    "黑鑽魔丸",
+)
 
 VIP_DISCOUNT_PAY_RATES: dict[str, int] = {
     "普通魔丸": 100,
@@ -195,6 +201,14 @@ def get_topup_rebate_percent(
         else VIP_TOPUP_REBATE_PERCENT
     )
     return int(rates.get(str(level_name or "普通魔丸"), 0))
+
+
+def build_topup_rebate_public_summary() -> str:
+    """Return the public Discord/web summary from the current rebate policy."""
+    return "｜".join(
+        f"{level_name} {VIP_TOPUP_REBATE_PERCENT[level_name]}%"
+        for level_name in VIP_TOPUP_REBATE_PUBLIC_LEVELS
+    )
 
 
 def get_vip_retention_days(level_name: str | None) -> int:
