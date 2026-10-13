@@ -1,0 +1,64 @@
+name: Fix bulk payout notification target collection
+
+on:
+  push:
+    branches:
+      - fix/report-button-payout-notification-20261013
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/report-button-payout-notification-20261013
+          fetch-depth: 0
+      - name: Fix fetch_rows tuple handling and regression mock
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          router = Path('web/app/routers/admin_payout_summary.py')
+          source = router.read_text(encoding='utf-8')
+          old = '''def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:
+    targets: list[dict] = []
+    for person in fetch_rows(month, role, None, status="unpaid"):
+'''
+          new = '''def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:
+    targets: list[dict] = []
+    rows, _ = fetch_rows(month, role, None, status="unpaid")
+    for person in rows:
+'''
+          if source.count(old) != 1:
+              raise SystemExit(f'router pattern count={source.count(old)}')
+          router.write_text(source.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('tests/test_payout_notifications.py')
+          source = test.read_text(encoding='utf-8')
+          old = '        lambda month, role, q, status="unpaid": rows if status == "unpaid" else [],\n'
+          new = '        lambda month, role, q, status="unpaid": (rows, {}) if status == "unpaid" else ([], {}),\n'
+          if source.count(old) != 1:
+              raise SystemExit(f'test pattern count={source.count(old)}')
+          test.write_text(source.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Compile and verify
+        run: |
+          python -m compileall -q web/app/routers/admin_payout_summary.py
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('web/app/routers/admin_payout_summary.py').read_text(encoding='utf-8')
+          assert 'rows, _ = fetch_rows(month, role, None, status="unpaid")' in source
+          assert 'for person in rows:' in source
+          PY
+      - name: Commit fix
+        run: |
+          rm -f .github/workflows/fix_bulk_payout_target_unpack_once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/app/routers/admin_payout_summary.py tests/test_payout_notifications.py .github/workflows/fix_bulk_payout_target_unpack_once.yml
+          git diff --cached --check
+          git commit -m "Fix bulk payout notification target collection"
+          git push origin HEAD:fix/report-button-payout-notification-20261013
