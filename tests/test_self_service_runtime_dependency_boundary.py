@@ -11,7 +11,6 @@ def test_self_service_runtime_uses_canonical_module_owned_dependencies():
     assert self_service_runtime.ORDER_CATEGORY_LABELS is orders.ORDER_CATEGORY_LABELS
     assert self_service_runtime._to_int is orders._to_int
     assert self_service_runtime.build_self_service_order_embed is orders.build_self_service_order_embed
-    assert self_service_runtime.get_self_service_quantity_unit is orders.get_self_service_quantity_unit
     assert self_service_runtime.remember_claim_data is database.remember_claim_data
     assert self_service_runtime.remember_order_data is database.remember_order_data
     assert self_service_runtime.save_bot_data is database.save_bot_data
@@ -41,7 +40,6 @@ def test_module_owned_dependency_names_are_explicitly_guarded():
         "ORDER_CATEGORY_LABELS",
         "_to_int",
         "build_self_service_order_embed",
-        "get_self_service_quantity_unit",
         "remember_claim_data",
         "remember_order_data",
         "save_bot_data",

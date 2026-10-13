@@ -12,7 +12,6 @@ from services.orders import (
     ORDER_CATEGORY_LABELS,
     _to_int,
     build_self_service_order_embed,
-    get_self_service_quantity_unit,
 )
 from services.smart_dispatch import create_smart_dispatch_plan, set_specified_dm_results
 
@@ -76,7 +75,6 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "ORDER_CATEGORY_LABELS",
         "_to_int",
         "build_self_service_order_embed",
-        "get_self_service_quantity_unit",
         "remember_claim_data",
         "remember_order_data",
         "save_bot_data",
