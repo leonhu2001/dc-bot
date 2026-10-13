@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping
 
 import discord
+
+from core.database import remember_claim_data, remember_order_data, save_bot_data
+from core.permissions import is_customer_staff
+from core.time_utils import get_taipei_now_iso
+from services.orders import (
+    ORDER_CATEGORY_LABELS,
+    _to_int,
+    build_self_service_order_embed,
+)
+from services.smart_dispatch import create_smart_dispatch_plan, set_specified_dm_results
 
 from services.self_service_financials import (
     configure_self_service_financials,
@@ -54,17 +65,39 @@ from services.self_service_reorder import (
     create_reorder_ticket_from_closed_order,
 )
 
+# Dependencies with a stable owning module are imported directly above and must not
+# be replaced by the legacy bot.py namespace injection. Keeping this allow-list
+# explicit lets us shrink the remaining runtime surface incrementally without
+# changing the public Discord self-service entry points.
+_MODULE_OWNED_RUNTIME_NAMES = frozenset(
+    {
+        "json",
+        "ORDER_CATEGORY_LABELS",
+        "_to_int",
+        "build_self_service_order_embed",
+        "remember_claim_data",
+        "remember_order_data",
+        "save_bot_data",
+        "is_customer_staff",
+        "get_taipei_now_iso",
+        "create_smart_dispatch_plan",
+        "set_specified_dm_results",
+    }
+)
+
 _CONFIGURED = False
 
 
 def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind remaining bot-owned legacy dependencies after bot.py is loaded."""
+    """Bind only the remaining bot-owned legacy dependencies after bot.py is loaded."""
     global _CONFIGURED
 
     for name, value in namespace.items():
         if name.startswith("__"):
             continue
         if name == "configure_self_service_runtime":
+            continue
+        if name in _MODULE_OWNED_RUNTIME_NAMES:
             continue
         globals()[name] = value
 
