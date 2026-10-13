@@ -244,6 +244,7 @@ def mark_wallet_refund_failed(
     error: object,
     db_file: str | Path | None = None,
 ) -> None:
+    """Terminal failure: the refund did not debit the wallet and needs review."""
     ensure_wallet_refund_tables(db_file)
     path = _db_path(db_file)
     now_text = get_taipei_now_iso()
@@ -255,5 +256,26 @@ def mark_wallet_refund_failed(
             WHERE id=?
             """,
             (now_text, str(error or "退款處理失敗")[:1000], now_text, int(refund_id)),
+        )
+        conn.commit()
+
+
+def reset_wallet_refund_for_retry(
+    refund_id: int,
+    error: object,
+    db_file: str | Path | None = None,
+) -> None:
+    """Return an in-flight refund to the queue after a recoverable interruption."""
+    ensure_wallet_refund_tables(db_file)
+    path = _db_path(db_file)
+    now_text = get_taipei_now_iso()
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.execute(
+            """
+            UPDATE wallet_refund_requests
+            SET status='pending', error_message=?, updated_at=?
+            WHERE id=? AND status='processing'
+            """,
+            (str(error or "退款處理中斷，系統將自動重試")[:1000], now_text, int(refund_id)),
         )
         conn.commit()
