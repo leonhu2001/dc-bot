@@ -7,6 +7,16 @@ from typing import Any
 from core.time_utils import get_taipei_now_iso
 
 
+# Only money actually paid by the customer is refundable and may be used for
+# 100%-to-worker tips. Free credits / VIP top-up rebates stay spendable on
+# normal store services, but they are not cash-equivalent customer funds.
+_REFUNDABLE_CREDIT_TYPES = frozenset({"topup"})
+_BONUS_FIRST_DEBIT_TYPES = frozenset({
+    "topup_bonus_reversal",
+    "bonus_reversal",
+})
+
+
 def _db_path(db_file: str | Path | None = None) -> Path:
     if db_file is not None:
         return Path(db_file)
@@ -120,6 +130,125 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
             )
 
         conn.commit()
+
+
+def _consume_wallet_bucket(
+    *,
+    principal: int,
+    bonus: int,
+    debit: int,
+    bonus_first: bool,
+) -> tuple[int, int]:
+    """Consume wallet buckets without ever making either source negative."""
+    remaining = max(0, int(debit or 0))
+    principal = max(0, int(principal or 0))
+    bonus = max(0, int(bonus or 0))
+
+    if bonus_first:
+        take = min(bonus, remaining)
+        bonus -= take
+        remaining -= take
+        take = min(principal, remaining)
+        principal -= take
+    else:
+        take = min(principal, remaining)
+        principal -= take
+        remaining -= take
+        take = min(bonus, remaining)
+        bonus -= take
+
+    return principal, bonus
+
+
+def _wallet_fund_breakdown_from_conn(
+    conn: sqlite3.Connection,
+    customer_id: str | int,
+    *,
+    current_balance: int | None = None,
+) -> dict[str, int]:
+    """Rebuild refundable principal vs non-cash credit from the transaction ledger.
+
+    Normal spending consumes paid principal first. This intentionally makes the
+    refundable amount shrink as soon as a service is purchased, preventing a
+    customer from spending free credit first and later refunding all paid cash.
+
+    Historical/manual positive credits that are not an explicit `topup` are
+    classified conservatively as non-refundable. Any legacy wallet balance that
+    predates transaction history is also non-refundable because the system cannot
+    prove it was paid cash.
+    """
+    customer = str(customer_id)
+    principal = 0
+    bonus = 0
+
+    rows = conn.execute(
+        """
+        SELECT amount, type
+        FROM wallet_transactions
+        WHERE customer_discord_id = ?
+        ORDER BY id ASC
+        """,
+        (customer,),
+    ).fetchall()
+
+    for row in rows:
+        amount = int(row["amount"] or 0)
+        tx_type = str(row["type"] or "").strip()
+
+        if amount > 0:
+            if tx_type in _REFUNDABLE_CREDIT_TYPES:
+                principal += amount
+            else:
+                bonus += amount
+            continue
+
+        if amount < 0:
+            principal, bonus = _consume_wallet_bucket(
+                principal=principal,
+                bonus=bonus,
+                debit=abs(amount),
+                bonus_first=tx_type in _BONUS_FIRST_DEBIT_TYPES,
+            )
+
+    if current_balance is None:
+        row = conn.execute(
+            "SELECT balance FROM customer_wallets WHERE customer_discord_id=?",
+            (customer,),
+        ).fetchone()
+        current_balance = int(row["balance"] or 0) if row else 0
+
+    balance = max(0, int(current_balance or 0))
+    reconstructed = principal + bonus
+
+    if reconstructed < balance:
+        # Legacy balance without a traceable paid-cash source is usable store
+        # credit, but it must not become refundable cash by assumption.
+        bonus += balance - reconstructed
+    elif reconstructed > balance:
+        overflow = reconstructed - balance
+        remove_bonus = min(bonus, overflow)
+        bonus -= remove_bonus
+        overflow -= remove_bonus
+        if overflow > 0:
+            principal = max(0, principal - overflow)
+
+    return {
+        "balance": balance,
+        "refundable_principal": min(principal, balance),
+        "nonrefundable_credit": max(0, balance - min(principal, balance)),
+    }
+
+
+def get_wallet_fund_breakdown(
+    customer_id: str | int,
+    db_file: str | Path | None = None,
+) -> dict[str, int]:
+    """Return total balance, refundable paid principal and non-cash credit."""
+    ensure_wallet_tables(db_file)
+    path = _db_path(db_file)
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        return _wallet_fund_breakdown_from_conn(conn, customer_id)
 
 
 def get_wallet_balance(customer_id: str | int, db_file: str | Path | None = None) -> int:
@@ -297,6 +426,21 @@ def adjust_wallet_balance(
             (str(customer_id),),
         ).fetchone()
         before = int(row["balance"] or 0) if row else 0
+
+        if normalized_type == "tip_payment" and amount < 0:
+            funds = _wallet_fund_breakdown_from_conn(
+                conn,
+                customer_id,
+                current_balance=before,
+            )
+            principal = int(funds["refundable_principal"])
+            if abs(amount) > principal:
+                raise ValueError(
+                    "雞腿／打賞只能使用實付儲值本金。"
+                    f"目前可用本金 {principal:,}T，"
+                    f"不足支付 {abs(amount):,}T。"
+                )
+
         after = before + amount
         if after < 0 and not allow_negative:
             raise ValueError(
