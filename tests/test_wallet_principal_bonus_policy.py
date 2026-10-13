@@ -101,11 +101,8 @@ def test_tip_cannot_use_bonus_balance_but_can_use_cash_backed_principal(tmp_path
     db = tmp_path / "bot.db"
     adjust_wallet_balance(customer_id="1", amount=100, tx_type="topup", db_file=db)
     adjust_wallet_balance(customer_id="1", amount=20, tx_type="topup_bonus", db_file=db)
-    adjust_wallet_balance(customer_id="1", amount=-20, tx_type="payment", db_file=db)
 
-    assert get_tip_eligible_wallet_balance("1", db) == 100
-    assert get_refundable_wallet_balance("1", db) == 80
-
+    # 總額 120T，但雞腿只能動用 100T 實付本金。
     with pytest.raises(ValueError, match="雞腿只能使用實付本金"):
         adjust_wallet_balance(
             customer_id="1",
@@ -114,6 +111,12 @@ def test_tip_cannot_use_bonus_balance_but_can_use_cash_backed_principal(tmp_path
             order_no="ORDER-1:TIP-1",
             db_file=db,
         )
+
+    # 一般點單先花 20T 贈額後，本金仍可拿來雞腿；
+    # 這筆本金消費同時會沖掉先前形成的 20T 退款抵扣額。
+    adjust_wallet_balance(customer_id="1", amount=-20, tx_type="payment", db_file=db)
+    assert get_tip_eligible_wallet_balance("1", db) == 100
+    assert get_refundable_wallet_balance("1", db) == 80
 
     adjust_wallet_balance(
         customer_id="1",
