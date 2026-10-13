@@ -4,6 +4,8 @@ from typing import Any, Mapping
 
 import discord
 
+from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD
+
 from services.order_credential_runtime import (
     configure_order_credentials,
     _order_requires_credentials,
@@ -113,7 +115,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
         "ORDER_CLAIMS",
         "SELF_SERVICE_ORDER_SELECTIONS",
         "StaffOrderOperationView",
-        "WALLET_PAYMENT_METHOD",
         "_build_receiver_text_from_claim_data",
         "_to_int",
         "add_customer_reward_from_order",
@@ -140,7 +141,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
             payment_method_view=PaymentMethodView,
             self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
             staff_order_operation_view=namespace["StaffOrderOperationView"],
-            wallet_payment_method=namespace["WALLET_PAYMENT_METHOD"],
             receiver_text_builder=namespace["_build_receiver_text_from_claim_data"],
             to_int=namespace["_to_int"],
             customer_reward_adder=namespace["add_customer_reward_from_order"],
