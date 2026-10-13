@@ -129,11 +129,18 @@ class SetupCommands(commands.Cog):
 
     @setup.command(
         name="topup_panel",
-        description="建立魔丸娛樂儲值中心面板",
+        description="建立或更新魔丸娛樂儲值中心面板",
+    )
+    @app_commands.describe(
+        message_id="要原地更新的 Panel 訊息 ID；不填則建立新 Panel",
     )
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.default_permissions(manage_messages=True)
-    async def setup_topup_panel(self, interaction: discord.Interaction):
+    async def setup_topup_panel(
+        self,
+        interaction: discord.Interaction,
+        message_id: str | None = None,
+    ):
         if not isinstance(interaction.channel, discord.TextChannel):
             await interaction.response.send_message("請在文字頻道使用這個指令。", ephemeral=True)
             return
@@ -149,7 +156,69 @@ class SetupCommands(commands.Cog):
             ),
             color=discord.Color.gold(),
         )
-        await interaction.channel.send(embed=embed, view=TopupPanelView())
+        view = TopupPanelView()
+
+        if message_id:
+            raw_message_id = str(message_id).strip()
+            if not raw_message_id.isdigit():
+                await interaction.response.send_message(
+                    "訊息 ID 格式不正確，請貼上純數字訊息 ID。",
+                    ephemeral=True,
+                )
+                return
+
+            target_message_id = int(raw_message_id)
+            try:
+                target_message = await interaction.channel.fetch_message(target_message_id)
+            except discord.NotFound:
+                await interaction.response.send_message(
+                    "找不到這則訊息，請確認是在該 Panel 所在的頻道執行指令。",
+                    ephemeral=True,
+                )
+                return
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "Bot 沒有讀取或編輯這個頻道訊息的權限。",
+                    ephemeral=True,
+                )
+                return
+            except discord.HTTPException as exc:
+                await interaction.response.send_message(
+                    f"讀取 Panel 失敗：{exc}",
+                    ephemeral=True,
+                )
+                return
+
+            bot_user = self.bot.user
+            if bot_user is None or target_message.author.id != bot_user.id:
+                await interaction.response.send_message(
+                    "只能更新由目前 Bot 自己發送的 Panel 訊息。",
+                    ephemeral=True,
+                )
+                return
+
+            try:
+                await target_message.edit(embed=embed, view=view)
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    "Bot 沒有編輯這則 Panel 的權限。",
+                    ephemeral=True,
+                )
+                return
+            except discord.HTTPException as exc:
+                await interaction.response.send_message(
+                    f"更新 Panel 失敗：{exc}",
+                    ephemeral=True,
+                )
+                return
+
+            await interaction.response.send_message(
+                f"儲值中心 Panel `{target_message_id}` 已原地更新。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.channel.send(embed=embed, view=view)
         await interaction.response.send_message("儲值中心面板已建立。", ephemeral=True)
 
     @setup.command(
