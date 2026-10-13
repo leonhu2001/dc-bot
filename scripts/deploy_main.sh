@@ -374,7 +374,7 @@ SOURCE_UPDATED=1
 
 if [ "$(git rev-parse HEAD)" != "$TARGET" ]; then
     echo "ERROR: HEAD does not match target."
-    exit 1
+    false
 fi
 
 echo "PASS: source updated"
