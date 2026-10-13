@@ -132,20 +132,17 @@ def test_topup_rebate_uses_effective_level_during_downgrade_reset():
         "vip_progress_base_total_spent": 10965,
     }
 
-    preview = calculate_member_topup_preview(
-        data,
-        1035,
-    )
+    preview = calculate_member_topup_preview(data, 1035)
 
     # 歷史累積會到 12,000T，但降級後只重新累積 1,035T，
-    # 所以仍是普通魔丸，不能提前拿白金 2% 返利。
+    # 所以仍是普通魔丸，不能提前拿白金返利。
     assert preview["vip_total_after"] == 12000
     assert preview["vip_level_after"] == "普通魔丸"
     assert preview["rebate_percent"] == 0
     assert preview["credited_amount"] == 1035
 
 
-def test_topup_reaching_effective_platinum_gets_two_percent_rebate():
+def test_topup_reaching_effective_platinum_gets_one_percent_rebate():
     data = {
         "total_spent": 25000,
         "vip_level_index": 2,
@@ -159,16 +156,13 @@ def test_topup_reaching_effective_platinum_gets_two_percent_rebate():
         ],
     }
 
-    preview = calculate_member_topup_preview(
-        data,
-        6000,
-    )
+    preview = calculate_member_topup_preview(data, 6000)
 
     assert preview["vip_level_before"] == "金級魔丸"
     assert preview["vip_level_after"] == "白金魔丸"
-    assert preview["rebate_percent"] == 2
-    assert preview["rebate_amount"] == 120
-    assert preview["credited_amount"] == 6120
+    assert preview["rebate_percent"] == 1
+    assert preview["rebate_amount"] == 60
+    assert preview["credited_amount"] == 6060
 
 
 def test_legacy_ordinary_reset_equal_to_current_total_is_preserved():
