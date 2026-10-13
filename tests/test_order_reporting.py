@@ -137,3 +137,14 @@ def test_reporting_status_badges_use_static_csp_safe_styles():
     assert ".order-report-nav-count" in css_source
     assert "order-report-history-status-style" not in ui_source
     assert 'document.createElement("style")' not in ui_source
+
+
+def test_report_reminder_dm_uses_discord_link_button_instead_of_raw_url():
+    root = Path(__file__).resolve().parents[1]
+    runtime_source = (root / "web/app/services/order_reporting.py").read_text(encoding="utf-8")
+    assert '"components": [' in runtime_source
+    assert '"style": 5' in runtime_source
+    assert '"label": "填寫報單"' in runtime_source
+    assert '"url": report_url' in runtime_source
+    assert '"emoji": {"name": "📝"}' in runtime_source
+    assert 'f"填寫報單：{report_url}"' not in runtime_source

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from web.app.services.audit_trail import write_sqlite_audit_log
+from web.app.services.payout_notifications import send_payout_paid_notification
 from web.app.services.internal_transfers import (
     ensure_internal_transfer_tables,
     mark_bulk_adjustments,
@@ -956,6 +957,47 @@ async def admin_month_options(request: Request):
     return {"ok": True, "months": get_summary_month_options()}
 
 
+def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:
+    targets: list[dict] = []
+    for person in fetch_rows(month, role, None, status="unpaid"):
+        person_id = str(person.get("discord_id") or "").strip()
+        person_role = str(person.get("role") or "all").strip() or "all"
+        if not person_id:
+            continue
+        targets.append(
+            {
+                "person_id": person_id,
+                "person_role": person_role,
+                "before": _audit_payout_state(
+                    month,
+                    person_role,
+                    person_id=person_id,
+                ),
+            }
+        )
+    return targets
+
+
+def _send_bulk_payout_paid_notifications(targets: list[dict]) -> None:
+    for target in targets:
+        try:
+            send_payout_paid_notification(
+                db_file=db_path(),
+                person_id=target["person_id"],
+                before=target["before"],
+                after={
+                    "target_status": "paid",
+                    "person_role": target["person_role"],
+                },
+            )
+        except Exception as exc:
+            print(
+                "[payout_notification] bulk delivery failed:",
+                target.get("person_id"),
+                repr(exc),
+            )
+
+
 @router.post("/admin/payouts/summary/mark-paid")
 async def mark_summary_payouts_paid(request: Request):
     user = require_manager(request)
@@ -965,6 +1007,7 @@ async def mark_summary_payouts_paid(request: Request):
     form = await request.form()
     month = str(form.get("month") or "").strip()
     role = str(form.get("role") or "all").strip()
+    notification_targets = _collect_bulk_payout_notification_targets(month, role)
     before = _audit_payout_state(month, role)
     update_summary_payout_status(month, role, "paid")
     after = _audit_payout_state(month, role)
@@ -978,6 +1021,7 @@ async def mark_summary_payouts_paid(request: Request):
         reason="批次標記薪資已發放",
         db_file=db_path(),
     )
+    _send_bulk_payout_paid_notifications(notification_targets)
     return RedirectResponse(
         url=build_summary_bulk_redirect(month, "paid", role),
         status_code=303,

@@ -164,3 +164,76 @@ def test_salary_notification_is_compact_and_links_employee_center(tmp_path, monk
     assert "1筆" in embed_text
     assert "https://mowanentertainment.com/employee" in embed_text
     assert "MW-1001" not in embed_text
+
+
+def test_single_person_paid_audit_hook_stays_connected(tmp_path, monkeypatch):
+    from web.app.services import audit_trail
+    captured = []
+
+    def fake_send_payout_paid_notification(**kwargs):
+        captured.append(kwargs)
+        return {"sent": True, "total": 321}
+
+    monkeypatch.setattr(payout_notifications, "send_payout_paid_notification", fake_send_payout_paid_notification)
+    audit_trail.write_sqlite_audit_log(
+        admin_discord_id="999",
+        action="set_person_payout_status",
+        target_type="payout_person",
+        target_id="123",
+        before=_snapshot(worker_unpaid=1),
+        after={**_snapshot(), "target_status": "paid", "person_role": "worker"},
+        db_file=tmp_path / "audit.db",
+    )
+    assert len(captured) == 1
+    assert str(captured[0]["person_id"]) == "123"
+    assert captured[0]["after"]["target_status"] == "paid"
+
+
+def test_bulk_paid_notification_targets_only_capture_currently_unpaid_people(monkeypatch):
+    from web.app.routers import admin_payout_summary
+    rows = [
+        {"discord_id": "101", "role": "worker"},
+        {"discord_id": "202", "role": "customer_service"},
+    ]
+    snapshots = []
+    monkeypatch.setattr(
+        admin_payout_summary,
+        "fetch_rows",
+        lambda month, role, q, status="unpaid": rows if status == "unpaid" else [],
+    )
+
+    def fake_snapshot(month, role, *, person_id=None):
+        snapshots.append((month, role, person_id))
+        return _snapshot(
+            worker_unpaid=1 if role == "worker" else 0,
+            cs_unpaid=1 if role == "customer_service" else 0,
+        )
+
+    monkeypatch.setattr(admin_payout_summary, "_audit_payout_state", fake_snapshot)
+    targets = admin_payout_summary._collect_bulk_payout_notification_targets("2026-10", "all")
+    assert [item["person_id"] for item in targets] == ["101", "202"]
+    assert snapshots == [
+        ("2026-10", "worker", "101"),
+        ("2026-10", "customer_service", "202"),
+    ]
+
+
+def test_bulk_paid_notification_failure_isolated_per_person(monkeypatch):
+    from web.app.routers import admin_payout_summary
+    calls = []
+
+    def fake_send(**kwargs):
+        calls.append(str(kwargs["person_id"]))
+        if str(kwargs["person_id"]) == "101":
+            raise RuntimeError("DM blocked")
+        return {"sent": True}
+
+    monkeypatch.setattr(admin_payout_summary, "send_payout_paid_notification", fake_send)
+    monkeypatch.setattr(admin_payout_summary, "db_path", lambda: "unused.db")
+    admin_payout_summary._send_bulk_payout_paid_notifications(
+        [
+            {"person_id": "101", "person_role": "worker", "before": _snapshot(worker_unpaid=1)},
+            {"person_id": "202", "person_role": "worker", "before": _snapshot(worker_unpaid=1)},
+        ]
+    )
+    assert calls == ["101", "202"]
