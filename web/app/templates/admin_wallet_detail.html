@@ -10,15 +10,24 @@
             <h2>{{ wallet.customer_display_name }}</h2>
             <p>Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span></p>
         </div>
-
     </section>
+
+    {% if refund_ok %}<div class="admin-alert admin-alert-success">{{ refund_ok }}</div>{% endif %}
+    {% if refund_error %}<div class="admin-alert admin-alert-danger">{{ refund_error }}</div>{% endif %}
 
     <section class="wallet-detail-stats">
         <article class="wallet-detail-stat">
             <span>目前餘額</span>
             <strong>{{ wallet.balance_text }}</strong>
         </article>
-
+        <article class="wallet-detail-stat">
+            <span>可退款實付本金</span>
+            <strong>{{ refund_preview.refundable_principal_text }}</strong>
+        </article>
+        <article class="wallet-detail-stat">
+            <span>贈額／非現金額度</span>
+            <strong>{{ refund_preview.nonrefundable_credit_text }}</strong>
+        </article>
         <article class="wallet-detail-stat">
             <span>最後更新</span>
             <strong>{{ wallet.updated_at_text or "—" }}</strong>
@@ -28,10 +37,40 @@
     <section class="wallet-detail-panel">
         <div class="wallet-detail-head">
             <div>
+                <p class="order-no">REFUND</p>
+                <h3>退還未使用儲值本金</h3>
+            </div>
+        </div>
+
+        {% if refund_preview.manual_review_required %}
+            <div class="member-alert">
+                本月已有 VIP 月福利使用紀錄，需先人工結算福利價值，暫不開放自動退款。
+            </div>
+        {% elif refund_preview.refundable_principal > 0 %}
+            <form method="post" action="/admin/wallets/{{ wallet.customer_discord_id }}/refund-principal">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                <p>
+                    本次將退還 <strong>{{ refund_preview.refundable_principal_text }}</strong> 實付本金，
+                    並取消尚存的儲值返利 <strong>{{ refund_preview.topup_bonus_to_cancel_text }}</strong>；
+                    VIP 累積與等級由 Bot 自動回滾。
+                </p>
+                <label>退款原因</label>
+                <input name="reason" type="text" maxlength="300" placeholder="例如：顧客申請退還未使用儲值本金">
+                <button class="button" type="submit" onclick="return confirm('確定送出退款申請？送出後 Bot 會自動扣回錢包額度並重算 VIP。')">
+                    送出退款申請
+                </button>
+            </form>
+        {% else %}
+            <p>目前沒有可退款的實付儲值本金。</p>
+        {% endif %}
+    </section>
+
+    <section class="wallet-detail-panel">
+        <div class="wallet-detail-head">
+            <div>
                 <p class="order-no">TRANSACTION LOG</p>
                 <h3>錢包異動流水</h3>
             </div>
-
             <form class="wallet-limit-form" method="get" action="/admin/wallets/{{ wallet.customer_discord_id }}">
                 <input type="hidden" name="return_to" value="{{ request.query_params.get('return_to', '') }}">
                 <input type="number" name="limit" min="1" max="300" value="{{ limit }}">
@@ -43,14 +82,8 @@
             <table class="wallet-table">
                 <thead>
                     <tr>
-                        <th>時間</th>
-                        <th>類型</th>
-                        <th>異動</th>
-                        <th>異動前</th>
-                        <th>異動後</th>
-                        <th>訂單</th>
-                        <th>操作人</th>
-                        <th>備註</th>
+                        <th>時間</th><th>類型</th><th>異動</th><th>異動前</th>
+                        <th>異動後</th><th>訂單</th><th>操作人</th><th>備註</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -58,33 +91,19 @@
                     <tr>
                         <td>{{ tx.created_at_text or "—" }}</td>
                         <td><span class="wallet-pill">{{ tx.type_label }}</span></td>
-                        <td class="wallet-amount {% if tx.amount > 0 %}wallet-plus{% else %}wallet-minus{% endif %}">
-                            {{ tx.amount_text }}
-                        </td>
+                        <td class="wallet-amount {% if tx.amount > 0 %}wallet-plus{% else %}wallet-minus{% endif %}">{{ tx.amount_text }}</td>
                         <td>{{ tx.balance_before_text }}</td>
                         <td>{{ tx.balance_after_text }}</td>
+                        <td>{% if tx.order_no %}<span class="wallet-code">{{ tx.order_no }}</span>{% else %}—{% endif %}</td>
                         <td>
-                            {% if tx.order_no %}
-                                <span class="wallet-code">{{ tx.order_no }}</span>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if tx.operator_display_name %}
-                                {{ tx.operator_display_name }}
-                            {% elif tx.operator_discord_id %}
-                                <span class="wallet-code">{{ tx.operator_discord_id }}</span>
-                            {% else %}
-                                —
-                            {% endif %}
+                            {% if tx.operator_display_name %}{{ tx.operator_display_name }}
+                            {% elif tx.operator_discord_id %}<span class="wallet-code">{{ tx.operator_discord_id }}</span>
+                            {% else %}—{% endif %}
                         </td>
                         <td class="wallet-note">{{ tx.note or "—" }}</td>
                     </tr>
                     {% else %}
-                    <tr>
-                        <td colspan="8" class="wallet-empty">目前沒有錢包流水。</td>
-                    </tr>
+                    <tr><td colspan="8" class="wallet-empty">目前沒有錢包流水。</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
