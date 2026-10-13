@@ -4,6 +4,8 @@ from typing import Callable
 
 import discord
 
+from services.payment_methods import WALLET_PAYMENT_METHOD
+
 from services.order_credential_runtime import (
     _order_requires_credentials,
     ensure_order_credential_request,
@@ -30,7 +32,6 @@ def configure_order_payment_runtime(
     payment_method_view,
     self_service_order_selections: dict,
     staff_order_operation_view,
-    wallet_payment_method: str,
     receiver_text_builder: Callable,
     to_int: Callable,
     customer_reward_adder: Callable,
@@ -52,7 +53,7 @@ def configure_order_payment_runtime(
     global _CONFIGURED
     global DISPATCH_CHANNEL_ID, DispatchClaimView, ORDER_CATEGORY_LABELS, ORDER_CLAIMS
     global PaymentMethodView, SELF_SERVICE_ORDER_SELECTIONS, StaffOrderOperationView
-    global WALLET_PAYMENT_METHOD, _build_receiver_text_from_claim_data, _to_int
+    global _build_receiver_text_from_claim_data, _to_int
     global add_customer_reward_from_order, adjust_customer_wallet_balance
     global build_payment_method_embed, build_self_service_order_embed
     global ensure_payment_submit_receipt, fetch_member_safely, format_t_amount
@@ -66,7 +67,6 @@ def configure_order_payment_runtime(
     PaymentMethodView = payment_method_view
     SELF_SERVICE_ORDER_SELECTIONS = self_service_order_selections
     StaffOrderOperationView = staff_order_operation_view
-    WALLET_PAYMENT_METHOD = str(wallet_payment_method)
     _build_receiver_text_from_claim_data = receiver_text_builder
     _to_int = to_int
     add_customer_reward_from_order = customer_reward_adder

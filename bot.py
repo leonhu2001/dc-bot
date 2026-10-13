@@ -367,6 +367,10 @@ from services.orders import (
     build_stored_order_detail_embed,
 )
 
+from services.payment_methods import (
+    PAYMENT_METHOD_OPTIONS,
+    WALLET_PAYMENT_METHOD,
+)
 from services.order_flow import (
     build_payment_method_embed,
     get_payment_method_info,
@@ -1513,13 +1517,6 @@ COMPANION_PREFERENCE_OPTIONS = [
     "指定陪玩/打手",
 ]
 
-PAYMENT_METHOD_OPTIONS = [
-    "街口",
-    "轉帳",
-    "我的錢包",
-]
-
-WALLET_PAYMENT_METHOD = "我的錢包"
 
 
 
