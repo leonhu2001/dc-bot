@@ -217,7 +217,8 @@ def fetch_wallets(keyword: str | None = None) -> list[dict]:
 def fetch_wallet_detail(
     customer_discord_id: str,
     limit: int = 100,
-) -> tuple[dict, list[dict], list[dict]]:
+) -> tuple[dict, list[dict]]:
+    """Keep the long-standing two-value helper contract for callers/tests."""
     ensure_wallet_tables()
     safe_limit = max(1, min(int(limit or 100), 300))
 
@@ -285,6 +286,10 @@ def fetch_wallet_detail(
         tx["created_at_text"] = format_wallet_datetime(tx.get("created_at"))
         transactions.append(tx)
 
+    return wallet, transactions
+
+
+def fetch_wallet_refunds(customer_discord_id: str) -> list[dict]:
     refunds = list_customer_wallet_refunds(
         customer_discord_id,
         limit=20,
@@ -295,8 +300,7 @@ def fetch_wallet_detail(
         refund["bonus_revoked_text"] = format_t_amount(refund.get("bonus_revoked_amount"))
         refund["created_at_text"] = format_wallet_datetime(refund.get("created_at"))
         refund["completed_at_text"] = format_wallet_datetime(refund.get("completed_at"))
-
-    return wallet, transactions, refunds
+    return refunds
 
 
 def _admin_display_name(user: dict) -> str:
@@ -355,10 +359,11 @@ async def admin_wallet_detail(
     if not user:
         return RedirectResponse("/admin", status_code=303)
 
-    wallet, transactions, refunds = fetch_wallet_detail(
+    wallet, transactions = fetch_wallet_detail(
         customer_discord_id,
         limit=limit,
     )
+    refunds = fetch_wallet_refunds(customer_discord_id)
 
     return templates.TemplateResponse(
         request=request,
