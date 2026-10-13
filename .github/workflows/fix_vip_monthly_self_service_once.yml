@@ -1,0 +1,27 @@
+name: Fix VIP monthly self-service
+on:
+  push:
+    branches: [fix/vip-monthly-self-service-and-individual-payout-dm-20261013]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/vip-monthly-self-service-and-individual-payout-dm-20261013
+          fetch-depth: 0
+      - name: Apply repair
+        run: python tools/one_shot_fix_vip_monthly_self_service.py
+      - name: Compile changed runtime
+        run: python -m compileall -q services/vip_monthly_benefits.py services/self_service_selection_runtime.py services/self_service_financials.py services/self_service_runtime.py shared/web_order_sync.py web/app/services/payout_notifications.py
+      - name: Commit repair
+        run: |
+          rm -f .github/workflows/fix_vip_monthly_self_service_once.yml tools/one_shot_fix_vip_monthly_self_service.py
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add -A
+          git diff --cached --check
+          git commit -m "Wire VIP monthly cash vouchers into self-service checkout"
+          git push origin HEAD:fix/vip-monthly-self-service-and-individual-payout-dm-20261013
