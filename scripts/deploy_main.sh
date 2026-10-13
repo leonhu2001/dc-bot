@@ -7,7 +7,12 @@ WEB_SERVICE="${WEB_SERVICE:-dc-bot-dashboard.service}"
 WEB_UNIT_PATH="${WEB_UNIT_PATH:-/etc/systemd/system/$WEB_SERVICE}"
 NGINX_CONFIG_SOURCE="$APP/nginx_dc_bot_dashboard.conf"
 NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-}"
+MARKER_PATH="$APP/data/deployed_version.json"
 TARGET="${1:-}"
+SERVICE_ACTIVE_ATTEMPTS="${DEPLOY_SERVICE_ACTIVE_ATTEMPTS:-20}"
+SERVICE_ACTIVE_INTERVAL="${DEPLOY_SERVICE_ACTIVE_INTERVAL_SECONDS:-1}"
+STABILITY_SAMPLES="${DEPLOY_STABILITY_SAMPLES:-5}"
+STABILITY_INTERVAL="${DEPLOY_STABILITY_INTERVAL_SECONDS:-2}"
 
 if [ -z "$TARGET" ]; then
     echo "Usage: $0 <target-commit>"
@@ -45,6 +50,146 @@ DEPENDENCY_SYNC_NEEDED=0
 WEB_UNIT_UPDATED=0
 NGINX_CONFIG_UPDATED=0
 SERVICES_RESTARTED=0
+MARKER_EXISTED=0
+MARKER_UPDATED=0
+
+get_service_state() {
+    local service="$1"
+    local state
+
+    state="$(systemctl is-active "$service" 2>/dev/null || true)"
+    if [ -n "$state" ]; then
+        printf '%s' "$state"
+    else
+        printf 'unknown'
+    fi
+}
+
+get_service_restart_count() {
+    local service="$1"
+    local value
+
+    value="$(systemctl show "$service" -p NRestarts --value 2>/dev/null || true)"
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+        printf '%s' "$value"
+    else
+        printf 'unknown'
+    fi
+}
+
+print_service_diagnostics() {
+    local service="$1"
+    local label="$2"
+    local state restarts
+
+    state="$(get_service_state "$service")"
+    restarts="$(get_service_restart_count "$service")"
+    echo "$label state: $state"
+    echo "$label NRestarts: $restarts"
+    systemctl status "$service" --no-pager || true
+    journalctl -u "$service" -n 100 --no-pager || true
+}
+
+wait_for_service_active() {
+    local service="$1"
+    local label="$2"
+    local attempt state
+
+    for attempt in $(seq 1 "$SERVICE_ACTIVE_ATTEMPTS"); do
+        state="$(get_service_state "$service")"
+        if [ "$state" = "active" ]; then
+            echo "$label: active"
+            return 0
+        fi
+
+        if [ "$attempt" -lt "$SERVICE_ACTIVE_ATTEMPTS" ]; then
+            sleep "$SERVICE_ACTIVE_INTERVAL"
+        fi
+    done
+
+    echo "ERROR: $label failed to become active after $SERVICE_ACTIVE_ATTEMPTS checks."
+    print_service_diagnostics "$service" "$label"
+    return 1
+}
+
+verify_service_stability() {
+    local service="$1"
+    local label="$2"
+    local baseline_restarts current_restarts state sample
+
+    baseline_restarts="$(get_service_restart_count "$service")"
+    state="$(get_service_state "$service")"
+    echo "$label stability baseline: state=$state NRestarts=$baseline_restarts"
+
+    if [ "$state" != "active" ]; then
+        echo "ERROR: $label is not active at the start of the stability window."
+        print_service_diagnostics "$service" "$label"
+        return 1
+    fi
+
+    for sample in $(seq 1 "$STABILITY_SAMPLES"); do
+        sleep "$STABILITY_INTERVAL"
+        state="$(get_service_state "$service")"
+        current_restarts="$(get_service_restart_count "$service")"
+        echo "$label stability $sample/$STABILITY_SAMPLES: state=$state NRestarts=$current_restarts"
+
+        if [ "$state" != "active" ]; then
+            echo "ERROR: $label left active state during deployment stabilization."
+            print_service_diagnostics "$service" "$label"
+            return 1
+        fi
+
+        if [[ "$baseline_restarts" =~ ^[0-9]+$ ]] \
+            && [[ "$current_restarts" =~ ^[0-9]+$ ]] \
+            && (( current_restarts > baseline_restarts )); then
+            echo "ERROR: $label restarted during deployment stabilization ($baseline_restarts -> $current_restarts)."
+            print_service_diagnostics "$service" "$label"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+write_deployment_marker() {
+    local commit="$1"
+    local previous_commit="$2"
+    local deployed_at="$3"
+    local subject="$4"
+    local status="$5"
+    local failed_target="${6:-}"
+
+    mkdir -p "$APP/data"
+    "$APP/venv/bin/python" - \
+        "$MARKER_PATH" \
+        "$commit" \
+        "$previous_commit" \
+        "$deployed_at" \
+        "$subject" \
+        "$status" \
+        "$failed_target" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = {
+    "commit": sys.argv[2],
+    "previous_commit": sys.argv[3],
+    "branch": "main",
+    "deployed_at": sys.argv[4],
+    "subject": sys.argv[5],
+    "status": sys.argv[6],
+}
+if sys.argv[7]:
+    payload["failed_target"] = sys.argv[7]
+path.write_text(
+    json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+PY
+    chmod 0644 "$MARKER_PATH"
+}
 
 restart_services() {
     local started_at finished_at elapsed_ms
@@ -61,6 +206,7 @@ restart_services() {
 
 rollback() {
     local rc=$?
+    local rollback_subject rollback_at
     trap - ERR
     set +e
 
@@ -101,8 +247,29 @@ rollback() {
     if [ "$SERVICES_RESTARTED" -eq 1 ]; then
         restart_services || true
 
-        echo "Bot after rollback: $(systemctl is-active "$BOT_SERVICE" || true)"
-        echo "Web after rollback: $(systemctl is-active "$WEB_SERVICE" || true)"
+        echo "Bot after rollback: $(get_service_state "$BOT_SERVICE")"
+        echo "Web after rollback: $(get_service_state "$WEB_SERVICE")"
+    fi
+
+    # A failed deployment must never leave a marker that claims the failed target
+    # is live. Reconcile the marker to the source we actually rolled back to.
+    if [ "$SOURCE_UPDATED" -eq 1 ]; then
+        rollback_subject="$(git log -1 --format=%s "$OLD_HEAD" 2>/dev/null || echo rollback)"
+        rollback_at="$(date --iso-8601=seconds 2>/dev/null || date)"
+        if write_deployment_marker \
+            "$OLD_HEAD" \
+            "$TARGET" \
+            "$rollback_at" \
+            "$rollback_subject" \
+            "rolled_back" \
+            "$TARGET"; then
+            echo "PASS: deployment marker reconciled to rollback source"
+        elif [ "$MARKER_EXISTED" -eq 1 ] && [ -f "$BACKUP/deployed_version.json" ]; then
+            echo "WARN: marker reconciliation failed; restoring previous marker backup"
+            install -m 0644 "$BACKUP/deployed_version.json" "$MARKER_PATH" || true
+        elif [ "$MARKER_UPDATED" -eq 1 ]; then
+            rm -f "$MARKER_PATH" || true
+        fi
     fi
 
     echo "Database backup retained at: $BACKUP"
@@ -134,11 +301,13 @@ if [ -n "$DIRTY_WORKTREE" ]; then
     exit 1
 fi
 
-if [ -e "$APP/data/deployed_version.json" ]; then
-    echo "PASS: ignored runtime marker data/deployed_version.json"
-fi
-
 mkdir -p "$BACKUP"
+
+if [ -f "$MARKER_PATH" ]; then
+    cp -L "$MARKER_PATH" "$BACKUP/deployed_version.json"
+    MARKER_EXISTED=1
+    echo "PASS: deployment marker backup"
+fi
 
 for db_name in bot.db web_dashboard.db; do
     if [ -e "$APP/$db_name" ]; then
@@ -229,7 +398,7 @@ fi
 echo
 
 echo "=== 5. PYTHON COMPILE CHECK ==="
-/opt/dc-bot/venv/bin/python -m compileall -q \
+"$APP/venv/bin/python" -m compileall -q \
     bot.py \
     cogs \
     core \
@@ -253,8 +422,8 @@ runuser -u dc-bot-web -- env PYTHONPATH="$APP" \
 echo
 
 echo "=== 7. OPTIONAL VPS TESTS ==="
-if /opt/dc-bot/venv/bin/python -c "import pytest" >/dev/null 2>&1; then
-    /opt/dc-bot/venv/bin/python -m pytest -q --ignore=tests/e2e
+if "$APP/venv/bin/python" -c "import pytest" >/dev/null 2>&1; then
+    "$APP/venv/bin/python" -m pytest -q --ignore=tests/e2e
 else
     echo "SKIP: pytest is intentionally not required on production VPS."
 fi
@@ -291,21 +460,11 @@ echo "Web stop timeout: $(systemctl show "$WEB_SERVICE" -p TimeoutStopUSec --val
 SERVICES_RESTARTED=1
 restart_services
 
-BOT_STATE="$(systemctl is-active "$BOT_SERVICE" || true)"
-WEB_STATE="$(systemctl is-active "$WEB_SERVICE" || true)"
-
-echo "Bot: $BOT_STATE"
-echo "Web: $WEB_STATE"
-
-if [ "$BOT_STATE" != "active" ]; then
-    echo "ERROR: Bot failed to become active."
-    journalctl -u "$BOT_SERVICE" -n 80 --no-pager || true
+if ! wait_for_service_active "$BOT_SERVICE" "Bot"; then
     false
 fi
 
-if [ "$WEB_STATE" != "active" ]; then
-    echo "ERROR: Web failed to become active."
-    journalctl -u "$WEB_SERVICE" -n 80 --no-pager || true
+if ! wait_for_service_active "$WEB_SERVICE" "Web"; then
     false
 fi
 
@@ -329,58 +488,61 @@ done
 if [ "$HEALTH_OK" -ne 1 ]; then
     echo "ERROR: Web health endpoint did not become ready after 15 attempts."
     curl --fail --silent --show-error --max-time 3 "$HEALTH_URL" || true
-    journalctl -u "$WEB_SERVICE" -n 80 --no-pager || true
+    print_service_diagnostics "$WEB_SERVICE" "Web"
     false
 fi
 
 printf '%s\n' "$HEALTH_RESPONSE"
 echo
+
+echo "=== 10. FINAL STABILITY CHECK ==="
+if ! FINAL_HEAD="$(git rev-parse HEAD)"; then
+    echo "ERROR: failed to resolve final HEAD."
+    false
+fi
+
+echo "HEAD: $FINAL_HEAD"
+if [ "$FINAL_HEAD" != "$TARGET" ]; then
+    echo "ERROR: final HEAD no longer matches deployment target."
+    false
+fi
+
+if ! verify_service_stability "$BOT_SERVICE" "Bot"; then
+    false
+fi
+
+if ! verify_service_stability "$WEB_SERVICE" "Web"; then
+    false
+fi
+
+BOT_FINAL_STATE="$(get_service_state "$BOT_SERVICE")"
+WEB_FINAL_STATE="$(get_service_state "$WEB_SERVICE")"
+echo "Bot:  $BOT_FINAL_STATE"
+echo "Web:  $WEB_FINAL_STATE"
+if [ -n "$NGINX_CONFIG_PATH" ]; then
+    NGINX_FINAL_STATE="$(get_service_state nginx)"
+    echo "Nginx: $NGINX_FINAL_STATE"
+fi
+echo "Backup: $BACKUP"
 echo
 
-echo "=== 10. WRITE DEPLOYMENT MARKER ==="
+echo "=== 11. WRITE DEPLOYMENT MARKER ==="
 SUBJECT="$(git log -1 --format=%s "$TARGET")"
-mkdir -p "$APP/data"
-
-/opt/dc-bot/venv/bin/python - \
-    "$APP/data/deployed_version.json" \
+MARKER_UPDATED=1
+write_deployment_marker \
     "$TARGET" \
     "$OLD_HEAD" \
     "$DEPLOYED_AT" \
-    "$SUBJECT" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-payload = {
-    "commit": sys.argv[2],
-    "previous_commit": sys.argv[3],
-    "branch": "main",
-    "deployed_at": sys.argv[4],
-    "subject": sys.argv[5],
-    "status": "success",
-}
-path.write_text(
-    json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-    encoding="utf-8",
-)
-PY
-
-chmod 0644 "$APP/data/deployed_version.json"
+    "$SUBJECT" \
+    "success"
 
 echo "PASS: deployment marker written"
 echo
 
-echo "=== 11. FINAL CHECK ==="
-echo "HEAD: $(git rev-parse HEAD)"
-echo "Bot:  $(systemctl is-active "$BOT_SERVICE")"
-echo "Web:  $(systemctl is-active "$WEB_SERVICE")"
-if [ -n "$NGINX_CONFIG_PATH" ]; then
-    echo "Nginx: $(systemctl is-active nginx || true)"
-fi
-echo "Backup: $BACKUP"
+# From this point onward there is no transactional work left. Disable rollback
+# before printing success so a presentation-only failure can never rewrite source.
+trap - ERR
 
-echo
 echo "========================================"
 echo "  SAFE DEPLOY SUCCESS"
 echo "========================================"
