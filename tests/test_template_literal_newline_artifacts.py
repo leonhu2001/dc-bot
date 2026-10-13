@@ -19,6 +19,6 @@ def test_templates_do_not_render_literal_newline_escape_artifacts():
             bad[str(path.relative_to(ROOT))] = count
 
     assert not bad, (
-        "literal \\n escape token found next to document closing tag: "
+        r"literal \n escape token found next to document closing tag: "
         + ", ".join(f"{path} x{count}" for path, count in bad.items())
     )
