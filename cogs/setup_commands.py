@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from core.vip_levels import build_topup_rebate_public_summary
 from services.topup_runtime import ensure_topup_credit_worker_started
 from services.payment_review_runtime import ensure_payment_review_worker_started
 from views.panels import MainPanelView
@@ -143,7 +144,7 @@ class SetupCommands(commands.Cog):
                 "可於此處進行魔丸錢包儲值。\n"
                 "付款完成並經客服確認後，系統會自動入帳並同步 VIP 進度。\n\n"
                 "**VIP 儲值回饋**\n"
-                "白金魔丸 2%｜鑽石魔丸 3%｜白鑽魔丸 4%｜黑鑽魔丸 5%\n"
+                f"{build_topup_rebate_public_summary()}\n"
                 "本次儲值若達成新 VIP 等級，當筆即套用新等級返利。"
             ),
             color=discord.Color.gold(),
