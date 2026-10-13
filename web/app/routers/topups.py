@@ -21,6 +21,7 @@ from services.topups import (
     topup_payment_reference_label,
     topup_status_label,
 )
+from services.wallet_service import get_wallet_balance_breakdown
 from web.app.routers.admin_staff import require_admin
 from web.app.services.audit_trail import (
     audit_snapshot,
@@ -80,6 +81,7 @@ async def member_wallet(request: Request):
     customer_id = str(user.get("id") or "")
     member = get_member_summary(customer_id)
     topups = [_decorate(row) for row in list_customer_topups(customer_id, limit=30)]
+    wallet = get_wallet_balance_breakdown(customer_id)
 
     return templates.TemplateResponse(
         request=request,
@@ -89,6 +91,7 @@ async def member_wallet(request: Request):
             "page_name": "member_wallet",
             "user": user,
             "member": member,
+            "wallet": wallet,
             "topups": topups,
             "error": request.query_params.get("error"),
             "ok": request.query_params.get("ok"),
