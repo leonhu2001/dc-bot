@@ -5,6 +5,7 @@ from typing import Any, Mapping
 import discord
 
 from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD
+from services.wallet_service import get_wallet_payment_transaction
 
 from services.order_credential_runtime import (
     configure_order_credentials,
@@ -1058,22 +1059,42 @@ class PaymentMethodSelect(discord.ui.Select):
             )
 
             if selected_method == WALLET_PAYMENT_METHOD:
-                wallet_balance = get_wallet_balance(self.customer_id)
-                if amount > 0:
-                    after_balance = wallet_balance - amount
+                # A wallet debit may already have committed even if a later Discord/Web
+                # finalization step failed. Recover the authoritative ledger row by ticket
+                # channel so the UI and the next retry both know this order is already paid.
+                wallet_tx = get_wallet_payment_transaction(
+                    self.customer_id,
+                    self.channel_id,
+                    db_file=DB_FILE,
+                )
+                if wallet_tx is not None:
+                    data["wallet_transaction_id"] = wallet_tx["id"]
+                    data["wallet_paid_amount"] = abs(int(wallet_tx.get("amount") or 0))
+                    data["wallet_balance_before"] = int(wallet_tx.get("balance_before") or 0)
+                    data["wallet_balance_after"] = int(wallet_tx.get("balance_after") or 0)
+                    remember_order_data(self.channel_id, data)
                     wallet_text = (
-                        f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
-                        f"本單金額：{format_t_amount(amount)}\n"
+                        f"✅ 錢包已扣款：{format_t_amount(abs(int(wallet_tx.get('amount') or 0)))}\n"
+                        f"扣款後餘額：{format_t_amount(int(wallet_tx.get('balance_after') or 0))}\n"
+                        "重新送出只會繼續完成訂單，不會再次扣款。"
                     )
-                    if after_balance >= 0:
-                        wallet_text += f"扣款後餘額：{format_t_amount(after_balance)}"
-                    else:
-                        wallet_text += f"尚不足：{format_t_amount(abs(after_balance))}"
                 else:
-                    wallet_text = (
-                        f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
-                        "本單金額：待客服填寫"
-                    )
+                    wallet_balance = get_wallet_balance(self.customer_id)
+                    if amount > 0:
+                        after_balance = wallet_balance - amount
+                        wallet_text = (
+                            f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
+                            f"本單金額：{format_t_amount(amount)}\n"
+                        )
+                        if after_balance >= 0:
+                            wallet_text += f"扣款後餘額：{format_t_amount(after_balance)}"
+                        else:
+                            wallet_text += f"尚不足：{format_t_amount(abs(after_balance))}"
+                    else:
+                        wallet_text = (
+                            f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
+                            "本單金額：待客服填寫"
+                        )
 
                 payment_embed.add_field(
                     name="我的錢包",

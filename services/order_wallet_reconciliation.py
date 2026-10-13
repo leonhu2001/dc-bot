@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-WALLET_PAYMENT_METHOD = "我的錢包"
+from services.payment_methods import WALLET_PAYMENT_METHOD
 
 
 def _normalize(value: Any) -> str:

@@ -5,6 +5,7 @@ import pytest
 from services.wallet_service import (
     adjust_wallet_balance,
     get_wallet_balance,
+    get_wallet_payment_transaction,
     get_wallet_transactions,
 )
 
@@ -82,3 +83,71 @@ def test_wallet_rejects_overdraft_with_customer_facing_amounts(tmp_path):
     message = str(exc_info.value)
     assert "目前餘額 0T" in message
     assert "無法扣除 500T" in message
+
+
+def test_wallet_payment_without_order_no_is_idempotent_by_ticket_channel(tmp_path):
+    db_file = tmp_path / "bot.db"
+    adjust_wallet_balance(
+        customer_id="customer-channel",
+        amount=2867,
+        tx_type="topup",
+        db_file=db_file,
+    )
+
+    first = adjust_wallet_balance(
+        customer_id="customer-channel",
+        amount=-1529,
+        tx_type="payment",
+        order_channel_id="ticket-1013",
+        order_no=None,
+        db_file=db_file,
+    )
+    # Simulate the dangerous crash window: debit committed but the order's
+    # wallet_transaction_id marker was never persisted. A retry supplies only the
+    # same ticket channel and must recover, not debit again.
+    retry = adjust_wallet_balance(
+        customer_id="customer-channel",
+        amount=-1529,
+        tx_type="payment",
+        order_channel_id="ticket-1013",
+        order_no=None,
+        db_file=db_file,
+    )
+
+    assert retry["id"] == first["id"]
+    assert retry["idempotent_replay"] is True
+    assert get_wallet_balance("customer-channel", db_file) == 1338
+    ledger = get_wallet_payment_transaction(
+        "customer-channel",
+        "ticket-1013",
+        db_file=db_file,
+    )
+    assert ledger is not None
+    assert ledger["id"] == first["id"]
+    assert ledger["balance_after"] == 1338
+    payment_rows = [
+        row
+        for row in get_wallet_transactions("customer-channel", limit=10, db_file=db_file)
+        if row["type"] == "payment"
+    ]
+    assert len(payment_rows) == 1
+
+    with pytest.raises(ValueError, match="同一訂單票口已有不同金額"):
+        adjust_wallet_balance(
+            customer_id="customer-channel",
+            amount=-1500,
+            tx_type="payment",
+            order_channel_id="ticket-1013",
+            order_no=None,
+            db_file=db_file,
+        )
+
+
+def test_wallet_payment_panel_recovers_committed_debit_instead_of_previewing_second_debit():
+    source = Path("services/order_runtime.py").read_text(encoding="utf-8")
+    assert "get_wallet_payment_transaction(" in source
+    assert "✅ 錢包已扣款" in source
+    assert "重新送出只會繼續完成訂單，不會再次扣款" in source
+
+    runtime = Path("services/order_payment_runtime.py").read_text(encoding="utf-8")
+    assert 'if not wallet_tx.get("idempotent_replay")' in runtime
