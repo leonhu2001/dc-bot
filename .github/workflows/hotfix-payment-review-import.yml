@@ -39,7 +39,7 @@ jobs:
         run: |
           python -m compileall -q bot.py services views tests
           python -c "from services.payment_review_runtime import ensure_payment_review_worker_started; print('payment-review-import-ok')"
-          python -m pytest -q tests/test_payment_review_runtime_import_boundary.py tests/test_worker_tips.py tests/test_architecture_growth_budget.py
+          python -m pytest -q tests/test_payment_review_runtime_import_boundary.py tests/test_worker_tip_extraction.py tests/test_payment_reviews.py tests/test_repair_legacy_tip_wallet_references.py tests/test_architecture_growth_budget.py
           python -m pytest -q tests/golden
           python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
       - name: Commit repaired runtime
