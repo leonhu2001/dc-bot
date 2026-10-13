@@ -2151,54 +2151,12 @@ WALLET_PAYMENT_METHOD = "我的錢包"
 # ========= 顧客錢包系統 =========
 
 def ensure_wallet_tables() -> None:
-    """建立顧客錢包與錢包流水表。"""
-    conn = sqlite3.connect(DB_FILE)
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS customer_wallets (
-                customer_discord_id TEXT PRIMARY KEY,
-                balance INTEGER NOT NULL DEFAULT 0,
-                updated_at TEXT
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS wallet_transactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                customer_discord_id TEXT NOT NULL,
-                amount INTEGER NOT NULL,
-                balance_before INTEGER NOT NULL,
-                balance_after INTEGER NOT NULL,
-                type TEXT NOT NULL,
-                order_channel_id TEXT,
-                order_no TEXT,
-                operator_discord_id TEXT,
-                operator_display_name TEXT,
-                note TEXT,
-                created_at TEXT NOT NULL
-            )
-        """)
-        conn.commit()
-    finally:
-        conn.close()
+    """Compatibility adapter: wallet schema ownership lives in wallet_service."""
+    _wallet_ensure_tables(DB_FILE)
 
 
 def get_wallet_balance(customer_id) -> int:
-    ensure_wallet_tables()
-    customer_id_text = str(customer_id)
-
-    conn = sqlite3.connect(DB_FILE)
-    try:
-        row = conn.execute(
-            "SELECT balance FROM customer_wallets WHERE customer_discord_id = ?",
-            (customer_id_text,),
-        ).fetchone()
-
-        if row is None:
-            return 0
-
-        return int(row[0] or 0)
-    finally:
-        conn.close()
+    return _wallet_get_balance(customer_id, DB_FILE)
 
 
 def adjust_customer_wallet_balance(
@@ -2212,133 +2170,26 @@ def adjust_customer_wallet_balance(
     note: str | None = None,
     allow_negative: bool = False,
 ) -> dict:
-    """基於目前餘額加減，並寫入流水。amount 可正可負。"""
-    ensure_wallet_tables()
-
-    customer_id_text = str(customer_id)
-    amount = int(amount or 0)
-
-    if amount == 0:
-        raise ValueError("異動金額不能為 0。")
-
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-
-    try:
-        conn.execute("BEGIN IMMEDIATE")
-
-        normalized_order_no = str(order_no or "").strip() or None
-        normalized_type = str(tx_type or "adjustment").strip() or "adjustment"
-
-        # 同一交易識別碼重送時必須保持冪等，避免 Discord 重送造成二次扣款；
-        # 也避免把資料庫 trigger 的英文錯誤直接丟給顧客。
-        if normalized_order_no:
-            existing = conn.execute(
-                """
-                SELECT *
-                FROM wallet_transactions
-                WHERE customer_discord_id = ?
-                  AND order_no = ?
-                  AND type = ?
-                ORDER BY id ASC
-                LIMIT 1
-                """,
-                (customer_id_text, normalized_order_no, normalized_type),
-            ).fetchone()
-
-            if existing is not None:
-                if int(existing["amount"] or 0) != amount:
-                    raise ValueError(
-                        "同一錢包交易識別碼已存在，但金額不同；已拒絕重複入帳。"
-                    )
-
-                conn.rollback()
-                return dict(existing)
-
-        row = conn.execute(
-            "SELECT balance FROM customer_wallets WHERE customer_discord_id = ?",
-            (customer_id_text,),
-        ).fetchone()
-
-        balance_before = int(row["balance"] or 0) if row is not None else 0
-        balance_after = balance_before + amount
-
-        if balance_after < 0 and not allow_negative:
-            raise ValueError(
-                f"錢包餘額不足，目前餘額 {format_t_amount(balance_before)}，"
-                f"無法扣除 {format_t_amount(abs(amount))}。"
-            )
-
-        now_text = get_taipei_now_iso()
-        operator_id = str(getattr(operator, "id", "") or "")
-        operator_name = (
-            getattr(operator, "display_name", None)
-            or getattr(operator, "name", None)
-            or operator_id
-            or None
-        )
-
-        conn.execute(
-            """
-            INSERT INTO customer_wallets (customer_discord_id, balance, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(customer_discord_id)
-            DO UPDATE SET balance = excluded.balance, updated_at = excluded.updated_at
-            """,
-            (customer_id_text, balance_after, now_text),
-        )
-
-        cur = conn.execute(
-            """
-            INSERT INTO wallet_transactions (
-                customer_discord_id,
-                amount,
-                balance_before,
-                balance_after,
-                type,
-                order_channel_id,
-                order_no,
-                operator_discord_id,
-                operator_display_name,
-                note,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                customer_id_text,
-                amount,
-                balance_before,
-                balance_after,
-                normalized_type,
-                str(order_channel_id) if order_channel_id is not None else None,
-                normalized_order_no,
-                operator_id or None,
-                operator_name,
-                str(note or "").strip() or None,
-                now_text,
-            ),
-        )
-
-        tx_id = int(cur.lastrowid)
-        conn.commit()
-
-        return {
-            "id": tx_id,
-            "customer_discord_id": customer_id_text,
-            "amount": amount,
-            "balance_before": balance_before,
-            "balance_after": balance_after,
-            "type": tx_type,
-            "note": note,
-            "created_at": now_text,
-        }
-
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Discord-facing adapter around the canonical wallet transaction service."""
+    operator_id = getattr(operator, "id", None)
+    operator_name = (
+        getattr(operator, "display_name", None)
+        or getattr(operator, "name", None)
+        or (str(operator_id) if operator_id is not None else None)
+    )
+    normalized_type = str(tx_type or "adjustment").strip() or "adjustment"
+    return _wallet_adjust_balance(
+        customer_id=customer_id,
+        amount=amount,
+        tx_type=normalized_type,
+        operator_discord_id=operator_id,
+        operator_display_name=operator_name,
+        order_channel_id=order_channel_id,
+        order_no=order_no,
+        note=note,
+        allow_negative=allow_negative,
+        db_file=DB_FILE,
+    )
 
 
 async def process_worker_tip_wallet_payment(
@@ -2460,40 +2311,7 @@ async def send_wallet_log(
 
 
 def get_wallet_transactions(customer_id, limit: int = 10) -> list[dict]:
-    ensure_wallet_tables()
-
-    safe_limit = max(1, min(int(limit or 10), 25))
-
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT
-                id,
-                customer_discord_id,
-                amount,
-                balance_before,
-                balance_after,
-                type,
-                order_channel_id,
-                order_no,
-                operator_discord_id,
-                operator_display_name,
-                note,
-                created_at
-            FROM wallet_transactions
-            WHERE customer_discord_id = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (str(customer_id), safe_limit),
-        ).fetchall()
-
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
+    return _wallet_get_transactions(customer_id, limit=limit, db_file=DB_FILE)
 
 
 def wallet_transaction_type_label(tx_type: str) -> str:
