@@ -67,6 +67,39 @@ router = APIRouter(tags=["admin"])
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+
+def _load_admin_order_meta_by_order(db) -> dict[int, dict]:
+    table_row = db.execute(
+        text(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'web_admin_order_meta'
+            LIMIT 1
+            """
+        )
+    ).first()
+
+    if table_row is None:
+        return {}
+
+    rows = db.execute(
+        text("SELECT * FROM web_admin_order_meta")
+    ).mappings().all()
+
+    result: dict[int, dict] = {}
+    for row in rows:
+        data = dict(row)
+        try:
+            order_id = int(data.get("order_id"))
+        except (TypeError, ValueError):
+            continue
+        result[order_id] = data
+
+    return result
+
+
 @router.get("/admin")
 async def admin_dashboard(
     request: Request,
@@ -878,7 +911,7 @@ async def admin_dashboard(
     try:
 
         admin_meta_by_order = (
-            _mw4a2r6_meta_map(
+            _load_admin_order_meta_by_order(
                 _mw_meta_db
             )
         )

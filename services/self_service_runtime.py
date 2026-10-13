@@ -70,8 +70,10 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
     if callable(reorder_configurator):
         reorder_configurator(create_reorder_ticket_from_closed_order)
 
+    # ORDER_POINT_BENEFIT_SPECS is owned by self_service_selection_runtime,
+    # so bot.py must not be required to re-export it just to configure
+    # the financial runtime.
     financial_keys = {
-        "ORDER_POINT_BENEFIT_SPECS",
         "POINT_REDEEM_ITEMS_BY_KEY",
         "_to_int",
         "allocate_store_absorbed_fixed_discount",
@@ -83,7 +85,7 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
     }
     if financial_keys.issubset(namespace):
         configure_self_service_financials(
-            order_point_benefit_specs=namespace["ORDER_POINT_BENEFIT_SPECS"],
+            order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
             point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
             get_rule_from_data=_get_rule_from_self_service_data,
             is_specify_preference=_is_specify_preference,
