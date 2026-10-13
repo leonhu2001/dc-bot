@@ -1,0 +1,46 @@
+name: One-time fix review favorite emoji
+
+on:
+  push:
+    branches:
+      - fix/review-favorite-emoji-20261014
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/review-favorite-emoji-20261014
+
+      - name: Patch invalid select emoji
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("views/review.py")
+          text = path.read_text(encoding="utf-8")
+          old = '                    emoji="❤️" if already else "♡",\n'
+          new = '                    emoji="❤️" if already else None,\n'
+          if text.count(old) != 1:
+              raise SystemExit(f"expected exactly one target, found {text.count(old)}")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+      - name: Syntax check
+        run: python -m py_compile views/review.py
+
+      - name: Remove one-time workflow
+        run: rm .github/workflows/one-time-fix-review-favorite.yml
+
+      - name: Commit direct source fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add views/review.py .github/workflows/one-time-fix-review-favorite.yml
+          git commit -m "Fix invalid favorite select emoji"
+          git push origin HEAD:fix/review-favorite-emoji-20261014
