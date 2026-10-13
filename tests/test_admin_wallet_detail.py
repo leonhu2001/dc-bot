@@ -1,5 +1,6 @@
 import sqlite3
 
+from services.wallet_service import adjust_wallet_balance
 from web.app.routers import admin_wallets
 
 
@@ -15,6 +16,11 @@ def test_wallet_detail_without_wallet_row_returns_empty_wallet(tmp_path, monkeyp
     assert wallet["customer_discord_id"] == "123456789"
     assert wallet["balance"] == 0
     assert wallet["balance_text"] == "0T"
+    assert wallet["principal_balance"] == 0
+    assert wallet["bonus_balance"] == 0
+    assert wallet["refund_offset_balance"] == 0
+    assert wallet["refundable_balance"] == 0
+    assert wallet["refundable_balance_text"] == "0T"
     assert transactions == []
 
 
@@ -55,6 +61,32 @@ def test_wallet_detail_recovers_balance_from_orphan_transaction(tmp_path, monkey
     wallet, transactions = admin_wallets.fetch_wallet_detail("987654321")
 
     assert wallet["balance"] == 1500
+    assert wallet["principal_balance"] == 1500
+    assert wallet["bonus_balance"] == 0
+    assert wallet["refund_offset_balance"] == 0
+    assert wallet["refundable_balance"] == 1500
     assert wallet["balance_text"] == "1,500T"
     assert wallet["updated_at_text"] == "2026/09/26 05:40"
     assert len(transactions) == 1
+
+
+def test_wallet_detail_distinguishes_principal_from_refundable_cash(tmp_path, monkeypatch):
+    bot_db = tmp_path / "bot.db"
+    web_db = tmp_path / "web_dashboard.db"
+
+    monkeypatch.setattr(admin_wallets, "bot_db_path", lambda: bot_db)
+    monkeypatch.setattr(admin_wallets, "web_dashboard_db_path", lambda: web_db)
+
+    adjust_wallet_balance(customer_id="123", amount=1000, tx_type="topup", db_file=bot_db)
+    adjust_wallet_balance(customer_id="123", amount=30, tx_type="topup_bonus", db_file=bot_db)
+    adjust_wallet_balance(customer_id="123", amount=-20, tx_type="payment", db_file=bot_db)
+
+    wallet, _ = admin_wallets.fetch_wallet_detail("123")
+
+    assert wallet["balance"] == 1010
+    assert wallet["principal_balance"] == 1000
+    assert wallet["bonus_balance"] == 10
+    assert wallet["refund_offset_balance"] == 20
+    assert wallet["refundable_balance"] == 980
+    assert wallet["principal_balance_text"] == "1,000T"
+    assert wallet["refundable_balance_text"] == "980T"
