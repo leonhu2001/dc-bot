@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from services import self_service_runtime
+from services import self_service_financials, self_service_runtime
 from web.app.routers import admin_dashboard
 
 
@@ -31,8 +31,13 @@ def test_self_service_financial_runtime_configures_without_bot_reexport(monkeypa
     self_service_runtime.configure_self_service_runtime(namespace)
 
     assert captured["order_point_benefit_specs"] is self_service_runtime.ORDER_POINT_BENEFIT_SPECS
-    assert callable(captured["self_service_staff_price"])
-    assert captured["self_service_staff_price"] is self_service_runtime.get_self_service_staff_price
+    assert "self_service_staff_price" not in captured
+    assert "staff_price_required" not in captured
+    assert self_service_runtime.get_self_service_staff_price is self_service_financials.get_self_service_staff_price
+    assert (
+        self_service_runtime.is_self_service_staff_price_required
+        is self_service_financials.is_self_service_staff_price_required
+    )
 
 
 def test_admin_dashboard_meta_loader_handles_existing_table():
