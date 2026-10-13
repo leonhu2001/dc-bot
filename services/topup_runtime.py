@@ -38,6 +38,7 @@ from services.vip_progress_repair import (
     repair_vip_progress_data,
 )
 from services.vip_review_runtime import process_vip_review_tick
+from services.wallet_refund_runtime import process_pending_wallet_refunds
 from services.wallet_service import adjust_wallet_balance, find_wallet_transaction, get_wallet_balance
 
 TOPUP_REVIEW_CHANNEL_ID = CUSTOMER_SERVICE_REVIEW_CHANNEL_ID
@@ -432,6 +433,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
             await _notify_pending_reviews(bot)
             await _sync_review_notifications(bot)
             await process_vip_review_tick(bot)
+            await process_pending_wallet_refunds(bot)
             rows = get_pending_credit_topups(limit=20)
             for row in rows:
                 await _process_one_topup(bot, row)
