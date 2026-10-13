@@ -44,6 +44,7 @@ DEPENDENCIES_UPDATED=0
 DEPENDENCY_SYNC_NEEDED=0
 WEB_UNIT_UPDATED=0
 NGINX_CONFIG_UPDATED=0
+SERVICES_RESTARTED=0
 
 restart_services() {
     local started_at finished_at elapsed_ms
@@ -97,7 +98,7 @@ rollback() {
         systemctl reload nginx || true
     fi
 
-    if [ "$SOURCE_UPDATED" -eq 1 ]; then
+    if [ "$SERVICES_RESTARTED" -eq 1 ]; then
         restart_services || true
 
         echo "Bot after rollback: $(systemctl is-active "$BOT_SERVICE" || true)"
@@ -242,6 +243,10 @@ echo "=== 5. PYTHON COMPILE CHECK ==="
 echo "PASS: Python compile"
 echo
 
+echo "=== 5B. RUNTIME IMPORT PREFLIGHT ==="
+"$APP/venv/bin/python" "$APP/tools/runtime_import_smoke.py"
+echo
+
 echo "=== 6. ENSURE DATABASE TABLES ==="
 runuser -u dc-bot-web -- env PYTHONPATH="$APP" \
     "$APP/venv/bin/python" -c "from shared.db import create_all_tables; create_all_tables(); print('PASS: database tables ready')"
@@ -283,6 +288,7 @@ echo
 echo "=== 8. RESTART SERVICES ==="
 echo "Bot stop timeout: $(systemctl show "$BOT_SERVICE" -p TimeoutStopUSec --value 2>/dev/null || echo unknown)"
 echo "Web stop timeout: $(systemctl show "$WEB_SERVICE" -p TimeoutStopUSec --value 2>/dev/null || echo unknown)"
+SERVICES_RESTARTED=1
 restart_services
 
 BOT_STATE="$(systemctl is-active "$BOT_SERVICE" || true)"
