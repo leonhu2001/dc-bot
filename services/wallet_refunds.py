@@ -125,10 +125,7 @@ def get_wallet_refund_preview(
         int(funds.get("nonrefundable_credit") or 0),
         _remaining_topup_bonus(customer_id, bot_db=bot_db),
     )
-    redeemed = has_redeemed_current_month_vip_benefit(
-        customer_id,
-        web_db=web_db,
-    )
+    redeemed = has_redeemed_current_month_vip_benefit(customer_id, web_db=web_db)
     return {
         **funds,
         "topup_bonus_to_cancel": bonus,
@@ -180,55 +177,36 @@ def create_wallet_refund_request(
             ) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
             """,
             (
-                str(customer_id),
-                principal,
-                int(preview["balance"] or 0),
+                str(customer_id), principal, int(preview["balance"] or 0),
                 int(preview["topup_bonus_to_cancel"] or 0),
                 str(requested_by_discord_id) if requested_by_discord_id else None,
                 str(requested_by_display_name or "").strip() or None,
                 str(reason or "").strip() or "顧客申請退還未使用儲值本金",
-                now_text,
-                now_text,
+                now_text, now_text,
             ),
         )
         row_id = int(cur.lastrowid)
         refund_no = f"RF-{datetime.now(TAIPEI_TZ).strftime('%Y%m%d')}-{row_id:04d}"
-        conn.execute(
-            "UPDATE wallet_refund_requests SET refund_no=? WHERE id=?",
-            (refund_no, row_id),
-        )
+        conn.execute("UPDATE wallet_refund_requests SET refund_no=? WHERE id=?", (refund_no, row_id))
         conn.commit()
-        row = conn.execute(
-            "SELECT * FROM wallet_refund_requests WHERE id=?",
-            (row_id,),
-        ).fetchone()
+        row = conn.execute("SELECT * FROM wallet_refund_requests WHERE id=?", (row_id,)).fetchone()
         return dict(row)
 
 
 def get_pending_wallet_refunds(
-    *,
-    limit: int = 20,
-    bot_db: str | Path | None = None,
+    *, limit: int = 20, bot_db: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     ensure_wallet_refund_tables(bot_db)
     with sqlite3.connect(_bot_db_path(bot_db), timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            """
-            SELECT * FROM wallet_refund_requests
-            WHERE status='pending'
-            ORDER BY id ASC LIMIT ?
-            """,
+            "SELECT * FROM wallet_refund_requests WHERE status='pending' ORDER BY id ASC LIMIT ?",
             (max(1, min(int(limit or 20), 100)),),
         ).fetchall()
         return [dict(row) for row in rows]
 
 
-def mark_wallet_refund_processing(
-    refund_id: int,
-    *,
-    bot_db: str | Path | None = None,
-) -> bool:
+def mark_wallet_refund_processing(refund_id: int, *, bot_db: str | Path | None = None) -> bool:
     ensure_wallet_refund_tables(bot_db)
     now_text = _now_text()
     with sqlite3.connect(_bot_db_path(bot_db), timeout=15) as conn:
@@ -245,14 +223,9 @@ def mark_wallet_refund_processing(
 
 
 def mark_wallet_refund_completed(
-    refund_id: int,
-    *,
-    principal_transaction_id: int,
-    bonus_transaction_id: int | None,
-    vip_total_before: int,
-    vip_total_after: int,
-    vip_level_before: str,
-    vip_level_after: str,
+    refund_id: int, *, principal_transaction_id: int,
+    bonus_transaction_id: int | None, vip_total_before: int,
+    vip_total_after: int, vip_level_before: str, vip_level_after: str,
     bot_db: str | Path | None = None,
 ) -> None:
     now_text = _now_text()
@@ -277,17 +250,14 @@ def mark_wallet_refund_completed(
 
 
 def reset_wallet_refund_error(
-    refund_id: int,
-    error_text: str,
-    *,
-    bot_db: str | Path | None = None,
+    refund_id: int, error_text: str, *, bot_db: str | Path | None = None,
 ) -> None:
     now_text = _now_text()
     with sqlite3.connect(_bot_db_path(bot_db), timeout=15) as conn:
         conn.execute(
             """
             UPDATE wallet_refund_requests
-            SET status='pending', error_text=?, updated_at=?
+            SET status='error', error_text=?, updated_at=?
             WHERE id=?
             """,
             (str(error_text or "")[:1000], now_text, int(refund_id)),
