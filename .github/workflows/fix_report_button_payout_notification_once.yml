@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   repair:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +47,7 @@ jobs:
               source = source.replace(import_line, import_block, 1)
 
           route_marker = '@router.post("/admin/payouts/summary/mark-paid")\n'
-          helper_block = '''def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:\n    targets: list[dict] = []\n    for person in fetch_rows(month, role, None, status="unpaid"):\n        person_id = str(person.get("discord_id") or "").strip()\n        person_role = str(person.get("role") or "all").strip() or "all"\n        if not person_id:\n            continue\n        targets.append(\n            {\n                "person_id": person_id,\n                "person_role": person_role,\n                "before": _audit_payout_state(\n                    month,\n                    person_role,\n                    person_id=person_id,\n                ),\n            }\n        )\n    return targets\n\n\ndef _send_bulk_payout_paid_notifications(targets: list[dict]) -> None:\n    for target in targets:\n        try:\n            send_payout_paid_notification(\n                db_file=db_path(),\n                person_id=target["person_id"],\n                before=target["before"],\n                after={\n                    "target_status": "paid",\n                    "person_role": target["person_role"],\n                },\n            )\n        except Exception as exc:\n            # Salary state/audit are already committed. One blocked DM must not\n            # roll back payroll or prevent the remaining staff notifications.\n            print(\n                "[payout_notification] bulk delivery failed:",\n                target.get("person_id"),\n                repr(exc),\n            )\n\n\n'''
+          helper_block = '''def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:\n    targets: list[dict] = []\n    for person in fetch_rows(month, role, None, status="unpaid"):\n        person_id = str(person.get("discord_id") or "").strip()\n        person_role = str(person.get("role") or "all").strip() or "all"\n        if not person_id:\n            continue\n        targets.append(\n            {\n                "person_id": person_id,\n                "person_role": person_role,\n                "before": _audit_payout_state(\n                    month,\n                    person_role,\n                    person_id=person_id,\n                ),\n            }\n        )\n    return targets\n\n\ndef _send_bulk_payout_paid_notifications(targets: list[dict]) -> None:\n    for target in targets:\n        try:\n            send_payout_paid_notification(\n                db_file=db_path(),\n                person_id=target["person_id"],\n                before=target["before"],\n                after={\n                    "target_status": "paid",\n                    "person_role": target["person_role"],\n                },\n            )\n        except Exception as exc:\n            print(\n                "[payout_notification] bulk delivery failed:",\n                target.get("person_id"),\n                repr(exc),\n            )\n\n\n'''
           if '_collect_bulk_payout_notification_targets' not in source:
               if source.count(route_marker) != 1:
                   raise SystemExit(f'payout route marker count={source.count(route_marker)}')
@@ -76,7 +75,6 @@ jobs:
 def test_report_reminder_dm_uses_discord_link_button_instead_of_raw_url():
     root = Path(__file__).resolve().parents[1]
     source = (root / "web/app/services/order_reporting.py").read_text(encoding="utf-8")
-
     assert '"components": [' in source
     assert '"style": 5' in source
     assert '"label": "填寫報單"' in source
@@ -90,33 +88,22 @@ PY
 
 def test_single_person_paid_audit_hook_stays_connected(tmp_path, monkeypatch):
     from web.app.services import audit_trail
-
     captured = []
 
     def fake_send_payout_paid_notification(**kwargs):
         captured.append(kwargs)
         return {"sent": True, "total": 321}
 
-    monkeypatch.setattr(
-        payout_notifications,
-        "send_payout_paid_notification",
-        fake_send_payout_paid_notification,
-    )
-
+    monkeypatch.setattr(payout_notifications, "send_payout_paid_notification", fake_send_payout_paid_notification)
     audit_trail.write_sqlite_audit_log(
         admin_discord_id="999",
         action="set_person_payout_status",
         target_type="payout_person",
         target_id="123",
         before=_snapshot(worker_unpaid=1),
-        after={
-            **_snapshot(),
-            "target_status": "paid",
-            "person_role": "worker",
-        },
+        after={**_snapshot(), "target_status": "paid", "person_role": "worker"},
         db_file=tmp_path / "audit.db",
     )
-
     assert len(captured) == 1
     assert str(captured[0]["person_id"]) == "123"
     assert captured[0]["after"]["target_status"] == "paid"
@@ -124,13 +111,11 @@ def test_single_person_paid_audit_hook_stays_connected(tmp_path, monkeypatch):
 
 def test_bulk_paid_notification_targets_only_capture_currently_unpaid_people(monkeypatch):
     from web.app.routers import admin_payout_summary
-
     rows = [
         {"discord_id": "101", "role": "worker"},
         {"discord_id": "202", "role": "customer_service"},
     ]
     snapshots = []
-
     monkeypatch.setattr(
         admin_payout_summary,
         "fetch_rows",
@@ -139,12 +124,13 @@ def test_bulk_paid_notification_targets_only_capture_currently_unpaid_people(mon
 
     def fake_snapshot(month, role, *, person_id=None):
         snapshots.append((month, role, person_id))
-        return _snapshot(worker_unpaid=1 if role == "worker" else 0, cs_unpaid=1 if role == "customer_service" else 0)
+        return _snapshot(
+            worker_unpaid=1 if role == "worker" else 0,
+            cs_unpaid=1 if role == "customer_service" else 0,
+        )
 
     monkeypatch.setattr(admin_payout_summary, "_audit_payout_state", fake_snapshot)
-
     targets = admin_payout_summary._collect_bulk_payout_notification_targets("2026-10", "all")
-
     assert [item["person_id"] for item in targets] == ["101", "202"]
     assert snapshots == [
         ("2026-10", "worker", "101"),
@@ -154,7 +140,6 @@ def test_bulk_paid_notification_targets_only_capture_currently_unpaid_people(mon
 
 def test_bulk_paid_notification_failure_isolated_per_person(monkeypatch):
     from web.app.routers import admin_payout_summary
-
     calls = []
 
     def fake_send(**kwargs):
@@ -165,14 +150,12 @@ def test_bulk_paid_notification_failure_isolated_per_person(monkeypatch):
 
     monkeypatch.setattr(admin_payout_summary, "send_payout_paid_notification", fake_send)
     monkeypatch.setattr(admin_payout_summary, "db_path", lambda: "unused.db")
-
     admin_payout_summary._send_bulk_payout_paid_notifications(
         [
             {"person_id": "101", "person_role": "worker", "before": _snapshot(worker_unpaid=1)},
             {"person_id": "202", "person_role": "worker", "before": _snapshot(worker_unpaid=1)},
         ]
     )
-
     assert calls == ["101", "202"]
 PY
 
