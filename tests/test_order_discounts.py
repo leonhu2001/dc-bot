@@ -1,7 +1,25 @@
 from services.order_discounts import (
+    FUNDING_SHARED,
+    FUNDING_STORE,
     allocate_store_absorbed_fixed_discount,
+    get_discount_funding_policy,
 )
 from shared.payout import calculate_order_payout
+
+
+def test_discount_funding_policy_matches_business_rules():
+    assert get_discount_funding_policy("vip_percent") == FUNDING_SHARED
+    assert get_discount_funding_policy("manual_percent") == FUNDING_SHARED
+    assert get_discount_funding_policy("promotion_percent") == FUNDING_SHARED
+
+    assert get_discount_funding_policy("manual_fixed") == FUNDING_STORE
+    assert get_discount_funding_policy("customer_compensation") == FUNDING_STORE
+    assert get_discount_funding_policy("point_cash") == FUNDING_STORE
+    assert get_discount_funding_policy("loyalty_coupon") == FUNDING_STORE
+    assert get_discount_funding_policy("vip_monthly_cash") == FUNDING_STORE
+
+    # A new/unknown benefit must not silently reduce worker payout.
+    assert get_discount_funding_policy("future_new_benefit") == FUNDING_STORE
 
 
 def test_fixed_discount_is_fully_absorbed_by_store():
