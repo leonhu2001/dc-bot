@@ -46,6 +46,9 @@ def test_vip_page_uses_refreshed_public_policy_copy():
     assert "儲值返利5%" not in template
     assert "退款以尚未消費的實付本金為限" in template
     assert "雞腿／打賞僅能使用實付本金" in template
+    assert "白金／鑽石 2,000T、白鑽 5,000T、黑鑽 8,000T" in template
+    assert "儲值本身不計入此門檻" in template
+    assert "2026/10/14 前已發放的當月福利不因新門檻追溯失效" in template
     assert "2026/10/14 起成立的新訂單與新儲值適用本規則" in template
     assert "優先安排熟悉／收藏陪玩" in template
     assert "銀級 30 天、金級 45 天、白金 60 天、鑽石 90 天、白鑽 120 天、黑鑽 180 天" in template
