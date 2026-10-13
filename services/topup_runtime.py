@@ -10,6 +10,10 @@ from core.discord_settings import (
     CUSTOMER_SERVICE_REVIEW_CHANNEL_ID,
     CUSTOMER_SERVICE_ROLE_ID,
 )
+from core.vip_levels import (
+    VIP_TOPUP_REBATE_POLICY_LEGACY,
+    get_topup_rebate_percent,
+)
 from services.legacy_topup_bridge import install_legacy_wallet_add_bridge
 from services.topup_notifications import (
     ensure_topup_notification_columns,
@@ -34,6 +38,7 @@ from services.vip_progress_repair import (
     repair_vip_progress_data,
 )
 from services.vip_review_runtime import process_vip_review_tick
+from services.wallet_refund_runtime import process_pending_wallet_refunds
 from services.wallet_service import adjust_wallet_balance, find_wallet_transaction, get_wallet_balance
 
 TOPUP_REVIEW_CHANNEL_ID = CUSTOMER_SERVICE_REVIEW_CHANNEL_ID
@@ -47,7 +52,6 @@ async def _sync_member_vip_benefits(
 ) -> None:
     if guild is None:
         return
-
     member = await rewards.fetch_member_safely(guild, customer_id)
     if member is not None:
         await rewards.ensure_reward_member_benefits(guild, member, data)
@@ -69,8 +73,7 @@ async def _repair_stuck_vip_members(bot: discord.Client) -> None:
             await _sync_member_vip_benefits(guild, customer_id, data)
         except Exception:
             print(
-                f"[vip-repair] role sync failed user={customer_id}\n"
-                f"{traceback.format_exc()}",
+                f"[vip-repair] role sync failed user={customer_id}\n{traceback.format_exc()}",
                 flush=True,
             )
 
@@ -80,8 +83,7 @@ async def _repair_stuck_vip_members(bot: discord.Client) -> None:
     for item in repaired:
         print(
             "[vip-repair] repaired "
-            f"user={item['user_id']} "
-            f"{item['old_level']} -> {item['new_level']} "
+            f"user={item['user_id']} {item['old_level']} -> {item['new_level']} "
             f"total={item['total_spent']}",
             flush=True,
         )
@@ -107,11 +109,7 @@ async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
     payment_method = str(row.get("payment_method") or "bank_transfer").strip()
     payment_method_label = topup_payment_method_label(payment_method)
     payment_reference_label = topup_payment_reference_label(payment_method)
-    payment_reference = str(
-        row.get("payment_reference")
-        or row.get("bank_last5")
-        or "—"
-    )
+    payment_reference = str(row.get("payment_reference") or row.get("bank_last5") or "—")
     source = str(row.get("source") or "").strip()
     source_label = {
         "web": "網站",
@@ -137,22 +135,14 @@ async def _notify_one_pending_review(bot: discord.Client, row: dict) -> None:
 
     view = discord.ui.View(timeout=None)
     view.add_item(
-        discord.ui.Button(
-            label="前往審核",
-            style=discord.ButtonStyle.link,
-            url=TOPUP_REVIEW_URL,
-        )
+        discord.ui.Button(label="前往審核", style=discord.ButtonStyle.link, url=TOPUP_REVIEW_URL)
     )
 
     message = await channel.send(
         content=f"<@&{CUSTOMER_SERVICE_ROLE_ID}> 有新的儲值付款待審核。",
         embed=embed,
         view=view,
-        allowed_mentions=discord.AllowedMentions(
-            everyone=False,
-            users=False,
-            roles=True,
-        ),
+        allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=True),
     )
     mark_review_notified(int(row["id"]), message.id)
     print(f"[topup] review notification sent: {topup_no}", flush=True)
@@ -165,8 +155,7 @@ async def _notify_pending_reviews(bot: discord.Client) -> None:
             await _notify_one_pending_review(bot, row)
         except Exception:
             print(
-                f"[topup] review notification failed id={row.get('id')}\n"
-                f"{traceback.format_exc()}",
+                f"[topup] review notification failed id={row.get('id')}\n{traceback.format_exc()}",
                 flush=True,
             )
 
@@ -190,7 +179,6 @@ async def _sync_one_review_notification(bot: discord.Client, row: dict) -> None:
     try:
         message = await channel.fetch_message(int(message_id))
     except discord.NotFound:
-        # 通知已被人工刪除，不要讓 worker 每 4 秒重試同一筆。
         mark_review_notification_updated(int(row["id"]))
         return
 
@@ -201,11 +189,7 @@ async def _sync_one_review_notification(bot: discord.Client, row: dict) -> None:
     payment_method = str(row.get("payment_method") or "bank_transfer").strip()
     payment_method_label = topup_payment_method_label(payment_method)
     payment_reference_label = topup_payment_reference_label(payment_method)
-    payment_reference = str(
-        row.get("payment_reference")
-        or row.get("bank_last5")
-        or "—"
-    )
+    payment_reference = str(row.get("payment_reference") or row.get("bank_last5") or "—")
     source = str(row.get("source") or "").strip()
     source_label = {
         "web": "網站",
@@ -284,8 +268,7 @@ async def _sync_review_notifications(bot: discord.Client) -> None:
             await _sync_one_review_notification(bot, row)
         except Exception:
             print(
-                f"[topup] review notification update failed id={row.get('id')}\n"
-                f"{traceback.format_exc()}",
+                f"[topup] review notification update failed id={row.get('id')}\n{traceback.format_exc()}",
                 flush=True,
             )
 
@@ -298,6 +281,9 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
     customer_id = int(str(row["customer_discord_id"]))
     amount = int(row["amount"] or 0)
     topup_no = str(row["topup_no"])
+    policy_version = str(row.get("policy_version") or VIP_TOPUP_REBATE_POLICY_LEGACY)
+    is_legacy_policy = policy_version == VIP_TOPUP_REBATE_POLICY_LEGACY
+    bonus_tx_type = "topup_bonus_legacy" if is_legacy_policy else "topup_bonus"
     operator_id = str(row.get("approved_by_discord_id") or "") or None
     operator_name = str(row.get("approved_by_display_name") or "").strip() or None
 
@@ -315,35 +301,27 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
         already_applied = reward_key in reward_keys
 
         if already_applied:
-            # 上一次處理若已寫入會員資料但尚未標記儲值完成，
-            # 以目前真正有效 VIP 作為重試時的返利基準，避免重複推進。
-            before_total = max(
-                0,
-                int(data.get("total_spent", 0) or 0) - amount,
-            )
+            before_total = max(0, int(data.get("total_spent", 0) or 0) - amount)
             current_level = rewards.get_effective_member_level(data)
-            preview = calculate_topup_preview(before_total, amount)
+            preview = calculate_topup_preview(
+                before_total,
+                amount,
+                policy_version=policy_version,
+            )
             preview["vip_level_after"] = str(
-                current_level.get("name")
-                or preview["vip_level_after"]
+                current_level.get("name") or preview["vip_level_after"]
             )
-            from core.vip_levels import get_topup_rebate_percent
             preview["rebate_percent"] = get_topup_rebate_percent(
-                preview["vip_level_after"]
+                preview["vip_level_after"],
+                policy_version=policy_version,
             )
-            preview["rebate_amount"] = (
-                amount
-                * int(preview["rebate_percent"])
-                // 100
-            )
-            preview["credited_amount"] = (
-                amount
-                + int(preview["rebate_amount"])
-            )
+            preview["rebate_amount"] = amount * int(preview["rebate_percent"]) // 100
+            preview["credited_amount"] = amount + int(preview["rebate_amount"])
         else:
             preview = calculate_member_topup_preview(
                 data,
                 amount,
+                policy_version=policy_version,
             )
 
         principal_tx = find_wallet_transaction(
@@ -368,13 +346,13 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
             bonus_tx = find_wallet_transaction(
                 customer_id=customer_id,
                 order_no=topup_no,
-                tx_type="topup_bonus",
+                tx_type=bonus_tx_type,
             )
             if bonus_tx is None:
                 bonus_tx = adjust_wallet_balance(
                     customer_id=customer_id,
                     amount=bonus_amount,
-                    tx_type="topup_bonus",
+                    tx_type=bonus_tx_type,
                     operator_discord_id=operator_id,
                     operator_display_name=operator_name,
                     order_no=topup_no,
@@ -388,12 +366,10 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
             reward_keys.append(reward_key)
             data["manual_purchase_keys"] = reward_keys[-500:]
 
-            # 儲值本金只計 VIP，不額外產生消費點數。
             base_points_after = rewards.calculate_reward_points(int(data["total_spent"]))
             data["point_adjustment"] = int(points_before) - int(base_points_after)
             data["points"] = int(points_before)
 
-            # 先沿用原本降級後重新累積的規則，再修復沒有降級紀錄卻卡階的舊資料。
             rewards.sync_vip_level_to_cumulative_if_higher(data)
             repair_vip_progress_data(data)
 
@@ -408,7 +384,6 @@ async def _process_one_topup(bot: discord.Client, row: dict) -> None:
         if new_level.get("threshold", 0) < old_level.get("threshold", 0):
             raise RuntimeError("VIP 等級計算異常：儲值後等級不應下降。")
 
-        # 寫入儲值單的 VIP 顯示以真正完成後的會員等級為準。
         preview = dict(preview)
         preview["vip_level_after"] = str(new_level.get("name") or preview["vip_level_after"])
         preview["vip_total_after"] = int(data.get("total_spent", preview["vip_total_after"]) or 0)
@@ -458,6 +433,7 @@ async def topup_credit_worker(bot: discord.Client) -> None:
             await _notify_pending_reviews(bot)
             await _sync_review_notifications(bot)
             await process_vip_review_tick(bot)
+            await process_pending_wallet_refunds(bot)
             rows = get_pending_credit_topups(limit=20)
             for row in rows:
                 await _process_one_topup(bot, row)

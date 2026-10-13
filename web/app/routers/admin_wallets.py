@@ -1,17 +1,23 @@
-
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 import sqlite3
+from urllib.parse import quote
 
-from fastapi import APIRouter, Request, Query
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from services.wallet_refunds import (
+    create_wallet_refund_request,
+    list_customer_wallet_refunds,
+)
+from services.wallet_service import ensure_wallet_tables as ensure_wallet_service_tables
+from web.app.routers.admin_staff import require_admin
 
 
 router = APIRouter(prefix="/admin/wallets", tags=["admin-wallets"])
-
 templates = Jinja2Templates(directory="web/app/templates")
 
 
@@ -32,7 +38,6 @@ def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
 
 
 def fetch_customer_display_names(customer_ids: list[str]) -> dict[str, str]:
-    """從 web_orders 補顧客顯示名稱，沒有資料就 fallback Discord ID。"""
     clean_ids = [str(x) for x in customer_ids if str(x or "").strip()]
     if not clean_ids:
         return {}
@@ -59,11 +64,11 @@ def fetch_customer_display_names(customer_ids: list[str]) -> dict[str, str]:
                 return {}
 
             order_col = "id" if "id" in cols else "rowid"
-
             placeholders = ",".join("?" for _ in clean_ids)
             rows = conn.execute(
                 f"""
-                SELECT customer_discord_id, {name_col} AS display_name, MAX({order_col}) AS latest_id
+                SELECT customer_discord_id, {name_col} AS display_name,
+                       MAX({order_col}) AS latest_id
                 FROM web_orders
                 WHERE customer_discord_id IN ({placeholders})
                   AND {name_col} IS NOT NULL
@@ -80,7 +85,6 @@ def fetch_customer_display_names(customer_ids: list[str]) -> dict[str, str]:
                 if customer_id and display_name:
                     result[customer_id] = display_name
             return result
-
     except sqlite3.Error:
         return {}
 
@@ -95,19 +99,16 @@ def format_t_amount(amount: int | None) -> str:
 
 def format_wallet_datetime(value) -> str:
     text = str(value or "").strip()
-
     if not text:
         return "—"
 
     normalized = text.replace("Z", "+00:00")
-
     try:
         dt = datetime.fromisoformat(normalized)
         return dt.strftime("%Y/%m/%d %H:%M")
     except Exception:
         pass
 
-    # fallback：處理 2026-06-10T23:34:41+08:00 這種字串
     text = text.replace("T", " ")
     if "+" in text:
         text = text.split("+", 1)[0]
@@ -118,52 +119,33 @@ def format_wallet_datetime(value) -> str:
 
 def wallet_type_label(tx_type: str | None) -> str:
     mapping = {
-        "topup": "儲值",
+        "topup": "儲值本金",
+        "topup_bonus": "VIP 儲值贈額",
+        "topup_bonus_legacy": "舊制儲值回饋",
         "payment": "訂單扣款",
         "tip_payment": "雞腿扣款",
-        "refund": "退款",
+        "refund": "儲值退款",
+        "bonus_reversal": "退款撤銷贈額",
+        "topup_bonus_reversal": "撤銷儲值贈額",
         "adjustment": "修正",
     }
     return mapping.get(str(tx_type or "").strip(), str(tx_type or "未知"))
 
 
 def ensure_wallet_tables() -> None:
-    with sqlite3.connect(bot_db_path()) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS customer_wallets (
-                customer_discord_id TEXT PRIMARY KEY,
-                balance INTEGER NOT NULL DEFAULT 0,
-                updated_at TEXT
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS wallet_transactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                customer_discord_id TEXT NOT NULL,
-                amount INTEGER NOT NULL,
-                balance_before INTEGER NOT NULL,
-                balance_after INTEGER NOT NULL,
-                type TEXT NOT NULL,
-                order_channel_id TEXT,
-                order_no TEXT,
-                operator_discord_id TEXT,
-                operator_display_name TEXT,
-                note TEXT,
-                created_at TEXT NOT NULL
-            )
-        """)
-        conn.commit()
+    ensure_wallet_service_tables(bot_db_path())
 
 
 def fetch_wallets(keyword: str | None = None) -> list[dict]:
     ensure_wallet_tables()
-
     q = str(keyword or "").strip()
 
     sql = """
         SELECT
             w.customer_discord_id,
             w.balance,
+            w.principal_balance,
+            w.bonus_balance,
             w.updated_at,
             (
                 SELECT COUNT(*)
@@ -192,7 +174,6 @@ def fetch_wallets(keyword: str | None = None) -> list[dict]:
     """
 
     params: list[str] = []
-
     if q:
         like = f"%{q}%"
         sql += """
@@ -216,32 +197,37 @@ def fetch_wallets(keyword: str | None = None) -> list[dict]:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(sql, params).fetchall()
 
-    wallets = []
     customer_ids = [str(row["customer_discord_id"]) for row in rows]
     display_names = fetch_customer_display_names(customer_ids)
-
+    wallets = []
     for row in rows:
         data = dict(row)
         customer_id = str(data.get("customer_discord_id") or "")
-        data["customer_display_name"] = display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
+        data["customer_display_name"] = (
+            display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
+        )
         data["balance_text"] = format_t_amount(data.get("balance"))
+        data["principal_balance_text"] = format_t_amount(data.get("principal_balance"))
+        data["bonus_balance_text"] = format_t_amount(data.get("bonus_balance"))
         data["updated_at_text"] = format_wallet_datetime(data.get("updated_at"))
         wallets.append(data)
-
     return wallets
 
 
-def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dict, list[dict]]:
+def fetch_wallet_detail(
+    customer_discord_id: str,
+    limit: int = 100,
+) -> tuple[dict, list[dict]]:
+    """Keep the long-standing two-value helper contract for callers/tests."""
     ensure_wallet_tables()
-
     safe_limit = max(1, min(int(limit or 100), 300))
 
     with sqlite3.connect(bot_db_path()) as conn:
         conn.row_factory = sqlite3.Row
-
         wallet_row = conn.execute(
             """
-            SELECT customer_discord_id, balance, updated_at
+            SELECT customer_discord_id, balance, principal_balance,
+                   bonus_balance, updated_at
             FROM customer_wallets
             WHERE customer_discord_id = ?
             """,
@@ -251,18 +237,9 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
         tx_rows = conn.execute(
             """
             SELECT
-                id,
-                customer_discord_id,
-                amount,
-                balance_before,
-                balance_after,
-                type,
-                order_channel_id,
-                order_no,
-                operator_discord_id,
-                operator_display_name,
-                note,
-                created_at
+                id, customer_discord_id, amount, balance_before, balance_after,
+                type, order_channel_id, order_no, operator_discord_id,
+                operator_display_name, note, created_at
             FROM wallet_transactions
             WHERE customer_discord_id = ?
             ORDER BY id DESC
@@ -275,23 +252,34 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
         wallet = dict(wallet_row)
     else:
         latest_tx = tx_rows[0] if tx_rows else None
+        balance = int(latest_tx["balance_after"] or 0) if latest_tx is not None else 0
         wallet = {
             "customer_discord_id": str(customer_discord_id),
-            "balance": int(latest_tx["balance_after"] or 0) if latest_tx is not None else 0,
+            "balance": balance,
+            "principal_balance": balance,
+            "bonus_balance": 0,
             "updated_at": latest_tx["created_at"] if latest_tx is not None else None,
         }
 
     customer_id = str(wallet.get("customer_discord_id") or "")
     display_names = fetch_customer_display_names([customer_id])
-    wallet["customer_display_name"] = display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
+    wallet["customer_display_name"] = (
+        display_names.get(customer_id) or f"老闆 {customer_id[-4:]}"
+    )
     wallet["balance_text"] = format_t_amount(wallet.get("balance"))
+    wallet["principal_balance_text"] = format_t_amount(wallet.get("principal_balance"))
+    wallet["bonus_balance_text"] = format_t_amount(wallet.get("bonus_balance"))
     wallet["updated_at_text"] = format_wallet_datetime(wallet.get("updated_at"))
 
     transactions = []
     for row in tx_rows:
         tx = dict(row)
         amount = int(tx.get("amount") or 0)
-        tx["amount_text"] = f"+{format_t_amount(amount)}" if amount > 0 else f"-{format_t_amount(abs(amount))}"
+        tx["amount_text"] = (
+            f"+{format_t_amount(amount)}"
+            if amount > 0
+            else f"-{format_t_amount(abs(amount))}"
+        )
         tx["balance_before_text"] = format_t_amount(tx.get("balance_before"))
         tx["balance_after_text"] = format_t_amount(tx.get("balance_after"))
         tx["type_label"] = wallet_type_label(tx.get("type"))
@@ -301,23 +289,56 @@ def fetch_wallet_detail(customer_discord_id: str, limit: int = 100) -> tuple[dic
     return wallet, transactions
 
 
+def fetch_wallet_refunds(customer_discord_id: str) -> list[dict]:
+    refunds = list_customer_wallet_refunds(
+        customer_discord_id,
+        limit=20,
+        db_file=bot_db_path(),
+    )
+    for refund in refunds:
+        refund["amount_text"] = format_t_amount(refund.get("amount"))
+        refund["bonus_revoked_text"] = format_t_amount(refund.get("bonus_revoked_amount"))
+        refund["created_at_text"] = format_wallet_datetime(refund.get("created_at"))
+        refund["completed_at_text"] = format_wallet_datetime(refund.get("completed_at"))
+    return refunds
+
+
+def _admin_display_name(user: dict) -> str:
+    return str(
+        user.get("display_name")
+        or user.get("global_name")
+        or user.get("username")
+        or user.get("id")
+        or "管理員"
+    )
+
+
+def _redirect_detail(customer_id: str, key: str, message: object) -> RedirectResponse:
+    return RedirectResponse(
+        f"/admin/wallets/{customer_id}?{key}={quote(str(message), safe='')}",
+        status_code=303,
+    )
+
+
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 async def admin_wallets(
     request: Request,
     q: str | None = Query(default=None, description="搜尋 Discord ID、訂單、備註、操作人"),
 ):
-    if not _mwfinal_wallet_admin_user(request):
-        return _mwfinal_wallet_redirect(url="/admin",status_code=303)
+    user = require_admin(request)
+    if not user:
+        return RedirectResponse("/admin", status_code=303)
+
     wallets = fetch_wallets(q)
     total_balance = sum(int(w.get("balance") or 0) for w in wallets)
 
     return templates.TemplateResponse(
-        request,
-        "admin_wallets.html",
-        {
+        request=request,
+        name="admin_wallets.html",
+        context={
             "title": "顧客錢包",
-            "user": request.session.get("user"),
+            "user": user,
             "wallets": wallets,
             "q": q or "",
             "total_balance": total_balance,
@@ -334,22 +355,57 @@ async def admin_wallet_detail(
     customer_discord_id: str,
     limit: int = Query(default=100, ge=1, le=300),
 ):
-    if not _mwfinal_wallet_admin_user(request):
-        return _mwfinal_wallet_redirect(url="/admin",status_code=303)
-    wallet, transactions = fetch_wallet_detail(customer_discord_id, limit=limit)
+    user = require_admin(request)
+    if not user:
+        return RedirectResponse("/admin", status_code=303)
+
+    wallet, transactions = fetch_wallet_detail(
+        customer_discord_id,
+        limit=limit,
+    )
+    refunds = fetch_wallet_refunds(customer_discord_id)
 
     return templates.TemplateResponse(
-        request,
-        "admin_wallet_detail.html",
-        {
+        request=request,
+        name="admin_wallet_detail.html",
+        context={
             "title": "錢包流水",
-            "user": request.session.get("user"),
+            "user": user,
             "wallet": wallet,
             "transactions": transactions,
+            "refunds": refunds,
             "limit": limit,
+            "error": request.query_params.get("error"),
+            "ok": request.query_params.get("ok"),
         },
     )
 
-# MAWAN_FINAL_WALLET_ADMIN_GUARD_V1
-from web.app.routers.admin_staff import _mw4b2_admin_user as _mwfinal_wallet_admin_user
-from fastapi.responses import RedirectResponse as _mwfinal_wallet_redirect
+
+@router.post("/{customer_discord_id}/refund")
+async def admin_wallet_refund(
+    request: Request,
+    customer_discord_id: str,
+    amount: int = Form(...),
+    note: str = Form(default=""),
+):
+    user = require_admin(request)
+    if not user:
+        return RedirectResponse("/admin", status_code=303)
+
+    try:
+        refund = create_wallet_refund_request(
+            customer_discord_id=customer_discord_id,
+            amount=int(amount),
+            requested_by_discord_id=str(user.get("id") or ""),
+            requested_by_display_name=_admin_display_name(user),
+            note=note,
+            db_file=bot_db_path(),
+        )
+    except ValueError as exc:
+        return _redirect_detail(customer_discord_id, "error", exc)
+
+    return _redirect_detail(
+        customer_discord_id,
+        "ok",
+        f"退款 #{refund['id']} 已送出，Bot 將同步處理錢包與 VIP。",
+    )

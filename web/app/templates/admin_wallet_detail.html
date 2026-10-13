@@ -10,19 +10,86 @@
             <h2>{{ wallet.customer_display_name }}</h2>
             <p>Discord ID：<span class="wallet-code">{{ wallet.customer_discord_id }}</span></p>
         </div>
-
     </section>
+
+    {% if error %}<div class="member-alert">{{ error }}</div>{% endif %}
+    {% if ok %}<div class="member-alert">{{ ok }}</div>{% endif %}
 
     <section class="wallet-detail-stats">
         <article class="wallet-detail-stat">
-            <span>目前餘額</span>
+            <span>目前總額</span>
             <strong>{{ wallet.balance_text }}</strong>
         </article>
-
+        <article class="wallet-detail-stat">
+            <span>可退款／可雞腿本金</span>
+            <strong>{{ wallet.principal_balance_text }}</strong>
+        </article>
+        <article class="wallet-detail-stat">
+            <span>VIP／活動贈額</span>
+            <strong>{{ wallet.bonus_balance_text }}</strong>
+        </article>
         <article class="wallet-detail-stat">
             <span>最後更新</span>
             <strong>{{ wallet.updated_at_text or "—" }}</strong>
         </article>
+    </section>
+
+    <section class="wallet-detail-panel">
+        <div class="wallet-detail-head">
+            <div>
+                <p class="order-no">REFUND</p>
+                <h3>儲值退款</h3>
+                <p>僅退尚未消費的實付本金。送出後由 Bot 回滾 VIP；現有未使用贈額會一併撤銷。</p>
+            </div>
+        </div>
+        <form method="post" action="/admin/wallets/{{ wallet.customer_discord_id }}/refund" class="wallet-limit-form">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <input
+                type="number"
+                name="amount"
+                min="1"
+                max="{{ wallet.principal_balance or 0 }}"
+                placeholder="退款本金"
+                required
+            >
+            <input type="text" name="note" maxlength="300" placeholder="退款原因／備註">
+            <button class="button" type="submit" {% if (wallet.principal_balance or 0) <= 0 %}disabled{% endif %}>送出退款</button>
+        </form>
+
+        {% if refunds %}
+        <div class="wallet-table-wrap">
+            <table class="wallet-table">
+                <thead>
+                    <tr>
+                        <th>建立時間</th>
+                        <th>退款本金</th>
+                        <th>狀態</th>
+                        <th>撤銷贈額</th>
+                        <th>VIP</th>
+                        <th>備註／錯誤</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for refund in refunds %}
+                    <tr>
+                        <td>{{ refund.created_at_text }}</td>
+                        <td>{{ refund.amount_text }}</td>
+                        <td><span class="wallet-pill">{{ refund.status }}</span></td>
+                        <td>{{ refund.bonus_revoked_text }}</td>
+                        <td>
+                            {% if refund.vip_level_before or refund.vip_level_after %}
+                                {{ refund.vip_level_before or "—" }} → {{ refund.vip_level_after or "—" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="wallet-note">{{ refund.error_message or refund.note or "—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </section>
 
     <section class="wallet-detail-panel">

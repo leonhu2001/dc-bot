@@ -20,12 +20,10 @@ _REVIEW_TARGET_GETTER: Callable | None = None
 _REFRESH_POST_CLOSE_HANDLER: Callable[..., Awaitable] | None = None
 
 WORKER_TIP_POLICY_TEXT = (
-    "🍗 **加雞腿說明**\n"
-    "• 雞腿金額 100% 給你指定的打手／陪玩。\n"
-    "• 雞腿採獨立帳務，不併入原訂單金額。\n"
-    "• 雞腿不計原單抽成，也不影響原訂單分潤。\n"
-    "• 雞腿不列入 VIP 累積消費，也不增加會員點數。\n"
-    "• 使用「我的錢包」會立即扣款；街口／轉帳送出後會進網站審核，請在票口貼付款截圖，客服確認後才會入帳。"
+    "🍗 **加雞腿**\n"
+    "• 雞腿金額 100% 給你指定的陪玩。\n"
+    "• 使用錢包時僅能使用實付本金，VIP／活動贈額不可用於雞腿。\n"
+    "• 街口／轉帳需貼付款截圖，客服確認後才會入帳。"
 )
 
 
@@ -56,7 +54,7 @@ async def _refresh_post_close(channel, customer_id: int):
     return await _REFRESH_POST_CLOSE_HANDLER(channel, customer_id)
 
 
-async def _log_worker_tip(event: str, *, interaction: discord.Interaction, tip_row: sqlite3.Row | None) -> None:
+async def _log_worker_tip(event: str, *, interaction: discord.Interaction, tip_row) -> None:
     callback = _LOG_HANDLER
     if callback is None or tip_row is None:
         return
@@ -71,7 +69,7 @@ async def _log_worker_tip(event: str, *, interaction: discord.Interaction, tip_r
         print(f"[worker-tip] log callback failed tip_id={tip_row['id']}: {exc}")
 
 
-async def _notify_worker_tip_paid(interaction: discord.Interaction, tip_row: sqlite3.Row | None) -> None:
+async def _notify_worker_tip_paid(interaction: discord.Interaction, tip_row) -> None:
     if tip_row is None:
         return
 
@@ -102,8 +100,7 @@ def _worker_tip_preview_text(*, target: dict, amount: int) -> str:
     return (
         f"{WORKER_TIP_POLICY_TEXT}\n\n"
         f"指定成員：**{target.get('display_name') or target.get('staff_id')}**\n"
-        f"雞腿金額：**{int(amount):,}T**\n\n"
-        "確認金額後，請選擇付款方式；付款前仍可修改金額。"
+        f"雞腿金額：**{int(amount):,}T**"
     )
 
 
@@ -329,11 +326,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             target=self.target,
             amount=self.amount,
             payment_method=payment_method,
-            payment_status=(
-                "pending"
-                if payment_method == "我的錢包"
-                else "pending_review"
-            ),
+            payment_status=("pending" if payment_method == "我的錢包" else "pending_review"),
         )
 
         if payment_method == "我的錢包":
@@ -364,10 +357,7 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
                 mark_worker_tip_cancelled(tip_id, cancelled_by=interaction.user)
                 error_text = str(exc).strip()
                 if "duplicate wallet transaction reference" in error_text.lower():
-                    error_text = (
-                        "雞腿付款未完成：系統偵測到重複交易，"
-                        "本次操作已取消且不會重複扣款。請重新開啟「加雞腿」再試一次。"
-                    )
+                    error_text = "系統偵測到重複交易，本次未扣款。請重新開啟「加雞腿」再試一次。"
                 elif not error_text:
                     error_text = "雞腿付款失敗，這筆雞腿沒有扣款，請重新操作。"
 
@@ -390,10 +380,8 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             )
             await _notify_worker_tip_paid(interaction, tip_row)
             await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
-
             await _refresh_post_close(channel, self.customer_id)
 
-            # 已付款會直接顯示在公開 Embed；把付款方式選單收掉即可。
             try:
                 await interaction.delete_original_response()
             except (discord.NotFound, discord.HTTPException):
@@ -431,16 +419,11 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
 
         review_message = await channel.send(
             (
-                f"🍗 **雞腿付款已送出網站審核**\n"
+                "🍗 **雞腿付款待審核**\n"
                 f"老闆：{interaction.user.mention}\n"
                 f"指定成員：<@{self.target.get('staff_id')}>\n"
-                f"金額：**{self.amount:,}T**\n"
-                f"付款方式：**{payment_method}**\n\n"
-                "雞腿 100% 給指定成員；不計原單抽成、不影響原訂單金額，"
-                "也不列入 VIP 累積或會員點數。\n\n"
-                "📎 **請將轉帳／街口付款截圖直接傳在此票口**，"
-                "方便客服核對後到網站完成付款審核。\n"
-                "客服確認前，這筆雞腿不會列入打手薪資。"
+                f"金額：**{self.amount:,}T**｜付款方式：**{payment_method}**\n\n"
+                "📎 請將付款截圖直接傳在此票口；客服確認後才會列入陪玩薪資。"
             ),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -451,23 +434,15 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
         set_worker_tip_confirmation_message(tip_id, review_message.id)
 
         try:
-            set_payment_review_notification(
-                int(review["id"]),
-                review_message.id,
-            )
+            set_payment_review_notification(int(review["id"]), review_message.id)
         except Exception:
             pass
 
         tip_row = get_worker_tip(tip_id)
         await _log_worker_tip("pending", interaction=interaction, tip_row=tip_row)
 
-        # 這是仍需要使用者下一步動作的提示，因此保留；
-        # 直接取代原付款方式選單，避免再多生一則私人訊息。
         await interaction.edit_original_response(
-            content=(
-                f"已建立 **{self.amount:,}T** 雞腿並送出網站審核。\n"
-                "請把付款截圖貼在這個票口，等待客服確認。"
-            ),
+            content="已送出審核，請把付款截圖貼在這個票口。",
             view=None,
         )
         await _refresh_post_close(channel, self.customer_id)
@@ -574,10 +549,7 @@ class WorkerTipPaymentConfirmView(discord.ui.View):
         await _notify_worker_tip_paid(interaction, tip_row)
         await _log_worker_tip("paid", interaction=interaction, tip_row=tip_row)
         if isinstance(interaction.channel, discord.TextChannel):
-            await _refresh_post_close(
-                interaction.channel,
-                self.customer_id,
-            )
+            await _refresh_post_close(interaction.channel, self.customer_id)
 
     @discord.ui.button(
         label="取消雞腿",
@@ -614,7 +586,4 @@ class WorkerTipPaymentConfirmView(discord.ui.View):
         )
         await _log_worker_tip("cancelled", interaction=interaction, tip_row=tip_row)
         if isinstance(interaction.channel, discord.TextChannel):
-            await _refresh_post_close(
-                interaction.channel,
-                self.customer_id,
-            )
+            await _refresh_post_close(interaction.channel, self.customer_id)

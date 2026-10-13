@@ -6,22 +6,19 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "vip_room": "・專屬 VIP 身分組，可使用VIP專屬包廂",
     "priority_cs": "・優先客服回覆",
     "discount_98": "・體驗單、趣味單外全館98折",
+    "rebate_1": "・儲值返利1%",
     "rebate_2": "・儲值返利2%",
     "monthly_coupon_200": "・每月一張折現券200T",
     "priority_order": "・優先排單",
     "familiar_worker": "・優先安排熟悉／收藏陪玩",
     "rebate_3": "・儲值返利3%",
     "discount_96": "・體驗單、趣味單外全館96折",
-    "rebate_4": "・儲值返利4%",
     "monthly_coupon_500": "・每月額外一張折現券500T",
     "free_secret_space": "・每月一次免費「機密航天保底1000w」或娛樂陪 2H",
-    "rebate_5": "・儲值返利5%",
     "discount_94": "・體驗單、趣味單外全館94折",
     "custom_order": "・可根據闆闆要求製作\"自訂單\"",
 }
 
-# benefit_keys 是每個 VIP 等級『實際生效』的完整權益。
-# 高等級沿用低等級的一般福利；同類型回饋／折扣只保留當前最高值。
 VIP_LEVELS: list[dict[str, Any]] = [
     {
         "name": "銀級魔丸",
@@ -33,25 +30,15 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "name": "金級魔丸",
         "threshold": 6000,
         "role_id": 1516575036973256738,
-        "benefit_keys": [
-            "vip_room",
-            "priority_cs",
-            "discount_98",
-            "custom_order",
-        ],
+        "benefit_keys": ["vip_room", "priority_cs", "discount_98", "custom_order"],
     },
     {
         "name": "白金魔丸",
         "threshold": 12000,
         "role_id": 1516575034670583929,
         "benefit_keys": [
-            "vip_room",
-            "priority_cs",
-            "discount_98",
-            "rebate_2",
-            "monthly_coupon_200",
-            "priority_order",
-            "custom_order",
+            "vip_room", "priority_cs", "discount_98", "rebate_1",
+            "monthly_coupon_200", "priority_order", "custom_order",
         ],
     },
     {
@@ -59,14 +46,8 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "threshold": 25000,
         "role_id": 1516575030648115200,
         "benefit_keys": [
-            "vip_room",
-            "priority_cs",
-            "monthly_coupon_200",
-            "priority_order",
-            "familiar_worker",
-            "rebate_3",
-            "discount_96",
-            "custom_order",
+            "vip_room", "priority_cs", "monthly_coupon_200", "priority_order",
+            "familiar_worker", "rebate_2", "discount_96", "custom_order",
         ],
     },
     {
@@ -74,14 +55,8 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "threshold": 50000,
         "role_id": 1516575026583961711,
         "benefit_keys": [
-            "vip_room",
-            "priority_cs",
-            "monthly_coupon_200",
-            "priority_order",
-            "familiar_worker",
-            "discount_96",
-            "rebate_4",
-            "monthly_coupon_500",
+            "vip_room", "priority_cs", "monthly_coupon_200", "priority_order",
+            "familiar_worker", "discount_96", "rebate_3", "monthly_coupon_500",
             "custom_order",
         ],
     },
@@ -90,16 +65,9 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "threshold": 88888,
         "role_id": 1516575018807726150,
         "benefit_keys": [
-            "vip_room",
-            "priority_cs",
-            "monthly_coupon_200",
-            "priority_order",
-            "familiar_worker",
-            "monthly_coupon_500",
-            "free_secret_space",
-            "rebate_5",
-            "discount_94",
-            "custom_order",
+            "vip_room", "priority_cs", "monthly_coupon_200", "priority_order",
+            "familiar_worker", "monthly_coupon_500", "free_secret_space",
+            "rebate_3", "discount_94", "custom_order",
         ],
     },
 ]
@@ -120,12 +88,9 @@ VIP_ROLE_TIERS: list[dict[str, int | str]] = [
     }
     for level in VIP_LEVELS
 ]
-
 VIP_ROLE_IDS: list[int] = [int(level["role_id"]) for level in VIP_LEVELS]
 SILVER_MEMBER_ROLE_ID: int = int(VIP_LEVELS[0]["role_id"])
 
-# VIP 保級以「最近一次實際消費」為基準；各階級採不同保留天數。
-# 這裡是單一規則來源，後台顯示、待審核判斷與 Discord 提醒共用。
 VIP_RETENTION_DAYS: dict[str, int] = {
     "普通魔丸": 0,
     "銀級魔丸": 30,
@@ -136,9 +101,19 @@ VIP_RETENTION_DAYS: dict[str, int] = {
     "黑鑽魔丸": 180,
 }
 
-# 儲值回饋依「本次儲值完成後」的有效 VIP 等級計算。
-# 銀級 / 金級尚未有儲值返利，因此為 0%。
+# 2026-10-14 起的新制。既有儲值單會在 topup_orders.policy_version 保留 legacy。
+VIP_TOPUP_REBATE_POLICY_CURRENT = "2026-10-14"
+VIP_TOPUP_REBATE_POLICY_LEGACY = "legacy"
 VIP_TOPUP_REBATE_PERCENT: dict[str, int] = {
+    "普通魔丸": 0,
+    "銀級魔丸": 0,
+    "金級魔丸": 0,
+    "白金魔丸": 1,
+    "鑽石魔丸": 2,
+    "白鑽魔丸": 3,
+    "黑鑽魔丸": 3,
+}
+VIP_TOPUP_REBATE_PERCENT_LEGACY: dict[str, int] = {
     "普通魔丸": 0,
     "銀級魔丸": 0,
     "金級魔丸": 0,
@@ -148,9 +123,6 @@ VIP_TOPUP_REBATE_PERCENT: dict[str, int] = {
     "黑鑽魔丸": 5,
 }
 
-
-# VIP 訂單折扣統一規則。
-# 數值代表「折後應付比例」：98 = 98 折後比例（即 98%）。
 VIP_DISCOUNT_PAY_RATES: dict[str, int] = {
     "普通魔丸": 100,
     "銀級魔丸": 100,
@@ -161,45 +133,26 @@ VIP_DISCOUNT_PAY_RATES: dict[str, int] = {
     "黑鑽魔丸": 94,
 }
 
-# 體驗單、趣味單與目前明確排除的方案不套用 VIP 折扣。
-VIP_DISCOUNT_EXCLUDED_CATEGORIES: frozenset[str] = frozenset({
-    "fun",
-    "title",
-})
+VIP_DISCOUNT_EXCLUDED_CATEGORIES: frozenset[str] = frozenset({"fun", "title"})
 
 
 class _VipDiscountExcludedRuleKeys(frozenset):
-    """Static exclusions plus each product's live VIP eligibility setting.
-
-    checkout_preview imports this object directly and tests membership, while
-    Discord pricing goes through get_vip_discount_pay_rate.  Keeping the live
-    product flag here makes both paths share exactly the same rule without a
-    second hard-coded exclusion list.
-    """
+    """Static exclusions plus each product's live VIP eligibility setting."""
 
     def __contains__(self, value) -> bool:
         key = str(value or "").strip()
-
         if super().__contains__(key):
             return True
-
         if not key:
             return False
-
         try:
             from services.order_rules import ORDER_RULES
 
             rule = ORDER_RULES.get(key)
             if rule is not None:
-                return not bool(
-                    getattr(rule, "vip_discount_allowed", True)
-                )
+                return not bool(getattr(rule, "vip_discount_allowed", True))
         except Exception:
-            # Fail open to the existing static VIP policy if product rules are
-            # temporarily unavailable.  The pricing path still has all legacy
-            # category/rule exclusions below.
             pass
-
         return False
 
 
@@ -220,28 +173,28 @@ def get_vip_discount_pay_rate(
     category: str | None = None,
     rule_key: str | None = None,
 ) -> int:
-    """回傳訂單應套用的 VIP 折後比例；不適用時回傳 100。"""
-    rate = int(
-        VIP_DISCOUNT_PAY_RATES.get(
-            str(level_name or "普通魔丸"),
-            100,
-        )
-    )
-
+    rate = int(VIP_DISCOUNT_PAY_RATES.get(str(level_name or "普通魔丸"), 100))
     if rate >= 100:
         return 100
-
     if str(category or "").strip() in VIP_DISCOUNT_EXCLUDED_CATEGORIES:
         return 100
-
     if str(rule_key or "").strip() in VIP_DISCOUNT_EXCLUDED_RULE_KEYS:
         return 100
-
     return max(0, min(100, rate))
 
 
-def get_topup_rebate_percent(level_name: str | None) -> int:
-    return int(VIP_TOPUP_REBATE_PERCENT.get(str(level_name or "普通魔丸"), 0))
+def get_topup_rebate_percent(
+    level_name: str | None,
+    *,
+    policy_version: str | None = None,
+) -> int:
+    policy = str(policy_version or VIP_TOPUP_REBATE_POLICY_CURRENT).strip()
+    rates = (
+        VIP_TOPUP_REBATE_PERCENT_LEGACY
+        if policy == VIP_TOPUP_REBATE_POLICY_LEGACY
+        else VIP_TOPUP_REBATE_PERCENT
+    )
+    return int(rates.get(str(level_name or "普通魔丸"), 0))
 
 
 def get_vip_retention_days(level_name: str | None) -> int:
@@ -249,55 +202,36 @@ def get_vip_retention_days(level_name: str | None) -> int:
 
 
 def has_active_vip_progress_reset(data: dict) -> bool:
-    """判斷會員是否真的處於降級 / 手動調整後的重新累積區間。
-
-    舊版曾在「正常升級」時誤寫 vip_progress_base_total_spent，
-    因此不能只看 base_total 是否存在。
-    """
     if not isinstance(data, dict):
         return False
-
     try:
         base_total = int(data.get("vip_progress_base_total_spent"))
     except (TypeError, ValueError):
         return False
-
     if data.get("vip_progress_reset_active") is True:
         return True
-
     logs = data.get("vip_downgrade_logs")
     if isinstance(logs, list) and bool(logs):
         return True
-
     if (
         data.get("last_level_manual_fixed_at")
         or data.get("last_level_manual_fixed_by")
         or data.get("last_level_manual_fixed_reason")
     ):
         return True
-
-    # 舊資料若缺少手動調整 metadata，普通魔丸且基準正好等於
-    # 當前累積金額，仍視為剛被重置到普通等級，避免誤拉回歷史 VIP。
     try:
         stored_index = int(data.get("vip_level_index"))
     except (TypeError, ValueError):
         stored_index = None
-
     try:
         total_spent = int(data.get("total_spent", 0) or 0)
     except (TypeError, ValueError):
         total_spent = 0
-
-    return (
-        stored_index == 0
-        and base_total > 0
-        and base_total <= total_spent
-    )
+    return stored_index == 0 and base_total > 0 and base_total <= total_spent
 
 
 def build_vip_level_benefits() -> dict[str, str]:
     benefits: dict[str, str] = {"普通魔丸": "尚未解鎖 VIP 福利。"}
-
     for level in VIP_LEVELS:
         lines = [f"累積消費 {int(level['threshold'])}⤴️"]
         lines.extend(
@@ -306,7 +240,6 @@ def build_vip_level_benefits() -> dict[str, str]:
             if key in VIP_BENEFIT_ITEMS
         )
         benefits[str(level["name"])] = "\n".join(lines)
-
     return benefits
 
 
