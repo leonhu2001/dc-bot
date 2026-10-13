@@ -1,0 +1,22 @@
+name: Phase10 style attribute inventory
+
+on:
+  push:
+    branches:
+      - refactor/phase10-csp-style-attrs-20261013
+    paths:
+      - tools/phase10_style_attr_inventory.py
+      - .github/workflows/phase10-style-attr-inventory.yml
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/phase10-csp-style-attrs-20261013
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Inventory style attributes and JS style operations
+        run: python tools/phase10_style_attr_inventory.py
