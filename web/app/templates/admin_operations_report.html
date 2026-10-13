@@ -78,12 +78,12 @@
       <div class="ops-share-list">
         <div>
           <div class="ops-share-head"><span>新客首單營收</span><span>{{ report.new_customer_revenue }} · {{ report.new_customer_revenue_share }}%</span></div>
-          <div class="ops-share-track"><div class="ops-share-fill" style="--share:{{ report.new_customer_revenue_share }}%"></div></div>
+          <div class="ops-share-track"><div class="ops-share-fill" data-csp-share-percent="{{ report.new_customer_revenue_share }}"></div></div>
           <div class="ops-share-meta">{{ report.new_customer_orders }} 筆首單</div>
         </div>
         <div>
           <div class="ops-share-head"><span>回購營收</span><span>{{ report.repeat_customer_revenue }} · {{ report.repeat_customer_revenue_share }}%</span></div>
-          <div class="ops-share-track"><div class="ops-share-fill" style="--share:{{ report.repeat_customer_revenue_share }}%"></div></div>
+          <div class="ops-share-track"><div class="ops-share-fill" data-csp-share-percent="{{ report.repeat_customer_revenue_share }}"></div></div>
           <div class="ops-share-meta">{{ report.repeat_customer_orders }} 筆第二單以上</div>
         </div>
         {% if report.unidentified_customer_revenue %}
@@ -100,7 +100,7 @@
       <h2>訂單取消狀況</h2>
       <div class="ops-insight-value"><span data-count="{{ report.cancellation_rate }}" data-decimals="1">{{ report.cancellation_rate }}</span>%</div>
       <div class="ops-insight-sub">{{ report.cancelled_orders }} 筆取消 / {{ report.created_orders }} 筆建立訂單</div>
-      <div class="ops-share-track" style="margin-top:14px"><div class="ops-share-fill" style="--share:{{ report.cancellation_rate }}%"></div></div>
+      <div class="ops-share-track csp-sa-88b9d5c614"><div class="ops-share-fill" data-csp-share-percent="{{ report.cancellation_rate }}"></div></div>
       <div class="ops-note">依訂單建立日計算；包含期間內尚未結單的訂單作為分母。</div>
     </div>
 
@@ -110,7 +110,7 @@
         {% for row in report.payment_rows %}
         <div>
           <div class="ops-share-head"><span>{{ row.label }}</span><span>{{ row.revenue }} · {{ row.share }}%</span></div>
-          <div class="ops-share-track"><div class="ops-share-fill" style="--share:{{ row.share }}%"></div></div>
+          <div class="ops-share-track"><div class="ops-share-fill" data-csp-share-percent="{{ row.share }}"></div></div>
           <div class="ops-share-meta">{{ row.orders }} 筆已結單</div>
         </div>
         {% else %}

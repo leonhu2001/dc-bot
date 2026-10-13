@@ -108,14 +108,14 @@
                                 <span class="profile-status {% if row.is_public %}public{% else %}hidden{% endif %}">
                                     {% if row.is_public %}公開{% else %}隱藏{% endif %}
                                 </span>
-                                <div style="margin-top:6px">
+                                <div class="csp-sa-2fd7789b39">
                                     <span class="profile-status {% if row.has_panel %}ready{% else %}missing{% endif %}">
                                         {% if row.has_panel %}Panel 正常{% else %}無 Panel{% endif %}
                                     </span>
                                 </div>
                             </td>
                             <td class="profile-bio">{{ row.bio or "—" }}</td>
-                            <td><span class="profile-muted" style="margin-top:0">{{ row.updated_at }}</span></td>
+                            <td><span class="profile-muted csp-sa-291b7bbb01">{{ row.updated_at }}</span></td>
                             <td>
                                 <div class="profile-actions">
                                     <a class="profile-button gold" href="/admin/staff_profiles/edit/{{ row.staff_id }}?return_to=/admin/staff_profiles/">編輯</a>

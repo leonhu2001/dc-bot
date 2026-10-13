@@ -12,9 +12,8 @@ ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
 
-# Debt budget after the 2026-10-13 public-layout extraction. The project still
-# needs CSP unsafe-inline on legacy pages, but new changes may only reduce these
-# counts, never increase them.
+# CSP debt is shrink-only. Style blocks and style attributes are fully retired;
+# the remaining inline scripts must carry a per-request nonce.
 MAX_INLINE_STYLE_BLOCKS = 0
 MAX_INLINE_SCRIPT_BLOCKS = 7
 
@@ -27,6 +26,7 @@ STATIC_REF_RE = re.compile(
     re.IGNORECASE,
 )
 INLINE_STYLE_RE = re.compile(r"<style(?:\s|>)", re.IGNORECASE)
+STYLE_ATTR_RE = re.compile(r"\bstyle\s*=", re.IGNORECASE)
 INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.IGNORECASE)
 PATCH_ASSET_RE = re.compile(r"(?:^|/)[^/]*_fix\.(?:js|css)$", re.IGNORECASE)
 
@@ -61,6 +61,7 @@ def main() -> None:
 
     errors: list[str] = []
     inline_style_count = 0
+    inline_style_attr_count = 0
     inline_script_count = 0
     static_references: set[str] = set()
 
@@ -81,6 +82,7 @@ def main() -> None:
             errors.append(message)
 
         inline_style_count += len(INLINE_STYLE_RE.findall(source))
+        inline_style_attr_count += len(STYLE_ATTR_RE.findall(source))
         inline_script_count += len(INLINE_SCRIPT_RE.findall(source))
         static_references.update(STATIC_REF_RE.findall(source))
 
@@ -115,10 +117,15 @@ def main() -> None:
 
     title("CSP_DEBT")
     print("INLINE_STYLE_BLOCKS:", inline_style_count)
+    print("INLINE_STYLE_ATTRIBUTES:", inline_style_attr_count)
     print("INLINE_SCRIPT_BLOCKS:", inline_script_count)
     print("MAX_INLINE_STYLE_BLOCKS:", MAX_INLINE_STYLE_BLOCKS)
     print("MAX_INLINE_SCRIPT_BLOCKS:", MAX_INLINE_SCRIPT_BLOCKS)
 
+    if inline_style_attr_count:
+        errors.append(
+            f"inline style attributes are forbidden: {inline_style_attr_count}"
+        )
     if inline_style_count > MAX_INLINE_STYLE_BLOCKS:
         errors.append(
             "inline style debt increased: "

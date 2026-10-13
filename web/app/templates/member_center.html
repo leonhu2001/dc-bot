@@ -35,7 +35,7 @@
                 </div>
                 <span>{{ member.total_spent_text }}</span>
             </div>
-            <div class="mc-progress"><i style="width: {{ member.vip_progress.percent }}%"></i></div>
+            <div class="mc-progress"><i data-csp-width-percent="{{ member.vip_progress.percent }}"></i></div>
             {% if member.vip_progress.next_name %}
                 <p>距 {{ member.vip_progress.next_name }} 尚差 <b>{{ "{:,}".format(member.vip_progress.remaining) }}T</b></p>
             {% else %}

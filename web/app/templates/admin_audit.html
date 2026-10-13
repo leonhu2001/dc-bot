@@ -54,8 +54,7 @@
         >
 
         <label
-            class="input"
-            style="display:flex;align-items:center;gap:8px;min-height:42px;"
+            class="input csp-sa-7ecf151d3b"
         >
             <input
                 type="checkbox"
@@ -170,12 +169,11 @@
                     {% if log.before_json or log.after_json %}
 
                         <div
-                            class="order-meta compact-meta"
-                            style="margin-top:12px;"
+                            class="order-meta compact-meta csp-sa-9374e84210"
                         >
-                            <div style="grid-column:1 / -1;">
+                            <div class="csp-sa-804ac9edc8">
                                 <span>變更摘要</span>
-                                <pre style="white-space:pre-wrap;margin:6px 0 0;">{{ format_audit_changes(log.before_json, log.after_json) }}</pre>
+                                <pre class="csp-sa-2054aafe1a">{{ format_audit_changes(log.before_json, log.after_json) }}</pre>
                             </div>
                         </div>
 
