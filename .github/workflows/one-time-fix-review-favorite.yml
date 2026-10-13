@@ -3,7 +3,7 @@ name: One-time fix review favorite emoji
 on:
   push:
     branches:
-      - fix/review-favorite-emoji-20261014
+      - main
 
 permissions:
   contents: write
@@ -13,10 +13,10 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
-          ref: fix/review-favorite-emoji-20261014
+          ref: main
 
       - name: Patch invalid select emoji
         shell: python
@@ -43,4 +43,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add views/review.py .github/workflows/one-time-fix-review-favorite.yml
           git commit -m "Fix invalid favorite select emoji"
-          git push origin HEAD:fix/review-favorite-emoji-20261014
+          git push origin HEAD:main
