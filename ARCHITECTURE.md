@@ -57,3 +57,5 @@ bot.py 仍是主入口，但大型已驗證 runtime 會依責任區塊搬出；�
 - Patch-style frontend assets (`*_fix.js` / `*_fix.css`) have no allow-list. Additions must be implemented in canonical controllers/styles instead.
 
 - Wallet persistence is canonical in `services/wallet_service.py`; Discord/Web layers may adapt identities or presentation, but must not open or mutate wallet tables directly.
+
+- Persistent VIP voice lifecycle behavior is owned by `services/vip_voice_runtime.py`; `bot.py` keeps Discord event/command registration and explicit dependency binding only.
