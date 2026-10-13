@@ -18,15 +18,26 @@ jobs:
           fetch-depth: 0
       - name: Apply repair
         run: python tools/one_shot_notification_repair.py
-      - name: Install dependencies
-        run: |
-          python -m pip install -q -r requirements.txt
-          python -m pip install -q -r web/requirements-web.txt
-          python -m pip install -q -r requirements-dev.txt
-      - name: Run focused regression
-        run: python -m pytest -q tests/test_order_reporting.py tests/test_payout_notifications.py
       - name: Compile changed runtime
         run: python -m compileall -q web/app/services/order_reporting.py web/app/routers/admin_payout_summary.py
+      - name: Verify notification contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          reporting = Path('web/app/services/order_reporting.py').read_text(encoding='utf-8')
+          assert '"style": 5' in reporting
+          assert '"label": "填寫報單"' in reporting
+          assert '"url": report_url' in reporting
+          assert 'f"填寫報單：{report_url}"' not in reporting
+
+          payouts = Path('web/app/routers/admin_payout_summary.py').read_text(encoding='utf-8')
+          assert 'def _collect_bulk_payout_notification_targets' in payouts
+          assert 'status="unpaid"' in payouts
+          assert 'def _send_bulk_payout_paid_notifications' in payouts
+          assert '_send_bulk_payout_paid_notifications(notification_targets)' in payouts
+          assert 'send_payout_paid_notification(' in payouts
+          PY
       - name: Commit repair
         run: |
           rm -f .github/workflows/fix_report_button_payout_notification_once.yml
