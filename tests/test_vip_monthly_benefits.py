@@ -36,11 +36,35 @@ def _make_bot_db(path, rows):
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_id TEXT,
+                amount INTEGER,
+                status TEXT,
+                closed_at TEXT
+            )
+            """
+        )
         for customer_id, data in rows:
             conn.execute(
                 "INSERT INTO customers(customer_id, data_json) VALUES (?, ?)",
                 (str(customer_id), json.dumps(data, ensure_ascii=False)),
             )
+            last_order_at = str(data.get("monthly_activity_order_at") or data.get("last_order_at") or "").strip()
+            if last_order_at:
+                conn.execute(
+                    """
+                    INSERT INTO orders(customer_id, amount, status, closed_at)
+                    VALUES (?, ?, 'closed', ?)
+                    """,
+                    (
+                        str(customer_id),
+                        int(data.get("monthly_activity_spend", data.get("total_spent", 0)) or 0),
+                        last_order_at,
+                    ),
+                )
         conn.commit()
 
 
@@ -72,7 +96,7 @@ def test_monthly_benefits_do_not_accumulate_and_black_gets_all_three(tmp_path):
                 {
                     "total_spent": 88888,
                     "vip_level_index": 6,
-                    "last_order_at": "2026-10-01T12:00:00+08:00",
+                    "last_order_at": "2026-10-10T12:00:00+08:00",
                 },
             )
         ],
@@ -190,6 +214,7 @@ def test_black_diamond_choice_reserve_release_and_redeem(tmp_path):
         month_key="2026-11",
         now=now,
         web_db=web_db,
+        bot_db=bot_db,
     ) is True
 
     snapshot = get_customer_vip_monthly_snapshot(
@@ -380,7 +405,6 @@ def test_releasing_reserved_black_benefit_after_downgrade_revokes_instead_of_reo
     assert raw[BLACK_DIAMOND_CHOICE] == REVOKED
 
 
-
 def test_monthly_cash_benefit_reserve_release_and_redeem_by_channel(tmp_path):
     bot_db = tmp_path / "bot.db"
     web_db = tmp_path / "web_dashboard.db"
@@ -463,3 +487,99 @@ def test_monthly_cash_benefit_reserve_release_and_redeem_by_channel(tmp_path):
         web_db=web_db,
         ensure_synced=False,
     ) == []
+
+
+def test_white_diamond_monthly_benefits_require_5000_recent_spend(tmp_path):
+    bot_db = tmp_path / "bot.db"
+    web_db = tmp_path / "web_dashboard.db"
+    customer_id = "white-diamond-activity"
+    _make_bot_db(
+        bot_db,
+        [(
+            customer_id,
+            {
+                "total_spent": 50000,
+                "vip_level_index": 5,
+                "last_order_at": "2026-11-05T10:00:00+08:00",
+                "monthly_activity_spend": 4999,
+            },
+        )],
+    )
+    now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
+
+    snapshot = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert snapshot["recent_spend"] == 4999
+    assert snapshot["recent_spend_required"] == 5000
+    assert snapshot["monthly_spend_eligible"] is False
+    assert snapshot["cash_benefits"] == []
+
+    with sqlite3.connect(bot_db) as conn:
+        conn.execute(
+            "UPDATE orders SET amount=5000 WHERE customer_id=?",
+            (customer_id,),
+        )
+        conn.commit()
+
+    unlocked = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert unlocked["monthly_spend_eligible"] is True
+    assert {row["benefit_key"] for row in unlocked["cash_benefits"]} == {
+        MONTHLY_COUPON_200,
+        MONTHLY_COUPON_500,
+    }
+
+
+def test_pre_policy_monthly_benefit_is_not_retroactively_revoked_by_activity_gate(tmp_path):
+    bot_db = tmp_path / "bot.db"
+    web_db = tmp_path / "web_dashboard.db"
+    customer_id = "grandfathered-october"
+    _make_bot_db(
+        bot_db,
+        [(
+            customer_id,
+            {
+                "total_spent": 50000,
+                "vip_level_index": 5,
+                "last_order_at": "2026-10-10T10:00:00+08:00",
+            },
+        )],
+    )
+
+    before_policy = datetime(2026, 10, 10, 12, tzinfo=TAIPEI_TZ)
+    first = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=before_policy,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert len(first["cash_benefits"]) == 2
+
+    with sqlite3.connect(bot_db) as conn:
+        conn.execute(
+            "UPDATE orders SET closed_at='2026-08-01T10:00:00+08:00' WHERE customer_id=?",
+            (customer_id,),
+        )
+        conn.commit()
+
+    after_policy = datetime(2026, 10, 15, 12, tzinfo=TAIPEI_TZ)
+    grandfathered = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=after_policy,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert grandfathered["recent_spend"] == 0
+    assert grandfathered["monthly_spend_eligible"] is False
+    assert {row["benefit_key"] for row in grandfathered["cash_benefits"]} == {
+        MONTHLY_COUPON_200,
+        MONTHLY_COUPON_500,
+    }
