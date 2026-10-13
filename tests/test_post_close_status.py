@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 
+from services import review_storage
 from views import review
 
 
@@ -65,7 +66,7 @@ def _prepare_order_db(db_file: Path) -> None:
 def test_post_close_embed_reflects_review_tip_and_favorite(tmp_path, monkeypatch):
     db_file = tmp_path / "post_close.db"
     _prepare_order_db(db_file)
-    monkeypatch.setattr(review, "_web_db_path", lambda: db_file)
+    monkeypatch.setattr(review_storage, "_web_db_path", lambda: db_file)
     review.ensure_review_tables()
 
     conn = sqlite3.connect(db_file)
