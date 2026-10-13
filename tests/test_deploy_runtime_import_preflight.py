@@ -23,6 +23,8 @@ def test_runtime_import_smoke_executes_all_critical_imports(capsys):
     module.main()
     output = capsys.readouterr().out
     assert "PASS: imported" in output
+    assert "validated" in output
+    assert "bot import contracts" in output
 
 
 def test_runtime_import_smoke_runs_as_deploy_invokes_it():
@@ -35,6 +37,35 @@ def test_runtime_import_smoke_runs_as_deploy_invokes_it():
     )
     assert result.returncode == 0, result.stderr
     assert "PASS: imported" in result.stdout
+    assert "bot import contracts" in result.stdout
+
+
+def test_runtime_import_smoke_validates_bot_symbol_ownership():
+    module = importlib.import_module("tools.runtime_import_smoke")
+    count = module._validate_bot_import_contracts()
+    assert count > 0
+
+
+def test_wallet_compatibility_adapters_use_explicit_canonical_imports():
+    module = importlib.import_module("tools.runtime_import_smoke")
+    assert module.REQUIRED_BOT_IMPORT_ALIASES == {
+        "_wallet_ensure_tables": (
+            "services.wallet_service",
+            "ensure_wallet_tables",
+        ),
+        "_wallet_get_balance": (
+            "services.wallet_service",
+            "get_wallet_balance",
+        ),
+        "_wallet_adjust_balance": (
+            "services.wallet_service",
+            "adjust_wallet_balance",
+        ),
+        "_wallet_get_transactions": (
+            "services.wallet_service",
+            "get_wallet_transactions",
+        ),
+    }
 
 
 def test_deploy_runs_runtime_import_preflight_before_restart():
@@ -55,3 +86,5 @@ def test_runtime_import_smoke_script_keeps_explicit_import_loop():
     source = SMOKE.read_text(encoding="utf-8")
     assert "importlib.import_module(module_name)" in source
     assert "sys.path.insert(0, str(ROOT))" in source
+    assert "ast.parse" in source
+    assert "REQUIRED_BOT_IMPORT_ALIASES" in source
