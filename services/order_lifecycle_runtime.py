@@ -5,6 +5,8 @@ from typing import Any, Mapping
 import asyncio
 import discord
 
+from services.payment_methods import WALLET_PAYMENT_METHOD
+
 
 _REQUIRED_DEPENDENCIES = (
     "RECEIPT_CHANNEL_ID",
