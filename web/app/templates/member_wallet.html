@@ -9,6 +9,14 @@
   {% if error %}<div class="member-alert">{{ error }}</div>{% endif %}
   {% if ok %}<div class="member-alert">{{ ok }}</div>{% endif %}
 
+  <section class="member-panel member-panel-wide">
+    <div class="member-benefit-row">
+      <div><span>錢包總額</span><strong>{{ "{:,}".format(wallet.balance) }}T</strong></div>
+      <div><span>實付本金</span><strong>{{ "{:,}".format(wallet.principal_balance) }}T</strong></div>
+      <div><span>VIP／活動贈額</span><strong>{{ "{:,}".format(wallet.bonus_balance) }}T</strong></div>
+    </div>
+  </section>
+
   <div class="member-panels">
     <section class="member-panel">
       <div class="member-panel-head">
