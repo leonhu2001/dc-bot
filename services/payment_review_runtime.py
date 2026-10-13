@@ -15,12 +15,11 @@ from services.payment_reviews import (
     mark_payment_review_apply_error,
     mark_payment_review_rejection_applied,
 )
-from views.review import (
-    _worker_tip_row,
+from services.worker_tips import (
     mark_worker_tip_cancelled,
     mark_worker_tip_paid,
-    refresh_post_close_panel,
 )
+from views.review import refresh_post_close_panel
 
 
 def _target_bot_module():
