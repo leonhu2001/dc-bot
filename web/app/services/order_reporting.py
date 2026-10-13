@@ -1206,13 +1206,27 @@ async def _send_discord_report_dm(client: httpx.AsyncClient, reminder: Mapping[s
         f"單別：{item}\n"
         f"結單時間：{closed_at}\n\n"
         "本單任一參與陪玩／打手填寫一次即可；隊友已填就不必重複。\n"
-        f"填寫報單：{report_url}"
+        "請點下方按鈕進入報單頁。"
     )
     message_response = await client.post(
         f"https://discord.com/api/v10/channels/{channel_id}/messages",
         headers=headers,
         json={
             "content": content,
+            "components": [
+                {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 5,
+                            "label": "填寫報單",
+                            "url": report_url,
+                            "emoji": {"name": "📝"},
+                        }
+                    ],
+                }
+            ],
             "allowed_mentions": {"parse": []},
         },
     )
