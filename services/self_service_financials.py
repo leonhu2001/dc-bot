@@ -5,6 +5,12 @@ from typing import Any, Callable
 
 import discord
 
+from services.vip_monthly_order_discount import (
+    build_vip_monthly_discount_note,
+    build_vip_monthly_discount_result,
+    resolve_vip_monthly_cash_discount,
+)
+
 
 ORDER_POINT_BENEFIT_SPECS: dict
 POINT_REDEEM_ITEMS_BY_KEY: dict
@@ -1369,29 +1375,11 @@ def calculate_self_service_financials(
         ),
     )
 
-    selected_vip_monthly = None
-    vip_monthly_cash = 0
-    selected_vip_monthly_id = data.get("selected_vip_monthly_benefit_id")
-    if selected_vip_monthly_id not in (None, ""):
-        if benefit is not None:
-            raise ValueError("VIP 每月福利券與點數福利同張訂單只能擇一使用。")
-        customer_id = data.get("customer_id")
-        if not customer_id:
-            raise ValueError("無法確認 VIP 每月福利券的會員身分，請重新開啟福利選單。")
-        from services.vip_monthly_benefits import get_available_cash_benefit
-        selected_vip_monthly = get_available_cash_benefit(
-            selected_vip_monthly_id,
-            customer_id=customer_id,
-        )
-        if selected_vip_monthly is None:
-            raise ValueError("這張 VIP 每月折現券已使用、已保留或已失效。")
-        vip_monthly_cash = max(
-            0,
-            min(
-                int(selected_vip_monthly.get("amount") or 0),
-                after_fixed,
-            ),
-        )
+    selected_vip_monthly, vip_monthly_cash = resolve_vip_monthly_cash_discount(
+        data,
+        has_point_benefit=benefit is not None,
+        max_discount_amount=after_fixed,
+    )
 
     allocation = allocate_store_absorbed_fixed_discount(
         after_percent_amount=after_percent,
@@ -1475,11 +1463,13 @@ def calculate_self_service_financials(
             f"-{_format_plain_amount(point_specify)}"
         )
 
-    if vip_monthly_cash:
-        notes.append(
-            f"{str(selected_vip_monthly.get('title') or 'VIP 每月折現券')} "
-            f"-{_format_plain_amount(vip_monthly_cash)}"
-        )
+    vip_monthly_note = build_vip_monthly_discount_note(
+        selected_vip_monthly,
+        vip_monthly_cash,
+        formatter=_format_plain_amount,
+    )
+    if vip_monthly_note:
+        notes.append(vip_monthly_note)
 
     # service_promotion_calc_v1
     purchased_service_quantity = max(
@@ -1588,16 +1578,10 @@ def calculate_self_service_financials(
             point_cash
         ),
 
-        "vip_monthly_benefit_id": (
-            int(selected_vip_monthly.get("id")) if selected_vip_monthly else None
+        **build_vip_monthly_discount_result(
+            selected_vip_monthly,
+            vip_monthly_cash,
         ),
-        "vip_monthly_benefit_key": (
-            str(selected_vip_monthly.get("benefit_key") or "") if selected_vip_monthly else ""
-        ),
-        "vip_monthly_benefit_title": (
-            str(selected_vip_monthly.get("title") or "") if selected_vip_monthly else ""
-        ),
-        "vip_monthly_cash_amount": vip_monthly_cash,
 
         "specified_fee_before_waiver": (
             specify_before
