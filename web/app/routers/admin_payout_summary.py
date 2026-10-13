@@ -959,7 +959,8 @@ async def admin_month_options(request: Request):
 
 def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:
     targets: list[dict] = []
-    for person in fetch_rows(month, role, None, status="unpaid"):
+    rows, _ = fetch_rows(month, role, None, status="unpaid")
+    for person in rows:
         person_id = str(person.get("discord_id") or "").strip()
         person_role = str(person.get("role") or "all").strip() or "all"
         if not person_id:

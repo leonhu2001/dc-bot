@@ -199,7 +199,7 @@ def test_bulk_paid_notification_targets_only_capture_currently_unpaid_people(mon
     monkeypatch.setattr(
         admin_payout_summary,
         "fetch_rows",
-        lambda month, role, q, status="unpaid": rows if status == "unpaid" else [],
+        lambda month, role, q, status="unpaid": (rows, {}) if status == "unpaid" else ([], {}),
     )
 
     def fake_snapshot(month, role, *, person_id=None):
