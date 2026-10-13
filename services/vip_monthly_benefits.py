@@ -39,6 +39,11 @@ BENEFIT_LABELS: dict[str, str] = {
     BLACK_DIAMOND_CHOICE: "黑鑽每月尊享福利",
 }
 
+MONTHLY_CASH_AMOUNTS: dict[str, int] = {
+    MONTHLY_COUPON_200: 200,
+    MONTHLY_COUPON_500: 500,
+}
+
 # 2026/10 上線前已由人工發放並使用過 200T 月券的會員。
 # 這是一次性資料遷移，唯一鍵會確保重啟不會重複寫入。
 OCTOBER_2026_USED_200_CUSTOMERS = (
@@ -456,6 +461,194 @@ def get_customer_vip_monthly_snapshot(
             and str(black_row.get("status")) == AVAILABLE
         ),
     }
+
+
+def list_available_cash_benefits(
+    customer_id: str | int,
+    *,
+    now: datetime | None = None,
+    web_db: str | Path | None = None,
+    bot_db: str | Path | None = None,
+    ensure_synced: bool = True,
+) -> list[dict[str, Any]]:
+    """Return current-month VIP cash vouchers that can be selected now."""
+    snapshot = get_customer_vip_monthly_snapshot(
+        customer_id,
+        now=now,
+        web_db=web_db,
+        bot_db=bot_db,
+        ensure_synced=ensure_synced,
+    )
+    result: list[dict[str, Any]] = []
+    for row in snapshot.get("cash_benefits") or []:
+        if str(row.get("status") or "") != AVAILABLE:
+            continue
+        benefit_key = str(row.get("benefit_key") or "")
+        amount = int(MONTHLY_CASH_AMOUNTS.get(benefit_key, 0) or 0)
+        if amount <= 0:
+            continue
+        item = dict(row)
+        item["amount"] = amount
+        item["title"] = str(row.get("benefit_label") or BENEFIT_LABELS.get(benefit_key) or benefit_key)
+        result.append(item)
+    return result
+
+
+def get_available_cash_benefit(
+    benefit_id: str | int,
+    *,
+    customer_id: str | int,
+    now: datetime | None = None,
+    web_db: str | Path | None = None,
+    bot_db: str | Path | None = None,
+) -> dict[str, Any] | None:
+    wanted = str(benefit_id)
+    for row in list_available_cash_benefits(
+        customer_id,
+        now=now,
+        web_db=web_db,
+        bot_db=bot_db,
+    ):
+        if str(row.get("id")) == wanted:
+            return row
+    return None
+
+
+def reserve_cash_benefit_for_channel(
+    *,
+    benefit_id: str | int,
+    customer_id: str | int,
+    channel_id: str | int,
+    now: datetime | None = None,
+    web_db: str | Path | None = None,
+    bot_db: str | Path | None = None,
+) -> dict[str, Any]:
+    """Atomically reserve one current-month VIP cash voucher for an order channel."""
+    current = _normalize_now(now)
+    sync_current_month_vip_benefits(now=current, web_db=web_db, bot_db=bot_db)
+    month = _month_key(current)
+    now_text = current.isoformat(timespec="seconds")
+    path = _web_db_path(web_db)
+    ensure_vip_monthly_tables(path)
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute(
+            """
+            UPDATE vip_monthly_benefits
+            SET status='reserved',
+                reserved_at=?,
+                reserved_channel_id=?,
+                updated_at=?
+            WHERE id=?
+              AND customer_id=?
+              AND month_key=?
+              AND benefit_key IN (?, ?)
+              AND status='available'
+            """,
+            (
+                now_text,
+                str(channel_id),
+                now_text,
+                int(benefit_id),
+                str(customer_id),
+                month,
+                MONTHLY_COUPON_200,
+                MONTHLY_COUPON_500,
+            ),
+        )
+        if int(cur.rowcount or 0) != 1:
+            raise ValueError("這張 VIP 每月折現券已使用、已保留或已失效。")
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM vip_monthly_benefits WHERE id=? LIMIT 1",
+            (int(benefit_id),),
+        ).fetchone()
+    return dict(row)
+
+
+def release_cash_benefits_for_channel(
+    channel_id: str | int,
+    *,
+    now: datetime | None = None,
+    web_db: str | Path | None = None,
+    bot_db: str | Path | None = None,
+) -> int:
+    """Release reserved VIP cash vouchers when an order is cancelled."""
+    current = _normalize_now(now)
+    current_month = _month_key(current)
+    now_text = current.isoformat(timespec="seconds")
+    path = _web_db_path(web_db)
+    ensure_vip_monthly_tables(path)
+
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT id, customer_id, month_key, benefit_key
+            FROM vip_monthly_benefits
+            WHERE reserved_channel_id=?
+              AND benefit_key IN (?, ?)
+              AND status='reserved'
+            """,
+            (str(channel_id), MONTHLY_COUPON_200, MONTHLY_COUPON_500),
+        ).fetchall()
+
+        released = 0
+        for row in rows:
+            member_status = _current_member_status(
+                str(row["customer_id"]),
+                now=current,
+                bot_db=bot_db,
+            )
+            eligible_keys = _benefit_keys_for_level(str(member_status.get("current_level") or "普通魔丸"))
+            next_status = (
+                AVAILABLE
+                if str(row["month_key"]) == current_month and str(row["benefit_key"]) in eligible_keys
+                else REVOKED
+            )
+            cur = conn.execute(
+                """
+                UPDATE vip_monthly_benefits
+                SET status=?,
+                    reserved_at=NULL,
+                    reserved_channel_id=NULL,
+                    updated_at=?
+                WHERE id=? AND status='reserved'
+                """,
+                (next_status, now_text, int(row["id"])),
+            )
+            released += int(cur.rowcount or 0)
+        conn.commit()
+    return released
+
+
+def redeem_cash_benefits_for_channel(
+    channel_id: str | int,
+    *,
+    now: datetime | None = None,
+    web_db: str | Path | None = None,
+) -> int:
+    """Finalize reserved VIP cash vouchers when an order is closed."""
+    current = _normalize_now(now)
+    now_text = current.isoformat(timespec="seconds")
+    path = _web_db_path(web_db)
+    ensure_vip_monthly_tables(path)
+    with sqlite3.connect(path, timeout=15) as conn:
+        cur = conn.execute(
+            """
+            UPDATE vip_monthly_benefits
+            SET status='redeemed',
+                redeemed_at=?,
+                updated_at=?
+            WHERE reserved_channel_id=?
+              AND benefit_key IN (?, ?)
+              AND status='reserved'
+            """,
+            (now_text, now_text, str(channel_id), MONTHLY_COUPON_200, MONTHLY_COUPON_500),
+        )
+        conn.commit()
+        return int(cur.rowcount or 0)
 
 
 def reserve_black_diamond_choice(

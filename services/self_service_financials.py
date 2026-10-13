@@ -1369,10 +1369,34 @@ def calculate_self_service_financials(
         ),
     )
 
+    selected_vip_monthly = None
+    vip_monthly_cash = 0
+    selected_vip_monthly_id = data.get("selected_vip_monthly_benefit_id")
+    if selected_vip_monthly_id not in (None, ""):
+        if benefit is not None:
+            raise ValueError("VIP 每月福利券與點數福利同張訂單只能擇一使用。")
+        customer_id = data.get("customer_id")
+        if not customer_id:
+            raise ValueError("無法確認 VIP 每月福利券的會員身分，請重新開啟福利選單。")
+        from services.vip_monthly_benefits import get_available_cash_benefit
+        selected_vip_monthly = get_available_cash_benefit(
+            selected_vip_monthly_id,
+            customer_id=customer_id,
+        )
+        if selected_vip_monthly is None:
+            raise ValueError("這張 VIP 每月折現券已使用、已保留或已失效。")
+        vip_monthly_cash = max(
+            0,
+            min(
+                int(selected_vip_monthly.get("amount") or 0),
+                after_fixed,
+            ),
+        )
+
     allocation = allocate_store_absorbed_fixed_discount(
         after_percent_amount=after_percent,
         fixed_discount_amount=fixed,
-        additional_store_discount_amount=point_cash,
+        additional_store_discount_amount=point_cash + vip_monthly_cash,
         extra_customer_charge_amount=specify_effective,
     )
 
@@ -1385,8 +1409,8 @@ def calculate_self_service_financials(
     selected_coupon = None
     selected_coupon_id = data.get("selected_benefit_coupon_id")
     if selected_coupon_id not in (None, ""):
-        if benefit is not None:
-            raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
+        if benefit is not None or selected_vip_monthly is not None:
+            raise ValueError("福利券、VIP 每月福利券與點數福利同張訂單只能擇一使用。")
         customer_id = data.get("customer_id")
         if customer_id:
             selected_coupon = get_applicable_coupon(
@@ -1449,6 +1473,12 @@ def calculate_self_service_financials(
         notes.append(
             "免指定費 "
             f"-{_format_plain_amount(point_specify)}"
+        )
+
+    if vip_monthly_cash:
+        notes.append(
+            f"{str(selected_vip_monthly.get('title') or 'VIP 每月折現券')} "
+            f"-{_format_plain_amount(vip_monthly_cash)}"
         )
 
     # service_promotion_calc_v1
@@ -1557,6 +1587,17 @@ def calculate_self_service_financials(
         "point_discount_coupon_amount": (
             point_cash
         ),
+
+        "vip_monthly_benefit_id": (
+            int(selected_vip_monthly.get("id")) if selected_vip_monthly else None
+        ),
+        "vip_monthly_benefit_key": (
+            str(selected_vip_monthly.get("benefit_key") or "") if selected_vip_monthly else ""
+        ),
+        "vip_monthly_benefit_title": (
+            str(selected_vip_monthly.get("title") or "") if selected_vip_monthly else ""
+        ),
+        "vip_monthly_cash_amount": vip_monthly_cash,
 
         "specified_fee_before_waiver": (
             specify_before

@@ -33,6 +33,13 @@ def should_send_payout_paid_notification(*, before, after) -> bool:
     if str(after_data.get("target_status") or "").strip() != "paid":
         return False
 
+    totals = dict((before or {}).get("totals") or {})
+    if "unpaid_count" in totals:
+        try:
+            return int(totals.get("unpaid_count") or 0) > 0
+        except (TypeError, ValueError):
+            return False
+
     worker, cs = _role_targets(after_data.get("person_role"))
     changed = 0
     if worker:
