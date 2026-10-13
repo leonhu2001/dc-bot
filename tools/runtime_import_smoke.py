@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+BOT_PATH = ROOT / "bot.py"
 CRITICAL_RUNTIME_MODULES = (
     "services.payment_review_runtime",
     "services.vip_voice_runtime",
@@ -28,11 +30,89 @@ CRITICAL_RUNTIME_MODULES = (
     "views.review",
 )
 
+BOT_IMPORT_PREFIXES = (
+    "services.",
+    "views.",
+)
+
+# These aliases back bot.py compatibility adapters. They must stay explicit
+# imports from the canonical wallet service instead of depending on namespace
+# injection or startup side effects.
+REQUIRED_BOT_IMPORT_ALIASES = {
+    "_wallet_ensure_tables": (
+        "services.wallet_service",
+        "ensure_wallet_tables",
+    ),
+    "_wallet_get_balance": (
+        "services.wallet_service",
+        "get_wallet_balance",
+    ),
+    "_wallet_adjust_balance": (
+        "services.wallet_service",
+        "adjust_wallet_balance",
+    ),
+    "_wallet_get_transactions": (
+        "services.wallet_service",
+        "get_wallet_transactions",
+    ),
+}
+
+
+def _validate_bot_import_contracts() -> int:
+    tree = ast.parse(BOT_PATH.read_text(encoding="utf-8"), filename=str(BOT_PATH))
+    imported_aliases: dict[str, tuple[str, str]] = {}
+    validated = 0
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or not node.module:
+            continue
+        if not node.module.startswith(BOT_IMPORT_PREFIXES):
+            continue
+
+        module = importlib.import_module(node.module)
+
+        for alias in node.names:
+            if alias.name == "*":
+                continue
+
+            if not hasattr(module, alias.name):
+                raise ImportError(
+                    "bot.py imports missing symbol "
+                    f"{alias.name!r} from {node.module!r} "
+                    f"at line {node.lineno}"
+                )
+
+            imported_name = alias.asname or alias.name
+            imported_aliases[imported_name] = (node.module, alias.name)
+            validated += 1
+
+    for alias_name, expected in REQUIRED_BOT_IMPORT_ALIASES.items():
+        actual = imported_aliases.get(alias_name)
+        if actual != expected:
+            expected_module, expected_symbol = expected
+            actual_text = (
+                f"{actual[0]}.{actual[1]}"
+                if actual is not None
+                else "not imported"
+            )
+            raise ImportError(
+                f"bot.py must import {alias_name} as "
+                f"{expected_module}.{expected_symbol}; got {actual_text}"
+            )
+
+    return validated
+
 
 def main() -> None:
     for module_name in CRITICAL_RUNTIME_MODULES:
         importlib.import_module(module_name)
-    print(f"PASS: imported {len(CRITICAL_RUNTIME_MODULES)} critical runtime modules")
+
+    bot_symbol_count = _validate_bot_import_contracts()
+    print(
+        "PASS: imported "
+        f"{len(CRITICAL_RUNTIME_MODULES)} critical runtime modules; "
+        f"validated {bot_symbol_count} bot import contracts"
+    )
 
 
 if __name__ == "__main__":
