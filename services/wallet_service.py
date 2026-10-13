@@ -47,6 +47,35 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
             "CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference "
             "ON wallet_transactions(customer_discord_id, order_no, type)"
         )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wallet_tx_payment_channel "
+            "ON wallet_transactions(customer_discord_id, order_channel_id, type)"
+        )
+
+        # Acceptance-payment wallet debits happen before a formal receipt/order_no
+        # exists. The ticket channel is therefore the stable payment idempotency key.
+        # Keep this as a trigger (rather than a unique-index migration) so historical
+        # duplicate rows, if any, do not make startup fail while all future duplicate
+        # debits are still blocked.
+        conn.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS trg_wallet_tx_unique_payment_channel
+            BEFORE INSERT ON wallet_transactions
+            WHEN NEW.type = 'payment'
+              AND NEW.order_channel_id IS NOT NULL
+              AND TRIM(NEW.order_channel_id) <> ''
+              AND EXISTS (
+                  SELECT 1
+                  FROM wallet_transactions
+                  WHERE customer_discord_id = NEW.customer_discord_id
+                    AND order_channel_id = NEW.order_channel_id
+                    AND type = 'payment'
+              )
+            BEGIN
+                SELECT RAISE(ABORT, 'duplicate wallet payment channel');
+            END
+            """
+        )
 
         # Even if historical duplicate references already exist, this trigger blocks
         # all future duplicates. This is safer than blindly deleting old financial rows.
@@ -126,6 +155,32 @@ def find_wallet_transaction(
         return dict(row) if row else None
 
 
+def get_wallet_payment_transaction(
+    customer_id: str | int,
+    order_channel_id: str | int,
+    *,
+    db_file: str | Path | None = None,
+) -> dict[str, Any] | None:
+    """Return the original wallet debit for a Discord order ticket, if any."""
+    ensure_wallet_tables(db_file)
+    path = _db_path(db_file)
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT *
+            FROM wallet_transactions
+            WHERE customer_discord_id=?
+              AND order_channel_id=?
+              AND type='payment'
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (str(customer_id), str(order_channel_id)),
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def get_wallet_transactions(
     customer_id: str | int,
     *,
@@ -178,15 +233,39 @@ def adjust_wallet_balance(
         raise ValueError("異動金額不能為 0。")
 
     normalized_order_no = str(order_no or "").strip() or None
+    normalized_order_channel_id = str(order_channel_id or "").strip() or None
     normalized_type = str(tx_type)
 
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
 
-        # Idempotency check must happen inside the same write transaction and before
-        # balance calculation. Repeated delivery of the same reference returns the
-        # original transaction instead of crediting/debiting a second time.
+        # Idempotency checks must happen inside the same write transaction and before
+        # balance calculation. A Discord order payment is keyed by ticket channel because
+        # the formal receipt/order number is generated only after wallet debit succeeds.
+        if normalized_type == "payment" and normalized_order_channel_id:
+            existing = conn.execute(
+                """
+                SELECT *
+                FROM wallet_transactions
+                WHERE customer_discord_id=? AND order_channel_id=? AND type='payment'
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                (str(customer_id), normalized_order_channel_id),
+            ).fetchone()
+
+            if existing is not None:
+                if int(existing["amount"] or 0) != amount:
+                    raise ValueError(
+                        "同一訂單票口已有不同金額的錢包扣款；已拒絕再次扣款，請通知客服確認。"
+                    )
+                conn.rollback()
+                result = dict(existing)
+                result["idempotent_replay"] = True
+                return result
+
+        # Non-order flows and legacy callers can still use the formal reference key.
         if normalized_order_no:
             existing = conn.execute(
                 """
@@ -209,7 +288,9 @@ def adjust_wallet_balance(
                         "同一錢包交易識別碼已存在，但金額不同；已拒絕重複入帳。"
                     )
                 conn.rollback()
-                return dict(existing)
+                result = dict(existing)
+                result["idempotent_replay"] = True
+                return result
 
         row = conn.execute(
             "SELECT balance FROM customer_wallets WHERE customer_discord_id=?",
@@ -243,7 +324,7 @@ def adjust_wallet_balance(
             """,
             (
                 str(customer_id), amount, before, after, normalized_type,
-                str(order_channel_id) if order_channel_id is not None else None,
+                normalized_order_channel_id,
                 normalized_order_no,
                 str(operator_discord_id) if operator_discord_id else None,
                 str(operator_display_name or "").strip() or None,
@@ -262,13 +343,10 @@ def adjust_wallet_balance(
             "balance_after": after,
             "type": normalized_type,
             "order_no": normalized_order_no,
-            "order_channel_id": (
-                str(order_channel_id)
-                if order_channel_id is not None
-                else None
-            ),
+            "order_channel_id": normalized_order_channel_id,
             "note": note,
             "created_at": now_text,
+            "idempotent_replay": False,
         }
 
     if operator_discord_id:

@@ -341,18 +341,19 @@ async def finalize_accepted_pending_payment(
                     return
 
                 data["wallet_transaction_id"] = wallet_tx["id"]
-                data["wallet_paid_amount"] = amount
+                data["wallet_paid_amount"] = abs(int(wallet_tx.get("amount") or amount))
                 data["wallet_balance_before"] = wallet_tx["balance_before"]
                 data["wallet_balance_after"] = wallet_tx["balance_after"]
                 remember_order_data(channel_id, data)
 
-                await send_wallet_log(
-                    guild,
-                    title="錢包訂單扣款",
-                    customer=customer_member if customer_member is not None else interaction.user,
-                    operator=interaction.user,
-                    tx=wallet_tx,
-                )
+                if not wallet_tx.get("idempotent_replay"):
+                    await send_wallet_log(
+                        guild,
+                        title="錢包訂單扣款",
+                        customer=customer_member if customer_member is not None else interaction.user,
+                        operator=interaction.user,
+                        tx=wallet_tx,
+                    )
 
         try:
             order_point_benefit_result = await redeem_order_point_benefit_on_payment(
