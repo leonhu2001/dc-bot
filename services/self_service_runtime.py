@@ -434,6 +434,7 @@ async def create_waiting_acceptance_order_from_self_service(
         raise ValueError("無法確認目前票口頻道。")
 
     data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(channel_id, {})
+    data["customer_id"] = int(customer_id)
 
     if data.get("dispatch_message_id") is not None:
         dispatch_message_id = _to_int(data.get("dispatch_message_id"))
@@ -528,6 +529,10 @@ async def create_waiting_acceptance_order_from_self_service(
         "point_benefit_name": price_adjustment.get("point_benefit_name"),
         "point_benefit_cost": price_adjustment.get("point_benefit_cost"),
         "point_discount_coupon_amount": price_adjustment.get("point_discount_coupon_amount"),
+        "vip_monthly_benefit_id": price_adjustment.get("vip_monthly_benefit_id"),
+        "vip_monthly_benefit_key": price_adjustment.get("vip_monthly_benefit_key"),
+        "vip_monthly_benefit_title": price_adjustment.get("vip_monthly_benefit_title"),
+        "vip_monthly_cash_amount": price_adjustment.get("vip_monthly_cash_amount"),
         "point_waived_specify_fee": price_adjustment.get("point_waived_specify_fee"),
         "point_free_first_hour_amount": price_adjustment.get("point_free_first_hour_amount"),
         "point_extra_hours": price_adjustment.get("point_extra_hours"),
@@ -694,6 +699,13 @@ async def create_waiting_acceptance_order_from_self_service(
             + (f"｜{benefit_note}" if benefit_note else "")
         )
 
+    if price_adjustment.get("vip_monthly_benefit_title"):
+        web_note_parts.append(
+            "VIP 月福利："
+            f"{price_adjustment['vip_monthly_benefit_title']}"
+            f"｜折抵 {int(price_adjustment.get('vip_monthly_cash_amount') or 0)}T"
+        )
+
     # service_promotion_web_note_v1
     if price_adjustment.get(
         "service_promotion_text"
@@ -742,6 +754,14 @@ async def create_waiting_acceptance_order_from_self_service(
             order_id=int(web_order.id),
             rule_key=str(rule.key),
             player_count=player_count,
+        )
+
+    if price_adjustment.get("vip_monthly_benefit_id"):
+        from services.vip_monthly_benefits import reserve_cash_benefit_for_channel
+        reserve_cash_benefit_for_channel(
+            benefit_id=int(price_adjustment["vip_monthly_benefit_id"]),
+            customer_id=customer_id,
+            channel_id=interaction.channel.id,
         )
 
     try:

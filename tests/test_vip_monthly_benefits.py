@@ -11,6 +11,10 @@ from services.vip_monthly_benefits import (
     OCTOBER_2026_USED_200_CUSTOMERS,
     REVOKED,
     get_customer_vip_monthly_snapshot,
+    list_available_cash_benefits,
+    redeem_cash_benefits_for_channel,
+    release_cash_benefits_for_channel,
+    reserve_cash_benefit_for_channel,
     mark_month_announcement_sent,
     redeem_black_diamond_choice,
     release_black_diamond_choice,
@@ -374,3 +378,88 @@ def test_releasing_reserved_black_benefit_after_downgrade_revokes_instead_of_reo
         for row in _benefit_rows(web_db, customer_id, "2026-11")
     }
     assert raw[BLACK_DIAMOND_CHOICE] == REVOKED
+
+
+
+def test_monthly_cash_benefit_reserve_release_and_redeem_by_channel(tmp_path):
+    bot_db = tmp_path / "bot.db"
+    web_db = tmp_path / "web_dashboard.db"
+    customer_id = "monthly-cash-user"
+    _make_bot_db(
+        bot_db,
+        [(
+            customer_id,
+            {
+                "total_spent": 30000,
+                "vip_level_index": 3,
+                "last_order_at": "2026-11-05T10:00:00+08:00",
+            },
+        )],
+    )
+    now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
+
+    available = list_available_cash_benefits(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert len(available) == 1
+    assert available[0]["benefit_key"] == MONTHLY_COUPON_200
+    assert available[0]["amount"] == 200
+
+    benefit_id = available[0]["id"]
+    reserved = reserve_cash_benefit_for_channel(
+        benefit_id=benefit_id,
+        customer_id=customer_id,
+        channel_id="ticket-1",
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert reserved["status"] == "reserved"
+    assert reserved["reserved_channel_id"] == "ticket-1"
+
+    with pytest.raises(ValueError, match="已使用、已保留或已失效"):
+        reserve_cash_benefit_for_channel(
+            benefit_id=benefit_id,
+            customer_id=customer_id,
+            channel_id="ticket-2",
+            now=now,
+            bot_db=bot_db,
+            web_db=web_db,
+        )
+
+    assert release_cash_benefits_for_channel(
+        "ticket-1",
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    ) == 1
+    assert list_available_cash_benefits(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )[0]["id"] == benefit_id
+
+    reserve_cash_benefit_for_channel(
+        benefit_id=benefit_id,
+        customer_id=customer_id,
+        channel_id="ticket-3",
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+    )
+    assert redeem_cash_benefits_for_channel(
+        "ticket-3",
+        now=now,
+        web_db=web_db,
+    ) == 1
+    assert list_available_cash_benefits(
+        customer_id,
+        now=now,
+        bot_db=bot_db,
+        web_db=web_db,
+        ensure_synced=False,
+    ) == []

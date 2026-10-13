@@ -237,3 +237,25 @@ def test_bulk_paid_notification_failure_isolated_per_person(monkeypatch):
         ]
     )
     assert calls == ["101", "202"]
+
+
+
+def test_individual_paid_notification_accepts_canonical_payout_summary_snapshot():
+    before = {
+        "month": "2026-10",
+        "role": "worker",
+        "person_id": "123",
+        "totals": {
+            "person_count": 1,
+            "unpaid_total": 800,
+            "unpaid_count": 2,
+            "paid_total": 0,
+            "paid_count": 0,
+        },
+        "people": [],
+    }
+    after = {"target_status": "paid", "person_role": "worker"}
+    assert payout_notifications.should_send_payout_paid_notification(before=before, after=after) is True
+
+    before["totals"]["unpaid_count"] = 0
+    assert payout_notifications.should_send_payout_paid_notification(before=before, after=after) is False

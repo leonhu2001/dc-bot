@@ -168,6 +168,24 @@ def upsert_web_order_from_dispatch(
         db.close()
 
 
+def _sync_vip_monthly_cash_benefit_lifecycle(ticket_channel_id: str, status: str) -> None:
+    if status not in {"closed", "cancelled"}:
+        return
+    try:
+        if status == "closed":
+            from services.vip_monthly_benefits import redeem_cash_benefits_for_channel
+            redeem_cash_benefits_for_channel(ticket_channel_id)
+        else:
+            from services.vip_monthly_benefits import release_cash_benefits_for_channel
+            release_cash_benefits_for_channel(ticket_channel_id)
+    except Exception as exc:
+        print(
+            f"[vip-monthly] lifecycle sync failed channel={ticket_channel_id} status={status}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def update_web_order_status_by_ticket_channel(
     *,
     ticket_channel_id,
@@ -224,6 +242,7 @@ def update_web_order_status_by_ticket_channel(
                 order.note = note_text
 
         db.commit()
+        _sync_vip_monthly_cash_benefit_lifecycle(ticket_channel_id_text, next_status)
         return True
     except Exception:
         db.rollback()

@@ -356,9 +356,24 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
                 label="不使用點數福利",
                 value="none",
                 description="清除這張單目前選擇的點數福利",
-                default=(parent_view.selected_key is None and parent_view.selected_coupon_id is None),
+                default=(
+                    parent_view.selected_key is None
+                    and parent_view.selected_coupon_id is None
+                    and parent_view.selected_vip_monthly_benefit_id is None
+                ),
             )
         ]
+
+        for benefit in parent_view.available_vip_monthly_benefits:
+            amount = int(benefit.get("amount") or 0)
+            options.append(
+                discord.SelectOption(
+                    label=_truncate_select_text(str(benefit.get("title") or "VIP 每月折現券")),
+                    value=f"vip_monthly:{benefit['id']}",
+                    description=_truncate_select_text(f"折抵 {amount}T；與其他福利擇一"),
+                    default=str(benefit.get("id")) == str(parent_view.selected_vip_monthly_benefit_id),
+                )
+            )
 
         for coupon in parent_view.available_coupons:
             options.append(
@@ -404,6 +419,11 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
         clear_keys = (
             "selected_point_benefit_key",
             "selected_benefit_coupon_id",
+            "selected_vip_monthly_benefit_id",
+            "vip_monthly_benefit_id",
+            "vip_monthly_benefit_key",
+            "vip_monthly_benefit_title",
+            "vip_monthly_cash_amount",
             "point_benefit_key",
             "point_benefit_name",
             "point_benefit_cost",
@@ -419,7 +439,13 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
         for key in clear_keys:
             data.pop(key, None)
 
-        if selected.startswith("coupon:"):
+        if selected.startswith("vip_monthly:"):
+            try:
+                data["selected_vip_monthly_benefit_id"] = int(selected.split(":", 1)[1])
+            except (TypeError, ValueError):
+                await interaction.response.send_message("VIP 每月福利券格式錯誤，請重新選擇。", ephemeral=True)
+                return
+        elif selected.startswith("coupon:"):
             try:
                 data["selected_benefit_coupon_id"] = int(selected.split(":", 1)[1])
             except (TypeError, ValueError):
@@ -471,9 +497,12 @@ class SelfServicePointBenefitView(discord.ui.View):
         data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
         self.selected_key = data.get("selected_point_benefit_key")
         self.selected_coupon_id = data.get("selected_benefit_coupon_id")
+        self.selected_vip_monthly_benefit_id = data.get("selected_vip_monthly_benefit_id")
         self.point_balance = get_customer_point_balance_for_order(customer_id)
         self.available_items = self.build_available_items(data)
         from services.loyalty_benefits import list_applicable_coupons
+        from services.vip_monthly_benefits import list_available_cash_benefits
+        self.available_vip_monthly_benefits = list_available_cash_benefits(customer_id)
         self.available_coupons = list_applicable_coupons(
             customer_id,
             rule_key=str(getattr(rule, "key", "")),
@@ -522,7 +551,18 @@ class SelfServicePointBenefitView(discord.ui.View):
         benefit = get_selected_order_point_benefit(data, self.rule)
         selected_text = "尚未使用"
 
-        if data.get("selected_benefit_coupon_id"):
+        if data.get("selected_vip_monthly_benefit_id"):
+            monthly = next(
+                (
+                    item
+                    for item in self.available_vip_monthly_benefits
+                    if str(item.get("id")) == str(data.get("selected_vip_monthly_benefit_id"))
+                ),
+                None,
+            )
+            if monthly:
+                selected_text = str(monthly.get("title") or "VIP 每月折現券")
+        elif data.get("selected_benefit_coupon_id"):
             coupon = next(
                 (item for item in self.available_coupons if str(item.get("id")) == str(data.get("selected_benefit_coupon_id"))),
                 None,
@@ -535,7 +575,7 @@ class SelfServicePointBenefitView(discord.ui.View):
         return (
             f"請選擇這張單要使用的點數福利或會員福利券。\n"
             f"目前可用點數：{self.point_balance} 點\n"
-            f"可用福利券：{len(self.available_coupons)} 張\n"
+            f"可用福利券：{len(self.available_vip_monthly_benefits) + len(self.available_coupons)} 張\n"
             f"目前選擇：{selected_text}\n\n"
             "同張訂單只能擇一；福利券會在訂單建立時先保留，結單後正式核銷。"
         )

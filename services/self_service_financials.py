@@ -5,6 +5,12 @@ from typing import Any, Callable
 
 import discord
 
+from services.vip_monthly_order_discount import (
+    build_vip_monthly_discount_note,
+    build_vip_monthly_discount_result,
+    resolve_vip_monthly_cash_discount,
+)
+
 
 ORDER_POINT_BENEFIT_SPECS: dict
 POINT_REDEEM_ITEMS_BY_KEY: dict
@@ -1369,10 +1375,16 @@ def calculate_self_service_financials(
         ),
     )
 
+    selected_vip_monthly, vip_monthly_cash = resolve_vip_monthly_cash_discount(
+        data,
+        has_point_benefit=benefit is not None,
+        max_discount_amount=after_fixed,
+    )
+
     allocation = allocate_store_absorbed_fixed_discount(
         after_percent_amount=after_percent,
         fixed_discount_amount=fixed,
-        additional_store_discount_amount=point_cash,
+        additional_store_discount_amount=point_cash + vip_monthly_cash,
         extra_customer_charge_amount=specify_effective,
     )
 
@@ -1385,8 +1397,8 @@ def calculate_self_service_financials(
     selected_coupon = None
     selected_coupon_id = data.get("selected_benefit_coupon_id")
     if selected_coupon_id not in (None, ""):
-        if benefit is not None:
-            raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
+        if benefit is not None or selected_vip_monthly is not None:
+            raise ValueError("福利券、VIP 每月福利券與點數福利同張訂單只能擇一使用。")
         customer_id = data.get("customer_id")
         if customer_id:
             selected_coupon = get_applicable_coupon(
@@ -1450,6 +1462,14 @@ def calculate_self_service_financials(
             "免指定費 "
             f"-{_format_plain_amount(point_specify)}"
         )
+
+    vip_monthly_note = build_vip_monthly_discount_note(
+        selected_vip_monthly,
+        vip_monthly_cash,
+        formatter=_format_plain_amount,
+    )
+    if vip_monthly_note:
+        notes.append(vip_monthly_note)
 
     # service_promotion_calc_v1
     purchased_service_quantity = max(
@@ -1556,6 +1576,11 @@ def calculate_self_service_financials(
 
         "point_discount_coupon_amount": (
             point_cash
+        ),
+
+        **build_vip_monthly_discount_result(
+            selected_vip_monthly,
+            vip_monthly_cash,
         ),
 
         "specified_fee_before_waiver": (
