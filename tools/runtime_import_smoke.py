@@ -14,6 +14,7 @@ CRITICAL_RUNTIME_MODULES = (
     "services.payment_review_runtime",
     "services.vip_voice_runtime",
     "services.order_runtime",
+    "services.order_lifecycle_runtime",
     "services.order_storage_runtime",
     "services.order_payment_runtime",
     "services.order_credential_runtime",
