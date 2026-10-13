@@ -17,6 +17,7 @@
 <!-- MAWAN_PHASE_4A2R6_ADMIN -->
 
 <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
+<link rel="stylesheet" href="/static/css/admin_order_status.css?v=20261013_1">
 </head>
 
 <body class="mw-r5-admin">
@@ -454,10 +455,11 @@
                         <span
                             class="
                                 badge
-                                {{ order.status_class }}
+                                admin-order-status-badge
+                                {% if order.status == "stored" %}stored{% else %}{{ order.status_class }}{% endif %}
                             "
                         >
-                            {{ order.status_label }}
+                            {% if order.status == "stored" %}已暫存{% else %}{{ order.status_label }}{% endif %}
                         </span>
 
                     </div>
