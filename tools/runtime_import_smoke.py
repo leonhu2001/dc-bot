@@ -24,6 +24,7 @@ CRITICAL_RUNTIME_MODULES = (
     "services.self_service_reorder",
     "services.self_service_financials",
     "services.worker_tips",
+    "services.review_storage",
     "views.review",
 )
 
