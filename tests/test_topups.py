@@ -1,9 +1,15 @@
 from pathlib import Path
+import sqlite3
 
+from core.vip_levels import (
+    VIP_TOPUP_REBATE_POLICY_CURRENT,
+    VIP_TOPUP_REBATE_POLICY_LEGACY,
+)
 from services.topups import (
     approve_topup_order,
     calculate_topup_preview,
     create_topup_order,
+    ensure_topup_tables,
     get_topup_order,
     submit_topup_payment,
 )
@@ -30,6 +36,92 @@ def test_rebate_uses_level_after_current_topup():
         preview = calculate_topup_preview(before, amount)
         assert preview["vip_level_after"] == level_name
         assert preview["rebate_percent"] == percent
+
+
+def test_legacy_topup_policy_keeps_old_rebate_rates():
+    cases = [
+        (11999, 1, "白金魔丸", 2),
+        (24999, 1, "鑽石魔丸", 3),
+        (49999, 1, "白鑽魔丸", 4),
+        (88887, 1, "黑鑽魔丸", 5),
+    ]
+
+    for before, amount, level_name, percent in cases:
+        preview = calculate_topup_preview(
+            before,
+            amount,
+            policy_version=VIP_TOPUP_REBATE_POLICY_LEGACY,
+        )
+        assert preview["vip_level_after"] == level_name
+        assert preview["rebate_percent"] == percent
+
+
+def test_new_topup_order_is_stamped_with_current_policy(tmp_path: Path):
+    db_file = tmp_path / "policy.db"
+    order = create_topup_order(
+        customer_discord_id="123",
+        customer_display_name="Boss",
+        amount=1000,
+        source="web",
+        db_file=db_file,
+    )
+    assert order["policy_version"] == VIP_TOPUP_REBATE_POLICY_CURRENT
+
+
+def test_existing_topup_rows_migrate_as_legacy(tmp_path: Path):
+    db_file = tmp_path / "legacy.db"
+    with sqlite3.connect(db_file) as conn:
+        conn.execute(
+            """
+            CREATE TABLE topup_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topup_no TEXT UNIQUE,
+                customer_discord_id TEXT NOT NULL,
+                customer_display_name TEXT,
+                amount INTEGER NOT NULL,
+                payment_method TEXT NOT NULL DEFAULT 'bank_transfer',
+                bank_last5 TEXT,
+                payment_reference TEXT,
+                payment_note TEXT,
+                source TEXT NOT NULL DEFAULT 'web',
+                status TEXT NOT NULL DEFAULT 'pending_payment',
+                vip_total_before INTEGER,
+                vip_total_after INTEGER,
+                vip_level_before TEXT,
+                vip_level_after TEXT,
+                rebate_percent INTEGER NOT NULL DEFAULT 0,
+                rebate_amount INTEGER NOT NULL DEFAULT 0,
+                credited_amount INTEGER NOT NULL DEFAULT 0,
+                wallet_transaction_id INTEGER,
+                bonus_transaction_id INTEGER,
+                submitted_at TEXT,
+                approved_at TEXT,
+                approved_by_discord_id TEXT,
+                approved_by_display_name TEXT,
+                completed_at TEXT,
+                rejected_at TEXT,
+                rejected_by_discord_id TEXT,
+                rejected_reason TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO topup_orders(
+                topup_no, customer_discord_id, amount, created_at, updated_at
+            ) VALUES('OLD-1', '123', 1000, '2026-10-13', '2026-10-13')
+            """
+        )
+        conn.commit()
+
+    ensure_topup_tables(db_file)
+    with sqlite3.connect(db_file) as conn:
+        row = conn.execute(
+            "SELECT policy_version FROM topup_orders WHERE topup_no='OLD-1'"
+        ).fetchone()
+    assert row[0] == VIP_TOPUP_REBATE_POLICY_LEGACY
 
 
 def test_topup_order_review_flow(tmp_path: Path):
