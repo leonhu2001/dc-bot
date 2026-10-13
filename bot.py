@@ -144,6 +144,12 @@ from services.smart_dispatch import (
     set_specified_dm_results,
 )
 from services.payment_review_runtime import ensure_payment_review_worker_started
+from services.wallet_service import (
+    ensure_wallet_tables as _wallet_ensure_tables,
+    get_wallet_balance as _wallet_get_balance,
+    adjust_wallet_balance as _wallet_adjust_balance,
+    get_wallet_transactions as _wallet_get_transactions,
+)
 from services.order_lifecycle_runtime import (
     configure_order_lifecycle_runtime,
     ensure_payment_submit_receipt,
@@ -262,6 +268,19 @@ from services.order_runtime import (
     PaymentMethodSelect,
     PaymentMethodView,
 )
+from services.self_service_selection_runtime import (
+    _truncate_select_text,
+    get_specified_staff_entries_for_rule,
+    _acknowledge_component_interaction,
+    _edit_component_message,
+    SelfServiceSpecifiedStaffDropdown,
+    SelfServiceSpecifiedStaffPageButton,
+    SelfServiceSpecifiedStaffClearButton,
+    SelfServiceSpecifiedStaffDoneButton,
+    SelfServicePointBenefitSelect,
+    SelfServicePointBenefitView,
+    SelfServiceSpecifiedStaffDropdownView,
+)
 from services.self_service_runtime import (
     configure_self_service_runtime,
     _format_plain_amount,
@@ -287,14 +306,6 @@ from services.self_service_runtime import (
     _quote_preview_lines_for_self_service,
     add_self_service_quote_preview,
     build_self_service_panel_embed,
-    _truncate_select_text,
-    get_specified_staff_entries_for_rule,
-    _acknowledge_component_interaction,
-    _edit_component_message,
-    SelfServiceSpecifiedStaffDropdown,
-    SelfServiceSpecifiedStaffPageButton,
-    SelfServiceSpecifiedStaffClearButton,
-    SelfServiceSpecifiedStaffDoneButton,
     _format_point_hours,
     get_order_point_item,
     get_customer_point_balance_for_order,
@@ -303,9 +314,6 @@ from services.self_service_runtime import (
     get_selected_order_point_benefit,
     calculate_self_service_financials,
     apply_self_service_financials_to_order_data,
-    SelfServicePointBenefitSelect,
-    SelfServicePointBenefitView,
-    SelfServiceSpecifiedStaffDropdownView,
     is_self_service_staff_price_required,
     get_self_service_staff_price,
     SelfServiceStaffPriceModal,
