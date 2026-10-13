@@ -48,7 +48,7 @@ def test_runtime_import_smoke_validates_bot_symbol_ownership():
 
 def test_wallet_compatibility_adapters_use_explicit_canonical_imports():
     module = importlib.import_module("tools.runtime_import_smoke")
-    assert module.REQUIRED_BOT_IMPORT_ALIASES == {
+    expected = {
         "_wallet_ensure_tables": (
             "services.wallet_service",
             "ensure_wallet_tables",
@@ -66,6 +66,29 @@ def test_wallet_compatibility_adapters_use_explicit_canonical_imports():
             "get_wallet_transactions",
         ),
     }
+    for alias_name, owner in expected.items():
+        assert module.REQUIRED_BOT_IMPORT_ALIASES[alias_name] == owner
+
+
+def test_self_service_selection_imports_use_canonical_owner():
+    module = importlib.import_module("tools.runtime_import_smoke")
+    for symbol in (
+        "_truncate_select_text",
+        "get_specified_staff_entries_for_rule",
+        "_acknowledge_component_interaction",
+        "_edit_component_message",
+        "SelfServiceSpecifiedStaffDropdown",
+        "SelfServiceSpecifiedStaffPageButton",
+        "SelfServiceSpecifiedStaffClearButton",
+        "SelfServiceSpecifiedStaffDoneButton",
+        "SelfServicePointBenefitSelect",
+        "SelfServicePointBenefitView",
+        "SelfServiceSpecifiedStaffDropdownView",
+    ):
+        assert module.REQUIRED_BOT_IMPORT_ALIASES[symbol] == (
+            "services.self_service_selection_runtime",
+            symbol,
+        )
 
 
 def test_deploy_runs_runtime_import_preflight_before_restart():
