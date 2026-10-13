@@ -103,8 +103,16 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
     storage_source = Path("services/order_storage_runtime.py").read_text(
         encoding="utf-8"
     )
+    dispatch_source = Path("services/order_dispatch_runtime.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "class DispatchClaimView" in order_source
+    assert "class DispatchClaimView" not in order_source
+    assert callable(order_runtime.DispatchClaimView)
+    assert "class DispatchClaimView" in dispatch_source
+    assert "def configure_order_dispatch_runtime" in dispatch_source
+    assert "import bot" not in dispatch_source
+    assert "from bot import" not in dispatch_source
     assert "async def lock_dispatch_claim_panel" not in order_source
     assert "async def store_dispatch_claim_panel" not in order_source
     assert "async def resume_stored_order" not in order_source
