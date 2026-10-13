@@ -106,7 +106,10 @@ def _validate_bot_import_contracts() -> int:
     imported_aliases: dict[str, tuple[str, str]] = {}
     validated = 0
 
-    for node in ast.walk(tree):
+    # Only top-level imports are part of the process startup boundary. Local
+    # imports are intentionally lazy and should not turn preflight into a full
+    # application dependency walk.
+    for node in tree.body:
         if not isinstance(node, ast.ImportFrom) or not node.module:
             continue
         if not node.module.startswith(BOT_IMPORT_PREFIXES):
