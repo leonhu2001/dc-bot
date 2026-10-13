@@ -38,9 +38,15 @@
 
     <section class="staff-summary-total-grid">
         <div class="staff-summary-total-card mw-r56-payout-metric">
-            <span>未發放總額 ◆</span>
+            <span>待發放總額 ◆</span>
             <strong class="mw-r56-payout-value">{{ unpaid_totals.display_total|default(unpaid_totals.unpaid_total)|round(0, 'common')|int }}</strong>
-            <small>待審核 {{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }} 筆</small>
+            <small>可發放 {{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }} 筆</small>
+        </div>
+
+        <div class="staff-summary-total-card mw-r56-payout-metric">
+            <span>報單鎖定總額 ◆</span>
+            <strong class="mw-r56-payout-value">{{ locked_totals.display_total|default(locked_totals.locked_total)|round(0, 'common')|int }}</strong>
+            <small>鎖定 {{ locked_totals.display_count|default(locked_totals.locked_count) }} 筆</small>
         </div>
 
         <div class="staff-summary-total-card mw-r56-payout-metric">
@@ -50,15 +56,9 @@
         </div>
 
         <div class="staff-summary-total-card mw-r56-payout-metric">
-            <span>未發放筆數 ◆</span>
-            <strong class="mw-r56-payout-value">{{ unpaid_totals.display_count|default(unpaid_totals.unpaid_count) }}</strong>
-            <small>待審核中</small>
-        </div>
-
-        <div class="staff-summary-total-card mw-r56-payout-metric">
-            <span>已發放筆數 ◆</span>
-            <strong class="mw-r56-payout-value">{{ paid_totals.paid_count }}</strong>
-            <small>結算完成</small>
+            <span>薪資筆數 ◆</span>
+            <strong class="mw-r56-payout-value">{{ unpaid_totals.unpaid_count + locked_totals.locked_count + paid_totals.paid_count }}</strong>
+            <small>待 {{ unpaid_totals.unpaid_count }} / 鎖 {{ locked_totals.locked_count }} / 已 {{ paid_totals.paid_count }}</small>
         </div>
     </section>
 
@@ -81,7 +81,8 @@
                         <tr>
                             <th>人員</th>
                             <th>身分</th>
-                            <th>未發放</th>
+                            <th>待發放</th>
+                            <th>報單鎖定</th>
                             <th>已發放</th>
                             <th>總筆數</th>
                             <th>狀態</th>
@@ -117,12 +118,16 @@
                                 </td>
 
                                 <td>
+                                    <span class="staff-money">{{ row.locked_total|round(0, 'common')|int }}T</span>
+                                </td>
+
+                                <td>
                                     <span class="staff-money">{{ row.paid_total|round(0, 'common')|int }}T</span>
                                 </td>
 
                                 <td>
                                     <span class="staff-count-main">{{ row.total_count }} 筆</span>
-                                    <span class="staff-count-sub">未 {{ row.unpaid_count }} / 已 {{ row.paid_count }}</span>
+                                    <span class="staff-count-sub">待 {{ row.unpaid_count }} / 鎖 {{ row.locked_count }} / 已 {{ row.paid_count }}</span>
                                 </td>
 
                                 <td>
@@ -140,7 +145,11 @@
                                                 <input type="hidden" name="current_role" value="{{ role }}">
                                                 <input type="hidden" name="person_role" value="{{ row.role }}">
                                                 <input type="hidden" name="person_id" value="{{ row.discord_id }}">
-                                                <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">已發放</button>
+                                                {% if row.unpaid_count > 0 %}
+                                                    <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">已發放</button>
+                                                {% else %}
+                                                    <button class="staff-summary-button primary" type="button" disabled title="報單尚未審核通過，薪資目前鎖定">已發放（鎖定）</button>
+                                                {% endif %}
                                             </form>
 
                                             <form method="post" action="/admin/payouts/summary/person-status">
@@ -157,7 +166,7 @@
                             </tr>
 
                             <tr class="staff-summary-detail-row" id="staff-summary-detail-{{ loop.index }}" hidden>
-                                <td colspan="7">
+                                <td colspan="8">
                                     <div class="staff-summary-detail">
                                         <h3>{{ row.display_name }}｜分潤明細</h3>
 
@@ -182,10 +191,10 @@
                                                         <td>{{ item.closed_date }}</td>
                                                         <td>{{ item.role }}</td>
                                                         <td>
-                                                            {% if item.payout_status == "paid" %}
-                                                                <span class="staff-ledger-stamp paid">已發放</span>
+                                                            {% if item.financial_state == "paid" %}
+                                                                <span class="staff-ledger-stamp paid">{{ item.status_label }}</span>
                                                             {% else %}
-                                                                <span class="staff-ledger-stamp unpaid">未發放</span>
+                                                                <span class="staff-ledger-stamp unpaid">{{ item.status_label }}</span>
                                                             {% endif %}
                                                         </td>
                                                         <td>{{ item.amount|round(0, 'common')|int }}T</td>

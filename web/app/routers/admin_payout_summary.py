@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from web.app.services.audit_trail import write_sqlite_audit_log
 from web.app.services.payout_notifications import send_payout_paid_notification
+from web.app.services.payout_report_gate import payout_financial_state, payout_status_label
 from web.app.services.internal_transfers import (
     ensure_internal_transfer_tables,
     mark_bulk_adjustments,
@@ -105,10 +106,11 @@ def normalize_payout_status(status: str | None) -> str:
     status = str(status or "unpaid").strip()
     if status in {"paid", "已發放", "已支付"}:
         return "paid"
+    if status in {"locked", "報單鎖定", "未填寫報單"}:
+        return "locked"
     if status in {"all", "全部", "全部狀態"}:
         return "all"
     return "unpaid"
-
 
 def payout_order_date_expr(alias: str = "w") -> str:
     return (
@@ -141,12 +143,24 @@ def add_person(
     customer_name=None,
     closed_at=None,
     item_role_label=None,
+    report_status=None,
+    report_required: bool = False,
+    filter_status: str = "all",
 ) -> None:
     discord_id = str(discord_id or "").strip()
     if not discord_id:
         return
 
-    payout_status = "paid" if str(payout_status or "") == "paid" else "unpaid"
+    stored_status = "paid" if str(payout_status or "") == "paid" else "unpaid"
+    financial_state = payout_financial_state(
+        payout_status=stored_status,
+        report_status=report_status,
+        report_required=report_required,
+    )
+    filter_status = normalize_payout_status(filter_status)
+    if filter_status != "all" and financial_state != filter_status:
+        return
+
     if discord_id not in people:
         people[discord_id] = {
             "discord_id": discord_id,
@@ -155,6 +169,8 @@ def add_person(
             "role_label": "人員",
             "unpaid_total": 0,
             "unpaid_count": 0,
+            "locked_total": 0,
+            "locked_count": 0,
             "paid_total": 0,
             "paid_count": 0,
             "items": [],
@@ -166,9 +182,12 @@ def add_person(
 
     person["roles"].add(role)
     amount = int(amount or 0)
-    if payout_status == "paid":
+    if financial_state == "paid":
         person["paid_total"] += amount
         person["paid_count"] += 1
+    elif financial_state == "locked":
+        person["locked_total"] += amount
+        person["locked_count"] += 1
     else:
         person["unpaid_total"] += amount
         person["unpaid_count"] += 1
@@ -183,11 +202,16 @@ def add_person(
             "closed_date": closed_text[:10] if closed_text else "未紀錄",
             "role": item_role_label or ("護航 / 陪玩" if role == "worker" else "客服"),
             "amount": amount,
-            "payout_status": payout_status,
-            "status_label": "已支付" if payout_status == "paid" else "未支付",
+            "payout_status": stored_status,
+            "financial_state": financial_state,
+            "report_status": str(report_status or ""),
+            "status_label": payout_status_label(
+                payout_status=stored_status,
+                report_status=report_status,
+                report_required=report_required,
+            ),
         }
     )
-
 
 def finalize_people(
     people: dict[str, dict],
@@ -213,25 +237,39 @@ def finalize_people(
             person["role"] = "all"
 
         if status == "paid":
-            if int(person.get("paid_total") or 0) <= 0:
+            if int(person.get("paid_count") or 0) <= 0:
                 continue
             person["display_total"] = person["paid_total"]
             person["display_count"] = person["paid_count"]
-            person["display_status"] = "已支付"
+            person["display_status"] = "已發放"
+        elif status == "locked":
+            if int(person.get("locked_count") or 0) <= 0:
+                continue
+            person["display_total"] = person["locked_total"]
+            person["display_count"] = person["locked_count"]
+            person["display_status"] = "報單鎖定"
         elif status == "all":
-            total = int(person.get("paid_total") or 0) + int(person.get("unpaid_total") or 0)
-            count = int(person.get("paid_count") or 0) + int(person.get("unpaid_count") or 0)
+            total = (
+                int(person.get("paid_total") or 0)
+                + int(person.get("unpaid_total") or 0)
+                + int(person.get("locked_total") or 0)
+            )
+            count = (
+                int(person.get("paid_count") or 0)
+                + int(person.get("unpaid_count") or 0)
+                + int(person.get("locked_count") or 0)
+            )
             if total <= 0 and count <= 0:
                 continue
             person["display_total"] = total
             person["display_count"] = count
             person["display_status"] = "全部"
         else:
-            if int(person.get("unpaid_total") or 0) <= 0:
+            if int(person.get("unpaid_count") or 0) <= 0:
                 continue
             person["display_total"] = person["unpaid_total"]
             person["display_count"] = person["unpaid_count"]
-            person["display_status"] = "未支付"
+            person["display_status"] = "待發放"
 
         person["items"].sort(
             key=lambda item: (str(item.get("closed_date") or ""), str(item.get("order_no") or "")),
@@ -248,7 +286,6 @@ def finalize_people(
         rows,
         key=lambda row: (-int(row.get("display_total") or 0), str(row.get("display_name") or "")),
     )
-
 
 def _adjustment_role_sql(role: str) -> str:
     role = normalize_role(role)
@@ -276,11 +313,17 @@ def fetch_rows(
     conn = sqlite3.connect(db_path())
     conn.row_factory = sqlite3.Row
 
+    db_payout_status = None
+    if status == "paid":
+        db_payout_status = "paid"
+    elif status in {"unpaid", "locked"}:
+        db_payout_status = "unpaid"
+
     payout_status_sql = ""
     payout_status_params: list[str] = []
-    if status in {"unpaid", "paid"}:
+    if db_payout_status:
         payout_status_sql = " AND p.payout_status = ? "
-        payout_status_params.append(status)
+        payout_status_params.append(db_payout_status)
 
     try:
         if role in {"all", "worker"}:
@@ -292,6 +335,7 @@ def fetch_rows(
                     p.worker_display_name AS display_name,
                     p.final_payout AS amount,
                     p.payout_status AS payout_status,
+                    COALESCE(r.status, 'missing') AS report_status,
                     w.bot_order_no,
                     w.id AS web_order_id,
                     w.category,
@@ -300,6 +344,7 @@ def fetch_rows(
                     {payout_order_date_expr('w')} AS closed_at
                 FROM worker_payouts p
                 JOIN web_orders w ON w.id = p.order_id
+                LEFT JOIN order_reports r ON r.order_id = w.id
                 WHERE w.status = 'closed'
                   AND COALESCE(p.final_payout, 0) > 0
                   {payout_status_sql}
@@ -316,6 +361,9 @@ def fetch_rows(
                     role="worker",
                     amount=row["amount"],
                     payout_status=row["payout_status"],
+                    report_status=row["report_status"],
+                    report_required=True,
+                    filter_status=status,
                     customer_name=row["customer_name"],
                     closed_at=row["closed_at"],
                     order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
@@ -355,6 +403,7 @@ def fetch_rows(
                     role="worker",
                     amount=row["amount"],
                     payout_status=row["payout_status"],
+                    filter_status=status,
                     customer_name=row["customer_name"],
                     closed_at=row["closed_at"],
                     order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
@@ -372,6 +421,7 @@ def fetch_rows(
                     p.customer_service_display_name AS display_name,
                     p.payout_amount AS amount,
                     p.payout_status AS payout_status,
+                    COALESCE(r.status, 'missing') AS report_status,
                     w.bot_order_no,
                     w.id AS web_order_id,
                     w.category,
@@ -380,6 +430,7 @@ def fetch_rows(
                     {payout_order_date_expr('w')} AS closed_at
                 FROM customer_service_payouts p
                 JOIN web_orders w ON w.id = p.order_id
+                LEFT JOIN order_reports r ON r.order_id = w.id
                 WHERE w.status = 'closed'
                   AND COALESCE(p.customer_service_discord_id, '') <> ''
                   AND COALESCE(p.customer_service_discord_id, '') <> 'demo_customer_service'
@@ -399,6 +450,9 @@ def fetch_rows(
                     role="customer_service",
                     amount=row["amount"],
                     payout_status=row["payout_status"],
+                    report_status=row["report_status"],
+                    report_required=True,
+                    filter_status=status,
                     customer_name=row["customer_name"],
                     closed_at=row["closed_at"],
                     order_no=row["bot_order_no"] or f"WEB-{row['web_order_id']}",
@@ -408,9 +462,9 @@ def fetch_rows(
 
         adjustment_status_sql = ""
         adjustment_status_params: list[str] = []
-        if status in {"unpaid", "paid"}:
+        if db_payout_status:
             adjustment_status_sql = " AND a.payout_status = ? "
-            adjustment_status_params.append(status)
+            adjustment_status_params.append(db_payout_status)
 
         adjustment_month_sql = ""
         adjustment_month_params: list[str] = []
@@ -452,11 +506,7 @@ def fetch_rows(
             role_key = "customer_service" if is_cs and not is_worker else "worker"
             counterparty = str(row["counterparty_display_name"] or "內部員工")
             direction = str(row["direction"] or "")
-            label = (
-                f"轉入｜來自 {counterparty}"
-                if direction == "incoming"
-                else f"轉出｜給 {counterparty}"
-            )
+            label = f"轉入｜來自 {counterparty}" if direction == "incoming" else f"轉出｜給 {counterparty}"
             reason = str(row["reason"] or "").strip()
             if reason:
                 label += f"｜{reason}"
@@ -468,6 +518,7 @@ def fetch_rows(
                 role=role_key,
                 amount=row["amount"],
                 payout_status=row["payout_status"],
+                filter_status=status,
                 customer_name=counterparty,
                 closed_at=row["effective_at"],
                 order_no=f"內部轉帳 #{int(row['transfer_id'])}",
@@ -475,7 +526,7 @@ def fetch_rows(
                 item=label,
                 item_role_label="內部轉帳",
             )
-            if is_cs and is_worker:
+            if str(row["discord_id"]) in people and is_cs and is_worker:
                 people[str(row["discord_id"])]["roles"].add("customer_service")
 
     finally:
@@ -486,13 +537,14 @@ def fetch_rows(
         "person_count": len(rows),
         "unpaid_total": sum(int(row.get("unpaid_total") or 0) for row in rows),
         "unpaid_count": sum(int(row.get("unpaid_count") or 0) for row in rows),
+        "locked_total": sum(int(row.get("locked_total") or 0) for row in rows),
+        "locked_count": sum(int(row.get("locked_count") or 0) for row in rows),
         "paid_total": sum(int(row.get("paid_total") or 0) for row in rows),
         "paid_count": sum(int(row.get("paid_count") or 0) for row in rows),
         "display_total": sum(int(row.get("display_total") or 0) for row in rows),
         "display_count": sum(int(row.get("display_count") or 0) for row in rows),
     }
     return rows, totals
-
 
 def _audit_payout_state(
     month: str | None,
@@ -508,6 +560,8 @@ def _audit_payout_state(
             "person_count": len(rows),
             "unpaid_total": sum(int(row.get("unpaid_total") or 0) for row in rows),
             "unpaid_count": sum(int(row.get("unpaid_count") or 0) for row in rows),
+            "locked_total": sum(int(row.get("locked_total") or 0) for row in rows),
+            "locked_count": sum(int(row.get("locked_count") or 0) for row in rows),
             "paid_total": sum(int(row.get("paid_total") or 0) for row in rows),
             "paid_count": sum(int(row.get("paid_count") or 0) for row in rows),
         }
@@ -521,12 +575,12 @@ def _audit_payout_state(
                 "discord_id": row.get("discord_id"),
                 "display_name": row.get("display_name"),
                 "unpaid_total": int(row.get("unpaid_total") or 0),
+                "locked_total": int(row.get("locked_total") or 0),
                 "paid_total": int(row.get("paid_total") or 0),
             }
             for row in rows
         ],
     }
-
 
 def get_summary_month_options() -> list[dict]:
     ensure_internal_transfer_tables(db_path())
@@ -606,6 +660,12 @@ def update_summary_payout_status(
                 "NULLIF(w.updated_at, ''), NULLIF(w.created_at, '')), 1, 7) = ?"
             )
             params.append(month)
+        salary_order_filter = order_filter
+        if target_status == "paid":
+            salary_order_filter += (
+                " AND EXISTS (SELECT 1 FROM order_reports r "
+                "WHERE r.order_id = w.id AND r.status = 'approved')"
+            )
 
         if role in {"all", "", "worker", "護航 / 陪玩"}:
             conn.execute(
@@ -613,7 +673,7 @@ def update_summary_payout_status(
                 UPDATE worker_payouts
                 SET payout_status = ?, paid_at = {paid_at_sql}
                 WHERE order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                    SELECT w.id FROM web_orders w WHERE {salary_order_filter}
                 )
                 """,
                 [target_status, *params],
@@ -638,7 +698,7 @@ def update_summary_payout_status(
                 UPDATE customer_service_payouts
                 SET payout_status = ?, paid_at = {paid_at_sql}
                 WHERE order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                    SELECT w.id FROM web_orders w WHERE {salary_order_filter}
                 )
                   AND COALESCE(customer_service_discord_id, '') <> ''
                   AND COALESCE(customer_service_discord_id, '') <> 'demo_customer_service'
@@ -655,7 +715,6 @@ def update_summary_payout_status(
         month=month,
         role=role,
     )
-
 
 def update_summary_person_payout_status(
     month: str,
@@ -699,6 +758,12 @@ def update_summary_person_payout_status(
             )
             params_worker.append(month)
             params_cs.append(month)
+        salary_order_filter = order_filter
+        if target_status == "paid":
+            salary_order_filter += (
+                " AND EXISTS (SELECT 1 FROM order_reports r "
+                "WHERE r.order_id = w.id AND r.status = 'approved')"
+            )
 
         if update_worker:
             conn.execute(
@@ -707,7 +772,7 @@ def update_summary_person_payout_status(
                 SET payout_status = ?, paid_at = {paid_at_sql}
                 WHERE worker_discord_id = ?
                   AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                    SELECT w.id FROM web_orders w WHERE {salary_order_filter}
                   )
                 """,
                 params_worker,
@@ -734,7 +799,7 @@ def update_summary_person_payout_status(
                 SET payout_status = ?, paid_at = {paid_at_sql}
                 WHERE customer_service_discord_id = ?
                   AND order_id IN (
-                    SELECT w.id FROM web_orders w WHERE {order_filter}
+                    SELECT w.id FROM web_orders w WHERE {salary_order_filter}
                   )
                 """,
                 params_cs,
@@ -749,10 +814,10 @@ def update_summary_person_payout_status(
         month=month,
     )
 
-
 def build_combined_summary_rows(
     unpaid_rows: list[dict],
     paid_rows: list[dict],
+    locked_rows: list[dict] | None = None,
 ) -> list[dict]:
     combined: dict[tuple[str, str], dict] = {}
 
@@ -784,8 +849,10 @@ def build_combined_summary_rows(
                 "discord_id": discord_id,
                 "display_name": get_value(row, "display_name", discord_id or "未知人員"),
                 "unpaid_total": 0,
+                "locked_total": 0,
                 "paid_total": 0,
                 "unpaid_count": 0,
+                "locked_count": 0,
                 "paid_count": 0,
                 "items": [],
             }
@@ -793,10 +860,14 @@ def build_combined_summary_rows(
 
     for row in unpaid_rows or []:
         target = ensure_row(row)
-        target["unpaid_total"] += as_number(
-            get_value(row, "display_total", get_value(row, "unpaid_total", 0))
-        )
+        target["unpaid_total"] += as_number(get_value(row, "display_total", get_value(row, "unpaid_total", 0)))
         target["unpaid_count"] += as_int(get_value(row, "unpaid_count", 0))
+        target["items"].extend(list(get_value(row, "items", []) or []))
+
+    for row in locked_rows or []:
+        target = ensure_row(row)
+        target["locked_total"] += as_number(get_value(row, "display_total", get_value(row, "locked_total", 0)))
+        target["locked_count"] += as_int(get_value(row, "locked_count", 0))
         target["items"].extend(list(get_value(row, "items", []) or []))
 
     for row in paid_rows or []:
@@ -807,9 +878,16 @@ def build_combined_summary_rows(
 
     rows = list(combined.values())
     for row in rows:
-        row["total_count"] = int(row["unpaid_count"] or 0) + int(row["paid_count"] or 0)
-        if row["unpaid_count"] and row["paid_count"]:
-            row["summary_status"] = "部分待審"
+        row["total_count"] = (
+            int(row["unpaid_count"] or 0)
+            + int(row["locked_count"] or 0)
+            + int(row["paid_count"] or 0)
+        )
+        if row["locked_count"]:
+            row["summary_status"] = "部分鎖定" if row["unpaid_count"] or row["paid_count"] else "報單鎖定"
+            row["summary_status_class"] = "unpaid"
+        elif row["unpaid_count"] and row["paid_count"]:
+            row["summary_status"] = "部分待發放"
             row["summary_status_class"] = "partial"
         elif row["unpaid_count"]:
             row["summary_status"] = "待發放"
@@ -817,16 +895,21 @@ def build_combined_summary_rows(
         else:
             row["summary_status"] = "正常"
             row["summary_status_class"] = "paid"
+        row["items"].sort(
+            key=lambda item: (str(item.get("closed_date") or ""), str(item.get("order_no") or "")),
+            reverse=True,
+        )
 
     rows.sort(
         key=lambda row: (
             int(row.get("unpaid_count") or 0) <= 0,
+            int(row.get("locked_count") or 0) <= 0,
             -float(row.get("unpaid_total") or 0),
+            -float(row.get("locked_total") or 0),
             str(row.get("display_name") or ""),
         )
     )
     return rows
-
 
 def attach_staff_avatars_to_summary_rows(rows: list[dict]) -> list[dict]:
     discord_ids = [
@@ -890,8 +973,9 @@ async def admin_payout_summary(
     status = "unpaid"
     rows, totals = fetch_rows(month, role, q, status)
     unpaid_rows, unpaid_totals = fetch_rows(month, role, q, "unpaid")
+    locked_rows, locked_totals = fetch_rows(month, role, q, "locked")
     paid_rows, paid_totals = fetch_rows(month, role, q, "paid")
-    summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows)
+    summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows, locked_rows)
 
     return templates.TemplateResponse(
         request=request,
@@ -901,8 +985,10 @@ async def admin_payout_summary(
             "user": user,
             "rows": rows,
             "unpaid_rows": unpaid_rows,
+            "locked_rows": locked_rows,
             "paid_rows": paid_rows,
             "unpaid_totals": unpaid_totals,
+            "locked_totals": locked_totals,
             "paid_totals": paid_totals,
             "totals": totals,
             "summary_rows": summary_rows,
