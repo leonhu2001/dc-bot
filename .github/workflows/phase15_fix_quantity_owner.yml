@@ -1,0 +1,29 @@
+name: Phase 15 quantity owner correction
+
+on:
+  push:
+    branches:
+      - refactor/phase15-self-service-dependency-boundary-20261013
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/phase15-self-service-dependency-boundary-20261013
+          fetch-depth: 0
+      - name: Correct helper ownership
+        run: python tools/phase15_fix_quantity_owner.py
+      - name: Remove temporary patch files
+        run: git rm tools/phase15_fix_quantity_owner.py .github/workflows/phase15_fix_quantity_owner.yml
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py tests/test_self_service_runtime_dependency_boundary.py
+          git commit -m "Keep quantity helper on legacy runtime boundary"
+          git push origin HEAD:refactor/phase15-self-service-dependency-boundary-20261013
