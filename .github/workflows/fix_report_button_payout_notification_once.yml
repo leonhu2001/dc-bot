@@ -1,0 +1,195 @@
+name: Fix report button and payout notification once
+
+on:
+  push:
+    branches:
+      - fix/report-button-payout-notification-20261013
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/report-button-payout-notification-20261013
+          fetch-depth: 0
+
+      - name: Apply narrow notification fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          reporting = Path('web/app/services/order_reporting.py')
+          source = reporting.read_text(encoding='utf-8')
+          old = '        f"填寫報單：{report_url}"\n'
+          new = '        "請點下方按鈕進入報單頁。"\n'
+          if source.count(old) != 1:
+              raise SystemExit(f'order report copy pattern count={source.count(old)}')
+          source = source.replace(old, new, 1)
+
+          old_payload = '''            "content": content,\n            "allowed_mentions": {"parse": []},\n'''
+          new_payload = '''            "content": content,\n            "components": [\n                {\n                    "type": 1,\n                    "components": [\n                        {\n                            "type": 2,\n                            "style": 5,\n                            "label": "填寫報單",\n                            "url": report_url,\n                            "emoji": {"name": "📝"},\n                        }\n                    ],\n                }\n            ],\n            "allowed_mentions": {"parse": []},\n'''
+          if source.count(old_payload) != 1:
+              raise SystemExit(f'order report payload pattern count={source.count(old_payload)}')
+          reporting.write_text(source.replace(old_payload, new_payload, 1), encoding='utf-8')
+
+          router = Path('web/app/routers/admin_payout_summary.py')
+          source = router.read_text(encoding='utf-8')
+          import_line = 'from web.app.services.audit_trail import write_sqlite_audit_log\n'
+          import_block = import_line + 'from web.app.services.payout_notifications import send_payout_paid_notification\n'
+          if import_block not in source:
+              if source.count(import_line) != 1:
+                  raise SystemExit(f'payout import anchor count={source.count(import_line)}')
+              source = source.replace(import_line, import_block, 1)
+
+          route_marker = '@router.post("/admin/payouts/summary/mark-paid")\n'
+          helper_block = '''def _collect_bulk_payout_notification_targets(month: str, role: str) -> list[dict]:\n    targets: list[dict] = []\n    for person in fetch_rows(month, role, None, status="unpaid"):\n        person_id = str(person.get("discord_id") or "").strip()\n        person_role = str(person.get("role") or "all").strip() or "all"\n        if not person_id:\n            continue\n        targets.append(\n            {\n                "person_id": person_id,\n                "person_role": person_role,\n                "before": _audit_payout_state(\n                    month,\n                    person_role,\n                    person_id=person_id,\n                ),\n            }\n        )\n    return targets\n\n\ndef _send_bulk_payout_paid_notifications(targets: list[dict]) -> None:\n    for target in targets:\n        try:\n            send_payout_paid_notification(\n                db_file=db_path(),\n                person_id=target["person_id"],\n                before=target["before"],\n                after={\n                    "target_status": "paid",\n                    "person_role": target["person_role"],\n                },\n            )\n        except Exception as exc:\n            # Salary state/audit are already committed. One blocked DM must not\n            # roll back payroll or prevent the remaining staff notifications.\n            print(\n                "[payout_notification] bulk delivery failed:",\n                target.get("person_id"),\n                repr(exc),\n            )\n\n\n'''
+          if '_collect_bulk_payout_notification_targets' not in source:
+              if source.count(route_marker) != 1:
+                  raise SystemExit(f'payout route marker count={source.count(route_marker)}')
+              source = source.replace(route_marker, helper_block + route_marker, 1)
+
+          old_start = '''    before = _audit_payout_state(month, role)\n    update_summary_payout_status(month, role, "paid")\n'''
+          new_start = '''    notification_targets = _collect_bulk_payout_notification_targets(month, role)\n    before = _audit_payout_state(month, role)\n    update_summary_payout_status(month, role, "paid")\n'''
+          if source.count(old_start) != 1:
+              raise SystemExit(f'bulk paid start pattern count={source.count(old_start)}')
+          source = source.replace(old_start, new_start, 1)
+
+          old_end = '''        reason="批次標記薪資已發放",\n        db_file=db_path(),\n    )\n    return RedirectResponse(\n'''
+          new_end = '''        reason="批次標記薪資已發放",\n        db_file=db_path(),\n    )\n    _send_bulk_payout_paid_notifications(notification_targets)\n    return RedirectResponse(\n'''
+          if source.count(old_end) != 1:
+              raise SystemExit(f'bulk paid end pattern count={source.count(old_end)}')
+          router.write_text(source.replace(old_end, new_end, 1), encoding='utf-8')
+          PY
+
+      - name: Add regression coverage
+        shell: bash
+        run: |
+          cat >> tests/test_order_reporting.py <<'PY'
+
+
+def test_report_reminder_dm_uses_discord_link_button_instead_of_raw_url():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "web/app/services/order_reporting.py").read_text(encoding="utf-8")
+
+    assert '"components": [' in source
+    assert '"style": 5' in source
+    assert '"label": "填寫報單"' in source
+    assert '"url": report_url' in source
+    assert '"emoji": {"name": "📝"}' in source
+    assert 'f"填寫報單：{report_url}"' not in source
+PY
+
+          cat >> tests/test_payout_notifications.py <<'PY'
+
+
+def test_single_person_paid_audit_hook_stays_connected(tmp_path, monkeypatch):
+    from web.app.services import audit_trail
+
+    captured = []
+
+    def fake_send_payout_paid_notification(**kwargs):
+        captured.append(kwargs)
+        return {"sent": True, "total": 321}
+
+    monkeypatch.setattr(
+        payout_notifications,
+        "send_payout_paid_notification",
+        fake_send_payout_paid_notification,
+    )
+
+    audit_trail.write_sqlite_audit_log(
+        admin_discord_id="999",
+        action="set_person_payout_status",
+        target_type="payout_person",
+        target_id="123",
+        before=_snapshot(worker_unpaid=1),
+        after={
+            **_snapshot(),
+            "target_status": "paid",
+            "person_role": "worker",
+        },
+        db_file=tmp_path / "audit.db",
+    )
+
+    assert len(captured) == 1
+    assert str(captured[0]["person_id"]) == "123"
+    assert captured[0]["after"]["target_status"] == "paid"
+
+
+def test_bulk_paid_notification_targets_only_capture_currently_unpaid_people(monkeypatch):
+    from web.app.routers import admin_payout_summary
+
+    rows = [
+        {"discord_id": "101", "role": "worker"},
+        {"discord_id": "202", "role": "customer_service"},
+    ]
+    snapshots = []
+
+    monkeypatch.setattr(
+        admin_payout_summary,
+        "fetch_rows",
+        lambda month, role, q, status="unpaid": rows if status == "unpaid" else [],
+    )
+
+    def fake_snapshot(month, role, *, person_id=None):
+        snapshots.append((month, role, person_id))
+        return _snapshot(worker_unpaid=1 if role == "worker" else 0, cs_unpaid=1 if role == "customer_service" else 0)
+
+    monkeypatch.setattr(admin_payout_summary, "_audit_payout_state", fake_snapshot)
+
+    targets = admin_payout_summary._collect_bulk_payout_notification_targets("2026-10", "all")
+
+    assert [item["person_id"] for item in targets] == ["101", "202"]
+    assert snapshots == [
+        ("2026-10", "worker", "101"),
+        ("2026-10", "customer_service", "202"),
+    ]
+
+
+def test_bulk_paid_notification_failure_isolated_per_person(monkeypatch):
+    from web.app.routers import admin_payout_summary
+
+    calls = []
+
+    def fake_send(**kwargs):
+        calls.append(str(kwargs["person_id"]))
+        if str(kwargs["person_id"]) == "101":
+            raise RuntimeError("DM blocked")
+        return {"sent": True}
+
+    monkeypatch.setattr(admin_payout_summary, "send_payout_paid_notification", fake_send)
+    monkeypatch.setattr(admin_payout_summary, "db_path", lambda: "unused.db")
+
+    admin_payout_summary._send_bulk_payout_paid_notifications(
+        [
+            {"person_id": "101", "person_role": "worker", "before": _snapshot(worker_unpaid=1)},
+            {"person_id": "202", "person_role": "worker", "before": _snapshot(worker_unpaid=1)},
+        ]
+    )
+
+    assert calls == ["101", "202"]
+PY
+
+      - name: Run focused tests
+        shell: bash
+        run: |
+          python -m pip install -q -r requirements.txt
+          python -m pytest -q tests/test_order_reporting.py tests/test_payout_notifications.py
+          python -m compileall -q web/app/services/order_reporting.py web/app/routers/admin_payout_summary.py
+
+      - name: Finalize branch
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix_report_button_payout_notification_once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/app/services/order_reporting.py web/app/routers/admin_payout_summary.py tests/test_order_reporting.py tests/test_payout_notifications.py .github/workflows/fix_report_button_payout_notification_once.yml
+          git diff --cached --check
+          git commit -m "Add report DM button and restore bulk payout notifications"
+          git push origin HEAD:fix/report-button-payout-notification-20261013
