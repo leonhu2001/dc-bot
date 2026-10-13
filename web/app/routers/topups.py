@@ -7,6 +7,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from core.vip_levels import VIP_TOPUP_REBATE_POLICY_LEGACY
 from services.topups import (
     approve_topup_order,
     calculate_topup_preview,
@@ -150,6 +151,10 @@ async def member_wallet_topup_detail(request: Request, topup_id: int):
         preview = calculate_topup_preview(
             member.get("total_spent", 0),
             int(order.get("amount") or 0),
+            policy_version=str(
+                order.get("policy_version")
+                or VIP_TOPUP_REBATE_POLICY_LEGACY
+            ),
         )
 
     return templates.TemplateResponse(
