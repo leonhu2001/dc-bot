@@ -108,7 +108,7 @@ class _FakeDeleteSession:
         pass
 
 
-def test_retract_dispatch_keeps_draft_and_cleans_prepay_state(monkeypatch):
+def test_retract_dispatch_allows_partial_claim_and_cleans_prepay_state(monkeypatch):
     ticket = _FakeTextChannel(6001)
     dispatch = _FakeTextChannel(6002)
     dispatch_message = _FakeMessage(7001)
@@ -167,7 +167,12 @@ def test_retract_dispatch_keeps_draft_and_cleans_prepay_state(monkeypatch):
     monkeypatch.setattr(
         order_acceptance,
         "get_acceptance_state",
-        lambda _order_id: SimpleNamespace(status="waiting_acceptance"),
+        lambda _order_id: SimpleNamespace(
+            status="waiting_acceptance",
+            required_staff_count=2,
+            accepted_count=1,
+            is_full=False,
+        ),
     )
     monkeypatch.setattr(
         order_acceptance,
@@ -251,7 +256,6 @@ def test_dispatched_view_is_persistent_and_has_retract_button():
     assert retract_buttons[0].label == "撤回派單"
 
 
-
 def test_retract_blocks_paid_local_state_even_without_web_order_id(monkeypatch):
     ticket = _FakeTextChannel(6101)
     dispatch = _FakeTextChannel(6102)
@@ -271,6 +275,8 @@ def test_retract_blocks_paid_local_state_even_without_web_order_id(monkeypatch):
 
     monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
     monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6101: draft}, raising=False)
+    monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", {}, raising=False)
+    monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", 6102, raising=False)
 
     with pytest.raises(ValueError, match="不能用『撤回派單』"):
         asyncio.run(
