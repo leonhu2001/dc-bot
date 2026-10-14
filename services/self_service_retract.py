@@ -5,6 +5,7 @@ from typing import Any
 
 import discord
 
+from core.permissions import is_customer_staff, is_manager_or_admin
 from services.orders import _to_int
 
 
@@ -254,3 +255,123 @@ async def retract_self_service_dispatch(
     if warnings:
         result += "\n" + "\n".join(f"⚠️ {warning}" for warning in warnings)
     return result
+
+
+
+class SelfServiceDispatchedView(discord.ui.View):
+    """送出後只保留撤回操作；固定 custom_id 讓重啟後仍可操作。"""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="撤回派單",
+        style=discord.ButtonStyle.danger,
+        custom_id="self_service_retract_dispatch_button",
+    )
+    async def retract_dispatch(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        if (
+            not isinstance(interaction.user, discord.Member)
+            or not (
+                is_customer_staff(interaction.user)
+                or is_manager_or_admin(interaction.user)
+            )
+        ):
+            await interaction.response.send_message(
+                "只有客服、店長或管理員可以撤回派單。",
+                ephemeral=True,
+            )
+            return
+
+        if not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message(
+                "無法確認目前票口頻道。",
+                ephemeral=True,
+            )
+            return
+
+        # Lazy import avoids a module cycle while keeping the legacy runtime's
+        # state stores as the single source of truth until that boundary is retired.
+        from services import self_service_runtime as runtime
+
+        channel_id = int(interaction.channel.id)
+        data = runtime.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        customer_id = _to_int(data.get("customer_id"), None)
+
+        if customer_id is None:
+            await interaction.response.send_message(
+                "找不到這張票口的顧客資料。",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            response_text = await retract_self_service_dispatch(
+                interaction,
+                channel_id=channel_id,
+                order_selections=runtime.SELF_SERVICE_ORDER_SELECTIONS,
+                order_claims=runtime.ORDER_CLAIMS,
+                dispatch_channel_id=runtime.DISPATCH_CHANNEL_ID,
+                remember_order=runtime.remember_order_data,
+                save_data=runtime.save_bot_data,
+                delete_claim_row=runtime.delete_claim_row_from_db,
+                order_log_sender=runtime.send_order_log,
+                now_iso=runtime.get_taipei_now_iso,
+            )
+        except ValueError as exc:
+            await interaction.followup.send(str(exc), ephemeral=True)
+            return
+        except Exception as exc:
+            print(
+                f"[dispatch-retract] failed channel_id={channel_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            await interaction.followup.send(
+                "撤回派單失敗，原訂單已鎖住付款；請再按一次撤回，"
+                "若仍失敗請通知客服主管查看後台紀錄。",
+                ephemeral=True,
+            )
+            return
+
+        panel_refreshed = False
+        if interaction.message is not None:
+            try:
+                updated_data = runtime.SELF_SERVICE_ORDER_SELECTIONS.get(
+                    channel_id,
+                    {},
+                )
+                await interaction.message.edit(
+                    embed=runtime.build_self_service_panel_embed(
+                        customer_id,
+                        updated_data,
+                        interaction.guild,
+                    ),
+                    view=runtime.SelfServiceOrderView(
+                        customer_id=customer_id,
+                        channel_id=channel_id,
+                        selected_category=updated_data.get("category"),
+                    ),
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+                panel_refreshed = True
+            except discord.HTTPException:
+                panel_refreshed = False
+
+        if not panel_refreshed:
+            response_text += (
+                "\n⚠️ 自助下單 Panel 未能自動刷新，"
+                "請重新開啟票口 Panel 後再修改。"
+            )
+
+        await interaction.followup.send(response_text, ephemeral=True)
