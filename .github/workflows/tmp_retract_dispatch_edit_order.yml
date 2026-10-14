@@ -31,7 +31,18 @@ jobs:
           python -m pip install -r web/requirements-web.txt
           python -m pip install -r requirements-dev.txt
       - name: Apply patch
-        run: python .github/tmp_patch_retract.py
+        run: |
+          python .github/tmp_patch_retract.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/test_self_service_retract_dispatch.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'monkeypatch.setattr(web_order_sync, "SessionLocal", lambda: session)'
+          new = 'monkeypatch.setattr(shared_db, "SessionLocal", lambda: session)'
+          if old not in text:
+              raise SystemExit('test SessionLocal seam anchor missing')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Targeted validation
         run: |
           python -m py_compile services/self_service_runtime.py shared/web_order_sync.py bot.py tests/test_self_service_retract_dispatch.py
