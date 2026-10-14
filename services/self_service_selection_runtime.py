@@ -349,17 +349,39 @@ ORDER_POINT_BENEFIT_SPECS = {
 
 
 
+def _same_order_benefit_option_text(benefit: dict | None) -> str:
+    if not benefit:
+        return "本單累積福利"
+
+    kind = str(benefit.get("benefit_kind") or "")
+    try:
+        units = float(benefit.get("benefit_units") or 0)
+    except (TypeError, ValueError):
+        units = 0.0
+
+    if kind == "extra_hours":
+        if abs(units - 0.5) < 0.001:
+            benefit_text = "折抵 30 分鐘"
+        else:
+            benefit_text = f"折抵 {units:g} 小時"
+    else:
+        benefit_text = f"折抵 {int(round(units))} 局"
+
+    return f"本單累積福利｜{benefit_text}"
+
+
 class SelfServicePointBenefitSelect(discord.ui.Select):
     def __init__(self, parent_view: "SelfServicePointBenefitView"):
         options = [
             discord.SelectOption(
-                label="不使用點數福利",
+                label="不使用福利",
                 value="none",
-                description="清除這張單目前選擇的點數福利",
+                description="清除這張單目前選擇的點數 / 會員福利",
                 default=(
                     parent_view.selected_key is None
                     and parent_view.selected_coupon_id is None
                     and parent_view.selected_vip_monthly_benefit_id is None
+                    and not parent_view.selected_same_order_benefit
                 ),
             )
         ]
@@ -372,6 +394,18 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
                     value=f"vip_monthly:{benefit['id']}",
                     description=_truncate_select_text(f"折抵 {amount}T；與其他福利擇一"),
                     default=str(benefit.get("id")) == str(parent_view.selected_vip_monthly_benefit_id),
+                )
+            )
+
+        if parent_view.available_same_order_benefit:
+            options.append(
+                discord.SelectOption(
+                    label=_truncate_select_text(
+                        _same_order_benefit_option_text(parent_view.available_same_order_benefit)
+                    ),
+                    value="same_order",
+                    description="本單達成累積門檻，可立即折抵；與其他福利擇一",
+                    default=parent_view.selected_same_order_benefit,
                 )
             )
 
@@ -420,6 +454,7 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             "selected_point_benefit_key",
             "selected_benefit_coupon_id",
             "selected_vip_monthly_benefit_id",
+            "selected_same_order_benefit",
             "vip_monthly_benefit_id",
             "vip_monthly_benefit_key",
             "vip_monthly_benefit_title",
@@ -434,12 +469,22 @@ class SelfServicePointBenefitSelect(discord.ui.Select):
             "service_bonus_text",
             "benefit_coupon_id",
             "benefit_coupon_title",
+            "benefit_coupon",
+            "benefit_discount_amount",
             "benefit_service_note",
         )
         for key in clear_keys:
             data.pop(key, None)
 
-        if selected.startswith("vip_monthly:"):
+        if selected == "same_order":
+            if view.available_same_order_benefit is None:
+                await interaction.response.send_message(
+                    "這張單目前尚未達到可立即折抵的累積門檻，請重新整理後再試。",
+                    ephemeral=True,
+                )
+                return
+            data["selected_same_order_benefit"] = True
+        elif selected.startswith("vip_monthly:"):
             try:
                 data["selected_vip_monthly_benefit_id"] = int(selected.split(":", 1)[1])
             except (TypeError, ValueError):
@@ -495,12 +540,14 @@ class SelfServicePointBenefitView(discord.ui.View):
         self.rule = rule
 
         data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        data["customer_id"] = self.customer_id
         self.selected_key = data.get("selected_point_benefit_key")
         self.selected_coupon_id = data.get("selected_benefit_coupon_id")
         self.selected_vip_monthly_benefit_id = data.get("selected_vip_monthly_benefit_id")
+        self.selected_same_order_benefit = bool(data.get("selected_same_order_benefit"))
         self.point_balance = get_customer_point_balance_for_order(customer_id)
         self.available_items = self.build_available_items(data)
-        from services.loyalty_benefits import list_applicable_coupons
+        from services.loyalty_benefits import list_applicable_coupons, preview_same_order_benefit
         from services.vip_monthly_benefits import list_available_cash_benefits
         self.available_vip_monthly_benefits = list_available_cash_benefits(customer_id)
         self.available_coupons = list_applicable_coupons(
@@ -508,6 +555,16 @@ class SelfServicePointBenefitView(discord.ui.View):
             rule_key=str(getattr(rule, "key", "")),
             player_count=_to_int(data.get("player_count"), 1) or 1,
         )
+        self.available_same_order_benefit = preview_same_order_benefit(
+            customer_id,
+            rule_key=str(getattr(rule, "key", "")),
+            quantity=_to_int(data.get("quantity"), 1) or 1,
+            player_count=_to_int(data.get("player_count"), 1) or 1,
+        )
+        if self.selected_same_order_benefit and self.available_same_order_benefit is None:
+            self.selected_same_order_benefit = False
+            data.pop("selected_same_order_benefit", None)
+            remember_order_data(self.channel_id, data)
 
         self.add_item(SelfServicePointBenefitSelect(self))
 
@@ -551,7 +608,9 @@ class SelfServicePointBenefitView(discord.ui.View):
         benefit = get_selected_order_point_benefit(data, self.rule)
         selected_text = "尚未使用"
 
-        if data.get("selected_vip_monthly_benefit_id"):
+        if data.get("selected_same_order_benefit") and self.available_same_order_benefit:
+            selected_text = _same_order_benefit_option_text(self.available_same_order_benefit)
+        elif data.get("selected_vip_monthly_benefit_id"):
             monthly = next(
                 (
                     item
@@ -575,7 +634,7 @@ class SelfServicePointBenefitView(discord.ui.View):
         return (
             f"請選擇這張單要使用的點數福利或會員福利券。\n"
             f"目前可用點數：{self.point_balance} 點\n"
-            f"可用福利券：{len(self.available_vip_monthly_benefits) + len(self.available_coupons)} 張\n"
+            f"可用福利券：{len(self.available_vip_monthly_benefits) + len(self.available_coupons) + (1 if self.available_same_order_benefit else 0)} 張\n"
             f"目前選擇：{selected_text}\n\n"
             "同張訂單只能擇一；福利券會在訂單建立時先保留，結單後正式核銷。"
         )

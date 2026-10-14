@@ -539,7 +539,9 @@ async def create_waiting_acceptance_order_from_self_service(
         "point_extra_games": price_adjustment.get("point_extra_games"),
         "benefit_coupon_id": price_adjustment.get("benefit_coupon_id"),
         "benefit_coupon_title": price_adjustment.get("benefit_coupon_title"),
+        "benefit_coupon": price_adjustment.get("benefit_coupon"),
         "benefit_service_value": price_adjustment.get("benefit_service_value"),
+        "benefit_discount_amount": price_adjustment.get("benefit_discount_amount"),
         "benefit_service_note": price_adjustment.get("benefit_service_note"),
         "store_absorbed_amount": price_adjustment.get("store_absorbed_amount"),
         "customer_pay_amount": price_adjustment.get("customer_pay_amount"),
@@ -943,7 +945,9 @@ async def create_waiting_acceptance_order_from_self_service(
     data["service_bonus_text"] = price_adjustment["service_bonus_text"]
     data["benefit_coupon_id"] = price_adjustment.get("benefit_coupon_id")
     data["benefit_coupon_title"] = price_adjustment.get("benefit_coupon_title")
+    data["benefit_coupon"] = price_adjustment.get("benefit_coupon")
     data["benefit_service_value"] = price_adjustment.get("benefit_service_value")
+    data["benefit_discount_amount"] = price_adjustment.get("benefit_discount_amount")
     data["benefit_service_note"] = price_adjustment.get("benefit_service_note")
     data["store_absorbed_amount"] = price_adjustment["store_absorbed_amount"]
     data["customer_pay_amount"] = price_adjustment["customer_pay_amount"]

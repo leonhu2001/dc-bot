@@ -734,6 +734,7 @@ def _qualifying_paid_amount(row: dict[str, Any]) -> int:
                 return max(0, int(
                     finance.get("service_after_vip")
                     or finance.get("service_amount")
+                    or snapshot.get("payout_base_amount")
                     or amount
                     or 0
                 ))
