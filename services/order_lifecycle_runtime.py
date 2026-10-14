@@ -6,6 +6,7 @@ import asyncio
 import discord
 
 from services.payment_methods import WALLET_PAYMENT_METHOD
+from services.order_payment_policy import is_zero_amount_order
 
 
 _REQUIRED_DEPENDENCIES = (
@@ -103,12 +104,15 @@ async def ensure_payment_submit_receipt(
     )
 
     amount_text = format_t_amount(amount)
-    payment_status_text = (
-        "已確認收款"
-        if payment_method == WALLET_PAYMENT_METHOD
-        or bool(order_data.get("payment_review_approved"))
-        else "已送出，待客服確認"
-    )
+    if is_zero_amount_order(amount):
+        payment_status_text = "免付款／已完成"
+    else:
+        payment_status_text = (
+            "已確認收款"
+            if payment_method == WALLET_PAYMENT_METHOD
+            or bool(order_data.get("payment_review_approved"))
+            else "已送出，待客服確認"
+        )
     order_content = f"{category_label}｜{item}｜數量：{quantity} 單"
     if companion_preference:
         order_content += f"｜{companion_preference}"
