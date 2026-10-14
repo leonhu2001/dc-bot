@@ -121,20 +121,25 @@ def test_v3_blocks_old_ranked_order_but_keeps_post_rollout_order(
         old_event = conn.execute(text(
             "SELECT note FROM loyalty_order_events WHERE order_id = 1"
         )).mappings().one()
-        assert loyalty._POLICY_V3_NONRETROACTIVE_MARKER in str(old_event['note'])
         post_rollout_event = conn.execute(text(
             "SELECT note FROM loyalty_order_events WHERE order_id = 2"
-        )).mappings().first()
-        assert post_rollout_event is None
+        )).mappings().one()
+        progress = conn.execute(text("""
+            SELECT progress_units
+            FROM customer_loyalty_progress
+            WHERE customer_discord_id = 'owner-b'
+              AND rule_key = 'valorant_entertain_ranked'
+        """)).scalar_one()
 
-    result = loyalty.process_closed_order(2)
-    assert result is not None
-    assert result['paid_units'] == 2.0
+    assert loyalty._POLICY_V3_NONRETROACTIVE_MARKER in str(old_event['note'])
+    assert loyalty._POLICY_V3_NONRETROACTIVE_MARKER not in str(post_rollout_event['note'])
+    assert str(post_rollout_event['note']).startswith('admin_reconciled')
+    assert float(progress) == 2.0
 
     with engine.begin() as conn:
         summary = loyalty.reconcile_customer_loyalty_in_connection(conn, 'owner-b')
         assert summary['issued'] == 0
-        progress = conn.execute(text("""
+        progress_after = conn.execute(text("""
             SELECT progress_units
             FROM customer_loyalty_progress
             WHERE customer_discord_id = 'owner-b'
@@ -143,5 +148,5 @@ def test_v3_blocks_old_ranked_order_but_keeps_post_rollout_order(
         old_event_after = conn.execute(text(
             "SELECT note FROM loyalty_order_events WHERE order_id = 1"
         )).mappings().one()
-    assert float(progress) == 2.0
+    assert float(progress_after) == 2.0
     assert loyalty._POLICY_V3_NONRETROACTIVE_MARKER in str(old_event_after['note'])
