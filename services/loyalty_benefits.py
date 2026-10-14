@@ -16,7 +16,7 @@ LOYALTY_START_AT_TAIPEI = datetime(2026, 10, 10, 0, 0, 0, tzinfo=TAIPEI_TZ)
 LOYALTY_START_AT_UTC_NAIVE = LOYALTY_START_AT_TAIPEI.astimezone(timezone.utc).replace(tzinfo=None)
 
 HOURLY_THRESHOLD = 10.0
-HOURLY_BONUS = 0.5
+HOURLY_BONUS = 1.0
 GAME_THRESHOLD = 20.0
 GAME_BONUS = 1.0
 COUPON_VALID_DAYS = 90
@@ -184,7 +184,7 @@ def loyalty_policy_for_rule(rule_key: str) -> dict[str, Any] | None:
             "benefit_kind": "extra_hours",
             "benefit_units": HOURLY_BONUS,
             "unit_label": "小時",
-            "benefit_label": "+30 分鐘",
+            "benefit_label": "+1 小時",
         }
     if pricing_type == "game":
         return {
