@@ -6,6 +6,21 @@ import discord
 
 from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD
 from services.wallet_service import get_wallet_payment_transaction
+from services.orders import (
+    ORDER_CATEGORY_LABELS,
+    ORDER_ITEM_GROUPS_BY_CATEGORY,
+    SELF_SERVICE_ACTIVE_CATEGORIES,
+    _to_int,
+    get_order_item_detail_for_selection,
+    get_order_item_details_for_group,
+    get_order_item_group_label,
+    get_self_service_quantity_meta,
+)
+from services.self_service_selection_state import (
+    apply_self_service_category_selection,
+    apply_self_service_detail_selection,
+    apply_self_service_item_group_selection,
+)
 
 from services.order_credential_runtime import (
     configure_order_credentials,
@@ -279,16 +294,7 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
 
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
-        data["category"] = selected_category
-        data.pop("item_group", None)
-        data.pop("item_detail_value", None)
-        data.pop("item", None)
-        data.pop("order_rule_key", None)
-        data.pop("quantity", None)
-        data.pop("player_count", None)
-        data.pop("specified_staff_ids", None)
-        data.pop("companion_preference", None)
-        data.pop("payment_method", None)
+        apply_self_service_category_selection(data, selected_category)
         remember_order_data(self.channel_id, data)
         await log_self_service_proxy_action(
             interaction,
@@ -380,29 +386,7 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         selected_group = self.values[0]
         data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
-        data["item_group"] = selected_group
-        data.pop("item_detail_value", None)
-        data.pop("item", None)
-        data.pop("order_rule_key", None)
-        data.pop("player_count", None)
-        data.pop("specified_staff_ids", None)
-        data.pop("payment_method", None)
-        data["companion_preference"] = "不指定陪玩/打手"
-
-        details = get_order_item_details_for_group(data.get("category"), selected_group)
-
-        # 只有一個規格時直接選好，但第三欄仍會顯示該規格。
-        if len(details) == 1:
-            detail = details[0]
-            data["item_detail_value"] = str(detail.get("value") or "")
-            data["item"] = detail["item"]
-            data["order_rule_key"] = detail["rule_key"]
-            if detail.get("player_count") is not None:
-                data["player_count"] = int(detail["player_count"])
-            data["quantity"] = int(detail.get("min_quantity") or 1)
-        else:
-            data["quantity"] = 1
-
+        apply_self_service_item_group_selection(data, selected_group)
         remember_order_data(self.channel_id, data)
 
         await _defer_and_refresh_self_service_panel(
@@ -504,19 +488,7 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
             await interaction.response.send_message("訂單規格選擇異常，請重新選擇。", ephemeral=True)
             return
 
-        data["item_detail_value"] = str(detail.get("value") or "")
-        data["item"] = detail["item"]
-        data["order_rule_key"] = detail["rule_key"]
-
-        if detail.get("player_count") is not None:
-            data["player_count"] = int(detail["player_count"])
-        else:
-            data.pop("player_count", None)
-
-        data["quantity"] = int(detail.get("min_quantity") or 1)
-        data.pop("specified_staff_ids", None)
-        data.pop("payment_method", None)
-        data["companion_preference"] = "不指定陪玩/打手"
+        apply_self_service_detail_selection(data, detail)
         remember_order_data(self.channel_id, data)
 
         await _defer_and_refresh_self_service_panel(
