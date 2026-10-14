@@ -41,7 +41,9 @@ def build_payment_method_embed(
     dispatch_url: str | None = None,
 ) -> discord.Embed:
     payment_info = get_payment_method_info(payment_method)
-    amount_text = format_t_amount(amount) if amount else "待客服填寫"
+    amount_known = amount is not None
+    payable_amount = int(amount) if amount_known else None
+    amount_text = format_t_amount(payable_amount) if amount_known else "待客服填寫"
     description = (
         f"下單用戶：<@{customer_id}>\n\n"
         f"訂單類別：{category_label}\n"
@@ -59,7 +61,7 @@ def build_payment_method_embed(
     if submitted and dispatch_url:
         description += "\n✅ 已送出派單，此付款面板已鎖定，請勿重複操作。\n"
         description += f"派單訊息：{dispatch_url}"
-    elif amount and payment_info:
+    elif payable_amount is not None and payable_amount > 0 and payment_info:
         description += "\n請闆闆確認總價與付款資訊，選擇付款方式後按「送出」。"
     else:
         description += "\n請選擇付款方式，完成後按「送出」。"
@@ -73,7 +75,7 @@ def build_payment_method_embed(
     if companion_preference is not None:
         embed.add_field(name="指定選項", value=companion_preference, inline=False)
 
-    if amount and payment_info:
+    if payable_amount is not None and payable_amount > 0 and payment_info:
         embed.add_field(name="付款資訊", value=f"```text\n{payment_info}\n```", inline=False)
 
     return embed
