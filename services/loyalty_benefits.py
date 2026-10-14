@@ -17,7 +17,7 @@ LOYALTY_START_AT_UTC_NAIVE = LOYALTY_START_AT_TAIPEI.astimezone(timezone.utc).re
 
 HOURLY_THRESHOLD = 10.0
 HOURLY_BONUS = 1.0
-GAME_THRESHOLD = 20.0
+GAME_THRESHOLD = 10.0
 GAME_BONUS = 1.0
 COUPON_VALID_DAYS = 90
 
@@ -259,6 +259,38 @@ def _loyalty_display_label(rule_key: str, fallback: object = "") -> str:
     return label or str(rule_key or "")
 
 
+def _snapshot_preview(row: dict[str, Any]) -> dict[str, Any]:
+    try:
+        import json
+
+        snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))
+    except Exception:
+        return {}
+    if not isinstance(snapshot, dict):
+        return {}
+    preview = snapshot.get("preview")
+    return preview if isinstance(preview, dict) else snapshot
+
+
+def _extract_same_order_benefit_count(
+    row: dict[str, Any],
+    *,
+    scope_key: str | None = None,
+) -> int:
+    preview = _snapshot_preview(row)
+    benefit = preview.get("benefit_coupon") if isinstance(preview, dict) else None
+    if not isinstance(benefit, dict):
+        return 0
+    if str(benefit.get("source") or "").strip() != "same_order":
+        return 0
+    if scope_key is not None and str(benefit.get("scope_key") or "").strip() != str(scope_key):
+        return 0
+    try:
+        return max(0, int(benefit.get("earned_count") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def loyalty_scope_key(rule_key: str, player_count: int = 1) -> str:
     # player_count intentionally does not participate in the scope. A customer
     # owns one progress pool per game/service family, regardless of 1/2/3/4陪.
@@ -278,6 +310,111 @@ def _coupon_title(row: dict[str, Any]) -> str:
         benefit = f"折抵 {int(round(units))} 局額度"
     label = _loyalty_display_label(str(row.get("rule_key") or ""), row.get("rule_label"))
     return f"{label}｜{benefit}"
+
+
+def _pending_same_order_claim_count(
+    conn,
+    *,
+    customer_id: str,
+    scope_key: str,
+) -> int:
+    try:
+        has_orders = conn.execute(text("""
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'web_orders'
+            LIMIT 1
+        """)).first()
+        if has_orders is None:
+            return 0
+        rows = conn.execute(text("""
+            SELECT price_snapshot_json
+            FROM web_orders
+            WHERE customer_discord_id = :customer_id
+              AND LOWER(COALESCE(status, '')) NOT IN ('closed', 'cancelled')
+        """), {"customer_id": customer_id}).mappings().all()
+    except Exception:
+        return 0
+
+    return sum(
+        _extract_same_order_benefit_count(dict(row), scope_key=scope_key)
+        for row in rows
+    )
+
+
+def preview_same_order_benefit(
+    customer_id: str | int,
+    *,
+    rule_key: str,
+    quantity: int,
+    player_count: int = 1,
+) -> dict[str, Any] | None:
+    """Return the loyalty reward earned by this order so it can be used now.
+
+    This is read-only. The order snapshot records the consumed reward and the
+    close-order path subtracts it before issuing any future coupon.
+    """
+    policy = loyalty_policy_for_rule(rule_key)
+    rule = _rule_for_key(rule_key)
+    customer = str(customer_id or "").strip()
+    if policy is None or rule is None or not customer:
+        return None
+
+    requested_players = max(1, int(player_count or 1))
+    companion_count = _service_companion_count(rule, requested_players)
+    paid_units = float(max(0, int(quantity or 0)) * companion_count)
+    if paid_units <= 0:
+        return None
+
+    ensure_loyalty_tables()
+    scope = loyalty_scope_key(rule_key, requested_players)
+    threshold = float(policy["threshold_units"] or 0)
+    if threshold <= 0:
+        return None
+
+    with engine.begin() as conn:
+        progress_row = conn.execute(text("""
+            SELECT progress_units, debt_units
+            FROM customer_loyalty_progress
+            WHERE customer_discord_id = :customer_id
+              AND scope_key = :scope_key
+            LIMIT 1
+        """), {
+            "customer_id": customer,
+            "scope_key": scope,
+        }).mappings().first()
+        previous = float(progress_row.get("progress_units") or 0) if progress_row else 0.0
+        debt_before = float(progress_row.get("debt_units") or 0) if progress_row else 0.0
+        credited_units = max(0.0, paid_units - debt_before)
+        projected_total = previous + credited_units
+        earned_count = max(0, int(projected_total // threshold))
+        pending_count = _pending_same_order_claim_count(
+            conn,
+            customer_id=customer,
+            scope_key=scope,
+        )
+
+    available_count = max(0, earned_count - pending_count)
+    if available_count <= 0:
+        return None
+
+    base_units = float(policy["benefit_units"] or 0)
+    benefit = {
+        "id": None,
+        "source": "same_order",
+        "same_order": True,
+        "earned_count": available_count,
+        "scope_key": scope,
+        "rule_key": str(rule_key),
+        "rule_label": _loyalty_display_label(rule_key, getattr(rule, "label", rule_key)),
+        "pricing_type": str(policy["pricing_type"]),
+        "player_count": requested_players,
+        "benefit_kind": str(policy["benefit_kind"]),
+        "benefit_units": base_units * available_count,
+        "threshold_units": threshold,
+    }
+    benefit["title"] = _coupon_title(benefit)
+    return benefit
 
 
 def list_customer_loyalty(customer_id: str | int) -> dict[str, Any]:
@@ -435,12 +572,13 @@ def calculate_coupon_service_value(
 def coupon_service_note(coupon: dict[str, Any] | None) -> str:
     if not coupon:
         return ""
+    prefix = "本單累積福利" if str(coupon.get("source") or "") == "same_order" else "福利券"
     kind = str(coupon.get("benefit_kind") or "")
     units = float(coupon.get("benefit_units") or 0)
     if kind == "extra_hours":
         amount = "30 分鐘" if abs(units - 0.5) < 0.001 else f"{units:g} 小時"
-        return f"福利券：折抵 {amount} 服務額度"
-    return f"福利券：折抵 {int(round(units))} 局服務額度"
+        return f"{prefix}：折抵 {amount} 服務額度"
+    return f"{prefix}：折抵 {int(round(units))} 局服務額度"
 
 
 def reserve_coupon_in_session(
@@ -575,6 +713,14 @@ def _qualifying_paid_amount(row: dict[str, Any]) -> int:
                 and isinstance(preview.get("finance"), dict)
                 else {}
             )
+            benefit = preview.get("benefit_coupon") if isinstance(preview, dict) else None
+            if isinstance(benefit, dict) and str(benefit.get("source") or "") == "same_order":
+                return max(0, int(
+                    finance.get("service_after_vip")
+                    or finance.get("service_amount")
+                    or amount
+                    or 0
+                ))
             if "subtotal_before_wallet" in finance:
                 return max(0, int(finance.get("subtotal_before_wallet") or 0))
             if "customer_pay_amount" in snapshot:
@@ -849,6 +995,7 @@ def _loyalty_bucket_from_order(row: dict[str, Any]) -> dict[str, Any] | None:
         "paid_units": float(
             max(0, int(row.get("quantity") or 0)) * companion_count
         ),
+        "same_order_consumed_count": _extract_same_order_benefit_count(row),
     }
 
 
@@ -923,8 +1070,12 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
             if aggregate is None:
                 aggregate = dict(bucket)
                 aggregate["paid_units"] = 0.0
+                aggregate["same_order_consumed_count"] = 0
                 buckets[scope] = aggregate
             aggregate["paid_units"] = float(aggregate.get("paid_units") or 0) + paid_units
+            aggregate["same_order_consumed_count"] = int(
+                aggregate.get("same_order_consumed_count") or 0
+            ) + int(bucket.get("same_order_consumed_count") or 0)
         elif not str(row.get("customer_discord_id") or "").strip():
             note = "admin_reconciled;missing_customer"
         elif not _event_time_is_in_scope(row):
@@ -981,6 +1132,7 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
             "benefit_kind": str(row.get("benefit_kind") or ""),
             "benefit_units": float(row.get("benefit_units") or 0),
             "paid_units": 0.0,
+            "same_order_consumed_count": 0,
         }
 
     coupon_meta_rows = conn.execute(text("""
@@ -1010,6 +1162,7 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
             "benefit_kind": str(row.get("benefit_kind") or policy["benefit_kind"]),
             "benefit_units": float(row.get("benefit_units") or policy["benefit_units"]),
             "paid_units": 0.0,
+            "same_order_consumed_count": 0,
         }
 
     revoked_total = 0
@@ -1050,7 +1203,12 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
             if str(row.get("status") or "").lower() == ACTIVE
         ]
 
-        target_nonprotected = max(0, earned_count - len(protected))
+        same_order_consumed = max(
+            0,
+            int((buckets.get(scope) or {}).get("same_order_consumed_count") or 0),
+        )
+        protected_count = len(protected) + same_order_consumed
+        target_nonprotected = max(0, earned_count - protected_count)
         keep_expired = min(len(expired), target_nonprotected)
         revoke_expired = expired[keep_expired:]
         target_active = max(0, target_nonprotected - keep_expired)
@@ -1098,7 +1256,7 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
             })
             issued_total += 1
 
-        debt_units = max(0.0, len(protected) * threshold - total_units)
+        debt_units = max(0.0, protected_count * threshold - total_units)
         progress_units = 0.0 if debt_units > 0.0001 else remainder
         current_bucket = buckets.get(scope)
 
@@ -1259,8 +1417,15 @@ def process_closed_order(order_id: int) -> dict[str, Any] | None:
             debt_after = max(0.0, debt_before - paid_units)
             credited_units = max(0.0, paid_units - debt_before)
             total = previous + credited_units
-            issued_count = max(0, int(total // threshold))
-            remainder = total - issued_count * threshold
+            same_order_consumed = _extract_same_order_benefit_count(row)
+            consumed_units = float(same_order_consumed) * threshold
+            if consumed_units > total:
+                debt_after += consumed_units - total
+                rewardable_total = 0.0
+            else:
+                rewardable_total = total - consumed_units
+            issued_count = max(0, int(rewardable_total // threshold))
+            remainder = rewardable_total - issued_count * threshold
             rule_label = _loyalty_display_label(
                 rule_key,
                 getattr(rule, "label", rule_key),

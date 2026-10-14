@@ -37,6 +37,7 @@ from services.loyalty_benefits import (
     coupon_service_note,
     get_applicable_coupon,
     list_applicable_coupons,
+    preview_same_order_benefit,
 )
 
 
@@ -1368,7 +1369,11 @@ def calculate_checkout_financials(
         "point_service_note": point_service_note,
         "point_service_value": point_service_value,
         "point_store_absorbed_amount": point_store_absorbed,
-        "benefit_coupon_id": (int(benefit_coupon.get("id")) if benefit_coupon else None),
+        "benefit_coupon_id": (
+            int(benefit_coupon.get("id"))
+            if benefit_coupon and benefit_coupon.get("id") not in (None, "")
+            else None
+        ),
         "benefit_coupon_title": (str(benefit_coupon.get("title") or "") if benefit_coupon else ""),
         "benefit_service_note": coupon_service_note(benefit_coupon),
         "benefit_service_value": benefit_service_value,
@@ -1857,6 +1862,13 @@ def build_checkout_preview(
         if selected_benefit_coupon is None:
             raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
 
+    if selected_point_item is None and selected_benefit_coupon is None:
+        selected_benefit_coupon = preview_same_order_benefit(
+            customer_id,
+            rule_key=rule_key,
+            quantity=int(quote.get("quantity") or quantity or 1),
+            player_count=int(quote.get("player_count") or player_count or 1),
+        )
 
 
     finance = (
@@ -2063,10 +2075,18 @@ def build_checkout_preview(
 
         "benefit_coupon": (
             {
-                "id": int(selected_benefit_coupon.get("id")),
+                "id": (
+                    int(selected_benefit_coupon.get("id"))
+                    if selected_benefit_coupon.get("id") not in (None, "")
+                    else None
+                ),
                 "title": str(selected_benefit_coupon.get("title") or ""),
                 "benefit_kind": str(selected_benefit_coupon.get("benefit_kind") or ""),
                 "benefit_units": float(selected_benefit_coupon.get("benefit_units") or 0),
+                "source": str(selected_benefit_coupon.get("source") or "loyalty"),
+                "same_order": bool(selected_benefit_coupon.get("same_order")),
+                "earned_count": int(selected_benefit_coupon.get("earned_count") or 0),
+                "scope_key": str(selected_benefit_coupon.get("scope_key") or ""),
             }
             if selected_benefit_coupon
             else None

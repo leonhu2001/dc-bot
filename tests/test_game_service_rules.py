@@ -190,14 +190,20 @@ def test_new_lol_and_valorant_orders_allow_specify_with_100t_fee_and_max_four_st
         assert all(int(value) == 100 for value in rule.specify_fee_by_game_role.values())
 
 
-def test_same_order_buy_get_is_disabled_and_loyalty_is_enabled():
-    rule = ORDER_RULES["valorant_radiant_ranked"]
-    result = calculate_price(rule, quantity=8, player_count=2)
-    assert rule.price == 400
-    assert result.base_amount == 6400
-    assert result.service_quantity == 8
-    assert rule.loyalty_benefits_enabled is True
-    assert set(get_allowed_role_ids(rule)) == {"1545357782906314782"}
+def test_same_order_buy_get_is_disabled_and_loyalty_is_entertainment_only():
+    tier_rule = ORDER_RULES["valorant_radiant_ranked"]
+    tier_result = calculate_price(tier_rule, quantity=8, player_count=2)
+    assert tier_rule.price == 400
+    assert tier_result.base_amount == 6400
+    assert tier_result.service_quantity == 8
+    assert tier_rule.loyalty_benefits_enabled is False
+    assert set(get_allowed_role_ids(tier_rule)) == {"1545357782906314782"}
+
+    entertainment_ranked = ORDER_RULES["valorant_entertain_ranked"]
+    assert entertainment_ranked.loyalty_benefits_enabled is True
+    assert calculate_price(
+        entertainment_ranked, quantity=8, player_count=2
+    ).service_quantity == 8
 
     lol = ORDER_RULES["lol_entertain_aram"]
     assert lol.price == 300
