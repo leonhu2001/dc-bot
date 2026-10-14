@@ -13,10 +13,16 @@ _CONFIGURED = False
 
 _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     {
+        "Any",
+        "Mapping",
+        "Path",
+        "asyncio",
+        "discord",
         "get_taipei_now_iso",
         "remember_claim_data",
         "remember_order_data",
         "save_bot_data",
+        "utc_now_naive",
     }
 )
 

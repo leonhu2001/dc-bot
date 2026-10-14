@@ -1,3 +1,9 @@
+import asyncio
+from pathlib import Path
+from typing import Any, Mapping
+
+import discord
+
 from core import database as core_database
 from core import time_utils
 from services.acceptance import runtime as acceptance_runtime
@@ -8,14 +14,21 @@ def test_acceptance_runtime_owns_canonical_persistence_and_time_dependencies():
     assert acceptance_runtime.remember_order_data is core_database.remember_order_data
     assert acceptance_runtime.save_bot_data is core_database.save_bot_data
     assert acceptance_runtime.get_taipei_now_iso is time_utils.get_taipei_now_iso
+    assert acceptance_runtime.utc_now_naive is time_utils.utc_now_naive
 
 
 def test_acceptance_legacy_injection_cannot_shadow_module_owned_dependencies():
     originals = {
-        "remember_claim_data": acceptance_runtime.remember_claim_data,
-        "remember_order_data": acceptance_runtime.remember_order_data,
-        "save_bot_data": acceptance_runtime.save_bot_data,
-        "get_taipei_now_iso": acceptance_runtime.get_taipei_now_iso,
+        "Any": Any,
+        "Mapping": Mapping,
+        "Path": Path,
+        "asyncio": asyncio,
+        "discord": discord,
+        "remember_claim_data": core_database.remember_claim_data,
+        "remember_order_data": core_database.remember_order_data,
+        "save_bot_data": core_database.save_bot_data,
+        "get_taipei_now_iso": time_utils.get_taipei_now_iso,
+        "utc_now_naive": time_utils.utc_now_naive,
     }
     marker = object()
 
@@ -34,9 +47,15 @@ def test_acceptance_legacy_injection_cannot_shadow_module_owned_dependencies():
 def test_acceptance_owned_dependency_names_are_explicit():
     assert acceptance_runtime._MODULE_OWNED_RUNTIME_NAMES == frozenset(
         {
+            "Any",
+            "Mapping",
+            "Path",
+            "asyncio",
+            "discord",
             "get_taipei_now_iso",
             "remember_claim_data",
             "remember_order_data",
             "save_bot_data",
+            "utc_now_naive",
         }
     )
