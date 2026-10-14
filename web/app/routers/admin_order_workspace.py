@@ -96,7 +96,6 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 
-
 def _mw4a2r6_redirect(
     order_id,
     *,
@@ -596,6 +595,15 @@ async def admin_order_workspace_edit_r8(
                     source="admin_order_workspace",
                     actor_discord_id=user.get("id"),
                 )
+        elif previous_status != status:
+            transition_order_state_in_connection(
+                db.connection(),
+                order_id=int(order_id),
+                target_status=status,
+                source="admin_order_workspace",
+                reason="客服後台調整訂單狀態",
+                actor_discord_id=user.get("id"),
+            )
 
         payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
 
