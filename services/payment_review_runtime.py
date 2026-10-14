@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import traceback
 from types import SimpleNamespace
 
 import discord
 
+from services import order_payment_runtime
 from services.payment_reviews import (
     PAYMENT_REVIEW_APPROVED,
     PAYMENT_REVIEW_REJECTED,
@@ -23,16 +23,15 @@ from views.review import refresh_post_close_panel
 
 
 def _target_bot_module():
-    for module in list(sys.modules.values()):
-        if module is None:
-            continue
-        if (
-            hasattr(module, "SELF_SERVICE_ORDER_SELECTIONS")
-            and hasattr(module, "finalize_accepted_pending_payment")
-            and hasattr(module, "PaymentMethodView")
-        ):
-            return module
-    return None
+    """Return the explicitly configured order-payment runtime adapter.
+
+    Payment review used to scan every loaded Python module and guess which one
+    happened to be bot.py.  order_payment_runtime already owns the exact
+    payment dependencies we need, so reuse that configured adapter instead.
+    """
+    if not getattr(order_payment_runtime, "_CONFIGURED", False):
+        return None
+    return order_payment_runtime
 
 
 def _actor(guild: discord.Guild | None, row: dict):
