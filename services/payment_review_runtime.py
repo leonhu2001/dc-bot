@@ -84,6 +84,26 @@ def _validate_order_review_snapshot(
         raise RuntimeError("付款審核顧客與目前訂單顧客不一致，請重新確認。")
 
 
+def _release_stale_review_runtime_lock(row: dict, data: dict, error_text: str) -> bool:
+    """Release only the stale review's own pending flag so payment can be resubmitted."""
+    if str(data.get("status") or "").strip().lower() != "accepted_pending_pay":
+        return False
+
+    review_id = _int_or_zero(row.get("id"))
+    current_review_id = _int_or_zero(data.get("payment_review_id"))
+    if current_review_id and review_id and current_review_id != review_id:
+        return False
+
+    data["payment_review_pending"] = False
+    data["payment_review_approved"] = False
+    data["payment_review_last_apply_error_id"] = review_id or None
+    data["payment_review_apply_error"] = str(error_text or "付款審核資料已過期")
+    data.pop("payment_review_id", None)
+    data.pop("payment_review_no", None)
+    data.pop("payment_finalizing", None)
+    return True
+
+
 def _rejection_still_targets_current_order_review(row: dict, data: dict) -> bool:
     """A late rejection must never clear a newer review or an active order."""
     if str(data.get("status") or "").strip().lower() != "accepted_pending_pay":
@@ -220,11 +240,17 @@ async def _apply_order_approval(bot: discord.Client, row: dict) -> None:
     if not isinstance(data, dict):
         raise RuntimeError("找不到原訂單的 Discord runtime 資料。")
 
-    _validate_order_review_snapshot(
-        row,
-        data,
-        customer_id=customer_id,
-    )
+    try:
+        _validate_order_review_snapshot(
+            row,
+            data,
+            customer_id=customer_id,
+        )
+    except RuntimeError as exc:
+        if _release_stale_review_runtime_lock(row, data, str(exc)):
+            target.remember_order_data(channel.id, data)
+            target.save_bot_data()
+        raise
 
     data["payment_review_id"] = int(row["id"])
     data["payment_review_no"] = str(row.get("review_no") or "")
