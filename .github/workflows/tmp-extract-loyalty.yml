@@ -1,0 +1,22 @@
+name: Extract loyalty domain
+on:
+  push:
+    branches: [tmp/dc-loyalty-extract]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/dc-loyalty-extract
+      - name: Apply patch
+        run: python tools/tmp_extract_dc_loyalty.py
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add services/self_service_financials.py
+          git commit -m "Refactor Discord loyalty financial integration"
+          git push origin HEAD:tmp/dc-loyalty-extract
