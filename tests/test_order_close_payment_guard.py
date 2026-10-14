@@ -1,6 +1,9 @@
+import inspect
+
 import pytest
 
 from services.order_lifecycle_runtime import validate_order_ready_to_close
+from services.order_payment_runtime import finalize_accepted_pending_payment
 from services.payment_review_runtime import (
     _rejection_still_targets_current_order_review,
     _release_stale_review_runtime_lock,
@@ -27,6 +30,26 @@ def test_order_close_guard_rejects_non_active_status(status):
 
 def test_order_close_guard_allows_active_order():
     validate_order_ready_to_close({"status": "active", "amount": 1000})
+
+
+def test_payment_requires_canonical_web_order_before_any_payment_path():
+    source = inspect.getsource(finalize_accepted_pending_payment)
+
+    web_order_guard = source.index("if web_order_id is None:")
+    external_review_branch = source.index("if requires_external_payment_review")
+    wallet_debit_branch = source.index("if requires_wallet_debit")
+
+    assert web_order_guard < external_review_branch
+    assert web_order_guard < wallet_debit_branch
+
+
+def test_member_reward_runs_only_after_canonical_order_promotion():
+    source = inspect.getsource(finalize_accepted_pending_payment)
+
+    promotion = source.index("promote_acceptance_claims_to_assignments")
+    reward = source.index("reward_result = await add_customer_reward_from_order")
+
+    assert promotion < reward
 
 
 def _review_row(**overrides):
