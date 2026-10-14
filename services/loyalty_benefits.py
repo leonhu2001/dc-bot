@@ -163,6 +163,7 @@ def ensure_loyalty_tables(bind=engine) -> None:
             )
         """))
         _repair_companion_loyalty_v2(conn)
+        _repair_entertainment_loyalty_policy_v3(conn)
 
 
 def _rule_for_key(rule_key: str):
@@ -206,6 +207,14 @@ _LOYALTY_SCOPE_FAMILY_ALIASES = {
     "basic_mobile_entertain_double": "basic_mobile_entertain",
 }
 _LOYALTY_COMPANION_MIGRATION_KEY = "20261011_companion_service_units_v2"
+_LOYALTY_POLICY_V3_MIGRATION_KEY = "20261014_entertainment_only_policy_v3"
+_POLICY_V3_NONRETROACTIVE_MARKER = "policy_v3_nonretroactive"
+_POLICY_V3_RANKED_START_AT_TAIPEI = datetime(2026, 10, 14, 15, 0, 0, tzinfo=TAIPEI_TZ)
+_POLICY_V3_NEWLY_ELIGIBLE_RULES = {
+    "valorant_entertain_ranked",
+    "lol_entertain_ranked",
+    "apex_entertain_ranked",
+}
 
 
 def _canonical_loyalty_rule_key(rule_key: str) -> str:
@@ -447,6 +456,8 @@ def list_customer_loyalty(customer_id: str | int) -> dict[str, Any]:
     progress = []
     for raw in progress_rows:
         row = dict(raw)
+        if loyalty_policy_for_rule(str(row.get("rule_key") or "").strip()) is None:
+            continue
         current = float(row.get("progress_units") or 0)
         threshold = float(row.get("threshold_units") or 1)
         row["progress_text"] = f"{current:g} / {threshold:g}"
@@ -472,9 +483,9 @@ def list_applicable_coupons(
     rule_key: str,
     player_count: int = 1,
 ) -> list[dict[str, Any]]:
-    policy = loyalty_policy_for_rule(rule_key)
-    if policy is None:
-        return []
+    # Grandfather already-earned coupons even when this service no longer
+    # accrues new loyalty progress. Scope matching still keeps the coupon tied
+    # to the original game/service family.
     ensure_loyalty_tables()
     scope = loyalty_scope_key(rule_key, player_count)
     with engine.begin() as conn:
@@ -674,10 +685,10 @@ def redeem_coupon_for_order(order_id: int) -> int:
         return int(result.rowcount or 0)
 
 
-def _event_time_is_in_scope(row: dict[str, Any]) -> bool:
+def _event_time_as_taipei(row: dict[str, Any]) -> datetime | None:
     value = row.get("closed_at") or row.get("updated_at") or row.get("created_at")
     if value is None:
-        return False
+        return None
     if isinstance(value, datetime):
         dt = value
     else:
@@ -685,13 +696,18 @@ def _event_time_is_in_scope(row: dict[str, Any]) -> bool:
         try:
             dt = datetime.fromisoformat(raw)
         except ValueError:
-            return False
+            return None
     if dt.tzinfo is None:
         # web_dashboard.db 的時間歷史上同時存在 UTC 與台北 naive；closed_at
-        # 由 Bot 寫入時是台北時間。為避免漏掉 10/10 當天已完成訂單，naive
-        # 以台北時間解讀，僅影響新制度起算邊界。
+        # 由 Bot 寫入時是台北時間。為避免漏掉制度切換當天已完成訂單，naive
+        # 以台北時間解讀，只用於福利制度時間邊界。
         dt = dt.replace(tzinfo=TAIPEI_TZ)
-    return dt.astimezone(TAIPEI_TZ) >= LOYALTY_START_AT_TAIPEI
+    return dt.astimezone(TAIPEI_TZ)
+
+
+def _event_time_is_in_scope(row: dict[str, Any]) -> bool:
+    dt = _event_time_as_taipei(row)
+    return dt is not None and dt >= LOYALTY_START_AT_TAIPEI
 
 
 def _qualifying_paid_amount(row: dict[str, Any]) -> int:
@@ -954,6 +970,154 @@ def _repair_companion_loyalty_v2(conn) -> None:
     })
 
 
+
+def _repair_entertainment_loyalty_policy_v3(conn) -> None:
+    """Align stored loyalty state with the entertainment-only policy.
+
+    Existing eligible progress is preserved exactly. Progress for services that
+    no longer accrue loyalty is removed. Already-earned coupons are untouched
+    (including their original 0.5h/1h value) and remain redeemable on their
+    original scope. Ranked entertainment orders that were already closed while
+    those rules were ineligible are explicitly marked non-retroactive so later
+    admin reconciliation cannot backfill them.
+    """
+    applied = conn.execute(text("""
+        SELECT migration_key
+        FROM loyalty_migrations
+        WHERE migration_key = :migration_key
+        LIMIT 1
+    """), {"migration_key": _LOYALTY_POLICY_V3_MIGRATION_KEY}).first()
+    if applied is not None:
+        return
+
+    now = get_taipei_now_iso()
+    removed_progress = 0
+    synced_progress = 0
+    marked_orders = 0
+    affected_customers: set[str] = set()
+
+    progress_rows = conn.execute(text("""
+        SELECT customer_discord_id, scope_key, rule_key
+        FROM customer_loyalty_progress
+    """)).mappings().all()
+    for raw in progress_rows:
+        row = dict(raw)
+        rule_key = str(row.get("rule_key") or "").strip()
+        policy = loyalty_policy_for_rule(rule_key)
+        params = {
+            "customer_id": str(row.get("customer_discord_id") or ""),
+            "scope_key": str(row.get("scope_key") or ""),
+        }
+        if policy is None:
+            result = conn.execute(text("""
+                DELETE FROM customer_loyalty_progress
+                WHERE customer_discord_id = :customer_id
+                  AND scope_key = :scope_key
+            """), params)
+            removed_progress += int(result.rowcount or 0)
+            continue
+
+        conn.execute(text("""
+            UPDATE customer_loyalty_progress
+            SET threshold_units = :threshold_units,
+                benefit_kind = :benefit_kind,
+                benefit_units = :benefit_units,
+                updated_at = :updated_at
+            WHERE customer_discord_id = :customer_id
+              AND scope_key = :scope_key
+        """), {
+            **params,
+            "threshold_units": float(policy["threshold_units"]),
+            "benefit_kind": str(policy["benefit_kind"]),
+            "benefit_units": float(policy["benefit_units"]),
+            "updated_at": now,
+        })
+        synced_progress += 1
+
+    has_orders = conn.execute(text("""
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'web_orders'
+        LIMIT 1
+    """)).first()
+    if has_orders is not None:
+        for rule_key in sorted(_POLICY_V3_NEWLY_ELIGIBLE_RULES):
+            rows = conn.execute(text("""
+                SELECT o.id, o.customer_discord_id,
+                       o.created_at, o.updated_at, o.closed_at,
+                       e.order_id AS event_order_id, e.note AS event_note
+                FROM web_orders o
+                LEFT JOIN loyalty_order_events e ON e.order_id = o.id
+                WHERE o.status = 'closed'
+                  AND o.order_rule_key = :rule_key
+                ORDER BY o.id ASC
+            """), {"rule_key": rule_key}).mappings().all()
+            for raw in rows:
+                row = dict(raw)
+                order_id = int(row["id"])
+                event_time = _event_time_as_taipei(row)
+                if event_time is None or event_time >= _POLICY_V3_RANKED_START_AT_TAIPEI:
+                    continue
+                event_order_id = row.get("event_order_id")
+                event_note = str(row.get("event_note") or "").strip()
+                parts = [part.strip() for part in event_note.split(";") if part.strip()]
+                customer_id = str(row.get("customer_discord_id") or "").strip()
+                if customer_id:
+                    affected_customers.add(customer_id)
+
+                if event_order_id is not None:
+                    if _POLICY_V3_NONRETROACTIVE_MARKER not in parts:
+                        parts.append(_POLICY_V3_NONRETROACTIVE_MARKER)
+                        marked_orders += 1
+                    conn.execute(text("""
+                        UPDATE loyalty_order_events
+                        SET note = :note,
+                            processed_at = :processed_at
+                        WHERE order_id = :order_id
+                    """), {
+                        "order_id": order_id,
+                        "note": ";".join(parts),
+                        "processed_at": now,
+                    })
+                    continue
+
+                conn.execute(text("""
+                    INSERT INTO loyalty_order_events (
+                        order_id, customer_discord_id, scope_key, paid_units,
+                        issued_coupon_count, processed_at, note
+                    ) VALUES (
+                        :order_id, :customer_id, NULL, 0,
+                        0, :processed_at, :note
+                    )
+                """), {
+                    "order_id": order_id,
+                    "customer_id": str(row.get("customer_discord_id") or "") or None,
+                    "processed_at": now,
+                    "note": _POLICY_V3_NONRETROACTIVE_MARKER,
+                })
+                marked_orders += 1
+
+    # If #270 briefly processed a pre-rollout ranked order before this cleanup
+    # deployed, rebuild those customers now so the accidental backfill is
+    # removed immediately instead of waiting for a future admin edit.
+    for customer_id in sorted(affected_customers):
+        reconcile_customer_loyalty_in_connection(conn, customer_id)
+
+    conn.execute(text("""
+        INSERT INTO loyalty_migrations (migration_key, applied_at, note)
+        VALUES (:migration_key, :applied_at, :note)
+    """), {
+        "migration_key": _LOYALTY_POLICY_V3_MIGRATION_KEY,
+        "applied_at": now,
+        "note": (
+            f"removed_progress={removed_progress};"
+            f"synced_progress={synced_progress};"
+            f"marked_orders={marked_orders};"
+            f"reconciled_customers={len(affected_customers)}"
+        ),
+    })
+
+
 def _append_reconcile_note(existing: object, marker: str) -> str:
     note = str(existing or "").strip()
     if not note:
@@ -1031,6 +1195,10 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
         FROM loyalty_order_events
         WHERE customer_discord_id = :customer_id
     """), {"customer_id": customer}).mappings().all()
+    event_notes = {
+        int(event["order_id"]): str(event.get("note") or "")
+        for event in event_rows
+    }
     for event in event_rows:
         conn.execute(text("""
             UPDATE loyalty_order_events
@@ -1059,7 +1227,10 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
     buckets: dict[str, dict[str, Any]] = {}
     for raw in order_rows:
         row = dict(raw)
-        bucket = _loyalty_bucket_from_order(row)
+        prior_note = event_notes.get(int(row["id"]), "")
+        prior_parts = {part.strip() for part in prior_note.split(";") if part.strip()}
+        nonretroactive = _POLICY_V3_NONRETROACTIVE_MARKER in prior_parts
+        bucket = None if nonretroactive else _loyalty_bucket_from_order(row)
         note = "admin_reconciled"
         scope = None
         paid_units = 0.0
@@ -1076,6 +1247,8 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
             aggregate["same_order_consumed_count"] = int(
                 aggregate.get("same_order_consumed_count") or 0
             ) + int(bucket.get("same_order_consumed_count") or 0)
+        elif nonretroactive:
+            note = f"admin_reconciled;{_POLICY_V3_NONRETROACTIVE_MARKER}"
         elif not str(row.get("customer_discord_id") or "").strip():
             note = "admin_reconciled;missing_customer"
         elif not _event_time_is_in_scope(row):
@@ -1120,17 +1293,19 @@ def reconcile_customer_loyalty_in_connection(conn, customer_id: str | int) -> di
     for raw in progress_rows:
         row = dict(raw)
         scope = str(row.get("scope_key") or "").strip()
-        if not scope or scope in scope_meta:
+        rule_key = str(row.get("rule_key") or "").strip()
+        policy = loyalty_policy_for_rule(rule_key)
+        if not scope or scope in scope_meta or policy is None:
             continue
         scope_meta[scope] = {
             "customer_id": customer,
             "scope_key": scope,
-            "rule_key": str(row.get("rule_key") or ""),
-            "rule_label": str(row.get("rule_label") or row.get("rule_key") or "福利"),
-            "pricing_type": str(row.get("pricing_type") or ""),
-            "threshold_units": float(row.get("threshold_units") or 0),
-            "benefit_kind": str(row.get("benefit_kind") or ""),
-            "benefit_units": float(row.get("benefit_units") or 0),
+            "rule_key": rule_key,
+            "rule_label": str(row.get("rule_label") or rule_key or "福利"),
+            "pricing_type": str(policy["pricing_type"]),
+            "threshold_units": float(policy["threshold_units"]),
+            "benefit_kind": str(policy["benefit_kind"]),
+            "benefit_units": float(policy["benefit_units"]),
             "paid_units": 0.0,
             "same_order_consumed_count": 0,
         }
