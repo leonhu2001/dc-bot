@@ -108,6 +108,10 @@ class _FakeDeleteSession:
         pass
 
 
+async def _noop_log(*_args, **_kwargs):
+    return None
+
+
 def test_retract_dispatch_allows_partial_claim_and_cleans_prepay_state(monkeypatch):
     ticket = _FakeTextChannel(6001)
     dispatch = _FakeTextChannel(6002)
@@ -159,10 +163,6 @@ def test_retract_dispatch_allows_partial_claim_and_cleans_prepay_state(monkeypat
         lambda **kwargs: deleted_claim_rows.append(kwargs),
     )
     monkeypatch.setattr(self_service_runtime, "get_taipei_now_iso", lambda: "2026-10-15T02:45:00+08:00")
-
-    async def _noop_log(*_args, **_kwargs):
-        return None
-
     monkeypatch.setattr(self_service_runtime, "send_order_log", _noop_log, raising=False)
     monkeypatch.setattr(
         order_acceptance,
@@ -277,6 +277,11 @@ def test_retract_blocks_paid_local_state_even_without_web_order_id(monkeypatch):
     monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6101: draft}, raising=False)
     monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", {}, raising=False)
     monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", 6102, raising=False)
+    monkeypatch.setattr(self_service_runtime, "remember_order_data", lambda *_args: None, raising=False)
+    monkeypatch.setattr(self_service_runtime, "save_bot_data", lambda: None, raising=False)
+    monkeypatch.setattr(self_service_runtime, "delete_claim_row_from_db", lambda **_kwargs: None, raising=False)
+    monkeypatch.setattr(self_service_runtime, "send_order_log", _noop_log, raising=False)
+    monkeypatch.setattr(self_service_runtime, "get_taipei_now_iso", lambda: "2026-10-15T03:00:00+08:00", raising=False)
 
     with pytest.raises(ValueError, match="不能用『撤回派單』"):
         asyncio.run(
@@ -319,10 +324,6 @@ def test_retract_marks_local_cancelled_before_later_cleanup_failure(monkeypatch)
     monkeypatch.setattr(self_service_runtime, "save_bot_data", lambda: None)
     monkeypatch.setattr(self_service_runtime, "get_taipei_now_iso", lambda: "2026-10-15T03:00:00+08:00")
     monkeypatch.setattr(self_service_runtime, "delete_claim_row_from_db", lambda **_kwargs: None)
-
-    async def _noop_log(*_args, **_kwargs):
-        return None
-
     monkeypatch.setattr(self_service_runtime, "send_order_log", _noop_log, raising=False)
     monkeypatch.setattr(order_acceptance, "get_acceptance_state", lambda _order_id: SimpleNamespace(status="accepted_pending_pay"))
     monkeypatch.setattr(order_acceptance, "cancel_acceptance_order", lambda *_args, **_kwargs: None)
