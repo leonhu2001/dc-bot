@@ -1,0 +1,50 @@
+name: Temporary order runtime import boundary
+
+on:
+  push:
+    branches:
+      - refactor/order-runtime-import-boundary-20261015
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/order-runtime-import-boundary-20261015
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply narrow order runtime import-shadow protection
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime_path = Path('services/order_runtime.py')
+          text = runtime_path.read_text(encoding='utf-8')
+          old = '''_CONFIGURED = False\n\n\ndef configure_order_runtime(namespace: Mapping[str, Any]) -> None:'''
+          new = '''_CONFIGURED = False\n\n_MODULE_OWNED_RUNTIME_NAMES = frozenset(\n    {\n        "Any",\n        "Mapping",\n        "discord",\n    }\n)\n\n\ndef configure_order_runtime(namespace: Mapping[str, Any]) -> None:'''
+          if old not in text:
+              raise SystemExit('expected order runtime configure prelude not found')
+          text = text.replace(old, new, 1)
+          old_loop = '''        if name == "configure_order_runtime":\n            continue\n        globals()[name] = value'''
+          new_loop = '''        if name == "configure_order_runtime":\n            continue\n        if name in _MODULE_OWNED_RUNTIME_NAMES:\n            continue\n        globals()[name] = value'''
+          if old_loop not in text:
+              raise SystemExit('expected order runtime injection loop not found')
+          runtime_path.write_text(text.replace(old_loop, new_loop, 1), encoding='utf-8')
+
+          Path('tests/test_order_runtime_dependency_boundary.py').write_text('''from typing import Any, Mapping\n\nimport discord\n\nfrom services import order_runtime\n\n\ndef test_order_runtime_legacy_injection_cannot_shadow_module_owned_imports():\n    originals = {\n        "Any": Any,\n        "Mapping": Mapping,\n        "discord": discord,\n    }\n    marker = object()\n\n    order_runtime.configure_order_runtime(\n        {\n            **{name: object() for name in originals},\n            "_order_runtime_boundary_marker": marker,\n        }\n    )\n\n    for name, original in originals.items():\n        assert getattr(order_runtime, name) is original\n    assert order_runtime._order_runtime_boundary_marker is marker\n\n\ndef test_order_runtime_owned_dependency_names_are_explicit():\n    assert order_runtime._MODULE_OWNED_RUNTIME_NAMES == frozenset(\n        {\n            "Any",\n            "Mapping",\n            "discord",\n        }\n    )\n''', encoding='utf-8')
+          PY
+          python -m py_compile services/order_runtime.py tests/test_order_runtime_dependency_boundary.py
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/tmp_order_runtime_import_boundary.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/order_runtime.py tests/test_order_runtime_dependency_boundary.py .github/workflows/tmp_order_runtime_import_boundary.yml
+          git commit -m "Protect order runtime imports from legacy injection"
+          git push origin HEAD:refactor/order-runtime-import-boundary-20261015
