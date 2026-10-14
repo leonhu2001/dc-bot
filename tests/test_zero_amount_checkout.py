@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 import services.rewards as rewards
+from services.order_flow import build_payment_method_embed
 from services.order_payment_policy import (
     is_zero_amount_order,
     requires_external_payment_review,
@@ -22,6 +23,27 @@ def test_zero_amount_payment_routing_skips_money_movement_but_positive_orders_do
 
     assert requires_wallet_debit("我的錢包", 0) is False
     assert requires_wallet_debit("我的錢包", 1) is True
+
+
+def test_payment_panel_displays_known_zero_amount_instead_of_staff_placeholder():
+    zero_embed = build_payment_method_embed(
+        customer_id=7000,
+        category_label="三角洲",
+        item="娛樂陪",
+        quantity=1,
+        amount=0,
+    )
+    unknown_embed = build_payment_method_embed(
+        customer_id=7000,
+        category_label="三角洲",
+        item="娛樂陪",
+        quantity=1,
+        amount=None,
+    )
+
+    assert "訂單總價：0T" in str(zero_embed.description)
+    assert "待客服填寫" not in str(zero_embed.description)
+    assert "待客服填寫" in str(unknown_embed.description)
 
 
 def test_zero_customer_pay_marks_reward_handling_complete_without_adding_spend_or_points():
