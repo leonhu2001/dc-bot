@@ -34,6 +34,69 @@ def _target_bot_module():
     return order_payment_runtime
 
 
+def _int_or_zero(value) -> int:
+    try:
+        return int(str(value or "0").strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def _validate_order_review_snapshot(
+    row: dict,
+    data: dict,
+    *,
+    customer_id: int,
+) -> None:
+    """Ensure an approved review still describes the order being finalized."""
+    status = str(data.get("status") or "").strip().lower()
+    if status != "accepted_pending_pay":
+        raise RuntimeError("訂單目前不是等待付款狀態，付款審核不可套用。")
+
+    review_id = _int_or_zero(row.get("id"))
+    current_review_id = _int_or_zero(data.get("payment_review_id"))
+    if current_review_id and review_id and current_review_id != review_id:
+        raise RuntimeError("付款審核編號已變更，請重新確認最新一筆付款。")
+
+    raw_amount = data.get("amount")
+    if raw_amount is None or str(raw_amount).strip() == "":
+        raw_amount = data.get("total_amount")
+    current_amount = _int_or_zero(raw_amount)
+    review_amount = _int_or_zero(row.get("amount"))
+    if current_amount != review_amount:
+        raise RuntimeError(
+            f"付款審核金額已過期：審核 {review_amount}T，訂單目前 {current_amount}T。"
+        )
+
+    current_method = str(data.get("payment_method") or "").strip()
+    review_method = str(row.get("payment_method") or "").strip()
+    if current_method != review_method:
+        raise RuntimeError(
+            "付款方式已在審核後變更，請重新送出付款審核。"
+        )
+
+    current_order_id = _int_or_zero(data.get("web_order_id"))
+    review_order_id = _int_or_zero(row.get("source_id"))
+    if current_order_id and review_order_id and current_order_id != review_order_id:
+        raise RuntimeError("付款審核所屬訂單已變更，請重新送出付款審核。")
+
+    runtime_customer_id = _int_or_zero(data.get("customer_id"))
+    if runtime_customer_id and runtime_customer_id != int(customer_id):
+        raise RuntimeError("付款審核顧客與目前訂單顧客不一致，請重新確認。")
+
+
+def _rejection_still_targets_current_order_review(row: dict, data: dict) -> bool:
+    """A late rejection must never clear a newer review or an active order."""
+    if str(data.get("status") or "").strip().lower() != "accepted_pending_pay":
+        return False
+
+    review_id = _int_or_zero(row.get("id"))
+    current_review_id = _int_or_zero(data.get("payment_review_id"))
+    if current_review_id and review_id and current_review_id != review_id:
+        return False
+
+    return True
+
+
 def _actor(guild: discord.Guild | None, row: dict):
     actor_id = str(row.get("approved_by_discord_id") or row.get("rejected_by_discord_id") or "").strip()
     member = None
@@ -157,6 +220,12 @@ async def _apply_order_approval(bot: discord.Client, row: dict) -> None:
     if not isinstance(data, dict):
         raise RuntimeError("找不到原訂單的 Discord runtime 資料。")
 
+    _validate_order_review_snapshot(
+        row,
+        data,
+        customer_id=customer_id,
+    )
+
     data["payment_review_id"] = int(row["id"])
     data["payment_review_no"] = str(row.get("review_no") or "")
     data["payment_review_pending"] = False
@@ -215,6 +284,13 @@ async def _apply_order_rejection(bot: discord.Client, row: dict) -> None:
 
     if not isinstance(data, dict):
         raise RuntimeError("找不到原訂單的 Discord runtime 資料。")
+
+    if not _rejection_still_targets_current_order_review(row, data):
+        # The rejection belongs to an older review, or the order has already
+        # advanced. Mark only the review event as consumed; never clear current
+        # payment state or a newer review from the runtime order.
+        mark_payment_review_rejection_applied(int(row["id"]))
+        return
 
     data["payment_review_pending"] = False
     data["payment_review_approved"] = False
