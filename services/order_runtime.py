@@ -63,6 +63,14 @@ from services.order_dispatch_runtime import (
 
 _CONFIGURED = False
 
+_MODULE_OWNED_RUNTIME_NAMES = frozenset(
+    {
+        "Any",
+        "Mapping",
+        "discord",
+    }
+)
+
 
 def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
     """Bind remaining bot-owned legacy dependencies after bot.py is loaded."""
@@ -72,6 +80,8 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
         if name.startswith("__"):
             continue
         if name == "configure_order_runtime":
+            continue
+        if name in _MODULE_OWNED_RUNTIME_NAMES:
             continue
         globals()[name] = value
 
