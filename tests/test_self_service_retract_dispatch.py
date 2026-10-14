@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 
 import discord
+import pytest
 
 from services import self_service_runtime
 from services.acceptance import runtime as acceptance_runtime
@@ -248,3 +249,96 @@ def test_dispatched_view_is_persistent_and_has_retract_button():
     ]
     assert len(retract_buttons) == 1
     assert retract_buttons[0].label == "撤回派單"
+
+
+
+def test_retract_blocks_paid_local_state_even_without_web_order_id(monkeypatch):
+    ticket = _FakeTextChannel(6101)
+    dispatch = _FakeTextChannel(6102)
+    dispatch.messages[7101] = _FakeMessage(7101)
+    guild = _FakeGuild(ticket, dispatch)
+    interaction = SimpleNamespace(
+        guild=guild,
+        channel=ticket,
+        user=SimpleNamespace(id=8101, mention="<@8101>"),
+    )
+    draft = {
+        "customer_id": 5101,
+        "dispatch_message_id": 7101,
+        "dispatch_channel_id": 6102,
+        "status": "active",
+    }
+
+    monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
+    monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6101: draft}, raising=False)
+
+    with pytest.raises(ValueError, match="不能用『撤回派單』"):
+        asyncio.run(
+            self_service_runtime.retract_waiting_acceptance_order_from_self_service(
+                interaction,
+                channel_id=6101,
+            )
+        )
+
+    assert draft["status"] == "active"
+    assert dispatch.messages[7101].deleted is False
+
+
+def test_retract_marks_local_cancelled_before_later_cleanup_failure(monkeypatch):
+    ticket = _FakeTextChannel(6201)
+    dispatch = _FakeTextChannel(6202)
+    dispatch.messages[7201] = _FakeMessage(7201)
+    ticket.messages[7202] = _FakeMessage(7202)
+    guild = _FakeGuild(ticket, dispatch)
+    interaction = SimpleNamespace(
+        guild=guild,
+        channel=ticket,
+        user=SimpleNamespace(id=8201, mention="<@8201>"),
+    )
+    draft = {
+        "customer_id": 5201,
+        "dispatch_message_id": 7201,
+        "dispatch_channel_id": 6202,
+        "web_order_id": 322,
+        "status": "accepted_pending_pay",
+        "payment_message_id": 7202,
+    }
+    remembered = []
+
+    monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
+    monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6201: draft}, raising=False)
+    monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", {}, raising=False)
+    monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", 6202, raising=False)
+    monkeypatch.setattr(self_service_runtime, "remember_order_data", lambda *_args: remembered.append(dict(draft)))
+    monkeypatch.setattr(self_service_runtime, "save_bot_data", lambda: None)
+    monkeypatch.setattr(self_service_runtime, "get_taipei_now_iso", lambda: "2026-10-15T03:00:00+08:00")
+    monkeypatch.setattr(self_service_runtime, "delete_claim_row_from_db", lambda **_kwargs: None)
+
+    async def _noop_log(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(self_service_runtime, "send_order_log", _noop_log, raising=False)
+    monkeypatch.setattr(order_acceptance, "get_acceptance_state", lambda _order_id: SimpleNamespace(status="accepted_pending_pay"))
+    monkeypatch.setattr(order_acceptance, "cancel_acceptance_order", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(shared_db, "engine", _ClaimEngine())
+
+    async def _revoke(_guild, _channel_id, _member):
+        return True
+
+    monkeypatch.setattr(acceptance_runtime, "revoke_order_ticket_access", _revoke)
+
+    def _fail_delete(**_kwargs):
+        raise RuntimeError("simulated cleanup failure")
+
+    monkeypatch.setattr(web_order_sync, "delete_web_order_by_ticket_channel", _fail_delete)
+
+    with pytest.raises(RuntimeError, match="simulated cleanup failure"):
+        asyncio.run(
+            self_service_runtime.retract_waiting_acceptance_order_from_self_service(
+                interaction,
+                channel_id=6201,
+            )
+        )
+
+    assert draft["status"] == "cancelled"
+    assert remembered and remembered[0]["status"] == "cancelled"

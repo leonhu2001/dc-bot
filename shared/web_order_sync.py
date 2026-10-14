@@ -767,9 +767,10 @@ def apply_discord_claim_event_to_web(
 def delete_web_order_by_ticket_channel(*, ticket_channel_id=None, dispatch_message_id=None) -> bool:
     """從網站資料庫刪除對應 web_order 與相關分潤/接單資料。
 
-    用於 DC bot /delete_order：
+    用於 DC bot /delete_order 與付款前撤回派單：
     - 網站不保留 cancelled/deleted 訂單
-    - 只保留 active / stored / closed
+    - 先釋放仍在 reserved 的會員 / VIP 福利
+    - 清掉付款前 acceptance / smart-dispatch lifecycle
     """
     from sqlalchemy import text
 
@@ -781,36 +782,44 @@ def delete_web_order_by_ticket_channel(*, ticket_channel_id=None, dispatch_messa
     if not ticket_channel_id_text and not dispatch_message_id_text:
         return False
 
-    db = SessionLocal()
+    conditions = []
+    params = {}
 
+    if ticket_channel_id_text:
+        conditions.append("ticket_channel_id = :ticket_channel_id")
+        params["ticket_channel_id"] = ticket_channel_id_text
+
+    if dispatch_message_id_text:
+        conditions.append("dispatch_message_id = :dispatch_message_id")
+        params["dispatch_message_id"] = dispatch_message_id_text
+
+    sql = "SELECT id FROM web_orders WHERE " + " OR ".join(conditions) + " LIMIT 1"
+
+    # Phase 1: lookup only, then close the Session before benefit helpers open
+    # independent SQLite write connections. This avoids self-locking the DB.
+    lookup_db = SessionLocal()
     try:
-        conditions = []
-        params = {}
+        row = lookup_db.execute(text(sql), params).first()
+    finally:
+        lookup_db.close()
 
-        if ticket_channel_id_text:
-            conditions.append("ticket_channel_id = :ticket_channel_id")
-            params["ticket_channel_id"] = ticket_channel_id_text
+    if row is None:
+        return False
 
-        if dispatch_message_id_text:
-            conditions.append("dispatch_message_id = :dispatch_message_id")
-            params["dispatch_message_id"] = dispatch_message_id_text
+    order_id = int(row[0])
 
-        sql = "SELECT id FROM web_orders WHERE " + " OR ".join(conditions) + " LIMIT 1"
-        row = db.execute(text(sql), params).first()
+    from services.loyalty_benefits import release_coupon_for_order
+    from services.vip_monthly_benefits import release_cash_benefits_for_channel
 
-        if row is None:
-            db.commit()
-            return False
+    # Both release helpers are idempotent. If later cleanup fails, retrying the
+    # retract/delete operation is safe and the cancelled order remains blocked.
+    release_coupon_for_order(order_id)
+    if ticket_channel_id_text:
+        release_cash_benefits_for_channel(ticket_channel_id_text)
 
-        order_id = int(row[0])
-
-        from services.loyalty_benefits import release_coupon_for_order
-        from services.vip_monthly_benefits import release_cash_benefits_for_channel
-
-        release_coupon_for_order(order_id)
-        if ticket_channel_id_text:
-            release_cash_benefits_for_channel(ticket_channel_id_text)
-
+    # Phase 2: delete the prepay lifecycle and WebOrder in one DB transaction.
+    db = SessionLocal()
+    try:
         for table_name in (
             "worker_payouts",
             "customer_service_payouts",
@@ -841,10 +850,8 @@ def delete_web_order_by_ticket_channel(*, ticket_channel_id=None, dispatch_messa
 
         db.commit()
         return True
-
     except Exception:
         db.rollback()
         raise
     finally:
         db.close()
-

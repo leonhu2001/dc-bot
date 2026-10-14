@@ -1046,12 +1046,20 @@ async def retract_waiting_acceptance_order_from_self_service(
     current_status = str(data.get("status") or "").strip().lower()
     claim_staff_ids: list[str] = []
 
+    from shared.order_acceptance import PREPAY_ACCEPTANCE_STATUSES
+
+    allowed_statuses = set(PREPAY_ACCEPTANCE_STATUSES) | {"cancelled"}
+
+    def _ensure_retractable_status(status: str) -> None:
+        if status and status not in allowed_statuses:
+            raise ValueError("這張單已進入付款／進行中或已結束，不能用『撤回派單』回到改單。")
+
+    # Even if a partially-created order is missing web_order_id, never let a
+    # paid/active local state bypass the retract guard.
+    _ensure_retractable_status(current_status)
+
     if order_id is not None:
-        from shared.order_acceptance import (
-            PREPAY_ACCEPTANCE_STATUSES,
-            cancel_acceptance_order,
-            get_acceptance_state,
-        )
+        from shared.order_acceptance import cancel_acceptance_order, get_acceptance_state
 
         try:
             state = get_acceptance_state(int(order_id))
@@ -1060,10 +1068,7 @@ async def retract_waiting_acceptance_order_from_self_service(
 
         if state is not None:
             current_status = str(getattr(state, "status", None) or current_status).strip().lower()
-
-        allowed_statuses = set(PREPAY_ACCEPTANCE_STATUSES) | {"cancelled"}
-        if current_status and current_status not in allowed_statuses:
-            raise ValueError("這張單已進入付款／進行中或已結束，不能用『撤回派單』回到改單。")
+            _ensure_retractable_status(current_status)
 
         if current_status in PREPAY_ACCEPTANCE_STATUSES:
             cancel_acceptance_order(
@@ -1098,6 +1103,12 @@ async def retract_waiting_acceptance_order_from_self_service(
                 f"{type(exc).__name__}: {exc}",
                 flush=True,
             )
+
+    # Fail safe before any best-effort Discord cleanup. If a later delete or DB
+    # cleanup fails, stale payment components must not still see accepted_pending_pay.
+    data["status"] = "cancelled"
+    remember_order_data(channel_id, data)
+    save_bot_data()
 
     warnings: list[str] = []
 
