@@ -33,7 +33,7 @@ def test_apex_new_pricing_is_fixed_per_person_per_hour():
         assert rule.specify_fee_default == 100
         assert rule.specify_free_min_units == 2
         assert rule.specify_free_basis == "quantity"
-        assert rule.loyalty_benefits_enabled is True
+        assert rule.loyalty_benefits_enabled is rule_key.startswith("apex_entertain_")
 
 
 def test_apex_double_predator_ranked_two_hours_costs_2600():
@@ -75,14 +75,15 @@ def test_apex_specify_fee_is_100_each_and_free_from_two_hours():
     assert two_hours.free_specify_fee is True
 
 
-def test_apex_loyalty_remains_ten_hours_for_thirty_minute_coupon():
-    policy = loyalty_policy_for_rule("apex_predator_ranked")
+def test_apex_loyalty_only_applies_to_entertainment_at_ten_percent():
+    policy = loyalty_policy_for_rule("apex_entertain_ranked")
     assert policy is not None
     assert policy["pricing_type"] == "hourly"
     assert policy["threshold_units"] == 10.0
     assert policy["benefit_kind"] == "extra_hours"
-    assert policy["benefit_units"] == 0.5
-    assert policy["benefit_label"] == "+30 分鐘"
+    assert policy["benefit_units"] == 1.0
+    assert policy["benefit_label"] == "+1 小時"
+    assert loyalty_policy_for_rule("apex_predator_ranked") is None
 
 
 def test_apex_web_catalog_no_longer_asks_for_customer_rank():
@@ -110,7 +111,12 @@ def test_apex_web_catalog_no_longer_asks_for_customer_rank():
         assert all(not variant["customer_adjustments"] for variant in group["variants"])
         assert "老闆目前段位" not in group["description"]
         assert "買 5 送 1" not in group["description"]
-        assert "累積 10H 送 30 分鐘券" in group["description"]
+        assert "累積 10H 送 30 分鐘券" not in group["description"]
+        if group_key == "apex_entertain":
+            assert "累積 10 個服務小時回饋 1 小時" in group["description"]
+            assert "達標當單直接折抵" in group["description"]
+        else:
+            assert "回饋" not in group["description"]
 
 
 def test_apex_discord_catalog_uses_mode_then_single_or_double():

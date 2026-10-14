@@ -105,7 +105,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩人數",
-        "description": "需同時具備男陪／女陪與三角洲<端遊>身分組；以聊天、娛樂與遊戲體驗為主。",
+        "description": "需同時具備男陪／女陪與三角洲<端遊>身分組；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("basic_entertain_single", "單陪"),
             ("basic_entertain_double", "雙陪"),
@@ -117,7 +117,7 @@ GROUP_SPECS = [
         "category": "delta_mobile_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩人數",
-        "description": "需同時具備男陪／女陪與三角洲<手遊>身分組；價格與端遊相同。",
+        "description": "需同時具備男陪／女陪與三角洲<手遊>身分組；價格與端遊相同；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("basic_mobile_entertain_single", "單陪"),
             ("basic_mobile_entertain_double", "雙陪"),
@@ -247,27 +247,27 @@ GROUP_SPECS = [
         "key": "steam",
         "category": "steam",
         "label": "Steam 陪玩",
-        "description": "需男陪／女陪 + Steam 身分組。",
+        "description": "需男陪／女陪 + Steam 身分組；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("steam_play", "Steam 陪玩"),
         ],
     },
 
-    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"需男陪／女陪 + 特戰英豪身分組；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
-    {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"需特戰英豪身分組 + 超凡／神話／輻能階級；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
-    {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"需特戰英豪身分組 + 神話／輻能階級；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
-    {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"需特戰英豪身分組 + 輻能階級；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
-    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"需男陪／女陪 + 英雄聯盟身分組；買 5 送 1；指定每位 +100T，ARAM / NG 2 小時、積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
-    {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"需英雄聯盟身分組 + 大師／宗師／菁英階級；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
-    {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"需英雄聯盟身分組 + 宗師／菁英階級；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
-    {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"需英雄聯盟身分組 + 菁英階級；買 5 送 1；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
+    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"需男陪／女陪 + 特戰英豪身分組；娛樂陪福利：NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
+    {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"需特戰英豪身分組 + 超凡／神話／輻能階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
+    {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"需特戰英豪身分組 + 神話／輻能階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
+    {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"需特戰英豪身分組 + 輻能階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
+    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"需男陪／女陪 + 英雄聯盟身分組；娛樂陪福利：ARAM / NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，ARAM / NG 2 小時、積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
+    {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"需英雄聯盟身分組 + 大師／宗師／菁英階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
+    {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"需英雄聯盟身分組 + 宗師／菁英階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
+    {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"需英雄聯盟身分組 + 菁英階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
 
     {
         "key": "apex_entertain",
         "category": "apex",
         "label": "APEX｜娛樂陪",
         "selector_label": "模式",
-        "description": "需男陪／女陪 + APEX身分組；NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
+        "description": "需男陪／女陪 + APEX身分組；NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("apex_entertain_ng", "NG"),
             ("apex_entertain_ranked", "積分"),
@@ -278,7 +278,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜鑽石陪",
         "selector_label": "模式",
-        "description": "需 APEX身分組 + 鑽石／大師／頂獵階級；NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
+        "description": "需 APEX身分組 + 鑽石／大師／頂獵階級；NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_diamond_ng", "NG"),
             ("apex_diamond_ranked", "積分"),
@@ -289,7 +289,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜大師陪",
         "selector_label": "模式",
-        "description": "需 APEX身分組 + 大師／頂獵階級；NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
+        "description": "需 APEX身分組 + 大師／頂獵階級；NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_master_ng", "NG"),
             ("apex_master_ranked", "積分"),
@@ -300,7 +300,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜頂獵陪",
         "selector_label": "模式",
-        "description": "需 APEX身分組 + 頂獵階級；NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費；累積 10H 送 30 分鐘券。",
+        "description": "需 APEX身分組 + 頂獵階級；NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_predator_ng", "NG"),
             ("apex_predator_ranked", "積分"),
