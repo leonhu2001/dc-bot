@@ -50,6 +50,12 @@ def _create_salary_db(path):
                 payout_amount INTEGER,
                 payout_status TEXT
             );
+
+            CREATE TABLE order_reports (
+                id INTEGER PRIMARY KEY,
+                order_id INTEGER,
+                status TEXT
+            );
             """
         )
 
@@ -117,12 +123,18 @@ def _create_salary_db(path):
             ) VALUES (1, 1, '123', '測試陪玩', 80, 'paid')
             """
         )
+        conn.execute(
+            """
+            INSERT INTO order_reports(id, order_id, status)
+            VALUES (1, 1, 'approved')
+            """
+        )
         conn.commit()
     finally:
         conn.close()
 
 
-def test_employee_salary_ledger_includes_tips_and_category_totals(tmp_path, monkeypatch):
+def test_employee_salary_ledger_includes_tips_and_report_gate(tmp_path, monkeypatch):
     db_file = tmp_path / "salary.db"
     _create_salary_db(db_file)
 
@@ -131,7 +143,10 @@ def test_employee_salary_ledger_includes_tips_and_category_totals(tmp_path, monk
 
     ledger = payouts.build_employee_salary_ledger("123")
 
-    assert ledger["summary"]["pending"] == 350
+    assert ledger["summary"]["pending"] == 50
+    assert ledger["summary"]["pending_count"] == 1
+    assert ledger["summary"]["locked"] == 300
+    assert ledger["summary"]["locked_count"] == 1
     assert ledger["summary"]["current_month_paid"] == 680
     assert ledger["summary"]["lifetime"] == 1030
     assert ledger["summary"]["paid_total"] == 680
@@ -145,6 +160,15 @@ def test_employee_salary_ledger_includes_tips_and_category_totals(tmp_path, monk
     assert len(tip_items) == 2
     assert {item["status_label"] for item in tip_items} == {"已發放", "待發放"}
     assert all(item["category_label"] == "🍗 雞腿" for item in tip_items)
+
+    locked_service = next(
+        item
+        for item in ledger["items"]
+        if item["order_no"] == "MW-0990" and item["category_key"] == "service"
+    )
+    assert locked_service["financial_state"] == "locked"
+    assert locked_service["report_status"] == "missing"
+    assert locked_service["status_label"] == "未填寫報單"
 
 
 def test_employee_salary_ledger_is_scoped_to_requested_discord_user(tmp_path, monkeypatch):
@@ -172,3 +196,35 @@ def test_employee_salary_ledger_is_scoped_to_requested_discord_user(tmp_path, mo
 
     assert ledger["summary"]["lifetime"] == 1030
     assert all(item["amount"] != 9999 for item in ledger["items"])
+
+
+def test_employee_salary_pending_report_is_locked(tmp_path, monkeypatch):
+    db_file = tmp_path / "salary.db"
+    _create_salary_db(db_file)
+
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute(
+            """
+            INSERT INTO order_reports(id, order_id, status)
+            VALUES (2, 2, 'pending')
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    monkeypatch.setattr(payouts, "my_payout_db_path", lambda: str(db_file))
+    monkeypatch.setattr(payouts, "_taipei_current_month", lambda: "2026-10")
+
+    ledger = payouts.build_employee_salary_ledger("123")
+    service_item = next(
+        item
+        for item in ledger["items"]
+        if item["order_no"] == "MW-0990" and item["category_key"] == "service"
+    )
+
+    assert service_item["financial_state"] == "locked"
+    assert service_item["status_label"] == "報單待審核"
+    assert ledger["summary"]["pending"] == 50
+    assert ledger["summary"]["locked"] == 300
