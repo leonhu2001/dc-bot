@@ -1,0 +1,62 @@
+name: Temporary acceptance boundary refactor
+
+on:
+  push:
+    branches:
+      - refactor/acceptance-canonical-deps-20261014
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/acceptance-canonical-deps-20261014
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply narrow dependency-boundary patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('services/acceptance/runtime.py')
+          source = path.read_text(encoding='utf-8')
+
+          old_import = 'from core.time_utils import utc_now_naive\n'
+          new_import = (
+              'from core.database import remember_claim_data, remember_order_data, save_bot_data\n'
+              'from core.time_utils import get_taipei_now_iso, utc_now_naive\n'
+          )
+          if old_import not in source:
+              raise SystemExit('expected core.time_utils import not found')
+          source = source.replace(old_import, new_import, 1)
+
+          old_config = '_CONFIGURED = False\n\n\ndef configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:\n'
+          new_config = '''_CONFIGURED = False\n\n_MODULE_OWNED_RUNTIME_NAMES = frozenset(\n    {\n        "get_taipei_now_iso",\n        "remember_claim_data",\n        "remember_order_data",\n        "save_bot_data",\n    }\n)\n\n\ndef configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:\n'''
+          if old_config not in source:
+              raise SystemExit('expected acceptance configuration marker not found')
+          source = source.replace(old_config, new_config, 1)
+
+          old_loop = '''        if name == "configure_acceptance_runtime":\n            continue\n        globals()[name] = value\n'''
+          new_loop = '''        if name == "configure_acceptance_runtime":\n            continue\n        if name in _MODULE_OWNED_RUNTIME_NAMES:\n            continue\n        globals()[name] = value\n'''
+          if old_loop not in source:
+              raise SystemExit('expected acceptance injection loop not found')
+          source = source.replace(old_loop, new_loop, 1)
+          path.write_text(source, encoding='utf-8')
+
+          test = Path('tests/test_acceptance_runtime_dependency_boundary.py')
+          test.write_text('''from core import database as core_database\nfrom core import time_utils\nfrom services.acceptance import runtime as acceptance_runtime\n\n\ndef test_acceptance_runtime_owns_canonical_persistence_and_time_dependencies():\n    assert acceptance_runtime.remember_claim_data is core_database.remember_claim_data\n    assert acceptance_runtime.remember_order_data is core_database.remember_order_data\n    assert acceptance_runtime.save_bot_data is core_database.save_bot_data\n    assert acceptance_runtime.get_taipei_now_iso is time_utils.get_taipei_now_iso\n\n\ndef test_acceptance_legacy_injection_cannot_shadow_module_owned_dependencies():\n    originals = {\n        "remember_claim_data": acceptance_runtime.remember_claim_data,\n        "remember_order_data": acceptance_runtime.remember_order_data,\n        "save_bot_data": acceptance_runtime.save_bot_data,\n        "get_taipei_now_iso": acceptance_runtime.get_taipei_now_iso,\n    }\n    marker = object()\n\n    acceptance_runtime.configure_acceptance_runtime(\n        {\n            **{name: object() for name in originals},\n            "_acceptance_runtime_boundary_marker": marker,\n        }\n    )\n\n    for name, original in originals.items():\n        assert getattr(acceptance_runtime, name) is original\n    assert acceptance_runtime._acceptance_runtime_boundary_marker is marker\n\n\ndef test_acceptance_owned_dependency_names_are_explicit():\n    assert acceptance_runtime._MODULE_OWNED_RUNTIME_NAMES == frozenset(\n        {\n            "get_taipei_now_iso",\n            "remember_claim_data",\n            "remember_order_data",\n            "save_bot_data",\n        }\n    )\n''', encoding='utf-8')
+          PY
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/tmp_acceptance_boundary.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/acceptance/runtime.py tests/test_acceptance_runtime_dependency_boundary.py .github/workflows/tmp_acceptance_boundary.yml
+          git commit -m "Use module-owned acceptance persistence dependencies"
+          git push origin HEAD:refactor/acceptance-canonical-deps-20261014
