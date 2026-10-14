@@ -7,6 +7,14 @@ import discord
 
 _CONFIGURED = False
 
+_MODULE_OWNED_RUNTIME_NAMES = frozenset(
+    {
+        "Any",
+        "Mapping",
+        "discord",
+    }
+)
+
 
 def configure_web_sync_runtime(namespace: Mapping[str, Any]) -> None:
     """Bind bot-owned runtime dependencies without importing bot.py.
@@ -20,6 +28,8 @@ def configure_web_sync_runtime(namespace: Mapping[str, Any]) -> None:
         if name.startswith("__"):
             continue
         if name == "configure_web_sync_runtime":
+            continue
+        if name in _MODULE_OWNED_RUNTIME_NAMES:
             continue
         globals()[name] = value
 
