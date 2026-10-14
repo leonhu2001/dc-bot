@@ -356,9 +356,18 @@ async def _defer_and_refresh_self_service_panel(
             ),
             allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
         )
-    except discord.HTTPException as exc:
+    except Exception as exc:
+        print(
+            f"[self-service] panel refresh failed channel_id={channel_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
         try:
-            await interaction.followup.send(f"更新自助下單 panel 失敗：{exc}", ephemeral=True)
+            await interaction.followup.send(
+                "訂單選項已儲存，但面板更新失敗。請再操作一次；若仍發生請通知客服。"
+                f"（{type(exc).__name__}）",
+                ephemeral=True,
+            )
         except discord.HTTPException:
             pass
 
