@@ -1,0 +1,30 @@
+name: Refine zero-amount checkout
+
+on:
+  push:
+    branches:
+      - fix/zero-amount-checkout-20261014
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/zero-amount-checkout-20261014
+      - name: Apply refinements
+        run: python tools/_tmp_refine_zero_amount_fix.py
+      - name: Commit refinements
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm tools/_tmp_refine_zero_amount_fix.py
+          git rm .github/workflows/refine_zero_amount_checkout.yml
+          git add services/rewards.py services/order_payment_runtime.py tests/test_zero_amount_checkout.py
+          git commit -m "Refine zero-amount reward and payment status handling"
+          git push origin HEAD:fix/zero-amount-checkout-20261014
