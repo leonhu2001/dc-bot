@@ -3,6 +3,7 @@ import pytest
 from services.order_lifecycle_runtime import validate_order_ready_to_close
 from services.payment_review_runtime import (
     _rejection_still_targets_current_order_review,
+    _release_stale_review_runtime_lock,
     _validate_order_review_snapshot,
 )
 
@@ -44,6 +45,8 @@ def _runtime_order(**overrides):
     data = {
         "status": "accepted_pending_pay",
         "payment_review_id": 88,
+        "payment_review_no": "PAY-88",
+        "payment_review_pending": True,
         "web_order_id": 123,
         "customer_id": 999,
         "amount": 1000,
@@ -75,6 +78,38 @@ def test_payment_review_snapshot_rejects_stale_order(runtime_change, message):
             _runtime_order(**runtime_change),
             customer_id=999,
         )
+
+
+def test_stale_current_review_releases_pending_lock_for_resubmit():
+    data = _runtime_order(amount=1200)
+
+    changed = _release_stale_review_runtime_lock(
+        _review_row(),
+        data,
+        "付款審核金額已過期",
+    )
+
+    assert changed is True
+    assert data["payment_review_pending"] is False
+    assert data["payment_review_approved"] is False
+    assert data["payment_review_last_apply_error_id"] == 88
+    assert "payment_review_id" not in data
+    assert "payment_review_no" not in data
+
+
+def test_stale_older_review_does_not_release_newer_review_lock():
+    data = _runtime_order(payment_review_id=99, payment_review_no="PAY-99")
+
+    changed = _release_stale_review_runtime_lock(
+        _review_row(id=88),
+        data,
+        "舊審核",
+    )
+
+    assert changed is False
+    assert data["payment_review_pending"] is True
+    assert data["payment_review_id"] == 99
+    assert data["payment_review_no"] == "PAY-99"
 
 
 def test_late_rejection_does_not_clear_newer_review():
