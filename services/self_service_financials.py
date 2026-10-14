@@ -863,6 +863,12 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 f"（{reason}，店內吸收，不影響打手分潤）"
             )
 
+        if adjustment.get("benefit_discount_amount", 0) > 0:
+            detail_parts.append(
+                f"累積福利 -{_format_plain_amount(adjustment['benefit_discount_amount'])}"
+                "（店內吸收，不影響打手分潤）"
+            )
+
         lines.append(("金額明細", "｜".join(detail_parts)))
 
         if adjustment["point_benefit_name"]:
@@ -1388,27 +1394,18 @@ def calculate_self_service_financials(
         extra_customer_charge_amount=specify_effective,
     )
 
-    from services.loyalty_benefits import (
-        calculate_coupon_service_value,
-        coupon_service_note,
-        get_applicable_coupon,
-    )
+    from services.self_service_loyalty_discount import resolve_self_service_loyalty_discount
 
-    selected_coupon = None
-    selected_coupon_id = data.get("selected_benefit_coupon_id")
-    if selected_coupon_id not in (None, ""):
-        if benefit is not None or selected_vip_monthly is not None:
-            raise ValueError("福利券、VIP 每月福利券與點數福利同張訂單只能擇一使用。")
-        customer_id = data.get("customer_id")
-        if customer_id:
-            selected_coupon = get_applicable_coupon(
-                selected_coupon_id,
-                customer_id=customer_id,
-                rule_key=str(getattr(rule, "key", "")),
-                player_count=_to_int(data.get("player_count"), 1) or 1,
-            )
-        if selected_coupon is None:
-            raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
+    loyalty_discount = resolve_self_service_loyalty_discount(
+        data=data,
+        rule=rule,
+        point_benefit_selected=benefit is not None,
+        vip_monthly_selected=selected_vip_monthly is not None,
+        available_service_amount=after_fixed,
+        to_int=_to_int,
+    )
+    benefit_service_value = loyalty_discount["service_value"]
+    benefit_discount_amount = loyalty_discount["discount_amount"]
 
     quantity_for_extra = max(1, _to_int(data.get("quantity"), 1) or 1)
     point_service_value = 0
@@ -1417,21 +1414,14 @@ def calculate_self_service_financials(
     elif extra_games > 0:
         point_service_value = max(0, int(round((service_original / quantity_for_extra) * extra_games)))
 
-    benefit_service_value = calculate_coupon_service_value(
-        rule_key=str(getattr(rule, "key", "")),
-        player_count=_to_int(data.get("player_count"), 1) or 1,
-        coupon=selected_coupon,
-    )
-
     # 百分比/VIP折扣只影響顧客付款。點數、免指定費與福利券都由店內吸收，
     # 額外服務用商品正常原價補進陪玩分潤基底。
     payout_base = (
         allocation.payout_base_amount
         + point_specify
         + point_service_value
-        + benefit_service_value
     )
-    customer_pay = allocation.customer_pay_amount
+    customer_pay = max(0, allocation.customer_pay_amount - benefit_discount_amount)
 
     notes = []
 
@@ -1636,17 +1626,19 @@ def calculate_self_service_financials(
             payout_base
         ),
 
-        "benefit_coupon_id": (int(selected_coupon.get("id")) if selected_coupon else None),
-        "benefit_coupon_title": (str(selected_coupon.get("title") or "") if selected_coupon else ""),
-        "benefit_service_note": coupon_service_note(selected_coupon),
+        "benefit_coupon_id": loyalty_discount["coupon_id"],
+        "benefit_coupon_title": loyalty_discount["coupon_title"],
+        "benefit_coupon": loyalty_discount["coupon"],
+        "benefit_service_note": loyalty_discount["service_note"],
         "benefit_service_value": benefit_service_value,
+        "benefit_discount_amount": benefit_discount_amount,
         "point_service_value": point_service_value,
 
         "store_absorbed_amount": (
             allocation.store_absorbed_amount
+            + benefit_discount_amount
             + point_specify
             + point_service_value
-            + benefit_service_value
         ),
 
         "customer_pay_amount": (
