@@ -136,6 +136,27 @@ async def finalize_accepted_pending_payment(
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
         return
 
+    # Every payment path (wallet / zero-amount / external review) must finalize
+    # against the same canonical WebOrder.  Previously only external reviews
+    # enforced this, allowing wallet/0T orders to become active in Discord while
+    # silently skipping assignment/payout promotion on the website.
+    web_order_id = _to_int(data.get("web_order_id"))
+    if web_order_id is None:
+        try:
+            from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
+            web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
+        except Exception:
+            web_order_id = None
+
+    if web_order_id is None:
+        await interaction.response.send_message(
+            "找不到這張訂單的網站資料，暫時不能完成付款，請通知客服確認。",
+            ephemeral=True,
+        )
+        return
+
+    data["web_order_id"] = int(web_order_id)
+
     zero_amount_order = is_zero_amount_order(amount)
     if zero_amount_order:
         # A fully discounted order still goes through the normal submit/finalize
@@ -150,22 +171,6 @@ async def finalize_accepted_pending_payment(
             await interaction.response.send_message(
                 "這筆付款已送出網站審核，請不要重複送出。\n"
                 "請將付款截圖直接傳在此票口，方便客服核對。",
-                ephemeral=True,
-            )
-            return
-
-        web_order_id = _to_int(data.get("web_order_id"))
-
-        if web_order_id is None:
-            try:
-                from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
-                web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
-            except Exception:
-                web_order_id = None
-
-        if web_order_id is None:
-            await interaction.response.send_message(
-                "找不到這張訂單的網站資料，暫時無法送出付款審核，請通知客服。",
                 ephemeral=True,
             )
             return
@@ -198,7 +203,6 @@ async def finalize_accepted_pending_payment(
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
-        data["web_order_id"] = int(web_order_id)
         data["payment_review_id"] = int(review["id"])
         data["payment_review_no"] = str(review.get("review_no") or "")
         data["payment_review_pending"] = True
@@ -394,14 +398,6 @@ async def finalize_accepted_pending_payment(
         data["payment_processing"] = True
         remember_order_data(channel_id, data)
 
-        reward_result = await add_customer_reward_from_order(
-            guild=guild,
-            order_channel_id=channel_id,
-            customer_id=customer_id,
-            amount_text=str(amount),
-            notify_channel=interaction.channel,
-        )
-
         receipt_staff_member = interaction.user
         amount_set_by = _to_int(data.get("amount_set_by"))
 
@@ -432,32 +428,32 @@ async def finalize_accepted_pending_payment(
             data["receipt_message_id"] = receipt_message.id
             data["receipt_channel_id"] = receipt_message.channel.id
 
-        web_order_id = _to_int(data.get("web_order_id"))
+        from shared.order_acceptance import promote_acceptance_claims_to_assignments
+        payout_base_amount = _to_int(data.get("payout_base_amount"), amount) or amount
+        promoted_count = promote_acceptance_claims_to_assignments(
+            order_id=int(web_order_id),
+            payment_method=str(payment_method),
+            amount=amount,
+            payout_base_amount=payout_base_amount,
+            original_amount=_to_int(data.get("original_amount"), payout_base_amount) or payout_base_amount,
+            manual_discount_amount=_to_int(data.get("manual_discount_amount"), 0) or 0,
+            cash_coupon_amount=_to_int(data.get("cash_coupon_amount"), 0) or 0,
+            store_absorbed_amount=_to_int(data.get("store_absorbed_amount"), 0) or 0,
+            customer_pay_amount=amount,
+            bot_order_no=data.get("order_no") or data.get("receipt_id"),
+        )
+        data["promoted_assignment_count"] = promoted_count
 
-        if web_order_id is None:
-            try:
-                from shared.order_acceptance import find_acceptance_order_id_by_dispatch_message_id
-                web_order_id = find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id)
-            except Exception:
-                web_order_id = None
-
-        if web_order_id is not None:
-            data["web_order_id"] = int(web_order_id)
-            from shared.order_acceptance import promote_acceptance_claims_to_assignments
-            payout_base_amount = _to_int(data.get("payout_base_amount"), amount) or amount
-            promoted_count = promote_acceptance_claims_to_assignments(
-                order_id=web_order_id,
-                payment_method=str(payment_method),
-                amount=amount,
-                payout_base_amount=payout_base_amount,
-                original_amount=_to_int(data.get("original_amount"), payout_base_amount) or payout_base_amount,
-                manual_discount_amount=_to_int(data.get("manual_discount_amount"), 0) or 0,
-                cash_coupon_amount=_to_int(data.get("cash_coupon_amount"), 0) or 0,
-                store_absorbed_amount=_to_int(data.get("store_absorbed_amount"), 0) or 0,
-                customer_pay_amount=amount,
-                bot_order_no=data.get("order_no") or data.get("receipt_id"),
-            )
-            data["promoted_assignment_count"] = promoted_count
+        # Member accumulation is a post-promotion side effect.  Do not award
+        # spend/order progress for a payment that failed to become the canonical
+        # active WebOrder.
+        reward_result = await add_customer_reward_from_order(
+            guild=guild,
+            order_channel_id=channel_id,
+            customer_id=customer_id,
+            amount_text=str(amount),
+            notify_channel=interaction.channel,
+        )
 
         dispatch_channel = guild.get_channel(dispatch_channel_id)
         dispatch_url = None

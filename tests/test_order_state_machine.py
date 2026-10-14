@@ -63,6 +63,8 @@ def test_order_state_aliases_and_terminal_guards():
     assert can_transition_order_status(STORED, ACTIVE)
     assert can_transition_order_status(ACTIVE, CLOSED)
 
+    assert not can_transition_order_status(ACCEPTED_PENDING_PAY, CLOSED)
+    assert not can_transition_order_status(STORED, CLOSED)
     assert not can_transition_order_status(CLOSED, ACTIVE)
     assert not can_transition_order_status(CANCELLED, WAITING_ACCEPTANCE)
 
@@ -166,6 +168,36 @@ def test_terminal_order_cannot_be_reactivated():
         ).scalar_one()
 
     assert current == CLOSED
+
+
+def test_stored_order_cannot_be_closed_without_resuming_active():
+    engine = create_engine("sqlite:///:memory:")
+    _create_order_tables(engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO web_orders(id, status, updated_at)
+                VALUES(1, :status, CURRENT_TIMESTAMP)
+                """
+            ),
+            {"status": STORED},
+        )
+
+        with pytest.raises(OrderStateTransitionError):
+            transition_order_state_in_connection(
+                conn,
+                order_id=1,
+                target_status=CLOSED,
+                source="invalid_stored_close",
+            )
+
+        current = conn.execute(
+            text("SELECT status FROM web_orders WHERE id = 1")
+        ).scalar_one()
+
+    assert current == STORED
 
 
 def test_pending_cancel_guard_rejects_order_that_already_has_dispatch_message():

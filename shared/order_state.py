@@ -60,7 +60,6 @@ ALLOWED_ORDER_TRANSITIONS = {
         WAITING_ACCEPTANCE,
         ACCEPTED_PENDING_PAY,
         ACTIVE,
-        CLOSED,
         CANCELLED,
     },
     CLOSED: set(),

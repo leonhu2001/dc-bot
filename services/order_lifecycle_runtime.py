@@ -54,6 +54,33 @@ def configure_order_lifecycle_runtime(namespace: Mapping[str, Any]) -> None:
     _CONFIGURED = True
 
 
+def validate_order_ready_to_close(order_data: dict) -> None:
+    """Fail closed unless payment has already promoted the order to service."""
+    status = str(order_data.get("status") or "").strip().lower()
+
+    if status in {"active", "paid"}:
+        return
+
+    if bool(order_data.get("closed")) or status in {"closed", "completed", "done"}:
+        raise ValueError("這張單已經結單，請勿重複操作。")
+
+    if status == "stored":
+        raise ValueError("這張單目前已暫存；請先恢復服務狀態，再執行結單。")
+
+    if status in {
+        "pending_cs_dispatch",
+        "created",
+        "waiting_acceptance",
+        "accepted_pending_pay",
+    }:
+        raise ValueError("這張單尚未完成付款並正式成立，不能結單。")
+
+    if status in {"cancelled", "canceled"}:
+        raise ValueError("這張單已取消，不能再結單。")
+
+    raise ValueError("無法確認這張單已完成付款，請先確認付款狀態後再結單。")
+
+
 async def ensure_payment_submit_receipt(
     *,
     guild: discord.Guild,
@@ -270,6 +297,12 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         date_text = get_taipei_now_text()
 
         order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+        try:
+            validate_order_ready_to_close(order_data)
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
         parsed_amount = _to_int(order_data.get("amount"), 0) or _to_int(order_data.get("total_amount"), 0) or 0
         if parsed_amount < 0:
             await interaction.response.send_message(
@@ -445,6 +478,12 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
 
     customer_member = guild.get_member(customer_id)
     order_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(order_channel.id, {})
+
+    try:
+        validate_order_ready_to_close(order_data)
+    except ValueError as exc:
+        await interaction.response.send_message(str(exc), ephemeral=True)
+        return
 
     parsed_amount = get_stored_order_amount_or_none(order_data)
     if parsed_amount is None:

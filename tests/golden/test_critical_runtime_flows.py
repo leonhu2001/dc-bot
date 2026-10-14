@@ -363,6 +363,7 @@ def test_zero_amount_checkout_runs_real_payment_finalizer_without_review_or_wall
 
     orders = {}
     remembered = []
+    promoted_order_ids = []
     for method in ("轉帳", "我的錢包"):
         channel_id = source.id
         orders[channel_id] = {
@@ -372,6 +373,7 @@ def test_zero_amount_checkout_runs_real_payment_finalizer_without_review_or_wall
             "total_amount": 0,
             "dispatch_message_id": 8201,
             "dispatch_channel_id": dispatch.id,
+            "web_order_id": 321,
             "category": "delta_desktop_basic",
             "category_label": "三角洲 基礎單<端遊>",
             "item": "娛樂陪〈端遊〉｜單陪",
@@ -409,11 +411,18 @@ def test_zero_amount_checkout_runs_real_payment_finalizer_without_review_or_wall
         monkeypatch.setattr(order_payment_runtime, "StaffOrderOperationView", lambda: object(), raising=False)
         monkeypatch.setattr(order_payment_runtime, "_order_requires_credentials", lambda _data: False)
 
-        # Keep the Golden test independent from the real acceptance DB.
+        # Keep the Golden test independent from the real acceptance DB while
+        # preserving the production invariant that every finalized payment has
+        # a canonical WebOrder and runs assignment/payout promotion.
         monkeypatch.setattr(
             order_acceptance,
             "find_acceptance_order_id_by_dispatch_message_id",
-            lambda _message_id: None,
+            lambda _message_id: 321,
+        )
+        monkeypatch.setattr(
+            order_acceptance,
+            "promote_acceptance_claims_to_assignments",
+            lambda **kwargs: promoted_order_ids.append(int(kwargs["order_id"])) or 1,
         )
 
         response = FakeResponse()
@@ -439,6 +448,9 @@ def test_zero_amount_checkout_runs_real_payment_finalizer_without_review_or_wall
         assert data["payment_zero_amount"] is True
         assert data["payment_review_pending"] is False
         assert data["receipt_id"] == "MO-ZERO"
+        assert data["promoted_assignment_count"] == 1
         assert "payment_finalizing" not in data
         assert "payment_processing" not in data
         assert any("訂單正式成立" in message for message in followup.messages)
+
+    assert promoted_order_ids == [321, 321]
