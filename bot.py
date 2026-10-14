@@ -319,6 +319,7 @@ from services.self_service_runtime import (
     SelfServiceStaffPriceModal,
     SelfServiceStaffDiscountCouponModal,
     SelfServiceSubmitNoteModal,
+    SelfServiceDispatchedView,
     SelfServiceOrderView,
     _reorder_order_value,
     _reorder_json_dict,
@@ -2903,6 +2904,7 @@ async def register_core_persistent_views_once() -> None:
     bot.add_view(MainPanelView())
     bot.add_view(OrderControlView())
     bot.add_view(StaffOrderOperationView())
+    bot.add_view(SelfServiceDispatchedView())
     bot.add_view(RecruitControlView())
     bot.add_view(ComplaintPanelView())
     bot.add_view(FeedbackPanelView())

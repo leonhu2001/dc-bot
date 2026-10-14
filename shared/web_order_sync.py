@@ -804,12 +804,31 @@ def delete_web_order_by_ticket_channel(*, ticket_channel_id=None, dispatch_messa
 
         order_id = int(row[0])
 
+        from services.loyalty_benefits import release_coupon_for_order
+        from services.vip_monthly_benefits import release_cash_benefits_for_channel
+
+        release_coupon_for_order(order_id)
+        if ticket_channel_id_text:
+            release_cash_benefits_for_channel(ticket_channel_id_text)
+
         for table_name in (
             "worker_payouts",
             "customer_service_payouts",
             "order_assignments",
             "sync_events",
+            "order_acceptance_claims",
+            "order_acceptance_meta",
+            "smart_dispatch_notifications",
         ):
+            table_exists = db.execute(
+                text(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type = 'table' AND name = :table_name LIMIT 1"
+                ),
+                {"table_name": table_name},
+            ).first()
+            if table_exists is None:
+                continue
             db.execute(
                 text(f"DELETE FROM {table_name} WHERE order_id = :order_id"),
                 {"order_id": order_id},
