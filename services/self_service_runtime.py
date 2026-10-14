@@ -71,6 +71,9 @@ from services.self_service_reorder import (
 # changing the public Discord self-service entry points.
 _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     {
+        "Any",
+        "Mapping",
+        "discord",
         "json",
         "ORDER_CATEGORY_LABELS",
         "_to_int",
