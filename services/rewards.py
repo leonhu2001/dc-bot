@@ -679,8 +679,24 @@ async def add_customer_reward_from_order(
         return f"會員消費未累積：{item_name} 不累積 VIP 點數。"
 
     amount = parse_receipt_amount(amount_text)
-    if amount is None or amount <= 0:
+    if amount is None:
         return "會員消費未累積：收據金額欄位沒有可辨識的數字。"
+
+    if amount <= 0:
+        # 0T is a valid final customer-pay amount (for example a fully covered
+        # member coupon), not a parse failure. Mark reward handling complete so
+        # closing the order does not warn that reward processing was skipped.
+        # Keep reward_excluded=False so a later amount correction can still add
+        # the proper spend/points through sync_reward_counted_order_amount().
+        order_data["reward_counted"] = True
+        order_data["reward_amount"] = 0
+        order_data["reward_zero_amount"] = True
+        order_data["reward_excluded"] = False
+        order_data["reward_excluded_reason"] = ""
+        order_data["reward_counted_at"] = get_taipei_now_iso()
+        if _SAVE_BOT_DATA is not None:
+            _SAVE_BOT_DATA()
+        return "顧客實付為 0T，本單不增加會員累積消費或點數。"
 
     item = str(order_data.get("item") or "").strip()
     if item in VIP_PROGRESS_EXCLUDED_ITEMS:

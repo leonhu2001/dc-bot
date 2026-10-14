@@ -5,6 +5,11 @@ from typing import Callable
 import discord
 
 from services.payment_methods import WALLET_PAYMENT_METHOD
+from services.order_payment_policy import (
+    is_zero_amount_order,
+    requires_external_payment_review,
+    requires_wallet_debit,
+)
 
 from services.order_credential_runtime import (
     _order_requires_credentials,
@@ -131,9 +136,16 @@ async def finalize_accepted_pending_payment(
         await interaction.response.send_message("找不到派單訊息，請通知客服確認。", ephemeral=True)
         return
 
-    external_review_methods = {"街口", "轉帳"}
+    zero_amount_order = is_zero_amount_order(amount)
+    if zero_amount_order:
+        # A fully discounted order still goes through the normal submit/finalize
+        # lifecycle, but it must not create a meaningless 0T payment review.
+        data["payment_zero_amount"] = True
+        data["payment_review_pending"] = False
+    else:
+        data.pop("payment_zero_amount", None)
 
-    if str(payment_method) in external_review_methods and not data.get("payment_review_approved"):
+    if requires_external_payment_review(payment_method, amount) and not data.get("payment_review_approved"):
         if data.get("payment_review_pending"):
             await interaction.response.send_message(
                 "這筆付款已送出網站審核，請不要重複送出。\n"
@@ -320,7 +332,7 @@ async def finalize_accepted_pending_payment(
                 await interaction.response.send_message(message, ephemeral=True)
             return
 
-        if payment_method == WALLET_PAYMENT_METHOD:
+        if requires_wallet_debit(payment_method, amount):
             existing_wallet_tx_id = data.get("wallet_transaction_id")
 
             if not existing_wallet_tx_id:
@@ -555,6 +567,10 @@ async def finalize_accepted_pending_payment(
 
         data["status"] = "active"
         data["closed"] = False
+        if zero_amount_order:
+            data["payment_zero_amount_completed_at"] = get_taipei_now_iso()
+        else:
+            data.pop("payment_zero_amount_completed_at", None)
         data.pop("payment_processing", None)
         data.pop("payment_finalizing", None)
         if data.get("payment_review_approved"):
