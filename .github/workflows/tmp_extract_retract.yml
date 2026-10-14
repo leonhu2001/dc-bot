@@ -1,0 +1,28 @@
+name: Temporary retract extraction
+on:
+  push:
+    branches: [feature/retract-dispatch-edit-order-20261015]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/retract-dispatch-edit-order-20261015
+          fetch-depth: 0
+      - name: Apply extraction
+        run: python .github/tmp_extract_retract.py
+      - name: Check size and syntax
+        run: |
+          python -m py_compile services/self_service_retract.py services/self_service_runtime.py
+          test $(wc -c < services/self_service_runtime.py) -le 70000
+      - name: Commit
+        run: |
+          rm -f .github/workflows/tmp_extract_retract.yml .github/tmp_extract_retract.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Keep retract lifecycle outside legacy runtime"
+          git push origin HEAD:feature/retract-dispatch-edit-order-20261015
