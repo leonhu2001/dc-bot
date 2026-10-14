@@ -863,6 +863,12 @@ def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | Non
                 f"（{reason}，店內吸收，不影響打手分潤）"
             )
 
+        if adjustment.get("benefit_discount_amount", 0) > 0:
+            detail_parts.append(
+                f"累積福利 -{_format_plain_amount(adjustment['benefit_discount_amount'])}"
+                "（店內吸收，不影響打手分潤）"
+            )
+
         lines.append(("金額明細", "｜".join(detail_parts)))
 
         if adjustment["point_benefit_name"]:
@@ -1381,34 +1387,38 @@ def calculate_self_service_financials(
         max_discount_amount=after_fixed,
     )
 
-    allocation = allocate_store_absorbed_fixed_discount(
-        after_percent_amount=after_percent,
-        fixed_discount_amount=fixed,
-        additional_store_discount_amount=point_cash + vip_monthly_cash,
-        extra_customer_charge_amount=specify_effective,
-    )
-
     from services.loyalty_benefits import (
         calculate_coupon_service_value,
         coupon_service_note,
         get_applicable_coupon,
+        preview_same_order_benefit,
     )
 
     selected_coupon = None
     selected_coupon_id = data.get("selected_benefit_coupon_id")
-    if selected_coupon_id not in (None, ""):
+    selected_same_order = bool(data.get("selected_same_order_benefit"))
+    if selected_coupon_id not in (None, "") or selected_same_order:
         if benefit is not None or selected_vip_monthly is not None:
             raise ValueError("福利券、VIP 每月福利券與點數福利同張訂單只能擇一使用。")
+
         customer_id = data.get("customer_id")
-        if customer_id:
-            selected_coupon = get_applicable_coupon(
-                selected_coupon_id,
-                customer_id=customer_id,
+        if selected_coupon_id not in (None, ""):
+            if customer_id:
+                selected_coupon = get_applicable_coupon(
+                    selected_coupon_id,
+                    customer_id=customer_id,
+                    rule_key=str(getattr(rule, "key", "")),
+                    player_count=_to_int(data.get("player_count"), 1) or 1,
+                )
+            if selected_coupon is None:
+                raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
+        elif customer_id:
+            selected_coupon = preview_same_order_benefit(
+                customer_id,
                 rule_key=str(getattr(rule, "key", "")),
+                quantity=max(1, _to_int(data.get("quantity"), 1) or 1),
                 player_count=_to_int(data.get("player_count"), 1) or 1,
             )
-        if selected_coupon is None:
-            raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
 
     quantity_for_extra = max(1, _to_int(data.get("quantity"), 1) or 1)
     point_service_value = 0
@@ -1422,6 +1432,21 @@ def calculate_self_service_financials(
         player_count=_to_int(data.get("player_count"), 1) or 1,
         coupon=selected_coupon,
     )
+    benefit_discount_amount = max(
+        0,
+        min(after_fixed, int(benefit_service_value or 0)),
+    )
+
+    allocation = allocate_store_absorbed_fixed_discount(
+        after_percent_amount=after_percent,
+        fixed_discount_amount=fixed,
+        additional_store_discount_amount=(
+            point_cash
+            + vip_monthly_cash
+            + benefit_discount_amount
+        ),
+        extra_customer_charge_amount=specify_effective,
+    )
 
     # 百分比/VIP折扣只影響顧客付款。點數、免指定費與福利券都由店內吸收，
     # 額外服務用商品正常原價補進陪玩分潤基底。
@@ -1429,7 +1454,6 @@ def calculate_self_service_financials(
         allocation.payout_base_amount
         + point_specify
         + point_service_value
-        + benefit_service_value
     )
     customer_pay = allocation.customer_pay_amount
 
@@ -1636,17 +1660,22 @@ def calculate_self_service_financials(
             payout_base
         ),
 
-        "benefit_coupon_id": (int(selected_coupon.get("id")) if selected_coupon else None),
+        "benefit_coupon_id": (
+            int(selected_coupon.get("id"))
+            if selected_coupon and selected_coupon.get("id") not in (None, "")
+            else None
+        ),
         "benefit_coupon_title": (str(selected_coupon.get("title") or "") if selected_coupon else ""),
+        "benefit_coupon": (dict(selected_coupon) if selected_coupon else None),
         "benefit_service_note": coupon_service_note(selected_coupon),
         "benefit_service_value": benefit_service_value,
+        "benefit_discount_amount": benefit_discount_amount,
         "point_service_value": point_service_value,
 
         "store_absorbed_amount": (
             allocation.store_absorbed_amount
             + point_specify
             + point_service_value
-            + benefit_service_value
         ),
 
         "customer_pay_amount": (
