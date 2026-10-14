@@ -59,6 +59,8 @@ def test_zero_customer_pay_marks_reward_handling_complete_without_adding_spend_o
 
     assert "實付為 0T" in result
     assert reward_data["total_spent"] == 2000
+    assert reward_data["order_count"] == 1
+    assert reward_data["last_order_at"]
     assert rewards.get_current_reward_points(reward_data) == 20
     assert order_data["reward_counted"] is True
     assert order_data["reward_amount"] == 0
@@ -89,3 +91,4 @@ def test_zero_reward_marker_can_be_corrected_to_positive_amount_later():
     assert result["delta"] == 500
     assert rewards.get_customer_reward_data(customer_id)["total_spent"] == 500
     assert order_data["reward_amount"] == 500
+    assert "reward_zero_amount" not in order_data

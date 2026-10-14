@@ -499,7 +499,15 @@ async def finalize_accepted_pending_payment(
                     final_label="顧客實付",
                 )
 
-                dispatch_embed.add_field(name="付款狀態", value="已付款，接單人員已確認", inline=False)
+                dispatch_embed.add_field(
+                    name="付款狀態",
+                    value=(
+                        "免付款，接單人員已確認"
+                        if zero_amount_order
+                        else "已付款，接單人員已確認"
+                    ),
+                    inline=False,
+                )
 
                 await dispatch_message.edit(
                     embed=dispatch_embed,
