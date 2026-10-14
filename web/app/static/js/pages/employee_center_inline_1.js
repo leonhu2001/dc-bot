@@ -34,7 +34,10 @@
             main.appendChild(el('span','salary-meta',item.category_label || '薪資'));
             row.appendChild(main);
 
-            const status = el('span',`salary-status ${item.payout_status === 'paid' ? 'paid' : 'unpaid'}`,item.status_label || '待發放');
+            const financialState = item.financial_state || (item.payout_status === 'paid' ? 'paid' : 'unpaid');
+            const statusClass = financialState === 'paid' ? 'paid' : 'unpaid';
+            const status = el('span',`salary-status ${statusClass}`,item.status_label || '待發放');
+            if(financialState === 'locked') status.dataset.state = 'locked';
             row.appendChild(status);
             row.appendChild(el('span','salary-amount',money(item.amount)));
 
@@ -70,9 +73,16 @@
         salaryItems = Array.isArray(data.items) ? data.items : [];
 
         document.getElementById('salaryPending').textContent = money(summary.pending);
-        document.getElementById('salaryPendingSub').textContent = Number(summary.pending_count || 0) > 0
-            ? `${summary.pending_count} 筆薪資尚未發放`
-            : '目前沒有待發放薪資';
+        const pendingCount = Number(summary.pending_count || 0);
+        const lockedCount = Number(summary.locked_count || 0);
+        const pendingParts = [];
+        pendingParts.push(pendingCount > 0
+            ? `${pendingCount} 筆薪資待發放`
+            : '目前沒有可發放待領薪資');
+        if(lockedCount > 0){
+            pendingParts.push(`${lockedCount} 筆報單鎖定 ${money(summary.locked)}`);
+        }
+        document.getElementById('salaryPendingSub').textContent = pendingParts.join('・');
 
         document.getElementById('salaryMonthPaid').textContent = money(summary.current_month_paid);
         document.getElementById('salaryMonthPaidSub').textContent = `${summary.current_month_label || '本月'}已完成發放`;
