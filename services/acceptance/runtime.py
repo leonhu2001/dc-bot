@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from core.time_utils import utc_now_naive
+from core.database import remember_claim_data, remember_order_data, save_bot_data
+from core.time_utils import get_taipei_now_iso, utc_now_naive
 import asyncio
 from pathlib import Path
 from typing import Any, Mapping
@@ -9,6 +10,15 @@ import discord
 
 
 _CONFIGURED = False
+
+_MODULE_OWNED_RUNTIME_NAMES = frozenset(
+    {
+        "get_taipei_now_iso",
+        "remember_claim_data",
+        "remember_order_data",
+        "save_bot_data",
+    }
+)
 
 
 def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
@@ -23,6 +33,8 @@ def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
         if name.startswith("__"):
             continue
         if name == "configure_acceptance_runtime":
+            continue
+        if name in _MODULE_OWNED_RUNTIME_NAMES:
             continue
         globals()[name] = value
 
