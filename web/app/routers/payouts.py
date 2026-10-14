@@ -11,6 +11,10 @@ from fastapi.templating import Jinja2Templates
 
 from web.app.config import config
 from web.app.services.internal_transfers import ensure_internal_transfer_tables
+from web.app.services.payout_report_gate import (
+    payout_financial_state,
+    payout_status_label,
+)
 
 
 router = APIRouter(tags=["payouts"])
@@ -513,12 +517,58 @@ def _salary_category(role_label: str | None) -> tuple[str, str]:
     return "service", "服務薪資"
 
 
+def _employee_report_status_by_order_no(discord_id: str) -> dict[str, str]:
+    """Return report status for service payouts visible to one employee."""
+    conn = sqlite3.connect(my_payout_db_path())
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                COALESCE(w.bot_order_no, 'WEB-' || w.id) AS order_no,
+                COALESCE(NULLIF(r.status, ''), 'missing') AS report_status
+            FROM web_orders w
+            LEFT JOIN order_reports r ON r.order_id = w.id
+            WHERE w.status = 'closed'
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM worker_payouts wp
+                        WHERE wp.order_id = w.id
+                          AND CAST(wp.worker_discord_id AS TEXT) = ?
+                          AND COALESCE(wp.final_payout, 0) > 0
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM customer_service_payouts cp
+                        WHERE cp.order_id = w.id
+                          AND CAST(cp.customer_service_discord_id AS TEXT) = ?
+                          AND COALESCE(cp.payout_amount, 0) > 0
+                    )
+              )
+            """,
+            (discord_id, discord_id),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        # Fail closed for legacy databases where the report table has not been
+        # created yet: service salary is not considered ready for payout.
+        return {}
+    finally:
+        conn.close()
+
+    return {
+        str(row["order_no"] or "").strip(): str(row["report_status"] or "missing")
+        for row in rows
+        if str(row["order_no"] or "").strip()
+    }
+
+
 def build_employee_salary_ledger(discord_id: str) -> dict:
     """員工中心薪資資料。
 
     直接沿用 build_my_payout_rows 的正式薪資來源：worker_payouts、worker_tips、
     customer_service_payouts 與 employee_payroll_adjustments，避免員工中心和
-    薪資結算各算各的。
+    薪資結算各算各的。服務 / 客服分潤另外套用與後台相同的報單審核 gate。
     """
     discord_id = str(discord_id or "").strip()
     unpaid_rows, paid_rows, totals = build_my_payout_rows(
@@ -534,6 +584,11 @@ def build_employee_salary_ledger(discord_id: str) -> dict:
 
     raw_items = list((person or {}).get("items") or [])
     items: list[dict] = []
+    report_status_by_order = _employee_report_status_by_order_no(discord_id)
+    pending_total = 0
+    pending_count = 0
+    locked_total = 0
+    locked_count = 0
 
     categories = {
         "all": {"count": 0, "total": 0},
@@ -547,6 +602,30 @@ def build_employee_salary_ledger(discord_id: str) -> dict:
         category_key, category_label = _salary_category(raw.get("role"))
         amount = int(raw.get("amount") or 0)
         payout_status = "paid" if str(raw.get("payout_status") or "") == "paid" else "unpaid"
+        order_no = str(raw.get("order_no") or "未紀錄訂單")
+        report_required = category_key in {"service", "customer_service"}
+        report_status = (
+            report_status_by_order.get(order_no, "missing")
+            if report_required
+            else None
+        )
+        financial_state = payout_financial_state(
+            payout_status=payout_status,
+            report_status=report_status,
+            report_required=report_required,
+        )
+        status_label = payout_status_label(
+            payout_status=payout_status,
+            report_status=report_status,
+            report_required=report_required,
+        )
+
+        if financial_state == "unpaid":
+            pending_total += amount
+            pending_count += 1
+        elif financial_state == "locked":
+            locked_total += amount
+            locked_count += 1
 
         if category_key == "tip":
             service_label = "老闆加雞腿"
@@ -558,14 +637,16 @@ def build_employee_salary_ledger(discord_id: str) -> dict:
             service_label = str(raw.get("item") or raw.get("category") or "服務薪資")
 
         item = {
-            "order_no": str(raw.get("order_no") or "未紀錄訂單"),
+            "order_no": order_no,
             "closed_date": str(raw.get("closed_date") or "未紀錄"),
             "customer_name": str(raw.get("customer_name") or "未紀錄"),
             "service_label": service_label,
             "category_key": category_key,
             "category_label": category_label,
             "payout_status": payout_status,
-            "status_label": "已發放" if payout_status == "paid" else "待發放",
+            "financial_state": financial_state,
+            "report_status": report_status,
+            "status_label": status_label,
             "amount": amount,
         }
         items.append(item)
@@ -590,8 +671,10 @@ def build_employee_salary_ledger(discord_id: str) -> dict:
 
     return {
         "summary": {
-            "pending": int(totals.get("unpaid_total") or 0),
-            "pending_count": int(totals.get("unpaid_count") or 0),
+            "pending": int(pending_total),
+            "pending_count": int(pending_count),
+            "locked": int(locked_total),
+            "locked_count": int(locked_count),
             "current_month_paid": int(month_paid_totals.get("paid_total") or 0),
             "current_month_label": current_month_label,
             "lifetime": int(totals.get("all_total") or 0),
