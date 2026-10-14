@@ -5,7 +5,12 @@ from typing import Any, Mapping
 
 import discord
 
-from core.database import remember_claim_data, remember_order_data, save_bot_data
+from core.database import (
+    delete_claim_row_from_db,
+    remember_claim_data,
+    remember_order_data,
+    save_bot_data,
+)
 from core.permissions import is_customer_staff
 from core.time_utils import get_taipei_now_iso
 from services.orders import (
@@ -14,6 +19,10 @@ from services.orders import (
     build_self_service_order_embed,
 )
 from services.smart_dispatch import create_smart_dispatch_plan, set_specified_dm_results
+from services.self_service_retract import (
+    SelfServiceDispatchedView,
+    retract_self_service_dispatch,
+)
 
 from services.self_service_financials import (
     configure_self_service_financials,
@@ -78,6 +87,7 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "ORDER_CATEGORY_LABELS",
         "_to_int",
         "build_self_service_order_embed",
+        "delete_claim_row_from_db",
         "remember_claim_data",
         "remember_order_data",
         "save_bot_data",
@@ -85,6 +95,8 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "get_taipei_now_iso",
         "create_smart_dispatch_plan",
         "set_specified_dm_results",
+        "SelfServiceDispatchedView",
+        "retract_self_service_dispatch",
     }
 )
 
@@ -1010,6 +1022,27 @@ async def create_waiting_acceptance_order_from_self_service(
 
 
 
+
+async def retract_waiting_acceptance_order_from_self_service(
+    interaction: discord.Interaction,
+    *,
+    channel_id: int,
+) -> str:
+    """Adapter from the legacy self-service runtime into the retract lifecycle."""
+    return await retract_self_service_dispatch(
+        interaction,
+        channel_id=channel_id,
+        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+        order_claims=ORDER_CLAIMS,
+        dispatch_channel_id=DISPATCH_CHANNEL_ID,
+        remember_order=remember_order_data,
+        save_data=save_bot_data,
+        delete_claim_row=delete_claim_row_from_db,
+        order_log_sender=send_order_log,
+        now_iso=get_taipei_now_iso,
+    )
+
+
 PRICE_FORMULA_VERSION = 2
 
 
@@ -1361,7 +1394,11 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
         if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
             try:
                 panel_message = await interaction.channel.fetch_message(self.panel_message_id)
-                await panel_message.edit(view=None)
+                await panel_message.edit(
+                    embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
+                    view=SelfServiceDispatchedView(),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
             except discord.HTTPException:
                 pass
 
@@ -1373,6 +1410,7 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
         )
 
         await interaction.followup.send(response_text, ephemeral=True)
+
 
 class SelfServiceOrderView(discord.ui.View):
     def __init__(self, customer_id: int, channel_id: int, selected_category: str | None = None):
