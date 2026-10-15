@@ -173,9 +173,22 @@ def test_bot_ticket_identity_helpers_are_extracted():
     assert "def get_order_customer_id_from_channel" in helper_source
 
 
-def test_runtime_configure_binds_remaining_legacy_dependencies():
+def test_runtime_configure_boundaries_match_current_migration_stage():
+    acceptance_marker = "_acceptance_runtime_test_marker"
+    if hasattr(acceptance_runtime, acceptance_marker):
+        delattr(acceptance_runtime, acceptance_marker)
+
     acceptance_runtime.configure_acceptance_runtime(
-        {"_acceptance_runtime_test_marker": object()}
+        {
+            "DISPATCH_CHANNEL_ID": 123,
+            "GUILD_ID": 456,
+            "ORDER_CLAIMS": {},
+            "PaymentMethodView": object,
+            "SELF_SERVICE_ORDER_SELECTIONS": {},
+            "_refresh_existing_web_sync_dispatch": lambda *_args, **_kwargs: None,
+            "bot": object(),
+            acceptance_marker: object(),
+        }
     )
     web_sync_runtime.configure_web_sync_runtime(
         {"_web_sync_runtime_test_marker": object()}
@@ -187,7 +200,7 @@ def test_runtime_configure_binds_remaining_legacy_dependencies():
         {"_self_service_runtime_test_marker": object()}
     )
 
-    assert hasattr(acceptance_runtime, "_acceptance_runtime_test_marker")
+    assert not hasattr(acceptance_runtime, acceptance_marker)
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     assert hasattr(order_runtime, "_order_runtime_test_marker")
     assert hasattr(self_service_runtime, "_self_service_runtime_test_marker")
