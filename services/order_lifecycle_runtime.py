@@ -7,6 +7,10 @@ import discord
 
 from services.payment_methods import WALLET_PAYMENT_METHOD
 from services.order_payment_policy import is_zero_amount_order
+from services.order_close_panel_recovery import (
+    ensure_post_close_panel,
+    is_order_already_closed,
+)
 
 
 _REQUIRED_DEPENDENCIES = (
@@ -61,7 +65,7 @@ def validate_order_ready_to_close(order_data: dict) -> None:
     if status in {"active", "paid"}:
         return
 
-    if bool(order_data.get("closed")) or status in {"closed", "completed", "done"}:
+    if is_order_already_closed(order_data):
         raise ValueError("這張單已經結單，請勿重複操作。")
 
     if status == "stored":
@@ -79,6 +83,80 @@ def validate_order_ready_to_close(order_data: dict) -> None:
         raise ValueError("這張單已取消，不能再結單。")
 
     raise ValueError("無法確認這張單已完成付款，請先確認付款狀態後再結單。")
+
+
+def _post_close_panel_content(
+    *,
+    staff_mention: str,
+    receipt_text: str,
+    reward_text: str,
+) -> str:
+    return (
+        f"此單已由 {staff_mention} 結單，{receipt_text}\n\n"
+        f"{reward_text}\n\n"
+        "可以選擇評價本次服務、加雞腿、不留評價，或關閉票口。"
+    )
+
+
+async def _ensure_public_post_close_panel(
+    *,
+    order_channel: discord.TextChannel,
+    order_data: dict,
+    customer_id: int,
+    order_content: str | None,
+    staff_mention: str,
+    receipt_text: str,
+    reward_text: str,
+) -> tuple[discord.Message, bool]:
+    return await ensure_post_close_panel(
+        order_channel=order_channel,
+        order_data=order_data,
+        customer_id=customer_id,
+        order_content=order_content,
+        content=_post_close_panel_content(
+            staff_mention=staff_mention,
+            receipt_text=receipt_text,
+            reward_text=reward_text,
+        ),
+        build_embed=build_post_close_status_embed,
+        build_view=ReviewButtonView,
+        remember_order=remember_order_data,
+    )
+
+
+async def _recover_closed_order_panel(
+    interaction: discord.Interaction,
+    *,
+    order_channel: discord.TextChannel,
+    order_data: dict,
+    customer_id: int,
+) -> None:
+    """Repair only the post-close UI; never repeat close financial side effects."""
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True)
+
+    order_content, _payment_method = get_order_summary_from_channel(order_channel.id)
+    reward_text = (
+        "會員累積已在顧客送出付款方式時處理。"
+        if order_data.get("reward_counted")
+        else "提醒：這張單尚未標記會員累積，請確認顧客是否已送出付款方式。"
+    )
+    _panel_message, created = await _ensure_public_post_close_panel(
+        order_channel=order_channel,
+        order_data=order_data,
+        customer_id=customer_id,
+        order_content=order_content,
+        staff_mention=getattr(interaction.user, "mention", f"<@{getattr(interaction.user, 'id', '')}>"),
+        receipt_text="收據與結單狀態已存在，本次不重複處理。",
+        reward_text=reward_text,
+    )
+
+    await interaction.followup.send(
+        "這張單已經結單；已補回結單後 Panel。"
+        if created
+        else "這張單已經結單；結單後 Panel 已存在並已重新整理。",
+        ephemeral=True,
+    )
 
 
 async def ensure_payment_submit_receipt(
@@ -227,7 +305,6 @@ async def ensure_payment_submit_receipt(
     return receipt_id, receipt_message
 
 
-
 # ========= 收據 Modal =========
 
 class ReceiptModal(discord.ui.Modal, title="已結單收據"):
@@ -300,6 +377,14 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
         try:
             validate_order_ready_to_close(order_data)
         except ValueError as exc:
+            if is_order_already_closed(order_data):
+                await _recover_closed_order_panel(
+                    interaction,
+                    order_channel=order_channel,
+                    order_data=order_data,
+                    customer_id=customer_id,
+                )
+                return
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
@@ -418,17 +503,20 @@ class ReceiptModal(discord.ui.Modal, title="已結單收據"):
 
         close_receipt_text = "收據已於付款送出時產生，本次不重複送出。" if receipt_already_created else "收據已送出。"
 
+        _panel_message, created = await _ensure_public_post_close_panel(
+            order_channel=order_channel,
+            order_data=order_data,
+            customer_id=customer_id,
+            order_content=order_content,
+            staff_mention=interaction.user.mention,
+            receipt_text=close_receipt_text,
+            reward_text=reward_result,
+        )
         await interaction.followup.send(
-            f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
-            f"{reward_result}\n\n"
-            f"可以選擇評價本次服務、加雞腿、不留評價，或關閉票口。",
-            embed=build_post_close_status_embed(order_channel.id, customer_id),
-            view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
-            allowed_mentions=discord.AllowedMentions(
-                users=True,
-                roles=False,
-                everyone=False
-            )
+            "結單完成，結單後 Panel 已建立。"
+            if created
+            else "結單完成，既有結單後 Panel 已重新整理。",
+            ephemeral=True,
         )
 
 
@@ -482,6 +570,14 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
     try:
         validate_order_ready_to_close(order_data)
     except ValueError as exc:
+        if is_order_already_closed(order_data):
+            await _recover_closed_order_panel(
+                interaction,
+                order_channel=order_channel,
+                order_data=order_data,
+                customer_id=customer_id,
+            )
+            return
         await interaction.response.send_message(str(exc), ephemeral=True)
         return
 
@@ -597,17 +693,20 @@ async def close_order_without_receipt_modal(interaction: discord.Interaction) ->
 
     close_receipt_text = "收據已於付款送出時產生，本次不重複送出。" if receipt_already_created else "收據已自動產生或補登。"
 
+    _panel_message, created = await _ensure_public_post_close_panel(
+        order_channel=order_channel,
+        order_data=order_data,
+        customer_id=customer_id,
+        order_content=order_content,
+        staff_mention=interaction.user.mention,
+        receipt_text=close_receipt_text,
+        reward_text=reward_result,
+    )
     await interaction.followup.send(
-        f"此單已由 {interaction.user.mention} 結單，{close_receipt_text}\n\n"
-        f"{reward_result}\n\n"
-        f"可以選擇評價本次服務、加雞腿、不留評價，或關閉票口。",
-        embed=build_post_close_status_embed(order_channel.id, customer_id),
-        view=ReviewButtonView(customer_id=customer_id, order_content=order_content),
-        allowed_mentions=discord.AllowedMentions(
-            users=True,
-            roles=False,
-            everyone=False,
-        ),
+        "結單完成，結單後 Panel 已建立。"
+        if created
+        else "結單完成，既有結單後 Panel 已重新整理。",
+        ephemeral=True,
     )
 
 
@@ -638,7 +737,6 @@ class ConfirmCloseOrderView(discord.ui.View):
             return
 
         await interaction.response.send_message("已保留訂單。", ephemeral=True)
-
 
 
 # ========= 下單操作按鈕 =========
