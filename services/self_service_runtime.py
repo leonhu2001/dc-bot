@@ -835,46 +835,6 @@ async def create_waiting_acceptance_order_from_self_service(
             flush=True,
         )
 
-    if specified_staff_ids:
-        try:
-            dm_sent_ids, dm_failed_ids = await send_specified_staff_dispatch_dms(
-                guild,
-                specified_staff_ids=specified_staff_ids,
-                category_label=category_label,
-                item_label=rule.label,
-                required_staff_count=required_staff_count,
-                dispatch_jump_url=dispatch_message.jump_url,
-                allowed_role_ids=allowed_role_ids_for_rule,
-                required_game_role_ids=required_game_role_ids_for_rule,
-            )
-
-            try:
-                set_specified_dm_results(
-                    int(web_order.id),
-                    sent_ids=dm_sent_ids,
-                    failed_ids=dm_failed_ids,
-                )
-            except Exception as exc:
-                print(
-                    f"[smart-dispatch] DM result persist failed "
-                    f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
-                    flush=True,
-                )
-
-            if dm_failed_ids:
-                print(
-                    f"[smart-dispatch] specified DM unavailable "
-                    f"order_id={int(web_order.id)} "
-                    f"failed={','.join(dm_failed_ids)}",
-                    flush=True,
-                )
-        except Exception as exc:
-            print(
-                f"[smart-dispatch] specified DM failed "
-                f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
-                flush=True,
-            )
-
     try:
         from shared.db import engine as _rule_snapshot_engine
         from sqlalchemy import text as _rule_snapshot_sql_text
@@ -1013,6 +973,46 @@ async def create_waiting_acceptance_order_from_self_service(
         )
     except (discord.Forbidden, discord.HTTPException) as exc:
         print(f"[smart-dispatch] initial alert failed: {exc}", flush=True)
+
+    if specified_staff_ids:
+        try:
+            dm_sent_ids, dm_failed_ids = await send_specified_staff_dispatch_dms(
+                guild,
+                specified_staff_ids=specified_staff_ids,
+                category_label=category_label,
+                item_label=rule.label,
+                required_staff_count=required_staff_count,
+                dispatch_jump_url=dispatch_message.jump_url,
+                allowed_role_ids=allowed_role_ids_for_rule,
+                required_game_role_ids=required_game_role_ids_for_rule,
+            )
+
+            try:
+                set_specified_dm_results(
+                    int(web_order.id),
+                    sent_ids=dm_sent_ids,
+                    failed_ids=dm_failed_ids,
+                )
+            except Exception as exc:
+                print(
+                    f"[smart-dispatch] DM result persist failed "
+                    f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+            if dm_failed_ids:
+                print(
+                    f"[smart-dispatch] specified DM unavailable "
+                    f"order_id={int(web_order.id)} "
+                    f"failed={','.join(dm_failed_ids)}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"[smart-dispatch] specified DM failed "
+                f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
     try:
         await send_order_log(
