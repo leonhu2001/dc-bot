@@ -1,0 +1,47 @@
+name: Guard self-service submit failure phase
+
+on:
+  push:
+    branches:
+      - refactor/self-service-dispatch-runtime-20261015
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/self-service-dispatch-runtime-20261015
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply phase-aware submit error handling
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('services/self_service_runtime.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        except ValueError as exc:\n            await interaction.followup.send(str(exc), ephemeral=True)\n            return\n        except Exception as exc:\n            failed_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})\n            cleanup_warnings = await cleanup_failed_self_service_dispatch(\n                interaction,\n                channel_id=self.channel_id,\n                data=failed_data,\n                order_claims=ORDER_CLAIMS,\n                default_dispatch_channel_id=DISPATCH_CHANNEL_ID,\n                remember_order=remember_order_data,\n                save_data=save_bot_data,\n                delete_claim_row=delete_claim_row_from_db,\n            )\n            print(\n                f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 "\n                f"channel_id={self.channel_id}: {type(exc).__name__}: {exc}",\n                flush=True,\n            )\n            warning_text = ""\n            if cleanup_warnings:\n                warning_text = "\\n⚠️ " + "；".join(cleanup_warnings)\n            await interaction.followup.send(\n                "送出等待接單失敗；本次派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"\n                + warning_text,\n                ephemeral=True,\n            )\n            return\n'''
+          new = '''        except ValueError as exc:\n            failed_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})\n            provisional_started = _to_int(\n                failed_data.get("provisional_dispatch_message_id"),\n                None,\n            ) is not None\n            if not provisional_started:\n                await interaction.followup.send(str(exc), ephemeral=True)\n                return\n\n            cleanup_warnings = await cleanup_failed_self_service_dispatch(\n                interaction,\n                channel_id=self.channel_id,\n                data=failed_data,\n                order_claims=ORDER_CLAIMS,\n                default_dispatch_channel_id=DISPATCH_CHANNEL_ID,\n                remember_order=remember_order_data,\n                save_data=save_bot_data,\n                delete_claim_row=delete_claim_row_from_db,\n            )\n            warning_text = ""\n            if cleanup_warnings:\n                warning_text = "\\n⚠️ " + "；".join(cleanup_warnings)\n            await interaction.followup.send(\n                f"{exc}\\n\\n本次 provisional 派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"\n                + warning_text,\n                ephemeral=True,\n            )\n            return\n        except Exception as exc:\n            failed_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})\n            provisional_started = _to_int(\n                failed_data.get("provisional_dispatch_message_id"),\n                None,\n            ) is not None\n            canonical_ready = (\n                _to_int(failed_data.get("dispatch_message_id"), None) is not None\n                and _to_int(failed_data.get("web_order_id"), None) is not None\n                and str(failed_data.get("status") or "").strip().lower()\n                == "waiting_acceptance"\n            )\n            print(\n                f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 "\n                f"channel_id={self.channel_id}: {type(exc).__name__}: {exc}",\n                flush=True,\n            )\n\n            if provisional_started:\n                cleanup_warnings = await cleanup_failed_self_service_dispatch(\n                    interaction,\n                    channel_id=self.channel_id,\n                    data=failed_data,\n                    order_claims=ORDER_CLAIMS,\n                    default_dispatch_channel_id=DISPATCH_CHANNEL_ID,\n                    remember_order=remember_order_data,\n                    save_data=save_bot_data,\n                    delete_claim_row=delete_claim_row_from_db,\n                )\n                warning_text = ""\n                if cleanup_warnings:\n                    warning_text = "\\n⚠️ " + "；".join(cleanup_warnings)\n                await interaction.followup.send(\n                    "送出等待接單失敗；本次 provisional 派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"\n                    + warning_text,\n                    ephemeral=True,\n                )\n                return\n\n            if canonical_ready:\n                await interaction.followup.send(\n                    "訂單的 WebOrder／接單狀態已建立完成，但送單後續處理發生異常。"\n                    "為避免重複派單，請先不要重新送出，通知客服主管確認此張單。",\n                    ephemeral=True,\n                )\n                return\n\n            await interaction.followup.send(\n                "送出等待接單失敗；尚未建立可接單的派單，原本填好的草稿仍保留，請修正後再試或通知客服主管。",\n                ephemeral=True,\n            )\n            return\n'''
+          if old not in s:
+              raise SystemExit('submit exception block anchor not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit phase-aware handling
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py
+          if git diff --cached --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+          git commit -m "Guard self-service rollback by submit phase"
+          git push origin HEAD:refactor/self-service-dispatch-runtime-20261015
