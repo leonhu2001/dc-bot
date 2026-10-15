@@ -8,41 +8,46 @@ from typing import Any, Mapping
 
 import discord
 
+from services.logging_service import send_order_log
+from services.order_dispatch_runtime import DispatchClaimView
+from services.order_flow import build_payment_method_embed
+from services.orders import (
+    ORDER_CATEGORY_LABELS,
+    _to_int,
+    build_self_service_order_embed,
+)
+from services.self_service_financials import (
+    _format_plain_amount,
+    _price_int,
+    _price_snapshot,
+    add_self_service_financial_breakdown_fields,
+)
+
 
 _CONFIGURED = False
-
-_MODULE_OWNED_RUNTIME_NAMES = frozenset(
-    {
-        "Any",
-        "Mapping",
-        "Path",
-        "asyncio",
-        "discord",
-        "get_taipei_now_iso",
-        "remember_claim_data",
-        "remember_order_data",
-        "save_bot_data",
-        "utc_now_naive",
-    }
+_DEPENDENCY_NAMES = (
+    "DISPATCH_CHANNEL_ID",
+    "GUILD_ID",
+    "ORDER_CLAIMS",
+    "PaymentMethodView",
+    "SELF_SERVICE_ORDER_SELECTIONS",
+    "_refresh_existing_web_sync_dispatch",
+    "bot",
 )
 
 
 def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind bot-owned runtime dependencies without importing bot.py.
-
-    This adapter keeps the extracted acceptance runtime import-safe while the
-    remaining legacy bot globals are split in later refactors.
-    """
+    """Bind only the bot-owned acceptance adapters that have no stable owner yet."""
     global _CONFIGURED
 
-    for name, value in namespace.items():
-        if name.startswith("__"):
-            continue
-        if name == "configure_acceptance_runtime":
-            continue
-        if name in _MODULE_OWNED_RUNTIME_NAMES:
-            continue
-        globals()[name] = value
+    missing = [name for name in _DEPENDENCY_NAMES if name not in namespace]
+    if missing:
+        raise RuntimeError(
+            "acceptance runtime missing dependencies: " + ", ".join(missing)
+        )
+
+    for name in _DEPENDENCY_NAMES:
+        globals()[name] = namespace[name]
 
     _CONFIGURED = True
 
@@ -469,7 +474,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
     data["quantity"] = quantity
     data["amount"] = amount
     data["total_amount"] = amount
-    data["amount_text"] = _format_plain_amount(amount) if "_format_plain_amount" in globals() else str(amount)
+    data["amount_text"] = _format_plain_amount(amount)
 
     for key, value in web_price_data.items():
         if value is not None:
