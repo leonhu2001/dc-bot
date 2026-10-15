@@ -1,0 +1,35 @@
+name: Apply self-service dispatch integrity patch
+
+on:
+  push:
+    branches:
+      - refactor/self-service-dispatch-runtime-20261015
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/self-service-dispatch-runtime-20261015
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply source patch
+        run: python scripts/_apply_self_service_dispatch_integrity.py
+      - name: Commit generated source change
+        shell: bash
+        run: |
+          if git diff --quiet -- services/self_service_runtime.py; then
+            echo "No source changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py
+          git commit -m "Harden self-service dispatch creation ordering"
+          git push origin HEAD:refactor/self-service-dispatch-runtime-20261015
