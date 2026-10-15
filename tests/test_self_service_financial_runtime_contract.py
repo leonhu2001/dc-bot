@@ -56,12 +56,11 @@ def test_financial_config_no_longer_injects_its_own_staff_price_helpers():
     assert "is_self_service_staff_price_required = staff_price_required" not in source
 
 
-
 def test_vip_monthly_cash_coupon_is_wired_as_store_absorbed_self_service_discount():
     selection = (ROOT / "services" / "self_service_selection_runtime.py").read_text(encoding="utf-8")
     financial = (ROOT / "services" / "self_service_financials.py").read_text(encoding="utf-8")
     discount_domain = (ROOT / "services" / "vip_monthly_order_discount.py").read_text(encoding="utf-8")
-    runtime = (ROOT / "services" / "self_service_runtime.py").read_text(encoding="utf-8")
+    dispatch_runtime = (ROOT / "services" / "self_service_dispatch_runtime.py").read_text(encoding="utf-8")
     lifecycle = (ROOT / "shared" / "web_order_sync.py").read_text(encoding="utf-8")
 
     assert 'list_available_cash_benefits(customer_id)' in selection
@@ -70,7 +69,8 @@ def test_vip_monthly_cash_coupon_is_wired_as_store_absorbed_self_service_discoun
     assert 'resolve_vip_monthly_cash_discount' in financial
     assert 'additional_store_discount_amount=point_cash + vip_monthly_cash' in financial
     assert 'vip_monthly_cash_amount' in discount_domain
-    assert 'reserve_cash_benefit_for_channel' in runtime
+    assert 'reserve_cash_benefit_for_channel' in dispatch_runtime
+    assert dispatch_runtime.index('upsert_web_order_from_dispatch(') < dispatch_runtime.index('reserve_cash_benefit_for_channel(')
     assert '_sync_vip_monthly_cash_benefit_lifecycle' in lifecycle
     assert 'redeem_cash_benefits_for_channel' in lifecycle
     assert 'release_cash_benefits_for_channel' in lifecycle

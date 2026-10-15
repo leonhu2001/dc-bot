@@ -20,6 +20,11 @@ class _FakeMessage:
     def __init__(self, message_id: int, channel_id: int):
         self.id = int(message_id)
         self.jump_url = f"https://discord.com/channels/123/{channel_id}/{message_id}"
+        self.edits = []
+
+    async def edit(self, **kwargs):
+        self.edits.append(kwargs)
+        return self
 
 
 class _FakeTextChannel:
@@ -27,10 +32,12 @@ class _FakeTextChannel:
         self.id = int(channel_id)
         self.mention = f"<#{channel_id}>"
         self.sent = []
+        self.last_message = None
 
     async def send(self, **kwargs):
         self.sent.append(kwargs)
-        return _FakeMessage(7001, self.id)
+        self.last_message = _FakeMessage(7001, self.id)
+        return self.last_message
 
 
 class _FakeGuild:
@@ -239,6 +246,10 @@ def test_discord_self_service_submit_reaches_waiting_acceptance_and_is_idempoten
 
     assert first == "已送出等待接單：https://discord.com/channels/123/6002/7001"
     assert len(dispatch_channel.sent) == 1
+    assert dispatch_channel.sent[0]["view"] is None
+    assert dispatch_channel.last_message is not None
+    assert len(dispatch_channel.last_message.edits) == 1
+    assert dispatch_channel.last_message.edits[0]["view"] is not None
     assert len(web_upserts) == 1
     assert web_upserts[0]["status"] == WAITING_ACCEPTANCE
     assert len(acceptance_writes) == 1
