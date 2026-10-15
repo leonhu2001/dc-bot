@@ -13,6 +13,7 @@ from core.database import (
 )
 from core.permissions import is_customer_staff
 from core.time_utils import get_taipei_now_iso
+from services.acceptance.runtime import _member_display_name
 from services.orders import (
     ORDER_CATEGORY_LABELS,
     _to_int,
@@ -98,6 +99,7 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "save_bot_data",
         "is_customer_staff",
         "get_taipei_now_iso",
+        "_member_display_name",
         "create_smart_dispatch_plan",
         "set_specified_dm_results",
         "SelfServiceDispatchedView",
