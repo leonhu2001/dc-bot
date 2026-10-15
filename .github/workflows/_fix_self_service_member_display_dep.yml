@@ -1,0 +1,58 @@
+name: Fix self-service member display dependency
+
+on:
+  push:
+    branches:
+      - refactor/self-service-dispatch-runtime-20261015
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/self-service-dispatch-runtime-20261015
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Bind member display helper to its owning module
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('services/self_service_runtime.py')
+          s = p.read_text(encoding='utf-8')
+
+          import_anchor = '''from core.time_utils import get_taipei_now_iso\n'''
+          import_line = '''from services.acceptance.runtime import _member_display_name\n'''
+          if import_line not in s:
+              if import_anchor not in s:
+                  raise SystemExit('time_utils import anchor missing')
+              s = s.replace(import_anchor, import_anchor + import_line, 1)
+
+          allow_anchor = '        "get_taipei_now_iso",\n'
+          allow_line = '        "_member_display_name",\n'
+          if allow_line not in s:
+              if allow_anchor not in s:
+                  raise SystemExit('module-owned allowlist anchor missing')
+              s = s.replace(allow_anchor, allow_anchor + allow_line, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+          python -m py_compile services/self_service_runtime.py services/self_service_dispatch_runtime.py
+      - name: Commit dependency fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py
+          if git diff --cached --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+          git commit -m "Bind self-service member display dependency explicitly"
+          git push origin HEAD:refactor/self-service-dispatch-runtime-20261015
