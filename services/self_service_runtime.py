@@ -1417,10 +1417,15 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
                 channel_id=self.channel_id,
             )
         except ValueError as exc:
-            await interaction.followup.send(str(exc), ephemeral=True)
-            return
-        except Exception as exc:
             failed_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+            provisional_started = _to_int(
+                failed_data.get("provisional_dispatch_message_id"),
+                None,
+            ) is not None
+            if not provisional_started:
+                await interaction.followup.send(str(exc), ephemeral=True)
+                return
+
             cleanup_warnings = await cleanup_failed_self_service_dispatch(
                 interaction,
                 channel_id=self.channel_id,
@@ -1431,17 +1436,64 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
                 save_data=save_bot_data,
                 delete_claim_row=delete_claim_row_from_db,
             )
+            warning_text = ""
+            if cleanup_warnings:
+                warning_text = "\n⚠️ " + "；".join(cleanup_warnings)
+            await interaction.followup.send(
+                f"{exc}\n\n本次 provisional 派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"
+                + warning_text,
+                ephemeral=True,
+            )
+            return
+        except Exception as exc:
+            failed_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+            provisional_started = _to_int(
+                failed_data.get("provisional_dispatch_message_id"),
+                None,
+            ) is not None
+            canonical_ready = (
+                _to_int(failed_data.get("dispatch_message_id"), None) is not None
+                and _to_int(failed_data.get("web_order_id"), None) is not None
+                and str(failed_data.get("status") or "").strip().lower()
+                == "waiting_acceptance"
+            )
             print(
                 f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 "
                 f"channel_id={self.channel_id}: {type(exc).__name__}: {exc}",
                 flush=True,
             )
-            warning_text = ""
-            if cleanup_warnings:
-                warning_text = "\n⚠️ " + "；".join(cleanup_warnings)
+
+            if provisional_started:
+                cleanup_warnings = await cleanup_failed_self_service_dispatch(
+                    interaction,
+                    channel_id=self.channel_id,
+                    data=failed_data,
+                    order_claims=ORDER_CLAIMS,
+                    default_dispatch_channel_id=DISPATCH_CHANNEL_ID,
+                    remember_order=remember_order_data,
+                    save_data=save_bot_data,
+                    delete_claim_row=delete_claim_row_from_db,
+                )
+                warning_text = ""
+                if cleanup_warnings:
+                    warning_text = "\n⚠️ " + "；".join(cleanup_warnings)
+                await interaction.followup.send(
+                    "送出等待接單失敗；本次 provisional 派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"
+                    + warning_text,
+                    ephemeral=True,
+                )
+                return
+
+            if canonical_ready:
+                await interaction.followup.send(
+                    "訂單的 WebOrder／接單狀態已建立完成，但送單後續處理發生異常。"
+                    "為避免重複派單，請先不要重新送出，通知客服主管確認此張單。",
+                    ephemeral=True,
+                )
+                return
+
             await interaction.followup.send(
-                "送出等待接單失敗；本次派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"
-                + warning_text,
+                "送出等待接單失敗；尚未建立可接單的派單，原本填好的草稿仍保留，請修正後再試或通知客服主管。",
                 ephemeral=True,
             )
             return
