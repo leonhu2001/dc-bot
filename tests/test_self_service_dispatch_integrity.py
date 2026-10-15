@@ -3,6 +3,7 @@ import inspect
 from types import SimpleNamespace
 
 from services.self_service_dispatch_cleanup import cleanup_failed_self_service_dispatch
+from services.self_service_dispatch_runtime import create_waiting_acceptance_order
 from services.self_service_runtime import (
     SelfServiceSubmitNoteModal,
     create_waiting_acceptance_order_from_self_service,
@@ -11,7 +12,7 @@ from shared import web_order_sync
 
 
 def test_self_service_dispatch_is_inert_until_canonical_order_is_ready():
-    source = inspect.getsource(create_waiting_acceptance_order_from_self_service)
+    source = inspect.getsource(create_waiting_acceptance_order)
 
     send = source.index("dispatch_message = await dispatch_channel.send(")
     provisional = source.index("view=None", send)
@@ -28,7 +29,7 @@ def test_self_service_dispatch_is_inert_until_canonical_order_is_ready():
 
 
 def test_self_service_dispatch_persists_provisional_message_for_crash_cleanup():
-    source = inspect.getsource(create_waiting_acceptance_order_from_self_service)
+    source = inspect.getsource(create_waiting_acceptance_order)
 
     assert 'data["provisional_dispatch_message_id"] = dispatch_message.id' in source
     assert 'data["provisional_dispatch_channel_id"] = dispatch_channel.id' in source
@@ -36,11 +37,22 @@ def test_self_service_dispatch_persists_provisional_message_for_crash_cleanup():
     assert 'data.pop("provisional_dispatch_channel_id", None)' in source
 
 
-def test_submit_note_failure_rolls_back_dispatch_without_dropping_draft():
+def test_legacy_self_service_entrypoint_is_only_a_dependency_adapter():
+    source = inspect.getsource(create_waiting_acceptance_order_from_self_service)
+
+    assert "create_self_service_waiting_acceptance_order(" in source
+    assert "SelfServiceDispatchDeps(" in source
+    assert "upsert_web_order_from_dispatch(" not in source
+
+
+def test_submit_note_failure_is_phase_aware_and_preserves_draft():
     source = inspect.getsource(SelfServiceSubmitNoteModal.on_submit)
 
+    assert "provisional_started" in source
+    assert "canonical_ready" in source
     assert "cleanup_failed_self_service_dispatch(" in source
     assert "原本填好的草稿仍保留" in source
+    assert "為避免重複派單" in source
 
 
 def test_failed_dispatch_cleanup_removes_canonical_side_effects_and_runtime_links():
@@ -86,7 +98,7 @@ def test_cleanup_before_provisional_dispatch_does_not_delete_web_order(monkeypat
 
 
 def test_non_transactional_dispatch_logs_do_not_roll_back_ready_order():
-    source = inspect.getsource(create_waiting_acceptance_order_from_self_service)
+    source = inspect.getsource(create_waiting_acceptance_order)
 
     unlock = source.index("await dispatch_message.edit(")
     order_log = source.index("await send_order_log(", unlock)
