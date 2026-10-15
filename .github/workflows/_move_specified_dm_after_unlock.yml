@@ -1,0 +1,69 @@
+name: Move specified DM after dispatch unlock
+
+on:
+  push:
+    branches:
+      - refactor/self-service-dispatch-runtime-20261015
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/self-service-dispatch-runtime-20261015
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Move specified staff notification after unlock
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('services/self_service_runtime.py')
+          s = p.read_text(encoding='utf-8')
+          block_start = '    if specified_staff_ids:\n        try:\n            dm_sent_ids, dm_failed_ids = await send_specified_staff_dispatch_dms(\n'
+          start = s.find(block_start)
+          if start < 0:
+              raise SystemExit('specified DM block start not found')
+          next_marker = '    try:\n        from shared.db import engine as _rule_snapshot_engine\n'
+          end = s.find(next_marker, start)
+          if end < 0:
+              raise SystemExit('specified DM block end not found')
+          dm_block = s[start:end]
+          s = s[:start] + s[end:]
+
+          alert_marker = '''    try:\n        await send_initial_smart_dispatch_alert(\n            guild,\n            content=smart_dispatch["content"],\n            dispatch_jump_url=dispatch_message.jump_url,\n        )\n    except (discord.Forbidden, discord.HTTPException) as exc:\n        print(f"[smart-dispatch] initial alert failed: {exc}", flush=True)\n\n'''
+          pos = s.find(alert_marker)
+          if pos < 0:
+              raise SystemExit('post-unlock alert marker not found')
+          insert_at = pos + len(alert_marker)
+          s = s[:insert_at] + dm_block + s[insert_at:]
+
+          create_start = s.index('async def create_waiting_acceptance_order_from_self_service(')
+          create_end = s.index('async def retract_waiting_acceptance_order_from_self_service(', create_start)
+          create = s[create_start:create_end]
+          unlock = create.index('await dispatch_message.edit(')
+          specified_dm = create.index('await send_specified_staff_dispatch_dms(')
+          initial_alert = create.index('await send_initial_smart_dispatch_alert(')
+          if not (unlock < initial_alert < specified_dm):
+              raise SystemExit('notification ordering invariant failed')
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit notification ordering
+        shell: bash
+        run: |
+          if git diff --quiet -- services/self_service_runtime.py; then
+            echo "No changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py
+          git commit -m "Delay specified staff DM until dispatch unlock"
+          git push origin HEAD:refactor/self-service-dispatch-runtime-20261015
