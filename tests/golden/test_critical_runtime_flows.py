@@ -20,6 +20,11 @@ class _FakeMessage:
     def __init__(self, message_id: int, channel_id: int):
         self.id = int(message_id)
         self.jump_url = f"https://discord.com/channels/123/{channel_id}/{message_id}"
+        self.edits = []
+
+    async def edit(self, **kwargs):
+        self.edits.append(kwargs)
+        return self
 
 
 class _FakeTextChannel:
