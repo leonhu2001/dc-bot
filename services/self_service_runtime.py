@@ -23,6 +23,7 @@ from services.self_service_retract import (
     SelfServiceDispatchedView,
     retract_self_service_dispatch,
 )
+from services.self_service_dispatch_cleanup import cleanup_failed_self_service_dispatch
 
 from services.self_service_financials import (
     configure_self_service_financials,
@@ -97,6 +98,7 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "set_specified_dm_results",
         "SelfServiceDispatchedView",
         "retract_self_service_dispatch",
+        "cleanup_failed_self_service_dispatch",
     }
 )
 
@@ -675,17 +677,7 @@ async def create_waiting_acceptance_order_from_self_service(
     dispatch_message = await dispatch_channel.send(
         content=None,
         embed=embed,
-        view=DispatchClaimView(
-            customer_id=customer_id,
-            category_label=category_label,
-            item=rule.label,
-            quantity=quantity,
-            payment_method="待付款",
-            source_channel_id=interaction.channel.id,
-            companion_preference=companion_preference,
-            locked=False,
-            status=WAITING_ACCEPTANCE,
-        ),
+        view=None,
         allowed_mentions=discord.AllowedMentions(
             users=True,
             roles=True,
@@ -693,14 +685,9 @@ async def create_waiting_acceptance_order_from_self_service(
         ),
     )
 
-    try:
-        await send_initial_smart_dispatch_alert(
-            guild,
-            content=smart_dispatch["content"],
-            dispatch_jump_url=dispatch_message.jump_url,
-        )
-    except (discord.Forbidden, discord.HTTPException) as exc:
-        print(f"[smart-dispatch] initial alert failed: {exc}", flush=True)
+    data["provisional_dispatch_message_id"] = dispatch_message.id
+    data["provisional_dispatch_channel_id"] = dispatch_channel.id
+    remember_order_data(interaction.channel.id, data)
 
     web_note_parts = []
 
@@ -991,28 +978,78 @@ async def create_waiting_acceptance_order_from_self_service(
     remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
     save_bot_data()
 
-    await send_order_log(
-        guild,
-        title="新自助下單｜等待接單",
-        fields=[
-            ("顧客", f"<@{customer_id}>", True),
-            ("訂單類別", category_label, True),
-            ("訂單項目", rule.label, True),
-            ("數量", f"{quantity} {get_self_service_quantity_unit(rule.label)}", True),
-            ("訂單總價", _format_plain_amount(amount), True),
-            ("接單需求", f"{required_staff_count} 位", True),
-            ("票口", interaction.channel.mention, False),
-            ("派單訊息", dispatch_message.jump_url, False),
-        ],
-        color=discord.Color.blue(),
-    )
+    try:
+        await dispatch_message.edit(
+            view=DispatchClaimView(
+                customer_id=customer_id,
+                category_label=category_label,
+                item=rule.label,
+                quantity=quantity,
+                payment_method="待付款",
+                source_channel_id=interaction.channel.id,
+                companion_preference=companion_preference,
+                locked=False,
+                status=WAITING_ACCEPTANCE,
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=True,
+                everyone=False,
+            ),
+        )
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        raise RuntimeError("派單訊息建立完成，但接單 Panel 啟用失敗。") from exc
 
-    await log_self_service_proxy_action(
-        interaction,
-        customer_id,
-        "送出等待接單",
-        f"{category_label}｜{rule.label}｜{quantity} {get_self_service_quantity_unit(rule.label)}｜{_format_plain_amount(amount)}",
-    )
+    data.pop("provisional_dispatch_message_id", None)
+    data.pop("provisional_dispatch_channel_id", None)
+    remember_order_data(interaction.channel.id, data)
+    save_bot_data()
+
+    try:
+        await send_initial_smart_dispatch_alert(
+            guild,
+            content=smart_dispatch["content"],
+            dispatch_jump_url=dispatch_message.jump_url,
+        )
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        print(f"[smart-dispatch] initial alert failed: {exc}", flush=True)
+
+    try:
+        await send_order_log(
+            guild,
+            title="新自助下單｜等待接單",
+            fields=[
+                ("顧客", f"<@{customer_id}>", True),
+                ("訂單類別", category_label, True),
+                ("訂單項目", rule.label, True),
+                ("數量", f"{quantity} {get_self_service_quantity_unit(rule.label)}", True),
+                ("訂單總價", _format_plain_amount(amount), True),
+                ("接單需求", f"{required_staff_count} 位", True),
+                ("票口", interaction.channel.mention, False),
+                ("派單訊息", dispatch_message.jump_url, False),
+            ],
+            color=discord.Color.blue(),
+        )
+    except Exception as exc:
+        print(
+            f"[self-service-dispatch] order log failed channel_id={channel_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+    try:
+        await log_self_service_proxy_action(
+            interaction,
+            customer_id,
+            "送出等待接單",
+            f"{category_label}｜{rule.label}｜{quantity} {get_self_service_quantity_unit(rule.label)}｜{_format_plain_amount(amount)}",
+        )
+    except Exception as exc:
+        print(
+            f"[self-service-dispatch] proxy log failed channel_id={channel_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
     return f"已送出等待接單：{dispatch_message.jump_url}"
 
@@ -1383,12 +1420,30 @@ class SelfServiceSubmitNoteModal(discord.ui.Modal, title="送單前訂單備註"
             await interaction.followup.send(str(exc), ephemeral=True)
             return
         except Exception as exc:
+            failed_data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+            cleanup_warnings = await cleanup_failed_self_service_dispatch(
+                interaction,
+                channel_id=self.channel_id,
+                data=failed_data,
+                order_claims=ORDER_CLAIMS,
+                default_dispatch_channel_id=DISPATCH_CHANNEL_ID,
+                remember_order=remember_order_data,
+                save_data=save_bot_data,
+                delete_claim_row=delete_claim_row_from_db,
+            )
             print(
                 f"[acceptance] 備註後建立 waiting_acceptance 自助單失敗 "
                 f"channel_id={self.channel_id}: {type(exc).__name__}: {exc}",
                 flush=True,
             )
-            await interaction.followup.send("送出等待接單失敗，請通知客服確認後台紀錄。", ephemeral=True)
+            warning_text = ""
+            if cleanup_warnings:
+                warning_text = "\n⚠️ " + "；".join(cleanup_warnings)
+            await interaction.followup.send(
+                "送出等待接單失敗；本次派單已回滾，原本填好的草稿仍保留，可以修正後重新送出。"
+                + warning_text,
+                ephemeral=True,
+            )
             return
 
         if isinstance(interaction.channel, discord.TextChannel) and self.panel_message_id:
