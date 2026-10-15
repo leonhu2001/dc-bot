@@ -20,6 +20,11 @@ from services.orders import (
     build_self_service_order_embed,
 )
 from services.smart_dispatch import create_smart_dispatch_plan, set_specified_dm_results
+from views.smart_dispatch import (
+    prepare_initial_smart_dispatch,
+    send_initial_smart_dispatch_alert,
+    send_specified_staff_dispatch_dms,
+)
 from services.self_service_retract import (
     SelfServiceDispatchedView,
     retract_self_service_dispatch,
@@ -102,6 +107,9 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "_member_display_name",
         "create_smart_dispatch_plan",
         "set_specified_dm_results",
+        "prepare_initial_smart_dispatch",
+        "send_initial_smart_dispatch_alert",
+        "send_specified_staff_dispatch_dms",
         "SelfServiceDispatchedView",
         "retract_self_service_dispatch",
         "cleanup_failed_self_service_dispatch",
