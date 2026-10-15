@@ -5,6 +5,13 @@ PATH = Path("services/self_service_runtime.py")
 text = PATH.read_text(encoding="utf-8")
 original = text
 
+if (
+    'data["provisional_dispatch_message_id"] = dispatch_message.id' in text
+    and "cleanup_failed_self_service_dispatch(" in text
+):
+    print("self_service_runtime.py already patched")
+    raise SystemExit(0)
+
 
 def replace_once(old: str, new: str) -> None:
     global text
