@@ -40,8 +40,10 @@ async def cleanup_failed_self_service_dispatch(
 ) -> list[str]:
     """Roll back a failed pre-claim self-service dispatch while preserving its draft.
 
-    The order has not been allowed to accept claims yet when this helper is used.
-    Deleting the canonical WebOrder also releases reserved coupon/VIP benefits.
+    A website order is deleted only when this submit attempt has a dispatch
+    message id. That id is persisted immediately after the provisional Discord
+    message is created, so failures before dispatch creation cannot accidentally
+    delete an unrelated/pre-existing WebOrder for the ticket.
     """
     warnings: list[str] = []
     guild = interaction.guild
@@ -64,24 +66,26 @@ async def cleanup_failed_self_service_dispatch(
         or int(default_dispatch_channel_id)
     )
 
-    # Remove the canonical website record first. This helper releases any
-    # reserved member coupon / VIP monthly cash benefit associated with it.
-    try:
-        from shared.web_order_sync import delete_web_order_by_ticket_channel
-
-        delete_web_order_by_ticket_channel(
-            ticket_channel_id=channel_id,
-            dispatch_message_id=dispatch_message_id,
-        )
-    except Exception as exc:
-        warnings.append(f"網站訂單回滾失敗：{type(exc).__name__}")
-        print(
-            f"[self-service-dispatch] failed web rollback channel_id={channel_id}: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-
+    # The provisional dispatch id is our proof that this submit attempt crossed
+    # the point where it could have created/upserted its canonical WebOrder.
+    # delete_web_order_by_ticket_channel also releases reserved member/VIP
+    # benefits and is idempotent for retries.
     if dispatch_message_id is not None:
+        try:
+            from shared.web_order_sync import delete_web_order_by_ticket_channel
+
+            delete_web_order_by_ticket_channel(
+                ticket_channel_id=channel_id,
+                dispatch_message_id=dispatch_message_id,
+            )
+        except Exception as exc:
+            warnings.append(f"網站訂單回滾失敗：{type(exc).__name__}")
+            print(
+                f"[self-service-dispatch] failed web rollback channel_id={channel_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
         order_claims.pop(dispatch_message_id, None)
         try:
             delete_claim_row(
