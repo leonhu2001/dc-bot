@@ -80,10 +80,7 @@ def test_explicit_acceptance_runtime_binds_only_declared_dependencies(monkeypatc
         repair_deps.sync_ticket_access_from_state
         is runtime.sync_acceptance_ticket_access_from_state
     )
-    assert (
-        repair_deps.acceptance_staff_display_text
-        is runtime._acceptance_staff_display_text
-    )
+    assert not hasattr(repair_deps, "acceptance_staff_display_text")
 
 
 def test_namespace_adapter_rejects_unknown_injection_and_delegates(monkeypatch):
