@@ -290,7 +290,8 @@ def mark_order_created_processing(
             """
             UPDATE sync_events
             SET status = 'processing',
-                error_message = NULL
+                error_message = NULL,
+                processed_at = datetime('now')
             WHERE id = ?
               AND event_type = 'order_created'
               AND status IN (
@@ -307,12 +308,26 @@ def mark_order_created_processing(
 def fetch_order_created_retry_events(
     *,
     limit: int = 10,
+    stale_processing_minutes: int = DEFAULT_STALE_PROCESSING_MINUTES,
     db_file: str | Path | None = None,
 ) -> list[dict[str, Any]]:
-    safe_limit = max(1, min(int(limit or 10), 100))
+    """Atomically claim failed or abandoned order_created events for retry.
 
-    with sqlite3.connect(_db_path(db_file), timeout=15) as conn:
+    Failed rows may retry immediately. A row already marked processing is only
+    recoverable after the same stale-processing lease used by the generic sync
+    queue. This prevents a second Bot instance from re-processing an actively
+    owned order_created event while still recovering work abandoned by a crash.
+    """
+
+    path = _db_path(db_file)
+    safe_limit = max(1, min(int(limit or 10), 100))
+    stale_minutes = max(1, int(stale_processing_minutes or 10))
+    stale_modifier = f"-{stale_minutes} minutes"
+
+    with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+
         rows = conn.execute(
             """
             SELECT
@@ -334,18 +349,51 @@ def fetch_order_created_retry_events(
             JOIN web_orders w
               ON w.id = e.order_id
             WHERE e.event_type = 'order_created'
-              AND e.status IN (
-                  'failed',
-                  'processing'
+              AND COALESCE(e.retry_count, 0) < 20
+              AND (
+                  e.status = 'failed'
+                  OR (
+                      e.status = 'processing'
+                      AND (
+                          e.processed_at IS NULL
+                          OR e.processed_at <= datetime('now', ?)
+                      )
+                  )
               )
-              AND COALESCE(
-                  e.retry_count,
-                  0
-              ) < 20
             ORDER BY e.id ASC
             LIMIT ?
             """,
-            (safe_limit,),
+            (stale_modifier, safe_limit),
         ).fetchall()
 
+        event_ids = [int(row["event_id"]) for row in rows]
+        if event_ids:
+            placeholders = ",".join("?" for _ in event_ids)
+            cursor = conn.execute(
+                f"""
+                UPDATE sync_events
+                SET status = 'processing',
+                    error_message = NULL,
+                    processed_at = datetime('now')
+                WHERE event_type = 'order_created'
+                  AND COALESCE(retry_count, 0) < 20
+                  AND id IN ({placeholders})
+                  AND (
+                      status = 'failed'
+                      OR (
+                          status = 'processing'
+                          AND (
+                              processed_at IS NULL
+                              OR processed_at <= datetime('now', ?)
+                          )
+                      )
+                  )
+                """,
+                (*event_ids, stale_modifier),
+            )
+            if cursor.rowcount != len(event_ids):
+                conn.rollback()
+                return []
+
+        conn.commit()
         return [dict(row) for row in rows]
