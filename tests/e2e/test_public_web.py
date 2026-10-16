@@ -67,9 +67,10 @@ def test_order_dialog_populates_rule_and_local_quote(page: Page) -> None:
     variant = page.locator("#mw-variant")
     expect(variant).to_be_visible()
     assert variant.locator("option").count() >= 1
+    assert variant.locator("option").first.get_attribute("data-rule-key")
 
     expect(page.locator("#mw-dialog-title")).not_to_have_text("")
-    expect(page.locator("#mw-rule-key")).not_to_have_text("—")
+    expect(page.locator("#mw-rule-key")).to_have_count(0)
     expect(page.locator("#mw-total")).to_have_text(PRICE_TEXT_RE)
     expect(page.locator("#mw-total-detail")).not_to_have_text("選擇方案後即時計算")
 
