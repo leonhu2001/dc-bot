@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block page_title %}報單審核詳情{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/order_reports.css?v=4">
+<link rel="stylesheet" href="/static/css/order_reports.css?v=5">
 <section class="report-shell report-detail-shell report-review-shell">
   <div class="report-review-topbar">
     <div class="report-review-title-row">
@@ -41,7 +41,6 @@
         <div class="report-section report-service-record report-review-service-panel">
           <div class="report-section-head report-review-section-head">
             <div><p class="report-kicker">SERVICE RECORD</p><h3>接單紀錄</h3></div>
-            <span class="report-muted">掛名審核後寫回薪資；直播狀態按人保存</span>
           </div>
 
           <div class="report-worker-service-list report-review-worker-list">
@@ -87,7 +86,7 @@
                 <label><input type="radio" name="recording_saved" value="0" required {% if detail.recording_saved == 0 %}checked{% endif %}> 未保留</label>
                 <label><input type="radio" name="recording_saved" value="1" required {% if detail.recording_saved == 1 %}checked{% endif %}> 有保留</label>
               </div>
-              <label class="report-field"><span>錄影保留者</span><input name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}" placeholder="例如：玉米"></label>
+              <label class="report-field"><span>錄影保留者</span><input name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}"></label>
             </div>
           </div>
         </div>
