@@ -142,7 +142,14 @@
             const current = clean(element.textContent);
             const next = sanitizeDescriptionText(current);
             if (!next) {
-                element.remove();
+                // The dialog description is part of the interactive order form and
+                // is populated again whenever a product/variant is opened. Keep the
+                // node alive so the canonical order UI can update it later.
+                if (element.id === "mw-dialog-description") {
+                    element.textContent = "";
+                } else {
+                    element.remove();
+                }
                 return;
             }
             if (next !== current) {
