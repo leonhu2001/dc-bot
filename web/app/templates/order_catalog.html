@@ -121,9 +121,11 @@
                     </h2>
 
 
-                    <p>
-                        {{ group.description }}
-                    </p>
+                    {% if group.description %}
+                        <p>
+                            {{ group.description }}
+                        </p>
+                    {% endif %}
 
 
                     <div class="order3-card-meta">
@@ -338,39 +340,6 @@
         </div>
 
 
-        <div class="order3-info">
-
-            <div>
-                <span>
-                    可接人員
-                </span>
-
-                <strong id="mw-roles">
-                    —
-                </strong>
-            </div>
-
-            <div>
-                <span>
-                    需要人員
-                </span>
-
-                <strong id="mw-required-staff">
-                    —
-                </strong>
-            </div>
-
-            <div>
-                <span>
-                    指定
-                </span>
-
-                <strong id="mw-specify">
-                    —
-                </strong>
-            </div>
-
-        </div>
 
 
         <div
@@ -875,17 +844,6 @@
             hidden
         ></div>
 
-        <div class="order3-debug">
-
-            <span>
-                Rule
-            </span>
-
-            <code id="mw-rule-key">
-                —
-            </code>
-
-        </div>
 
     </div>
 
@@ -912,7 +870,7 @@
 
 
 <script
-    src="/static/js/mw_order.js?v=3a-apex1"
+    src="/static/js/mw_order.js?v=3a-apex2"
     defer
 ></script>
 
