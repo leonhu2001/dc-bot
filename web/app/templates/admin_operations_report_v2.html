@@ -3,7 +3,7 @@
 {{ super() }}
 
 <div class="ops-report">
-  <section class="ops-panel" id="orderRetainedDiagnostics">
+  <section class="ops-panel is-visible" id="orderRetainedDiagnostics">
     <h2>訂單實留診斷</h2>
     <div class="ops-insight-sub">
       依實留率由低到高排列 · 負實留 {{ report.negative_order_count }} 筆 / 合計倒貼 {{ report.negative_order_loss }}
@@ -92,7 +92,4 @@
     </div>
   </section>
 </div>
-<script nonce="{{ request.state.csp_nonce }}">
-  document.getElementById('orderRetainedDiagnostics')?.classList.add('is-visible');
-</script>
 {% endblock %}
