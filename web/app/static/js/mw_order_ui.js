@@ -40,15 +40,13 @@
         document.body.classList.toggle("mw-order-open", shouldLock);
     }
 
-    function stripRecordingKeeperExample(value) {
+    function isRecordingKeeperText(value) {
         const text = clean(value);
-        if (!text) {
-            return text;
-        }
-        if (!(text.includes("錄影") && text.includes("保留者"))) {
-            return text;
-        }
-        return text
+        return text.includes("錄影") && text.includes("保留者");
+    }
+
+    function stripExampleSuffix(value) {
+        return clean(value)
             .replace(
                 /\s*(?:（|\()?(?:例|例如|範例)\s*[:：].*?(?:）|\))?\s*$/u,
                 "",
@@ -56,12 +54,28 @@
             .trim();
     }
 
+    function hasRecordingKeeperContext(element) {
+        let current = element;
+        for (let depth = 0; depth < 4 && current; depth += 1) {
+            if (isRecordingKeeperText(current.textContent)) {
+                return true;
+            }
+            current = current.parentElement;
+        }
+        return false;
+    }
+
     function sanitizeRecordingKeeperCopy(root = document) {
         root.querySelectorAll("input[placeholder], textarea[placeholder]").forEach(element => {
             const current = String(element.getAttribute("placeholder") || "");
-            const next = stripRecordingKeeperExample(current);
-            if (next !== current.trim()) {
+            if (!isRecordingKeeperText(current) && !hasRecordingKeeperContext(element)) {
+                return;
+            }
+            const next = stripExampleSuffix(current);
+            if (next && !/^(?:例|例如|範例)\s*[:：]/u.test(next)) {
                 element.setAttribute("placeholder", next);
+            } else {
+                element.removeAttribute("placeholder");
             }
         });
 
@@ -70,8 +84,52 @@
                 return;
             }
             const current = String(element.textContent || "");
-            const next = stripRecordingKeeperExample(current);
+            if (!isRecordingKeeperText(current)) {
+                return;
+            }
+            const next = stripExampleSuffix(current);
             if (next && next !== current.trim()) {
+                element.textContent = next;
+            }
+        });
+    }
+
+    function sanitizeDescriptionText(value) {
+        const text = clean(value);
+        if (!text) {
+            return text;
+        }
+
+        const internalTerms = [
+            "身分組",
+            "智慧派單",
+            "派單只通知",
+            "派單通知",
+            "可接人員",
+            "required_staff",
+            "rule key",
+        ];
+
+        const clauses = text
+            .split(/[；;]/u)
+            .map(part => clean(part))
+            .filter(Boolean)
+            .filter(part => !internalTerms.some(term => part.toLowerCase().includes(term.toLowerCase())));
+
+        if (!clauses.length) {
+            return "選擇適合你的方案。";
+        }
+
+        return clauses
+            .join("；")
+            .replace(/[。；;]+$/u, "") + "。";
+    }
+
+    function sanitizeCatalogDescriptions() {
+        document.querySelectorAll(".order3-card > p, #mw-dialog-description").forEach(element => {
+            const current = clean(element.textContent);
+            const next = sanitizeDescriptionText(current);
+            if (next && next !== current) {
                 element.textContent = next;
             }
         });
@@ -80,6 +138,7 @@
     function removePublicInternalHints() {
         [
             ".order3-debug",
+            ".order3-info",
             ".order3-verified-badge",
             ".order3-server-title > div > small",
             ".order-checkout-preview-badge",
@@ -106,6 +165,7 @@
 
     function sanitizePublicCopy() {
         removePublicInternalHints();
+        sanitizeCatalogDescriptions();
         sanitizeRecordingKeeperCopy(byId("mw-order-dialog") || document);
     }
 
