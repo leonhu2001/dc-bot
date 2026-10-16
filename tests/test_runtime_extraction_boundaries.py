@@ -22,6 +22,7 @@ from services import (
 
 def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(acceptance_runtime.configure_acceptance_runtime)
+    assert callable(acceptance_runtime.configure_acceptance_runtime_explicit)
     assert callable(web_sync_runtime.configure_web_sync_runtime)
     assert callable(acceptance_runtime.process_acceptance_sync_events_once)
     assert callable(acceptance_sync_worker.process_acceptance_sync_events_once)
@@ -29,6 +30,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(order_runtime.configure_order_runtime)
     assert callable(order_storage_runtime.configure_order_storage_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime)
+    assert callable(self_service_runtime.configure_self_service_runtime_explicit)
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
     assert callable(order_payment_runtime.configure_order_payment_runtime)
@@ -42,16 +44,20 @@ def test_extracted_runtime_modules_import_without_importing_bot():
 def test_runtime_dependency_binding_is_explicitly_deferred_to_bot_startup():
     bot_source = Path("bot.py").read_text(encoding="utf-8")
 
-    acceptance_bind = bot_source.index("configure_acceptance_runtime(globals())")
+    acceptance_bind = bot_source.index("configure_acceptance_runtime_explicit(")
     web_bind = bot_source.index("configure_web_sync_runtime(globals())")
     order_bind = bot_source.index("configure_order_runtime(globals())")
-    self_service_bind = bot_source.index("configure_self_service_runtime(globals())")
+    lifecycle_bind = bot_source.index("configure_order_lifecycle_runtime(globals())")
+    self_service_bind = bot_source.index("configure_self_service_runtime_explicit(")
     bot_run = bot_source.index("bot.run(TOKEN)")
 
     assert acceptance_bind < bot_run
     assert web_bind < bot_run
     assert order_bind < bot_run
+    assert lifecycle_bind < bot_run
     assert self_service_bind < bot_run
+    assert "configure_acceptance_runtime(globals())" not in bot_source
+    assert "configure_self_service_runtime(globals())" not in bot_source
 
 
 def test_large_runtime_implementations_no_longer_live_in_bot():

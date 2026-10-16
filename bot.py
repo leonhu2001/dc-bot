@@ -192,7 +192,7 @@ from services.web_sync.discord_helpers import (
     normalize_dispatch_embed_field_order as _normalize_dispatch_embed_field_order,
 )
 from services.acceptance.runtime import (
-    configure_acceptance_runtime,
+    configure_acceptance_runtime_explicit,
     _member_role_id_texts,
     _member_display_name,
     _ticket_overwrite_has_values,
@@ -282,7 +282,7 @@ from services.self_service_selection_runtime import (
     SelfServiceSpecifiedStaffDropdownView,
 )
 from services.self_service_runtime import (
-    configure_self_service_runtime,
+    configure_self_service_runtime_explicit,
     _format_plain_amount,
     _extract_discord_ids_from_text,
     _get_rule_from_self_service_data,
@@ -6550,13 +6550,30 @@ except app_commands.CommandAlreadyRegistered:
     pass
 
 
-# Bind extracted legacy runtime adapters only after bot.py has defined all
-# remaining Views/callbacks they depend on. The extracted modules never import
-# bot.py directly, avoiding a circular import during startup.
-configure_acceptance_runtime(globals())
+# Bind extracted runtimes only after bot.py has defined the remaining
+# Views/callbacks they depend on. Acceptance and self-service now use explicit
+# bot-owned dependencies; the other legacy adapters are migrated separately.
+configure_acceptance_runtime_explicit(
+    dispatch_channel_id=DISPATCH_CHANNEL_ID,
+    order_claims=ORDER_CLAIMS,
+    payment_method_view_type=PaymentMethodView,
+    order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+    bot_instance=bot,
+    guild_id=GUILD_ID,
+    refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch,
+)
 configure_web_sync_runtime(globals())
 configure_order_runtime(globals())
 configure_order_lifecycle_runtime(globals())
-configure_self_service_runtime(globals())
+configure_self_service_runtime_explicit(
+    customer_category_id=CUSTOMER_CATEGORY_ID,
+    customer_role_id=CUSTOMER_ROLE_ID,
+    dispatch_channel_id=DISPATCH_CHANNEL_ID,
+    order_claims=ORDER_CLAIMS,
+    point_redeem_items=POINT_REDEEM_ITEMS,
+    point_redeem_items_by_key=POINT_REDEEM_ITEMS_BY_KEY,
+    order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+    order_control_view_type=OrderControlView,
+)
 
 bot.run(TOKEN)
