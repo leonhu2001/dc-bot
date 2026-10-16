@@ -203,6 +203,20 @@ def test_reporting_ui_contracts_are_present():
     assert "/dispatch/reports/statuses.json" in ui_source
 
 
+def test_report_review_page_keeps_compact_workspace_contract():
+    root = Path(__file__).resolve().parents[1]
+    review_source = (root / "web/app/templates/order_report_review_detail.html").read_text(encoding="utf-8")
+    css_source = (root / "web/app/static/css/order_reports.css").read_text(encoding="utf-8")
+
+    assert "report-review-workspace" in review_source
+    assert "report-review-side-panel" in review_source
+    assert "report-review-action-bar" in review_source
+    assert '<details class="report-trace-details">' in review_source
+    assert ".report-review-workspace" in css_source
+    assert "grid-template-columns:minmax(0,1.7fr) minmax(310px,.72fr)" in css_source
+    assert ".report-review-shell .report-button{min-height:34px" in css_source
+
+
 def test_reporting_status_badges_use_static_csp_safe_styles():
     root = Path(__file__).resolve().parents[1]
     css_source = (root / "web/app/static/css/pages/layout_inline_1.css").read_text(encoding="utf-8")
