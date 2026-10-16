@@ -1,0 +1,61 @@
+name: Trim lifecycle wiring debt
+
+on:
+  push:
+    branches:
+      - refactor/explicit-order-lifecycle-wiring-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  trim:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/explicit-order-lifecycle-wiring-20261017
+          fetch-depth: 0
+      - name: Trim stale wiring commentary and update lifecycle contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bot_path = Path('bot.py')
+          bot = bot_path.read_text(encoding='utf-8')
+          stale = '''# Bind extracted runtimes only after bot.py has defined the remaining\n# Views/callbacks they depend on. Acceptance and self-service now use explicit\n# bot-owned dependencies; the other legacy adapters are migrated separately.\n'''
+          if bot.count(stale) != 1:
+              raise SystemExit('stale wiring comment anchor mismatch')
+          bot = bot.replace(stale, '', 1)
+          bot_path.write_text(bot, encoding='utf-8')
+
+          test_path = Path('tests/test_order_lifecycle_runtime_extraction.py')
+          test = test_path.read_text(encoding='utf-8')
+          old = '    assert "configure_order_lifecycle_runtime(globals())" in bot_source\n'
+          new = '''    assert "configure_order_lifecycle_runtime_explicit(" in bot_source\n    assert "configure_order_lifecycle_runtime(globals())" not in bot_source\n'''
+          if test.count(old) != 1:
+              raise SystemExit('lifecycle extraction test anchor mismatch')
+          test = test.replace(old, new, 1)
+          test_path.write_text(test, encoding='utf-8')
+          PY
+      - name: Enforce bot architecture budget before commit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          size = Path('bot.py').stat().st_size
+          if size > 235000:
+              raise SystemExit(f'bot.py still over architecture budget: {size} > 235000')
+          print(f'bot.py bytes: {size}')
+          PY
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/trim-lifecycle-wiring-debt.yml
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py tests/test_order_lifecycle_runtime_extraction.py .github/workflows/trim-lifecycle-wiring-debt.yml
+          git commit -m "Keep explicit lifecycle wiring within architecture budget"
+          git push origin HEAD:refactor/explicit-order-lifecycle-wiring-20261017
