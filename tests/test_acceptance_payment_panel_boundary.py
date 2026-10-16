@@ -3,18 +3,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_SOURCE = (ROOT / "services/acceptance/runtime.py").read_text(encoding="utf-8")
+DISPATCH_REFRESH_SOURCE = (
+    ROOT / "services/acceptance/dispatch_refresh.py"
+).read_text(encoding="utf-8")
 REPAIR_SOURCE = (ROOT / "services/acceptance/repair_runtime.py").read_text(encoding="utf-8")
 PAYMENT_SOURCE = (ROOT / "services/acceptance/payment_panel.py").read_text(encoding="utf-8")
 
 
 def test_acceptance_payment_panel_has_single_owner():
     assert "from services.order_flow import build_payment_method_embed" not in RUNTIME_SOURCE
+    assert "from services.order_flow import build_payment_method_embed" not in DISPATCH_REFRESH_SOURCE
     assert "from services.order_flow import build_payment_method_embed" not in REPAIR_SOURCE
     assert "from services.order_flow import build_payment_method_embed" in PAYMENT_SOURCE
 
-    assert "ensure_acceptance_payment_panel(" in RUNTIME_SOURCE
+    assert "ensure_acceptance_payment_panel(" not in RUNTIME_SOURCE
+    assert "ensure_acceptance_payment_panel(" in DISPATCH_REFRESH_SOURCE
     assert "ensure_acceptance_payment_panel(" in REPAIR_SOURCE
-    assert "invalidate_acceptance_payment_panel(" in RUNTIME_SOURCE
+    assert "invalidate_acceptance_payment_panel(" not in RUNTIME_SOURCE
+    assert "invalidate_acceptance_payment_panel(" in DISPATCH_REFRESH_SOURCE
 
 
 def test_repair_runtime_does_not_own_payment_message_persistence():

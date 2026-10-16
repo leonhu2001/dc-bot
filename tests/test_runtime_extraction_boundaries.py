@@ -4,6 +4,7 @@ import pytest
 
 # Phase 2 contract: moved responsibilities stay physically separated while the
 # parent runtimes keep their existing public import/configuration surface.
+from services.acceptance import dispatch_refresh as acceptance_dispatch_refresh
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
 from services.web_sync import runtime as web_sync_runtime
@@ -86,9 +87,22 @@ def test_large_runtime_implementations_no_longer_live_in_bot():
         encoding="utf-8"
     )
 
+    acceptance_dispatch_source = Path(
+        "services/acceptance/dispatch_refresh.py"
+    ).read_text(encoding="utf-8")
+
     assert "async def process_acceptance_sync_events_once" not in acceptance_source
     assert "async def process_acceptance_sync_events_once" in acceptance_worker_source
-    assert "async def refresh_acceptance_dispatch_from_web_order" in acceptance_source
+    assert "async def refresh_acceptance_dispatch_from_web_order" not in acceptance_source
+    assert "async def refresh_acceptance_dispatch_from_web_order" in acceptance_dispatch_source
+    assert "async def send_acceptance_payment_panel_if_ready" not in acceptance_source
+    assert "async def send_acceptance_payment_panel_if_ready" in acceptance_dispatch_source
+    assert "import bot" not in acceptance_dispatch_source
+    assert "from bot import" not in acceptance_dispatch_source
+    assert (
+        acceptance_runtime.refresh_acceptance_dispatch_from_web_order
+        is acceptance_dispatch_refresh.refresh_acceptance_dispatch_from_web_order
+    )
     assert "async def _web_order_created_ensure_ticket" in web_source
     assert "class WebsiteOrderCsConfirmView" in web_source
     assert "async def _process_web_order_created_event" in web_source
