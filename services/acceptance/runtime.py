@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from core.database import remember_claim_data, remember_order_data, save_bot_data
 from core.time_utils import get_taipei_now_iso
-from pathlib import Path
 from typing import Any, Mapping
 
 import discord
 
+from services.acceptance.repair_runtime import (
+    configure_acceptance_repair_runtime,
+    repair_pending_acceptance_dispatch_panels_once,
+    repair_pending_acceptance_payment_panels_once,
+    repair_pending_acceptance_ticket_access_once,
+    restore_acceptance_payment_panel_for_order,
+)
 from services.acceptance.sync_worker import (
     acceptance_sync_event_worker,
     configure_acceptance_sync_worker,
@@ -70,6 +76,13 @@ def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
         grant_ticket_access=grant_order_ticket_access,
         revoke_ticket_access=revoke_order_ticket_access,
         to_int=_to_int,
+    )
+    configure_acceptance_repair_runtime(
+        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+        payment_method_view_type=PaymentMethodView,
+        refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
+        sync_ticket_access_from_state=sync_acceptance_ticket_access_from_state,
+        acceptance_staff_display_text=_acceptance_staff_display_text,
     )
 
     _CONFIGURED = True
@@ -502,7 +515,6 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         if value is not None:
             data[key] = value
 
-
     if data.get("website_finance_settled"):
         for unsafe_key in (
             "point_benefit_key",
@@ -549,7 +561,6 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         dispatch_embed,
         web_price_data,
     )
-
 
     website_info_lines = [
         f"網站訂單：WEB-{order_id}"
@@ -614,7 +625,6 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         value="人數已滿，等待顧客付款" if str(state.status) == ACCEPTED_PENDING_PAY else "等待接單中",
         inline=False,
     )
-
 
     dispatch_embed.set_footer(
         text=f"WEB-{order_id}｜網站訂單"
@@ -725,56 +735,6 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
     save_bot_data()
 
 
-
-
-async def repair_pending_acceptance_dispatch_panels_once(
-    guild: discord.Guild,
-    *,
-    limit: int = 100,
-) -> int:
-    """依 canonical acceptance 狀態修復等待接單中的 Discord panel。"""
-    import sqlite3
-
-    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
-    db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
-    conn = sqlite3.connect(db_path, timeout=15)
-    conn.row_factory = sqlite3.Row
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT id
-            FROM web_orders
-            WHERE status IN ('waiting_acceptance', 'accepted_pending_pay')
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (int(limit),),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    repaired = 0
-
-    for row in rows:
-        order_id = int(row["id"])
-
-        try:
-            await refresh_acceptance_dispatch_from_web_order(
-                guild,
-                order_id,
-            )
-            repaired += 1
-        except Exception as exc:
-            print(
-                f"[acceptance-sync] startup reconcile failed "
-                f"order_id={order_id}: {type(exc).__name__}: {exc}",
-                flush=True,
-            )
-
-    return repaired
-
-
 async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Interaction, state) -> None:
     try:
         from shared.order_acceptance import ACCEPTED_PENDING_PAY
@@ -851,324 +811,6 @@ async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Inte
         ],
         color=discord.Color.gold(),
     )
-
-
-
-async def restore_acceptance_payment_panel_for_order(
-    guild: discord.Guild,
-    order_id: int,
-    *,
-    reason: str = "manual",
-) -> tuple[bool, str]:
-    """補送或重掛付款前接單流程的付款 panel。
-
-    只處理 accepted_pending_pay，避免影響 active / stored / closed。
-    """
-    import sqlite3
-
-    try:
-        from shared.order_acceptance import ACCEPTED_PENDING_PAY, get_acceptance_state
-    except Exception:
-        ACCEPTED_PENDING_PAY = "accepted_pending_pay"
-        get_acceptance_state = None
-
-    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
-    db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
-    conn = sqlite3.connect(db_path, timeout=15)
-    conn.row_factory = sqlite3.Row
-    try:
-        row = conn.execute(
-            """
-            SELECT *
-            FROM web_orders
-            WHERE id = ?
-            LIMIT 1
-            """,
-            (int(order_id),),
-        ).fetchone()
-
-        if row is None:
-            return False, f"找不到 WEB-{order_id}。"
-
-        row_keys = set(row.keys())
-        current_status = str(row["status"] or "").lower()
-
-        state = None
-        state_status = current_status
-        accepted_count = None
-        required_count = None
-
-        if get_acceptance_state is not None:
-            try:
-                state = get_acceptance_state(int(order_id))
-                state_status = str(getattr(state, "status", current_status) or current_status).lower()
-                accepted_count = getattr(state, "accepted_count", None)
-                required_count = getattr(state, "required_staff_count", None)
-            except Exception:
-                state = None
-
-        if state_status != ACCEPTED_PENDING_PAY and current_status != ACCEPTED_PENDING_PAY:
-            return False, f"WEB-{order_id} 目前不是等待付款狀態，status={current_status}，acceptance_status={state_status}。"
-
-        ticket_channel_id = _to_int(row["ticket_channel_id"])
-        if ticket_channel_id is None:
-            return False, f"WEB-{order_id} 沒有 ticket_channel_id。"
-
-        ticket_channel = guild.get_channel(ticket_channel_id)
-        if not isinstance(ticket_channel, discord.TextChannel):
-            return False, f"WEB-{order_id} 找不到票口頻道：{ticket_channel_id}。"
-
-        customer_id = _to_int(row["customer_discord_id"])
-        if customer_id is None:
-            return False, f"WEB-{order_id} 沒有 customer_discord_id。"
-
-        amount = 0
-        for amount_key in ("customer_pay_amount", "amount", "total_amount"):
-            if amount_key in row_keys:
-                amount = _to_int(row[amount_key], 0) or 0
-                if amount:
-                    break
-
-        quantity = _to_int(row["quantity"], 1) or 1
-        category_label = str(row["category"] or "訂單")
-        item = str(row["item"] or "未紀錄")
-
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(ticket_channel_id, {})
-        data["status"] = ACCEPTED_PENDING_PAY
-        data["customer_id"] = customer_id
-        data["category"] = data.get("category") or category_label
-        data["category_label"] = data.get("category_label") or category_label
-        data["item"] = data.get("item") or item
-        data["quantity"] = _to_int(data.get("quantity"), quantity) or quantity
-        data["amount"] = _to_int(data.get("amount"), amount) or amount
-        data["total_amount"] = _to_int(data.get("total_amount"), amount) or amount
-
-        if "dispatch_channel_id" in row_keys and row["dispatch_channel_id"]:
-            data["dispatch_channel_id"] = _to_int(row["dispatch_channel_id"])
-        if "dispatch_message_id" in row_keys and row["dispatch_message_id"]:
-            data["dispatch_message_id"] = _to_int(row["dispatch_message_id"])
-
-        if str(data.get("payment_method") or "") == "待付款":
-            data.pop("payment_method", None)
-
-        selected_payment_method = str(data.get("payment_method") or "").strip() or None
-        accepted_staff_display_text = (
-            _acceptance_staff_display_text(guild, state)
-            if state is not None
-            else str(data.get("accepted_staff_display_text") or "").strip() or None
-        )
-
-        if accepted_staff_display_text:
-            data["accepted_staff_display_text"] = accepted_staff_display_text
-
-        payment_embed = build_payment_method_embed(
-            customer_id=customer_id,
-            category_label=str(data.get("category_label") or category_label),
-            item=str(data.get("item") or item),
-            quantity=_to_int(data.get("quantity"), quantity) or quantity,
-            payment_method=selected_payment_method,
-            companion_preference=data.get("companion_preference"),
-            amount=_to_int(data.get("amount"), amount) or amount,
-            receiver_text=accepted_staff_display_text,
-        )
-
-        payment_view = PaymentMethodView(
-            customer_id=customer_id,
-            channel_id=ticket_channel_id,
-            selected_method=selected_payment_method,
-        )
-
-        existing_message_id = _to_int(data.get("payment_message_id"))
-        existing_channel_id = _to_int(data.get("payment_channel_id"), ticket_channel_id) or ticket_channel_id
-        existing_channel = guild.get_channel(existing_channel_id)
-        existing_message = None
-
-        if isinstance(existing_channel, discord.TextChannel) and existing_message_id is not None:
-            try:
-                existing_message = await existing_channel.fetch_message(existing_message_id)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                existing_message = None
-
-        content = f"<@{customer_id}> 接單人數已滿，請選擇付款方式。"
-
-        if existing_message is not None:
-            try:
-                await existing_message.edit(
-                    content=content,
-                    embed=payment_embed,
-                    view=payment_view,
-                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-                )
-                data["payment_channel_id"] = existing_message.channel.id
-                data["payment_message_id"] = existing_message.id
-                action = "已重新掛回付款 panel"
-            except discord.HTTPException:
-                existing_message = None
-
-        if existing_message is None:
-            payment_message = await ticket_channel.send(
-                content=content,
-                embed=payment_embed,
-                view=payment_view,
-                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-            )
-            data["payment_channel_id"] = ticket_channel.id
-            data["payment_message_id"] = payment_message.id
-            action = "已補送新的付款 panel"
-
-        data["accepted_pending_pay_at"] = data.get("accepted_pending_pay_at") or get_taipei_now_iso()
-        remember_order_data(ticket_channel_id, data)
-        save_bot_data()
-
-        if current_status != ACCEPTED_PENDING_PAY:
-            from shared.order_state import (
-                WAITING_ACCEPTANCE,
-                transition_order_state,
-            )
-
-            transition_order_state(
-                order_id=int(order_id),
-                target_status=ACCEPTED_PENDING_PAY,
-                source="payment_panel_repair",
-                reason=f"付款 panel 修復：{reason}",
-                expected_statuses={
-                    WAITING_ACCEPTANCE,
-                    ACCEPTED_PENDING_PAY,
-                },
-            )
-
-        progress_text = ""
-        if accepted_count is not None and required_count is not None:
-            progress_text = f"｜接單進度 {accepted_count}/{required_count}"
-
-        try:
-            await send_order_log(
-                guild,
-                title="付款 panel 已修復",
-                fields=[
-                    ("訂單", f"WEB-{order_id}", True),
-                    ("顧客", f"<@{customer_id}>", True),
-                    ("狀態", f"{action}{progress_text}", False),
-                    ("票口", ticket_channel.mention, False),
-                    ("來源", reason, True),
-                ],
-                color=discord.Color.gold(),
-            )
-        except Exception:
-            pass
-
-        return True, f"WEB-{order_id} {action}。"
-
-    finally:
-        conn.close()
-
-
-async def repair_pending_acceptance_payment_panels_once(
-    guild: discord.Guild,
-    *,
-    reason: str = "startup",
-    limit: int = 30,
-) -> int:
-    import sqlite3
-
-    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
-    db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
-    conn = sqlite3.connect(db_path, timeout=15)
-    conn.row_factory = sqlite3.Row
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT id
-            FROM web_orders
-            WHERE status IN ('accepted_pending_pay', 'waiting_acceptance')
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (int(limit),),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    repaired = 0
-
-    for row in rows:
-        try:
-            ok, message = await restore_acceptance_payment_panel_for_order(
-                guild,
-                int(row["id"]),
-                reason=reason,
-            )
-            if ok:
-                repaired += 1
-                print(f"[acceptance-repair] {message}", flush=True)
-        except Exception as exc:
-            print(f"[acceptance-repair] failed order_id={row['id']}: {type(exc).__name__}: {exc}", flush=True)
-
-    return repaired
-
-
-async def repair_pending_acceptance_ticket_access_once(
-    guild: discord.Guild,
-    *,
-    limit: int = 100,
-) -> int:
-    """Bot 啟動時把目前接單者的票口權限補齊。"""
-    import sqlite3
-
-    from shared.order_acceptance import get_acceptance_state
-
-    # runtime.py 位於 services/acceptance/；web_dashboard.db 位於專案根目錄。
-    db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
-    conn = sqlite3.connect(db_path, timeout=15)
-    conn.row_factory = sqlite3.Row
-
-    try:
-        rows = conn.execute(
-            """
-            SELECT id, ticket_channel_id
-            FROM web_orders
-            WHERE status IN ('waiting_acceptance', 'accepted_pending_pay')
-              AND ticket_channel_id IS NOT NULL
-              AND TRIM(ticket_channel_id) <> ''
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (int(limit),),
-        ).fetchall()
-    finally:
-        conn.close()
-
-    restored = 0
-
-    for row in rows:
-        order_id = int(row["id"])
-        ticket_channel_id = _to_int(row["ticket_channel_id"])
-
-        if ticket_channel_id is None:
-            continue
-
-        try:
-            state = get_acceptance_state(order_id)
-            accepted_count = int(getattr(state, "accepted_count", 0) or 0)
-
-            if accepted_count <= 0:
-                continue
-
-            await sync_acceptance_ticket_access_from_state(
-                guild,
-                ticket_channel_id,
-                state,
-            )
-            restored += accepted_count
-        except Exception as exc:
-            print(
-                f"[ticket-access] startup repair failed "
-                f"order_id={order_id}: {type(exc).__name__}: {exc}",
-                flush=True,
-            )
-
-    return restored
 
 
 def _build_receiver_text_from_claim_data(claim_data: dict) -> str | None:
