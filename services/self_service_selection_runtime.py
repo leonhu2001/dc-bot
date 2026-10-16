@@ -124,7 +124,7 @@ def _prioritize_specified_staff_entries_for_customer(
     result.sort(
         key=lambda item: (
             0 if item.get("is_favorite") else 1,
-            int(item.get("role_order", 999) or 999),
+            int(item["role_order"]) if item.get("role_order") is not None else 999,
             str(item.get("label") or "").casefold(),
             str(item.get("id") or ""),
         )
