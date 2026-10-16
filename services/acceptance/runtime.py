@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from core.database import remember_claim_data, remember_order_data, save_bot_data
-from core.time_utils import get_taipei_now_iso
 from typing import Any, Mapping
 
 import discord
 
+from services.acceptance.payment_panel import (
+    acceptance_staff_display_text,
+    ensure_acceptance_payment_panel,
+    invalidate_acceptance_payment_panel,
+)
 from services.acceptance.repair_runtime import (
     configure_acceptance_repair_runtime,
     repair_pending_acceptance_dispatch_panels_once,
@@ -24,9 +28,7 @@ from services.acceptance.ticket_access import (
     revoke_order_ticket_access,
     sync_acceptance_ticket_access_from_state,
 )
-from services.logging_service import send_order_log
 from services.order_dispatch_runtime import DispatchClaimView
-from services.order_flow import build_payment_method_embed
 from services.orders import (
     ORDER_CATEGORY_LABELS,
     _to_int,
@@ -89,7 +91,6 @@ def configure_acceptance_runtime_explicit(
         payment_method_view_type=PaymentMethodView,
         refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
         sync_ticket_access_from_state=sync_acceptance_ticket_access_from_state,
-        acceptance_staff_display_text=_acceptance_staff_display_text,
     )
 
     _CONFIGURED = True
@@ -134,29 +135,9 @@ def _member_display_name(member: discord.Member) -> str:
     )
 
 
-def _acceptance_staff_display_text(
-    guild: discord.Guild | None,
-    state,
-) -> str | None:
-    """Use clickable Discord mentions when possible, with a saved-name fallback."""
-    values: list[str] = []
-
-    for claim in getattr(state, "claims", ()):
-        user_id = _to_int(getattr(claim, "staff_discord_id", None))
-        member = guild.get_member(user_id) if guild is not None and user_id is not None else None
-
-        if member is not None:
-            display_value = member.mention
-        else:
-            display_value = str(
-                getattr(claim, "staff_display_name", None)
-                or ""
-            ).strip()
-
-        if display_value and display_value not in values:
-            values.append(display_value)
-
-    return "、".join(values) or None
+# Backward-compatible export for bot.py / repair tests while presentation now
+# lives with the payment panel lifecycle instead of the orchestration runtime.
+_acceptance_staff_display_text = acceptance_staff_display_text
 
 
 def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
@@ -174,10 +155,17 @@ def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
     claim_data["required_staff_count"] = int(getattr(state, "required_staff_count", 1) or 1)
     claim_data["protector_count"] = int(getattr(state, "protector_count", 0) or 0)
     claim_data["min_protector_count"] = int(getattr(state, "min_protector_count", 0) or 0)
-    claim_data["status"] = str(getattr(state, "status", None) or claim_data.get("status") or "waiting_acceptance")
+    claim_data["status"] = str(
+        getattr(state, "status", None)
+        or claim_data.get("status")
+        or "waiting_acceptance"
+    )
 
 
-async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order_id: int) -> None:
+async def refresh_acceptance_dispatch_from_web_order(
+    guild: discord.Guild,
+    order_id: int,
+) -> None:
     from shared.db import SessionLocal
     from shared.models import WebOrder
     from shared.order_acceptance import ACCEPTED_PENDING_PAY, get_acceptance_state
@@ -191,7 +179,10 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
             raise ValueError(f"找不到網站訂單：{order_id}")
 
         dispatch_message_id = _to_int(order.dispatch_message_id)
-        dispatch_channel_id = _to_int(order.dispatch_channel_id, DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+        dispatch_channel_id = (
+            _to_int(order.dispatch_channel_id, DISPATCH_CHANNEL_ID)
+            or DISPATCH_CHANNEL_ID
+        )
         ticket_channel_id = _to_int(order.ticket_channel_id)
         customer_id = _to_int(order.customer_discord_id)
         customer_display_name = str(
@@ -201,117 +192,55 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         category_raw = str(order.category or "未紀錄")
         category_label = ORDER_CATEGORY_LABELS.get(category_raw, category_raw)
         item = str(order.item or "未紀錄")
-        quantity = _to_int(
-            order.quantity,
-            1,
-        ) or 1
+        quantity = _to_int(order.quantity, 1) or 1
 
         amount = _to_int(
-            getattr(
-                order,
-                "customer_pay_amount",
-                None,
-            ),
+            getattr(order, "customer_pay_amount", None),
             None,
         )
 
         if amount is None:
-            amount = _to_int(
-                order.amount,
-                0,
-            ) or 0
+            amount = _to_int(order.amount, 0) or 0
 
-        payment_method = str(
-            order.payment_method
-            or "待付款"
-        )
+        payment_method = str(order.payment_method or "待付款")
 
         web_price_data = _price_snapshot(
-            getattr(
-                order,
-                "price_snapshot_json",
-                None,
-            )
+            getattr(order, "price_snapshot_json", None)
         )
 
         web_price_data.setdefault(
             "original_amount",
-            _to_int(
-                getattr(
-                    order,
-                    "original_amount",
-                    None,
-                ),
-                0,
-            )
-            or 0,
+            _to_int(getattr(order, "original_amount", None), 0) or 0,
         )
 
         web_price_data.setdefault(
             "service_original_amount",
-            web_price_data.get(
-                "original_amount",
-                0,
-            ),
+            web_price_data.get("original_amount", 0),
         )
 
         web_price_data.setdefault(
             "manual_discount_amount",
-            _to_int(
-                getattr(
-                    order,
-                    "manual_discount_amount",
-                    None,
-                ),
-                0,
-            )
-            or 0,
+            _to_int(getattr(order, "manual_discount_amount", None), 0) or 0,
         )
 
         web_price_data.setdefault(
             "cash_coupon_amount",
-            _to_int(
-                getattr(
-                    order,
-                    "cash_coupon_amount",
-                    None,
-                ),
-                0,
-            )
-            or 0,
+            _to_int(getattr(order, "cash_coupon_amount", None), 0) or 0,
         )
         web_price_data.setdefault(
             "fixed_discount_amount",
-            web_price_data.get(
-                "cash_coupon_amount",
-                0,
-            ),
+            web_price_data.get("cash_coupon_amount", 0),
         )
 
         web_price_data.setdefault(
             "payout_base_amount",
-            _to_int(
-                getattr(
-                    order,
-                    "payout_base_amount",
-                    None,
-                ),
-                amount,
-            )
-            or 0,
+            _to_int(getattr(order, "payout_base_amount", None), amount) or 0,
         )
 
-        web_price_data.setdefault(
-            "customer_pay_amount",
-            amount,
-        )
+        web_price_data.setdefault("customer_pay_amount", amount)
 
         absorbed = _to_int(
-            getattr(
-                order,
-                "store_absorbed_amount",
-                None,
-            ),
+            getattr(order, "store_absorbed_amount", None),
             0,
         ) or 0
 
@@ -329,21 +258,21 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         )
 
         web_order_note = str(
-            getattr(
-                order,
-                "note",
-                None,
-            )
+            getattr(order, "note", None)
             or ""
         ).strip()
     finally:
         db.close()
 
-    if dispatch_message_id is None or ticket_channel_id is None or customer_id is None:
+    if (
+        dispatch_message_id is None
+        or ticket_channel_id is None
+        or customer_id is None
+    ):
         raise ValueError(f"網站訂單缺少必要頻道或顧客資料：{order_id}")
 
     state = get_acceptance_state(int(order_id))
-    accepted_staff_display_text = _acceptance_staff_display_text(guild, state)
+    accepted_staff_display_text = acceptance_staff_display_text(guild, state)
 
     dispatch_channel = guild.get_channel(dispatch_channel_id)
     ticket_channel = guild.get_channel(ticket_channel_id)
@@ -370,7 +299,6 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
     else:
         data.pop("accepted_staff_display_text", None)
 
-    # zYao 3C3B website order refresh safety v1
     if data.get("website_finance_settled"):
         website_selected_method = str(
             data.get("website_payment_method")
@@ -381,8 +309,8 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         if website_selected_method:
             data["website_payment_method"] = website_selected_method
 
-        # 網站只是預選付款方式。
-        # 正式付款仍由原本 Discord PaymentMethodView 決定。
+        # Website payment choice is only a preference. Discord remains the
+        # canonical payment confirmation surface.
         payment_method = "待付款"
 
     claim_data = ORDER_CLAIMS.setdefault(
@@ -396,7 +324,11 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
     _apply_acceptance_state_to_claim_data(claim_data, state)
 
-    companion_preference = data.get("companion_preference") or claim_data.get("companion_preference") or "不指定陪玩/打手"
+    companion_preference = (
+        data.get("companion_preference")
+        or claim_data.get("companion_preference")
+        or "不指定陪玩/打手"
+    )
 
     claim_data["locked"] = False
     claim_data["customer_id"] = customer_id
@@ -462,7 +394,14 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         source_channel=ticket_channel,
         companion_preference=companion_preference,
         receiver_text=receiver_text,
-        staff_note=str(data.get("extra_requirements") or data.get("staff_note") or "").strip() or None,
+        staff_note=(
+            str(
+                data.get("extra_requirements")
+                or data.get("staff_note")
+                or ""
+            ).strip()
+            or None
+        ),
     )
 
     add_self_service_financial_breakdown_fields(
@@ -470,12 +409,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
         web_price_data,
     )
 
-    website_info_lines = [
-        f"網站訂單：WEB-{order_id}"
-    ]
-
-    # 官網不選付款方式。
-    website_payment_method = ""
+    website_info_lines = [f"網站訂單：WEB-{order_id}"]
 
     service_terms_version = str(
         data.get("service_terms_version")
@@ -489,11 +423,7 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
     specified_staff_ids = [
         str(value).strip()
-        for value
-        in (
-            data.get("specified_staff_ids")
-            or []
-        )
+        for value in (data.get("specified_staff_ids") or [])
         if str(value).strip()
     ]
 
@@ -502,16 +432,13 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
             "指定人員："
             + "、".join(
                 f"<@{staff_id}>"
-                for staff_id
-                in specified_staff_ids
+                for staff_id in specified_staff_ids
             )
         )
 
     dispatch_embed.add_field(
         name="網站下單資訊",
-        value="\n".join(
-            website_info_lines
-        )[:1024],
+        value="\n".join(website_info_lines)[:1024],
         inline=False,
     )
 
@@ -530,16 +457,20 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
 
     dispatch_embed.add_field(
         name="狀態",
-        value="人數已滿，等待顧客付款" if str(state.status) == ACCEPTED_PENDING_PAY else "等待接單中",
+        value=(
+            "人數已滿，等待顧客付款"
+            if str(state.status) == ACCEPTED_PENDING_PAY
+            else "等待接單中"
+        ),
         inline=False,
     )
 
-    dispatch_embed.set_footer(
-        text=f"WEB-{order_id}｜網站訂單"
-    )
+    dispatch_embed.set_footer(text=f"WEB-{order_id}｜網站訂單")
 
     try:
-        dispatch_message = await dispatch_channel.fetch_message(dispatch_message_id)
+        dispatch_message = await dispatch_channel.fetch_message(
+            dispatch_message_id
+        )
         await dispatch_message.edit(
             embed=dispatch_embed,
             view=DispatchClaimView(
@@ -553,7 +484,11 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
                 locked=False,
                 status=str(state.status),
             ),
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
         )
     except discord.HTTPException as exc:
         raise ValueError(f"更新 Discord 派單 panel 失敗：{exc}") from exc
@@ -561,89 +496,44 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
     remember_claim_data(dispatch_message_id, claim_data)
 
     if str(state.status) == ACCEPTED_PENDING_PAY:
-        if _to_int(data.get("payment_message_id")) is None:
-            payment_embed = build_payment_method_embed(
-                customer_id=customer_id,
-                category_label=category_label,
-                item=item,
-                quantity=quantity,
-                companion_preference=companion_preference,
-                amount=amount,
-                receiver_text=accepted_staff_display_text,
-            )
-
-            payment_message = await ticket_channel.send(
-                content=f"<@{customer_id}> 接單人數已滿，請選擇付款方式。",
-                embed=payment_embed,
-                view=PaymentMethodView(
-                    customer_id=customer_id,
-                    channel_id=ticket_channel_id,
-                ),
-                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-            )
-
-            data["payment_channel_id"] = ticket_channel.id
-            data["payment_message_id"] = payment_message.id
-            data["accepted_pending_pay_at"] = get_taipei_now_iso()
-
-            await send_order_log(
-                guild,
-                title="網站接單滿人｜開放付款",
-                fields=[
-                    ("顧客", f"<@{customer_id}>", True),
-                    ("訂單", f"{category_label}｜{item} x{quantity}", False),
-                    ("接單進度", f"{state.accepted_count}/{state.required_staff_count}", True),
-                    ("票口", ticket_channel.mention, False),
-                ],
-                color=discord.Color.gold(),
-            )
+        await ensure_acceptance_payment_panel(
+            guild=guild,
+            ticket_channel=ticket_channel,
+            data=data,
+            payment_method_view_type=PaymentMethodView,
+            customer_id=customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            companion_preference=companion_preference,
+            amount=amount,
+            state=state,
+            log_title="網站接單滿人｜開放付款",
+        )
     else:
-        old_payment_message_id = _to_int(data.get("payment_message_id"))
-        old_payment_channel_id = _to_int(data.get("payment_channel_id"), ticket_channel.id) or ticket_channel.id
-
-        if old_payment_message_id is not None:
-            old_payment_channel = guild.get_channel(old_payment_channel_id)
-
-            if isinstance(old_payment_channel, discord.TextChannel):
-                try:
-                    old_payment_message = await old_payment_channel.fetch_message(old_payment_message_id)
-                    disabled_embed = build_payment_method_embed(
-                        customer_id=customer_id,
-                        category_label=category_label,
-                        item=item,
-                        quantity=quantity,
-                        payment_method="等待接單人數補滿",
-                        companion_preference=companion_preference,
-                        amount=amount,
-                        receiver_text=accepted_staff_display_text,
-                        submitted=True,
-                    )
-                    disabled_embed.add_field(
-                        name="付款狀態",
-                        value="接單人數目前不足，這個付款面板已失效。人數再次補滿時會重新開付款面板。",
-                        inline=False,
-                    )
-                    await old_payment_message.edit(
-                        embed=disabled_embed,
-                        view=PaymentMethodView(
-                            customer_id=customer_id,
-                            channel_id=ticket_channel_id,
-                            submitted=True,
-                        ),
-                        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-                    )
-                except discord.HTTPException:
-                    pass
-
-        data.pop("payment_message_id", None)
-        data.pop("payment_channel_id", None)
-        data.pop("accepted_pending_pay_at", None)
+        await invalidate_acceptance_payment_panel(
+            guild=guild,
+            ticket_channel=ticket_channel,
+            data=data,
+            payment_method_view_type=PaymentMethodView,
+            customer_id=customer_id,
+            category_label=category_label,
+            item=item,
+            quantity=quantity,
+            companion_preference=companion_preference,
+            amount=amount,
+            state=state,
+        )
 
     remember_order_data(ticket_channel_id, data)
     save_bot_data()
 
 
-async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Interaction, state) -> None:
+async def send_acceptance_payment_panel_if_ready(
+    view,
+    interaction: discord.Interaction,
+    state,
+) -> None:
     try:
         from shared.order_acceptance import ACCEPTED_PENDING_PAY
     except Exception:
@@ -665,59 +555,34 @@ async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Inte
     if _to_int(data.get("payment_message_id")) is not None:
         return
 
-    amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
+    amount = (
+        _to_int(data.get("amount"), 0)
+        or _to_int(data.get("total_amount"), 0)
+        or 0
+    )
     quantity = _to_int(data.get("quantity"), view.quantity) or view.quantity
     category_label = str(data.get("category_label") or view.category_label)
     item = str(data.get("item") or view.item)
-    companion_preference = data.get("companion_preference") or view.companion_preference
-    accepted_staff_display_text = _acceptance_staff_display_text(guild, state)
+    companion_preference = (
+        data.get("companion_preference")
+        or view.companion_preference
+    )
 
-    if accepted_staff_display_text:
-        data["accepted_staff_display_text"] = accepted_staff_display_text
-    else:
-        data.pop("accepted_staff_display_text", None)
+    data["status"] = ACCEPTED_PENDING_PAY
 
-    if str(data.get("payment_method") or "") == "待付款":
-        data.pop("payment_method", None)
-
-    payment_embed = build_payment_method_embed(
+    await ensure_acceptance_payment_panel(
+        guild=guild,
+        ticket_channel=ticket_channel,
+        data=data,
+        payment_method_view_type=PaymentMethodView,
         customer_id=view.customer_id,
         category_label=category_label,
         item=item,
         quantity=quantity,
         companion_preference=companion_preference,
         amount=amount,
-        receiver_text=accepted_staff_display_text,
-    )
-
-    payment_message = await ticket_channel.send(
-        content=f"<@{view.customer_id}> 接單人數已滿，請選擇付款方式。",
-        embed=payment_embed,
-        view=PaymentMethodView(
-            customer_id=view.customer_id,
-            channel_id=view.source_channel_id,
-        ),
-        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-    )
-
-    data["status"] = ACCEPTED_PENDING_PAY
-    data["payment_channel_id"] = ticket_channel.id
-    data["payment_message_id"] = payment_message.id
-    data["accepted_pending_pay_at"] = get_taipei_now_iso()
-
-    remember_order_data(view.source_channel_id, data)
-    save_bot_data()
-
-    await send_order_log(
-        guild,
-        title="接單人數已滿｜開放付款",
-        fields=[
-            ("顧客", f"<@{view.customer_id}>", True),
-            ("訂單", f"{category_label}｜{item} x{quantity}", False),
-            ("接單進度", f"{state.accepted_count}/{state.required_staff_count}", True),
-            ("票口", ticket_channel.mention, False),
-        ],
-        color=discord.Color.gold(),
+        state=state,
+        log_title="接單人數已滿｜開放付款",
     )
 
 
