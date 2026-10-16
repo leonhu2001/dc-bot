@@ -1,4 +1,30 @@
-        [hidden] { display: none !important; }
+[hidden] { display: none !important; }
+
+/* Shared backoffice density: keep controls compact and remove redundant
+   page-header helper copy. Page-specific guidance inside workflows remains. */
+.mw-r5-page-header > p {
+    display: none !important;
+}
+
+.mw-r5-main-host input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.mw-r5-main-host select,
+.mw-r5-main-host textarea {
+    min-height: 38px;
+    box-sizing: border-box;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.mw-r5-main-host textarea {
+    min-height: 68px;
+}
+
+.mw-r5-main-host label > small,
+.mw-r5-main-host .field-help,
+.mw-r5-main-host .form-help {
+    margin-top: 4px;
+    line-height: 1.4;
+}
 
 /* Shared order-report status badges (CSP-safe static styles). */
 .history-report-state {
