@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -9,6 +8,7 @@ from core import database as core_database
 from core import time_utils
 from services import logging_service, order_flow, orders, self_service_financials
 from services.acceptance import runtime as acceptance_runtime
+from services.acceptance import sync_worker as acceptance_sync_worker
 from services import order_dispatch_runtime
 
 
@@ -31,7 +31,8 @@ def test_acceptance_runtime_owns_canonical_persistence_and_time_dependencies():
     assert acceptance_runtime.remember_order_data is core_database.remember_order_data
     assert acceptance_runtime.save_bot_data is core_database.save_bot_data
     assert acceptance_runtime.get_taipei_now_iso is time_utils.get_taipei_now_iso
-    assert acceptance_runtime.utc_now_naive is time_utils.utc_now_naive
+    assert acceptance_sync_worker.utc_now_naive is time_utils.utc_now_naive
+    assert not hasattr(acceptance_runtime, "utc_now_naive")
 
 
 def test_acceptance_runtime_owns_stable_service_dependencies():
@@ -55,13 +56,11 @@ def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
         "Any": Any,
         "Mapping": Mapping,
         "Path": Path,
-        "asyncio": asyncio,
         "discord": discord,
         "remember_claim_data": core_database.remember_claim_data,
         "remember_order_data": core_database.remember_order_data,
         "save_bot_data": core_database.save_bot_data,
         "get_taipei_now_iso": time_utils.get_taipei_now_iso,
-        "utc_now_naive": time_utils.utc_now_naive,
         "_to_int": orders._to_int,
         "build_payment_method_embed": order_flow.build_payment_method_embed,
         "DispatchClaimView": order_dispatch_runtime.DispatchClaimView,
@@ -83,10 +82,21 @@ def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
 def test_acceptance_runtime_dependency_names_are_explicit():
     assert acceptance_runtime._DEPENDENCY_NAMES == (
         "DISPATCH_CHANNEL_ID",
-        "GUILD_ID",
         "ORDER_CLAIMS",
         "PaymentMethodView",
         "SELF_SERVICE_ORDER_SELECTIONS",
+    )
+    assert acceptance_runtime._SYNC_WORKER_DEPENDENCY_NAMES == (
+        "GUILD_ID",
+        "_refresh_existing_web_sync_dispatch",
+        "bot",
+    )
+    assert acceptance_runtime._REQUIRED_DEPENDENCY_NAMES == (
+        "DISPATCH_CHANNEL_ID",
+        "ORDER_CLAIMS",
+        "PaymentMethodView",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "GUILD_ID",
         "_refresh_existing_web_sync_dispatch",
         "bot",
     )
