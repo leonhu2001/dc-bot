@@ -164,6 +164,7 @@ def ensure_loyalty_tables(bind=engine) -> None:
         """))
         _repair_companion_loyalty_v2(conn)
         _repair_entertainment_loyalty_policy_v3(conn)
+        _repair_apex_entertainment_shared_scope_v4(conn)
 
 
 def _rule_for_key(rule_key: str):
@@ -199,15 +200,23 @@ def loyalty_policy_for_rule(rule_key: str) -> dict[str, Any] | None:
     return None
 
 
+_APEX_ENTERTAINMENT_RULE_KEYS = {
+    "apex_entertain_ng",
+    "apex_entertain_ranked",
+}
 _LOYALTY_SCOPE_FAMILY_ALIASES = {
     # 同一個遊戲／服務只是陪玩席位數不同，必須共用同一個老闆福利池。
     "basic_entertain_single": "basic_entertain",
     "basic_entertain_double": "basic_entertain",
     "basic_mobile_entertain_single": "basic_mobile_entertain",
     "basic_mobile_entertain_double": "basic_mobile_entertain",
+    # APEX 娛樂陪 NG / 積分皆為計時制，共用同一個 10H -> 1H 福利池。
+    "apex_entertain_ng": "apex_entertain",
+    "apex_entertain_ranked": "apex_entertain",
 }
 _LOYALTY_COMPANION_MIGRATION_KEY = "20261011_companion_service_units_v2"
 _LOYALTY_POLICY_V3_MIGRATION_KEY = "20261014_entertainment_only_policy_v3"
+_LOYALTY_APEX_SHARED_SCOPE_MIGRATION_KEY = "20261017_apex_entertain_shared_scope_v4"
 _POLICY_V3_NONRETROACTIVE_MARKER = "policy_v3_nonretroactive"
 _POLICY_V3_RANKED_START_AT_TAIPEI = datetime(2026, 10, 14, 15, 0, 0, tzinfo=TAIPEI_TZ)
 _POLICY_V3_NEWLY_ELIGIBLE_RULES = {
@@ -260,6 +269,10 @@ def _extract_player_count(row: dict[str, Any]) -> int:
 
 
 def _loyalty_display_label(rule_key: str, fallback: object = "") -> str:
+    key = str(rule_key or "").strip()
+    if key in _APEX_ENTERTAINMENT_RULE_KEYS:
+        return "APEX｜娛樂陪"
+
     label = str(fallback or rule_key or "").strip()
     for suffix in ("｜單陪", "｜雙陪", "｜三陪", "｜四陪"):
         if label.endswith(suffix):
@@ -292,8 +305,22 @@ def _extract_same_order_benefit_count(
         return 0
     if str(benefit.get("source") or "").strip() != "same_order":
         return 0
-    if scope_key is not None and str(benefit.get("scope_key") or "").strip() != str(scope_key):
-        return 0
+    if scope_key is not None:
+        expected_scope = str(scope_key)
+        stored_scope = str(benefit.get("scope_key") or "").strip()
+        if stored_scope != expected_scope:
+            benefit_rule_key = str(benefit.get("rule_key") or "").strip()
+            try:
+                benefit_player_count = max(1, int(benefit.get("player_count") or 1))
+            except (TypeError, ValueError):
+                benefit_player_count = 1
+            canonical_scope = (
+                loyalty_scope_key(benefit_rule_key, benefit_player_count)
+                if benefit_rule_key
+                else ""
+            )
+            if canonical_scope != expected_scope:
+                return 0
     try:
         return max(0, int(benefit.get("earned_count") or 0))
     except (TypeError, ValueError):
@@ -1115,6 +1142,100 @@ def _repair_entertainment_loyalty_policy_v3(conn) -> None:
             f"synced_progress={synced_progress};"
             f"marked_orders={marked_orders};"
             f"reconciled_customers={len(affected_customers)}"
+        ),
+    })
+
+
+def _repair_apex_entertainment_shared_scope_v4(conn) -> None:
+    """Merge APEX entertainment NG/ranked into one hourly loyalty pool."""
+    applied = conn.execute(text("""
+        SELECT migration_key
+        FROM loyalty_migrations
+        WHERE migration_key = :migration_key
+        LIMIT 1
+    """), {"migration_key": _LOYALTY_APEX_SHARED_SCOPE_MIGRATION_KEY}).first()
+    if applied is not None:
+        return
+
+    has_orders = conn.execute(text("""
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'web_orders'
+        LIMIT 1
+    """)).first()
+    if has_orders is None:
+        return
+
+    now = get_taipei_now_iso()
+    shared_scope = loyalty_scope_key("apex_entertain_ng")
+    old_scopes = (
+        "apex|apex_entertain_ng",
+        "apex|apex_entertain_ranked",
+        shared_scope,
+    )
+    affected_customers: set[str] = set()
+
+    customer_queries = (
+        """
+        SELECT DISTINCT customer_discord_id
+        FROM customer_loyalty_progress
+        WHERE rule_key IN ('apex_entertain_ng', 'apex_entertain_ranked')
+           OR scope_key IN (:scope_1, :scope_2, :scope_3)
+        """,
+        """
+        SELECT DISTINCT customer_discord_id
+        FROM customer_benefit_coupons
+        WHERE rule_key IN ('apex_entertain_ng', 'apex_entertain_ranked')
+           OR scope_key IN (:scope_1, :scope_2, :scope_3)
+        """,
+        """
+        SELECT DISTINCT customer_discord_id
+        FROM web_orders
+        WHERE order_rule_key IN ('apex_entertain_ng', 'apex_entertain_ranked')
+        """,
+    )
+    scope_params = {
+        "scope_1": old_scopes[0],
+        "scope_2": old_scopes[1],
+        "scope_3": old_scopes[2],
+    }
+    for query in customer_queries:
+        for row in conn.execute(text(query), scope_params).fetchall():
+            customer_id = str(row[0] or "").strip()
+            if customer_id:
+                affected_customers.add(customer_id)
+
+    conn.execute(text("""
+        UPDATE customer_benefit_coupons
+        SET scope_key = :shared_scope,
+            rule_label = 'APEX｜娛樂陪'
+        WHERE rule_key IN ('apex_entertain_ng', 'apex_entertain_ranked')
+           OR scope_key IN (:scope_1, :scope_2, :scope_3)
+    """), {"shared_scope": shared_scope, **scope_params})
+
+    conn.execute(text("""
+        DELETE FROM customer_loyalty_progress
+        WHERE rule_key IN ('apex_entertain_ng', 'apex_entertain_ranked')
+           OR scope_key IN (:scope_1, :scope_2, :scope_3)
+    """), scope_params)
+
+    revoked = 0
+    issued = 0
+    for customer_id in sorted(affected_customers):
+        summary = reconcile_customer_loyalty_in_connection(conn, customer_id)
+        revoked += int(summary.get("revoked") or 0)
+        issued += int(summary.get("issued") or 0)
+
+    conn.execute(text("""
+        INSERT INTO loyalty_migrations (migration_key, applied_at, note)
+        VALUES (:migration_key, :applied_at, :note)
+    """), {
+        "migration_key": _LOYALTY_APEX_SHARED_SCOPE_MIGRATION_KEY,
+        "applied_at": now,
+        "note": (
+            f"shared_scope={shared_scope};"
+            f"reconciled_customers={len(affected_customers)};"
+            f"revoked={revoked};issued={issued}"
         ),
     })
 
