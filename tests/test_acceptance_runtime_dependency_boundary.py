@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import inspect
 from typing import Any, Mapping
 
 import discord
@@ -62,6 +65,25 @@ def test_acceptance_repair_runtime_uses_canonical_services_not_raw_db_paths():
     assert not hasattr(acceptance_repair_runtime, "Path")
 
 
+def test_acceptance_explicit_configurator_is_keyword_only():
+    signature = inspect.signature(
+        acceptance_runtime.configure_acceptance_runtime_explicit
+    )
+    assert list(signature.parameters) == [
+        "dispatch_channel_id",
+        "order_claims",
+        "payment_method_view_type",
+        "order_selections",
+        "bot_instance",
+        "guild_id",
+        "refresh_existing_web_sync_dispatch",
+    ]
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        for parameter in signature.parameters.values()
+    )
+
+
 def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
     originals = {
         "Any": Any,
@@ -87,6 +109,14 @@ def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
     for name, original in originals.items():
         assert getattr(acceptance_runtime, name) is original
     assert not hasattr(acceptance_runtime, "_acceptance_runtime_boundary_marker")
+
+
+def test_acceptance_legacy_adapter_only_validates_and_delegates():
+    source = inspect.getsource(acceptance_runtime.configure_acceptance_runtime)
+    assert "globals()[" not in source
+    assert "configure_acceptance_runtime_explicit(" in source
+    assert "configure_acceptance_sync_worker(" not in source
+    assert "configure_acceptance_repair_runtime(" not in source
 
 
 def test_acceptance_runtime_dependency_names_are_explicit():
