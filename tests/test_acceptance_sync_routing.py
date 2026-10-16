@@ -42,8 +42,13 @@ def test_bot_startup_reconciles_existing_acceptance_panels():
     runtime_source = Path("services/acceptance/runtime.py").read_text(
         encoding="utf-8"
     )
+    repair_source = Path("services/acceptance/repair_runtime.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "async def repair_pending_acceptance_dispatch_panels_once" in runtime_source
+    assert "async def repair_pending_acceptance_dispatch_panels_once" not in runtime_source
+    assert "repair_pending_acceptance_dispatch_panels_once," in runtime_source
+    assert "async def repair_pending_acceptance_dispatch_panels_once" in repair_source
     assert "await repair_pending_acceptance_dispatch_panels_once(" in bot_source
 
 
@@ -97,4 +102,3 @@ def test_cs_dispatch_failure_does_not_claim_rollback_succeeded_when_it_failed():
     assert "CS dispatch rollback failed" in body
     assert "if rollback_error is None:" in body
     assert "訂單狀態沒有成功恢復" in body
-
