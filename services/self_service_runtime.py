@@ -86,9 +86,8 @@ from services.self_service_reorder import (
 )
 
 # Dependencies with a stable owning module are imported directly above and must not
-# be replaced by the legacy bot.py namespace injection. Keeping this allow-list
-# explicit lets us shrink the remaining runtime surface incrementally without
-# changing the public Discord self-service entry points.
+# be replaced by bot.py runtime values. The explicit legacy contract below is the
+# only bot-owned surface that configure_self_service_runtime is allowed to bind.
 _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     {
         "Any",
@@ -118,125 +117,131 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     }
 )
 
+_BOT_OWNED_RUNTIME_NAMES = frozenset(
+    {
+        "CUSTOMER_CATEGORY_ID",
+        "CUSTOMER_ROLE_ID",
+        "DISPATCH_CHANNEL_ID",
+        "ORDER_CLAIMS",
+        "ORDER_ITEM_GROUPS_BY_CATEGORY",
+        "ORDER_ITEM_TO_CATEGORY",
+        "POINT_REDEEM_ITEMS",
+        "POINT_REDEEM_ITEMS_BY_KEY",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "DispatchClaimView",
+        "OrderControlView",
+        "SelfServiceOrderCategorySelect",
+        "SelfServiceOrderDetailSelect",
+        "SelfServiceOrderItemSelect",
+        "SelfServiceOrderQuantitySelect",
+        "_get_order_rule_by_item_label",
+        "_self_service_quantity_meta",
+        "allocate_store_absorbed_fixed_discount",
+        "build_ticket_channel_name",
+        "can_operate_self_service_order",
+        "configure_reorder_ticket_creator",
+        "delete_order_row_from_db",
+        "get_current_reward_points",
+        "get_customer_reward_data",
+        "get_effective_member_level",
+        "get_order_item_detail_for_selection",
+        "get_order_item_details_for_group",
+        "get_order_item_group_label",
+        "get_self_service_quantity_meta",
+        "get_self_service_quantity_unit",
+        "get_vip_discount_pay_rate",
+        "log_self_service_proxy_action",
+        "normalize_self_service_staff_count",
+        "send_order_log",
+    }
+)
+
 _CONFIGURED = False
 
 
 def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the remaining bot-owned legacy dependencies after bot.py is loaded."""
+    """Bind the explicit remaining bot-owned dependency contract.
+
+    Older versions copied nearly every bot.py global into this module. That made
+    unrelated bot.py names silently become runtime dependencies and allowed a
+    later global with the same name to replace a module-owned implementation.
+    Keep the public configure(globals()) call for compatibility, but only consume
+    the names this runtime still actually needs.
+    """
     global _CONFIGURED
 
-    for name, value in namespace.items():
-        if name.startswith("__"):
-            continue
-        if name == "configure_self_service_runtime":
-            continue
-        if name in _MODULE_OWNED_RUNTIME_NAMES:
-            continue
-        globals()[name] = value
+    missing_runtime_names = sorted(
+        name for name in _BOT_OWNED_RUNTIME_NAMES if name not in namespace
+    )
+    if missing_runtime_names:
+        raise RuntimeError(
+            "self-service runtime missing dependencies: "
+            + ", ".join(missing_runtime_names)
+        )
 
-    reorder_configurator = globals().get("configure_reorder_ticket_creator")
-    if callable(reorder_configurator):
-        reorder_configurator(create_reorder_ticket_from_closed_order)
+    for name in _BOT_OWNED_RUNTIME_NAMES:
+        globals()[name] = namespace[name]
+
+    configure_reorder_ticket_creator(create_reorder_ticket_from_closed_order)
 
     # ORDER_POINT_BENEFIT_SPECS is owned by self_service_selection_runtime,
     # so bot.py must not be required to re-export it just to configure
     # the financial runtime.
-    financial_keys = {
-        "POINT_REDEEM_ITEMS_BY_KEY",
-        "allocate_store_absorbed_fixed_discount",
-        "get_current_reward_points",
-        "get_customer_reward_data",
-        "get_effective_member_level",
-        "get_self_service_quantity_unit",
-        "get_vip_discount_pay_rate",
-    }
-    present_financial_keys = financial_keys.intersection(namespace)
-    missing_financial_keys = sorted(financial_keys.difference(namespace))
+    configure_self_service_financials(
+        order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
+        point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
+        get_rule_from_data=_get_rule_from_self_service_data,
+        is_specify_preference=_is_specify_preference,
+        role_key_for_member=_role_key_for_member,
+        to_int=_to_int,
+        store_absorbed_discount_allocator=namespace["allocate_store_absorbed_fixed_discount"],
+        current_reward_points=namespace["get_current_reward_points"],
+        customer_reward_data=namespace["get_customer_reward_data"],
+        effective_member_level=namespace["get_effective_member_level"],
+        self_service_quantity_unit=namespace["get_self_service_quantity_unit"],
+        vip_discount_pay_rate=namespace["get_vip_discount_pay_rate"],
+    )
 
-    if present_financial_keys and missing_financial_keys:
-        raise RuntimeError(
-            "self-service financial runtime missing dependencies: "
-            + ", ".join(missing_financial_keys)
-        )
+    configure_self_service_reorder(
+        order_category_labels=ORDER_CATEGORY_LABELS,
+        order_item_groups_by_category=namespace["ORDER_ITEM_GROUPS_BY_CATEGORY"],
+        get_order_rule_by_item_label=namespace["_get_order_rule_by_item_label"],
+        role_key_for_member=_role_key_for_member,
+        to_int=_to_int,
+        order_item_details_for_group=namespace["get_order_item_details_for_group"],
+        order_item_group_label=namespace["get_order_item_group_label"],
+        self_service_quantity_meta=namespace["get_self_service_quantity_meta"],
+        taipei_now_iso=get_taipei_now_iso,
+        staff_price_required=is_self_service_staff_price_required,
+        customer_role_id=namespace["CUSTOMER_ROLE_ID"],
+        customer_category_id=namespace["CUSTOMER_CATEGORY_ID"],
+        order_control_view=namespace["OrderControlView"],
+        self_service_order_view=SelfServiceOrderView,
+        panel_embed_builder=build_self_service_panel_embed,
+        self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        remember_data=remember_order_data,
+        save_data=save_bot_data,
+        ticket_channel_name_builder=namespace["build_ticket_channel_name"],
+        delete_order_row=namespace["delete_order_row_from_db"],
+        order_log_sender=namespace["send_order_log"],
+    )
 
-    if not missing_financial_keys:
-        configure_self_service_financials(
-            order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
-            point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
-            get_rule_from_data=_get_rule_from_self_service_data,
-            is_specify_preference=_is_specify_preference,
-            role_key_for_member=_role_key_for_member,
-            to_int=_to_int,
-            store_absorbed_discount_allocator=namespace["allocate_store_absorbed_fixed_discount"],
-            current_reward_points=namespace["get_current_reward_points"],
-            customer_reward_data=namespace["get_customer_reward_data"],
-            effective_member_level=namespace["get_effective_member_level"],
-            self_service_quantity_unit=namespace["get_self_service_quantity_unit"],
-            vip_discount_pay_rate=namespace["get_vip_discount_pay_rate"],
-        )
-
-    reorder_keys = {
-        "ORDER_ITEM_GROUPS_BY_CATEGORY",
-        "CUSTOMER_ROLE_ID",
-        "CUSTOMER_CATEGORY_ID",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "OrderControlView",
-        "_get_order_rule_by_item_label",
-        "build_ticket_channel_name",
-        "delete_order_row_from_db",
-        "get_order_item_details_for_group",
-        "get_order_item_group_label",
-        "get_self_service_quantity_meta",
-        "send_order_log",
-    }
-    if reorder_keys.issubset(namespace):
-        configure_self_service_reorder(
-            order_category_labels=ORDER_CATEGORY_LABELS,
-            order_item_groups_by_category=namespace["ORDER_ITEM_GROUPS_BY_CATEGORY"],
-            get_order_rule_by_item_label=namespace["_get_order_rule_by_item_label"],
-            role_key_for_member=_role_key_for_member,
-            to_int=_to_int,
-            order_item_details_for_group=namespace["get_order_item_details_for_group"],
-            order_item_group_label=namespace["get_order_item_group_label"],
-            self_service_quantity_meta=namespace["get_self_service_quantity_meta"],
-            taipei_now_iso=get_taipei_now_iso,
-            staff_price_required=is_self_service_staff_price_required,
-            customer_role_id=namespace["CUSTOMER_ROLE_ID"],
-            customer_category_id=namespace["CUSTOMER_CATEGORY_ID"],
-            order_control_view=namespace["OrderControlView"],
-            self_service_order_view=SelfServiceOrderView,
-            panel_embed_builder=build_self_service_panel_embed,
-            self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            remember_data=remember_order_data,
-            save_data=save_bot_data,
-            ticket_channel_name_builder=namespace["build_ticket_channel_name"],
-            delete_order_row=namespace["delete_order_row_from_db"],
-            order_log_sender=namespace["send_order_log"],
-        )
-
-
-    selection_keys = {
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "POINT_REDEEM_ITEMS",
-    }
-    if selection_keys.issubset(namespace):
-        configure_self_service_selection_runtime(
-            order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            point_redeem_items=namespace["POINT_REDEEM_ITEMS"],
-            role_key_for_member=_role_key_for_member,
-            remember_data=remember_order_data,
-            panel_embed_builder=build_self_service_panel_embed,
-            order_view_type=SelfServiceOrderView,
-            to_int=_to_int,
-            order_point_item_getter=get_order_point_item,
-            customer_point_balance_getter=get_customer_point_balance_for_order,
-            point_benefit_allowed_for_rule=is_order_point_benefit_allowed_for_rule,
-            point_benefit_adapter=_adapt_order_point_benefit_for_rule,
-            selected_point_benefit_getter=get_selected_order_point_benefit,
-        )
+    configure_self_service_selection_runtime(
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        point_redeem_items=namespace["POINT_REDEEM_ITEMS"],
+        role_key_for_member=_role_key_for_member,
+        remember_data=remember_order_data,
+        panel_embed_builder=build_self_service_panel_embed,
+        order_view_type=SelfServiceOrderView,
+        to_int=_to_int,
+        order_point_item_getter=get_order_point_item,
+        customer_point_balance_getter=get_customer_point_balance_for_order,
+        point_benefit_allowed_for_rule=is_order_point_benefit_allowed_for_rule,
+        point_benefit_adapter=_adapt_order_point_benefit_for_rule,
+        selected_point_benefit_getter=get_selected_order_point_benefit,
+    )
 
     _CONFIGURED = True
-
 
 
 
@@ -1277,19 +1282,3 @@ class SelfServiceOrderView(discord.ui.View):
                 panel_message_id=panel_message_id,
             )
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
