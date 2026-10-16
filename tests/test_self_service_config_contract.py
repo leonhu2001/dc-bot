@@ -6,7 +6,9 @@ from services import self_service_runtime
 
 
 def test_subruntime_configurators_use_module_owned_dependencies_directly():
-    source = inspect.getsource(self_service_runtime.configure_self_service_runtime)
+    source = inspect.getsource(
+        self_service_runtime.configure_self_service_runtime_explicit
+    )
 
     forbidden_namespace_lookups = (
         'namespace["ORDER_CATEGORY_LABELS"]',
