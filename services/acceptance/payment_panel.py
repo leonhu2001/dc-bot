@@ -142,11 +142,15 @@ async def ensure_acceptance_payment_panel(
     """
     channel_id = int(ticket_channel.id)
     selected_method = _normalize_selected_payment_method(data)
-    receiver_text = acceptance_staff_display_text(guild, state)
+    receiver_text = (
+        acceptance_staff_display_text(guild, state)
+        if state is not None
+        else str(data.get("accepted_staff_display_text") or "").strip() or None
+    )
 
     if receiver_text:
         data["accepted_staff_display_text"] = receiver_text
-    else:
+    elif state is not None:
         data.pop("accepted_staff_display_text", None)
 
     existing_message_id = _to_int(data.get("payment_message_id"))
@@ -226,16 +230,22 @@ async def ensure_acceptance_payment_panel(
     save_bot_data()
 
     if log_title:
+        progress = None
+        if state is not None:
+            progress = (
+                f"{getattr(state, 'accepted_count', 0)}/"
+                f"{getattr(state, 'required_staff_count', 1)}"
+            )
+
         fields = [
             ("顧客", f"<@{customer_id}>", True),
             ("訂單", f"{category_label}｜{item} x{quantity}", False),
-            (
-                "接單進度",
-                f"{getattr(state, 'accepted_count', 0)}/{getattr(state, 'required_staff_count', 1)}",
-                True,
-            ),
-            ("票口", ticket_channel.mention, False),
         ]
+
+        if progress:
+            fields.append(("接單進度", progress, True))
+
+        fields.append(("票口", ticket_channel.mention, False))
 
         if log_source:
             fields.append(("來源", log_source, True))
