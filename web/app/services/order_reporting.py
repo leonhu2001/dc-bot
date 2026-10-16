@@ -4,6 +4,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import (
@@ -15,6 +16,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    inspect,
     select,
     text,
 )
@@ -47,6 +49,7 @@ REPORT_STATUSES = {
 TAIPEI_TZ = timezone(timedelta(hours=8))
 REPORT_NOTE_MAX_LENGTH = 1000
 REVIEW_NOTE_MAX_LENGTH = 1000
+STREAM_URL_MAX_LENGTH = 500
 REMINDER_MAX_ATTEMPTS = 3
 REMINDER_LOOP_SECONDS = 30
 
@@ -59,6 +62,7 @@ order_reports = Table(
     Column("order_id", Integer, nullable=False, unique=True, index=True),
     Column("status", String(32), nullable=False, index=True),
     Column("is_legacy", Integer, nullable=False, default=0),
+    # Compatibility summary: true when at least one reported worker streamed.
     Column("streamed", Integer, nullable=True),
     Column("recording_saved", Integer, nullable=True),
     Column("recording_holder", String(120), nullable=True),
@@ -82,6 +86,8 @@ order_report_workers = Table(
     Column("worker_discord_id", String(32), nullable=False),
     Column("worker_display_name", String(120), nullable=True),
     Column("has_named_bonus", Integer, nullable=False, default=0),
+    Column("streamed", Integer, nullable=True),
+    Column("stream_url", String(STREAM_URL_MAX_LENGTH), nullable=True),
     UniqueConstraint(
         "report_id",
         "worker_discord_id",
@@ -170,6 +176,68 @@ def _public_base_url() -> str:
     if allowed:
         return str(allowed[0]).rstrip("/")
     return "https://mowanentertainment.com"
+
+
+def _normalize_stream_url(value: Any) -> str | None:
+    stream_url = _trimmed(value, STREAM_URL_MAX_LENGTH)
+    if not stream_url:
+        return None
+    parsed = urlparse(stream_url)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("直播網址格式不正確，請貼上完整的 http:// 或 https:// 網址。")
+    return stream_url
+
+
+def _normalize_worker_stream_fields(
+    worker_ids: set[str],
+    streamed_by_worker: Mapping[str, bool] | None,
+    stream_url_by_worker: Mapping[str, str | None] | None,
+) -> tuple[dict[str, bool], dict[str, str | None]]:
+    streamed_input = {
+        str(key): bool(value)
+        for key, value in (streamed_by_worker or {}).items()
+    }
+    missing_streamed = sorted(worker_ids - set(streamed_input))
+    if missing_streamed:
+        raise ValueError("請確認本單每位接單人員是否開直播。")
+
+    url_input = {
+        str(key): value
+        for key, value in (stream_url_by_worker or {}).items()
+    }
+    normalized_streamed: dict[str, bool] = {}
+    normalized_urls: dict[str, str | None] = {}
+    for worker_id in worker_ids:
+        did_stream = bool(streamed_input[worker_id])
+        normalized_streamed[worker_id] = did_stream
+        if not did_stream:
+            normalized_urls[worker_id] = None
+            continue
+        stream_url = _normalize_stream_url(url_input.get(worker_id))
+        if not stream_url:
+            raise ValueError("有開直播的接單人員必須填寫直播網址。")
+        normalized_urls[worker_id] = stream_url
+    return normalized_streamed, normalized_urls
+
+
+def _ensure_order_report_worker_columns(bind: Engine) -> None:
+    """Upgrade existing report-worker rows in place without recreating report data."""
+    columns = {
+        str(column.get("name") or "")
+        for column in inspect(bind).get_columns("order_report_workers")
+    }
+    statements: list[str] = []
+    if "streamed" not in columns:
+        statements.append("ALTER TABLE order_report_workers ADD COLUMN streamed INTEGER")
+    if "stream_url" not in columns:
+        statements.append(
+            f"ALTER TABLE order_report_workers ADD COLUMN stream_url VARCHAR({STREAM_URL_MAX_LENGTH})"
+        )
+    if not statements:
+        return
+    with bind.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))
 
 
 def _install_sqlite_triggers(bind: Engine) -> None:
@@ -318,6 +386,7 @@ def ensure_order_reporting_tables(bind: Engine = engine) -> None:
     orders never suddenly become overdue reports.
     """
     metadata.create_all(bind=bind)
+    _ensure_order_report_worker_columns(bind)
 
     now = _now()
     with bind.begin() as conn:
@@ -612,7 +681,9 @@ def _load_report_detail(order_id: int) -> dict | None:
                     a.worker_display_name,
                     a.role_type,
                     a.has_named_bonus AS current_named_bonus,
-                    rw.has_named_bonus AS reported_named_bonus
+                    rw.has_named_bonus AS reported_named_bonus,
+                    rw.streamed AS reported_streamed,
+                    rw.stream_url AS reported_stream_url
                 FROM order_assignments a
                 LEFT JOIN order_report_workers rw
                   ON rw.report_id = :report_id
@@ -749,11 +820,12 @@ def submit_order_report(
     *,
     order_id: int,
     user: Mapping[str, Any],
-    streamed: bool,
     recording_saved: bool,
     recording_holder: str | None,
     note: str | None,
     named_bonus_by_worker: Mapping[str, bool],
+    streamed_by_worker: Mapping[str, bool],
+    stream_url_by_worker: Mapping[str, str | None],
 ) -> None:
     ensure_order_reporting_tables()
     worker_id = str(user.get("id") or "").strip()
@@ -804,6 +876,13 @@ def submit_order_report(
         if missing_named:
             raise ValueError("請確認本單每位接單人員是否掛名。")
 
+        streamed_map, stream_url_map = _normalize_worker_stream_fields(
+            worker_ids,
+            streamed_by_worker,
+            stream_url_by_worker,
+        )
+        any_streamed = any(streamed_map.values())
+
         report_id = int(order["report_id"])
         before = _report_snapshot(conn, report_id)
         conn.execute(
@@ -811,7 +890,7 @@ def submit_order_report(
             .where(order_reports.c.id == report_id)
             .values(
                 status=REPORT_STATUS_PENDING,
-                streamed=_to_bool_int(streamed),
+                streamed=_to_bool_int(any_streamed),
                 recording_saved=_to_bool_int(recording_saved),
                 recording_holder=holder_text,
                 note=note_text,
@@ -838,6 +917,8 @@ def submit_order_report(
                     worker_discord_id=current_worker_id,
                     worker_display_name=row.get("worker_display_name") or current_worker_id,
                     has_named_bonus=_to_bool_int(named_bonus_by_worker.get(current_worker_id)),
+                    streamed=_to_bool_int(streamed_map[current_worker_id]),
+                    stream_url=stream_url_map[current_worker_id],
                 )
             )
 
@@ -897,11 +978,12 @@ def review_order_report(
     admin_user: Mapping[str, Any],
     action: str,
     review_note: str | None = None,
-    streamed: bool | None = None,
     recording_saved: bool | None = None,
     recording_holder: str | None = None,
     note: str | None = None,
     named_bonus_by_worker: Mapping[str, bool] | None = None,
+    streamed_by_worker: Mapping[str, bool] | None = None,
+    stream_url_by_worker: Mapping[str, str | None] | None = None,
 ) -> None:
     ensure_order_reporting_tables()
     action = str(action or "").strip()
@@ -969,9 +1051,9 @@ def review_order_report(
             return
 
         # Approval may also be used by CS to complete a missing report on behalf of
-        # the workers. Therefore the editable report fields are validated here.
-        if streamed is None or recording_saved is None:
-            raise ValueError("確認通過前，請確認直播與錄影狀態。")
+        # the workers. Therefore all editable report fields are validated here.
+        if recording_saved is None:
+            raise ValueError("確認通過前，請確認錄影狀態。")
 
         assignments = list(
             db.scalars(
@@ -985,20 +1067,24 @@ def review_order_report(
             raise ValueError("這張訂單沒有接單人員，請先確認訂單資料。")
 
         named_map = {str(key): bool(value) for key, value in (named_bonus_by_worker or {}).items()}
-        missing_named = [
-            str(row.worker_discord_id)
-            for row in assignments
-            if str(row.worker_discord_id) not in named_map
-        ]
+        worker_ids = {str(row.worker_discord_id) for row in assignments}
+        missing_named = sorted(worker_ids - set(named_map))
         if missing_named:
             raise ValueError("確認通過前，請確認本單每位接單人員是否掛名。")
+
+        streamed_map, stream_url_map = _normalize_worker_stream_fields(
+            worker_ids,
+            streamed_by_worker,
+            stream_url_by_worker,
+        )
+        any_streamed = any(streamed_map.values())
 
         conn.execute(
             order_reports.update()
             .where(order_reports.c.id == report_id)
             .values(
                 status=REPORT_STATUS_APPROVED,
-                streamed=_to_bool_int(streamed),
+                streamed=_to_bool_int(any_streamed),
                 recording_saved=_to_bool_int(recording_saved),
                 recording_holder=(
                     _trimmed(recording_holder, 120)
@@ -1032,6 +1118,8 @@ def review_order_report(
                         or current_worker_id
                     ),
                     has_named_bonus=int(enabled),
+                    streamed=_to_bool_int(streamed_map[current_worker_id]),
+                    stream_url=stream_url_map[current_worker_id],
                 )
             )
 
@@ -1047,6 +1135,11 @@ def review_order_report(
                 "named_bonus_worker_ids": [
                     worker_id
                     for worker_id, enabled in named_map.items()
+                    if enabled
+                ],
+                "streamed_worker_ids": [
+                    worker_id
+                    for worker_id, enabled in streamed_map.items()
                     if enabled
                 ],
             },

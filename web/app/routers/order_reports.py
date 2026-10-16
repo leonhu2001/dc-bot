@@ -109,6 +109,29 @@ def _parse_named_map(form, workers: list[dict]) -> dict[str, bool]:
     return result
 
 
+def _parse_worker_stream_maps(
+    form,
+    workers: list[dict],
+) -> tuple[dict[str, bool], dict[str, str]]:
+    streamed_by_worker: dict[str, bool] = {}
+    stream_url_by_worker: dict[str, str] = {}
+    for worker in workers:
+        worker_id = str(worker.get("worker_discord_id") or "").strip()
+        if not worker_id:
+            continue
+        streamed_key = f"streamed_{worker_id}"
+        if streamed_key in form:
+            value = str(form.get(streamed_key) or "").strip().lower()
+            if value in {"1", "true", "yes", "on"}:
+                streamed_by_worker[worker_id] = True
+            elif value in {"0", "false", "no", "off"}:
+                streamed_by_worker[worker_id] = False
+        stream_url_by_worker[worker_id] = str(
+            form.get(f"stream_url_{worker_id}") or ""
+        ).strip()
+    return streamed_by_worker, stream_url_by_worker
+
+
 @router.on_event("startup")
 async def _order_report_startup() -> None:
     global _reminder_task
@@ -335,19 +358,23 @@ async def order_report_review_submit(request: Request, order_id: int):
         if action != REPORT_STATUS_APPROVED:
             raise ValueError("請選擇審核操作。")
 
-        streamed = _parse_bool(form, "streamed")
         recording_saved = _parse_bool(form, "recording_saved")
         named_map = _parse_named_map(form, detail.get("workers", []))
+        streamed_map, stream_url_map = _parse_worker_stream_maps(
+            form,
+            detail.get("workers", []),
+        )
         review_order_report(
             order_id=order_id,
             admin_user=user,
             action=REPORT_STATUS_APPROVED,
             review_note=str(form.get("review_note") or ""),
-            streamed=streamed,
             recording_saved=recording_saved,
             recording_holder=str(form.get("recording_holder") or ""),
             note=str(form.get("note") or ""),
             named_bonus_by_worker=named_map,
+            streamed_by_worker=streamed_map,
+            stream_url_by_worker=stream_url_map,
         )
     except ValueError as exc:
         return _redirect(
@@ -468,24 +495,28 @@ async def order_report_submit(request: Request, order_id: int):
         )
 
     form = await request.form()
-    streamed = _parse_bool(form, "streamed")
     recording_saved = _parse_bool(form, "recording_saved")
-    if streamed is None or recording_saved is None:
+    if recording_saved is None:
         return _redirect(
             f"/dispatch/reports/{order_id}",
-            error="請確認是否開直播，以及是否保留錄影。",
+            error="請確認是否保留錄影。",
         )
 
     named_map = _parse_named_map(form, detail.get("workers", []))
+    streamed_map, stream_url_map = _parse_worker_stream_maps(
+        form,
+        detail.get("workers", []),
+    )
     try:
         submit_order_report(
             order_id=order_id,
             user=user,
-            streamed=streamed,
             recording_saved=recording_saved,
             recording_holder=str(form.get("recording_holder") or ""),
             note=str(form.get("note") or ""),
             named_bonus_by_worker=named_map,
+            streamed_by_worker=streamed_map,
+            stream_url_by_worker=stream_url_map,
         )
     except ValueError as exc:
         return _redirect(

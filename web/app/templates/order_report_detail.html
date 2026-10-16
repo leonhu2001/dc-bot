@@ -1,13 +1,13 @@
 {% extends "layout.html" %}
 {% block page_title %}填寫報單{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/order_reports.css?v=2">
+<link rel="stylesheet" href="/static/css/order_reports.css?v=3">
 <section class="report-shell report-detail-shell">
   <div class="report-hero report-hero-compact">
     <div>
       <p class="report-kicker">{{ detail.bot_order_no or ('WEB-' ~ detail.id) }}</p>
       <h2>{{ detail.category }}｜{{ detail.item }}</h2>
-      <p>系統已帶入訂單資料，你只需要確認掛名、直播、錄影與備註。</p>
+      <p>系統已帶入訂單資料；一份報單統一確認每位接單人員的掛名與直播，再補上整單錄影與備註。</p>
     </div>
     <span class="report-badge report-badge-{{ detail.report_status }}">{{ status_labels.get(detail.report_status, detail.report_status) }}</span>
   </div>
@@ -35,49 +35,62 @@
   <form method="post" class="report-form">
     <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
     <fieldset class="report-form-fieldset" {% if readonly %}disabled{% endif %}>
-      <div class="report-section">
+      <div class="report-section report-service-record">
         <div class="report-section-head">
-          <div><p class="report-kicker">NAMED BONUS</p><h3>掛名確認</h3></div>
-          <span class="report-muted">每位接單人員都要確認</span>
+          <div><p class="report-kicker">SERVICE RECORD</p><h3>接單紀錄</h3></div>
+          <span class="report-muted">一份報單即可；每位接單人員的直播狀態要分開確認</span>
         </div>
-        <div class="report-worker-list">
+
+        <div class="report-worker-service-list">
           {% for worker in workers %}
             {% set named_value = worker.reported_named_bonus if worker.reported_named_bonus is not none else worker.current_named_bonus %}
-            <label class="report-worker-row">
-              <div>
+            {% set stream_value = worker.reported_streamed %}
+            <div class="report-worker-service-row" data-worker-live-row>
+              <div class="report-worker-identity">
                 <strong>{{ worker.worker_display_name or worker.worker_discord_id }}</strong>
                 <small>{{ worker.worker_discord_id }}</small>
               </div>
-              <select name="named_{{ worker.worker_discord_id }}" required>
-                <option value="0" {% if not named_value %}selected{% endif %}>無掛名</option>
-                <option value="1" {% if named_value %}selected{% endif %}>有掛名</option>
-              </select>
-            </label>
+
+              <label class="report-field report-worker-named">
+                <span>掛名</span>
+                <select name="named_{{ worker.worker_discord_id }}" required>
+                  <option value="0" {% if not named_value %}selected{% endif %}>無掛名</option>
+                  <option value="1" {% if named_value %}selected{% endif %}>有掛名</option>
+                </select>
+              </label>
+
+              <div class="report-field report-worker-live-choice">
+                <span>直播</span>
+                <div class="report-choice-grid report-choice-grid-compact">
+                  <label><input type="radio" data-worker-streamed name="streamed_{{ worker.worker_discord_id }}" value="0" required {% if stream_value == 0 %}checked{% endif %}> 沒有</label>
+                  <label><input type="radio" data-worker-streamed name="streamed_{{ worker.worker_discord_id }}" value="1" required {% if stream_value == 1 %}checked{% endif %}> 有</label>
+                </div>
+              </div>
+
+              <label class="report-field report-worker-stream-url" data-worker-stream-url-wrap {% if stream_value != 1 %}hidden{% endif %}>
+                <span>直播網址</span>
+                <input type="url" data-worker-stream-url name="stream_url_{{ worker.worker_discord_id }}" maxlength="500" value="{{ worker.reported_stream_url or '' }}" placeholder="https://..." {% if stream_value == 1 %}required{% endif %}>
+              </label>
+            </div>
           {% endfor %}
         </div>
-      </div>
 
-      <div class="report-two-column">
-        <div class="report-section">
-          <p class="report-kicker">LIVE</p>
-          <h3>是否開直播</h3>
-          <div class="report-choice-grid">
-            <label><input type="radio" name="streamed" value="0" required {% if detail.streamed == 0 %}checked{% endif %}> 沒有</label>
-            <label><input type="radio" name="streamed" value="1" required {% if detail.streamed == 1 %}checked{% endif %}> 有</label>
+        <div class="report-recording-block">
+          <div>
+            <p class="report-kicker">RECORDING</p>
+            <h3>整單錄影</h3>
+            <p class="report-muted">錄影仍是整張單共用，不需要每位接單人員各填一次。</p>
           </div>
-        </div>
-
-        <div class="report-section">
-          <p class="report-kicker">RECORDING</p>
-          <h3>是否保留錄影</h3>
-          <div class="report-choice-grid">
-            <label><input type="radio" name="recording_saved" value="0" required {% if detail.recording_saved == 0 %}checked{% endif %}> 未保留</label>
-            <label><input type="radio" name="recording_saved" value="1" required {% if detail.recording_saved == 1 %}checked{% endif %}> 有保留</label>
+          <div class="report-recording-fields">
+            <div class="report-choice-grid">
+              <label><input type="radio" name="recording_saved" value="0" required {% if detail.recording_saved == 0 %}checked{% endif %}> 未保留</label>
+              <label><input type="radio" name="recording_saved" value="1" required {% if detail.recording_saved == 1 %}checked{% endif %}> 有保留</label>
+            </div>
+            <label class="report-field">
+              <span>錄影保留者（選填）</span>
+              <input type="text" name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}" placeholder="例如：玉米">
+            </label>
           </div>
-          <label class="report-field">
-            <span>錄影保留者（選填）</span>
-            <input type="text" name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}" placeholder="例如：玉米">
-          </label>
         </div>
       </div>
 
@@ -109,4 +122,5 @@
     </div>
   {% endif %}
 </section>
+<script src="/static/js/order_reports.js?v=3" defer></script>
 {% endblock %}
