@@ -66,7 +66,6 @@ GROUP_SPECS = [
         "key": "exbar_tech",
         "category": "delta_desktop_basic",
         "label": "絕巴技術陪",
-        "description": "絕巴技術陪服務。",
         "variants": [
             ("basic_exbar_tech", "絕巴技術陪"),
         ],
@@ -105,7 +104,7 @@ GROUP_SPECS = [
         "category": "delta_desktop_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩人數",
-        "description": "需同時具備男陪／女陪與三角洲<端遊>身分組；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("basic_entertain_single", "單陪"),
             ("basic_entertain_double", "雙陪"),
@@ -117,7 +116,7 @@ GROUP_SPECS = [
         "category": "delta_mobile_basic",
         "label": "娛樂陪",
         "selector_label": "陪玩人數",
-        "description": "需同時具備男陪／女陪與三角洲<手遊>身分組；價格與端遊相同；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "description": "價格與端遊相同；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("basic_mobile_entertain_single", "單陪"),
             ("basic_mobile_entertain_double", "雙陪"),
@@ -241,33 +240,31 @@ GROUP_SPECS = [
         ],
     },
 
-
-
     {
         "key": "steam",
         "category": "steam",
         "label": "Steam 陪玩",
-        "description": "需男陪／女陪 + Steam 身分組；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "description": "娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("steam_play", "Steam 陪玩"),
         ],
     },
 
-    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"需男陪／女陪 + 特戰英豪身分組；娛樂陪福利：NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
-    {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"需特戰英豪身分組 + 超凡／神話／輻能階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
-    {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"需特戰英豪身分組 + 神話／輻能階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
-    {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"需特戰英豪身分組 + 輻能階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
-    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"需男陪／女陪 + 英雄聯盟身分組；娛樂陪福利：ARAM / NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，ARAM / NG 2 小時、積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
-    {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"需英雄聯盟身分組 + 大師／宗師／菁英階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
-    {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"需英雄聯盟身分組 + 宗師／菁英階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
-    {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"需英雄聯盟身分組 + 菁英階級；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
+    {"key":"valorant_entertain","category":"valorant","label":"特戰英豪｜娛樂陪","selector_label":"模式","description":"娛樂陪福利：NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_entertain_ng","NG"),("valorant_entertain_ranked","積分")]},
+    {"key":"valorant_ascendant","category":"valorant","label":"特戰英豪｜超凡陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_ascendant_ng","NG"),("valorant_ascendant_ranked","積分")]},
+    {"key":"valorant_immortal","category":"valorant","label":"特戰英豪｜神話陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_immortal_ng","NG"),("valorant_immortal_ranked","積分")]},
+    {"key":"valorant_radiant","category":"valorant","label":"特戰英豪｜輻能陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("valorant_radiant_ng","NG"),("valorant_radiant_ranked","積分")]},
+    {"key":"lol_entertain","category":"lol","label":"英雄聯盟｜娛樂陪","selector_label":"模式","description":"娛樂陪福利：ARAM / NG 累積 10 個服務小時回饋 1 小時、積分累積 10 個服務局回饋 1 局，達標當單可直接折抵；指定每位 +100T，ARAM / NG 2 小時、積分 2 局以上免指定費。","variants":[("lol_entertain_aram","ARAM"),("lol_entertain_ng","NG"),("lol_entertain_ranked","積分")]},
+    {"key":"lol_master","category":"lol","label":"英雄聯盟｜大師陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_master_ng","NG"),("lol_master_ranked","積分")]},
+    {"key":"lol_grandmaster","category":"lol","label":"英雄聯盟｜宗師陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_grandmaster_ng","NG"),("lol_grandmaster_ranked","積分")]},
+    {"key":"lol_elite","category":"lol","label":"英雄聯盟｜菁英陪","selector_label":"模式","description":"指定每位 +100T，NG 2 小時 / 積分 2 局以上免指定費。","variants":[("lol_elite_ng","NG"),("lol_elite_ranked","積分")]},
 
     {
         "key": "apex_entertain",
         "category": "apex",
         "label": "APEX｜娛樂陪",
         "selector_label": "模式",
-        "description": "需男陪／女陪 + APEX身分組；NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
+        "description": "NG 300T/人/H、積分 350T/人/H；指定每位 +100T，2H 以上免指定費；娛樂陪福利累積 10 個服務小時回饋 1 小時，可於達標當單直接折抵。",
         "variants": [
             ("apex_entertain_ng", "NG"),
             ("apex_entertain_ranked", "積分"),
@@ -278,7 +275,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜鑽石陪",
         "selector_label": "模式",
-        "description": "需 APEX身分組 + 鑽石／大師／頂獵階級；NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 400T/人/H、積分 450T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_diamond_ng", "NG"),
             ("apex_diamond_ranked", "積分"),
@@ -289,7 +286,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜大師陪",
         "selector_label": "模式",
-        "description": "需 APEX身分組 + 大師／頂獵階級；NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 500T/人/H、積分 550T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_master_ng", "NG"),
             ("apex_master_ranked", "積分"),
@@ -300,7 +297,7 @@ GROUP_SPECS = [
         "category": "apex",
         "label": "APEX｜頂獵陪",
         "selector_label": "模式",
-        "description": "需 APEX身分組 + 頂獵階級；NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費。",
+        "description": "NG 600T/人/H、積分 650T/人/H；指定每位 +100T，2H 以上免指定費。",
         "variants": [
             ("apex_predator_ng", "NG"),
             ("apex_predator_ranked", "積分"),
@@ -310,7 +307,7 @@ GROUP_SPECS = [
 ]
 
 
-# 甜蜜單與教學單改為遊戲內服務，避免智慧派單跨遊戲通知。
+# 甜蜜單與教學單依遊戲分組；接單資格與智慧派單條件只留在內部規則。
 _GAME_SHARED_GROUPS = (
     ("delta_desktop", "delta_desktop_basic", "三角洲<端遊>"),
     ("delta_mobile", "delta_mobile_basic", "三角洲<手遊>"),
@@ -326,7 +323,7 @@ for _prefix, _category, _game_label in _GAME_SHARED_GROUPS:
         "category": _category,
         "label": "甜蜜單",
         "selector_label": "陪玩性別／人數",
-        "description": f"{_game_label}限定；派單只通知同時具有陪玩資格與該遊戲身分組的人員。",
+        "description": f"{_game_label}限定甜蜜單。",
         "variants": [
             (f"{_prefix}_sweet_female_single", "女單陪"),
             (f"{_prefix}_sweet_male_single", "男單陪"),
@@ -349,7 +346,7 @@ for _prefix, _category, _game_label in _GAME_TEACHING_GROUPS:
         "key": f"{_prefix}_teaching",
         "category": _category,
         "label": "教學單",
-        "description": f"{_game_label}限定教學；智慧派單會同時檢查導師階級與遊戲身分組。",
+        "description": f"{_game_label}限定教學服務。",
         "variants": [
             (f"{_prefix}_teaching_one", "1 對 1 教學"),
         ],
@@ -687,7 +684,7 @@ def _group_data(
         "description":
             spec.get(
                 "description",
-                "選擇適合你的方案。",
+                "",
             ),
         "starting_price":
             starting_price,
@@ -808,10 +805,7 @@ def _current_group_specs() -> list[dict]:
                 "category": category,
                 "label": group_label,
                 "selector_label": "方案",
-                "description": (
-                    intro
-                    or "選擇適合你的方案。"
-                ),
+                "description": intro,
                 "variants": [],
             }
             specs.append(spec)
