@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 import services.acceptance.repair_runtime as repair_runtime
@@ -22,27 +24,34 @@ def _dependency_namespace() -> dict[str, object]:
     }
 
 
-def test_configure_acceptance_runtime_binds_only_explicit_dependencies(monkeypatch):
-    namespace = _dependency_namespace()
-    unexpected = object()
-    namespace["UNEXPECTED_ACCEPTANCE_INJECTION"] = unexpected
+def _configure_explicit(namespace: dict[str, object]) -> None:
+    runtime.configure_acceptance_runtime_explicit(
+        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
+        order_claims=namespace["ORDER_CLAIMS"],
+        payment_method_view_type=namespace["PaymentMethodView"],
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        bot_instance=namespace["bot"],
+        guild_id=namespace["GUILD_ID"],
+        refresh_existing_web_sync_dispatch=namespace[
+            "_refresh_existing_web_sync_dispatch"
+        ],
+    )
 
-    monkeypatch.delattr(runtime, "UNEXPECTED_ACCEPTANCE_INJECTION", raising=False)
-    for name in runtime._SYNC_WORKER_DEPENDENCY_NAMES:
-        monkeypatch.delattr(runtime, name, raising=False)
+
+def test_explicit_acceptance_runtime_binds_only_declared_dependencies(monkeypatch):
+    namespace = _dependency_namespace()
+
     monkeypatch.setattr(runtime, "_CONFIGURED", False)
     monkeypatch.setattr(sync_worker, "_DEPS", None)
     monkeypatch.setattr(repair_runtime, "_DEPS", None)
 
-    runtime.configure_acceptance_runtime(namespace)
+    _configure_explicit(namespace)
 
     assert runtime._CONFIGURED is True
-    for name in runtime._DEPENDENCY_NAMES:
-        assert getattr(runtime, name) is namespace[name]
-
-    assert not hasattr(runtime, "UNEXPECTED_ACCEPTANCE_INJECTION")
-    for name in runtime._SYNC_WORKER_DEPENDENCY_NAMES:
-        assert not hasattr(runtime, name)
+    assert runtime.DISPATCH_CHANNEL_ID == namespace["DISPATCH_CHANNEL_ID"]
+    assert runtime.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
+    assert runtime.PaymentMethodView is namespace["PaymentMethodView"]
+    assert runtime.SELF_SERVICE_ORDER_SELECTIONS is namespace["SELF_SERVICE_ORDER_SELECTIONS"]
 
     sync_deps = sync_worker._DEPS
     assert sync_deps is not None
@@ -75,6 +84,25 @@ def test_configure_acceptance_runtime_binds_only_explicit_dependencies(monkeypat
         repair_deps.acceptance_staff_display_text
         is runtime._acceptance_staff_display_text
     )
+
+
+def test_namespace_adapter_rejects_unknown_injection_and_delegates(monkeypatch):
+    namespace = _dependency_namespace()
+    namespace["UNEXPECTED_ACCEPTANCE_INJECTION"] = object()
+
+    monkeypatch.delattr(runtime, "UNEXPECTED_ACCEPTANCE_INJECTION", raising=False)
+    monkeypatch.setattr(runtime, "_CONFIGURED", False)
+    monkeypatch.setattr(sync_worker, "_DEPS", None)
+    monkeypatch.setattr(repair_runtime, "_DEPS", None)
+
+    runtime.configure_acceptance_runtime(namespace)
+
+    assert runtime._CONFIGURED is True
+    assert not hasattr(runtime, "UNEXPECTED_ACCEPTANCE_INJECTION")
+
+    source = inspect.getsource(runtime.configure_acceptance_runtime)
+    assert "configure_acceptance_runtime_explicit(" in source
+    assert "globals()[" not in source
 
 
 def test_configure_acceptance_runtime_rejects_missing_before_binding(monkeypatch):
