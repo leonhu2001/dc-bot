@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import inspect
 import json
+
+import pytest
 
 from core import database, permissions, time_utils, vip_levels
 from services import (
@@ -58,24 +61,30 @@ def test_self_service_runtime_uses_canonical_module_owned_dependencies():
     assert self_service_runtime.set_specified_dm_results is smart_dispatch.set_specified_dm_results
 
 
-def test_legacy_configurator_cannot_shadow_module_owned_or_inject_unknown_names():
+def test_legacy_configurator_rejects_partial_or_unknown_only_namespace():
     canonical_json = self_service_runtime.json
     canonical_send_order_log = self_service_runtime.send_order_log
     marker_name = "_self_service_dependency_boundary_marker"
     if hasattr(self_service_runtime, marker_name):
         delattr(self_service_runtime, marker_name)
 
-    self_service_runtime.configure_self_service_runtime(
-        {
-            "json": object(),
-            "send_order_log": object(),
-            marker_name: object(),
-        }
-    )
+    with pytest.raises(RuntimeError, match="self-service runtime missing dependencies"):
+        self_service_runtime.configure_self_service_runtime(
+            {
+                "json": object(),
+                "send_order_log": object(),
+                marker_name: object(),
+            }
+        )
 
     assert self_service_runtime.json is canonical_json
     assert self_service_runtime.send_order_log is canonical_send_order_log
     assert not hasattr(self_service_runtime, marker_name)
+
+
+def test_legacy_configurator_has_no_dynamic_globals_assignment():
+    source = inspect.getsource(self_service_runtime.configure_self_service_runtime)
+    assert "globals()[" not in source
 
 
 def test_module_owned_dependency_names_are_explicitly_guarded():

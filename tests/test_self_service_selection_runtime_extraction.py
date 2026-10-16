@@ -46,8 +46,10 @@ def test_selection_runtime_has_no_parent_or_bot_import_cycle():
 def test_parent_configures_selection_with_explicit_dependencies():
     source = PARENT.read_text(encoding="utf-8")
     for fragment in (
-        "order_selections=namespace[\"SELF_SERVICE_ORDER_SELECTIONS\"]",
-        "point_redeem_items=namespace[\"POINT_REDEEM_ITEMS\"]",
+        'SELF_SERVICE_ORDER_SELECTIONS = namespace["SELF_SERVICE_ORDER_SELECTIONS"]',
+        'POINT_REDEEM_ITEMS = namespace["POINT_REDEEM_ITEMS"]',
+        "order_selections=SELF_SERVICE_ORDER_SELECTIONS",
+        "point_redeem_items=POINT_REDEEM_ITEMS",
         "role_key_for_member=_role_key_for_member",
         "order_view_type=SelfServiceOrderView",
         "point_benefit_adapter=_adapt_order_point_benefit_for_rule",
