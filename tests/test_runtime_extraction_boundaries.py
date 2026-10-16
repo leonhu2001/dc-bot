@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 # Phase 2 contract: moved responsibilities stay physically separated while the
 # parent runtimes keep their existing public import/configuration surface.
 from services.acceptance import runtime as acceptance_runtime
@@ -227,9 +229,10 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
             "_order_runtime_test_marker": object(),
         }
     )
-    self_service_runtime.configure_self_service_runtime(
-        {self_service_marker: object()}
-    )
+    with pytest.raises(RuntimeError, match="self-service runtime missing dependencies"):
+        self_service_runtime.configure_self_service_runtime(
+            {self_service_marker: object()}
+        )
 
     assert not hasattr(acceptance_runtime, acceptance_marker)
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
