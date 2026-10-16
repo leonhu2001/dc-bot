@@ -37,14 +37,34 @@ def test_self_service_runtime_reexports_canonical_staff_price_helpers():
     assert "is_self_service_staff_price_required," in runtime_source
 
 
-def test_financial_runtime_missing_dependencies_fail_fast():
+def test_financial_runtime_only_takes_bot_owned_point_item_mapping_from_namespace():
     runtime_source = (ROOT / "services" / "self_service_runtime.py").read_text(encoding="utf-8")
 
-    assert "present_financial_keys = financial_keys.intersection(namespace)" in runtime_source
-    assert "missing_financial_keys = sorted(financial_keys.difference(namespace))" in runtime_source
-    assert "if present_financial_keys and missing_financial_keys:" in runtime_source
-    assert "self-service financial runtime missing dependencies" in runtime_source
-    assert "if financial_keys.issubset(namespace):" not in runtime_source
+    assert 'if "POINT_REDEEM_ITEMS_BY_KEY" in namespace:' in runtime_source
+    assert 'point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"]' in runtime_source
+
+    # Stable domain helpers must come from their owning modules, not bot globals.
+    forbidden_namespace_lookups = (
+        'namespace["allocate_store_absorbed_fixed_discount"]',
+        'namespace["get_current_reward_points"]',
+        'namespace["get_customer_reward_data"]',
+        'namespace["get_effective_member_level"]',
+        'namespace["get_self_service_quantity_unit"]',
+        'namespace["get_vip_discount_pay_rate"]',
+    )
+    for lookup in forbidden_namespace_lookups:
+        assert lookup not in runtime_source
+
+    expected_direct_bindings = (
+        "store_absorbed_discount_allocator=allocate_store_absorbed_fixed_discount",
+        "current_reward_points=get_current_reward_points",
+        "customer_reward_data=get_customer_reward_data",
+        "effective_member_level=get_effective_member_level",
+        "self_service_quantity_unit=get_self_service_quantity_unit",
+        "vip_discount_pay_rate=get_vip_discount_pay_rate",
+    )
+    for binding in expected_direct_bindings:
+        assert binding in runtime_source
 
 
 def test_financial_config_no_longer_injects_its_own_staff_price_helpers():
