@@ -46,6 +46,7 @@ def test_bot_startup_reconciles_existing_acceptance_panels():
     assert "async def repair_pending_acceptance_dispatch_panels_once" in runtime_source
     assert "await repair_pending_acceptance_dispatch_panels_once(" in bot_source
 
+
 def test_generic_web_sync_atomically_claims_only_non_claim_events():
     source = Path("services/web_sync/event_store.py").read_text(
         encoding="utf-8"
@@ -63,7 +64,7 @@ def test_generic_web_sync_atomically_claims_only_non_claim_events():
 
 
 def test_acceptance_worker_is_single_owner_for_claim_events():
-    source = Path("services/acceptance/runtime.py").read_text(
+    source = Path("services/acceptance/sync_worker.py").read_text(
         encoding="utf-8"
     )
 
@@ -76,8 +77,10 @@ def test_acceptance_worker_is_single_owner_for_claim_events():
     assert "claimed.rowcount != 1" in body
     assert '"admin_added_worker"' in body
     assert '"admin_removed_worker"' in body
-    assert "await _refresh_existing_web_sync_dispatch(" in body
-    assert "Legacy claim events already completed" in body
+    assert "await deps.refresh_existing_web_sync_dispatch(" in body
+    assert "if not is_prepay_acceptance and not is_admin_worker_change:" in body
+    assert "event.status = SyncEventStatus.DONE.value" in body
+
 
 def test_cs_dispatch_failure_does_not_claim_rollback_succeeded_when_it_failed():
     source = Path("services/web_sync/runtime.py").read_text(
