@@ -118,21 +118,66 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     }
 )
 
+# Temporary bridge while the remaining bot-owned state/configuration is migrated to
+# explicit keyword wiring.  Crucially, configure_self_service_runtime no longer
+# mirrors arbitrary bot.py globals into this module: only names in this set can cross
+# the legacy boundary.  Keep this list narrow and shrink it as ownership moves.
+_LEGACY_RUNTIME_NAMES = frozenset(
+    {
+        "CUSTOMER_CATEGORY_ID",
+        "CUSTOMER_ROLE_ID",
+        "DISPATCH_CHANNEL_ID",
+        "ORDER_CLAIMS",
+        "ORDER_ITEM_GROUPS_BY_CATEGORY",
+        "ORDER_ITEM_TO_CATEGORY",
+        "POINT_REDEEM_ITEMS",
+        "POINT_REDEEM_ITEMS_BY_KEY",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "DispatchClaimView",
+        "OrderControlView",
+        "SelfServiceOrderCategorySelect",
+        "SelfServiceOrderDetailSelect",
+        "SelfServiceOrderItemSelect",
+        "SelfServiceOrderQuantitySelect",
+        "_get_order_rule_by_item_label",
+        "_self_service_quantity_meta",
+        "allocate_store_absorbed_fixed_discount",
+        "build_ticket_channel_name",
+        "can_operate_self_service_order",
+        "configure_reorder_ticket_creator",
+        "delete_order_row_from_db",
+        "get_current_reward_points",
+        "get_customer_reward_data",
+        "get_effective_member_level",
+        "get_order_item_detail_for_selection",
+        "get_order_item_details_for_group",
+        "get_order_item_group_label",
+        "get_self_service_quantity_meta",
+        "get_self_service_quantity_unit",
+        "get_vip_discount_pay_rate",
+        "log_self_service_proxy_action",
+        "normalize_self_service_staff_count",
+        "send_order_log",
+    }
+)
+
 _CONFIGURED = False
 
 
 def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the remaining bot-owned legacy dependencies after bot.py is loaded."""
+    """Bind only the known remaining bot-owned dependencies after bot.py is loaded.
+
+    This is intentionally a constrained transitional boundary.  Unknown names are
+    ignored instead of being copied into module globals, preventing unrelated bot.py
+    state from silently becoming a self-service dependency.
+    """
     global _CONFIGURED
 
-    for name, value in namespace.items():
-        if name.startswith("__"):
-            continue
-        if name == "configure_self_service_runtime":
-            continue
+    for name in _LEGACY_RUNTIME_NAMES:
         if name in _MODULE_OWNED_RUNTIME_NAMES:
             continue
-        globals()[name] = value
+        if name in namespace:
+            globals()[name] = namespace[name]
 
     reorder_configurator = globals().get("configure_reorder_ticket_creator")
     if callable(reorder_configurator):
@@ -214,7 +259,6 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             order_log_sender=namespace["send_order_log"],
         )
 
-
     selection_keys = {
         "SELF_SERVICE_ORDER_SELECTIONS",
         "POINT_REDEEM_ITEMS",
@@ -236,7 +280,6 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
         )
 
     _CONFIGURED = True
-
 
 
 
