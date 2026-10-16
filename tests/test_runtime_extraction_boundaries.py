@@ -179,6 +179,24 @@ def test_bot_ticket_identity_helpers_are_extracted():
     assert "def get_order_customer_id_from_channel" in helper_source
 
 
+def _order_dispatch_namespace() -> dict[str, object]:
+    async def async_noop(*_args, **_kwargs):
+        return None
+
+    return {
+        "BOOSTER_RECEIVER_ROLE_ID": 1,
+        "DISPATCH_CHANNEL_ID": 123,
+        "ORDER_CLAIMS": {},
+        "SELF_SERVICE_ORDER_SELECTIONS": {},
+        "_apply_acceptance_state_to_claim_data": lambda *_args, **_kwargs: None,
+        "_member_display_name": lambda member: str(getattr(member, "id", "worker")),
+        "_member_role_id_texts": lambda _member: [],
+        "_order_requires_credentials": lambda _data: False,
+        "revoke_order_credential_messages": async_noop,
+        "send_acceptance_payment_panel_if_ready": async_noop,
+    }
+
+
 def test_runtime_configure_boundaries_match_current_migration_stage():
     acceptance_marker = "_acceptance_runtime_test_marker"
     if hasattr(acceptance_runtime, acceptance_marker):
@@ -200,7 +218,10 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
         {"_web_sync_runtime_test_marker": object()}
     )
     order_runtime.configure_order_runtime(
-        {"_order_runtime_test_marker": object()}
+        {
+            **_order_dispatch_namespace(),
+            "_order_runtime_test_marker": object(),
+        }
     )
     self_service_runtime.configure_self_service_runtime(
         {"_self_service_runtime_test_marker": object()}
