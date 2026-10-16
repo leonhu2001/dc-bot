@@ -80,25 +80,34 @@ async def cleanup_failed_self_service_dispatch(
         to_int(data.get("rollback_web_order_id"))
         or to_int(data.get("web_order_id"))
     )
+    vip_monthly_benefit_id = to_int(data.get("vip_monthly_benefit_id"))
 
     if delete_claim_row is None:
         from core.database import delete_claim_row_from_db
 
         delete_claim_row = delete_claim_row_from_db
 
-    # The provisional/recovery dispatch id proves this submit attempt crossed
-    # the point where it could have created/upserted its canonical WebOrder.
-    # delete_web_order_by_ticket_channel releases reserved member/VIP benefits
-    # and removes the acceptance/smart-dispatch lifecycle as one compensating
-    # operation. The helper is idempotent, so retrying rollback is safe.
+    # Use only this attempt's provisional dispatch message id to identify the
+    # canonical WebOrder. Passing ticket_channel_id here would make the shared
+    # helper use an OR lookup and could target an unrelated stale order from the
+    # same ticket if the current upsert never completed.
     if dispatch_message_id is not None:
         try:
             from shared.web_order_sync import delete_web_order_by_ticket_channel
 
             delete_web_order_by_ticket_channel(
-                ticket_channel_id=channel_id,
                 dispatch_message_id=dispatch_message_id,
             )
+
+            # The shared delete helper releases VIP monthly cash benefits only
+            # when a ticket id is supplied. Release by channel separately, but
+            # only when this draft actually selected a monthly cash benefit.
+            if vip_monthly_benefit_id is not None:
+                from services.vip_monthly_benefits import (
+                    release_cash_benefits_for_channel,
+                )
+
+                release_cash_benefits_for_channel(channel_id)
         except Exception as exc:
             warnings.append(f"網站訂單回滾失敗：{type(exc).__name__}")
             print(
