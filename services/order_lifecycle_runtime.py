@@ -5,57 +5,87 @@ from typing import Any, Mapping
 import asyncio
 import discord
 
+from core.database import generate_order_receipt_id, remember_order_data
+from core.permissions import is_customer_staff
+from core.time_utils import (
+    get_taipei_now,
+    get_taipei_now_iso,
+    get_taipei_now_text,
+)
+from services.logging_service import send_order_log
+from services.order_dispatch_runtime import delete_dispatch_claim_panel_for_order
+from services.order_storage_runtime import lock_dispatch_claim_panel
 from services.payment_methods import WALLET_PAYMENT_METHOD
 from services.order_payment_policy import is_zero_amount_order
 from services.order_close_panel_recovery import (
     ensure_post_close_panel,
     is_order_already_closed,
 )
+from services.orders import (
+    ORDER_CATEGORY_LABELS,
+    _to_int,
+    get_order_summary_from_channel,
+)
+from services.rewards import format_t_amount, parse_receipt_amount
+from services.ticket_identity import (
+    get_order_customer_id_from_channel,
+    rename_ticket_channel,
+)
+from views.review import build_post_close_status_embed, ReviewButtonView
+from views.staff_profiles import refresh_staff_profile_panels_for_order
 
 
-_REQUIRED_DEPENDENCIES = (
-    "RECEIPT_CHANNEL_ID",
-    "SELF_SERVICE_ORDER_SELECTIONS",
-    "ORDER_CATEGORY_LABELS",
-    "_to_int",
-    "format_t_amount",
-    "parse_receipt_amount",
-    "generate_order_receipt_id",
-    "get_taipei_now",
-    "get_taipei_now_iso",
-    "get_taipei_now_text",
-    "remember_order_data",
-    "send_order_log",
-    "is_customer_staff",
-    "get_order_customer_id_from_channel",
-    "get_order_summary_from_channel",
-    "sync_web_order_closed_from_bot",
-    "sync_web_order_cancelled_from_bot",
-    "refresh_staff_profile_panels_for_order",
-    "lock_dispatch_claim_panel",
-    "delete_dispatch_claim_panel_for_order",
-    "rename_ticket_channel",
-    "build_post_close_status_embed",
-    "ReviewButtonView",
+# Only these dependencies are still owned by the bot composition root. Everything
+# else in this runtime has a stable owning module and is imported directly above.
+_LEGACY_RUNTIME_NAMES = frozenset(
+    {
+        "RECEIPT_CHANNEL_ID",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "sync_web_order_closed_from_bot",
+        "sync_web_order_cancelled_from_bot",
+    }
 )
 
 _CONFIGURED = False
 
 
-def configure_order_lifecycle_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind the bot-owned lifecycle adapters after bot.py finishes defining them."""
+def configure_order_lifecycle_runtime_explicit(
+    *,
+    receipt_channel_id: int,
+    order_selections: dict,
+    sync_web_order_closed,
+    sync_web_order_cancelled,
+) -> None:
+    """Bind the remaining bot-owned lifecycle dependencies explicitly."""
     global _CONFIGURED
+    global RECEIPT_CHANNEL_ID, SELF_SERVICE_ORDER_SELECTIONS
+    global sync_web_order_closed_from_bot, sync_web_order_cancelled_from_bot
 
-    missing = [name for name in _REQUIRED_DEPENDENCIES if name not in namespace]
+    RECEIPT_CHANNEL_ID = receipt_channel_id
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
+    sync_web_order_closed_from_bot = sync_web_order_closed
+    sync_web_order_cancelled_from_bot = sync_web_order_cancelled
+    _CONFIGURED = True
+
+
+def configure_order_lifecycle_runtime(namespace: Mapping[str, Any]) -> None:
+    """Compatibility adapter while bot.py startup wiring is migrated."""
+    missing = sorted(
+        name
+        for name in _LEGACY_RUNTIME_NAMES
+        if name not in namespace
+    )
     if missing:
         raise RuntimeError(
             "order lifecycle runtime missing dependencies: " + ", ".join(missing)
         )
 
-    for name in _REQUIRED_DEPENDENCIES:
-        globals()[name] = namespace[name]
-
-    _CONFIGURED = True
+    configure_order_lifecycle_runtime_explicit(
+        receipt_channel_id=namespace["RECEIPT_CHANNEL_ID"],
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        sync_web_order_closed=namespace["sync_web_order_closed_from_bot"],
+        sync_web_order_cancelled=namespace["sync_web_order_cancelled_from_bot"],
+    )
 
 
 def validate_order_ready_to_close(order_data: dict) -> None:
