@@ -97,7 +97,17 @@
     function sanitizeDescriptionText(value) {
         const text = clean(value);
         if (!text) {
-            return text;
+            return "";
+        }
+
+        const genericCopy = new Set([
+            "選擇適合你的方案",
+            "選擇適合你的方案。",
+            "絕巴技術陪服務",
+            "絕巴技術陪服務。",
+        ]);
+        if (genericCopy.has(text)) {
+            return "";
         }
 
         const internalTerms = [
@@ -117,19 +127,25 @@
             .filter(part => !internalTerms.some(term => part.toLowerCase().includes(term.toLowerCase())));
 
         if (!clauses.length) {
-            return "選擇適合你的方案。";
+            return "";
         }
 
-        return clauses
+        const next = clauses
             .join("；")
             .replace(/[。；;]+$/u, "") + "。";
+
+        return genericCopy.has(next) ? "" : next;
     }
 
     function sanitizeCatalogDescriptions() {
         document.querySelectorAll(".order3-card > p, #mw-dialog-description").forEach(element => {
             const current = clean(element.textContent);
             const next = sanitizeDescriptionText(current);
-            if (next && next !== current) {
+            if (!next) {
+                element.remove();
+                return;
+            }
+            if (next !== current) {
                 element.textContent = next;
             }
         });
