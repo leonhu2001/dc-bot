@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from core.database import remember_claim_data, remember_order_data, save_bot_data
-from core.time_utils import get_taipei_now_iso, utc_now_naive
-import asyncio
+from core.time_utils import get_taipei_now_iso
 from pathlib import Path
 from typing import Any, Mapping
 
 import discord
 
+from services.acceptance.sync_worker import (
+    acceptance_sync_event_worker,
+    configure_acceptance_sync_worker,
+    process_acceptance_sync_events_once,
+)
 from services.logging_service import send_order_log
 from services.order_dispatch_runtime import DispatchClaimView
 from services.order_flow import build_payment_method_embed
@@ -25,20 +29,25 @@ from services.self_service_financials import (
 
 
 _CONFIGURED = False
-_DEPENDENCY_NAMES = (
+_RUNTIME_DEPENDENCY_NAMES = (
     "DISPATCH_CHANNEL_ID",
-    "GUILD_ID",
     "ORDER_CLAIMS",
     "PaymentMethodView",
     "SELF_SERVICE_ORDER_SELECTIONS",
+)
+_SYNC_WORKER_DEPENDENCY_NAMES = (
+    "GUILD_ID",
     "_refresh_existing_web_sync_dispatch",
     "bot",
 )
+_DEPENDENCY_NAMES = _RUNTIME_DEPENDENCY_NAMES + _SYNC_WORKER_DEPENDENCY_NAMES
 
 
 def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the bot-owned acceptance adapters that have no stable owner yet."""
+    """Bind explicit acceptance UI/store adapters and configure its sync worker."""
     global _CONFIGURED
+    global DISPATCH_CHANNEL_ID, ORDER_CLAIMS, PaymentMethodView
+    global SELF_SERVICE_ORDER_SELECTIONS
 
     missing = [name for name in _DEPENDENCY_NAMES if name not in namespace]
     if missing:
@@ -46,8 +55,22 @@ def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
             "acceptance runtime missing dependencies: " + ", ".join(missing)
         )
 
-    for name in _DEPENDENCY_NAMES:
-        globals()[name] = namespace[name]
+    DISPATCH_CHANNEL_ID = int(namespace["DISPATCH_CHANNEL_ID"])
+    ORDER_CLAIMS = namespace["ORDER_CLAIMS"]
+    PaymentMethodView = namespace["PaymentMethodView"]
+    SELF_SERVICE_ORDER_SELECTIONS = namespace["SELF_SERVICE_ORDER_SELECTIONS"]
+
+    configure_acceptance_sync_worker(
+        bot_instance=namespace["bot"],
+        guild_id=int(namespace["GUILD_ID"]),
+        to_int=_to_int,
+        refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
+        refresh_existing_web_sync_dispatch=namespace[
+            "_refresh_existing_web_sync_dispatch"
+        ],
+        grant_ticket_access=grant_order_ticket_access,
+        revoke_ticket_access=revoke_order_ticket_access,
+    )
 
     _CONFIGURED = True
 
@@ -752,168 +775,6 @@ async def repair_pending_acceptance_dispatch_panels_once(
 
     return repaired
 
-
-async def process_acceptance_sync_events_once() -> None:
-    import json
-    from datetime import datetime
-
-    from sqlalchemy import select, update
-
-    from shared.db import SessionLocal
-    from shared.models import SyncEvent, SyncEventStatus, SyncEventType, WebOrder
-
-    guild = bot.get_guild(GUILD_ID)
-
-    if guild is None:
-        return
-
-    async def _resolve_member(worker_id: int | None):
-        if worker_id is None:
-            return None
-
-        member = guild.get_member(worker_id)
-        if member is not None:
-            return member
-
-        try:
-            fetched_member = await guild.fetch_member(worker_id)
-            return (
-                fetched_member
-                if isinstance(fetched_member, discord.Member)
-                else None
-            )
-        except (
-            discord.NotFound,
-            discord.Forbidden,
-            discord.HTTPException,
-        ):
-            return None
-
-    db = SessionLocal()
-
-    try:
-        events = list(
-            db.scalars(
-                select(SyncEvent)
-                .where(SyncEvent.status == SyncEventStatus.PENDING.value)
-                .where(SyncEvent.event_type.in_([
-                    SyncEventType.ORDER_CLAIMED.value,
-                    SyncEventType.ORDER_UNCLAIMED.value,
-                ]))
-                .order_by(SyncEvent.created_at.asc())
-                .limit(10)
-            ).all()
-        )
-
-        for event in events:
-            try:
-                payload = json.loads(event.payload_json or "{}")
-            except Exception:
-                payload = {}
-
-            is_prepay_acceptance = bool(payload.get("prepay_acceptance"))
-            is_admin_worker_change = payload.get("reason") in {
-                "admin_added_worker",
-                "admin_removed_worker",
-            }
-
-            # Claim/unclaim events have one owner: this worker. Claim the row
-            # conditionally so a second Bot instance cannot process the same event.
-            claimed = db.execute(
-                update(SyncEvent)
-                .where(SyncEvent.id == int(event.id))
-                .where(SyncEvent.status == SyncEventStatus.PENDING.value)
-                .values(
-                    status=SyncEventStatus.PROCESSING.value,
-                    retry_count=int(event.retry_count or 0) + 1,
-                    processed_at=utc_now_naive(),
-                )
-            )
-            db.commit()
-
-            if claimed.rowcount != 1:
-                continue
-
-            if not is_prepay_acceptance and not is_admin_worker_change:
-                # Legacy claim events already completed in their original Discord
-                # flow. Mark them consumed instead of leaving them pending forever.
-                event.status = SyncEventStatus.DONE.value
-                event.error_message = None
-                event.processed_at = utc_now_naive()
-                db.commit()
-                continue
-
-            try:
-                order = db.get(WebOrder, int(event.order_id))
-                ticket_channel_id = (
-                    _to_int(order.ticket_channel_id)
-                    if order is not None
-                    else None
-                )
-
-                if is_prepay_acceptance:
-                    await refresh_acceptance_dispatch_from_web_order(
-                        guild,
-                        int(event.order_id),
-                    )
-                elif is_admin_worker_change:
-                    if order is None:
-                        raise RuntimeError(
-                            f"web order not found: {event.order_id}"
-                        )
-
-                    await _refresh_existing_web_sync_dispatch(
-                        {
-                            "order_id": int(event.order_id),
-                            "dispatch_channel_id": order.dispatch_channel_id,
-                            "dispatch_message_id": order.dispatch_message_id,
-                        }
-                    )
-
-                worker_id = _to_int(payload.get("worker_discord_id"))
-
-                if worker_id is not None and ticket_channel_id is not None:
-                    member = await _resolve_member(worker_id)
-
-                    if member is not None:
-                        if event.event_type == SyncEventType.ORDER_CLAIMED.value:
-                            await grant_order_ticket_access(
-                                guild,
-                                ticket_channel_id,
-                                member,
-                            )
-                        elif event.event_type == SyncEventType.ORDER_UNCLAIMED.value:
-                            await revoke_order_ticket_access(
-                                guild,
-                                ticket_channel_id,
-                                member,
-                            )
-
-                event.status = SyncEventStatus.DONE.value
-                event.error_message = None
-                event.processed_at = utc_now_naive()
-                db.commit()
-            except Exception as exc:
-                event.status = SyncEventStatus.FAILED.value
-                event.error_message = f"{type(exc).__name__}: {exc}"
-                event.processed_at = utc_now_naive()
-                db.commit()
-                print(f"[acceptance-sync] 處理網站接單事件失敗 event_id={event.id}: {exc}")
-    finally:
-        db.close()
-
-
-async def acceptance_sync_event_worker() -> None:
-    await bot.wait_until_ready()
-    print("[acceptance-sync] worker loop running", flush=True)
-
-    while not bot.is_closed():
-        try:
-            await process_acceptance_sync_events_once()
-        except Exception as exc:
-            print(f"[acceptance-sync] 背景同步失敗：{exc}")
-
-        await asyncio.sleep(5)
 
 async def send_acceptance_payment_panel_if_ready(view, interaction: discord.Interaction, state) -> None:
     try:
