@@ -61,6 +61,26 @@ def test_self_service_runtime_uses_canonical_module_owned_dependencies():
     assert self_service_runtime.set_specified_dm_results is smart_dispatch.set_specified_dm_results
 
 
+def test_explicit_configurator_is_keyword_only_and_declares_the_bot_owned_boundary():
+    signature = inspect.signature(
+        self_service_runtime.configure_self_service_runtime_explicit
+    )
+    assert list(signature.parameters) == [
+        "customer_category_id",
+        "customer_role_id",
+        "dispatch_channel_id",
+        "order_claims",
+        "point_redeem_items",
+        "point_redeem_items_by_key",
+        "order_selections",
+        "order_control_view_type",
+    ]
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        for parameter in signature.parameters.values()
+    )
+
+
 def test_legacy_configurator_rejects_partial_or_unknown_only_namespace():
     canonical_json = self_service_runtime.json
     canonical_send_order_log = self_service_runtime.send_order_log
@@ -82,9 +102,13 @@ def test_legacy_configurator_rejects_partial_or_unknown_only_namespace():
     assert not hasattr(self_service_runtime, marker_name)
 
 
-def test_legacy_configurator_has_no_dynamic_globals_assignment():
+def test_legacy_configurator_is_only_a_validating_delegate():
     source = inspect.getsource(self_service_runtime.configure_self_service_runtime)
     assert "globals()[" not in source
+    assert "configure_self_service_runtime_explicit(" in source
+    assert "configure_self_service_financials(" not in source
+    assert "configure_self_service_reorder(" not in source
+    assert "configure_self_service_selection_runtime(" not in source
 
 
 def test_module_owned_dependency_names_are_explicitly_guarded():
