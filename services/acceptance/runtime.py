@@ -55,30 +55,31 @@ _SYNC_WORKER_DEPENDENCY_NAMES = (
 _REQUIRED_DEPENDENCY_NAMES = _DEPENDENCY_NAMES + _SYNC_WORKER_DEPENDENCY_NAMES
 
 
-def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the bot-owned acceptance adapters that have no stable owner yet."""
+def configure_acceptance_runtime_explicit(
+    *,
+    dispatch_channel_id: int,
+    order_claims: dict,
+    payment_method_view_type,
+    order_selections: dict,
+    bot_instance,
+    guild_id: int,
+    refresh_existing_web_sync_dispatch,
+) -> None:
+    """Bind the acceptance runtime from explicit bot-owned dependencies."""
     global _CONFIGURED
     global DISPATCH_CHANNEL_ID, ORDER_CLAIMS, PaymentMethodView
     global SELF_SERVICE_ORDER_SELECTIONS
 
-    missing = [name for name in _REQUIRED_DEPENDENCY_NAMES if name not in namespace]
-    if missing:
-        raise RuntimeError(
-            "acceptance runtime missing dependencies: " + ", ".join(missing)
-        )
-
-    DISPATCH_CHANNEL_ID = namespace["DISPATCH_CHANNEL_ID"]
-    ORDER_CLAIMS = namespace["ORDER_CLAIMS"]
-    PaymentMethodView = namespace["PaymentMethodView"]
-    SELF_SERVICE_ORDER_SELECTIONS = namespace["SELF_SERVICE_ORDER_SELECTIONS"]
+    DISPATCH_CHANNEL_ID = dispatch_channel_id
+    ORDER_CLAIMS = order_claims
+    PaymentMethodView = payment_method_view_type
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
 
     configure_acceptance_sync_worker(
-        bot_instance=namespace["bot"],
-        guild_id=namespace["GUILD_ID"],
+        bot_instance=bot_instance,
+        guild_id=guild_id,
         refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
-        refresh_existing_web_sync_dispatch=namespace[
-            "_refresh_existing_web_sync_dispatch"
-        ],
+        refresh_existing_web_sync_dispatch=refresh_existing_web_sync_dispatch,
         grant_ticket_access=grant_order_ticket_access,
         revoke_ticket_access=revoke_order_ticket_access,
         to_int=_to_int,
@@ -92,6 +93,27 @@ def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
     )
 
     _CONFIGURED = True
+
+
+def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
+    """Compatibility adapter for bot.py while final startup wiring is migrated."""
+    missing = [name for name in _REQUIRED_DEPENDENCY_NAMES if name not in namespace]
+    if missing:
+        raise RuntimeError(
+            "acceptance runtime missing dependencies: " + ", ".join(missing)
+        )
+
+    configure_acceptance_runtime_explicit(
+        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
+        order_claims=namespace["ORDER_CLAIMS"],
+        payment_method_view_type=namespace["PaymentMethodView"],
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        bot_instance=namespace["bot"],
+        guild_id=namespace["GUILD_ID"],
+        refresh_existing_web_sync_dispatch=namespace[
+            "_refresh_existing_web_sync_dispatch"
+        ],
+    )
 
 
 def _member_role_id_texts(member: discord.Member) -> list[str]:
