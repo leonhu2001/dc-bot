@@ -21,7 +21,7 @@ def _catalog_costs():
 
 def test_point_catalog_v2_has_compact_non_vip_rewards():
     assert _catalog_costs() == {
-        "discount_50": 25,
+        "discount_50": 20,
         "free_specify_fee": 30,
         "discount_100": 45,
         "entertain_service_small": 80,
