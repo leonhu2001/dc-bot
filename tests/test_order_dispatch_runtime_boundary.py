@@ -25,6 +25,26 @@ def _top_level_names(path: Path) -> set[str]:
     }
 
 
+def _dispatch_namespace(**overrides):
+    async def async_noop(*_args, **_kwargs):
+        return None
+
+    namespace = {
+        "BOOSTER_RECEIVER_ROLE_ID": 1,
+        "DISPATCH_CHANNEL_ID": 123,
+        "ORDER_CLAIMS": {},
+        "SELF_SERVICE_ORDER_SELECTIONS": {},
+        "_apply_acceptance_state_to_claim_data": lambda *_args, **_kwargs: None,
+        "_member_display_name": lambda member: str(getattr(member, "id", "worker")),
+        "_member_role_id_texts": lambda _member: [],
+        "_order_requires_credentials": lambda _data: False,
+        "revoke_order_credential_messages": async_noop,
+        "send_acceptance_payment_panel_if_ready": async_noop,
+    }
+    namespace.update(overrides)
+    return namespace
+
+
 def test_dispatch_implementation_has_single_canonical_owner():
     legacy = _top_level_names(ROOT / "services/order_runtime.py")
     dispatch = _top_level_names(ROOT / "services/order_dispatch_runtime.py")
@@ -50,11 +70,12 @@ def test_dispatch_runtime_configuration_is_explicitly_scoped():
     import services.order_dispatch_runtime as dispatch
 
     marker = object()
-    dispatch.configure_order_dispatch_runtime({
-        "DISPATCH_CHANNEL_ID": 123,
-        "ORDER_CLAIMS": marker,
-        "UNRELATED_SENTINEL": object(),
-    })
+    dispatch.configure_order_dispatch_runtime(
+        _dispatch_namespace(
+            ORDER_CLAIMS=marker,
+            UNRELATED_SENTINEL=object(),
+        )
+    )
     assert dispatch.DISPATCH_CHANNEL_ID == 123
     assert dispatch.ORDER_CLAIMS is marker
     assert not hasattr(dispatch, "UNRELATED_SENTINEL")
