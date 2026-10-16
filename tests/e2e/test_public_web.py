@@ -87,6 +87,7 @@ def test_public_order_hides_internal_staffing_metadata(page: Page) -> None:
     public_copy = f"{descriptions}\n{dialog_description}"
     for internal_term in ("身分組", "智慧派單", "派單只通知", "Rule key"):
         assert internal_term not in public_copy
+    assert "選擇適合你的方案。" not in descriptions
 
 
 def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> None:
