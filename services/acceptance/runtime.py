@@ -39,6 +39,8 @@ _DEPENDENCY_NAMES = (
 def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
     """Bind only the bot-owned acceptance adapters that have no stable owner yet."""
     global _CONFIGURED
+    global DISPATCH_CHANNEL_ID, GUILD_ID, ORDER_CLAIMS, PaymentMethodView
+    global SELF_SERVICE_ORDER_SELECTIONS, _refresh_existing_web_sync_dispatch, bot
 
     missing = [name for name in _DEPENDENCY_NAMES if name not in namespace]
     if missing:
@@ -46,8 +48,13 @@ def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
             "acceptance runtime missing dependencies: " + ", ".join(missing)
         )
 
-    for name in _DEPENDENCY_NAMES:
-        globals()[name] = namespace[name]
+    DISPATCH_CHANNEL_ID = namespace["DISPATCH_CHANNEL_ID"]
+    GUILD_ID = namespace["GUILD_ID"]
+    ORDER_CLAIMS = namespace["ORDER_CLAIMS"]
+    PaymentMethodView = namespace["PaymentMethodView"]
+    SELF_SERVICE_ORDER_SELECTIONS = namespace["SELF_SERVICE_ORDER_SELECTIONS"]
+    _refresh_existing_web_sync_dispatch = namespace["_refresh_existing_web_sync_dispatch"]
+    bot = namespace["bot"]
 
     _CONFIGURED = True
 
@@ -336,7 +343,6 @@ async def refresh_acceptance_dispatch_from_web_order(guild: discord.Guild, order
             )
             or 0,
         )
-
         web_price_data.setdefault(
             "fixed_discount_amount",
             web_price_data.get(
@@ -1016,7 +1022,6 @@ async def restore_acceptance_payment_panel_for_order(
     db_path = Path(__file__).resolve().parents[2] / "web_dashboard.db"
     conn = sqlite3.connect(db_path, timeout=15)
     conn.row_factory = sqlite3.Row
-
     try:
         row = conn.execute(
             """
