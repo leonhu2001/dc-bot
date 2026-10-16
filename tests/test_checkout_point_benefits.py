@@ -19,7 +19,7 @@ def _rule(key: str, pricing_type: str, *, entertainment: bool = True) -> OrderRu
 
 def test_point_catalog_prices_and_legacy_rewards_hidden_from_new_selection():
     items = {item["key"]: item for item in checkout.POINT_ITEMS}
-    assert items["discount_50"]["cost"] == 25
+    assert items["discount_50"]["cost"] == 20
     assert items["free_specify_fee"]["cost"] == 30
     assert items["discount_100"]["cost"] == 45
     assert items["entertain_service_small"]["cost"] == 80
