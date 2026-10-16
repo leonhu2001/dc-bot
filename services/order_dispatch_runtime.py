@@ -4,6 +4,19 @@ from typing import Any, Mapping
 
 import discord
 
+from core.database import (
+    delete_claim_row_from_db,
+    delete_order_row_from_db,
+    remember_claim_data,
+    save_bot_data,
+)
+from services.acceptance.ticket_access import (
+    grant_order_ticket_access,
+    revoke_order_ticket_access,
+)
+from services.logging_service import send_order_log
+from services.orders import _to_int, build_self_service_order_embed
+
 
 _CONFIGURED = False
 _DEPENDENCY_NAMES = (
@@ -15,17 +28,8 @@ _DEPENDENCY_NAMES = (
     "_member_display_name",
     "_member_role_id_texts",
     "_order_requires_credentials",
-    "_to_int",
-    "build_self_service_order_embed",
-    "delete_claim_row_from_db",
-    "delete_order_row_from_db",
-    "grant_order_ticket_access",
-    "remember_claim_data",
     "revoke_order_credential_messages",
-    "revoke_order_ticket_access",
-    "save_bot_data",
     "send_acceptance_payment_panel_if_ready",
-    "send_order_log",
 )
 
 
@@ -33,9 +37,14 @@ def configure_order_dispatch_runtime(namespace: Mapping[str, Any]) -> None:
     """Bind the bot-owned adapters needed by the Discord dispatch lifecycle."""
     global _CONFIGURED
 
+    missing = [name for name in _DEPENDENCY_NAMES if name not in namespace]
+    if missing:
+        raise RuntimeError(
+            "order dispatch runtime missing dependencies: " + ", ".join(missing)
+        )
+
     for name in _DEPENDENCY_NAMES:
-        if name in namespace:
-            globals()[name] = namespace[name]
+        globals()[name] = namespace[name]
 
     _CONFIGURED = True
 
