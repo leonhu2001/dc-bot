@@ -202,6 +202,10 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
     if hasattr(acceptance_runtime, acceptance_marker):
         delattr(acceptance_runtime, acceptance_marker)
 
+    self_service_marker = "_self_service_runtime_test_marker"
+    if hasattr(self_service_runtime, self_service_marker):
+        delattr(self_service_runtime, self_service_marker)
+
     acceptance_runtime.configure_acceptance_runtime(
         {
             "DISPATCH_CHANNEL_ID": 123,
@@ -224,10 +228,10 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
         }
     )
     self_service_runtime.configure_self_service_runtime(
-        {"_self_service_runtime_test_marker": object()}
+        {self_service_marker: object()}
     )
 
     assert not hasattr(acceptance_runtime, acceptance_marker)
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     assert hasattr(order_runtime, "_order_runtime_test_marker")
-    assert hasattr(self_service_runtime, "_self_service_runtime_test_marker")
+    assert not hasattr(self_service_runtime, self_service_marker)
