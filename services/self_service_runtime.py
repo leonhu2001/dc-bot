@@ -7,19 +7,48 @@ import discord
 
 from core.database import (
     delete_claim_row_from_db,
+    delete_order_row_from_db,
     remember_claim_data,
     remember_order_data,
     save_bot_data,
 )
-from core.permissions import is_customer_staff
+from core.permissions import can_operate_self_service_order, is_customer_staff
 from core.time_utils import get_taipei_now_iso
+from core.vip_levels import get_vip_discount_pay_rate
 from services.acceptance.runtime import _member_display_name
+from services.logging_service import send_order_log
+from services.order_discounts import allocate_store_absorbed_fixed_discount
+from services.order_dispatch_runtime import DispatchClaimView
+from services.order_runtime import (
+    SelfServiceOrderCategorySelect,
+    SelfServiceOrderDetailSelect,
+    SelfServiceOrderItemSelect,
+    SelfServiceOrderQuantitySelect,
+    _get_order_rule_by_item_label,
+    _self_service_quantity_meta,
+    get_self_service_quantity_unit,
+    log_self_service_proxy_action,
+    normalize_self_service_staff_count,
+)
 from services.orders import (
     ORDER_CATEGORY_LABELS,
+    ORDER_ITEM_GROUPS_BY_CATEGORY,
+    ORDER_ITEM_TO_CATEGORY,
     _to_int,
     build_self_service_order_embed,
+    get_order_item_detail_for_selection,
+    get_order_item_details_for_group,
+    get_order_item_group_label,
+    get_self_service_quantity_meta,
+)
+from services.rewards import (
+    get_current_reward_points,
+    get_customer_reward_data,
+    get_effective_member_level,
 )
 from services.smart_dispatch import create_smart_dispatch_plan, set_specified_dm_results
+from services.ticket_identity import build_ticket_channel_name
+from views.review import configure_reorder_ticket_creator
 from views.smart_dispatch import (
     prepare_initial_smart_dispatch,
     send_initial_smart_dispatch_alert,
@@ -96,15 +125,41 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "discord",
         "json",
         "ORDER_CATEGORY_LABELS",
+        "ORDER_ITEM_GROUPS_BY_CATEGORY",
+        "ORDER_ITEM_TO_CATEGORY",
         "_to_int",
         "build_self_service_order_embed",
+        "get_order_item_detail_for_selection",
+        "get_order_item_details_for_group",
+        "get_order_item_group_label",
+        "get_self_service_quantity_meta",
         "delete_claim_row_from_db",
+        "delete_order_row_from_db",
         "remember_claim_data",
         "remember_order_data",
         "save_bot_data",
+        "can_operate_self_service_order",
         "is_customer_staff",
         "get_taipei_now_iso",
+        "get_vip_discount_pay_rate",
         "_member_display_name",
+        "send_order_log",
+        "allocate_store_absorbed_fixed_discount",
+        "DispatchClaimView",
+        "SelfServiceOrderCategorySelect",
+        "SelfServiceOrderDetailSelect",
+        "SelfServiceOrderItemSelect",
+        "SelfServiceOrderQuantitySelect",
+        "_get_order_rule_by_item_label",
+        "_self_service_quantity_meta",
+        "get_self_service_quantity_unit",
+        "log_self_service_proxy_action",
+        "normalize_self_service_staff_count",
+        "get_current_reward_points",
+        "get_customer_reward_data",
+        "get_effective_member_level",
+        "build_ticket_channel_name",
+        "configure_reorder_ticket_creator",
         "create_smart_dispatch_plan",
         "set_specified_dm_results",
         "prepare_initial_smart_dispatch",
@@ -119,45 +174,18 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
 )
 
 # Temporary bridge while the remaining bot-owned state/configuration is migrated to
-# explicit keyword wiring.  Crucially, configure_self_service_runtime no longer
-# mirrors arbitrary bot.py globals into this module: only names in this set can cross
-# the legacy boundary.  Keep this list narrow and shrink it as ownership moves.
+# explicit keyword wiring. Only state/config that still genuinely lives in bot.py is
+# allowed across this boundary.
 _LEGACY_RUNTIME_NAMES = frozenset(
     {
         "CUSTOMER_CATEGORY_ID",
         "CUSTOMER_ROLE_ID",
         "DISPATCH_CHANNEL_ID",
         "ORDER_CLAIMS",
-        "ORDER_ITEM_GROUPS_BY_CATEGORY",
-        "ORDER_ITEM_TO_CATEGORY",
         "POINT_REDEEM_ITEMS",
         "POINT_REDEEM_ITEMS_BY_KEY",
         "SELF_SERVICE_ORDER_SELECTIONS",
-        "DispatchClaimView",
         "OrderControlView",
-        "SelfServiceOrderCategorySelect",
-        "SelfServiceOrderDetailSelect",
-        "SelfServiceOrderItemSelect",
-        "SelfServiceOrderQuantitySelect",
-        "_get_order_rule_by_item_label",
-        "_self_service_quantity_meta",
-        "allocate_store_absorbed_fixed_discount",
-        "build_ticket_channel_name",
-        "can_operate_self_service_order",
-        "configure_reorder_ticket_creator",
-        "delete_order_row_from_db",
-        "get_current_reward_points",
-        "get_customer_reward_data",
-        "get_effective_member_level",
-        "get_order_item_detail_for_selection",
-        "get_order_item_details_for_group",
-        "get_order_item_group_label",
-        "get_self_service_quantity_meta",
-        "get_self_service_quantity_unit",
-        "get_vip_discount_pay_rate",
-        "log_self_service_proxy_action",
-        "normalize_self_service_staff_count",
-        "send_order_log",
     }
 )
 
@@ -165,46 +193,20 @@ _CONFIGURED = False
 
 
 def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the known remaining bot-owned dependencies after bot.py is loaded.
+    """Bind only the remaining bot-owned state/config after bot.py is loaded.
 
-    This is intentionally a constrained transitional boundary.  Unknown names are
-    ignored instead of being copied into module globals, preventing unrelated bot.py
-    state from silently becoming a self-service dependency.
+    Stable helpers are imported from their canonical modules above. Unknown names
+    are ignored instead of being copied into module globals.
     """
     global _CONFIGURED
 
     for name in _LEGACY_RUNTIME_NAMES:
-        if name in _MODULE_OWNED_RUNTIME_NAMES:
-            continue
         if name in namespace:
             globals()[name] = namespace[name]
 
-    reorder_configurator = globals().get("configure_reorder_ticket_creator")
-    if callable(reorder_configurator):
-        reorder_configurator(create_reorder_ticket_from_closed_order)
+    configure_reorder_ticket_creator(create_reorder_ticket_from_closed_order)
 
-    # ORDER_POINT_BENEFIT_SPECS is owned by self_service_selection_runtime,
-    # so bot.py must not be required to re-export it just to configure
-    # the financial runtime.
-    financial_keys = {
-        "POINT_REDEEM_ITEMS_BY_KEY",
-        "allocate_store_absorbed_fixed_discount",
-        "get_current_reward_points",
-        "get_customer_reward_data",
-        "get_effective_member_level",
-        "get_self_service_quantity_unit",
-        "get_vip_discount_pay_rate",
-    }
-    present_financial_keys = financial_keys.intersection(namespace)
-    missing_financial_keys = sorted(financial_keys.difference(namespace))
-
-    if present_financial_keys and missing_financial_keys:
-        raise RuntimeError(
-            "self-service financial runtime missing dependencies: "
-            + ", ".join(missing_financial_keys)
-        )
-
-    if not missing_financial_keys:
+    if "POINT_REDEEM_ITEMS_BY_KEY" in namespace:
         configure_self_service_financials(
             order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
             point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
@@ -212,38 +214,30 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             is_specify_preference=_is_specify_preference,
             role_key_for_member=_role_key_for_member,
             to_int=_to_int,
-            store_absorbed_discount_allocator=namespace["allocate_store_absorbed_fixed_discount"],
-            current_reward_points=namespace["get_current_reward_points"],
-            customer_reward_data=namespace["get_customer_reward_data"],
-            effective_member_level=namespace["get_effective_member_level"],
-            self_service_quantity_unit=namespace["get_self_service_quantity_unit"],
-            vip_discount_pay_rate=namespace["get_vip_discount_pay_rate"],
+            store_absorbed_discount_allocator=allocate_store_absorbed_fixed_discount,
+            current_reward_points=get_current_reward_points,
+            customer_reward_data=get_customer_reward_data,
+            effective_member_level=get_effective_member_level,
+            self_service_quantity_unit=get_self_service_quantity_unit,
+            vip_discount_pay_rate=get_vip_discount_pay_rate,
         )
 
     reorder_keys = {
-        "ORDER_ITEM_GROUPS_BY_CATEGORY",
         "CUSTOMER_ROLE_ID",
         "CUSTOMER_CATEGORY_ID",
         "SELF_SERVICE_ORDER_SELECTIONS",
         "OrderControlView",
-        "_get_order_rule_by_item_label",
-        "build_ticket_channel_name",
-        "delete_order_row_from_db",
-        "get_order_item_details_for_group",
-        "get_order_item_group_label",
-        "get_self_service_quantity_meta",
-        "send_order_log",
     }
     if reorder_keys.issubset(namespace):
         configure_self_service_reorder(
             order_category_labels=ORDER_CATEGORY_LABELS,
-            order_item_groups_by_category=namespace["ORDER_ITEM_GROUPS_BY_CATEGORY"],
-            get_order_rule_by_item_label=namespace["_get_order_rule_by_item_label"],
+            order_item_groups_by_category=ORDER_ITEM_GROUPS_BY_CATEGORY,
+            get_order_rule_by_item_label=_get_order_rule_by_item_label,
             role_key_for_member=_role_key_for_member,
             to_int=_to_int,
-            order_item_details_for_group=namespace["get_order_item_details_for_group"],
-            order_item_group_label=namespace["get_order_item_group_label"],
-            self_service_quantity_meta=namespace["get_self_service_quantity_meta"],
+            order_item_details_for_group=get_order_item_details_for_group,
+            order_item_group_label=get_order_item_group_label,
+            self_service_quantity_meta=get_self_service_quantity_meta,
             taipei_now_iso=get_taipei_now_iso,
             staff_price_required=is_self_service_staff_price_required,
             customer_role_id=namespace["CUSTOMER_ROLE_ID"],
@@ -254,9 +248,9 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
             self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
             remember_data=remember_order_data,
             save_data=save_bot_data,
-            ticket_channel_name_builder=namespace["build_ticket_channel_name"],
-            delete_order_row=namespace["delete_order_row_from_db"],
-            order_log_sender=namespace["send_order_log"],
+            ticket_channel_name_builder=build_ticket_channel_name,
+            delete_order_row=delete_order_row_from_db,
+            order_log_sender=send_order_log,
         )
 
     selection_keys = {
