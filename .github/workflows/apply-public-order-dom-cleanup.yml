@@ -32,8 +32,7 @@ jobs:
               depth = 0
               end = None
               for match in token_re.finditer(text, start):
-                  token = match.group(0).lower()
-                  if token.startswith('<div'):
+                  if match.group(0).lower().startswith('<div'):
                       depth += 1
                   else:
                       depth -= 1
@@ -72,38 +71,21 @@ jobs:
 
           js_path = Path('web/app/static/js/mw_order.js')
           js = js_path.read_text(encoding='utf-8')
-          declaration_blocks = [
+          blocks = [
               '''    const rolesEl =\n        document.getElementById(\n            "mw-roles"\n        );\n\n''',
               '''    const requiredStaffEl =\n        document.getElementById(\n            "mw-required-staff"\n        );\n\n''',
               '''    const specifyEl =\n        document.getElementById(\n            "mw-specify"\n        );\n\n''',
               '''    const ruleKeyEl =\n        document.getElementById(\n            "mw-rule-key"\n        );\n\n''',
-          ]
-          assignment_blocks = [
               '''        rolesEl.textContent =\n            (\n                activeVariant.allowed_roles\n                || []\n            ).join(" / ")\n            || "—";\n\n\n''',
               '''        requiredStaffEl.textContent =\n            activeVariant.required_staff\n            || "—";\n\n\n''',
               '''        specifyEl.textContent =\n            activeVariant.allow_specify\n                ? "可指定"\n                : "不開放";\n\n\n''',
               '''        ruleKeyEl.textContent =\n            activeVariant.rule_key;\n\n\n''',
           ]
-          for block in declaration_blocks + assignment_blocks:
+          for block in blocks:
               if js.count(block) != 1:
                   raise SystemExit(f'mw_order.js anchor mismatch: {block[:70]!r}')
               js = js.replace(block, '', 1)
           js_path.write_text(js, encoding='utf-8')
-
-          groups_path = Path('web/app/services/order_groups.py')
-          groups = groups_path.read_text(encoding='utf-8')
-          old_default = '''        "description":\n            spec.get(\n                "description",\n                "選擇適合你的方案。",\n            ),'''
-          new_default = '''        "description":\n            spec.get(\n                "description",\n                "",\n            ),'''
-          if groups.count(old_default) != 1:
-              raise SystemExit('built-in public description fallback anchor mismatch')
-          groups = groups.replace(old_default, new_default, 1)
-
-          old_custom = '''                "description": (\n                    intro\n                    or "選擇適合你的方案。"\n                ),'''
-          new_custom = '''                "description": (\n                    intro\n                    or ""\n                ),'''
-          if groups.count(old_custom) != 1:
-              raise SystemExit('custom public description fallback anchor mismatch')
-          groups = groups.replace(old_custom, new_custom, 1)
-          groups_path.write_text(groups, encoding='utf-8')
 
           test_path = Path('tests/test_public_order_dom_contract.py')
           test_path.write_text('''from pathlib import Path\n\n\ndef test_public_order_dialog_does_not_render_internal_dispatch_fields():\n    template = Path("web/app/templates/order_catalog.html").read_text(encoding="utf-8")\n    script = Path("web/app/static/js/mw_order.js").read_text(encoding="utf-8")\n\n    internal_ids = (\n        "mw-roles",\n        "mw-required-staff",\n        "mw-specify",\n        "mw-rule-key",\n    )\n\n    for element_id in internal_ids:\n        assert f'id="{element_id}"' not in template\n        assert f'getElementById(\\n            "{element_id}"' not in script\n\n    assert 'class="order3-info"' not in template\n    assert 'class="order3-debug"' not in template\n    assert "可接人員" not in template\n    assert "需要人員" not in template\n\n\ndef test_public_order_catalog_has_no_generic_description_fallback():\n    source = Path("web/app/services/order_groups.py").read_text(encoding="utf-8")\n    assert '"選擇適合你的方案。"' not in source\n\n\ndef test_public_catalog_only_renders_description_when_present():\n    template = Path("web/app/templates/order_catalog.html").read_text(encoding="utf-8")\n    assert "{% if group.description %}" in template\n''', encoding='utf-8')
@@ -115,6 +97,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add web/app/templates/order_catalog.html web/app/static/js/mw_order.js web/app/services/order_groups.py tests/test_public_order_dom_contract.py .github/workflows/apply-public-order-dom-cleanup.yml
+          git add web/app/templates/order_catalog.html web/app/static/js/mw_order.js tests/test_public_order_dom_contract.py .github/workflows/apply-public-order-dom-cleanup.yml
           git commit -m "Remove internal dispatch DOM from public ordering"
           git push origin HEAD:fix/public-order-internal-dom
