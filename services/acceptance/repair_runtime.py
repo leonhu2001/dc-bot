@@ -121,9 +121,6 @@ async def restore_acceptance_payment_panel_for_order(
                 f"status={current_status}，acceptance_status={state_status}。",
             )
 
-        if state is None:
-            return False, f"WEB-{order_id} 找不到 acceptance state。"
-
         ticket_channel_id = _to_int(order.ticket_channel_id)
         if ticket_channel_id is None:
             return False, f"WEB-{order_id} 沒有 ticket_channel_id。"
