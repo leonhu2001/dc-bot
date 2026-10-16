@@ -40,6 +40,75 @@
         document.body.classList.toggle("mw-order-open", shouldLock);
     }
 
+    function stripRecordingKeeperExample(value) {
+        const text = clean(value);
+        if (!text) {
+            return text;
+        }
+        if (!(text.includes("錄影") && text.includes("保留者"))) {
+            return text;
+        }
+        return text
+            .replace(
+                /\s*(?:（|\()?(?:例|例如|範例)\s*[:：].*?(?:）|\))?\s*$/u,
+                "",
+            )
+            .trim();
+    }
+
+    function sanitizeRecordingKeeperCopy(root = document) {
+        root.querySelectorAll("input[placeholder], textarea[placeholder]").forEach(element => {
+            const current = String(element.getAttribute("placeholder") || "");
+            const next = stripRecordingKeeperExample(current);
+            if (next !== current.trim()) {
+                element.setAttribute("placeholder", next);
+            }
+        });
+
+        root.querySelectorAll("label, span, small, p, strong").forEach(element => {
+            if (element.children.length) {
+                return;
+            }
+            const current = String(element.textContent || "");
+            const next = stripRecordingKeeperExample(current);
+            if (next && next !== current.trim()) {
+                element.textContent = next;
+            }
+        });
+    }
+
+    function removePublicInternalHints() {
+        [
+            ".order3-debug",
+            ".order3-verified-badge",
+            ".order3-server-title > div > small",
+            ".order-checkout-preview-badge",
+            ".order-checkout-head p",
+            ".order-checkout-terms > small",
+            "#mw-next-notice",
+            "#mw-checkout-final-note",
+        ].forEach(selector => {
+            document.querySelectorAll(selector).forEach(element => element.remove());
+        });
+
+        document
+            .querySelectorAll(".order-checkout-account > div > small:not(#mw-checkout-vip-note)")
+            .forEach(element => element.remove());
+
+        const pointNote = byId("mw-checkout-point-note");
+        if (
+            pointNote
+            && clean(pointNote.textContent).includes("伺服器重新驗證資格")
+        ) {
+            pointNote.remove();
+        }
+    }
+
+    function sanitizePublicCopy() {
+        removePublicInternalHints();
+        sanitizeRecordingKeeperCopy(byId("mw-order-dialog") || document);
+    }
+
     function setupExtraRequirements() {
         const field = byId("mw-adjustments-field");
         const adjustments = byId("mw-adjustments");
@@ -230,6 +299,7 @@
 
     function refreshModal() {
         setupExtraRequirements();
+        sanitizePublicCopy();
         void refreshPlayerRule();
         syncBackgroundLock();
     }
@@ -244,6 +314,7 @@
         if (backgroundLocked) {
             requestAnimationFrame(syncBackgroundLock);
         }
+        requestAnimationFrame(sanitizePublicCopy);
     });
 
     document.addEventListener("change", event => {
@@ -252,6 +323,7 @@
         }
         requestAnimationFrame(() => {
             setupExtraRequirements();
+            sanitizePublicCopy();
             void refreshPlayerRule();
         });
     });
@@ -264,6 +336,7 @@
 
     requestAnimationFrame(() => {
         setupExtraRequirements();
+        sanitizePublicCopy();
         syncBackgroundLock();
     });
 })();
