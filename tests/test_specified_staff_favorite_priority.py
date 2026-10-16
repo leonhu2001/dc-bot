@@ -1,3 +1,4 @@
+from services import self_service_favorite_priority as favorite_priority
 from services import self_service_selection_runtime as selection_runtime
 
 
@@ -17,9 +18,9 @@ def test_customer_favorites_are_moved_to_front_and_marked(monkeypatch):
         seen["staff_ids"] = list(staff_ids)
         return {"200"}
 
-    monkeypatch.setattr(selection_runtime, "get_staff_favorites", fake_get_staff_favorites)
+    monkeypatch.setattr(favorite_priority, "get_staff_favorites", fake_get_staff_favorites)
 
-    result = selection_runtime._prioritize_specified_staff_entries_for_customer(
+    result = favorite_priority.prioritize_specified_staff_entries_for_customer(
         _entries(),
         999,
     )
@@ -38,9 +39,9 @@ def test_favorite_lookup_failure_keeps_normal_role_and_name_order(monkeypatch):
     def broken_get_staff_favorites(_customer_id, _staff_ids):
         raise RuntimeError("db unavailable")
 
-    monkeypatch.setattr(selection_runtime, "get_staff_favorites", broken_get_staff_favorites)
+    monkeypatch.setattr(favorite_priority, "get_staff_favorites", broken_get_staff_favorites)
 
-    result = selection_runtime._prioritize_specified_staff_entries_for_customer(
+    result = favorite_priority.prioritize_specified_staff_entries_for_customer(
         [
             {"id": "200", "label": "Beta", "description": "Role B", "role_order": 1},
             {"id": "300", "label": "Gamma", "description": "Role A", "role_order": 0},
@@ -51,3 +52,8 @@ def test_favorite_lookup_failure_keeps_normal_role_and_name_order(monkeypatch):
 
     assert [item["id"] for item in result] == ["100", "300", "200"]
     assert all(item["is_favorite"] is False for item in result)
+
+
+def test_specified_staff_view_uses_customer_favorite_priority():
+    source = selection_runtime.SelfServiceSpecifiedStaffDropdownView.__init__.__code__.co_names
+    assert "prioritize_specified_staff_entries_for_customer" in source
