@@ -9,6 +9,7 @@ import pytest
 from core import database as core_database
 from core import time_utils
 from services import logging_service, order_flow, orders, self_service_financials
+from services.acceptance import payment_panel as acceptance_payment_panel
 from services.acceptance import repair_runtime as acceptance_repair_runtime
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
@@ -29,22 +30,20 @@ def _required_namespace(**overrides):
     return namespace
 
 
-def test_acceptance_runtime_owns_canonical_persistence_and_time_dependencies():
+def test_acceptance_runtime_owns_orchestration_persistence_dependencies():
     assert acceptance_runtime.remember_claim_data is core_database.remember_claim_data
     assert acceptance_runtime.remember_order_data is core_database.remember_order_data
     assert acceptance_runtime.save_bot_data is core_database.save_bot_data
-    assert acceptance_runtime.get_taipei_now_iso is time_utils.get_taipei_now_iso
     assert acceptance_sync_worker.utc_now_naive is time_utils.utc_now_naive
     assert not hasattr(acceptance_runtime, "utc_now_naive")
+    assert not hasattr(acceptance_runtime, "get_taipei_now_iso")
 
 
-def test_acceptance_runtime_owns_stable_service_dependencies():
+def test_acceptance_runtime_owns_stable_orchestration_dependencies():
     assert acceptance_runtime._to_int is orders._to_int
     assert acceptance_runtime.ORDER_CATEGORY_LABELS is orders.ORDER_CATEGORY_LABELS
     assert acceptance_runtime.build_self_service_order_embed is orders.build_self_service_order_embed
-    assert acceptance_runtime.build_payment_method_embed is order_flow.build_payment_method_embed
     assert acceptance_runtime.DispatchClaimView is order_dispatch_runtime.DispatchClaimView
-    assert acceptance_runtime.send_order_log is logging_service.send_order_log
     assert acceptance_runtime._price_snapshot is self_service_financials._price_snapshot
     assert acceptance_runtime._price_int is self_service_financials._price_int
     assert acceptance_runtime._format_plain_amount is self_service_financials._format_plain_amount
@@ -52,15 +51,26 @@ def test_acceptance_runtime_owns_stable_service_dependencies():
         acceptance_runtime.add_self_service_financial_breakdown_fields
         is self_service_financials.add_self_service_financial_breakdown_fields
     )
+    assert not hasattr(acceptance_runtime, "build_payment_method_embed")
+    assert not hasattr(acceptance_runtime, "send_order_log")
 
 
-def test_acceptance_repair_runtime_uses_canonical_services_not_raw_db_paths():
-    assert acceptance_repair_runtime.remember_order_data is core_database.remember_order_data
-    assert acceptance_repair_runtime.save_bot_data is core_database.save_bot_data
-    assert acceptance_repair_runtime.get_taipei_now_iso is time_utils.get_taipei_now_iso
+def test_acceptance_payment_panel_owns_payment_ui_time_and_persistence():
+    assert acceptance_payment_panel.remember_order_data is core_database.remember_order_data
+    assert acceptance_payment_panel.save_bot_data is core_database.save_bot_data
+    assert acceptance_payment_panel.get_taipei_now_iso is time_utils.get_taipei_now_iso
+    assert acceptance_payment_panel._to_int is orders._to_int
+    assert acceptance_payment_panel.build_payment_method_embed is order_flow.build_payment_method_embed
+    assert acceptance_payment_panel.send_order_log is logging_service.send_order_log
+
+
+def test_acceptance_repair_runtime_delegates_payment_surface_dependencies():
     assert acceptance_repair_runtime._to_int is orders._to_int
-    assert acceptance_repair_runtime.build_payment_method_embed is order_flow.build_payment_method_embed
-    assert acceptance_repair_runtime.send_order_log is logging_service.send_order_log
+    assert not hasattr(acceptance_repair_runtime, "remember_order_data")
+    assert not hasattr(acceptance_repair_runtime, "save_bot_data")
+    assert not hasattr(acceptance_repair_runtime, "get_taipei_now_iso")
+    assert not hasattr(acceptance_repair_runtime, "build_payment_method_embed")
+    assert not hasattr(acceptance_repair_runtime, "send_order_log")
     assert not hasattr(acceptance_repair_runtime, "sqlite3")
     assert not hasattr(acceptance_repair_runtime, "Path")
 
@@ -85,29 +95,37 @@ def test_acceptance_explicit_configurator_is_keyword_only():
 
 
 def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
-    originals = {
+    runtime_owned = {
         "Any": Any,
         "Mapping": Mapping,
         "discord": discord,
         "remember_claim_data": core_database.remember_claim_data,
         "remember_order_data": core_database.remember_order_data,
         "save_bot_data": core_database.save_bot_data,
-        "get_taipei_now_iso": time_utils.get_taipei_now_iso,
         "_to_int": orders._to_int,
-        "build_payment_method_embed": order_flow.build_payment_method_embed,
         "DispatchClaimView": order_dispatch_runtime.DispatchClaimView,
     }
+    moved_to_payment_panel = (
+        "get_taipei_now_iso",
+        "build_payment_method_embed",
+        "send_order_log",
+    )
     marker = object()
 
     acceptance_runtime.configure_acceptance_runtime(
         _required_namespace(
-            **{name: object() for name in originals},
+            **{name: object() for name in runtime_owned},
+            **{name: object() for name in moved_to_payment_panel},
             _acceptance_runtime_boundary_marker=marker,
         )
     )
 
-    for name, original in originals.items():
+    for name, original in runtime_owned.items():
         assert getattr(acceptance_runtime, name) is original
+
+    for name in moved_to_payment_panel:
+        assert not hasattr(acceptance_runtime, name)
+
     assert not hasattr(acceptance_runtime, "_acceptance_runtime_boundary_marker")
 
 
