@@ -13,6 +13,15 @@ from core.discord_settings import (
     VIP_MONTHLY_ANNOUNCEMENT_CHANNEL_ID,
 )
 from core.vip_levels import BASE_MEMBER_LEVELS
+from services.vip_customer_notifications import (
+    list_expiry_reminders,
+    list_retention_renewals,
+    mark_expiry_reminder_sent,
+    mark_retention_resolved,
+    send_expiry_reminder,
+    send_level_changed,
+    send_retention_extended,
+)
 from services.vip_monthly_benefits import (
     mark_month_announcement_sent,
     sync_current_month_vip_benefits,
@@ -184,6 +193,14 @@ async def _process_action(bot: discord.Client, row: dict) -> None:
             if rewards._SAVE_BOT_DATA is not None:
                 rewards._SAVE_BOT_DATA()
 
+            if target_index != old_index:
+                await send_level_changed(
+                    bot,
+                    customer_id=customer_id,
+                    old_level=str(BASE_MEMBER_LEVELS[old_index]["name"]),
+                    new_level=str(BASE_MEMBER_LEVELS[target_index]["name"]),
+                )
+
             print(
                 "[vip-review] level adjusted "
                 f"user={customer_id} {old_index}->{target_index} by={operator_id}",
@@ -216,6 +233,20 @@ async def _process_action(bot: discord.Client, row: dict) -> None:
                 operator_discord_id=operator_id,
                 operator_display_name=operator_name,
             )
+
+            next_status = build_vip_retention_status(
+                data,
+                protection_until=next_until.isoformat(timespec="seconds"),
+            )
+            next_expiry = next_status.get("expiry_at") or next_until.isoformat(timespec="seconds")
+            await send_retention_extended(
+                bot,
+                customer_id=customer_id,
+                level_name=str(status.get("current_level") or "VIP"),
+                expiry_at=next_expiry,
+            )
+            mark_retention_resolved(customer_id, next_expiry)
+
             print(
                 "[vip-review] retention extended "
                 f"user={customer_id} days={days} until={next_until.isoformat()} by={operator_id}",
@@ -397,6 +428,26 @@ async def _send_review_message(
     )
 
 
+async def _scan_customer_notifications(bot: discord.Client) -> None:
+    snapshot = build_vip_review_snapshot(view="vip")
+    vip_rows = list(snapshot.get("rows") or [])
+    if not vip_rows:
+        return
+
+    for row in list_retention_renewals(vip_rows):
+        await send_retention_extended(
+            bot,
+            customer_id=row.get("customer_id"),
+            level_name=str(row.get("current_level") or "VIP"),
+            expiry_at=row.get("expiry_at"),
+        )
+        mark_retention_resolved(row.get("customer_id"), row.get("expiry_at"))
+
+    for row in list_expiry_reminders(vip_rows):
+        await send_expiry_reminder(bot, row)
+        mark_expiry_reminder_sent(row)
+
+
 async def _scan_and_notify(bot: discord.Client) -> None:
     snapshot = build_vip_review_snapshot(view="pending")
     pending_rows = list(snapshot.get("rows") or [])
@@ -519,6 +570,14 @@ async def process_vip_review_tick(bot: discord.Client) -> None:
     except Exception:
         print(
             f"[vip-monthly] sync/announcement failed\n{traceback.format_exc()}",
+            flush=True,
+        )
+
+    try:
+        await _scan_customer_notifications(bot)
+    except Exception:
+        print(
+            f"[vip-customer] notification scan failed\n{traceback.format_exc()}",
             flush=True,
         )
 
