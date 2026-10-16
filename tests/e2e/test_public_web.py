@@ -75,6 +75,20 @@ def test_order_dialog_populates_rule_and_local_quote(page: Page) -> None:
     expect(page.locator("#mw-total-detail")).not_to_have_text("選擇方案後即時計算")
 
 
+def test_public_order_hides_internal_staffing_metadata(page: Page) -> None:
+    open_first_order_dialog(page)
+
+    expect(page.locator(".order3-info")).to_have_count(0)
+    expect(page.locator("#mw-rule-key")).to_have_count(0)
+    expect(page.locator("#mw-next-notice")).to_have_count(0)
+
+    descriptions = "\n".join(page.locator(".order3-card > p").all_inner_texts())
+    dialog_description = page.locator("#mw-dialog-description").inner_text()
+    public_copy = f"{descriptions}\n{dialog_description}"
+    for internal_term in ("身分組", "智慧派單", "派單只通知", "Rule key"):
+        assert internal_term not in public_copy
+
+
 def test_visible_order_steppers_recalculate_without_page_reload(page: Page) -> None:
     open_first_order_dialog(page)
 
