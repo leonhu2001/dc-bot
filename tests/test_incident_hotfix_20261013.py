@@ -16,9 +16,32 @@ def test_self_service_financial_runtime_configures_without_bot_reexport(monkeypa
         "configure_self_service_financials",
         fake_configure_self_service_financials,
     )
+    monkeypatch.setattr(
+        self_service_runtime,
+        "configure_self_service_reorder",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        self_service_runtime,
+        "configure_self_service_selection_runtime",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        self_service_runtime,
+        "configure_reorder_ticket_creator",
+        lambda *_args, **_kwargs: None,
+    )
 
     namespace = {
+        "CUSTOMER_CATEGORY_ID": 1,
+        "CUSTOMER_ROLE_ID": 2,
+        "DISPATCH_CHANNEL_ID": 3,
+        "ORDER_CLAIMS": {},
+        "POINT_REDEEM_ITEMS": [],
         "POINT_REDEEM_ITEMS_BY_KEY": {},
+        "SELF_SERVICE_ORDER_SELECTIONS": {},
+        "OrderControlView": object,
+        # Stable helpers below must remain ignored in favor of canonical imports.
         "_to_int": lambda value, default=0: default,
         "allocate_store_absorbed_fixed_discount": lambda *args, **kwargs: None,
         "get_current_reward_points": lambda *args, **kwargs: 0,
@@ -31,6 +54,17 @@ def test_self_service_financial_runtime_configures_without_bot_reexport(monkeypa
     self_service_runtime.configure_self_service_runtime(namespace)
 
     assert captured["order_point_benefit_specs"] is self_service_runtime.ORDER_POINT_BENEFIT_SPECS
+    assert captured["point_redeem_items_by_key"] is namespace["POINT_REDEEM_ITEMS_BY_KEY"]
+    assert captured["to_int"] is self_service_runtime._to_int
+    assert (
+        captured["store_absorbed_discount_allocator"]
+        is self_service_runtime.allocate_store_absorbed_fixed_discount
+    )
+    assert captured["current_reward_points"] is self_service_runtime.get_current_reward_points
+    assert captured["customer_reward_data"] is self_service_runtime.get_customer_reward_data
+    assert captured["effective_member_level"] is self_service_runtime.get_effective_member_level
+    assert captured["self_service_quantity_unit"] is self_service_runtime.get_self_service_quantity_unit
+    assert captured["vip_discount_pay_rate"] is self_service_runtime.get_vip_discount_pay_rate
     assert "self_service_staff_price" not in captured
     assert "staff_price_required" not in captured
     assert self_service_runtime.get_self_service_staff_price is self_service_financials.get_self_service_staff_price
