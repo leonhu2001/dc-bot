@@ -16,6 +16,7 @@ from services import (
     self_service_financials,
     self_service_reorder,
     self_service_runtime,
+    self_service_ui_runtime,
     ticket_identity,
 )
 
@@ -31,6 +32,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(order_storage_runtime.configure_order_storage_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime_explicit)
+    assert callable(self_service_ui_runtime.configure_self_service_ui_runtime)
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
     assert callable(order_payment_runtime.configure_order_payment_runtime)
@@ -163,7 +165,18 @@ def test_phase2_self_service_financials_are_physically_extracted():
         encoding="utf-8"
     )
 
-    assert "class SelfServiceOrderView" in self_service_source
+    ui_source = Path("services/self_service_ui_runtime.py").read_text(encoding="utf-8")
+
+    assert "class SelfServiceOrderView" not in self_service_source
+    assert "class SelfServiceOrderView" in ui_source
+    assert "class SelfServiceSubmitNoteModal" not in self_service_source
+    assert "class SelfServiceSubmitNoteModal" in ui_source
+    assert "class SelfServiceStaffPriceModal" not in self_service_source
+    assert "class SelfServiceStaffPriceModal" in ui_source
+    assert "import bot" not in ui_source
+    assert "from bot import" not in ui_source
+    assert self_service_runtime.SelfServiceOrderView is self_service_ui_runtime.SelfServiceOrderView
+    assert self_service_runtime.build_self_service_panel_embed is self_service_ui_runtime.build_self_service_panel_embed
     assert "async def build_reorder_self_service_draft" not in self_service_source
     assert "async def create_reorder_ticket_from_closed_order" not in self_service_source
     assert "async def build_reorder_self_service_draft" in reorder_source
