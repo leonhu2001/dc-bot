@@ -40,11 +40,23 @@ def test_extracted_runtime_modules_import_without_importing_bot():
 def test_runtime_dependency_binding_is_explicitly_deferred_to_bot_startup():
     bot_source = Path("bot.py").read_text(encoding="utf-8")
 
-    acceptance_bind = bot_source.index("configure_acceptance_runtime(globals())")
+    assert "configure_acceptance_runtime(globals())" not in bot_source
+    acceptance_bind = bot_source.index("configure_acceptance_runtime(")
     web_bind = bot_source.index("configure_web_sync_runtime(globals())")
     order_bind = bot_source.index("configure_order_runtime(globals())")
     self_service_bind = bot_source.index("configure_self_service_runtime(globals())")
     bot_run = bot_source.index("bot.run(TOKEN)")
+
+    for explicit_binding in (
+        "dispatch_channel_id=DISPATCH_CHANNEL_ID",
+        "order_claims=ORDER_CLAIMS",
+        "payment_method_view_type=PaymentMethodView",
+        "order_selections=SELF_SERVICE_ORDER_SELECTIONS",
+        "bot_instance=bot",
+        "guild_id=GUILD_ID",
+        "refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch",
+    ):
+        assert explicit_binding in bot_source
 
     assert acceptance_bind < bot_run
     assert web_bind < bot_run
@@ -198,25 +210,18 @@ def _order_dispatch_namespace() -> dict[str, object]:
 
 
 def test_runtime_configure_boundaries_match_current_migration_stage():
-    acceptance_marker = "_acceptance_runtime_test_marker"
-    if hasattr(acceptance_runtime, acceptance_marker):
-        delattr(acceptance_runtime, acceptance_marker)
-
     self_service_marker = "_self_service_runtime_test_marker"
     if hasattr(self_service_runtime, self_service_marker):
         delattr(self_service_runtime, self_service_marker)
 
     acceptance_runtime.configure_acceptance_runtime(
-        {
-            "DISPATCH_CHANNEL_ID": 123,
-            "GUILD_ID": 456,
-            "ORDER_CLAIMS": {},
-            "PaymentMethodView": object,
-            "SELF_SERVICE_ORDER_SELECTIONS": {},
-            "_refresh_existing_web_sync_dispatch": lambda *_args, **_kwargs: None,
-            "bot": object(),
-            acceptance_marker: object(),
-        }
+        dispatch_channel_id=123,
+        order_claims={},
+        payment_method_view_type=object,
+        order_selections={},
+        bot_instance=object(),
+        guild_id=456,
+        refresh_existing_web_sync_dispatch=lambda *_args, **_kwargs: None,
     )
     web_sync_runtime.configure_web_sync_runtime(
         {"_web_sync_runtime_test_marker": object()}
@@ -231,7 +236,6 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
         {self_service_marker: object()}
     )
 
-    assert not hasattr(acceptance_runtime, acceptance_marker)
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     assert hasattr(order_runtime, "_order_runtime_test_marker")
     assert not hasattr(self_service_runtime, self_service_marker)
