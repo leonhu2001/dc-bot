@@ -152,21 +152,6 @@
             "mw-adjustments"
         );
 
-    const rolesEl =
-        document.getElementById(
-            "mw-roles"
-        );
-
-    const requiredStaffEl =
-        document.getElementById(
-            "mw-required-staff"
-        );
-
-    const specifyEl =
-        document.getElementById(
-            "mw-specify"
-        );
-
     const totalEl =
         document.getElementById(
             "mw-total"
@@ -175,11 +160,6 @@
     const detailEl =
         document.getElementById(
             "mw-total-detail"
-        );
-
-    const ruleKeyEl =
-        document.getElementById(
-            "mw-rule-key"
         );
 
     const serviceBonusEl =
@@ -657,29 +637,6 @@
         playerField.hidden =
             !activeVariant
                 .player_count_enabled;
-
-
-        rolesEl.textContent =
-            (
-                activeVariant.allowed_roles
-                || []
-            ).join(" / ")
-            || "—";
-
-
-        requiredStaffEl.textContent =
-            activeVariant.required_staff
-            || "—";
-
-
-        specifyEl.textContent =
-            activeVariant.allow_specify
-                ? "可指定"
-                : "不開放";
-
-
-        ruleKeyEl.textContent =
-            activeVariant.rule_key;
 
 
         renderAdjustments();
