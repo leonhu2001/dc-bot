@@ -6550,9 +6550,6 @@ except app_commands.CommandAlreadyRegistered:
     pass
 
 
-# Bind extracted runtimes only after bot.py has defined the remaining
-# Views/callbacks they depend on. Acceptance and self-service now use explicit
-# bot-owned dependencies; the other legacy adapters are migrated separately.
 configure_acceptance_runtime_explicit(
     dispatch_channel_id=DISPATCH_CHANNEL_ID,
     order_claims=ORDER_CLAIMS,
