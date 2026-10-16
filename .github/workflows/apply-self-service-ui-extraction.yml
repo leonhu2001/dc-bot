@@ -1,0 +1,109 @@
+name: Apply self-service UI runtime extraction
+
+on:
+  push:
+    branches:
+      - refactor/self-service-ui-runtime-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/self-service-ui-runtime-20261017
+          fetch-depth: 0
+
+      - name: Extract self-service UI runtime without behavior changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime_path = Path('services/self_service_runtime.py')
+          source = runtime_path.read_text(encoding='utf-8')
+
+          player_marker = 'class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):'
+          submit_adapter_marker = '\n\nasync def create_waiting_acceptance_order_from_self_service('
+          ui_marker = 'PRICE_FORMULA_VERSION = 2'
+
+          if source.count(player_marker) != 1:
+              raise SystemExit('player modal extraction anchor mismatch')
+          if source.count(submit_adapter_marker) != 1:
+              raise SystemExit('submit adapter extraction anchor mismatch')
+          if source.count(ui_marker) != 1:
+              raise SystemExit('UI runtime extraction anchor mismatch')
+
+          player_start = source.index(player_marker)
+          player_end = source.index(submit_adapter_marker, player_start)
+          player_block = source[player_start:player_end].rstrip() + '\n\n'
+
+          source_without_player = source[:player_start] + source[player_end + 2:]
+
+          ui_start = source_without_player.index(ui_marker)
+          ui_block = source_without_player[ui_start:].rstrip() + '\n'
+          parent = source_without_player[:ui_start].rstrip() + '\n'
+
+          ui_header = '''from __future__ import annotations\n\nimport discord\n\nfrom core.database import (\n    delete_claim_row_from_db,\n    remember_order_data,\n    save_bot_data,\n)\nfrom core.permissions import can_operate_self_service_order, is_customer_staff\nfrom core.time_utils import get_taipei_now_iso\nfrom services.order_runtime import (\n    SelfServiceOrderCategorySelect,\n    SelfServiceOrderDetailSelect,\n    SelfServiceOrderItemSelect,\n    SelfServiceOrderQuantitySelect,\n    _self_service_quantity_meta,\n    get_self_service_quantity_unit,\n    log_self_service_proxy_action,\n    normalize_self_service_staff_count,\n)\nfrom services.orders import (\n    ORDER_CATEGORY_LABELS,\n    ORDER_ITEM_TO_CATEGORY,\n    _to_int,\n    get_order_item_detail_for_selection,\n)\nfrom services.self_service_dispatch_cleanup import cleanup_failed_self_service_dispatch\nfrom services.self_service_financials import (\n    _format_percent_value,\n    _format_plain_amount,\n    _parse_cash_amount_text,\n    _parse_discount_percent_text,\n    add_self_service_quote_preview,\n    get_self_service_staff_price,\n    is_order_point_benefit_allowed_for_rule,\n    is_self_service_staff_price_required,\n)\nfrom services.self_service_retract import SelfServiceDispatchedView\nfrom services.self_service_selection_runtime import (\n    SelfServicePointBenefitView,\n    SelfServiceSpecifiedStaffDropdownView,\n    get_specified_staff_entries_for_rule,\n)\n\n\n_CONFIGURED = False\nSELF_SERVICE_ORDER_SELECTIONS: dict = {}\nORDER_CLAIMS: dict = {}\nDISPATCH_CHANNEL_ID = 0\n\n\ndef _unconfigured(*_args, **_kwargs):\n    raise RuntimeError("self-service UI runtime is not configured")\n\n\n_get_rule_from_self_service_data = _unconfigured\n_is_specify_preference = _unconfigured\ncreate_waiting_acceptance_order_from_self_service = _unconfigured\n\n\ndef configure_self_service_ui_runtime(\n    *,\n    order_selections: dict,\n    order_claims: dict,\n    dispatch_channel_id: int,\n    get_rule_from_data,\n    is_specify_preference,\n    create_waiting_order,\n) -> None:\n    \"\"\"Bind the small set of orchestrator-owned callbacks/state used by the UI.\"\"\"\n    global _CONFIGURED\n    global SELF_SERVICE_ORDER_SELECTIONS, ORDER_CLAIMS, DISPATCH_CHANNEL_ID\n    global _get_rule_from_self_service_data, _is_specify_preference\n    global create_waiting_acceptance_order_from_self_service\n\n    SELF_SERVICE_ORDER_SELECTIONS = order_selections\n    ORDER_CLAIMS = order_claims\n    DISPATCH_CHANNEL_ID = int(dispatch_channel_id)\n    _get_rule_from_self_service_data = get_rule_from_data\n    _is_specify_preference = is_specify_preference\n    create_waiting_acceptance_order_from_self_service = create_waiting_order\n    _CONFIGURED = True\n\n\n'''
+
+          ui_path = Path('services/self_service_ui_runtime.py')
+          if ui_path.exists():
+              raise SystemExit('self_service_ui_runtime.py already exists')
+          ui_path.write_text(ui_header + player_block + ui_block, encoding='utf-8')
+
+          ui_import = '''from services.self_service_ui_runtime import (\n    PRICE_FORMULA_VERSION,\n    SelfServiceOrderView,\n    SelfServicePlayerCountModal,\n    SelfServiceStaffDiscountCouponModal,\n    SelfServiceStaffPriceModal,\n    SelfServiceSubmitNoteModal,\n    build_self_service_panel_embed,\n    configure_self_service_ui_runtime,\n)\n\n'''
+          import_anchor = '# Dependencies with a stable owning module are imported directly above and must not\n'
+          if parent.count(import_anchor) != 1:
+              raise SystemExit('self-service UI import insertion anchor mismatch')
+          parent = parent.replace(import_anchor, ui_import + import_anchor, 1)
+
+          config_anchor = '    _CONFIGURED = True\n\n\ndef configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:'
+          if parent.count(config_anchor) != 1:
+              raise SystemExit('self-service UI config insertion anchor mismatch')
+          ui_config = '''    configure_self_service_ui_runtime(\n        order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n        order_claims=ORDER_CLAIMS,\n        dispatch_channel_id=DISPATCH_CHANNEL_ID,\n        get_rule_from_data=_get_rule_from_self_service_data,\n        is_specify_preference=_is_specify_preference,\n        create_waiting_order=create_waiting_acceptance_order_from_self_service,\n    )\n\n    _CONFIGURED = True\n\n\ndef configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:'''
+          parent = parent.replace(config_anchor, ui_config, 1)
+          runtime_path.write_text(parent, encoding='utf-8')
+
+          boundary_path = Path('tests/test_runtime_extraction_boundaries.py')
+          boundary = boundary_path.read_text(encoding='utf-8')
+          old_import = '''    self_service_reorder,\n    self_service_runtime,\n    ticket_identity,\n)'''
+          new_import = '''    self_service_reorder,\n    self_service_runtime,\n    self_service_ui_runtime,\n    ticket_identity,\n)'''
+          if boundary.count(old_import) != 1:
+              raise SystemExit('runtime boundary import anchor mismatch')
+          boundary = boundary.replace(old_import, new_import, 1)
+
+          old_callable = '    assert callable(self_service_runtime.configure_self_service_runtime_explicit)\n'
+          new_callable = old_callable + '    assert callable(self_service_ui_runtime.configure_self_service_ui_runtime)\n'
+          if boundary.count(old_callable) != 1:
+              raise SystemExit('runtime boundary callable anchor mismatch')
+          boundary = boundary.replace(old_callable, new_callable, 1)
+
+          old_assert = '    assert "class SelfServiceOrderView" in self_service_source\n'
+          new_assert = '''    ui_source = Path("services/self_service_ui_runtime.py").read_text(encoding="utf-8")\n\n    assert "class SelfServiceOrderView" not in self_service_source\n    assert "class SelfServiceOrderView" in ui_source\n    assert "class SelfServiceSubmitNoteModal" not in self_service_source\n    assert "class SelfServiceSubmitNoteModal" in ui_source\n    assert "class SelfServiceStaffPriceModal" not in self_service_source\n    assert "class SelfServiceStaffPriceModal" in ui_source\n    assert "import bot" not in ui_source\n    assert "from bot import" not in ui_source\n    assert self_service_runtime.SelfServiceOrderView is self_service_ui_runtime.SelfServiceOrderView\n    assert self_service_runtime.build_self_service_panel_embed is self_service_ui_runtime.build_self_service_panel_embed\n'''
+          if boundary.count(old_assert) != 1:
+              raise SystemExit('runtime boundary UI extraction anchor mismatch')
+          boundary = boundary.replace(old_assert, new_assert, 1)
+          boundary_path.write_text(boundary, encoding='utf-8')
+
+          contract_path = Path('tests/test_self_service_ui_runtime_contract.py')
+          contract_path.write_text('''from services import self_service_ui_runtime\n\n\ndef test_ui_runtime_configuration_is_explicit_and_shares_canonical_state():\n    order_selections = {}\n    order_claims = {}\n\n    def get_rule(data):\n        return data\n\n    def is_specify(value):\n        return bool(value)\n\n    async def create_waiting(*_args, **_kwargs):\n        return "ok"\n\n    self_service_ui_runtime.configure_self_service_ui_runtime(\n        order_selections=order_selections,\n        order_claims=order_claims,\n        dispatch_channel_id=123,\n        get_rule_from_data=get_rule,\n        is_specify_preference=is_specify,\n        create_waiting_order=create_waiting,\n    )\n\n    assert self_service_ui_runtime.SELF_SERVICE_ORDER_SELECTIONS is order_selections\n    assert self_service_ui_runtime.ORDER_CLAIMS is order_claims\n    assert self_service_ui_runtime.DISPATCH_CHANNEL_ID == 123\n    assert self_service_ui_runtime._get_rule_from_self_service_data is get_rule\n    assert self_service_ui_runtime._is_specify_preference is is_specify\n    assert self_service_ui_runtime.create_waiting_acceptance_order_from_self_service is create_waiting\n''', encoding='utf-8')
+          PY
+
+      - name: Compile extracted modules before commit
+        run: python -m py_compile services/self_service_runtime.py services/self_service_ui_runtime.py
+
+      - name: Remove one-shot migration workflow
+        run: rm .github/workflows/apply-self-service-ui-extraction.yml
+
+      - name: Commit canonical extraction
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/self_service_runtime.py services/self_service_ui_runtime.py tests/test_runtime_extraction_boundaries.py tests/test_self_service_ui_runtime_contract.py .github/workflows/apply-self-service-ui-extraction.yml
+          git commit -m "Extract self-service UI runtime"
+          git push origin HEAD:refactor/self-service-ui-runtime-20261017
