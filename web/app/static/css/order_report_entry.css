@@ -1,0 +1,184 @@
+.report-detail-shell {
+    max-width: 1120px;
+    gap: 12px;
+}
+
+.report-detail-shell .report-hero {
+    padding: 15px 18px;
+    border-radius: 18px;
+}
+
+.report-detail-shell .report-hero h2 {
+    font-size: clamp(22px, 3vw, 30px);
+}
+
+.report-detail-shell .report-order-summary {
+    padding: 10px;
+    border-radius: 15px;
+    gap: 7px;
+}
+
+.report-detail-shell .report-order-summary > div {
+    padding: 8px 10px;
+    border-radius: 10px;
+}
+
+.report-detail-shell .report-form,
+.report-detail-shell .report-form-fieldset {
+    gap: 12px;
+}
+
+.report-detail-shell .report-section {
+    gap: 10px;
+    padding: 13px;
+    border-radius: 16px;
+}
+
+.report-detail-shell .report-section-head {
+    align-items: center;
+    padding-bottom: 8px;
+}
+
+.report-detail-shell .report-worker-service-list {
+    gap: 7px;
+}
+
+.report-detail-shell .report-worker-service-row {
+    grid-template-columns: minmax(180px, 1.25fr) minmax(120px, .58fr) auto minmax(210px, 1fr);
+    gap: 9px;
+    align-items: center;
+    padding: 9px 10px;
+    border-radius: 12px;
+}
+
+.report-detail-shell .report-worker-identity small {
+    margin-top: 2px;
+    font-size: 10px;
+}
+
+.report-detail-shell .report-field {
+    gap: 4px;
+}
+
+.report-detail-shell .report-field > span {
+    margin-bottom: 0;
+    font-size: 10px;
+}
+
+.report-detail-shell .report-worker-named select,
+.report-detail-shell .report-worker-stream-url input,
+.report-detail-shell .report-recording-fields input[type="text"] {
+    min-height: 34px;
+    padding: 6px 9px;
+    border-radius: 9px;
+    font-size: 12px;
+}
+
+.report-detail-shell .report-worker-live-choice {
+    width: max-content;
+    min-width: 0;
+}
+
+.report-detail-shell .report-worker-live-choice > span {
+    margin-bottom: 4px;
+}
+
+.report-detail-shell .report-choice-grid-compact,
+.report-detail-shell .report-recording-fields .report-choice-grid {
+    display: inline-flex;
+    width: auto;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 10px;
+    background: rgba(255,255,255,.025);
+}
+
+.report-detail-shell .report-choice-grid-compact label,
+.report-detail-shell .report-recording-fields .report-choice-grid label {
+    justify-content: center;
+    min-width: 62px;
+    min-height: 30px;
+    gap: 5px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.report-detail-shell input[type="radio"] {
+    width: 13px !important;
+    height: 13px !important;
+    min-width: 13px !important;
+    min-height: 13px !important;
+    margin: 0;
+    padding: 0;
+    flex: 0 0 13px;
+}
+
+.report-detail-shell .report-choice-grid-compact label:has(input:checked),
+.report-detail-shell .report-recording-fields .report-choice-grid label:has(input:checked) {
+    background: rgba(245,198,107,.14);
+    color: #fff1c9;
+    box-shadow: inset 0 0 0 1px rgba(245,198,107,.22);
+}
+
+.report-detail-shell .report-recording-block {
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding-top: 10px;
+}
+
+.report-detail-shell .report-recording-fields {
+    grid-template-columns: max-content minmax(220px, 1fr);
+    gap: 9px;
+    align-items: end;
+}
+
+.report-detail-shell .report-section textarea {
+    min-height: 86px;
+    padding: 9px 10px;
+    border-radius: 10px;
+}
+
+.report-detail-shell .report-action-bar {
+    gap: 7px;
+}
+
+.report-detail-shell .report-button {
+    min-height: 36px;
+    padding: 7px 12px;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .report-detail-shell .report-worker-service-row {
+        grid-template-columns: minmax(160px, 1fr) minmax(120px, .65fr) auto;
+    }
+
+    .report-detail-shell .report-worker-stream-url {
+        grid-column: 2 / 4;
+    }
+}
+
+@media (max-width: 640px) {
+    .report-detail-shell .report-worker-service-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .report-detail-shell .report-worker-identity {
+        grid-column: 1 / 3;
+    }
+
+    .report-detail-shell .report-worker-stream-url {
+        grid-column: 1 / 3;
+    }
+
+    .report-detail-shell .report-recording-block,
+    .report-detail-shell .report-recording-fields {
+        grid-template-columns: 1fr;
+    }
+}
