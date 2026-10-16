@@ -193,85 +193,92 @@ _CONFIGURED = False
 
 
 def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the remaining bot-owned state/config after bot.py is loaded.
+    """Bind the remaining bot-owned state/config after bot.py is loaded.
 
-    Stable helpers are imported from their canonical modules above. Unknown names
-    are ignored instead of being copied into module globals.
+    This is still the compatibility entry point used by bot.py, but dependency
+    binding is explicit and fail-fast: no arbitrary name is copied through
+    globals(), and a partially configured runtime is rejected at startup.
     """
     global _CONFIGURED
+    global CUSTOMER_CATEGORY_ID, CUSTOMER_ROLE_ID, DISPATCH_CHANNEL_ID
+    global ORDER_CLAIMS, POINT_REDEEM_ITEMS, POINT_REDEEM_ITEMS_BY_KEY
+    global SELF_SERVICE_ORDER_SELECTIONS, OrderControlView
 
-    for name in _LEGACY_RUNTIME_NAMES:
-        if name in namespace:
-            globals()[name] = namespace[name]
+    missing = sorted(
+        name
+        for name in _LEGACY_RUNTIME_NAMES
+        if name not in namespace
+    )
+    if missing:
+        raise RuntimeError(
+            "self-service runtime missing dependencies: "
+            + ", ".join(missing)
+        )
+
+    CUSTOMER_CATEGORY_ID = namespace["CUSTOMER_CATEGORY_ID"]
+    CUSTOMER_ROLE_ID = namespace["CUSTOMER_ROLE_ID"]
+    DISPATCH_CHANNEL_ID = namespace["DISPATCH_CHANNEL_ID"]
+    ORDER_CLAIMS = namespace["ORDER_CLAIMS"]
+    POINT_REDEEM_ITEMS = namespace["POINT_REDEEM_ITEMS"]
+    POINT_REDEEM_ITEMS_BY_KEY = namespace["POINT_REDEEM_ITEMS_BY_KEY"]
+    SELF_SERVICE_ORDER_SELECTIONS = namespace["SELF_SERVICE_ORDER_SELECTIONS"]
+    OrderControlView = namespace["OrderControlView"]
 
     configure_reorder_ticket_creator(create_reorder_ticket_from_closed_order)
 
-    if "POINT_REDEEM_ITEMS_BY_KEY" in namespace:
-        configure_self_service_financials(
-            order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
-            point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
-            get_rule_from_data=_get_rule_from_self_service_data,
-            is_specify_preference=_is_specify_preference,
-            role_key_for_member=_role_key_for_member,
-            to_int=_to_int,
-            store_absorbed_discount_allocator=allocate_store_absorbed_fixed_discount,
-            current_reward_points=get_current_reward_points,
-            customer_reward_data=get_customer_reward_data,
-            effective_member_level=get_effective_member_level,
-            self_service_quantity_unit=get_self_service_quantity_unit,
-            vip_discount_pay_rate=get_vip_discount_pay_rate,
-        )
+    configure_self_service_financials(
+        order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
+        point_redeem_items_by_key=POINT_REDEEM_ITEMS_BY_KEY,
+        get_rule_from_data=_get_rule_from_self_service_data,
+        is_specify_preference=_is_specify_preference,
+        role_key_for_member=_role_key_for_member,
+        to_int=_to_int,
+        store_absorbed_discount_allocator=allocate_store_absorbed_fixed_discount,
+        current_reward_points=get_current_reward_points,
+        customer_reward_data=get_customer_reward_data,
+        effective_member_level=get_effective_member_level,
+        self_service_quantity_unit=get_self_service_quantity_unit,
+        vip_discount_pay_rate=get_vip_discount_pay_rate,
+    )
 
-    reorder_keys = {
-        "CUSTOMER_ROLE_ID",
-        "CUSTOMER_CATEGORY_ID",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "OrderControlView",
-    }
-    if reorder_keys.issubset(namespace):
-        configure_self_service_reorder(
-            order_category_labels=ORDER_CATEGORY_LABELS,
-            order_item_groups_by_category=ORDER_ITEM_GROUPS_BY_CATEGORY,
-            get_order_rule_by_item_label=_get_order_rule_by_item_label,
-            role_key_for_member=_role_key_for_member,
-            to_int=_to_int,
-            order_item_details_for_group=get_order_item_details_for_group,
-            order_item_group_label=get_order_item_group_label,
-            self_service_quantity_meta=get_self_service_quantity_meta,
-            taipei_now_iso=get_taipei_now_iso,
-            staff_price_required=is_self_service_staff_price_required,
-            customer_role_id=namespace["CUSTOMER_ROLE_ID"],
-            customer_category_id=namespace["CUSTOMER_CATEGORY_ID"],
-            order_control_view=namespace["OrderControlView"],
-            self_service_order_view=SelfServiceOrderView,
-            panel_embed_builder=build_self_service_panel_embed,
-            self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            remember_data=remember_order_data,
-            save_data=save_bot_data,
-            ticket_channel_name_builder=build_ticket_channel_name,
-            delete_order_row=delete_order_row_from_db,
-            order_log_sender=send_order_log,
-        )
+    configure_self_service_reorder(
+        order_category_labels=ORDER_CATEGORY_LABELS,
+        order_item_groups_by_category=ORDER_ITEM_GROUPS_BY_CATEGORY,
+        get_order_rule_by_item_label=_get_order_rule_by_item_label,
+        role_key_for_member=_role_key_for_member,
+        to_int=_to_int,
+        order_item_details_for_group=get_order_item_details_for_group,
+        order_item_group_label=get_order_item_group_label,
+        self_service_quantity_meta=get_self_service_quantity_meta,
+        taipei_now_iso=get_taipei_now_iso,
+        staff_price_required=is_self_service_staff_price_required,
+        customer_role_id=CUSTOMER_ROLE_ID,
+        customer_category_id=CUSTOMER_CATEGORY_ID,
+        order_control_view=OrderControlView,
+        self_service_order_view=SelfServiceOrderView,
+        panel_embed_builder=build_self_service_panel_embed,
+        self_service_order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+        remember_data=remember_order_data,
+        save_data=save_bot_data,
+        ticket_channel_name_builder=build_ticket_channel_name,
+        delete_order_row=delete_order_row_from_db,
+        order_log_sender=send_order_log,
+    )
 
-    selection_keys = {
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "POINT_REDEEM_ITEMS",
-    }
-    if selection_keys.issubset(namespace):
-        configure_self_service_selection_runtime(
-            order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            point_redeem_items=namespace["POINT_REDEEM_ITEMS"],
-            role_key_for_member=_role_key_for_member,
-            remember_data=remember_order_data,
-            panel_embed_builder=build_self_service_panel_embed,
-            order_view_type=SelfServiceOrderView,
-            to_int=_to_int,
-            order_point_item_getter=get_order_point_item,
-            customer_point_balance_getter=get_customer_point_balance_for_order,
-            point_benefit_allowed_for_rule=is_order_point_benefit_allowed_for_rule,
-            point_benefit_adapter=_adapt_order_point_benefit_for_rule,
-            selected_point_benefit_getter=get_selected_order_point_benefit,
-        )
+    configure_self_service_selection_runtime(
+        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+        point_redeem_items=POINT_REDEEM_ITEMS,
+        role_key_for_member=_role_key_for_member,
+        remember_data=remember_order_data,
+        panel_embed_builder=build_self_service_panel_embed,
+        order_view_type=SelfServiceOrderView,
+        to_int=_to_int,
+        order_point_item_getter=get_order_point_item,
+        customer_point_balance_getter=get_customer_point_balance_for_order,
+        point_benefit_allowed_for_rule=is_order_point_benefit_allowed_for_rule,
+        point_benefit_adapter=_adapt_order_point_benefit_for_rule,
+        selected_point_benefit_getter=get_selected_order_point_benefit,
+    )
 
     _CONFIGURED = True
 
@@ -1295,7 +1302,6 @@ class SelfServiceOrderView(discord.ui.View):
             return
 
         if getattr(rule, "allow_specify", False) and _is_specify_preference(companion_preference) and not data.get("specified_staff_ids"):
-            panel_message_id = interaction.message.id if interaction.message is not None else None
             await interaction.response.send_message(
                 "老闆已選擇指定，但尚未完成指定成員選擇。請老闆先點「選擇指定成員」並按「完成」後，再送出等待接單。",
                 ephemeral=True,
@@ -1314,19 +1320,3 @@ class SelfServiceOrderView(discord.ui.View):
                 panel_message_id=panel_message_id,
             )
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
