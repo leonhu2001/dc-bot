@@ -2,12 +2,12 @@
 {% block page_title %}填寫報單{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/order_reports.css?v=3">
+<link rel="stylesheet" href="/static/css/order_report_entry.css?v=1">
 <section class="report-shell report-detail-shell">
   <div class="report-hero report-hero-compact">
     <div>
       <p class="report-kicker">{{ detail.bot_order_no or ('WEB-' ~ detail.id) }}</p>
       <h2>{{ detail.category }}｜{{ detail.item }}</h2>
-      <p>系統已帶入訂單資料；一份報單統一確認每位接單人員的掛名與直播，再補上整單錄影與備註。</p>
     </div>
     <span class="report-badge report-badge-{{ detail.report_status }}">{{ status_labels.get(detail.report_status, detail.report_status) }}</span>
   </div>
@@ -38,7 +38,6 @@
       <div class="report-section report-service-record">
         <div class="report-section-head">
           <div><p class="report-kicker">SERVICE RECORD</p><h3>接單紀錄</h3></div>
-          <span class="report-muted">一份報單即可；每位接單人員的直播狀態要分開確認</span>
         </div>
 
         <div class="report-worker-service-list">
@@ -62,14 +61,14 @@
               <div class="report-field report-worker-live-choice">
                 <span>直播</span>
                 <div class="report-choice-grid report-choice-grid-compact">
-                  <label><input type="radio" data-worker-streamed name="streamed_{{ worker.worker_discord_id }}" value="0" required {% if stream_value == 0 %}checked{% endif %}> 沒有</label>
-                  <label><input type="radio" data-worker-streamed name="streamed_{{ worker.worker_discord_id }}" value="1" required {% if stream_value == 1 %}checked{% endif %}> 有</label>
+                  <label><input type="radio" data-worker-streamed name="streamed_{{ worker.worker_discord_id }}" value="0" required {% if stream_value == 0 %}checked{% endif %}>沒有</label>
+                  <label><input type="radio" data-worker-streamed name="streamed_{{ worker.worker_discord_id }}" value="1" required {% if stream_value == 1 %}checked{% endif %}>有</label>
                 </div>
               </div>
 
               <label class="report-field report-worker-stream-url" data-worker-stream-url-wrap {% if stream_value != 1 %}hidden{% endif %}>
                 <span>直播網址</span>
-                <input type="url" data-worker-stream-url name="stream_url_{{ worker.worker_discord_id }}" maxlength="500" value="{{ worker.reported_stream_url or '' }}" placeholder="https://..." {% if stream_value == 1 %}required{% endif %}>
+                <input type="url" data-worker-stream-url name="stream_url_{{ worker.worker_discord_id }}" maxlength="500" value="{{ worker.reported_stream_url or '' }}" {% if stream_value == 1 %}required{% endif %}>
               </label>
             </div>
           {% endfor %}
@@ -79,16 +78,15 @@
           <div>
             <p class="report-kicker">RECORDING</p>
             <h3>整單錄影</h3>
-            <p class="report-muted">錄影仍是整張單共用，不需要每位接單人員各填一次。</p>
           </div>
           <div class="report-recording-fields">
             <div class="report-choice-grid">
-              <label><input type="radio" name="recording_saved" value="0" required {% if detail.recording_saved == 0 %}checked{% endif %}> 未保留</label>
-              <label><input type="radio" name="recording_saved" value="1" required {% if detail.recording_saved == 1 %}checked{% endif %}> 有保留</label>
+              <label><input type="radio" name="recording_saved" value="0" required {% if detail.recording_saved == 0 %}checked{% endif %}>未保留</label>
+              <label><input type="radio" name="recording_saved" value="1" required {% if detail.recording_saved == 1 %}checked{% endif %}>有保留</label>
             </div>
             <label class="report-field">
               <span>錄影保留者（選填）</span>
-              <input type="text" name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}" placeholder="例如：玉米">
+              <input type="text" name="recording_holder" maxlength="120" value="{{ detail.recording_holder or '' }}">
             </label>
           </div>
         </div>
@@ -98,8 +96,8 @@
         <p class="report-kicker">NOTE</p>
         <h3>備註</h3>
         <label class="report-field">
-          <span>特殊狀況、掛名／直播／錄影補充都可以寫在這裡（選填）</span>
-          <textarea name="note" rows="5" maxlength="1000" placeholder="最多 1000 字">{{ detail.note or '' }}</textarea>
+          <span>備註（選填）</span>
+          <textarea name="note" rows="4" maxlength="1000">{{ detail.note or '' }}</textarea>
         </label>
       </div>
     </fieldset>
