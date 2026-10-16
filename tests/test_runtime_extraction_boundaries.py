@@ -3,6 +3,7 @@ from pathlib import Path
 # Phase 2 contract: moved responsibilities stay physically separated while the
 # parent runtimes keep their existing public import/configuration surface.
 from services.acceptance import runtime as acceptance_runtime
+from services.acceptance import sync_worker as acceptance_sync_worker
 from services.web_sync import runtime as web_sync_runtime
 from services import (
     order_credential_runtime,
@@ -21,6 +22,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(acceptance_runtime.configure_acceptance_runtime)
     assert callable(web_sync_runtime.configure_web_sync_runtime)
     assert callable(acceptance_runtime.process_acceptance_sync_events_once)
+    assert callable(acceptance_sync_worker.process_acceptance_sync_events_once)
     assert callable(web_sync_runtime._process_web_order_created_event)
     assert callable(order_runtime.configure_order_runtime)
     assert callable(order_storage_runtime.configure_order_storage_runtime)
@@ -67,11 +69,15 @@ def test_large_runtime_implementations_no_longer_live_in_bot():
     acceptance_source = Path("services/acceptance/runtime.py").read_text(
         encoding="utf-8"
     )
+    acceptance_worker_source = Path(
+        "services/acceptance/sync_worker.py"
+    ).read_text(encoding="utf-8")
     web_source = Path("services/web_sync/runtime.py").read_text(
         encoding="utf-8"
     )
 
-    assert "async def process_acceptance_sync_events_once" in acceptance_source
+    assert "async def process_acceptance_sync_events_once" not in acceptance_source
+    assert "async def process_acceptance_sync_events_once" in acceptance_worker_source
     assert "async def refresh_acceptance_dispatch_from_web_order" in acceptance_source
     assert "async def _web_order_created_ensure_ticket" in web_source
     assert "class WebsiteOrderCsConfirmView" in web_source
