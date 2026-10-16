@@ -60,7 +60,7 @@ class _FakeGuild:
 
 class _FakeConnection:
     def execute(self, *_args, **_kwargs):
-        return None
+        return SimpleNamespace(rowcount=1)
 
 
 class _FakeEngine:

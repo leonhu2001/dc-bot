@@ -6,6 +6,8 @@ from typing import Any, Callable, Mapping
 
 import discord
 
+from services.self_service_dispatch_cleanup import cleanup_failed_self_service_dispatch
+
 
 @dataclass(frozen=True)
 class SelfServiceDispatchDeps:
@@ -39,6 +41,86 @@ class SelfServiceDispatchDeps:
 
 
 async def create_waiting_acceptance_order(
+    interaction: discord.Interaction,
+    *,
+    customer_id: int,
+    channel_id: int,
+    deps: SelfServiceDispatchDeps,
+) -> str:
+    """Create a self-service dispatch with a runtime-owned compensation boundary.
+
+    The Discord dispatch stays inert until canonical WebOrder/acceptance/local
+    state is ready. Any failure before the claim panel is activated is rolled
+    back here rather than relying on a UI caller to remember compensation.
+    """
+    data = deps.order_selections.setdefault(channel_id, {})
+
+    if data.get("dispatch_rollback_pending"):
+        try:
+            warnings = await cleanup_failed_self_service_dispatch(
+                interaction,
+                channel_id=channel_id,
+                data=data,
+                order_claims=deps.order_claims,
+                default_dispatch_channel_id=int(deps.dispatch_channel_id),
+                remember_order=deps.remember_order,
+                save_data=deps.save_data,
+            )
+        except Exception as cleanup_exc:
+            raise RuntimeError(
+                "上一次派單回滾尚未完成，暫時不能建立新派單，請通知客服主管確認。"
+            ) from cleanup_exc
+
+        if warnings:
+            raise RuntimeError(
+                "上一次派單回滾尚未完成，暫時不能建立新派單，請通知客服主管確認。"
+            )
+
+    try:
+        return await _create_waiting_acceptance_order_once(
+            interaction,
+            customer_id=customer_id,
+            channel_id=channel_id,
+            deps=deps,
+        )
+    except Exception:
+        failed_data = deps.order_selections.setdefault(channel_id, {})
+        provisional_started = (
+            deps.to_int(
+                failed_data.get("provisional_dispatch_message_id"),
+                None,
+            )
+            is not None
+        )
+
+        if provisional_started:
+            try:
+                warnings = await cleanup_failed_self_service_dispatch(
+                    interaction,
+                    channel_id=channel_id,
+                    data=failed_data,
+                    order_claims=deps.order_claims,
+                    default_dispatch_channel_id=int(deps.dispatch_channel_id),
+                    remember_order=deps.remember_order,
+                    save_data=deps.save_data,
+                )
+                if warnings:
+                    print(
+                        f"[self-service-dispatch] rollback pending channel_id={channel_id}: "
+                        + "；".join(warnings),
+                        flush=True,
+                    )
+            except Exception as cleanup_exc:
+                print(
+                    f"[self-service-dispatch] rollback crashed channel_id={channel_id}: "
+                    f"{type(cleanup_exc).__name__}: {cleanup_exc}",
+                    flush=True,
+                )
+
+        raise
+
+
+async def _create_waiting_acceptance_order_once(
     interaction: discord.Interaction,
     *,
     customer_id: int,
@@ -403,7 +485,7 @@ async def create_waiting_acceptance_order(
         from sqlalchemy import text as _rule_snapshot_sql_text
 
         with _rule_snapshot_engine.begin() as _rule_snapshot_conn:
-            _rule_snapshot_conn.execute(
+            result = _rule_snapshot_conn.execute(
                 _rule_snapshot_sql_text("""
                     UPDATE web_orders
                     SET order_rule_key = :order_rule_key,
@@ -421,8 +503,12 @@ async def create_waiting_acceptance_order(
                     "price_snapshot_json": price_snapshot_json,
                 },
             )
+            if result.rowcount != 1:
+                raise RuntimeError(
+                    f"WebOrder snapshot update rowcount={result.rowcount}"
+                )
     except Exception as exc:
-        print(f"[rule-snapshot] failed to persist web_order snapshot order_id={getattr(web_order, 'id', None)}: {type(exc).__name__}: {exc}")
+        raise RuntimeError("WebOrder 規則／價格快照寫入失敗。") from exc
 
     create_or_update_acceptance_meta(
         order_id=int(web_order.id),
@@ -435,7 +521,6 @@ async def create_waiting_acceptance_order(
         point_benefits_allowed=bool(rule.point_benefits_allowed),
         status=WAITING_ACCEPTANCE,
     )
-
 
     try:
         create_smart_dispatch_plan(
@@ -450,18 +535,14 @@ async def create_waiting_acceptance_order(
             notified_candidate_ids=smart_dispatch["initial_notified_ids"],
         )
     except Exception as exc:
-        print(
-            f"[smart-dispatch] plan create failed "
-            f"order_id={int(web_order.id)}: {type(exc).__name__}: {exc}",
-            flush=True,
-        )
+        raise RuntimeError("智慧派單計畫建立失敗。") from exc
 
     try:
         from shared.db import engine as _rule_snapshot_engine
         from sqlalchemy import text as _rule_snapshot_sql_text
 
         with _rule_snapshot_engine.begin() as _rule_snapshot_conn:
-            _rule_snapshot_conn.execute(
+            result = _rule_snapshot_conn.execute(
                 _rule_snapshot_sql_text("""
                     UPDATE order_acceptance_meta
                     SET rule_version = :rule_version,
@@ -478,8 +559,12 @@ async def create_waiting_acceptance_order(
                     "updated_at": get_taipei_now_iso(),
                 },
             )
+            if result.rowcount != 1:
+                raise RuntimeError(
+                    f"acceptance snapshot update rowcount={result.rowcount}"
+                )
     except Exception as exc:
-        print(f"[rule-snapshot] failed to persist acceptance_meta snapshot order_id={getattr(web_order, 'id', None)}: {type(exc).__name__}: {exc}")
+        raise RuntimeError("接單規則／價格快照寫入失敗。") from exc
 
     ORDER_CLAIMS[dispatch_message.id] = {
         "companion": set(),
@@ -581,6 +666,8 @@ async def create_waiting_acceptance_order(
     except (discord.Forbidden, discord.HTTPException) as exc:
         raise RuntimeError("派單訊息建立完成，但接單 Panel 啟用失敗。") from exc
 
+    # From this point the panel is public and may be claimed immediately. Do not
+    # compensate later notification/log failures back into a deleted order.
     data.pop("provisional_dispatch_message_id", None)
     data.pop("provisional_dispatch_channel_id", None)
     remember_order_data(interaction.channel.id, data)
@@ -592,8 +679,11 @@ async def create_waiting_acceptance_order(
             content=smart_dispatch["content"],
             dispatch_jump_url=dispatch_message.jump_url,
         )
-    except (discord.Forbidden, discord.HTTPException) as exc:
-        print(f"[smart-dispatch] initial alert failed: {exc}", flush=True)
+    except Exception as exc:
+        print(
+            f"[smart-dispatch] initial alert failed: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
     if specified_staff_ids:
         try:
