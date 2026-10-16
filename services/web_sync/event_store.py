@@ -164,6 +164,7 @@ def mark_event_failed(
                     ELSE processed_at
                 END
             WHERE id = ?
+              AND status <> 'done'
             """,
             (
                 next_status,

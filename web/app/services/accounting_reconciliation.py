@@ -431,6 +431,12 @@ def _check_wallet_paid_orders(
         )
         reference = order_no or f"WEB-{order_id}"
 
+        # A zero-pay order intentionally creates no wallet debit. Keep the
+        # selected payment method for audit/history, but do not require a fake
+        # 0T wallet transaction merely to satisfy reconciliation.
+        if expected_amount == 0:
+            continue
+
         if not customer_id:
             _issue(
                 issues,
