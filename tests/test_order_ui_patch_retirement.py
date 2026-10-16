@@ -20,7 +20,7 @@ def test_legacy_order_patch_assets_are_fully_retired() -> None:
 
 def test_canonical_order_assets_are_loaded_by_public_layout() -> None:
     source = SITE_LAYOUT.read_text(encoding="utf-8")
-    assert '/static/js/mw_order_ui.js?v=20261016' in source
+    assert '/static/js/mw_order_ui.js?v=20261016b' in source
     assert '/static/css/order_ui.css?v=20261016' in source
 
 
@@ -29,6 +29,7 @@ def test_order_form_behavior_lives_in_canonical_controller() -> None:
     assert "/order/rule-ui-meta" in source
     assert "mw-extra-requirements" in source
     assert "mw-fixed-player-count" in source
+    assert "sanitizeCatalogDescriptions" in source
 
 
 def test_extraction_preserves_legacy_rule_and_player_fallbacks() -> None:
