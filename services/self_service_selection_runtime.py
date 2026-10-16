@@ -5,6 +5,10 @@ from typing import Any
 
 import discord
 
+from services.self_service_favorite_priority import (
+    prioritize_specified_staff_entries_for_customer,
+)
+
 
 _CONFIGURED = False
 SELF_SERVICE_ORDER_SELECTIONS: dict = {}
@@ -130,7 +134,6 @@ def get_specified_staff_entries_for_rule(guild: discord.Guild, rule) -> list[dic
     return entries
 
 
-
 async def _acknowledge_component_interaction(interaction: discord.Interaction) -> None:
     try:
         if not interaction.response.is_done():
@@ -157,6 +160,7 @@ async def _edit_component_message(
             await interaction.followup.send(f"更新指定人員選單失敗：{exc}", ephemeral=True)
         except discord.HTTPException:
             pass
+
 
 class SelfServiceSpecifiedStaffDropdown(discord.ui.Select):
     def __init__(self, parent_view: "SelfServiceSpecifiedStaffDropdownView"):
@@ -331,22 +335,6 @@ ORDER_POINT_BENEFIT_SPECS = {
     "extra_game_1": {"kind": "extra_games", "games": 1, "pricing_types": ("game",), "summary": "服務局數 +1 局，由店內吸收額外服務成本"},
     "extra_game_2": {"kind": "extra_games", "games": 2, "pricing_types": ("game",), "summary": "服務局數 +2 局，由店內吸收額外服務成本"},
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _same_order_benefit_option_text(benefit: dict | None) -> str:
@@ -657,6 +645,7 @@ class SelfServicePointBenefitView(discord.ui.View):
             except discord.HTTPException:
                 pass
 
+
 class SelfServiceSpecifiedStaffDropdownView(discord.ui.View):
     def __init__(
         self,
@@ -675,7 +664,10 @@ class SelfServiceSpecifiedStaffDropdownView(discord.ui.View):
         self.panel_message_id = panel_message_id
         self.rule_key = str(rule_key)
         self.max_specified_count = max(1, int(max_specified_count or 1))
-        self.entries = entries
+        self.entries = prioritize_specified_staff_entries_for_customer(
+            entries,
+            self.customer_id,
+        )
         self.selected_ids = list(dict.fromkeys(str(item) for item in (selected_ids or []) if str(item).strip()))
         self.page = 0
         self.refresh_items()
