@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 import traceback
+from typing import Any, Callable
 
 import discord
 
@@ -10,19 +10,60 @@ from services.topups import create_topup_order, mark_topup_completed
 from services.vip_progress_repair import calculate_member_topup_preview, repair_vip_progress_data
 
 
-def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
-    target_module = None
-    for module in list(sys.modules.values()):
-        if module is None:
-            continue
-        if hasattr(module, "adjust_customer_wallet_balance") and hasattr(module, "CUSTOMER_REWARDS"):
-            target_module = module
-            break
+_BRIDGE_INSTALLED_GLOBAL = "_legacy_wallet_add_bridge_installed"
 
-    if target_module is None or getattr(target_module, "_legacy_wallet_add_bridge_installed", False):
+
+def _wallet_add_callback(bot: discord.Client) -> Callable[..., Any] | None:
+    """Return the callback for this Bot's registered /wallet_add command.
+
+    The compatibility bridge exists only for the legacy command that still lives
+    in bot.py. Resolve that exact command instead of scanning sys.modules and
+    guessing a module by unrelated global names.
+    """
+
+    tree = getattr(bot, "tree", None)
+    get_command = getattr(tree, "get_command", None)
+    if not callable(get_command):
+        return None
+
+    # Keep global lookup for tests/future command migration. The production
+    # command is currently guild-scoped, so also inspect the Bot's known guilds.
+    try:
+        command = get_command("wallet_add")
+    except (TypeError, ValueError):
+        command = None
+
+    callback = getattr(command, "callback", None)
+    if callable(callback):
+        return callback
+
+    for guild in list(getattr(bot, "guilds", []) or []):
+        try:
+            command = get_command("wallet_add", guild=guild)
+        except (TypeError, ValueError):
+            continue
+
+        callback = getattr(command, "callback", None)
+        if callable(callback):
+            return callback
+
+    return None
+
+
+def _wallet_add_globals(bot: discord.Client) -> dict[str, Any] | None:
+    callback = _wallet_add_callback(bot)
+    namespace = getattr(callback, "__globals__", None)
+    return namespace if isinstance(namespace, dict) else None
+
+
+def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
+    target_globals = _wallet_add_globals(bot)
+    if target_globals is None or bool(target_globals.get(_BRIDGE_INSTALLED_GLOBAL)):
         return
 
-    original_adjust = getattr(target_module, "adjust_customer_wallet_balance")
+    original_adjust = target_globals.get("adjust_customer_wallet_balance")
+    if not callable(original_adjust):
+        return
 
     def bridged_adjust_customer_wallet_balance(**kwargs):
         tx_type = str(kwargs.get("tx_type") or "adjustment").strip()
@@ -122,6 +163,6 @@ def install_legacy_wallet_add_bridge(bot: discord.Client) -> None:
 
         return principal_tx
 
-    setattr(target_module, "adjust_customer_wallet_balance", bridged_adjust_customer_wallet_balance)
-    target_module._legacy_wallet_add_bridge_installed = True
+    target_globals["adjust_customer_wallet_balance"] = bridged_adjust_customer_wallet_balance
+    target_globals[_BRIDGE_INSTALLED_GLOBAL] = True
     print("[topup] legacy /wallet_add bridge installed", flush=True)
