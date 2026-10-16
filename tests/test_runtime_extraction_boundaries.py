@@ -134,3 +134,79 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
     assert "class OrderCredentialModal" in credentials_source
     assert "async def ensure_order_credential_request" in credentials_source
     assert "async def redeem_order_point_benefit_on_payment" in redemption_source
+
+    # Persistence and Discord UI/runtime are intentionally separate services.
+    assert "def ensure_order_credential_tables" in persistence_source
+    assert "def configure_order_credentials" not in persistence_source
+    assert "from services.order_credentials import" in credentials_source
+
+
+def test_phase2_self_service_financials_are_physically_extracted():
+    self_service_source = Path("services/self_service_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    financials_source = Path("services/self_service_financials.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "def calculate_self_service_financials" not in self_service_source
+    assert "def calculate_manual_price_adjustment" not in self_service_source
+    reorder_source = Path("services/self_service_reorder.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "class SelfServiceOrderView" in self_service_source
+    assert "async def build_reorder_self_service_draft" not in self_service_source
+    assert "async def create_reorder_ticket_from_closed_order" not in self_service_source
+    assert "async def build_reorder_self_service_draft" in reorder_source
+    assert "async def create_reorder_ticket_from_closed_order" in reorder_source
+    assert "def configure_self_service_reorder" in reorder_source
+    assert "import bot" not in reorder_source
+    assert "from bot import" not in reorder_source
+
+    assert "def calculate_self_service_financials" in financials_source
+    assert "def calculate_manual_price_adjustment" in financials_source
+    assert "def add_self_service_financial_breakdown_fields" in financials_source
+
+
+def test_bot_ticket_identity_helpers_are_extracted():
+    bot_source = Path("bot.py").read_text(encoding="utf-8")
+    helper_source = Path("services/ticket_identity.py").read_text(encoding="utf-8")
+
+    assert "def build_ticket_channel_name" not in bot_source
+    assert "def get_order_customer_id_from_channel" not in bot_source
+    assert "def build_ticket_channel_name" in helper_source
+    assert "def get_order_customer_id_from_channel" in helper_source
+
+
+def test_runtime_configure_boundaries_match_current_migration_stage():
+    acceptance_marker = "_acceptance_runtime_test_marker"
+    if hasattr(acceptance_runtime, acceptance_marker):
+        delattr(acceptance_runtime, acceptance_marker)
+
+    acceptance_runtime.configure_acceptance_runtime(
+        {
+            "DISPATCH_CHANNEL_ID": 123,
+            "GUILD_ID": 456,
+            "ORDER_CLAIMS": {},
+            "PaymentMethodView": object,
+            "SELF_SERVICE_ORDER_SELECTIONS": {},
+            "_refresh_existing_web_sync_dispatch": lambda *_args, **_kwargs: None,
+            "bot": object(),
+            acceptance_marker: object(),
+        }
+    )
+    web_sync_runtime.configure_web_sync_runtime(
+        {"_web_sync_runtime_test_marker": object()}
+    )
+    order_runtime.configure_order_runtime(
+        {"_order_runtime_test_marker": object()}
+    )
+    self_service_runtime.configure_self_service_runtime(
+        {"_self_service_runtime_test_marker": object()}
+    )
+
+    assert not hasattr(acceptance_runtime, acceptance_marker)
+    assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
+    assert hasattr(order_runtime, "_order_runtime_test_marker")
+    assert hasattr(self_service_runtime, "_self_service_runtime_test_marker")
