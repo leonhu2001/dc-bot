@@ -7,11 +7,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PARENT = ROOT / "services" / "self_service_runtime.py"
 SERVICE = ROOT / "services" / "self_service_selection_runtime.py"
+CATALOG = ROOT / "services" / "point_benefit_catalog.py"
 
 
 def test_selection_ui_is_canonical_in_dedicated_service():
     parent = PARENT.read_text(encoding="utf-8")
     service = SERVICE.read_text(encoding="utf-8")
+    catalog = CATALOG.read_text(encoding="utf-8")
 
     assert "from services.self_service_selection_runtime import (" in parent
     assert "configure_self_service_selection_runtime(" in parent
@@ -22,10 +24,16 @@ def test_selection_ui_is_canonical_in_dedicated_service():
         "class SelfServicePointBenefitSelect(",
         "class SelfServicePointBenefitView(",
         "class SelfServiceSpecifiedStaffDropdownView(",
-        "ORDER_POINT_BENEFIT_SPECS = {",
     ):
         assert symbol not in parent
         assert symbol in service
+
+    # Point catalog policy is shared by Discord and web; it should not be
+    # duplicated back into self_service_runtime or the selection UI module.
+    assert "POINT_BENEFIT_SPECS = {" not in parent
+    assert "POINT_BENEFIT_SPECS = {" not in service
+    assert "POINT_BENEFIT_SPECS = {" in catalog
+    assert "from services.point_benefit_catalog import (" in service
 
 
 def test_selection_runtime_import_smoke():
