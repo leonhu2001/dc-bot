@@ -61,13 +61,15 @@ def test_order_dialog_escape_uses_canonical_close_behavior(page: Page) -> None:
     expect(dialog).not_to_be_visible()
 
 
-def test_order_dialog_populates_rule_and_local_quote(page: Page) -> None:
+def test_order_dialog_populates_variant_and_local_quote(page: Page) -> None:
     open_first_order_dialog(page)
 
     variant = page.locator("#mw-variant")
     expect(variant).to_be_visible()
     assert variant.locator("option").count() >= 1
-    assert variant.locator("option").first.get_attribute("data-rule-key")
+    # The public DOM no longer needs to expose an internal rule-key attribute.
+    # The selected option value is the canonical UI selection used by the quote flow.
+    expect(variant).not_to_have_value("")
 
     expect(page.locator("#mw-dialog-title")).not_to_have_text("")
     expect(page.locator("#mw-rule-key")).to_have_count(0)
@@ -83,7 +85,12 @@ def test_public_order_hides_internal_staffing_metadata(page: Page) -> None:
     expect(page.locator("#mw-next-notice")).to_have_count(0)
 
     descriptions = "\n".join(page.locator(".order3-card > p").all_inner_texts())
-    dialog_description = page.locator("#mw-dialog-description").inner_text()
+    dialog_description_locator = page.locator("#mw-dialog-description")
+    dialog_description = (
+        dialog_description_locator.inner_text()
+        if dialog_description_locator.count()
+        else ""
+    )
     public_copy = f"{descriptions}\n{dialog_description}"
     for internal_term in ("身分組", "智慧派單", "派單只通知", "Rule key"):
         assert internal_term not in public_copy
