@@ -6,8 +6,7 @@ from core import database, permissions, time_utils
 from services import orders, self_service_runtime, smart_dispatch
 
 
-# Phase 15 only moves dependencies whose canonical owner is already stable.
-# Runtime-owned helpers stay on the legacy boundary until their owner is extracted safely.
+# Stable module-owned dependencies must never be shadowed by startup wiring.
 def test_self_service_runtime_uses_canonical_module_owned_dependencies():
     assert self_service_runtime.json is json
     assert self_service_runtime.ORDER_CATEGORY_LABELS is orders.ORDER_CATEGORY_LABELS
@@ -22,18 +21,21 @@ def test_self_service_runtime_uses_canonical_module_owned_dependencies():
     assert self_service_runtime.set_specified_dm_results is smart_dispatch.set_specified_dm_results
 
 
-def test_legacy_configurator_cannot_shadow_module_owned_dependencies():
+def test_legacy_configurator_cannot_shadow_module_owned_or_inject_unknown_names():
     canonical_json = self_service_runtime.json
-    marker = object()
+    marker_name = "_self_service_dependency_boundary_marker"
+    if hasattr(self_service_runtime, marker_name):
+        delattr(self_service_runtime, marker_name)
+
     self_service_runtime.configure_self_service_runtime(
         {
             "json": object(),
-            "_self_service_dependency_boundary_marker": marker,
+            marker_name: object(),
         }
     )
 
     assert self_service_runtime.json is canonical_json
-    assert self_service_runtime._self_service_dependency_boundary_marker is marker
+    assert not hasattr(self_service_runtime, marker_name)
 
 
 def test_module_owned_dependency_names_are_explicitly_guarded():
@@ -51,3 +53,18 @@ def test_module_owned_dependency_names_are_explicitly_guarded():
         "set_specified_dm_results",
     }
     assert expected <= self_service_runtime._MODULE_OWNED_RUNTIME_NAMES
+
+
+def test_remaining_legacy_boundary_is_explicitly_allowlisted():
+    expected = {
+        "DISPATCH_CHANNEL_ID",
+        "ORDER_CLAIMS",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "POINT_REDEEM_ITEMS",
+        "POINT_REDEEM_ITEMS_BY_KEY",
+        "OrderControlView",
+        "send_order_log",
+    }
+    assert expected <= self_service_runtime._LEGACY_RUNTIME_NAMES
+    assert "json" not in self_service_runtime._LEGACY_RUNTIME_NAMES
+    assert "_self_service_dependency_boundary_marker" not in self_service_runtime._LEGACY_RUNTIME_NAMES
