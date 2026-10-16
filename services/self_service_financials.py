@@ -5,6 +5,14 @@ from typing import Any, Callable
 
 import discord
 
+from services.point_benefit_catalog import (
+    ALL_POINT_BENEFIT_SPECS,
+    POINT_REDEEM_ITEMS_BY_KEY as CANONICAL_POINT_REDEEM_ITEMS_BY_KEY,
+    adapt_point_benefit_for_rule,
+    calculate_one_seat_service_bonus_value,
+    get_point_benefit_item,
+    is_service_bonus_allowed_for_rule,
+)
 from services.vip_monthly_order_discount import (
     build_vip_monthly_discount_note,
     build_vip_monthly_discount_result,
@@ -78,8 +86,16 @@ def configure_self_service_financials(
     global get_self_service_quantity_unit
     global get_vip_discount_pay_rate
 
-    ORDER_POINT_BENEFIT_SPECS = order_point_benefit_specs
-    POINT_REDEEM_ITEMS_BY_KEY = point_redeem_items_by_key
+    # Keep caller-provided legacy data readable, but the canonical checkout
+    # catalog owns all current point-benefit definitions.
+    ORDER_POINT_BENEFIT_SPECS = {
+        **dict(order_point_benefit_specs or {}),
+        **ALL_POINT_BENEFIT_SPECS,
+    }
+    POINT_REDEEM_ITEMS_BY_KEY = {
+        **dict(point_redeem_items_by_key or {}),
+        **CANONICAL_POINT_REDEEM_ITEMS_BY_KEY,
+    }
     _get_rule_from_self_service_data = get_rule_from_data
     _is_specify_preference = is_specify_preference
     _role_key_for_member = role_key_for_member
@@ -971,13 +987,24 @@ def _format_point_hours(hours) -> str:
 
 
 def get_order_point_item(key: str | None) -> dict | None:
+    canonical = get_point_benefit_item(key)
+    if canonical is not None:
+        return canonical
+
     if not key:
         return None
 
     try:
-        return POINT_REDEEM_ITEMS_BY_KEY.get(str(key))
+        item = POINT_REDEEM_ITEMS_BY_KEY.get(str(key))
     except Exception:
+        item = None
+
+    if item is None:
         return None
+
+    merged = dict(item)
+    merged.update(ORDER_POINT_BENEFIT_SPECS.get(str(key)) or {})
+    return merged
 
 
 def get_customer_point_balance_for_order(customer_id: int) -> int:
@@ -991,7 +1018,8 @@ def get_customer_point_balance_for_order(customer_id: int) -> int:
 def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = None) -> tuple[bool, str]:
     data = data or {}
     key = str(key or "")
-    spec = ORDER_POINT_BENEFIT_SPECS.get(key)
+    item = get_order_point_item(key)
+    spec = dict(item or {})
 
     if not spec:
         return False, "這個點數福利不支援新下單流程。"
@@ -1014,6 +1042,12 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
 
     kind = spec.get("kind")
     pricing_type = str(getattr(rule, "pricing_type", "") or "")
+
+    if kind == "service_bonus":
+        if pricing_type not in {"hourly", "game"}:
+            return False, "服務加贈只適用計時或計局方案。"
+        if not is_service_bonus_allowed_for_rule(rule, spec):
+            return False, "這張服務加贈券不適用此陪玩類型。"
 
     if kind == "free_specify_fee":
         if not getattr(rule, "allow_specify", False):
@@ -1045,7 +1079,7 @@ def is_order_point_benefit_allowed_for_rule(rule, key: str, data: dict | None = 
 
 
 def _adapt_order_point_benefit_for_rule(rule, benefit: dict) -> dict:
-    return dict(benefit or {})
+    return adapt_point_benefit_for_rule(rule, benefit)
 
 
 def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
@@ -1055,18 +1089,12 @@ def get_selected_order_point_benefit(data: dict, rule=None) -> dict | None:
     if item is None:
         return None
 
-    spec = ORDER_POINT_BENEFIT_SPECS.get(str(key))
-
-    if spec is None:
-        return None
-
     if rule is not None:
         allowed, _ = is_order_point_benefit_allowed_for_rule(rule, str(key), data)
         if not allowed:
             return None
 
     merged = dict(item)
-    merged.update(spec)
 
     if rule is not None:
         merged = _adapt_order_point_benefit_for_rule(
@@ -1407,15 +1435,17 @@ def calculate_self_service_financials(
     benefit_service_value = loyalty_discount["service_value"]
     benefit_discount_amount = loyalty_discount["discount_amount"]
 
-    quantity_for_extra = max(1, _to_int(data.get("quantity"), 1) or 1)
-    point_service_value = 0
-    if extra_hours > 0:
-        point_service_value = max(0, int(round((service_original / quantity_for_extra) * extra_hours)))
-    elif extra_games > 0:
-        point_service_value = max(0, int(round((service_original / quantity_for_extra) * extra_games)))
+    point_service_value = calculate_one_seat_service_bonus_value(
+        rule=rule,
+        service_original=service_original,
+        quantity=data.get("quantity"),
+        player_count=data.get("player_count"),
+        extra_hours=extra_hours,
+        extra_games=extra_games,
+    )
 
     # 百分比/VIP折扣只影響顧客付款。點數、免指定費與福利券都由店內吸收，
-    # 額外服務用商品正常原價補進陪玩分潤基底。
+    # 額外服務只補貼一位陪玩，並用該席位正常原價補進陪玩分潤基底。
     payout_base = (
         allocation.payout_base_amount
         + point_specify
@@ -1435,12 +1465,13 @@ def calculate_self_service_financials(
         notes.append(
             "服務時間 +"
             f"{_format_point_hours(extra_hours)}"
+            "（1 位陪玩）"
         )
 
     if extra_games:
         if bkind == "extra_games":
             notes.append(
-                f"服務局數 +{extra_games} 局"
+                f"服務局數 +{extra_games} 局（1 位陪玩）"
             )
         else:
             notes.append(

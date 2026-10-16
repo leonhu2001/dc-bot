@@ -8,6 +8,13 @@ from typing import Any
 from services.order_flow import (
     get_payment_method_info,
 )
+from services.point_benefit_catalog import (
+    LEGACY_POINT_REDEEM_ITEMS,
+    POINT_REDEEM_ITEMS,
+    adapt_point_benefit_for_rule,
+    get_point_benefit_item,
+    is_service_bonus_allowed_for_rule,
+)
 
 from core.vip_levels import (
     VIP_DISCOUNT_EXCLUDED_CATEGORIES as VIP_EXCLUDED_CATEGORIES,
@@ -86,78 +93,37 @@ VIP_THRESHOLDS = [
 
 # ============================================================
 # Points
-#
-# 80-point free hour is intentionally NOT in this list.
 # ============================================================
 
+def _materialize_point_item(key: str) -> dict | None:
+    item = get_point_benefit_item(key)
+    return dict(item) if item is not None else None
+
+
 POINT_ITEMS = [
-    {
-        "key": "discount_20",
-        "cost": 10,
-        "name": "20T 折價券",
-        "kind": "cash_discount",
-        "amount": 20,
-    },
-    {
-        "key": "discount_30",
-        "cost": 15,
-        "name": "30T 折價券",
-        "kind": "cash_discount",
-        "amount": 30,
-    },
-    {
-        "key": "free_specify_fee",
-        "cost": 30,
-        "name": "免指定費 1 次",
-        "kind": "free_specify_fee",
-    },
-    {
-        "key": "discount_100",
-        "cost": 45,
-        "name": "100T 折價券",
-        "kind": "cash_discount",
-        "amount": 100,
-    },
-    {
-        "key": "extra_hour_30m",
-        "cost": 60,
-        "name": "加時 30 分鐘",
-        "kind": "extra_hours",
-        "hours": 0.5,
-        "pricing_types": ("hourly",),
-    },
-    {
-        "key": "extra_hour_1h",
-        "cost": 110,
-        "name": "加時 1 小時",
-        "kind": "extra_hours",
-        "hours": 1,
-        "pricing_types": ("hourly",),
-    },
-    {
-        "key": "extra_game_1",
-        "cost": 40,
-        "name": "加 1 局",
-        "kind": "extra_games",
-        "games": 1,
-        "pricing_types": ("game",),
-    },
-    {
-        "key": "extra_game_2",
-        "cost": 70,
-        "name": "加 2 局",
-        "kind": "extra_games",
-        "games": 2,
-        "pricing_types": ("game",),
-    },
+    item
+    for item in (
+        _materialize_point_item(str(source.get("key") or ""))
+        for source in POINT_REDEEM_ITEMS
+    )
+    if item is not None
 ]
 
 
+# Legacy benefits remain lookup-only for orders created before this migration.
 POINT_ITEM_MAP = {
-    item["key"]:
-        item
-    for item
-    in POINT_ITEMS
+    item["key"]: item
+    for item in [
+        *POINT_ITEMS,
+        *[
+            benefit
+            for benefit in (
+                _materialize_point_item(str(source.get("key") or ""))
+                for source in LEGACY_POINT_REDEEM_ITEMS
+            )
+            if benefit is not None
+        ],
+    ]
 }
 
 
@@ -1153,7 +1119,7 @@ def resolve_selected_staff(
 # ============================================================
 
 def _point_item_for_rule(rule, item: dict) -> dict:
-    return dict(item or {})
+    return adapt_point_benefit_for_rule(rule, item)
 
 
 def point_item_status(
@@ -1187,12 +1153,19 @@ def point_item_status(
         return {"allowed": False, "reason": "體驗單不可使用點數福利。"}
 
     pricing_type = str(rule.pricing_type)
+    kind = str(item.get("kind") or "")
+
+    if kind == "service_bonus":
+        if pricing_type not in {"hourly", "game"}:
+            return {"allowed": False, "reason": "服務加贈只適用計時或計局方案。"}
+        if not is_service_bonus_allowed_for_rule(rule, item):
+            return {"allowed": False, "reason": "這張服務加贈券不適用此陪玩類型。"}
+
     pricing_types = tuple(item.get("pricing_types") or ())
     if pricing_types and pricing_type not in pricing_types:
         label = "計時" if "hourly" in pricing_types else "計局"
         return {"allowed": False, "reason": f"此點數福利只適用{label}方案。"}
 
-    kind = str(item["kind"])
     if kind == "free_specify_fee":
         if not rule.allow_specify:
             return {"allowed": False, "reason": "此方案不開放指定。"}
@@ -1225,13 +1198,8 @@ def list_point_options(
     if rule is None:
         return []
 
-    pricing_type = str(rule.pricing_type)
     result = []
     for item in POINT_ITEMS:
-        pricing_types = tuple(item.get("pricing_types") or ())
-        if pricing_types and pricing_type not in pricing_types:
-            continue
-
         status = point_item_status(
             rule_key=rule_key,
             point_item_key=item["key"],
@@ -1256,7 +1224,7 @@ def calculate_point_service_value(
     vip_pay_rate: int,
     point_item: dict | None,
 ) -> int:
-    """Compute store-funded payout value for point-added time or games."""
+    """Compute store-funded payout value for one companion seat only."""
     if not point_item:
         return 0
 
@@ -1272,11 +1240,13 @@ def calculate_point_service_value(
         return 0
 
     quantity = max(1, int(quote.get("quantity") or 1))
+    staff_count = max(1, int(quote.get("required_staff_count") or 1))
     service_amount = max(0, int(quote.get("customer_pay_amount") or 0))
-    gross_extra_value = int(round((service_amount / quantity) * units))
-    # 額外服務是店家福利；VIP 折扣只影響顧客付款，不壓低陪玩薪資基底。
-    return max(0, gross_extra_value)
+    gross_extra_value = int(round((service_amount / quantity / staff_count) * units))
 
+    # VIP only changes the customer's charge; the extra service is funded at its
+    # normal one-seat value so the selected companion's payout is not reduced.
+    return max(0, gross_extra_value)
 
 def calculate_checkout_financials(
     *,
@@ -1316,13 +1286,13 @@ def calculate_checkout_financials(
         elif kind == "extra_hours":
             hours = float(point_item.get("hours") or 0)
             point_service_note = (
-                "服務時間 +30 分鐘"
+                "服務時間 +30 分鐘（1 位陪玩）"
                 if hours == 0.5
-                else f"服務時間 +{hours:g} 小時"
+                else f"服務時間 +{hours:g} 小時（1 位陪玩）"
             )
         elif kind == "extra_games":
             games = int(point_item.get("games") or 0)
-            point_service_note = f"服務局數 +{games} 局"
+            point_service_note = f"服務局數 +{games} 局（1 位陪玩）"
 
     effective_specify_fee = max(0, specify_fee - point_waived_specify)
     after_point = max(0, after_vip - point_cash_discount)
