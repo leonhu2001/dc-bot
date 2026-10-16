@@ -7,7 +7,7 @@ from typing import Any
 # VIP retention / tier rewards intentionally stay out of this catalog. They belong in the
 # future gift / redemption center instead of order checkout.
 POINT_REDEEM_ITEMS = [
-    {"key": "discount_50", "cost": 25, "name": "50T 折價券"},
+    {"key": "discount_50", "cost": 20, "name": "50T 折價券"},
     {"key": "free_specify_fee", "cost": 30, "name": "免指定費 1 次"},
     {"key": "discount_100", "cost": 45, "name": "100T 折價券"},
     {"key": "entertain_service_small", "cost": 80, "name": "娛樂陪加贈｜30 分鐘／1 局"},
