@@ -20,8 +20,10 @@ def test_legacy_order_patch_assets_are_fully_retired() -> None:
 
 def test_canonical_order_assets_are_loaded_by_public_layout() -> None:
     source = SITE_LAYOUT.read_text(encoding="utf-8")
-    assert '/static/js/mw_order_ui.js?v=20261016b' in source
-    assert '/static/css/order_ui.css?v=20261016' in source
+    # Cache-bust versions change whenever canonical assets change. The contract is
+    # that public pages load the canonical controller/styles, not a dated version.
+    assert '/static/js/mw_order_ui.js?v=' in source
+    assert '/static/css/order_ui.css?v=' in source
 
 
 def test_order_form_behavior_lives_in_canonical_controller() -> None:
