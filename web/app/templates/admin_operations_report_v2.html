@@ -1,0 +1,95 @@
+{% extends "admin_operations_report.html" %}
+{% block content %}
+{{ super() }}
+
+<div class="ops-report">
+  <section class="ops-panel">
+    <h2>訂單實留診斷</h2>
+    <div class="ops-insight-sub">
+      依實留率由低到高排列 · 負實留 {{ report.negative_order_count }} 筆 / 合計倒貼 {{ report.negative_order_loss }}
+      · 實收低於分潤基底 {{ report.payout_gap_order_count }} 筆
+      {% if report.manual_override_order_count %} · 手動分潤覆寫 {{ report.manual_override_order_count }} 筆{% endif %}
+    </div>
+    <div class="ops-table-wrap">
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th>結單 / 單號</th>
+            <th>服務</th>
+            <th>實收</th>
+            <th>分潤基底</th>
+            <th>店家吸收</th>
+            <th>陪玩薪資</th>
+            <th>客服薪資</th>
+            <th>掛名加成</th>
+            <th>手動分潤</th>
+            <th>店家實留</th>
+            <th>實留率</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report.order_diagnostics %}
+          <tr>
+            <td>
+              {{ row.closed_at[:10] or '未紀錄' }}<br>
+              <small>{{ row.order_no }}</small>
+            </td>
+            <td>
+              {{ row.service }}<br>
+              <small>{{ row.customer_name }}</small>
+            </td>
+            <td>{{ row.revenue }}</td>
+            <td>
+              {% if row.payout_gap > 0 %}
+                <strong>⚠ {{ row.payout_base }}</strong><br>
+                <small>高於實收 {{ row.payout_gap }}</small>
+              {% else %}
+                {{ row.payout_base }}
+              {% endif %}
+            </td>
+            <td>{{ row.store_absorbed }}</td>
+            <td>{{ row.worker_cost }}</td>
+            <td>{{ row.service_cost }}</td>
+            <td>
+              {% if row.named_bonus_amount %}
+                +{{ row.named_bonus_amount }}
+              {% else %}
+                0
+              {% endif %}
+            </td>
+            <td>
+              {% if row.manual_override_count %}
+                ⚠ {{ row.manual_override_count }} 筆 / {{ row.manual_override_total }}
+                {% if row.manual_override_reasons %}<br><small>{{ row.manual_override_reasons }}</small>{% endif %}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if row.retained < 0 %}<strong>⚠ {{ row.retained }}</strong>{% else %}{{ row.retained }}{% endif %}
+            </td>
+            <td>
+              {% if row.retained_rate is none %}
+                {% if row.payroll > 0 %}<strong>⚠ 無營收</strong>{% else %}—{% endif %}
+              {% elif row.retained_rate < 0 %}
+                <strong>⚠ {{ row.retained_rate }}%</strong>
+              {% elif row.retained_rate < 10 %}
+                <strong>{{ row.retained_rate }}%</strong>
+              {% else %}
+                {{ row.retained_rate }}%
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11">目前沒有已結單資料</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="ops-note">
+      「分潤基底」是陪玩薪資計算基礎；若高於顧客實收，會直接標記差額。店家吸收包含點數／福利成本。
+      優惠減免 KPI 已改為「比例折扣 + 固定福利券 + 其他店家吸收」，福利券不再與 store_absorbed 重複計算。
+    </div>
+  </section>
+</div>
+{% endblock %}
