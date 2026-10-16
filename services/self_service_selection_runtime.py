@@ -5,6 +5,10 @@ from typing import Any
 
 import discord
 
+from services.point_benefit_catalog import (
+    POINT_BENEFIT_SPECS as ORDER_POINT_BENEFIT_SPECS,
+    POINT_REDEEM_ITEMS as CANONICAL_POINT_REDEEM_ITEMS,
+)
 from services.self_service_favorite_priority import (
     prioritize_specified_staff_entries_for_customer,
 )
@@ -58,7 +62,9 @@ def configure_self_service_selection_runtime(
         raise RuntimeError("self-service selection runtime requires order_view_type")
 
     SELF_SERVICE_ORDER_SELECTIONS = order_selections
-    POINT_REDEEM_ITEMS = point_redeem_items
+    # The old bot.py list is intentionally ignored here. This module owns the
+    # order-checkout catalog now so Discord and web can share one canonical source.
+    POINT_REDEEM_ITEMS = [dict(item) for item in CANONICAL_POINT_REDEEM_ITEMS]
     _role_key_for_member = role_key_for_member
     remember_order_data = remember_data
     build_self_service_panel_embed = panel_embed_builder
@@ -322,18 +328,6 @@ FREE_PLAY_FIRST_HOUR_RULE_KEYS = {
     "basic_entertain_double",
     "basic_tech_secret_single",
     "basic_tech_secret_double",
-}
-
-
-ORDER_POINT_BENEFIT_SPECS = {
-    "discount_20": {"kind": "cash_discount", "amount": 20, "summary": "20T 折價券，店內吸收，不影響陪玩分潤"},
-    "discount_30": {"kind": "cash_discount", "amount": 30, "summary": "30T 折價券，店內吸收，不影響陪玩分潤"},
-    "free_specify_fee": {"kind": "free_specify_fee", "summary": "免指定費，指定費由店內吸收，陪玩應得不減少"},
-    "discount_100": {"kind": "cash_discount", "amount": 100, "summary": "100T 折價券，店內吸收，不影響陪玩分潤"},
-    "extra_hour_30m": {"kind": "extra_hours", "hours": 0.5, "pricing_types": ("hourly",), "summary": "服務時間 +30 分鐘，由店內吸收額外服務成本"},
-    "extra_hour_1h": {"kind": "extra_hours", "hours": 1, "pricing_types": ("hourly",), "summary": "服務時間 +1 小時，由店內吸收額外服務成本"},
-    "extra_game_1": {"kind": "extra_games", "games": 1, "pricing_types": ("game",), "summary": "服務局數 +1 局，由店內吸收額外服務成本"},
-    "extra_game_2": {"kind": "extra_games", "games": 2, "pricing_types": ("game",), "summary": "服務局數 +2 局，由店內吸收額外服務成本"},
 }
 
 
