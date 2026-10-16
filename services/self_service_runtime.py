@@ -92,7 +92,6 @@ from services.self_service_financials import (
     is_self_service_staff_price_required,
 )
 
-
 from services.self_service_selection_runtime import (
     configure_self_service_selection_runtime,
     FREE_PLAY_FIRST_HOUR_RULE_KEYS,
@@ -101,7 +100,6 @@ from services.self_service_selection_runtime import (
     SelfServicePointBenefitView,
     SelfServiceSpecifiedStaffDropdownView,
 )
-
 
 from services.self_service_reorder import (
     configure_self_service_reorder,
@@ -115,9 +113,9 @@ from services.self_service_reorder import (
 )
 
 # Dependencies with a stable owning module are imported directly above and must not
-# be replaced by the legacy bot.py namespace injection. Keeping this allow-list
-# explicit lets us shrink the remaining runtime surface incrementally without
-# changing the public Discord self-service entry points.
+# be replaced by bot.py namespace injection. Keeping this allow-list explicit lets
+# us catch future regressions where a module-owned dependency leaks back into the
+# startup boundary.
 _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     {
         "Any",
@@ -173,9 +171,8 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     }
 )
 
-# Temporary bridge while the remaining bot-owned state/configuration is migrated to
-# explicit keyword wiring. Only state/config that still genuinely lives in bot.py is
-# allowed across this boundary.
+# Compatibility-only names for callers that still use the legacy Mapping entry
+# point. The actual configuration path below is keyword-only and explicit.
 _LEGACY_RUNTIME_NAMES = frozenset(
     {
         "CUSTOMER_CATEGORY_ID",
@@ -192,37 +189,31 @@ _LEGACY_RUNTIME_NAMES = frozenset(
 _CONFIGURED = False
 
 
-def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind the remaining bot-owned state/config after bot.py is loaded.
-
-    This is still the compatibility entry point used by bot.py, but dependency
-    binding is explicit and fail-fast: no arbitrary name is copied through
-    globals(), and a partially configured runtime is rejected at startup.
-    """
+def configure_self_service_runtime_explicit(
+    *,
+    customer_category_id: int,
+    customer_role_id: int,
+    dispatch_channel_id: int,
+    order_claims: dict,
+    point_redeem_items,
+    point_redeem_items_by_key,
+    order_selections: dict,
+    order_control_view_type,
+) -> None:
+    """Bind the remaining bot-owned self-service dependencies explicitly."""
     global _CONFIGURED
     global CUSTOMER_CATEGORY_ID, CUSTOMER_ROLE_ID, DISPATCH_CHANNEL_ID
     global ORDER_CLAIMS, POINT_REDEEM_ITEMS, POINT_REDEEM_ITEMS_BY_KEY
     global SELF_SERVICE_ORDER_SELECTIONS, OrderControlView
 
-    missing = sorted(
-        name
-        for name in _LEGACY_RUNTIME_NAMES
-        if name not in namespace
-    )
-    if missing:
-        raise RuntimeError(
-            "self-service runtime missing dependencies: "
-            + ", ".join(missing)
-        )
-
-    CUSTOMER_CATEGORY_ID = namespace["CUSTOMER_CATEGORY_ID"]
-    CUSTOMER_ROLE_ID = namespace["CUSTOMER_ROLE_ID"]
-    DISPATCH_CHANNEL_ID = namespace["DISPATCH_CHANNEL_ID"]
-    ORDER_CLAIMS = namespace["ORDER_CLAIMS"]
-    POINT_REDEEM_ITEMS = namespace["POINT_REDEEM_ITEMS"]
-    POINT_REDEEM_ITEMS_BY_KEY = namespace["POINT_REDEEM_ITEMS_BY_KEY"]
-    SELF_SERVICE_ORDER_SELECTIONS = namespace["SELF_SERVICE_ORDER_SELECTIONS"]
-    OrderControlView = namespace["OrderControlView"]
+    CUSTOMER_CATEGORY_ID = customer_category_id
+    CUSTOMER_ROLE_ID = customer_role_id
+    DISPATCH_CHANNEL_ID = dispatch_channel_id
+    ORDER_CLAIMS = order_claims
+    POINT_REDEEM_ITEMS = point_redeem_items
+    POINT_REDEEM_ITEMS_BY_KEY = point_redeem_items_by_key
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
+    OrderControlView = order_control_view_type
 
     configure_reorder_ticket_creator(create_reorder_ticket_from_closed_order)
 
@@ -282,6 +273,30 @@ def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
 
     _CONFIGURED = True
 
+
+def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
+    """Compatibility adapter for legacy callers that still pass a namespace."""
+    missing = sorted(
+        name
+        for name in _LEGACY_RUNTIME_NAMES
+        if name not in namespace
+    )
+    if missing:
+        raise RuntimeError(
+            "self-service runtime missing dependencies: "
+            + ", ".join(missing)
+        )
+
+    configure_self_service_runtime_explicit(
+        customer_category_id=namespace["CUSTOMER_CATEGORY_ID"],
+        customer_role_id=namespace["CUSTOMER_ROLE_ID"],
+        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
+        order_claims=namespace["ORDER_CLAIMS"],
+        point_redeem_items=namespace["POINT_REDEEM_ITEMS"],
+        point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        order_control_view_type=namespace["OrderControlView"],
+    )
 
 
 def _extract_discord_ids_from_text(text_value: str) -> list[str]:
@@ -402,7 +417,6 @@ async def _resolve_specified_roles_for_price(
     return specified_roles, resolved_mentions
 
 
-
 async def _defer_and_refresh_self_service_panel(
     interaction: discord.Interaction,
     *,
@@ -449,8 +463,6 @@ async def _defer_and_refresh_self_service_panel(
             pass
 
 
-
-
 class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
     player_count = discord.ui.TextInput(
         label="陪玩人數",
@@ -494,15 +506,6 @@ class SelfServicePlayerCountModal(discord.ui.Modal, title="填寫陪玩人數"):
             f"已填寫陪玩人數：**{value} 位**。\n請再按一次「送出等待接單」。",
             ephemeral=True,
         )
-
-
-
-
-
-
-
-
-
 
 
 async def create_waiting_acceptance_order_from_self_service(
@@ -568,17 +571,6 @@ async def retract_waiting_acceptance_order_from_self_service(
 
 
 PRICE_FORMULA_VERSION = 2
-
-
-
-
-
-
-
-
-
-
-
 
 
 def build_self_service_panel_embed(
@@ -796,7 +788,6 @@ class SelfServiceStaffDiscountCouponModal(discord.ui.Modal, title="客服設定�
                 or ""
             ).strip()
         else:
-            # 百分比留空 = 清除客服百分比覆蓋，回到 VIP 自動折扣。
             data.pop("manual_discount_mode", None)
             data.pop("manual_discount_percent", None)
             data.pop("manual_discount_reason", None)
@@ -1085,7 +1076,6 @@ class SelfServiceOrderView(discord.ui.View):
             data["companion_preference"] = "指定陪玩/打手"
             remember_order_data(self.channel_id, data)
 
-
         await interaction.response.defer(ephemeral=True)
 
         max_specified_count = int(rule.max_specified_count or required_staff_count or 1)
@@ -1266,7 +1256,6 @@ class SelfServiceOrderView(discord.ui.View):
                 ephemeral=True,
             )
             return
-
 
         quantity_meta = _self_service_quantity_meta(data, item)
         min_quantity = int(quantity_meta["min"])
