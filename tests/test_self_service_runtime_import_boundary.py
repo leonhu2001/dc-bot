@@ -1,6 +1,7 @@
 from typing import Any, Mapping
 
 import discord
+import pytest
 
 from services import self_service_runtime
 
@@ -15,12 +16,13 @@ def test_self_service_legacy_injection_cannot_shadow_basic_imports_or_add_unknow
     if hasattr(self_service_runtime, marker_name):
         delattr(self_service_runtime, marker_name)
 
-    self_service_runtime.configure_self_service_runtime(
-        {
-            **{name: object() for name in originals},
-            marker_name: object(),
-        }
-    )
+    with pytest.raises(RuntimeError, match="self-service runtime missing dependencies"):
+        self_service_runtime.configure_self_service_runtime(
+            {
+                **{name: object() for name in originals},
+                marker_name: object(),
+            }
+        )
 
     for name, original in originals.items():
         assert getattr(self_service_runtime, name) is original
