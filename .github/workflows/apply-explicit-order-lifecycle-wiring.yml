@@ -1,0 +1,72 @@
+name: Apply explicit order lifecycle startup wiring
+
+on:
+  push:
+    branches:
+      - refactor/explicit-order-lifecycle-wiring-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/explicit-order-lifecycle-wiring-20261017
+          fetch-depth: 0
+
+      - name: Replace lifecycle globals startup adapter
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bot_path = Path('bot.py')
+          bot = bot_path.read_text(encoding='utf-8')
+
+          old_import = '''from services.order_lifecycle_runtime import (\n    configure_order_lifecycle_runtime,\n'''
+          new_import = '''from services.order_lifecycle_runtime import (\n    configure_order_lifecycle_runtime_explicit,\n'''
+          if bot.count(old_import) != 1:
+              raise SystemExit('order lifecycle import anchor mismatch')
+          bot = bot.replace(old_import, new_import, 1)
+
+          old_bind = '''configure_web_sync_runtime(globals())\nconfigure_order_runtime(globals())\nconfigure_order_lifecycle_runtime(globals())\nconfigure_self_service_runtime_explicit('''
+          new_bind = '''configure_web_sync_runtime(globals())\nconfigure_order_runtime(globals())\nconfigure_order_lifecycle_runtime_explicit(\n    receipt_channel_id=RECEIPT_CHANNEL_ID,\n    order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n    sync_web_order_closed=sync_web_order_closed_from_bot,\n    sync_web_order_cancelled=sync_web_order_cancelled_from_bot,\n)\nconfigure_self_service_runtime_explicit('''
+          if bot.count(old_bind) != 1:
+              raise SystemExit('order lifecycle startup anchor mismatch')
+          bot = bot.replace(old_bind, new_bind, 1)
+          bot_path.write_text(bot, encoding='utf-8')
+
+          test_path = Path('tests/test_runtime_extraction_boundaries.py')
+          test = test_path.read_text(encoding='utf-8')
+          old_line = '    lifecycle_bind = bot_source.index("configure_order_lifecycle_runtime(globals())")\n'
+          new_line = '    lifecycle_bind = bot_source.index("configure_order_lifecycle_runtime_explicit(")\n'
+          if test.count(old_line) != 1:
+              raise SystemExit('lifecycle boundary anchor mismatch')
+          test = test.replace(old_line, new_line, 1)
+
+          old_asserts = '''    assert "configure_acceptance_runtime(globals())" not in bot_source\n    assert "configure_self_service_runtime(globals())" not in bot_source\n'''
+          new_asserts = '''    assert "configure_acceptance_runtime(globals())" not in bot_source\n    assert "configure_order_lifecycle_runtime(globals())" not in bot_source\n    assert "configure_self_service_runtime(globals())" not in bot_source\n'''
+          if test.count(old_asserts) != 1:
+              raise SystemExit('lifecycle no-globals assertion anchor mismatch')
+          test = test.replace(old_asserts, new_asserts, 1)
+          test_path.write_text(test, encoding='utf-8')
+          PY
+
+      - name: Compile composition root
+        run: python -m py_compile bot.py services/order_lifecycle_runtime.py
+
+      - name: Remove one-shot migration workflow
+        run: rm .github/workflows/apply-explicit-order-lifecycle-wiring.yml
+
+      - name: Commit canonical wiring
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py tests/test_runtime_extraction_boundaries.py .github/workflows/apply-explicit-order-lifecycle-wiring.yml
+          git commit -m "Use explicit order lifecycle startup wiring"
+          git push origin HEAD:refactor/explicit-order-lifecycle-wiring-20261017
