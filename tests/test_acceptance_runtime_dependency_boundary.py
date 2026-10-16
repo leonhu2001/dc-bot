@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any, Mapping
 
 import discord
@@ -7,6 +6,7 @@ import pytest
 from core import database as core_database
 from core import time_utils
 from services import logging_service, order_flow, orders, self_service_financials
+from services.acceptance import repair_runtime as acceptance_repair_runtime
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
 from services import order_dispatch_runtime
@@ -51,11 +51,21 @@ def test_acceptance_runtime_owns_stable_service_dependencies():
     )
 
 
+def test_acceptance_repair_runtime_uses_canonical_services_not_raw_db_paths():
+    assert acceptance_repair_runtime.remember_order_data is core_database.remember_order_data
+    assert acceptance_repair_runtime.save_bot_data is core_database.save_bot_data
+    assert acceptance_repair_runtime.get_taipei_now_iso is time_utils.get_taipei_now_iso
+    assert acceptance_repair_runtime._to_int is orders._to_int
+    assert acceptance_repair_runtime.build_payment_method_embed is order_flow.build_payment_method_embed
+    assert acceptance_repair_runtime.send_order_log is logging_service.send_order_log
+    assert not hasattr(acceptance_repair_runtime, "sqlite3")
+    assert not hasattr(acceptance_repair_runtime, "Path")
+
+
 def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
     originals = {
         "Any": Any,
         "Mapping": Mapping,
-        "Path": Path,
         "discord": discord,
         "remember_claim_data": core_database.remember_claim_data,
         "remember_order_data": core_database.remember_order_data,
