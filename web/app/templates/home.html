@@ -339,9 +339,12 @@
                         {{ service.label }}
                     </h3>
 
-                    <p>
-                        {{ service.description }}
-                    </p>
+                    {% set service_description = (service.description or '')|trim %}
+                    {% if service_description and service_description not in ['選擇適合你的方案', '選擇適合你的方案。', '絕巴技術陪服務', '絕巴技術陪服務。'] %}
+                        <p>
+                            {{ service_description }}
+                        </p>
+                    {% endif %}
 
                     <span class="card-link">
                         查看方案 →
@@ -595,8 +598,7 @@
             </h2>
 
             <p>
-                專屬折扣、會員活動、點數與升級進度，
-                之後全部集中在個人中心查看。
+                專屬折扣、會員活動、點數與升級進度，n                之後全部集中在個人中心查看。
             </p>
 
             <a
