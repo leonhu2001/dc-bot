@@ -282,6 +282,16 @@ app.include_router(order_history_router)
 app.include_router(admin_payouts_grouped.router)
 
 
+@app.get("/discord/login", include_in_schema=False)
+async def legacy_discord_login_redirect():
+    # 舊版員工中心仍可能導向這個網址；統一送進目前的 Discord OAuth，
+    # 並在登入完成後回到員工中心，避免使用者落到 FastAPI 404 JSON。
+    return RedirectResponse(
+        url="/auth/discord/login?next=/employee",
+        status_code=303,
+    )
+
+
 @app.on_event("startup")
 async def startup_event():
     create_all_tables()
