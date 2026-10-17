@@ -33,6 +33,7 @@ def test_selected_monthly_voucher_is_revalidated_and_clamped(monkeypatch):
         {"customer_id": "123", "selected_vip_monthly_benefit_id": 9},
         has_point_benefit=False,
         max_discount_amount=150,
+        original_service_amount=1500,
     )
     assert calls == [(9, "123")]
     assert selected["id"] == 9
@@ -52,12 +53,53 @@ def test_selected_monthly_voucher_is_revalidated_and_clamped(monkeypatch):
     }
 
 
+def test_200_voucher_requires_1500_original_service_amount(monkeypatch):
+    monkeypatch.setattr(
+        vip_monthly_benefits,
+        "get_available_cash_benefit",
+        lambda *args, **kwargs: {
+            "id": 9,
+            "benefit_key": "monthly_coupon_200",
+            "title": "VIP 每月 200T 折現券",
+            "amount": 200,
+        },
+    )
+    with pytest.raises(ValueError, match="1,500T"):
+        monthly_discount.resolve_vip_monthly_cash_discount(
+            {"customer_id": "123", "selected_vip_monthly_benefit_id": 9},
+            has_point_benefit=False,
+            max_discount_amount=1400,
+            original_service_amount=1499,
+        )
+
+
+def test_500_voucher_requires_4000_original_service_amount(monkeypatch):
+    monkeypatch.setattr(
+        vip_monthly_benefits,
+        "get_available_cash_benefit",
+        lambda *args, **kwargs: {
+            "id": 10,
+            "benefit_key": "monthly_coupon_500",
+            "title": "VIP 每月額外 500T 折現券",
+            "amount": 500,
+        },
+    )
+    with pytest.raises(ValueError, match="4,000T"):
+        monthly_discount.resolve_vip_monthly_cash_discount(
+            {"customer_id": "123", "selected_vip_monthly_benefit_id": 10},
+            has_point_benefit=False,
+            max_discount_amount=3900,
+            original_service_amount=3999,
+        )
+
+
 def test_monthly_voucher_rejects_point_benefit_conflict():
     with pytest.raises(ValueError, match="只能擇一"):
         monthly_discount.resolve_vip_monthly_cash_discount(
             {"customer_id": "123", "selected_vip_monthly_benefit_id": 9},
             has_point_benefit=True,
             max_discount_amount=600,
+            original_service_amount=1500,
         )
 
 
@@ -67,6 +109,7 @@ def test_monthly_voucher_requires_customer_identity():
             {"selected_vip_monthly_benefit_id": 9},
             has_point_benefit=False,
             max_discount_amount=600,
+            original_service_amount=1500,
         )
 
 
@@ -77,4 +120,5 @@ def test_monthly_voucher_rejects_unavailable_selection(monkeypatch):
             {"customer_id": "123", "selected_vip_monthly_benefit_id": 9},
             has_point_benefit=False,
             max_discount_amount=600,
+            original_service_amount=1500,
         )
