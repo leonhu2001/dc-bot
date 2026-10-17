@@ -8,6 +8,16 @@ WORKER_BASE_PAYOUT_RATE = 0.80
 CUSTOMER_SERVICE_PAYOUT_RATE = 0.25
 LEGACY_CUSTOMER_SERVICE_GROSS_RATE = 0.05
 WORKER_NAMED_BONUS_RATE = 0.05
+LEGACY_CUSTOMER_SERVICE_POLICY = "legacy_gross_5_v1"
+
+
+class CustomerServicePayoutBase(int):
+    """Int-compatible payout basis carrying the frozen CS policy for an order."""
+
+    def __new__(cls, value: int, *, legacy_gross_rate: float | None = None):
+        obj = int.__new__(cls, max(0, int(value or 0)))
+        obj.legacy_gross_rate = legacy_gross_rate
+        return obj
 
 
 @dataclass(frozen=True)
@@ -76,6 +86,10 @@ def calculate_customer_service_payout_base_amount(
     customer-service commission. Store-funded cash coupons are intentionally
     *not* removed here: the customer may pay less or zero, while workers and
     customer service still receive their normal payout on the subsidised basis.
+
+    Existing orders tagged by the one-time deploy migration carry the old gross
+    5% policy through this int-compatible value, so later payout recalculation
+    cannot silently rewrite a pre-deploy order.
     """
     base = max(0, int(payout_base_amount or 0))
 
@@ -88,7 +102,7 @@ def calculate_customer_service_payout_base_amount(
             snapshot = {}
 
     if not isinstance(snapshot, dict):
-        return base
+        snapshot = {}
 
     preview = (
         snapshot.get("preview")
@@ -112,7 +126,17 @@ def calculate_customer_service_payout_base_amount(
         _amount("point_service_value")
         + _amount("benefit_service_value")
     )
-    return max(0, base - store_funded_service)
+    eligible = max(0, base - store_funded_service)
+    legacy_rate = (
+        LEGACY_CUSTOMER_SERVICE_GROSS_RATE
+        if str(finance.get("customer_service_payout_policy") or "")
+        == LEGACY_CUSTOMER_SERVICE_POLICY
+        else None
+    )
+    return CustomerServicePayoutBase(
+        eligible,
+        legacy_gross_rate=legacy_rate,
+    )
 
 
 def calculate_order_payout(
@@ -126,6 +150,14 @@ def calculate_order_payout(
     customer_service_total_amount: int | None = None,
     legacy_customer_service_gross_rate: float | None = None,
 ) -> OrderPayoutResult:
+    tagged_legacy_rate = (
+        getattr(customer_service_total_amount, "legacy_gross_rate", None)
+        if customer_service_total_amount is not None
+        else None
+    )
+    if legacy_customer_service_gross_rate is None and tagged_legacy_rate is not None:
+        legacy_customer_service_gross_rate = float(tagged_legacy_rate)
+
     customer_service_amount = (
         max(0, int(total_amount or 0))
         if customer_service_total_amount is None
