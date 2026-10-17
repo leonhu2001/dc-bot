@@ -51,6 +51,7 @@ from web.app.services.customer_portal import (
     get_customer_order,
 )
 from services.loyalty_benefits import list_customer_loyalty
+from services.promotion_benefit_presentation import list_customer_promotion_benefits
 
 
 from web.app.services.marketing_funnel import (
@@ -383,6 +384,10 @@ async def member_center(
         customer_id,
         guild_id=config.DISCORD_GUILD_ID,
     )
+    benefits = dict(list_customer_loyalty(customer_id))
+    promotions = list_customer_promotion_benefits(customer_id, active_only=True)
+    benefits["promotions"] = promotions
+    benefits["active_count"] = int(benefits.get("active_count") or 0) + len(promotions)
 
     return templates.TemplateResponse(
         request=request,
@@ -393,7 +398,7 @@ async def member_center(
             page_name="member",
             member=member,
             portal=portal,
-            benefits=list_customer_loyalty(customer_id),
+            benefits=benefits,
         ),
     )
 

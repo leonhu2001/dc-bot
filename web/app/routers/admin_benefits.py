@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from pathlib import Path
 from urllib.parse import urlencode
@@ -28,6 +29,11 @@ from services.promotion_benefits import (
     list_templates,
     revoke_issued_benefit,
 )
+from services.promotion_benefit_presentation import (
+    build_benefit_grant_dm,
+    list_customer_promotion_benefits,
+)
+from web.app.services.discord_service import send_direct_message
 
 
 router = APIRouter(tags=["admin-benefits"])
@@ -268,25 +274,84 @@ async def issue_customer_benefit(request: Request):
         return RedirectResponse(url="/", status_code=303)
 
     form = await request.form()
-    customer_id = str(form.get("customer_discord_id") or "").strip()
+    customer_ids = [
+        str(value or "").strip()
+        for value in form.getlist("customer_discord_ids")
+        if str(value or "").strip()
+    ]
+    legacy_customer_id = str(form.get("customer_discord_id") or "").strip()
+    if legacy_customer_id:
+        customer_ids.append(legacy_customer_id)
+    customer_ids = list(dict.fromkeys(customer_ids))
+    selected_customer = customer_ids[0] if len(customer_ids) == 1 else ""
+    if not customer_ids:
+        return _redirect("請至少選擇一位要發放的會員。")
+
     template_id = str(form.get("template_id") or "").strip()
     template = get_template(template_id) if template_id else None
     if template is None:
-        return _redirect("請選擇有效的福利模板。", customer_id=customer_id)
+        return _redirect("請選擇有效的福利模板。", customer_id=selected_customer)
     if bool(template.get("is_high_risk")) and not bool(user.get("is_manager")):
-        return _redirect("這是高風險福利模板，只能由管理員發放。", customer_id=customer_id)
+        return _redirect("這是高風險福利模板，只能由管理員發放。", customer_id=selected_customer)
 
-    try:
-        issued_id = issue_benefit(
-            template_id=template_id,
-            customer_discord_id=customer_id,
-            actor_discord_id=user.get("id"),
-            note=str(form.get("note") or ""),
-            expires_at=str(form.get("expires_at") or "").strip() or None,
-        )
-    except ValueError as exc:
-        return _redirect(str(exc), customer_id=customer_id)
-    return _redirect(f"已發放福利 #{issued_id}。", customer_id=customer_id)
+    note = str(form.get("note") or "")
+    expires_at = str(form.get("expires_at") or "").strip() or None
+    issued_count = 0
+    issue_failed = 0
+    dm_failed = 0
+
+    for customer_id in customer_ids:
+        try:
+            issued_id = issue_benefit(
+                template_id=template_id,
+                customer_discord_id=customer_id,
+                actor_discord_id=user.get("id"),
+                note=note,
+                expires_at=expires_at,
+            )
+        except ValueError:
+            issue_failed += 1
+            continue
+
+        issued_count += 1
+        try:
+            item = next(
+                (
+                    benefit
+                    for benefit in list_customer_promotion_benefits(
+                        customer_id,
+                        active_only=False,
+                        limit=20,
+                    )
+                    if int(benefit.get("id") or 0) == int(issued_id)
+                ),
+                None,
+            )
+            if item is None:
+                raise RuntimeError("issued benefit could not be reloaded")
+            await asyncio.to_thread(
+                send_direct_message,
+                customer_id,
+                content=build_benefit_grant_dm(item),
+            )
+        except Exception as exc:
+            dm_failed += 1
+            print(
+                f"[benefits] DM failed customer={customer_id}: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    if issued_count == 0:
+        return _redirect("福利發放失敗，請重新確認會員與模板。", customer_id=selected_customer)
+
+    message = f"已發放福利給 {issued_count} 位會員"
+    if issue_failed:
+        message += f"，另有 {issue_failed} 位發放失敗"
+    if dm_failed:
+        message += f"；其中 {dm_failed} 位 Discord 私訊未送達，但福利仍已入帳"
+    else:
+        message += "；Discord 私訊通知已送出"
+    return _redirect(message + "。", customer_id=selected_customer)
 
 
 @router.post("/admin/benefits/issued/{issued_id}/revoke")

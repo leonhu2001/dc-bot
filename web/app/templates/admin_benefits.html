@@ -32,23 +32,26 @@
                     <h3>發放福利</h3>
                 </div>
             </div>
-            <form class="benefit-form" method="post" action="/admin/benefits/issue">
+            <form class="benefit-form" method="post" action="/admin/benefits/issue" data-benefit-issue-form>
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
-                <label>
-                    會員
-                    <select class="benefit-member-select" name="customer_discord_id" required>
-                        <option value="">選擇會員</option>
-                        {% if selected_customer %}
-                        <option value="{{ selected_customer }}" selected>{{ selected_customer }}</option>
-                        {% endif %}
-                        {% for customer in customers if customer.customer_discord_id != selected_customer %}
-                        <option value="{{ customer.customer_discord_id }}">
-                            {{ customer.display_name }} · {{ customer.customer_discord_id }}
-                        </option>
+                <div class="benefit-picker-section">
+                    <div class="benefit-picker-head">
+                        <div>
+                            <strong>目標會員</strong>
+                            <small data-benefit-member-count>已選 0 位</small>
+                        </div>
+                        <input class="benefit-filter-input" type="search" placeholder="搜尋會員名稱或 Discord ID" data-benefit-filter="benefit-member-picker">
+                    </div>
+                    <div class="benefit-check-grid" id="benefit-member-picker">
+                        {% for customer in customers %}
+                        <label class="benefit-check-row" data-benefit-option="{{ customer.display_name }} {{ customer.customer_discord_id }}">
+                            <input type="checkbox" name="customer_discord_ids" value="{{ customer.customer_discord_id }}" data-benefit-member-checkbox {% if customer.customer_discord_id == selected_customer %}checked{% endif %}>
+                            <span><b>{{ customer.display_name }}</b><small>{{ customer.customer_discord_id }}</small></span>
+                        </label>
                         {% endfor %}
-                    </select>
-                </label>
+                    </div>
+                </div>
 
                 <label>
                     福利模板
@@ -332,5 +335,5 @@
     </section>
 </div>
 
-<script src="/static/js/pages/admin_benefits.js?v=20261018"></script>
+<script src="/static/js/pages/admin_benefits.js?v=20261018-2"></script>
 {% endblock %}
