@@ -32,14 +32,18 @@ def test_support_admin_shortcut_is_available_even_for_dual_role_users():
 
 
 def test_dispatch_clickable_controls_are_visually_distinct_from_status_pills():
-    css = _read("web/app/static/css/pages/dispatch_inline_1.css")
+    template = _read("web/app/templates/dispatch.html")
+    css = _read("web/app/static/css/pages/dispatch_actions.css")
 
-    assert ".dispatch-my-link:hover" in css
-    assert ".dispatch-support-link:hover" in css
-    assert ".dispatch-footer .button" in css
-    assert ".dispatch-tag-button:hover" in css
-    assert "transform:translateY(-2px)" in css
+    assert 'dispatch_inline_1.css?v=20261017-actions-2' in template
+    assert 'dispatch_actions.css?v=20261017-actions-2' in template
+    assert ".dispatch-shell a.dispatch-my-link" in css
+    assert ".dispatch-shell a.dispatch-support-link" in css
+    assert ".dispatch-shell .dispatch-footer .button" in css
+    assert ".dispatch-shell .dispatch-tag-button:hover" in css
+    assert "translateY(-2px)" in css
     assert "focus-visible" in css
+    assert 'content: "↗"' in css
 
 
 def test_dispatch_alert_client_updates_on_state_changes_without_full_reload():
