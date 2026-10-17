@@ -1,1252 +1,329 @@
 from __future__ import annotations
 
-import json
-import sqlite3
-from pathlib import Path
+"""Checkout facade with unified coupon / benefit handling.
+
+The pre-existing catalog, VIP, staff and point helpers are preserved in
+``checkout_preview_legacy``.  This file owns only the financial/benefit layer so
+Web and the persisted payout base agree on the 2026-10-17 policy:
+
+* point cash and VIP monthly cash discounts are shared discounts;
+* store-funded promo/compensation coupons never reduce worker/CS entitlement;
+* loyalty and service gifts keep their existing store-funded semantics;
+* all selectable benefits share the existing single "我的福利" selector.
+"""
+
 from typing import Any
 
-from services.order_flow import (
-    get_payment_method_info,
+from services import issued_benefits as issued_service
+from services.benefit_selector import (
+    SOURCE_ISSUED,
+    SOURCE_LOYALTY,
+    SOURCE_VIP_MONTHLY,
+    decode_benefit_selector_id,
+    encode_issued_benefit_id,
+    encode_vip_monthly_benefit_id,
 )
-from services.point_benefit_catalog import (
-    LEGACY_POINT_REDEEM_ITEMS,
-    POINT_REDEEM_ITEMS,
-    adapt_point_benefit_for_rule,
-    get_point_benefit_item,
-    is_service_bonus_allowed_for_rule,
+from services.order_discounts import FUNDING_SHARED, FUNDING_STORE
+from services.vip_monthly_benefits import (
+    get_available_cash_benefit,
+    list_available_cash_benefits,
 )
-
-from core.vip_levels import (
-    VIP_DISCOUNT_EXCLUDED_CATEGORIES as VIP_EXCLUDED_CATEGORIES,
-    VIP_DISCOUNT_EXCLUDED_RULE_KEYS as VIP_EXCLUDED_RULE_KEYS,
-    VIP_DISCOUNT_PAY_RATES as VIP_PAY_RATES,
+from services.vip_monthly_order_discount import (
+    get_vip_monthly_cash_minimum_order_amount,
 )
+from web.app.services import checkout_preview_legacy as _legacy
+from web.app.services.checkout_preview_legacy import *  # noqa: F401,F403
 
-from services.order_rules import (
-    ALL_ROLE_IDS,
-    ALL_ROLE_LABELS,
-    ORDER_RULES,
-    ROLE_IDS,
-    calculate_price,
-    get_allowed_role_ids,
-    get_allowed_role_keys,
-    get_required_game_role_ids,
-    get_required_game_role_keys,
-    get_required_staff_count,
-    role_ids_match_requirements,
-)
 
-from web.app.services.public_checkout import (
-    build_public_quote,
-)
-from services.loyalty_benefits import (
-    calculate_coupon_service_value,
-    coupon_service_note,
-    get_applicable_coupon,
-    list_applicable_coupons,
-    preview_same_order_benefit,
-)
+# ---------------------------------------------------------------------------
+# Benefit option adapters
+# ---------------------------------------------------------------------------
 
-
-ROOT = Path(
-    __file__
-).resolve().parents[3]
-
-BOT_DB = (
-    ROOT
-    / "bot.db"
-)
-
-WEB_DB = (
-    ROOT
-    / "web_dashboard.db"
-)
-
-
-PUBLIC_ROLE_LABELS = {
-    "top_protector": "頂護航",
-    "female_protector": "女護航",
-    "male_protector": "男護航",
-    "male_companion": "男陪",
-    "female_companion": "女陪",
-}
-
-
-# ============================================================
-# VIP
-#
-# Pay rate:
-# Gold / Platinum 98%
-# Diamond / White Diamond 96%
-# Black Diamond 94%
-# ============================================================
-
-VIP_THRESHOLDS = [
-    (88888, "黑鑽魔丸"),
-    (50000, "白鑽魔丸"),
-    (25000, "鑽石魔丸"),
-    (12000, "白金魔丸"),
-    (6000, "金級魔丸"),
-    (2000, "銀級魔丸"),
-]
-
-
-# ============================================================
-# Points
-# ============================================================
-
-def _materialize_point_item(key: str) -> dict | None:
-    item = get_point_benefit_item(key)
-    return dict(item) if item is not None else None
-
-
-POINT_ITEMS = [
-    item
-    for item in (
-        _materialize_point_item(str(source.get("key") or ""))
-        for source in POINT_REDEEM_ITEMS
-    )
-    if item is not None
-]
-
-
-# Legacy benefits remain lookup-only for orders created before this migration.
-POINT_ITEM_MAP = {
-    item["key"]: item
-    for item in [
-        *POINT_ITEMS,
-        *[
-            benefit
-            for benefit in (
-                _materialize_point_item(str(source.get("key") or ""))
-                for source in LEGACY_POINT_REDEEM_ITEMS
-            )
-            if benefit is not None
-        ],
-    ]
-}
-
-
-PAYMENT_METHODS = [
-    "轉帳",
-    "街口",
-]
-
-
-# ============================================================
-# Generic helpers
-# ============================================================
-
-def _to_int(
-    value: Any,
-    default: int = 0,
-) -> int:
-
-    try:
-
-        if (
-            value is None
-            or value == ""
-        ):
-            return default
-
-        return int(value)
-
-    except (
-        TypeError,
-        ValueError,
-    ):
-
-        return default
-
-
-def _table_exists(
-    conn: sqlite3.Connection,
-    table: str,
-) -> bool:
-
-    row = conn.execute(
-        "SELECT name "
-        "FROM sqlite_master "
-        "WHERE type='table' "
-        "AND name=?",
-        (
-            table,
-        ),
-    ).fetchone()
-
-    return row is not None
-
-
-def _columns(
-    conn: sqlite3.Connection,
-    table: str,
-) -> set[str]:
-
-    if not _table_exists(
-        conn,
-        table,
-    ):
-        return set()
-
-    try:
-
-        return {
-            str(
-                row[1]
-            )
-            for row
-            in conn.execute(
-                f"PRAGMA table_info({table})"
-            ).fetchall()
-        }
-
-    except sqlite3.Error:
-
-        return set()
-
-
-def _json_dict(
-    value,
-) -> dict:
-
-    if isinstance(
-        value,
-        dict,
-    ):
-        return value
-
-    if value is None:
-        return {}
-
-    try:
-
-        parsed = json.loads(
-            str(
-                value
-            )
-        )
-
-    except Exception:
-
-        return {}
-
-    return (
-        parsed
-        if isinstance(
-            parsed,
-            dict,
-        )
-        else {}
-    )
-
-
-def _json_list(
-    value,
-) -> list[str]:
-
-    if isinstance(
-        value,
-        list,
-    ):
-        return [
-            str(x)
-            for x
-            in value
-            if str(
-                x
-            ).strip()
-        ]
-
-    if value is None:
-        return []
-
-    try:
-
-        parsed = json.loads(
-            str(
-                value
-            )
-        )
-
-    except Exception:
-
-        return []
-
-    if not isinstance(
-        parsed,
-        list,
-    ):
-        return []
-
-    return [
-        str(x)
-        for x
-        in parsed
-        if str(
-            x
-        ).strip()
-    ]
-
-
-# ============================================================
-# Customer / VIP / points
-# ============================================================
-
-def _vip_from_total_spent(
-    total_spent: int,
-) -> str:
-
-    for threshold, name in (
-        VIP_THRESHOLDS
-    ):
-
-        if (
-            total_spent
-            >= threshold
-        ):
-            return name
-
-    return "普通魔丸"
-
-
-def load_customer_state(
-    customer_id: str,
-) -> dict:
-
-    customer_id = str(
-        customer_id
-        or ""
-    ).strip()
-
-    result = {
-        "customer_id":
-            customer_id,
-
-        "total_spent":
-            0,
-
-        "points":
-            0,
-
-        "vip_name":
-            "普通魔丸",
-
-        "wallet_balance":
-            0,
-    }
-
-
-    if BOT_DB.exists():
-
-        try:
-
-            conn = sqlite3.connect(
-                BOT_DB
-            )
-
-            conn.row_factory = (
-                sqlite3.Row
-            )
-
-
-            try:
-
-                customer_cols = (
-                    _columns(
-                        conn,
-                        "customers",
-                    )
-                )
-
-
-                if customer_cols:
-
-                    if (
-                        "customer_id"
-                        in customer_cols
-                    ):
-                        id_col = (
-                            "customer_id"
-                        )
-
-                    elif (
-                        "user_id"
-                        in customer_cols
-                    ):
-                        id_col = (
-                            "user_id"
-                        )
-
-                    else:
-                        id_col = None
-
-
-                    if id_col:
-
-                        row = conn.execute(
-                            "SELECT * "
-                            "FROM customers "
-                            f"WHERE CAST({id_col} AS TEXT)=? "
-                            "LIMIT 1",
-                            (
-                                customer_id,
-                            ),
-                        ).fetchone()
-
-
-                        if row is not None:
-
-                            row_data = dict(
-                                row
-                            )
-
-
-                            json_data = {}
-
-
-                            for candidate in (
-                                "data_json",
-                                "data",
-                            ):
-
-                                if (
-                                    candidate
-                                    in row_data
-                                ):
-
-                                    json_data = (
-                                        _json_dict(
-                                            row_data.get(
-                                                candidate
-                                            )
-                                        )
-                                    )
-
-                                    if json_data:
-                                        break
-
-
-                            total_spent = (
-                                _to_int(
-                                    row_data.get(
-                                        "total_spent"
-                                    ),
-                                    _to_int(
-                                        json_data.get(
-                                            "total_spent"
-                                        ),
-                                        0,
-                                    ),
-                                )
-                            )
-
-
-                            result[
-                                "total_spent"
-                            ] = max(
-                                0,
-                                total_spent,
-                            )
-
-
-                            if (
-                                "point_adjustment"
-                                in json_data
-                            ):
-
-                                adjustment = (
-                                    _to_int(
-                                        json_data.get(
-                                            "point_adjustment"
-                                        ),
-                                        0,
-                                    )
-                                )
-
-                                points = max(
-                                    0,
-                                    (
-                                        total_spent
-                                        // 100
-                                    )
-                                    + adjustment,
-                                )
-
-                            else:
-
-                                points = (
-                                    _to_int(
-                                        row_data.get(
-                                            "points"
-                                        ),
-                                        _to_int(
-                                            json_data.get(
-                                                "points"
-                                            ),
-                                            0,
-                                        ),
-                                    )
-                                )
-
-
-                            result[
-                                "points"
-                            ] = max(
-                                0,
-                                points,
-                            )
-
-
-                            level = str(
-                                row_data.get(
-                                    "level"
-                                )
-                                or ""
-                            ).strip()
-
-
-                            if level:
-
-                                result[
-                                    "vip_name"
-                                ] = level
-
-                            else:
-
-                                result[
-                                    "vip_name"
-                                ] = (
-                                    _vip_from_total_spent(
-                                        total_spent
-                                    )
-                                )
-
-
-                wallet_cols = (
-                    _columns(
-                        conn,
-                        "customer_wallets",
-                    )
-                )
-
-
-                if (
-                    "customer_discord_id"
-                    in wallet_cols
-                    and "balance"
-                    in wallet_cols
-                ):
-
-                    wallet = conn.execute(
-                        "SELECT balance "
-                        "FROM customer_wallets "
-                        "WHERE CAST(customer_discord_id AS TEXT)=? "
-                        "LIMIT 1",
-                        (
-                            customer_id,
-                        ),
-                    ).fetchone()
-
-
-                    if wallet is not None:
-
-                        result[
-                            "wallet_balance"
-                        ] = max(
-                            0,
-                            _to_int(
-                                wallet[
-                                    "balance"
-                                ],
-                                0,
-                            ),
-                        )
-
-
-            finally:
-
-                conn.close()
-
-
-        except sqlite3.Error:
-
-            pass
-
-
-    return result
-
-
-def vip_discount_policy(
-    *,
-    vip_name: str,
-    rule_key: str,
-) -> dict:
-
-    rule = (
-        ORDER_RULES.get(
-            str(
-                rule_key
-            )
-        )
-    )
-
-
-    pay_rate = (
-        VIP_PAY_RATES.get(
-            str(
-                vip_name
-            ),
-            100,
-        )
-    )
-
-
-    if (
-        pay_rate >= 100
-    ):
-
-        return {
-            "eligible":
-                False,
-
-            "pay_rate":
-                100,
-
-            "reason":
-                "目前會員等級沒有全館折扣。",
-        }
-
-
-    if (
-        rule is None
-    ):
-
-        return {
-            "eligible":
-                False,
-
-            "pay_rate":
-                100,
-
-            "reason":
-                "無法確認商品規則。",
-        }
-
-
-    if (
-        str(
-            rule_key
-        )
-        in VIP_EXCLUDED_RULE_KEYS
-    ):
-
-        return {
-            "eligible":
-                False,
-
-            "pay_rate":
-                100,
-
-            "reason":
-                "此方案目前列入 VIP 折扣排除。",
-        }
-
-
-    if (
-        str(
-            rule.category
-        )
-        in VIP_EXCLUDED_CATEGORIES
-    ):
-
-        return {
-            "eligible":
-                False,
-
-            "pay_rate":
-                100,
-
-            "reason":
-                "此分類目前列入 VIP 折扣排除。",
-        }
-
-
-    return {
-        "eligible":
-            True,
-
-        "pay_rate":
-            pay_rate,
-
-        "reason":
-            f"自動套用 {pay_rate} 折後比例。",
-    }
-
-
-# ============================================================
-# Staff
-# ============================================================
-
-def _choose_role_key(
-    rule,
-    role_ids: set[str],
-) -> str | None:
-
-    if not role_ids_match_requirements(
-        role_ids,
-        get_allowed_role_ids(rule),
-        get_required_game_role_ids(rule),
-    ):
-        return None
-
-    matched = [
-        role_key
-        for role_key
-        in get_allowed_role_keys(rule)
-        if str(
-            ALL_ROLE_IDS.get(
-                role_key
-            )
-        )
-        in role_ids
-    ]
-
-
-    if not matched:
-        return None
-
-
-    fee_map = {
-        **(rule.specify_fee_by_role or {}),
-        **(getattr(rule, "specify_fee_by_game_role", {}) or {}),
-    }
-
-
-    # Match current Discord self-service logic:
-    # if a member owns multiple matching roles,
-    # use the highest applicable specify fee role.
-    matched.sort(
-        key=lambda role_key:
-            int(
-                fee_map.get(
-                    role_key,
-                    rule.specify_fee_default
-                    or 0,
-                )
-            ),
-        reverse=True,
-    )
-
-
-    return matched[0]
-
-
-def list_eligible_staff(
-    *,
-    rule_key: str,
-) -> list[dict]:
-
-    rule = (
-        ORDER_RULES.get(
-            str(
-                rule_key
-            )
-        )
-    )
-
-
-    if (
-        rule is None
-        or not rule.allow_specify
-        or not WEB_DB.exists()
-    ):
-        return []
-
-
-    try:
-
-        conn = sqlite3.connect(
-            WEB_DB
-        )
-
-        conn.row_factory = (
-            sqlite3.Row
-        )
-
-
-        try:
-
-            member_columns = (
-                _columns(
-                    conn,
-                    "web_staff_members",
-                )
-            )
-
-
-            if (
-                "discord_id"
-                not in member_columns
-                or "roles_json"
-                not in member_columns
-            ):
-                return []
-
-
-            active_where = (
-                "WHERE COALESCE(m.is_active, 1) = 1 "
-                if "is_active"
-                in member_columns
-                else ""
-            )
-
-
-            # ------------------------------------------------
-            # 指定名單以 Discord 同步身分為準。
-            #
-            # staff_profiles 只拿來補漂亮顯示名稱與排序，
-            # 不再是出現在指定名單的必要條件。
-            #
-            # 所以：
-            # - 有個人牆 -> 優先個人牆名稱
-            # - 沒個人牆 -> Discord 暱稱
-            # - 個人牆隱藏 -> 仍可指定
-            # - 是否能指定 -> 只看目前 Discord 身分
-            # ------------------------------------------------
-
-            if _table_exists(
-                conn,
-                "staff_profiles",
-            ):
-
-                rows = conn.execute(
-                    "SELECT "
-                    "m.discord_id AS staff_discord_id, "
-                    "COALESCE("
-                    "NULLIF(p.display_name, ''), "
-                    "NULLIF(m.display_name, ''), "
-                    "NULLIF(m.global_name, ''), "
-                    "NULLIF(m.username, ''), "
-                    "m.discord_id"
-                    ") AS display_name, "
-                    "m.roles_json, "
-                    "COALESCE(p.sort_score, 0) "
-                    "AS profile_sort_score "
-                    "FROM web_staff_members m "
-                    "LEFT JOIN staff_profiles p "
-                    "ON p.staff_discord_id = m.discord_id "
-                    f"{active_where}"
-                    "ORDER BY "
-                    "COALESCE(p.sort_score, 0) DESC, "
-                    "display_name ASC"
-                ).fetchall()
-
-
-            else:
-
-                rows = conn.execute(
-                    "SELECT "
-                    "m.discord_id AS staff_discord_id, "
-                    "COALESCE("
-                    "NULLIF(m.display_name, ''), "
-                    "NULLIF(m.global_name, ''), "
-                    "NULLIF(m.username, ''), "
-                    "m.discord_id"
-                    ") AS display_name, "
-                    "m.roles_json, "
-                    "0 AS profile_sort_score "
-                    "FROM web_staff_members m "
-                    f"{active_where}"
-                    "ORDER BY display_name ASC"
-                ).fetchall()
-
-
-        finally:
-
-            conn.close()
-
-
-    except sqlite3.Error:
-
-        return []
-
-
-    result = []
-
-
-    seen = set()
-
-
-    for row in rows:
-
-        staff_id = str(
-            row[
-                "staff_discord_id"
-            ]
-            or ""
-        ).strip()
-
-
-        if (
-            not staff_id
-            or staff_id in seen
-        ):
-            continue
-
-
-        role_ids = set(
-            _json_list(
-                row[
-                    "roles_json"
-                ]
-            )
-        )
-
-
-        role_key = (
-            _choose_role_key(
-                rule,
-                role_ids,
-            )
-        )
-
-
-        if role_key is None:
-            continue
-
-
-        seen.add(
-            staff_id
-        )
-
-
-        result.append(
-            {
-                "staff_id":
-                    staff_id,
-
-                "display_name":
-                    str(
-                        row[
-                            "display_name"
-                        ]
-                        or staff_id
-                    ),
-
-                "role_key":
-                    role_key,
-
-                "role_label":
-                    PUBLIC_ROLE_LABELS.get(
-                        role_key
-                    )
-                    or ALL_ROLE_LABELS.get(
-                        role_key,
-                        role_key,
-                    ),
-
-                "avatar_url":
-                    (
-                        "/discord-avatar/"
-                        f"{staff_id}"
-                        "?size=256"
-                    ),
-
-                "source":
-                    "discord_role",
-            }
-        )
-
-
-    return result
-
-
-
-def resolve_selected_staff(
-    *,
-    rule_key: str,
-    selected_ids: Any,
-) -> tuple[
-    list[dict],
-    list[str],
-]:
-
-    rule = (
-        ORDER_RULES.get(
-            str(
-                rule_key
-            )
-        )
-    )
-
-
+def _issued_scope_matches(benefit: dict[str, Any], *, rule_key: str) -> bool:
+    rule = _legacy.ORDER_RULES.get(str(rule_key))
     if rule is None:
-
-        raise ValueError(
-            "找不到商品規則。"
-        )
-
-
-    if selected_ids is None:
-        selected_ids = []
-
-
-    if not isinstance(
-        selected_ids,
-        list,
-    ):
-
-        raise ValueError(
-            "指定人員格式錯誤。"
-        )
-
-
-    clean_ids = []
-
-
-    for value in selected_ids:
-
-        text = str(
-            value
-            or ""
-        ).strip()
-
-        if (
-            text
-            and text not in clean_ids
-        ):
-            clean_ids.append(
-                text
-            )
-
-
-    if not clean_ids:
-
-        return [], []
-
-
-    if not rule.allow_specify:
-
-        raise ValueError(
-            "這個方案不開放指定人員。"
-        )
-
-
-    required_staff = (
-        get_required_staff_count(
-            rule,
-            1,
-        )
-    )
-
-
-    max_specified = (
-        int(
-            rule.max_specified_count
-        )
-        if rule.max_specified_count
-        is not None
-        else required_staff
-    )
-
-
-    if (
-        len(
-            clean_ids
-        )
-        > max_specified
-    ):
-
-        raise ValueError(
-            f"這個方案最多只能指定 {max_specified} 位。"
-        )
-
-
-    available = {
-        item["staff_id"]:
-            item
-        for item
-        in list_eligible_staff(
-            rule_key=
-                rule_key
-        )
-    }
-
-
-    selected = []
-
-    role_keys = []
-
-
-    for staff_id in clean_ids:
-
-        item = (
-            available.get(
-                staff_id
-            )
-        )
-
-
-        if item is None:
-
-            raise ValueError(
-                "指定的人員目前不在可指定名單，"
-                "可能已停用個人牆或職位不符合。"
-            )
-
-
-        selected.append(
-            item
-        )
-
-
-        role_keys.append(
-            item[
-                "role_key"
-            ]
-        )
-
-
-    return (
-        selected,
-        role_keys,
-    )
-
-
-# ============================================================
-# Point benefit rules
-# ============================================================
-
-def _point_item_for_rule(rule, item: dict) -> dict:
-    return adapt_point_benefit_for_rule(rule, item)
-
-
-def point_item_status(
-    *,
-    rule_key: str,
-    point_item_key: str,
-    point_balance: int,
-    quantity: int,
-    has_specified_staff: bool,
-) -> dict:
-    rule = ORDER_RULES.get(str(rule_key))
-    item = POINT_ITEM_MAP.get(str(point_item_key))
-
-    if rule is None or item is None:
-        return {"allowed": False, "reason": "不支援這個點數福利。"}
-
-    if point_balance < int(item["cost"]):
-        return {"allowed": False, "reason": "點數不足。"}
-
-    if not bool(rule.point_benefits_allowed):
-        return {"allowed": False, "reason": "此方案不可使用點數福利。"}
-
+        return False
+    rules = dict(benefit.get("rules") or {})
+    allowed_rules = set(rules.get("rule_keys") or [])
+    allowed_categories = set(rules.get("categories") or [])
+    excluded_rules = set(rules.get("excluded_rule_keys") or [])
+    excluded_categories = set(rules.get("excluded_categories") or [])
     category = str(rule.category)
-    if category == "steam":
-        return {"allowed": False, "reason": "Steam遊戲目前不可使用點數福利。"}
+    if allowed_rules and str(rule_key) not in allowed_rules:
+        return False
+    if allowed_categories and category not in allowed_categories:
+        return False
+    if str(rule_key) in excluded_rules or category in excluded_categories:
+        return False
 
-    if category in {"fun", "delta_desktop_fun", "title"}:
-        return {"allowed": False, "reason": "趣味單不可使用點數福利。"}
-
-    if str(rule_key).startswith("basic_trial_"):
-        return {"allowed": False, "reason": "體驗單不可使用點數福利。"}
-
+    effect = str(rules.get("effect_type") or "fixed_cash")
     pricing_type = str(rule.pricing_type)
-    kind = str(item.get("kind") or "")
-
-    if kind == "service_bonus":
-        if pricing_type not in {"hourly", "game"}:
-            return {"allowed": False, "reason": "服務加贈只適用計時或計局方案。"}
-        if not is_service_bonus_allowed_for_rule(rule, item):
-            return {"allowed": False, "reason": "這張服務加贈券不適用此陪玩類型。"}
-
-    pricing_types = tuple(item.get("pricing_types") or ())
-    if pricing_types and pricing_type not in pricing_types:
-        label = "計時" if "hourly" in pricing_types else "計局"
-        return {"allowed": False, "reason": f"此點數福利只適用{label}方案。"}
-
-    if kind == "free_specify_fee":
-        if not rule.allow_specify:
-            return {"allowed": False, "reason": "此方案不開放指定。"}
-        if pricing_type == "hourly" and int(quantity) >= 2:
-            return {"allowed": False, "reason": "2 小時以上本來就免指定費。"}
-        if not has_specified_staff:
-            return {
-                "allowed": False,
-                "requires_specified": True,
-                "reason": "需先指定人員。",
-            }
-
-    if kind == "extra_hours" and pricing_type != "hourly":
-        return {"allowed": False, "reason": "加時只適用計時方案。"}
-
-    if kind == "extra_games" and pricing_type != "game":
-        return {"allowed": False, "reason": "加局只適用計局方案。"}
-
-    return {"allowed": True, "reason": ""}
+    if effect == issued_service.EFFECT_SERVICE_HOURS and pricing_type != "hourly":
+        return False
+    if effect == issued_service.EFFECT_SERVICE_GAMES and pricing_type != "game":
+        return False
+    if effect == issued_service.EFFECT_WAIVE_FEE and not bool(rule.allow_specify):
+        return False
+    return True
 
 
-def list_point_options(
+def _issued_option(benefit: dict[str, Any]) -> dict[str, Any]:
+    rules = dict(benefit.get("rules") or {})
+    summary = issued_service.describe_rules(rules)
+    title = str(benefit.get("title") or "會員福利")
+    minimum = int(rules.get("minimum_order_amount") or 0)
+    suffix = f"｜滿 {minimum:,}T 可用" if minimum > 0 else ""
+    return {
+        "id": encode_issued_benefit_id(int(benefit["id"])),
+        "title": f"{title}｜{summary}{suffix}",
+        "benefit_kind": str(rules.get("effect_type") or "fixed_cash"),
+        "benefit_units": float(
+            rules.get("service_hours")
+            or rules.get("service_games")
+            or rules.get("amount")
+            or 0
+        ),
+        "source": SOURCE_ISSUED,
+        "issued_benefit_id": int(benefit["id"]),
+    }
+
+
+def _vip_monthly_option(item: dict[str, Any]) -> dict[str, Any]:
+    real_id = int(item["id"])
+    amount = int(item.get("amount") or 0)
+    benefit_key = str(item.get("benefit_key") or "")
+    minimum = get_vip_monthly_cash_minimum_order_amount(benefit_key)
+    return {
+        "id": encode_vip_monthly_benefit_id(real_id),
+        "title": (
+            f"{str(item.get('title') or 'VIP 每月折現券')}"
+            + (f"｜單筆滿 {minimum:,}T" if minimum > 0 else "")
+        ),
+        "benefit_kind": "fixed_cash",
+        "benefit_units": float(amount),
+        "source": SOURCE_VIP_MONTHLY,
+        "vip_monthly_benefit_id": real_id,
+        "benefit_key": benefit_key,
+    }
+
+
+def build_checkout_options(
     *,
+    customer_id: str,
     rule_key: str,
-    point_balance: int,
-    quantity: int,
-    has_specified_staff: bool = False,
-) -> list[dict]:
-    rule = ORDER_RULES.get(str(rule_key))
-    if rule is None:
-        return []
+    quantity: int = 1,
+    player_count: int = 1,
+    customer_adjustments: Any = None,
+    preselected_staff_id: str | None = None,
+) -> dict:
+    data = _legacy.build_checkout_options(
+        customer_id=customer_id,
+        rule_key=rule_key,
+        quantity=quantity,
+        player_count=player_count,
+        customer_adjustments=customer_adjustments,
+        preselected_staff_id=preselected_staff_id,
+    )
 
-    result = []
-    for item in POINT_ITEMS:
-        status = point_item_status(
-            rule_key=rule_key,
-            point_item_key=item["key"],
-            point_balance=point_balance,
-            quantity=quantity,
-            has_specified_staff=has_specified_staff,
-        )
-        data = _point_item_for_rule(rule, item)
-        data.update(status)
-        result.append(data)
+    combined = list(data.get("benefit_coupons") or [])
 
-    return result
+    try:
+        for item in list_available_cash_benefits(customer_id):
+            combined.append(_vip_monthly_option(item))
+    except Exception:
+        # A benefit-list failure must not make the order catalog unusable.
+        pass
+
+    try:
+        for benefit in issued_service.list_available_benefits_for_customer(customer_id):
+            if _issued_scope_matches(benefit, rule_key=rule_key):
+                combined.append(_issued_option(benefit))
+    except Exception:
+        pass
+
+    data["benefit_coupons"] = combined
+    return data
 
 
-# ============================================================
-# Financial calculation
-# ============================================================
+# ---------------------------------------------------------------------------
+# Financial helpers
+# ---------------------------------------------------------------------------
 
-def calculate_point_service_value(
+def _service_unit_cash_value(
     *,
-    quote: dict,
-    vip_pay_rate: int,
-    point_item: dict | None,
+    service_after_vip: int,
+    quote: dict[str, Any],
+    units: float,
+    service_scope: str,
 ) -> int:
-    """Compute store-funded payout value for one companion seat only."""
-    if not point_item:
-        return 0
-
-    kind = str(point_item.get("kind") or "")
-    if kind == "extra_hours":
-        units = float(point_item.get("hours") or 0)
-    elif kind == "extra_games":
-        units = float(point_item.get("games") or 0)
-    else:
-        return 0
-
     if units <= 0:
         return 0
-
-    quantity = max(1, int(quote.get("quantity") or 1))
+    quantity = max(1.0, float(quote.get("quantity") or 1))
     staff_count = max(1, int(quote.get("required_staff_count") or 1))
-    service_amount = max(0, int(quote.get("customer_pay_amount") or 0))
-    gross_extra_value = int(round((service_amount / quantity / staff_count) * units))
+    per_order_unit = max(0.0, float(service_after_vip)) / quantity
+    if str(service_scope or "one_seat") == "whole_order":
+        return max(0, int(round(per_order_unit * units)))
+    return max(0, int(round((per_order_unit / staff_count) * units)))
 
-    # VIP only changes the customer's charge; the extra service is funded at its
-    # normal one-seat value so the selected companion's payout is not reduced.
-    return max(0, gross_extra_value)
+
+def _generic_benefit_descriptor(
+    *,
+    benefit: dict[str, Any],
+    customer_id: str,
+    rule_key: str,
+    quote: dict[str, Any],
+    service_after_vip: int,
+    specify_fee: int,
+) -> dict[str, Any]:
+    if str(benefit.get("customer_id") or "") != str(customer_id):
+        raise ValueError("這張福利券不屬於目前會員。")
+    if str(benefit.get("status") or "") != issued_service.STATUS_AVAILABLE:
+        raise ValueError("這張福利券已使用、已保留或已失效。")
+    if not _issued_scope_matches(benefit, rule_key=rule_key):
+        raise ValueError("這張福利券不適用這個方案。")
+
+    rules = issued_service.normalize_rules(benefit.get("rules") or {})
+    original_service = max(0, int(quote.get("customer_pay_amount") or 0))
+    minimum = max(0, int(rules.get("minimum_order_amount") or 0))
+    if original_service < minimum:
+        raise ValueError(f"這張福利券需單筆原始服務金額滿 {minimum:,}T 才能使用。")
+
+    effect = str(rules.get("effect_type") or issued_service.EFFECT_FIXED_CASH)
+    funding = str(rules.get("funding") or FUNDING_STORE)
+    include_specify = bool(rules.get("include_specify_fee"))
+    service_discount = 0
+    specify_discount = 0
+    note = str(benefit.get("title") or "會員福利")
+
+    if effect == issued_service.EFFECT_FIXED_CASH:
+        amount = max(0, int(rules.get("amount") or 0))
+        service_discount = min(service_after_vip, amount)
+        remainder = max(0, amount - service_discount)
+        if include_specify:
+            specify_discount = min(specify_fee, remainder)
+    elif effect == issued_service.EFFECT_PERCENT:
+        percent = max(0.0, min(100.0, float(rules.get("percent_off") or 0)))
+        service_discount = int(round(service_after_vip * percent / 100))
+        if include_specify:
+            specify_discount = int(round(specify_fee * percent / 100))
+    elif effect == issued_service.EFFECT_FULL_ORDER:
+        service_discount = service_after_vip
+        specify_discount = specify_fee if include_specify else 0
+    elif effect == issued_service.EFFECT_WAIVE_FEE:
+        specify_discount = specify_fee
+    elif effect in {issued_service.EFFECT_SERVICE_HOURS, issued_service.EFFECT_SERVICE_GAMES}:
+        units = float(
+            rules.get("service_hours")
+            if effect == issued_service.EFFECT_SERVICE_HOURS
+            else rules.get("service_games")
+            or 0
+        )
+        service_discount = _service_unit_cash_value(
+            service_after_vip=service_after_vip,
+            quote=quote,
+            units=units,
+            service_scope=str(rules.get("service_scope") or "one_seat"),
+        )
+
+    maximum = max(0, int(rules.get("maximum_discount_amount") or 0))
+    total = service_discount + specify_discount
+    if maximum > 0 and total > maximum:
+        overflow = total - maximum
+        # Preserve specify waiver first for explicit fee-waiver benefits;
+        # otherwise reduce the specify portion before the service discount.
+        if effect == issued_service.EFFECT_WAIVE_FEE:
+            specify_discount = max(0, specify_discount - overflow)
+        else:
+            reduce_specify = min(specify_discount, overflow)
+            specify_discount -= reduce_specify
+            overflow -= reduce_specify
+            service_discount = max(0, service_discount - overflow)
+
+    return {
+        "selector_id": encode_issued_benefit_id(int(benefit["id"])),
+        "real_id": int(benefit["id"]),
+        "title": str(benefit.get("title") or "會員福利"),
+        "source": SOURCE_ISSUED,
+        "funding": funding,
+        "service_discount": max(0, int(service_discount)),
+        "specify_discount": max(0, int(specify_discount)),
+        "note": note,
+        "benefit_kind": effect,
+        "benefit_units": float(
+            rules.get("service_hours")
+            or rules.get("service_games")
+            or rules.get("amount")
+            or 0
+        ),
+        "rules": rules,
+    }
+
+
+def _vip_monthly_descriptor(
+    *,
+    benefit: dict[str, Any],
+    quote: dict[str, Any],
+    service_after_vip: int,
+) -> dict[str, Any]:
+    benefit_key = str(benefit.get("benefit_key") or "")
+    minimum = get_vip_monthly_cash_minimum_order_amount(benefit_key)
+    original_service = max(0, int(quote.get("customer_pay_amount") or 0))
+    if original_service < minimum:
+        raise ValueError(
+            f"{int(benefit.get('amount') or 0)}T VIP 月券需單筆原始服務金額滿 {minimum:,}T 才能使用。"
+        )
+    amount = min(service_after_vip, max(0, int(benefit.get("amount") or 0)))
+    return {
+        "selector_id": encode_vip_monthly_benefit_id(int(benefit["id"])),
+        "real_id": int(benefit["id"]),
+        "title": str(benefit.get("title") or "VIP 每月折現券"),
+        "source": SOURCE_VIP_MONTHLY,
+        "funding": FUNDING_SHARED,
+        "service_discount": amount,
+        "specify_discount": 0,
+        "note": f"{str(benefit.get('title') or 'VIP 每月折現券')} -{amount:,}T",
+        "benefit_kind": "fixed_cash",
+        "benefit_units": float(amount),
+        "benefit_key": benefit_key,
+    }
+
+
+def _loyalty_descriptor(
+    *,
+    coupon: dict[str, Any],
+    rule_key: str,
+    player_count: int,
+    service_after_vip: int,
+) -> dict[str, Any]:
+    value = _legacy.calculate_coupon_service_value(
+        rule_key=rule_key,
+        player_count=player_count,
+        coupon=coupon,
+    )
+    value = min(max(0, int(value)), max(0, int(service_after_vip)))
+    return {
+        "selector_id": (
+            int(coupon.get("id")) if coupon.get("id") not in (None, "") else None
+        ),
+        "real_id": int(coupon.get("id")) if coupon.get("id") not in (None, "") else None,
+        "title": str(coupon.get("title") or "跨單累積福利"),
+        "source": str(coupon.get("source") or SOURCE_LOYALTY),
+        "funding": FUNDING_STORE,
+        "service_discount": value,
+        "specify_discount": 0,
+        "note": _legacy.coupon_service_note(coupon),
+        "benefit_kind": str(coupon.get("benefit_kind") or ""),
+        "benefit_units": float(coupon.get("benefit_units") or 0),
+        "same_order": bool(coupon.get("same_order")),
+        "earned_count": int(coupon.get("earned_count") or 0),
+        "scope_key": str(coupon.get("scope_key") or ""),
+        "rule_key": str(coupon.get("rule_key") or ""),
+        "player_count": int(coupon.get("player_count") or player_count or 1),
+        # Existing loyalty benefit policy intentionally excludes the free unit
+        # from CS commission base.
+        "exclude_from_cs_base": value,
+    }
+
 
 def calculate_checkout_financials(
     *,
@@ -1257,15 +334,13 @@ def calculate_checkout_financials(
     wallet_balance: int,
     use_wallet: bool,
     point_service_value: int = 0,
-    benefit_coupon: dict | None = None,
-    benefit_service_value: int = 0,
+    benefit: dict[str, Any] | None = None,
 ) -> dict:
     service_amount = max(0, int(service_amount or 0))
     vip_pay_rate = max(0, min(100, int(vip_pay_rate or 100)))
     specify_fee = max(0, int(specify_fee or 0))
     wallet_balance = max(0, int(wallet_balance or 0))
     point_service_value = max(0, int(point_service_value or 0))
-    benefit_service_value = max(0, int(benefit_service_value or 0))
 
     after_vip = int(round(service_amount * vip_pay_rate / 100))
     vip_discount_amount = max(0, service_amount - after_vip)
@@ -1273,52 +348,61 @@ def calculate_checkout_financials(
     point_cash_discount = 0
     point_waived_specify = 0
     point_service_note = ""
-
     if point_item:
         kind = str(point_item.get("kind") or "")
         if kind == "cash_discount":
-            point_cash_discount = min(
-                after_vip,
-                max(0, int(point_item.get("amount") or 0)),
-            )
+            point_cash_discount = min(after_vip, max(0, int(point_item.get("amount") or 0)))
         elif kind == "free_specify_fee":
             point_waived_specify = specify_fee
         elif kind == "extra_hours":
             hours = float(point_item.get("hours") or 0)
             point_service_note = (
                 "服務時間 +30 分鐘（1 位陪玩）"
-                if hours == 0.5
+                if abs(hours - 0.5) < 0.001
                 else f"服務時間 +{hours:g} 小時（1 位陪玩）"
             )
         elif kind == "extra_games":
             games = int(point_item.get("games") or 0)
             point_service_note = f"服務局數 +{games} 局（1 位陪玩）"
 
-    effective_specify_fee = max(0, specify_fee - point_waived_specify)
-    after_point = max(0, after_vip - point_cash_discount)
-    benefit_discount_amount = (
-        min(after_point, benefit_service_value)
-        if benefit_coupon
-        else 0
+    # Cash point coupons are normal shared discounts under the new policy.
+    service_after_point = max(0, after_vip - point_cash_discount)
+
+    benefit_service_discount = max(0, int((benefit or {}).get("service_discount") or 0))
+    benefit_specify_discount = max(0, int((benefit or {}).get("specify_discount") or 0))
+    benefit_funding = str((benefit or {}).get("funding") or FUNDING_STORE)
+    benefit_service_discount = min(service_after_point, benefit_service_discount)
+    benefit_specify_discount = min(
+        max(0, specify_fee - point_waived_specify),
+        benefit_specify_discount,
     )
-    after_benefit = max(0, after_point - benefit_discount_amount)
-    subtotal = max(0, after_benefit + effective_specify_fee)
+
+    service_after_benefit = max(0, service_after_point - benefit_service_discount)
+    effective_specify_fee = max(
+        0,
+        specify_fee - point_waived_specify - benefit_specify_discount,
+    )
+    subtotal = max(0, service_after_benefit + effective_specify_fee)
     wallet_use = min(wallet_balance, subtotal) if use_wallet else 0
     remaining = max(0, subtotal - wallet_use)
 
-    # Point rewards and loyalty benefits are store-funded. A loyalty benefit
-    # only lowers what the customer pays; it must not reduce worker payout or
-    # add phantom service time to the payout base.
-    payout_base = max(
-        0,
-        after_vip + specify_fee + point_service_value,
-    )
-    point_store_absorbed = max(
-        0,
-        point_cash_discount + point_waived_specify + point_service_value,
-    )
-    benefit_store_absorbed = benefit_discount_amount
+    payout_base = after_vip + specify_fee + point_service_value
+    payout_base -= point_cash_discount
+    if benefit_funding == FUNDING_SHARED:
+        payout_base -= benefit_service_discount + benefit_specify_discount
+    payout_base = max(0, int(payout_base))
 
+    # Store absorption only contains benefits that truly do not reduce worker/CS
+    # entitlement. Shared discounts are represented by the lower payout base.
+    point_store_absorbed = max(0, point_waived_specify + point_service_value)
+    benefit_store_absorbed = (
+        benefit_service_discount + benefit_specify_discount
+        if benefit and benefit_funding == FUNDING_STORE
+        else 0
+    )
+    loyalty_cs_exclusion = max(0, int((benefit or {}).get("exclude_from_cs_base") or 0))
+
+    benefit_id = (benefit or {}).get("selector_id")
     return {
         "service_amount": service_amount,
         "original_amount": service_amount,
@@ -1330,8 +414,12 @@ def calculate_checkout_financials(
         "percent_discount_amount": vip_discount_amount,
         "service_after_vip": after_vip,
         "specify_fee": specify_fee,
-        "cash_coupon_amount": benefit_discount_amount,
-        "fixed_discount_amount": 0,
+        "cash_coupon_amount": benefit_service_discount + benefit_specify_discount,
+        "fixed_discount_amount": (
+            benefit_service_discount + benefit_specify_discount
+            if benefit and benefit_funding == FUNDING_SHARED
+            else 0
+        ),
         "point_cash_discount": point_cash_discount,
         "point_discount_coupon_amount": point_cash_discount,
         "point_waived_specify_fee": point_waived_specify,
@@ -1339,15 +427,18 @@ def calculate_checkout_financials(
         "point_service_note": point_service_note,
         "point_service_value": point_service_value,
         "point_store_absorbed_amount": point_store_absorbed,
-        "benefit_coupon_id": (
-            int(benefit_coupon.get("id"))
-            if benefit_coupon and benefit_coupon.get("id") not in (None, "")
-            else None
+        "benefit_coupon_id": int(benefit_id) if benefit_id not in (None, "") else None,
+        "benefit_coupon_title": str((benefit or {}).get("title") or ""),
+        "benefit_service_note": str((benefit or {}).get("note") or ""),
+        # Only legacy loyalty free service is excluded from CS base. Admin promo
+        # coupons marked store-funded still pay CS from the normal entitlement.
+        "benefit_service_value": loyalty_cs_exclusion,
+        "issued_benefit_service_value": (
+            benefit_service_discount
+            if benefit and str(benefit.get("source") or "") == SOURCE_ISSUED
+            else 0
         ),
-        "benefit_coupon_title": (str(benefit_coupon.get("title") or "") if benefit_coupon else ""),
-        "benefit_service_note": coupon_service_note(benefit_coupon),
-        "benefit_service_value": benefit_service_value,
-        "benefit_discount_amount": benefit_discount_amount,
+        "benefit_discount_amount": benefit_service_discount + benefit_specify_discount,
         "benefit_store_absorbed_amount": benefit_store_absorbed,
         "subtotal_before_wallet": subtotal,
         "customer_pay_amount": subtotal,
@@ -1360,250 +451,9 @@ def calculate_checkout_financials(
     }
 
 
-# ============================================================
-# Checkout endpoints data
-# ============================================================
-
-def build_checkout_options(
-    *,
-    customer_id: str,
-    rule_key: str,
-    quantity: int = 1,
-    player_count: int = 1,
-    customer_adjustments: Any = None,
-    preselected_staff_id: str | None = None,
-) -> dict:
-
-    quote = build_public_quote(
-        rule_key=
-            rule_key,
-
-        quantity=
-            quantity,
-
-        player_count=
-            player_count,
-
-        customer_adjustments=
-            customer_adjustments,
-
-        specified_staff_id=
-            None,
-    )
-
-
-    customer = load_customer_state(
-        customer_id
-    )
-
-
-    rule = (
-        ORDER_RULES.get(
-            str(
-                rule_key
-            )
-        )
-    )
-
-
-    if rule is None:
-
-        raise ValueError(
-            "找不到商品規則。"
-        )
-
-
-    required_staff = int(
-        quote.get(
-            "required_staff_count"
-        )
-        or 1
-    )
-
-
-    max_specified = (
-        int(
-            rule.max_specified_count
-        )
-        if rule.max_specified_count
-        is not None
-        else required_staff
-    )
-
-
-    max_specified = min(
-        max_specified,
-        required_staff,
-    )
-
-
-    eligible_staff = (
-        list_eligible_staff(
-            rule_key=
-                rule_key
-        )
-    )
-
-
-    preselected_staff_id = str(
-        preselected_staff_id
-        or ""
-    ).strip() or None
-
-
-    preselected_staff = None
-
-
-    if preselected_staff_id:
-
-        if not rule.allow_specify:
-
-            raise ValueError(
-                "你從陪玩陣容選擇的人員"
-                "無法指定到這個方案。"
-            )
-
-
-        for item in eligible_staff:
-
-            if (
-                str(
-                    item[
-                        "staff_id"
-                    ]
-                )
-                == preselected_staff_id
-            ):
-
-                preselected_staff = (
-                    item
-                )
-
-                break
-
-
-        if preselected_staff is None:
-
-            raise ValueError(
-                "你從陪玩陣容指定的人員"
-                "目前無法接這個方案，"
-                "請重新選擇適用方案。"
-            )
-
-
-    vip = (
-        vip_discount_policy(
-            vip_name=
-                customer[
-                    "vip_name"
-                ],
-
-            rule_key=
-                rule_key,
-        )
-    )
-
-
-    point_options = (
-        list_point_options(
-            rule_key=
-                rule_key,
-
-            point_balance=
-                customer[
-                    "points"
-                ],
-
-            quantity=
-                int(
-                    quote[
-                        "quantity"
-                    ]
-                ),
-
-            has_specified_staff=
-                bool(
-                    preselected_staff
-                ),
-        )
-    )
-
-
-    payment_methods = []
-
-
-    for method in PAYMENT_METHODS:
-
-        payment_methods.append(
-            {
-                "key":
-                    method,
-
-                "label":
-                    method,
-
-                "info":
-                    get_payment_method_info(
-                        method
-                    )
-                    or "",
-            }
-        )
-
-
-    return {
-        "quote":
-            quote,
-
-        "customer":
-            customer,
-
-        "vip":
-            vip,
-
-        "staff": {
-            "allow_specify":
-                bool(
-                    rule.allow_specify
-                ),
-
-            "max_specified_count":
-                max_specified,
-
-            "items":
-                eligible_staff,
-
-            "preselected_staff_id":
-                preselected_staff_id,
-
-            "preselected_staff":
-                preselected_staff,
-
-            # From roster/profile means this staff
-            # is already the user's explicit choice.
-            "preselected_locked":
-                bool(
-                    preselected_staff
-                ),
-        },
-
-        "point_options":
-            point_options,
-
-        "benefit_coupons": list_applicable_coupons(
-            customer_id,
-            rule_key=rule_key,
-            player_count=int(quote.get("player_count") or player_count or 1),
-        ),
-
-        "payment_methods":
-            payment_methods,
-
-        "read_only_preview":
-            True,
-    }
-
-
+# ---------------------------------------------------------------------------
+# Verified preview
+# ---------------------------------------------------------------------------
 
 def build_checkout_preview(
     *,
@@ -1618,1853 +468,211 @@ def build_checkout_preview(
     use_wallet: bool = False,
     payment_method: str | None = None,
 ) -> dict:
-
-    quote = build_public_quote(
-        rule_key=
-            rule_key,
-
-        quantity=
-            quantity,
-
-        player_count=
-            player_count,
-
-        customer_adjustments=
-            customer_adjustments,
-
-        specified_staff_id=
-            None,
+    quote = _legacy.build_public_quote(
+        rule_key=rule_key,
+        quantity=quantity,
+        player_count=player_count,
+        customer_adjustments=customer_adjustments,
+        specified_staff_id=None,
     )
-
-
-    customer = load_customer_state(
-        customer_id
-    )
-
-
-    rule = (
-        ORDER_RULES.get(
-            str(
-                rule_key
-            )
-        )
-    )
-
-
+    customer = _legacy.load_customer_state(customer_id)
+    rule = _legacy.ORDER_RULES.get(str(rule_key))
     if rule is None:
+        raise ValueError("找不到商品規則。")
 
-        raise ValueError(
-            "找不到商品規則。"
-        )
-
-
-    selected_staff, role_keys = (
-        resolve_selected_staff(
-            rule_key=
-                rule_key,
-
-            selected_ids=
-                specified_staff_ids,
-        )
+    selected_staff, role_keys = _legacy.resolve_selected_staff(
+        rule_key=rule_key,
+        selected_ids=specified_staff_ids,
     )
-
 
     specify_fee = 0
-
     free_specify_by_rule = False
-
-
     if role_keys:
-
-        # Season 3x3 does not allow specify,
-        # so its website-only quantity override never reaches here.
-        price = calculate_price(
+        price = _legacy.calculate_price(
             rule,
-
-            quantity=
-                int(
-                    quote[
-                        "quantity"
-                    ]
-                ),
-
-            player_count=(
-                int(
-                    quote[
-                        "player_count"
-                    ]
-                )
-                if rule.player_count_enabled
-                else None
-            ),
-
-            specified_roles=
-                role_keys,
-
+            quantity=int(quote["quantity"]),
+            player_count=(int(quote["player_count"]) if rule.player_count_enabled else None),
+            specified_roles=role_keys,
             staff_adjustments=[],
         )
+        specify_fee = max(0, int(price.specify_fee))
+        free_specify_by_rule = bool(price.free_specify_fee)
 
-
-        specify_fee = max(
-            0,
-            int(
-                price.specify_fee
-            ),
-        )
-
-
-        free_specify_by_rule = bool(
-            price.free_specify_fee
-        )
-
-
-    vip = (
-        vip_discount_policy(
-            vip_name=
-                customer[
-                    "vip_name"
-                ],
-
-            rule_key=
-                rule_key,
-        )
+    vip = _legacy.vip_discount_policy(
+        vip_name=customer["vip_name"],
+        rule_key=rule_key,
     )
+    vip_rate = int(vip["pay_rate"]) if vip["eligible"] else 100
 
-
-    vip_rate = (
-        int(
-            vip[
-                "pay_rate"
-            ]
-        )
-        if vip[
-            "eligible"
-        ]
-        else 100
-    )
-
+    source, real_benefit_id = decode_benefit_selector_id(benefit_coupon_id)
+    issued_benefit = None
+    if benefit_coupon_id not in (None, "") and source == SOURCE_ISSUED:
+        issued_benefit = issued_service.get_issued_benefit(int(real_benefit_id or 0))
+        if issued_benefit is None:
+            raise ValueError("找不到這張福利券。")
+        rules = issued_service.normalize_rules(issued_benefit.get("rules") or {})
+        if not bool(rules.get("allow_vip_percent", True)):
+            vip_rate = 100
+            vip = dict(vip)
+            vip["eligible"] = False
+            vip["pay_rate"] = 100
+            vip["reason"] = "此福利券不可與 VIP 百分比折扣併用。"
 
     selected_point_item = None
-
-
-    point_item_key = str(
-        point_item_key
-        or ""
-    ).strip()
-
-
+    point_item_key = str(point_item_key or "").strip()
     if point_item_key:
-
-        item = (
-            POINT_ITEM_MAP.get(
-                point_item_key
-            )
-        )
-
-
+        if benefit_coupon_id not in (None, ""):
+            raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
+        item = _legacy.POINT_ITEM_MAP.get(point_item_key)
         if item is None:
-
-            raise ValueError(
-                "找不到這個點數福利。"
-            )
-
-
-        status = (
-            point_item_status(
-                rule_key=
-                    rule_key,
-
-                point_item_key=
-                    point_item_key,
-
-                point_balance=
-                    customer[
-                        "points"
-                    ],
-
-                quantity=
-                    int(
-                        quote[
-                            "quantity"
-                        ]
-                    ),
-
-                has_specified_staff=
-                    bool(
-                        selected_staff
-                    ),
-            )
+            raise ValueError("找不到這個點數福利。")
+        status = _legacy.point_item_status(
+            rule_key=rule_key,
+            point_item_key=point_item_key,
+            point_balance=customer["points"],
+            quantity=int(quote["quantity"]),
+            has_specified_staff=bool(selected_staff),
         )
+        if not status.get("allowed"):
+            raise ValueError(str(status.get("reason") or "目前不能使用這個點數福利。"))
+        selected_point_item = _legacy._point_item_for_rule(rule, item)
 
+    service_amount = max(0, int(quote.get("customer_pay_amount") or 0))
+    service_after_vip = int(round(service_amount * vip_rate / 100))
+    selected_benefit = None
+    selected_coupon_raw = None
 
-        if not status.get(
-            "allowed"
-        ):
-
-            raise ValueError(
-                str(
-                    status.get(
-                        "reason"
-                    )
-                    or "目前不能使用這個點數福利。"
-                )
-            )
-
-
-        selected_point_item = (
-            _point_item_for_rule(
-                rule,
-                item,
-            )
-        )
-
-
-    selected_benefit_coupon = None
     if benefit_coupon_id not in (None, ""):
         if selected_point_item is not None:
             raise ValueError("福利券與點數福利同張訂單只能擇一使用。")
-        selected_benefit_coupon = get_applicable_coupon(
-            benefit_coupon_id,
-            customer_id=customer_id,
-            rule_key=rule_key,
-            player_count=int(quote.get("player_count") or player_count or 1),
-        )
-        if selected_benefit_coupon is None:
-            raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
 
-    if selected_point_item is None and selected_benefit_coupon is None:
-        selected_benefit_coupon = preview_same_order_benefit(
+        if source == SOURCE_LOYALTY:
+            selected_coupon_raw = _legacy.get_applicable_coupon(
+                int(real_benefit_id or 0),
+                customer_id=customer_id,
+                rule_key=rule_key,
+                player_count=int(quote.get("player_count") or player_count or 1),
+            )
+            if selected_coupon_raw is None:
+                raise ValueError("這張福利券已使用、已保留，或不適用這個方案。")
+            selected_benefit = _loyalty_descriptor(
+                coupon=selected_coupon_raw,
+                rule_key=rule_key,
+                player_count=int(quote.get("player_count") or player_count or 1),
+                service_after_vip=service_after_vip,
+            )
+
+        elif source == SOURCE_VIP_MONTHLY:
+            selected_coupon_raw = get_available_cash_benefit(
+                int(real_benefit_id or 0),
+                customer_id=customer_id,
+            )
+            if selected_coupon_raw is None:
+                raise ValueError("這張 VIP 月券已使用、已保留或已失效。")
+            selected_benefit = _vip_monthly_descriptor(
+                benefit=selected_coupon_raw,
+                quote=quote,
+                service_after_vip=service_after_vip,
+            )
+
+        elif source == SOURCE_ISSUED:
+            selected_benefit = _generic_benefit_descriptor(
+                benefit=issued_benefit or {},
+                customer_id=customer_id,
+                rule_key=rule_key,
+                quote=quote,
+                service_after_vip=service_after_vip,
+                specify_fee=specify_fee,
+            )
+
+    if selected_point_item is None and selected_benefit is None:
+        selected_coupon_raw = _legacy.preview_same_order_benefit(
             customer_id,
             rule_key=rule_key,
             quantity=int(quote.get("quantity") or quantity or 1),
             player_count=int(quote.get("player_count") or player_count or 1),
         )
-
-
-    finance = (
-        calculate_checkout_financials(
-            service_amount=
-                int(
-                    quote.get(
-                        "customer_pay_amount"
-                    )
-                    or 0
-                ),
-
-            vip_pay_rate=
-                vip_rate,
-
-            specify_fee=
-                specify_fee,
-
-            point_item=
-                selected_point_item,
-
-            point_service_value=
-                calculate_point_service_value(
-                    quote=quote,
-                    vip_pay_rate=vip_rate,
-                    point_item=selected_point_item,
-                ),
-
-            benefit_coupon=selected_benefit_coupon,
-            benefit_service_value=calculate_coupon_service_value(
+        if selected_coupon_raw:
+            selected_benefit = _loyalty_descriptor(
+                coupon=selected_coupon_raw,
                 rule_key=rule_key,
                 player_count=int(quote.get("player_count") or player_count or 1),
-                coupon=selected_benefit_coupon,
-            ),
+                service_after_vip=service_after_vip,
+            )
 
-            wallet_balance=
-                customer[
-                    "wallet_balance"
-                ],
-
-            use_wallet=
-                bool(
-                    use_wallet
-                ),
-        )
+    finance = calculate_checkout_financials(
+        service_amount=service_amount,
+        vip_pay_rate=vip_rate,
+        specify_fee=specify_fee,
+        point_item=selected_point_item,
+        point_service_value=_legacy.calculate_point_service_value(
+            quote=quote,
+            vip_pay_rate=vip_rate,
+            point_item=selected_point_item,
+        ),
+        benefit=selected_benefit,
+        wallet_balance=customer["wallet_balance"],
+        use_wallet=bool(use_wallet),
     )
 
-
-    remaining = int(
-        finance[
-            "remaining_pay_amount"
-        ]
-    )
-
-
-    payment_method = str(
-        payment_method
-        or ""
-    ).strip()
-
-
+    remaining = int(finance["remaining_pay_amount"])
+    payment_method = str(payment_method or "").strip()
     if remaining > 0:
-
-        # 官網建立訂單時不選付款方式。
-        # 接單人數滿後才由 Discord PaymentMethodView 讓顧客選擇。
-        if (
-            payment_method
-            and payment_method
-            not in PAYMENT_METHODS
-        ):
-
-            raise ValueError(
-                "付款方式格式錯誤。"
-            )
-
-
+        if payment_method and payment_method not in _legacy.PAYMENT_METHODS:
+            raise ValueError("付款方式格式錯誤。")
         if payment_method:
-
-            payment_display = (
-                payment_method
-            )
-
-
-            payment_info = (
-                get_payment_method_info(
-                    payment_method
-                )
-                or ""
-            )
-
-
+            payment_display = payment_method
+            payment_info = _legacy.get_payment_method_info(payment_method) or ""
         else:
-
-            payment_display = (
-                "接單滿人後於 Discord 選擇"
-            )
-
-
+            payment_display = "接單滿人後於 Discord 選擇"
             payment_info = ""
-
-
     else:
-
-        if (
-            finance[
-                "wallet_use_amount"
-            ] > 0
-        ):
-
-            payment_display = (
-                "錢包全額"
-            )
-
-        else:
-
-            payment_display = (
-                "無需額外付款"
-            )
-
-
+        payment_display = "錢包全額" if finance["wallet_use_amount"] > 0 else "無需額外付款"
         payment_info = ""
 
-
-    point_cost = (
-        int(
-            selected_point_item[
-                "cost"
-            ]
-        )
-        if selected_point_item
-        else 0
-    )
-
-
-    point_name = (
-        str(
-            selected_point_item[
-                "name"
-            ]
-        )
-        if selected_point_item
-        else ""
-    )
-
-
-    return {
-        "quote":
-            quote,
-
-        "customer":
-            customer,
-
-        "vip":
-            vip,
-
-        "selected_staff":
-            selected_staff,
-
-        "selected_staff_ids": [
-            item[
-                "staff_id"
-            ]
-            for item
-            in selected_staff
-        ],
-
-        "selected_role_keys":
-            role_keys,
-
-        "free_specify_by_rule":
-            free_specify_by_rule,
-
-        "point": {
-            "key":
-                (
-                    selected_point_item[
-                        "key"
-                    ]
-                    if selected_point_item
-                    else None
-                ),
-
-            "name":
-                point_name,
-
-            "cost":
-                point_cost,
-
-            "balance_before":
-                customer[
-                    "points"
-                ],
-
-            # preview only, no DB mutation
-            "balance_after_preview":
-                max(
-                    0,
-                    customer[
-                        "points"
-                    ]
-                    - point_cost,
-                ),
-        },
-
-        "benefit_coupon": (
-            {
-                "id": (
-                    int(selected_benefit_coupon.get("id"))
-                    if selected_benefit_coupon.get("id") not in (None, "")
-                    else None
-                ),
-                "title": str(selected_benefit_coupon.get("title") or ""),
-                "benefit_kind": str(selected_benefit_coupon.get("benefit_kind") or ""),
-                "benefit_units": float(selected_benefit_coupon.get("benefit_units") or 0),
-                "source": str(selected_benefit_coupon.get("source") or "loyalty"),
-                "same_order": bool(selected_benefit_coupon.get("same_order")),
-                "earned_count": int(selected_benefit_coupon.get("earned_count") or 0),
-                "scope_key": str(selected_benefit_coupon.get("scope_key") or ""),
-            }
-            if selected_benefit_coupon
-            else None
-        ),
-
-        "finance":
-            finance,
-
-        "payment": {
-            "method":
-                payment_display,
-
-            "external_method":
-                (
-                    payment_method
-                    if remaining > 0
-                    else None
-                ),
-
-            "info":
-                payment_info,
-        },
-
-        "wallet_after_preview":
-            max(
-                0,
-                customer[
-                    "wallet_balance"
-                ]
-                - int(
-                    finance[
-                        "wallet_use_amount"
-                    ]
-                ),
-            ),
-
-        "read_only_preview":
-            True,
-
-        "server_verified":
-            True,
-    }
-
-# === PHASE 3B-2.4 STAFF ORDER FILTER ===
-
-PUBLIC_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
-    "farm_season_3x3_skin",
-    "custom_custom_order",
-    "farm_season_3x3_dc_skin",
-    "farm_season_3x3_dc_loss",
-    "farm_season_3x3_dc_skin_loss",
-}
-
-
-def _role_keys_from_discord_ids(
-    role_ids,
-) -> tuple[str, ...]:
-
-    role_id_set = {
-        str(
-            role_id
-        ).strip()
-
-        for role_id
-        in (
-            role_ids
-            or []
-        )
-
-        if str(
-            role_id
-        ).strip()
-    }
-
-
-    result = []
-
-
-    for role_key, role_id in (
-        ALL_ROLE_IDS.items()
-    ):
-
-        if (
-            str(
-                role_id
-            )
-            in role_id_set
-        ):
-
-            result.append(
-                role_key
-            )
-
-
-    return tuple(
-        result
-    )
-
-
-def _load_cached_staff_role_keys(
-    staff_id: str,
-) -> tuple[str, ...]:
-
-    staff_id = str(
-        staff_id
-        or ""
-    ).strip()
-
-
-    if (
-        not staff_id
-        or not WEB_DB.exists()
-    ):
-
-        return ()
-
-
-    try:
-
-        conn = sqlite3.connect(
-            WEB_DB
-        )
-
-        conn.row_factory = (
-            sqlite3.Row
-        )
-
-
-        try:
-
-            cols = (
-                _columns(
-                    conn,
-                    "web_staff_members",
-                )
-            )
-
-
-            if (
-                "discord_id"
-                not in cols
-                or "roles_json"
-                not in cols
-            ):
-
-                return ()
-
-
-            active_sql = (
-                " AND COALESCE(is_active,1)=1"
-                if "is_active"
-                in cols
-                else ""
-            )
-
-
-            row = conn.execute(
-                "SELECT roles_json "
-                "FROM web_staff_members "
-                "WHERE CAST(discord_id AS TEXT)=?"
-                + active_sql
-                + " LIMIT 1",
-                (
-                    staff_id,
-                ),
-            ).fetchone()
-
-
-        finally:
-
-            conn.close()
-
-
-    except sqlite3.Error:
-
-        return ()
-
-
-    if row is None:
-
-        return ()
-
-
-    return _role_keys_from_discord_ids(
-        _json_list(
-            row[
-                "roles_json"
-            ]
-        )
-    )
-
-
-def _load_live_staff_role_keys(
-    staff_id: str,
-) -> tuple[
-    tuple[str, ...],
-    str,
-]:
-
-    staff_id = str(
-        staff_id
-        or ""
-    ).strip()
-
-
-    if not staff_id:
-
-        return (
-            (),
-            "none",
-        )
-
-
-    try:
-
-        from web.app.services.discord_service import (
-            get_member_role_ids,
-        )
-
-
-        live_role_ids = (
-            get_member_role_ids(
-                staff_id
-            )
-        )
-
-
-        return (
-            _role_keys_from_discord_ids(
-                live_role_ids
-            ),
-            "discord_live",
-        )
-
-
-    except Exception:
-
-        cached = (
-            _load_cached_staff_role_keys(
-                staff_id
-            )
-        )
-
-
-        if cached:
-
-            return (
-                cached,
-                "web_staff_members_cache",
-            )
-
-
-        return (
-            (),
-            "unavailable",
-        )
-
-
-def eligible_rule_keys_for_role_keys(
-    role_keys,
-) -> list[str]:
-
-    role_set = {
-        str(
-            role_key
-        ).strip()
-
-        for role_key
-        in (
-            role_keys
-            or []
-        )
-
-        if str(
-            role_key
-        ).strip()
-    }
-
-
-    result = []
-
-
-    for rule_key, rule in (
-        ORDER_RULES.items()
-    ):
-
-        if (
-            rule_key
-            in PUBLIC_DIRECT_ORDER_EXCLUDED_RULE_KEYS
-        ):
-
-            continue
-
-
-        if not rule.allow_specify:
-
-            continue
-
-
-        allowed_keys = set(
-            get_allowed_role_keys(rule)
-        )
-        required_game_keys = set(
-            get_required_game_role_keys(rule)
-        )
-
-        if (
-            role_set & allowed_keys
-            and (
-                not required_game_keys
-                or role_set & required_game_keys
-            )
-        ):
-
-            result.append(
-                rule_key
-            )
-
-
-    return sorted(
-        result
-    )
-
-
-def _safe_group_mapping(
-    value,
-):
-
-    if isinstance(
-        value,
-        dict,
-    ):
-
-        return value
-
-
-    try:
-
-        from dataclasses import (
-            asdict,
-            is_dataclass,
-        )
-
-
-        if is_dataclass(
-            value
-        ):
-
-            return asdict(
-                value
-            )
-
-
-    except Exception:
-
-        pass
-
-
-    if (
-        hasattr(
-            value,
-            "__dict__",
-        )
-        and str(
-            getattr(
-                value.__class__,
-                "__module__",
-                "",
-            )
-        )
-        == "web.app.services.order_groups"
-    ):
-
-        try:
-
-            return dict(
-                vars(
-                    value
-                )
-            )
-
-        except Exception:
-
-            return None
-
-
-    return None
-
-
-def discover_order_group_rule_map(
-) -> dict[str, list[str]]:
-
-    try:
-
-        from web.app.services import (
-            order_groups as order_groups_module,
-        )
-
-
-    except Exception:
-
-        return {}
-
-
-    result: dict[
-        str,
-        set[str],
-    ] = {}
-
-
-    visited = set()
-
-
-    def walk(
-        value,
-        depth: int = 0,
-    ) -> set[str]:
-
-        if depth > 14:
-
-            return set()
-
-
-        if isinstance(
-            value,
-            str,
-        ):
-
-            if value in ORDER_RULES:
-
-                return {
-                    value
-                }
-
-            return set()
-
-
-        if (
-            value is None
-            or isinstance(
-                value,
-                (
-                    int,
-                    float,
-                    bool,
-                    bytes,
-                ),
-            )
-        ):
-
-            return set()
-
-
-        object_id = id(
-            value
-        )
-
-
-        if object_id in visited:
-
-            return set()
-
-
-        mapping = (
-            _safe_group_mapping(
-                value
-            )
-        )
-
-
-        if (
-            isinstance(
-                value,
-                (
-                    dict,
-                    list,
-                    tuple,
-                    set,
-                ),
-            )
-            or mapping is not None
-        ):
-
-            visited.add(
-                object_id
-            )
-
-
-        if isinstance(
-            value,
-            (
-                list,
-                tuple,
-                set,
-            ),
-        ):
-
-            found = set()
-
-
-            for item in value:
-
-                found.update(
-                    walk(
-                        item,
-                        depth + 1,
-                    )
-                )
-
-
-            return found
-
-
-        if mapping is None:
-
-            return set()
-
-
-        found = set()
-
-
-        for child in (
-            mapping.values()
-        ):
-
-            found.update(
-                walk(
-                    child,
-                    depth + 1,
-                )
-            )
-
-
-        key = str(
-            mapping.get(
-                "key"
-            )
-            or ""
-        ).strip()
-
-
-        if (
-            key
-            and key
-            not in ORDER_RULES
-            and found
-        ):
-
-            result.setdefault(
-                key,
-                set(),
-            ).update(
-                found
-            )
-
-
-        return found
-
-
-    for name, value in (
-        vars(
-            order_groups_module
-        ).items()
-    ):
-
-        if name.startswith(
-            "__"
-        ):
-
-            continue
-
-
-        if callable(
-            value
-        ):
-
-            continue
-
-
-        if isinstance(
-            value,
-            type,
-        ):
-
-            continue
-
-
-        walk(
-            value
-        )
-
-
-    return {
-        key:
-            sorted(
-                rules
-            )
-
-        for key, rules
-        in result.items()
-    }
-
-
-# === /PHASE 3B-2.4 STAFF ORDER FILTER ===
-
-# === PHASE 3B-2.5 STRICT STAFF CATALOG ===
-
-MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS = {
-    "farm_season_3x3_skin",
-    "custom_custom_order",
-    "farm_season_3x3_dc_skin",
-    "farm_season_3x3_dc_loss",
-    "farm_season_3x3_dc_skin_loss",
-}
-
-
-# Public card names.
-#
-# These are only a fallback for the visual catalog grouping.
-# Actual eligibility ALWAYS comes from ORDER_RULES.allowed_roles.
-MW_ORDER_GROUP_FALLBACKS = {
-    "絕巴四幻神賭單": [
-        "basic_exbar_gamble_zongheng",
-        "basic_exbar_gamble_leiguan",
-        "basic_exbar_gamble_tianyuan",
-        "basic_exbar_gamble_rangefinder",
-    ],
-
-    "絕巴技術陪": [
-        "basic_exbar_tech",
-    ],
-
-    "技術陪": [
-        "basic_tech_secret_single",
-        "basic_tech_secret_double",
-        "basic_tech_topsecret_single",
-        "basic_tech_topsecret_double",
-    ],
-
-    "教學單": [
-        "basic_teaching_one",
-        "basic_teaching_two",
-    ],
-
-    "娛樂陪": [
-        "basic_entertain_single",
-        "basic_entertain_double",
-    ],
-
-    "甜蜜單": [
-        "basic_sweet_female_single",
-        "basic_sweet_male_single",
-        "basic_sweet_female_double",
-        "basic_sweet_male_double",
-        "basic_sweet_double_any",
-    ],
-
-    "油鍋": [
-        "basic_oil_fuel",
-        "basic_oil_satellite",
-        "basic_oil_all",
-    ],
-
-    "賭約": [
-        "basic_bet_1000",
-        "basic_bet_1500",
-        "basic_bet_2500",
-    ],
-
-    "體驗": [
-        "basic_trial_500",
-        "basic_trial_1000",
-    ],
-
-    "比翼雙飛": [
-        "fun_lovebirds",
-    ],
-
-    "已讀亂回": [
-        "fun_read_no_reply",
-    ],
-
-    "富得流油": [
-        "fun_rich_enough",
-    ],
-
-    "吃自己": [
-        "fun_eat_yourself",
-    ],
-
-    "Galagame": [
-        "fun_mawan_galagame_basic",
-        "fun_mawan_galagame_standard",
-        "fun_mawan_galagame_hard",
-        "fun_mawan_galagame_hell",
-    ],
-
-    "部門任務": [
-        "farm_department_task",
-    ],
-
-    "半幣": [
-        "farm_halfcoin_120m",
-        "farm_halfcoin_360m",
-    ],
-
-    "Steam": [
-        "steam_play",
-    ],
-
-    "特戰英豪 娛樂陪": [
-        "valorant_entertain_ng",
-        "valorant_entertain_ranked",
-    ],
-    "特戰英豪 超凡陪": [
-        "valorant_ascendant_ng",
-        "valorant_ascendant_ranked",
-    ],
-    "特戰英豪 神話陪": [
-        "valorant_immortal_ng",
-        "valorant_immortal_ranked",
-    ],
-    "特戰英豪 輻能陪": [
-        "valorant_radiant_ng",
-        "valorant_radiant_ranked",
-    ],
-    "英雄聯盟 娛樂陪": [
-        "lol_entertain_aram",
-        "lol_entertain_ng",
-        "lol_entertain_ranked",
-    ],
-    "英雄聯盟 大師陪": [
-        "lol_master_ng",
-        "lol_master_ranked",
-    ],
-    "英雄聯盟 宗師陪": [
-        "lol_grandmaster_ng",
-        "lol_grandmaster_ranked",
-    ],
-    "英雄聯盟 菁英陪": [
-        "lol_elite_ng",
-        "lol_elite_ranked",
-    ],
-}
-
-
-def _mw25_role_keys_from_ids(
-    role_ids,
-) -> tuple[str, ...]:
-
-    role_id_set = {
-        str(
-            value
-        ).strip()
-
-        for value
-        in (
-            role_ids
-            or []
-        )
-
-        if str(
-            value
-        ).strip()
-    }
-
-
-    result = []
-
-
-    for role_key, role_id in (
-        ALL_ROLE_IDS.items()
-    ):
-
-        if (
-            str(
-                role_id
-            )
-            in role_id_set
-        ):
-
-            result.append(
-                role_key
-            )
-
-
-    return tuple(
-        result
-    )
-
-
-def _mw25_load_staff_role_keys(
-    staff_id: str,
-) -> tuple[str, ...]:
-
-    staff_id = str(
-        staff_id
-        or ""
-    ).strip()
-
-
-    if (
-        not staff_id
-        or not WEB_DB.exists()
-    ):
-
-        return ()
-
-
-    try:
-
-        conn = sqlite3.connect(
-            WEB_DB
-        )
-
-        conn.row_factory = (
-            sqlite3.Row
-        )
-
-
-        try:
-
-            columns = {
-                str(
-                    row[1]
-                )
-
-                for row
-                in conn.execute(
-                    "PRAGMA table_info(web_staff_members)"
-                ).fetchall()
-            }
-
-
-            if (
-                "discord_id"
-                not in columns
-                or "roles_json"
-                not in columns
-            ):
-
-                return ()
-
-
-            active_sql = (
-                " AND COALESCE(is_active,1)=1"
-                if "is_active"
-                in columns
-                else ""
-            )
-
-
-            row = conn.execute(
-                "SELECT roles_json "
-                "FROM web_staff_members "
-                "WHERE CAST(discord_id AS TEXT)=?"
-                + active_sql
-                + " LIMIT 1",
-                (
-                    staff_id,
-                ),
-            ).fetchone()
-
-
-        finally:
-
-            conn.close()
-
-
-    except sqlite3.Error:
-
-        return ()
-
-
-    if row is None:
-
-        return ()
-
-
-    return _mw25_role_keys_from_ids(
-        _json_list(
-            row[
-                "roles_json"
-            ]
-        )
-    )
-
-
-def mw25_eligible_rule_keys_for_roles(
-    role_keys,
-) -> list[str]:
-
-    role_set = {
-        str(
-            role_key
-        ).strip()
-
-        for role_key
-        in (
-            role_keys
-            or []
-        )
-
-        if str(
-            role_key
-        ).strip()
-    }
-
-
-    result = []
-
-
-    for rule_key, rule in (
-        ORDER_RULES.items()
-    ):
-
-        if (
-            rule_key
-            in MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS
-        ):
-
-            continue
-
-
-        # From staff roster means that employee is being specified.
-        if not rule.allow_specify:
-
-            continue
-
-
-        if (
-            role_set
-            & set(
-                get_allowed_role_keys(rule)
-            )
-        ):
-
-            result.append(
-                rule_key
-            )
-
-
-    return sorted(
-        result
-    )
-
-
-def _mw25_discover_dynamic_groups(
-) -> dict[str, list[str]]:
-
-    try:
-
-        from dataclasses import (
-            asdict,
-            is_dataclass,
-        )
-
-        from web.app.services import (
-            order_groups as order_groups_module,
-        )
-
-    except Exception:
-
-        return {}
-
-
-    result = {}
-
-
-    visited = set()
-
-
-    def convert(
-        value,
-    ):
-
-        if isinstance(
-            value,
-            dict,
-        ):
-
-            return value
-
-
-        if is_dataclass(
-            value
-        ):
-
-            try:
-
-                return asdict(
-                    value
-                )
-
-            except Exception:
-
-                return None
-
-
-        if (
-            hasattr(
-                value,
-                "__dict__",
-            )
-            and str(
-                getattr(
-                    value.__class__,
-                    "__module__",
-                    "",
-                )
-            )
-            == "web.app.services.order_groups"
-        ):
-
-            try:
-
-                return dict(
-                    vars(
-                        value
-                    )
-                )
-
-            except Exception:
-
-                return None
-
-
-        return None
-
-
-    def walk(
-        value,
-        depth=0,
-    ):
-
-        if depth > 14:
-
-            return set()
-
-
-        if isinstance(
-            value,
-            str,
-        ):
-
-            if value in ORDER_RULES:
-
-                return {
-                    value
-                }
-
-            return set()
-
-
-        if (
-            value is None
-            or isinstance(
-                value,
-                (
-                    int,
-                    float,
-                    bool,
-                    bytes,
-                ),
-            )
-        ):
-
-            return set()
-
-
-        object_id = id(
-            value
-        )
-
-
-        if object_id in visited:
-
-            return set()
-
-
-        mapping = convert(
-            value
-        )
-
-
-        if (
-            isinstance(
-                value,
-                (
-                    dict,
-                    list,
-                    tuple,
-                    set,
-                ),
-            )
-            or mapping is not None
-        ):
-
-            visited.add(
-                object_id
-            )
-
-
-        if isinstance(
-            value,
-            (
-                list,
-                tuple,
-                set,
-            ),
-        ):
-
-            found = set()
-
-
-            for item in value:
-
-                found.update(
-                    walk(
-                        item,
-                        depth + 1,
-                    )
-                )
-
-
-            return found
-
-
-        if mapping is None:
-
-            return set()
-
-
-        found = set()
-
-
-        for child in mapping.values():
-
-            found.update(
-                walk(
-                    child,
-                    depth + 1,
-                )
-            )
-
-
-        if found:
-
-            label = str(
-                mapping.get(
-                    "title"
-                )
-                or mapping.get(
-                    "label"
-                )
-                or mapping.get(
-                    "name"
-                )
-                or mapping.get(
-                    "display_name"
-                )
-                or ""
-            ).strip()
-
-
-            if label:
-
-                result.setdefault(
-                    label,
-                    set(),
-                ).update(
-                    found
-                )
-
-
-        return found
-
-
-    for name, value in (
-        vars(
-            order_groups_module
-        ).items()
-    ):
-
-        if name.startswith(
-            "__"
-        ):
-
-            continue
-
-
-        if callable(
-            value
-        ):
-
-            continue
-
-
-        if isinstance(
-            value,
-            type,
-        ):
-
-            continue
-
-
-        walk(
-            value
-        )
-
-
-    return {
-        label:
-            sorted(
-                values
-            )
-
-        for label, values
-        in result.items()
-    }
-
-
-def mw25_order_group_meta(
-) -> dict[str, list[str]]:
-
-    result = {
-        label:
-            [
-                rule_key
-
-                for rule_key
-                in rule_keys
-
-                if rule_key
-                in ORDER_RULES
-            ]
-
-        for label, rule_keys
-        in MW_ORDER_GROUP_FALLBACKS.items()
-    }
-
-
-    dynamic = (
-        _mw25_discover_dynamic_groups()
-    )
-
-
-    for label, rule_keys in (
-        dynamic.items()
-    ):
-
-        valid = [
-            key
-
-            for key
-            in rule_keys
-
-            if key
-            in ORDER_RULES
-        ]
-
-
-        if valid:
-
-            result[
-                label
-            ] = sorted(
-                set(
-                    valid
-                )
-            )
-
-
-    return result
-
-
-def build_staff_order_filter(
-    staff_id: str,
-) -> dict:
-
-    staff_id = str(
-        staff_id
-        or ""
-    ).strip()
-
-
-    role_keys = (
-        _mw25_load_staff_role_keys(
-            staff_id
-        )
-    )
-
-
-    if not role_keys:
-
-        raise ValueError(
-            "目前無法確認這位陪玩的有效接單身分。"
-        )
-
-
-    eligible_rule_keys = (
-        mw25_eligible_rule_keys_for_roles(
-            role_keys
-        )
-    )
-
-
-    rules = {}
-
-
-    for rule_key, rule in (
-        ORDER_RULES.items()
-    ):
-
-        if (
-            rule_key
-            in MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS
-        ):
-
-            continue
-
-
-        rules[
-            rule_key
-        ] = {
-            "key":
-                rule_key,
-
-            "label":
-                str(
-                    rule.label
-                ),
-
-            "category":
-                str(
-                    rule.category
-                ),
-
-            "allowed_roles":
-                list(
-                    get_allowed_role_keys(rule)
-                ),
-
-            "allow_specify":
-                bool(
-                    rule.allow_specify
-                ),
+    point_cost = int(selected_point_item["cost"]) if selected_point_item else 0
+    point_name = str(selected_point_item["name"]) if selected_point_item else ""
+
+    benefit_payload = None
+    if selected_benefit:
+        benefit_payload = {
+            "id": selected_benefit.get("selector_id"),
+            "real_id": selected_benefit.get("real_id"),
+            "title": str(selected_benefit.get("title") or ""),
+            "benefit_kind": str(selected_benefit.get("benefit_kind") or ""),
+            "benefit_units": float(selected_benefit.get("benefit_units") or 0),
+            "source": str(selected_benefit.get("source") or SOURCE_LOYALTY),
+            "funding": str(selected_benefit.get("funding") or FUNDING_STORE),
+            "same_order": bool(selected_benefit.get("same_order")),
+            "earned_count": int(selected_benefit.get("earned_count") or 0),
+            "scope_key": str(selected_benefit.get("scope_key") or ""),
+            "rule_key": str(selected_benefit.get("rule_key") or ""),
+            "player_count": int(selected_benefit.get("player_count") or quote.get("player_count") or 1),
         }
 
-
-    group_meta = (
-        mw25_order_group_meta()
-    )
-
-
-    eligible_set = set(
-        eligible_rule_keys
-    )
-
-
-    eligible_group_labels = [
-        label
-
-        for label, rule_keys
-        in group_meta.items()
-
-        if (
-            set(
-                rule_keys
-            )
-            & eligible_set
-        )
-    ]
-
-
     return {
-        "staff_id":
-            staff_id,
-
-        "staff_role_keys":
-            list(
-                role_keys
-            ),
-
-        "role_source":
-            "web_staff_members",
-
-        "eligible_rule_keys":
-            eligible_rule_keys,
-
-        "eligible_group_labels":
-            sorted(
-                eligible_group_labels
-            ),
-
-        "group_meta":
-            group_meta,
-
-        "rules":
-            rules,
-
-        "excluded_rule_keys":
-            sorted(
-                MW_DIRECT_ORDER_EXCLUDED_RULE_KEYS
-            ),
-
-        "filter_active":
-            True,
+        "quote": quote,
+        "customer": customer,
+        "vip": vip,
+        "selected_staff": selected_staff,
+        "selected_staff_ids": [item["staff_id"] for item in selected_staff],
+        "selected_role_keys": role_keys,
+        "free_specify_by_rule": free_specify_by_rule,
+        "point": {
+            "key": selected_point_item["key"] if selected_point_item else None,
+            "name": point_name,
+            "cost": point_cost,
+            "balance_before": customer["points"],
+            "balance_after_preview": max(0, customer["points"] - point_cost),
+        },
+        "benefit_coupon": benefit_payload,
+        "finance": finance,
+        "payment": {
+            "method": payment_display,
+            "external_method": payment_method if remaining > 0 else None,
+            "info": payment_info,
+        },
+        "wallet_after_preview": max(0, customer["wallet_balance"] - int(finance["wallet_use_amount"])),
+        "read_only_preview": True,
+        "server_verified": True,
     }
-
-# === /PHASE 3B-2.5 STRICT STAFF CATALOG ===
