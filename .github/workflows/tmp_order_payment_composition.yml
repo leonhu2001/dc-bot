@@ -27,6 +27,8 @@ jobs:
       - name: Compile changed Python
         run: python -m py_compile services/wallet_discord_runtime.py services/order_payment_composition.py services/order_child_composition.py services/order_runtime.py bot.py
       - name: Run focused tests
+        env:
+          PYTHONPATH: .
         run: >-
           pytest -q
           tests/test_order_child_composition.py
