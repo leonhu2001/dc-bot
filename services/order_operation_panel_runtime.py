@@ -53,13 +53,14 @@ async def _reposition_panel(
     channel: discord.TextChannel,
     *,
     expected_panel_message_id: int,
+    expected_status: str = "active",
     order_selections: dict[int, dict[str, Any]],
     operation_view_factory: Callable[[], discord.ui.View],
 ) -> None:
     lock = _REPOSITION_LOCKS.setdefault(channel.id, asyncio.Lock())
     async with lock:
         order_data = order_selections.get(channel.id)
-        if not _is_active_order(order_data):
+        if _order_status(order_data) != expected_status:
             return
 
         panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
@@ -75,7 +76,7 @@ async def _reposition_panel(
             return
 
         order_data = order_selections.get(channel.id)
-        if not _is_active_order(order_data):
+        if _order_status(order_data) != expected_status:
             return
         if _to_int(order_data.get("operation_panel_message_id")) != panel_message_id:
             return
@@ -120,16 +121,22 @@ async def handle_order_operation_panel_interaction(
         return
 
     order_data = order_selections.get(interaction.channel.id)
+    initial_status = _order_status(order_data)
 
-    # The operation panel confirm button normally does not reposition itself.
-    # Resume is the exception: the interaction starts while the order is stored,
-    # then the callback switches it back to active. Waiting here lets the callback
-    # finish first, after which _reposition_panel can safely move the panel down.
+    # Confirm is special because the panel should only move when the operation
+    # actually toggles storage state. active -> stored is store; stored -> active
+    # is resume. Close/cancel end in terminal states and therefore do not move it.
     if custom_id == "staff_order_operation_confirm":
-        if not _is_stored_order(order_data):
+        if initial_status == "active":
+            expected_status = "stored"
+        elif initial_status == "stored":
+            expected_status = "active"
+        else:
             return
-    elif not _is_active_order(order_data):
-        return
+    else:
+        if initial_status != "active":
+            return
+        expected_status = "active"
 
     panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
     if panel_message_id is None:
@@ -140,6 +147,7 @@ async def handle_order_operation_panel_interaction(
     await _reposition_panel(
         interaction.channel,
         expected_panel_message_id=panel_message_id,
+        expected_status=expected_status,
         order_selections=order_selections,
         operation_view_factory=operation_view_factory,
     )

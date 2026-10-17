@@ -16,13 +16,16 @@ def test_active_ticket_actions_delegate_panel_reposition_to_runtime():
     assert 'bot.add_listener(_listener, "on_interaction")' in RUNTIME_SOURCE
 
 
-def test_panel_runtime_repositions_only_stored_to_active_confirm_flow():
+def test_panel_runtime_repositions_store_and_resume_confirm_transitions():
     assert "interaction.type is not discord.InteractionType.component" in RUNTIME_SOURCE
     assert "interaction.message.flags.ephemeral" in RUNTIME_SOURCE
     assert 'custom_id == "staff_order_operation_select"' in RUNTIME_SOURCE
     assert 'custom_id == "staff_order_operation_confirm"' in RUNTIME_SOURCE
-    assert '_is_stored_order(order_data)' in RUNTIME_SOURCE
-    assert '_is_active_order(order_data)' in RUNTIME_SOURCE
+    assert 'initial_status == "active"' in RUNTIME_SOURCE
+    assert 'expected_status = "stored"' in RUNTIME_SOURCE
+    assert 'initial_status == "stored"' in RUNTIME_SOURCE
+    assert 'expected_status = "active"' in RUNTIME_SOURCE
+    assert '_order_status(order_data) != expected_status' in RUNTIME_SOURCE
     assert "await asyncio.sleep(0.8)" in RUNTIME_SOURCE
     assert "await old_panel.delete()" in RUNTIME_SOURCE
     assert "view=operation_view_factory()" in RUNTIME_SOURCE
