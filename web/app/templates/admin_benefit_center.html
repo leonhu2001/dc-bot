@@ -1,0 +1,179 @@
+{% extends "layout.html" %}
+
+{% block page_title %}優惠與福利{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/pages/admin_benefit_center.css?v=20261017">
+
+<div class="benefit-center-grid">
+    <section class="panel compact-panel benefit-hero">
+        <div>
+            <span class="eyebrow">BENEFITS & COUPONS</span>
+            <h2>優惠與福利</h2>
+            <p class="muted-text">發券規則與已發出的券分開保存；模板之後修改，不會改到會員手上既有的券。</p>
+        </div>
+        <div class="benefit-hero-stats">
+            <div><span>模板</span><strong>{{ templates|length }}</strong></div>
+            <div><span>目前列表</span><strong>{{ issued|length }}</strong></div>
+        </div>
+    </section>
+
+    {% if ok %}
+    <section class="panel compact-panel benefit-message is-ok"><strong>完成</strong><span>{{ ok }}</span></section>
+    {% endif %}
+    {% if error %}
+    <section class="panel compact-panel benefit-message is-error"><strong>注意</strong><span>{{ error }}</span></section>
+    {% endif %}
+
+    <section class="panel compact-panel">
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">ISSUE BENEFIT</span>
+                <h3>發放福利</h3>
+                <p class="muted-text">指定會員、選模板、設定期限即可。店家吸收券不會降低打手與客服結算基數。</p>
+            </div>
+        </div>
+        <form method="post" action="/admin/benefit-center/issue" class="benefit-form benefit-form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <label>
+                <span>會員 Discord ID</span>
+                <input class="input" name="customer_id" value="{{ customer_id }}" required placeholder="輸入會員 Discord ID">
+            </label>
+            <label>
+                <span>福利模板</span>
+                <select class="input" name="template_id" required>
+                    {% for item in templates if item.is_active %}
+                    <option value="{{ item.id }}">#{{ item.id }} {{ item.name }}｜{{ item.summary }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>有效天數</span>
+                <input class="input" type="number" min="0" max="3650" name="expires_in_days" value="30">
+                <small>填 0 代表不設到期日。</small>
+            </label>
+            <label class="benefit-span-2">
+                <span>發放原因／活動備註</span>
+                <input class="input" name="reason" placeholder="例如：主播宣傳合作、10 月抽獎">
+            </label>
+            <div class="benefit-actions benefit-span-2">
+                <button class="button" type="submit">確認發放</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel compact-panel">
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">ISSUED BENEFITS</span>
+                <h3>已發放紀錄</h3>
+            </div>
+        </div>
+        <form method="get" action="/admin/benefit-center" class="benefit-filter">
+            <input class="input" name="customer_id" value="{{ customer_id }}" placeholder="會員 Discord ID">
+            <select class="input" name="status">
+                <option value="" {% if not status_filter %}selected{% endif %}>全部狀態</option>
+                <option value="available" {% if status_filter == 'available' %}selected{% endif %}>可使用</option>
+                <option value="reserved" {% if status_filter == 'reserved' %}selected{% endif %}>保留中</option>
+                <option value="redeemed" {% if status_filter == 'redeemed' %}selected{% endif %}>已使用</option>
+                <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>已過期</option>
+                <option value="revoked" {% if status_filter == 'revoked' %}selected{% endif %}>已撤回</option>
+            </select>
+            <button class="button secondary" type="submit">篩選</button>
+        </form>
+
+        <div class="benefit-list">
+            {% for item in issued %}
+            <article class="benefit-row">
+                <div class="benefit-row-main">
+                    <div>
+                        <strong>{{ item.title }}</strong>
+                        <small>#{{ item.id }}｜{{ item.summary }}</small>
+                    </div>
+                    <span class="benefit-status is-{{ item.status }}">{{ item.status }}</span>
+                </div>
+                <div class="benefit-row-meta">
+                    <span>會員：{{ item.customer_display_name or item.customer_id }}</span>
+                    <span>ID：{{ item.customer_id }}</span>
+                    <span>發放：{{ item.issued_at }}</span>
+                    <span>到期：{{ item.expires_at or '無' }}</span>
+                    <span>剩餘：{{ item.remaining_uses }} 次</span>
+                </div>
+                {% if item.issued_reason %}<p class="muted-text">備註：{{ item.issued_reason }}</p>{% endif %}
+                {% if item.status in ['available', 'reserved'] %}
+                <form method="post" action="/admin/benefit-center/issued/{{ item.id }}/revoke" class="benefit-inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <input type="hidden" name="customer_id" value="{{ item.customer_id }}">
+                    <input class="input" name="reason" placeholder="撤回原因">
+                    <button class="button secondary" type="submit">撤回</button>
+                </form>
+                {% endif %}
+            </article>
+            {% else %}
+            <div class="empty-benefit">目前沒有符合條件的已發福利。</div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="panel compact-panel">
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">TEMPLATES</span>
+                <h3>券／福利模板</h3>
+                <p class="muted-text">模板只負責「之後發什麼券」；發出去後會保存規則快照，不會被模板後續調整追溯修改。</p>
+            </div>
+        </div>
+        <div class="benefit-list">
+            {% for item in templates %}
+            <article class="benefit-row">
+                <div class="benefit-row-main">
+                    <div><strong>#{{ item.id }} {{ item.name }}</strong><small>{{ item.summary }}</small></div>
+                    <span class="benefit-status {% if item.is_active %}is-available{% else %}is-revoked{% endif %}">{% if item.is_active %}啟用{% else %}停用{% endif %}</span>
+                </div>
+                {% if item.description %}<p class="muted-text">{{ item.description }}</p>{% endif %}
+                {% if user and user.is_manager %}
+                <form method="post" action="/admin/benefit-center/templates/{{ item.id }}/toggle" class="benefit-inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <input type="hidden" name="is_active" value="{% if item.is_active %}0{% else %}1{% endif %}">
+                    <button class="button secondary" type="submit">{% if item.is_active %}停用模板{% else %}重新啟用{% endif %}</button>
+                </form>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if user and user.is_manager %}
+    <section class="panel compact-panel">
+        <div class="section-title-row">
+            <div>
+                <span class="eyebrow">CREATE TEMPLATE</span>
+                <h3>建立新模板</h3>
+                <p class="muted-text">常用限制直接填；指定商品／分類可用逗號分隔 key。無上限免單等高風險券請勾選「僅總管可發」。</p>
+            </div>
+        </div>
+        <form method="post" action="/admin/benefit-center/templates" class="benefit-form benefit-form-grid">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <label><span>模板名稱</span><input class="input" name="name" required placeholder="例如：抽獎 500T 抵免券"></label>
+            <label><span>類型</span><select class="input" name="effect_type">{% for key, label in effect_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+            <label><span>負擔方式</span><select class="input" name="funding">{% for key, label in funding_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+            <label><span>固定折抵金額</span><input class="input" type="number" min="0" name="amount" value="0"></label>
+            <label><span>折扣百分比（折掉幾 %）</span><input class="input" type="number" min="0" max="100" step="0.1" name="percent_off" value="0"></label>
+            <label><span>免費時數</span><input class="input" type="number" min="0" step="0.5" name="service_hours" value="0"></label>
+            <label><span>免費局數</span><input class="input" type="number" min="0" name="service_games" value="0"></label>
+            <label><span>最低原始服務金額</span><input class="input" type="number" min="0" name="minimum_order_amount" value="0"></label>
+            <label><span>最高折抵上限（0＝不另設）</span><input class="input" type="number" min="0" name="maximum_discount_amount" value="0"></label>
+            <label><span>可使用次數</span><input class="input" type="number" min="1" max="100" name="max_uses" value="1"></label>
+            <label><span>指定商品 rule key</span><input class="input" name="rule_keys" placeholder="可留空；多個用逗號"></label>
+            <label><span>指定分類 category</span><input class="input" name="categories" placeholder="可留空；多個用逗號"></label>
+            <label><span>排除商品 rule key</span><input class="input" name="excluded_rule_keys" placeholder="可留空；多個用逗號"></label>
+            <label><span>排除分類 category</span><input class="input" name="excluded_categories" placeholder="可留空；多個用逗號"></label>
+            <label class="benefit-check"><input type="checkbox" name="include_specify_fee" value="true"><span>折抵範圍包含指定費</span></label>
+            <label class="benefit-check"><input type="checkbox" name="manager_only" value="true"><span>僅總管可發放</span></label>
+            <label class="benefit-span-2"><span>說明</span><textarea class="input" rows="3" name="description" placeholder="這張券是做什麼的、何時使用"></textarea></label>
+            <div class="benefit-actions benefit-span-2"><button class="button" type="submit">建立模板</button></div>
+        </form>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
