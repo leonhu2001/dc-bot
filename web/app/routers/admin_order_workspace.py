@@ -26,12 +26,14 @@ from shared.order_state import (
 )
 from web.app.services.admin_service import (
     add_worker_to_order,
+    can_override_stream_bonus_for_order,
     remove_worker_from_order,
     set_customer_service_for_order,
     set_customer_service_payout_status,
     set_manual_worker_payout,
     set_worker_payout_status,
     toggle_named_bonus_for_assignment,
+    toggle_stream_bonus_for_assignment,
 )
 from web.app.services.order_service import (
     create_demo_orders_if_empty,
@@ -286,6 +288,7 @@ def _mw_r8_worker_rows(db, order_id: int) -> list[dict]:
                 oa.worker_discord_id,
                 oa.worker_display_name,
                 oa.has_named_bonus,
+                oa.stream_bonus_override,
                 oa.is_active,
                 wp.id AS payout_id,
                 wp.gross_share,
@@ -312,7 +315,34 @@ def _mw_r8_worker_rows(db, order_id: int) -> list[dict]:
         {"order_id": int(order_id)},
     ).mappings().all()
 
-    return [dict(row) for row in rows]
+    result = [dict(row) for row in rows]
+    stream_rows = db.execute(
+        text(
+            """
+            SELECT rw.worker_discord_id, rw.streamed
+            FROM order_reports r
+            JOIN order_report_workers rw ON rw.report_id = r.id
+            WHERE r.order_id = :order_id
+              AND r.status = 'approved'
+            """
+        ),
+        {"order_id": int(order_id)},
+    ).mappings().all()
+    report_stream_map = {
+        str(row.get("worker_discord_id") or ""): bool(row.get("streamed"))
+        for row in stream_rows
+        if str(row.get("worker_discord_id") or "").strip()
+    }
+    for row in result:
+        worker_id = str(row.get("worker_discord_id") or "")
+        report_streamed = bool(report_stream_map.get(worker_id))
+        override = row.get("stream_bonus_override")
+        row["report_streamed"] = report_streamed
+        row["effective_stream_bonus"] = (
+            report_streamed if override is None else bool(override)
+        )
+        row["stream_bonus_override_active"] = override is not None
+    return result
 
 
 def _mw_r8_cs_payout_rows(db, order_id: int) -> list[dict]:
@@ -442,6 +472,7 @@ async def admin_order_workspace_r8(
         worker_members = list_admin_worker_dropdown_members()
         workspace_assignments = _mw_r8_worker_rows(db, int(order_id))
         workspace_cs_payouts = _mw_r8_cs_payout_rows(db, int(order_id))
+        stream_bonus_editable = can_override_stream_bonus_for_order(db, int(order_id))
 
         acceptance_state = None
         if str(order.get("status") or "").strip().lower() in PREPAY_ACCEPTANCE_STATUSES:
@@ -466,6 +497,7 @@ async def admin_order_workspace_r8(
             "worker_members": worker_members,
             "workspace_assignments": workspace_assignments,
             "workspace_cs_payouts": workspace_cs_payouts,
+            "stream_bonus_editable": stream_bonus_editable,
             "acceptance_state": acceptance_state,
             "paid_status": PayoutStatus.PAID.value,
             "unpaid_status": PayoutStatus.UNPAID.value,
@@ -1073,6 +1105,37 @@ async def admin_order_workspace_named_bonus_r8(
         db.close()
 
     return _mw4a2r6_redirect(order_id,request=request, message="掛名加成已更新。")
+
+
+@router.post("/admin/order-workspace/{order_id}/assignments/{assignment_id}/stream-bonus")
+async def admin_order_workspace_stream_bonus_r8(
+    order_id: int,
+    assignment_id: int,
+    request: Request,
+    enabled: str | None = Form(default=None),
+):
+    user = require_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/service", status_code=303)
+
+    db = SessionLocal()
+    try:
+        payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
+        toggle_stream_bonus_for_assignment(
+            db,
+            assignment_id=assignment_id,
+            enabled=enabled == "on",
+            admin_user=user,
+        )
+        _mw_r8_restore_payout_status(db, int(order_id), payout_snapshot)
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        return _mw4a2r6_redirect(order_id, request=request, error=str(exc))
+    finally:
+        db.close()
+
+    return _mw4a2r6_redirect(order_id, request=request, message="直播加成已更新。")
 
 
 @router.post("/admin/order-workspace/{order_id}/assignments/{assignment_id}/remove")

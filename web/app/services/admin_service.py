@@ -17,7 +17,10 @@ from shared.models import (
 )
 from web.app.services.order_service import create_sync_event, recalculate_order_payouts
 from web.app.services.audit_trail import sanitize_audit_payload
-from web.app.services.worker_bonus_payout import apply_approved_report_worker_bonuses
+from web.app.services.worker_bonus_payout import (
+    _is_legacy_order,
+    apply_approved_report_worker_bonuses,
+)
 
 
 def get_admin_display_name(user: dict) -> str:
@@ -209,6 +212,71 @@ def toggle_named_bonus_for_assignment(
 
     db.commit()
     _reapply_approved_report_bonuses(assignment.order_id, report_approved)
+
+
+def can_override_stream_bonus_for_order(db: Session, order_id: int) -> bool:
+    order = db.get(WebOrder, int(order_id))
+    return bool(
+        order is not None
+        and not _is_legacy_order(order)
+        and _order_has_approved_report(db, int(order_id))
+    )
+
+
+def toggle_stream_bonus_for_assignment(
+    db: Session,
+    *,
+    assignment_id: int,
+    enabled: bool,
+    admin_user: dict,
+) -> None:
+    assignment = db.get(OrderAssignment, int(assignment_id))
+    if assignment is None:
+        raise ValueError("找不到這筆接單紀錄。")
+
+    order = db.get(WebOrder, int(assignment.order_id))
+    if order is None:
+        raise ValueError("找不到這張訂單。")
+    if _is_legacy_order(order):
+        raise ValueError("舊制訂單不使用直播 +2% 加成。")
+    if not _order_has_approved_report(db, int(assignment.order_id)):
+        raise ValueError("直播加成只能在報單審核通過後修正。")
+
+    before_override = assignment.stream_bonus_override
+    assignment.stream_bonus_override = bool(enabled)
+    db.flush()
+
+    recalculate_order_payouts(db, int(assignment.order_id))
+    create_sync_event(
+        db,
+        event_type=SyncEventType.ORDER_UPDATED,
+        order_id=int(assignment.order_id),
+        payload={
+            "reason": "stream_bonus_override_updated",
+            "assignment_id": int(assignment.id),
+            "worker_discord_id": str(assignment.worker_discord_id),
+            "stream_bonus_override": bool(enabled),
+        },
+    )
+    write_admin_audit_log(
+        db,
+        admin_user=admin_user,
+        action="toggle_stream_bonus_override",
+        target_type="order_assignment",
+        target_id=str(assignment.id),
+        before={
+            "order_id": int(assignment.order_id),
+            "worker_discord_id": str(assignment.worker_discord_id),
+            "stream_bonus_override": before_override,
+        },
+        after={
+            "order_id": int(assignment.order_id),
+            "worker_discord_id": str(assignment.worker_discord_id),
+            "stream_bonus_override": bool(enabled),
+        },
+    )
+    db.commit()
+    _reapply_approved_report_bonuses(int(assignment.order_id), True)
 
 
 def remove_worker_from_order(
