@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
-
 import asyncio
 import discord
 
@@ -35,17 +33,6 @@ from views.review import build_post_close_status_embed, ReviewButtonView
 from views.staff_profiles import refresh_staff_profile_panels_for_order
 
 
-# Only these dependencies are still owned by the bot composition root. Everything
-# else in this runtime has a stable owning module and is imported directly above.
-_LEGACY_RUNTIME_NAMES = frozenset(
-    {
-        "RECEIPT_CHANNEL_ID",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "sync_web_order_closed_from_bot",
-        "sync_web_order_cancelled_from_bot",
-    }
-)
-
 _CONFIGURED = False
 
 
@@ -66,26 +53,6 @@ def configure_order_lifecycle_runtime_explicit(
     sync_web_order_closed_from_bot = sync_web_order_closed
     sync_web_order_cancelled_from_bot = sync_web_order_cancelled
     _CONFIGURED = True
-
-
-def configure_order_lifecycle_runtime(namespace: Mapping[str, Any]) -> None:
-    """Compatibility adapter while bot.py startup wiring is migrated."""
-    missing = sorted(
-        name
-        for name in _LEGACY_RUNTIME_NAMES
-        if name not in namespace
-    )
-    if missing:
-        raise RuntimeError(
-            "order lifecycle runtime missing dependencies: " + ", ".join(missing)
-        )
-
-    configure_order_lifecycle_runtime_explicit(
-        receipt_channel_id=namespace["RECEIPT_CHANNEL_ID"],
-        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-        sync_web_order_closed=namespace["sync_web_order_closed_from_bot"],
-        sync_web_order_cancelled=namespace["sync_web_order_cancelled_from_bot"],
-    )
 
 
 def validate_order_ready_to_close(order_data: dict) -> None:
