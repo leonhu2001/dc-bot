@@ -10,6 +10,7 @@ from services import (
     order_credential_composition,
     order_credential_runtime,
     order_dispatch_composition,
+    order_payment_composition,
     order_payment_runtime,
     order_point_redemption,
     order_runtime,
@@ -31,6 +32,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(web_sync_runtime._process_web_order_created_event)
     assert callable(order_runtime.configure_order_runtime)
     assert callable(order_dispatch_composition.configure_order_dispatch_composition)
+    assert callable(order_payment_composition.configure_order_payment_composition)
     assert callable(order_storage_runtime.configure_order_storage_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime_explicit)
     assert not hasattr(self_service_runtime, "configure_self_service_runtime")
@@ -132,6 +134,8 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
     assert callable(order_runtime.finalize_accepted_pending_payment)
     assert "async def finalize_accepted_pending_payment" in payment_source
     assert "def configure_order_payment_runtime" in payment_source
+    assert "configure_order_payment_runtime(" not in order_source
+    assert "payment_keys =" not in order_source
     assert "import bot" not in payment_source
     assert "from bot import" not in payment_source
     storage_source = Path("services/order_storage_runtime.py").read_text(

@@ -153,8 +153,11 @@ from services.review_persistent_runtime import restore_persistent_review_views
 from services.wallet_service import (
     ensure_wallet_tables as _wallet_ensure_tables,
     get_wallet_balance as _wallet_get_balance,
-    adjust_wallet_balance as _wallet_adjust_balance,
     get_wallet_transactions as _wallet_get_transactions,
+)
+from services.wallet_discord_runtime import (
+    adjust_customer_wallet_balance,
+    send_wallet_log,
 )
 from services.order_lifecycle_runtime import (
     configure_order_lifecycle_runtime_explicit,
@@ -1535,39 +1538,6 @@ def get_wallet_balance(customer_id) -> int:
     return _wallet_get_balance(customer_id, DB_FILE)
 
 
-def adjust_customer_wallet_balance(
-    *,
-    customer_id,
-    amount: int,
-    tx_type: str,
-    operator=None,
-    order_channel_id=None,
-    order_no=None,
-    note: str | None = None,
-    allow_negative: bool = False,
-) -> dict:
-    """Discord-facing adapter around the canonical wallet transaction service."""
-    operator_id = getattr(operator, "id", None)
-    operator_name = (
-        getattr(operator, "display_name", None)
-        or getattr(operator, "name", None)
-        or (str(operator_id) if operator_id is not None else None)
-    )
-    normalized_type = str(tx_type or "adjustment").strip() or "adjustment"
-    return _wallet_adjust_balance(
-        customer_id=customer_id,
-        amount=amount,
-        tx_type=normalized_type,
-        operator_discord_id=operator_id,
-        operator_display_name=operator_name,
-        order_channel_id=order_channel_id,
-        order_no=order_no,
-        note=note,
-        allow_negative=allow_negative,
-        db_file=DB_FILE,
-    )
-
-
 async def process_worker_tip_wallet_payment(
     *,
     customer_id: int,
@@ -1657,32 +1627,6 @@ def build_customer_info_with_wallet_embed(member: discord.Member, *, show_staff_
             )
 
     return embed
-
-
-async def send_wallet_log(
-    guild: discord.Guild | None,
-    *,
-    title: str,
-    customer: discord.Member,
-    operator: discord.Member | discord.User,
-    tx: dict,
-) -> None:
-    try:
-        await send_order_log(
-            guild,
-            title=title,
-            fields=[
-                ("顧客", customer.mention, True),
-                ("操作人員", getattr(operator, "mention", str(getattr(operator, "id", "未知"))), True),
-                ("異動金額", format_t_amount(int(tx["amount"])), True),
-                ("原餘額", format_t_amount(int(tx["balance_before"])), True),
-                ("新餘額", format_t_amount(int(tx["balance_after"])), True),
-                ("備註", str(tx.get("note") or "未填寫"), False),
-            ],
-            color=discord.Color.gold(),
-        )
-    except Exception as exc:
-        print(f"錢包日誌送出失敗：{exc}")
 
 
 
@@ -6564,7 +6508,7 @@ configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch,
 )
 configure_web_sync_runtime(globals())
-configure_order_children(BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, CUSTOMER_REWARDS, CREDENTIAL_OWNER_USER_ID, GUILD_ID, bot)
+configure_order_children(BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, CUSTOMER_REWARDS, CREDENTIAL_OWNER_USER_ID, GUILD_ID, bot, StaffOrderOperationView)
 configure_order_runtime(globals())
 configure_order_lifecycle_runtime_explicit(
     receipt_channel_id=RECEIPT_CHANNEL_ID,

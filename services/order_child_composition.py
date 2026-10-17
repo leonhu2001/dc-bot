@@ -5,6 +5,7 @@ from core.time_utils import get_taipei_now_iso
 from services.logging_service import send_order_log
 from services.order_credential_composition import configure_order_credential_composition
 from services.order_dispatch_composition import configure_order_dispatch_composition
+from services.order_payment_composition import configure_order_payment_composition
 from services.order_point_redemption import configure_order_point_redemption
 from services.orders import _to_int
 from services.rewards import get_current_reward_points, get_customer_reward_data
@@ -20,6 +21,7 @@ def configure_order_children(
     credential_owner_user_id,
     guild_id,
     bot_instance,
+    staff_order_operation_view,
 ) -> None:
     """Wire extracted order child runtimes from bot-owned state only."""
     configure_order_dispatch_composition(
@@ -44,4 +46,10 @@ def configure_order_children(
         guild_id,
         order_selections,
         bot_instance,
+    )
+    configure_order_payment_composition(
+        dispatch_channel_id,
+        order_claims,
+        order_selections,
+        staff_order_operation_view,
     )
