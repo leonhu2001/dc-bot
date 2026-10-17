@@ -1,0 +1,40 @@
+name: Temporary order dispatch extraction
+
+on:
+  push:
+    branches:
+      - refactor/order-dispatch-composition-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/order-dispatch-composition-20261017
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply patch
+        run: python .tmp_patch_order_dispatch.py
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Focused validation
+        run: |
+          python -m compileall -q bot.py services/order_runtime.py services/order_dispatch_composition.py
+          python -m pytest -q tests/test_order_dispatch_composition.py tests/test_order_runtime_dependency_boundary.py tests/test_runtime_extraction_boundaries.py tests/test_architecture_growth_budget.py
+      - name: Commit patch and remove temporary files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bot.py services/order_runtime.py tests/test_order_runtime_dependency_boundary.py tests/test_runtime_extraction_boundaries.py
+          git rm .tmp_patch_order_dispatch.py .github/workflows/tmp-order-dispatch-composition.yml
+          git commit -m 'Move order dispatch composition out of legacy runtime'
+          git push origin HEAD:refactor/order-dispatch-composition-20261017
