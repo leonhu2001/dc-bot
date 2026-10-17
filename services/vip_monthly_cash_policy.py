@@ -121,3 +121,27 @@ def install_cash_entitlement_wrapper() -> None:
         return result
 
     vip.sync_current_month_vip_benefits = wrapped
+
+    # A cancelled order must return a tier cash coupon even when the member no
+    # longer meets the old trailing-spend threshold. That threshold is retained
+    # only for the Black Diamond service benefit.
+    original_restore = vip._can_restore_reserved_benefit
+    vip._cash_policy_original_can_restore_reserved_benefit = original_restore
+
+    def can_restore_reserved_benefit(*, row, current, bot_db):
+        benefit_key = str(row["benefit_key"] or "")
+        if benefit_key not in CASH_KEYS:
+            return original_restore(row=row, current=current, bot_db=bot_db)
+
+        customer_id = str(row["customer_id"] or "")
+        member_status = vip._current_member_status(
+            customer_id,
+            now=current,
+            bot_db=bot_db,
+        )
+        if bool(member_status.get("is_due")):
+            return False
+        level_name = str(member_status.get("current_level") or "普通魔丸")
+        return benefit_key in vip._benefit_keys_for_level(level_name)
+
+    vip._can_restore_reserved_benefit = can_restore_reserved_benefit
