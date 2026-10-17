@@ -25,8 +25,8 @@ def test_support_admin_shortcut_is_available_even_for_dual_role_users():
     template = _read("web/app/templates/dispatch.html")
 
     assert (
-        '{% if support_can_manage %}<a class="dispatch-my-link" href="/admin">'
-        "開啟客服後台</a>{% endif %}"
+        '{% if support_can_manage %}<a class="dispatch-my-link" href="/admin" '
+        'target="_blank" rel="noopener">開啟客服後台</a>{% endif %}'
     ) in template
     assert template.count("開啟客服後台</a>") == 1
 
