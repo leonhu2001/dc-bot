@@ -125,7 +125,7 @@ def test_admin_benefits_ui_uses_normal_selects_and_checkbox_pickers():
     root = Path(__file__).resolve().parents[1]
     template = (root / "web/app/templates/admin_benefits.html").read_text(encoding="utf-8")
     css = (root / "web/app/static/css/pages/admin_benefits.css").read_text(encoding="utf-8")
-    workspace_js = (root / "web/app/static/js/pages/admin_order_detail_inline_1.js").read_text(encoding="utf-8")
+    workspace = (root / "web/app/templates/admin_order_detail.html").read_text(encoding="utf-8")
 
     assert "<datalist" not in template
     assert 'name="scope_category_values"' in template
@@ -133,8 +133,9 @@ def test_admin_benefits_ui_uses_normal_selects_and_checkbox_pickers():
     assert 'name="excluded_rule_keys"' in template
     assert 'name="sync_unused_issued"' in template
     assert "input[type=checkbox]" in css
-    assert "新制 +3%" in workspace_js
-    assert "前月已發放薪資達 5000T" in workspace_js
+    assert "新制 +3%" in workspace
+    assert "前月已發放薪資達 5000T" in workspace
+    assert "掛名 +5%" not in workspace
 
 
 def test_checkout_copy_keeps_shared_cash_and_store_promotion_distinct():
