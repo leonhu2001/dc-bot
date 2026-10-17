@@ -3,6 +3,7 @@ from __future__ import annotations
 from core.database import remember_order_data, save_bot_data
 from core.time_utils import get_taipei_now_iso
 from services.logging_service import send_order_log
+from services.order_credential_composition import configure_order_credential_composition
 from services.order_dispatch_composition import configure_order_dispatch_composition
 from services.order_point_redemption import configure_order_point_redemption
 from services.orders import _to_int
@@ -16,6 +17,9 @@ def configure_order_children(
     order_claims,
     order_selections,
     customer_rewards,
+    credential_owner_user_id,
+    guild_id,
+    bot_instance,
 ) -> None:
     """Wire extracted order child runtimes from bot-owned state only."""
     configure_order_dispatch_composition(
@@ -34,4 +38,10 @@ def configure_order_children(
         remember_data=remember_order_data,
         save_data=save_bot_data,
         order_log_sender=send_order_log,
+    )
+    configure_order_credential_composition(
+        credential_owner_user_id,
+        guild_id,
+        order_selections,
+        bot_instance,
     )
