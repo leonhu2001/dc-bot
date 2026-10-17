@@ -20,10 +20,15 @@ if import_block not in bot_source:
     bot_source = bot_source.replace(import_anchor, import_anchor + import_block, 1)
 
 
-def replace_method_prefix(source: str, method_marker: str, next_marker: str) -> str:
-    assert source.count(method_marker) == 1, f"method marker drifted: {method_marker!r}"
-    start = source.index(method_marker)
-    body_start = start + len(method_marker)
+def replace_method_prefix_in_class(
+    source: str,
+    class_marker: str,
+    method_marker: str,
+    next_marker: str,
+) -> str:
+    class_start = source.index(class_marker)
+    method_start = source.index(method_marker, class_start)
+    body_start = method_start + len(method_marker)
     next_index = source.index(next_marker, body_start)
     replacement = method_marker + '''        if not await validate_staff_order_operation_interaction(
             interaction, is_customer_staff
@@ -31,16 +36,18 @@ def replace_method_prefix(source: str, method_marker: str, next_marker: str) -> 
             return
 
 '''
-    return source[:start] + replacement + source[next_index:]
+    return source[:method_start] + replacement + source[next_index:]
 
 
-bot_source = replace_method_prefix(
+bot_source = replace_method_prefix_in_class(
     bot_source,
+    "class StaffOrderOperationSelect(discord.ui.Select):\n",
     "    async def callback(self, interaction: discord.Interaction):\n",
     "        STAFF_ORDER_OPERATION_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]\n",
 )
-bot_source = replace_method_prefix(
+bot_source = replace_method_prefix_in_class(
     bot_source,
+    "class StaffOrderOperationView(discord.ui.View):\n",
     "    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):\n",
     "        selected = STAFF_ORDER_OPERATION_SELECTIONS.get((interaction.channel.id, interaction.user.id))\n",
 )
