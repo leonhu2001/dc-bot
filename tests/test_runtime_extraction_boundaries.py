@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 # Phase 2 contract: moved responsibilities stay physically separated while the
-# parent runtimes keep their existing public import/configuration surface.
+# parent runtimes expose only the startup/configuration surface still in use.
 from services.acceptance import dispatch_refresh as acceptance_dispatch_refresh
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
@@ -23,8 +23,8 @@ from services import (
 
 
 def test_extracted_runtime_modules_import_without_importing_bot():
-    assert callable(acceptance_runtime.configure_acceptance_runtime)
     assert callable(acceptance_runtime.configure_acceptance_runtime_explicit)
+    assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
     assert callable(web_sync_runtime.configure_web_sync_runtime)
     assert callable(acceptance_runtime.process_acceptance_sync_events_once)
     assert callable(acceptance_sync_worker.process_acceptance_sync_events_once)
@@ -233,25 +233,18 @@ def _order_dispatch_namespace() -> dict[str, object]:
 
 
 def test_runtime_configure_boundaries_match_current_migration_stage():
-    acceptance_marker = "_acceptance_runtime_test_marker"
-    if hasattr(acceptance_runtime, acceptance_marker):
-        delattr(acceptance_runtime, acceptance_marker)
-
     self_service_marker = "_self_service_runtime_test_marker"
     if hasattr(self_service_runtime, self_service_marker):
         delattr(self_service_runtime, self_service_marker)
 
-    acceptance_runtime.configure_acceptance_runtime(
-        {
-            "DISPATCH_CHANNEL_ID": 123,
-            "GUILD_ID": 456,
-            "ORDER_CLAIMS": {},
-            "PaymentMethodView": object,
-            "SELF_SERVICE_ORDER_SELECTIONS": {},
-            "_refresh_existing_web_sync_dispatch": lambda *_args, **_kwargs: None,
-            "bot": object(),
-            acceptance_marker: object(),
-        }
+    acceptance_runtime.configure_acceptance_runtime_explicit(
+        dispatch_channel_id=123,
+        order_claims={},
+        payment_method_view_type=object,
+        order_selections={},
+        bot_instance=object(),
+        guild_id=456,
+        refresh_existing_web_sync_dispatch=lambda *_args, **_kwargs: None,
     )
     web_sync_runtime.configure_web_sync_runtime(
         {"_web_sync_runtime_test_marker": object()}
@@ -267,7 +260,7 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
             {self_service_marker: object()}
         )
 
-    assert not hasattr(acceptance_runtime, acceptance_marker)
+    assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     assert hasattr(order_runtime, "_order_runtime_test_marker")
     assert not hasattr(self_service_runtime, self_service_marker)
