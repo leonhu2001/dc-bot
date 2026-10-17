@@ -15,3 +15,12 @@ _order_rules.validate_rules()
 from .benefit_runtime_integration import install_root_benefit_integrations as _install_benefits
 
 _install_benefits()
+
+# User-facing checkout copy must describe the same funding policy as the actual
+# payroll calculation. Install after benefit integration so wrappers see the
+# final calculation/runtime hooks.
+from .self_service_financial_copy import (
+    install_self_service_financial_copy_policy as _install_financial_copy,
+)
+
+_install_financial_copy()
