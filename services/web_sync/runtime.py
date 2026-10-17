@@ -15,23 +15,71 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     }
 )
 
+_ALLOWED_RUNTIME_DEPENDENCY_NAMES = frozenset(
+    {
+        "CANCEL_REASON_OPTIONS",
+        "CUSTOMER_CATEGORY_ID",
+        "CUSTOMER_ROLE_ID",
+        "DISPATCH_CHANNEL_ID",
+        "GUILD_ID",
+        "ORDER_CATEGORY_LABELS",
+        "ORDER_CLAIMS",
+        "ORDER_ITEM_GROUPS_BY_CATEGORY",
+        "OrderCancellationReasonSelect",
+        "OrderControlView",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "SelfServiceOrderView",
+        "_apply_acceptance_state_to_claim_data",
+        "_format_plain_amount",
+        "_to_int",
+        "_web_order_created_details",
+        "_web_order_created_find_ticket",
+        "_web_order_created_get_channel",
+        "_web_order_created_get_member",
+        "_web_order_created_has_footer",
+        "_web_order_created_load_bundle",
+        "_web_order_created_mark_processing",
+        "_web_order_created_update_links",
+        "_web_sync_mark_event_done",
+        "_web_sync_mark_event_failed",
+        "asyncio",
+        "bot",
+        "build_self_service_panel_embed",
+        "build_ticket_channel_name",
+        "create_smart_dispatch_plan",
+        "delete_order_row_from_db",
+        "format_t_amount",
+        "get_order_item_details_for_group",
+        "get_order_item_group_label",
+        "get_smart_dispatch_plan",
+        "get_taipei_now_iso",
+        "is_customer_staff",
+        "prepare_initial_smart_dispatch",
+        "re",
+        "refresh_acceptance_dispatch_from_web_order",
+        "remember_claim_data",
+        "remember_order_data",
+        "save_bot_data",
+        "send_initial_smart_dispatch_alert",
+        "send_order_log",
+        "send_specified_staff_dispatch_dms",
+        "set_specified_dm_results",
+        "sqlite3",
+    }
+)
+
 
 def configure_web_sync_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind bot-owned runtime dependencies without importing bot.py.
+    """Bind only the legacy bot-owned dependencies used by Web sync.
 
-    The Web sync runtime remains behavior-compatible while legacy bot globals
-    are progressively replaced with explicit service/view dependencies.
+    This remains behavior-compatible with the current bot wiring while making
+    the temporary namespace bridge explicit. Unknown bot globals are ignored.
     """
     global _CONFIGURED
 
-    for name, value in namespace.items():
-        if name.startswith("__"):
-            continue
-        if name == "configure_web_sync_runtime":
-            continue
-        if name in _MODULE_OWNED_RUNTIME_NAMES:
-            continue
-        globals()[name] = value
+    for name in _ALLOWED_RUNTIME_DEPENDENCY_NAMES:
+        if name in namespace:
+            globals()[name] = namespace[name]
 
     _CONFIGURED = True
 
