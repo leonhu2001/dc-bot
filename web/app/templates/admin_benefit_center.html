@@ -149,7 +149,7 @@
             <div>
                 <span class="eyebrow">CREATE TEMPLATE</span>
                 <h3>建立新模板</h3>
-                <p class="muted-text">常用限制直接填；指定商品／分類可用逗號分隔 key。無上限免單等高風險券請勾選「僅總管可發」。</p>
+                <p class="muted-text">常用限制直接填；指定商品／分類可用逗號分隔 key。整單免單會自動設成僅總管可發。</p>
             </div>
         </div>
         <form method="post" action="/admin/benefit-center/templates" class="benefit-form benefit-form-grid">
@@ -159,8 +159,9 @@
             <label><span>負擔方式</span><select class="input" name="funding">{% for key, label in funding_types %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
             <label><span>固定折抵金額</span><input class="input" type="number" min="0" name="amount" value="0"></label>
             <label><span>折扣百分比（折掉幾 %）</span><input class="input" type="number" min="0" max="100" step="0.1" name="percent_off" value="0"></label>
-            <label><span>免費時數</span><input class="input" type="number" min="0" step="0.5" name="service_hours" value="0"></label>
-            <label><span>免費局數</span><input class="input" type="number" min="0" name="service_games" value="0"></label>
+            <label><span>免費／折抵時數</span><input class="input" type="number" min="0" step="0.5" name="service_hours" value="0"></label>
+            <label><span>免費／折抵局數</span><input class="input" type="number" min="0" name="service_games" value="0"></label>
+            <label><span>時數／局數折抵範圍</span><select class="input" name="service_scope">{% for key, label in service_scopes %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
             <label><span>最低原始服務金額</span><input class="input" type="number" min="0" name="minimum_order_amount" value="0"></label>
             <label><span>最高折抵上限（0＝不另設）</span><input class="input" type="number" min="0" name="maximum_discount_amount" value="0"></label>
             <label><span>可使用次數</span><input class="input" type="number" min="1" max="100" name="max_uses" value="1"></label>
@@ -169,6 +170,7 @@
             <label><span>排除商品 rule key</span><input class="input" name="excluded_rule_keys" placeholder="可留空；多個用逗號"></label>
             <label><span>排除分類 category</span><input class="input" name="excluded_categories" placeholder="可留空；多個用逗號"></label>
             <label class="benefit-check"><input type="checkbox" name="include_specify_fee" value="true"><span>折抵範圍包含指定費</span></label>
+            <label class="benefit-check"><input type="checkbox" name="allow_vip_percent" value="true" checked><span>可與 VIP 百分比折扣併用</span></label>
             <label class="benefit-check"><input type="checkbox" name="manager_only" value="true"><span>僅總管可發放</span></label>
             <label class="benefit-span-2"><span>說明</span><textarea class="input" rows="3" name="description" placeholder="這張券是做什麼的、何時使用"></textarea></label>
             <div class="benefit-actions benefit-span-2"><button class="button" type="submit">建立模板</button></div>
