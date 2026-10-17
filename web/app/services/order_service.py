@@ -1,515 +1,36 @@
-import json
-from datetime import datetime
+from __future__ import annotations
 
-from sqlalchemy import delete, select, text
-from sqlalchemy.orm import Session, selectinload
+"""Compatibility facade for order operations and payout-policy cutover.
 
+All order behavior remains in ``order_service_legacy``.  Only payout
+recalculation is overridden so orders created before the 2026-10-17 financial
+policy keep the historical 5% customer-service payout, while new-policy orders
+use 25% of the positive margin pool.
+"""
+
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from services.financial_policy import uses_current_financial_policy
 from shared.models import (
     CustomerServicePayout,
     OrderAssignment,
-    OrderStatus,
     PayoutStatus,
-    SyncEvent,
-    SyncEventStatus,
-    SyncEventType,
     WebOrder,
     WorkerPayout,
     WorkerPayoutOverride,
 )
-from shared.payout import (
-    calculate_customer_service_payout_base_amount,
-    calculate_order_payout,
-)
-from shared.order_acceptance import (
-    ACCEPTED_PENDING_PAY,
-    WAITING_ACCEPTANCE,
-    claim_acceptance_order,
-    has_acceptance_meta,
-    unclaim_acceptance_order,
-)
-
-
-def get_display_name(user: dict) -> str:
-    return str(
-        user.get("global_name")
-        or user.get("username")
-        or user.get("id")
-        or "未知使用者"
-    )
-
-
-VISIBLE_DISPATCH_STATUSES = [
-    OrderStatus.ACTIVE.value,
-    WAITING_ACCEPTANCE,
-    ACCEPTED_PENDING_PAY,
-]
-
-PREPAY_DISPATCH_STATUSES = {
-    WAITING_ACCEPTANCE,
-    ACCEPTED_PENDING_PAY,
-}
-
-
-DISPATCH_STATUS_LABELS = {
-    WAITING_ACCEPTANCE: "可接單",
-    ACCEPTED_PENDING_PAY: "待付款（已滿）",
-    OrderStatus.ACTIVE.value: "進行中",
-}
-
-
-def is_dispatch_claim_open(order) -> bool:
-    status = _normalize_text(getattr(order, "status", None))
-
-    if status != WAITING_ACCEPTANCE:
-        return False
-
-    missing_count = getattr(order, "dispatch_missing_staff_count", None)
-    if missing_count is None:
-        return True
-
-    return int(missing_count or 0) > 0
-
-
-def partition_dispatch_orders(orders):
-    claimable_orders = []
-    non_claimable_orders = []
-
-    for order in orders:
-        if is_dispatch_claim_open(order):
-            claimable_orders.append(order)
-        else:
-            non_claimable_orders.append(order)
-
-    return claimable_orders, non_claimable_orders
-
-
-PENDING_PAYMENT_METHODS = {
-    "",
-    "待付款",
-    "未紀錄",
-    "未记录",
-    "pending",
-    "unpaid",
-}
-
-
-def is_prepay_acceptance_sync_event(
-    event_type: str | None,
-    payload: dict | None,
-) -> bool:
-    normalized_type = str(event_type or "").strip().lower()
-
-    return (
-        normalized_type
-        in {
-            SyncEventType.ORDER_CLAIMED.value,
-            SyncEventType.ORDER_UNCLAIMED.value,
-        }
-        and bool((payload or {}).get("prepay_acceptance"))
-    )
-
-
-def _normalize_text(value) -> str:
-    return str(value or "").strip()
-
-
-def _is_pending_payment_method(value) -> bool:
-    return _normalize_text(value).lower() in PENDING_PAYMENT_METHODS
-
-
-def get_acceptance_meta_status_for_order(db: Session, order_id: int) -> str | None:
-    row = db.execute(
-        text("""
-            SELECT status
-            FROM order_acceptance_meta
-            WHERE order_id = :order_id
-            LIMIT 1
-        """),
-        {"order_id": int(order_id)},
-    ).mappings().first()
-
-    if row is None:
-        return None
-
-    return _normalize_text(row.get("status")) or None
-
-
-def ensure_not_unpaid_prepay_order_for_legacy_assignment(
-    db: Session,
-    order: WebOrder,
-    *,
-    action_label: str,
-) -> None:
-    """防止付款前接單流程誤走舊 active assignment / payout 流程。"""
-    meta_status = get_acceptance_meta_status_for_order(db, int(order.id))
-
-    if meta_status is None:
-        return
-
-    order_status = _normalize_text(order.status)
-    payment_method = _normalize_text(getattr(order, "payment_method", None))
-
-    if (
-        order_status in PREPAY_DISPATCH_STATUSES
-        or meta_status in PREPAY_DISPATCH_STATUSES
-        or _is_pending_payment_method(payment_method)
-    ):
-        raise ValueError(
-            f"這張訂單是付款前接單流程，尚未付款成立，不能用舊流程{action_label}。"
-            "請先補付款 panel，等顧客付款送出後再操作。"
-        )
-
-
-def _user_role_ids(user: dict) -> list[str]:
-    role_ids: list[str] = []
-
-    for key in ("role_ids", "roles", "discord_role_ids"):
-        value = user.get(key)
-        if isinstance(value, list):
-            role_ids.extend(str(item) for item in value if str(item).strip())
-        elif isinstance(value, str):
-            text_value = value.strip()
-            if not text_value:
-                continue
-            try:
-                parsed = json.loads(text_value)
-            except Exception:
-                parsed = None
-            if isinstance(parsed, list):
-                role_ids.extend(str(item) for item in parsed if str(item).strip())
-            else:
-                role_ids.extend(part.strip() for part in text_value.split(",") if part.strip())
-
-    roles_json = user.get("roles_json")
-    if isinstance(roles_json, str) and roles_json.strip():
-        try:
-            parsed = json.loads(roles_json)
-        except Exception:
-            parsed = None
-        if isinstance(parsed, list):
-            role_ids.extend(str(item) for item in parsed if str(item).strip())
-
-    return list(dict.fromkeys(role_ids))
-
-
-def _prepay_claimed_order_ids(db: Session, worker_discord_id: str) -> set[int]:
-    rows = db.execute(
-        text("""
-            SELECT c.order_id
-            FROM order_acceptance_claims c
-            JOIN web_orders o ON o.id = c.order_id
-            WHERE c.staff_discord_id = :worker_discord_id
-              AND c.is_active = 1
-              AND o.status IN (:waiting_acceptance, :accepted_pending_pay)
-        """),
-        {
-            "worker_discord_id": str(worker_discord_id),
-            "waiting_acceptance": WAITING_ACCEPTANCE,
-            "accepted_pending_pay": ACCEPTED_PENDING_PAY,
-        },
-    ).fetchall()
-
-    return {int(row[0]) for row in rows}
-
-PROTECTOR_ROLE_IDS_FOR_PREPAY_DISPLAY = {
-    "1500234130871550004",
-    "1500234170943934544",
-    "1500751039060643990",
-}
-
-
-def _load_json_list_for_prepay_claims(value) -> list[str]:
-    if value is None:
-        return []
-
-    try:
-        parsed = json.loads(str(value))
-    except Exception:
-        return []
-
-    if not isinstance(parsed, list):
-        return []
-
-    return [str(item) for item in parsed if str(item).strip()]
-
-
-def attach_acceptance_claims_to_orders(db: Session, orders: list[WebOrder]) -> None:
-    for order in orders:
-        setattr(order, "prepay_claims", [])
-        setattr(order, "prepay_claim_count", 0)
-        setattr(order, "prepay_required_count", 0)
-        setattr(order, "prepay_protector_count", 0)
-        setattr(order, "prepay_min_protector_count", 0)
-
-        meta = db.execute(
-            text("""
-                SELECT
-                    required_staff_count,
-                    min_protector_count
-                FROM order_acceptance_meta
-                WHERE order_id = :order_id
-                LIMIT 1
-            """),
-            {"order_id": int(order.id)},
-        ).mappings().first()
-
-        if meta is None:
-            continue
-
-        rows = db.execute(
-            text("""
-                SELECT
-                    staff_discord_id,
-                    staff_display_name,
-                    staff_role_ids_json
-                FROM order_acceptance_claims
-                WHERE order_id = :order_id
-                  AND is_active = 1
-                ORDER BY claimed_at ASC, id ASC
-            """),
-            {"order_id": int(order.id)},
-        ).mappings().all()
-
-        claims = []
-        protector_count = 0
-
-        for row in rows:
-            role_ids = set(_load_json_list_for_prepay_claims(row["staff_role_ids_json"]))
-
-            if role_ids & PROTECTOR_ROLE_IDS_FOR_PREPAY_DISPLAY:
-                protector_count += 1
-
-            claims.append({
-                "worker_discord_id": str(row["staff_discord_id"]),
-                "worker_display_name": row["staff_display_name"] or str(row["staff_discord_id"]),
-                "has_named_bonus": False,
-            })
-
-        setattr(order, "prepay_claims", claims)
-        setattr(order, "prepay_claim_count", len(claims))
-        setattr(order, "prepay_required_count", int(meta["required_staff_count"] or 0))
-        setattr(order, "prepay_protector_count", protector_count)
-        setattr(order, "prepay_min_protector_count", int(meta["min_protector_count"] or 0))
-
-def attach_dispatch_operational_context(orders: list[WebOrder]) -> None:
-    for order in orders:
-        active_assignments = [
-            assignment
-            for assignment in (getattr(order, "assignments", None) or [])
-            if bool(getattr(assignment, "is_active", False))
-        ]
-        prepay_count = int(getattr(order, "prepay_claim_count", 0) or 0)
-        required_count = int(getattr(order, "prepay_required_count", 0) or 0)
-
-        status = _normalize_text(getattr(order, "status", None))
-        if status in PREPAY_DISPATCH_STATUSES:
-            current_count = prepay_count
-        else:
-            current_count = len(active_assignments) or prepay_count
-
-        if required_count <= 0:
-            required_count = current_count
-
-        missing_count = max(0, required_count - current_count)
-        claim_open = (
-            status == WAITING_ACCEPTANCE
-            and missing_count > 0
-        )
-
-        if claim_open:
-            status_label = "可接單"
-        else:
-            status_label = DISPATCH_STATUS_LABELS.get(
-                status,
-                status or "未知狀態",
-            )
-
-        if status == ACCEPTED_PENDING_PAY:
-            locked_message = "接單名額已滿，等待付款成立。"
-        elif status == OrderStatus.ACTIVE.value:
-            locked_message = "已付款成立，網站接單已鎖定。"
-        else:
-            locked_message = "此狀態不開放網站接單。"
-
-        setattr(order, "dispatch_current_staff_count", current_count)
-        setattr(order, "dispatch_required_staff_count", required_count)
-        setattr(order, "dispatch_missing_staff_count", missing_count)
-        setattr(order, "dispatch_claim_open", claim_open)
-        setattr(order, "dispatch_allows_unclaim", status in PREPAY_DISPATCH_STATUSES)
-        setattr(order, "dispatch_status_label", status_label)
-        setattr(order, "dispatch_locked_message", locked_message)
-
-
-def get_worker_dispatch_payout_preview(
-    order: WebOrder,
-    worker_discord_id: str,
-) -> dict:
-    worker_id = str(worker_discord_id)
-
-    for payout in getattr(order, "payouts", None) or []:
-        if str(getattr(payout, "worker_discord_id", "")) == worker_id:
-            return {
-                "label": "目前分潤",
-                "amount": int(round(float(getattr(payout, "final_payout", 0) or 0))),
-                "is_estimate": False,
-            }
-
-    if _normalize_text(getattr(order, "status", None)) in PREPAY_DISPATCH_STATUSES:
-        required_count = int(
-            getattr(order, "dispatch_required_staff_count", 0)
-            or getattr(order, "prepay_required_count", 0)
-            or 0
-        )
-        total_amount = int(
-            getattr(order, "payout_base_amount", None)
-            or getattr(order, "customer_pay_amount", None)
-            or getattr(order, "amount", 0)
-            or 0
-        )
-
-        if required_count > 0 and total_amount > 0:
-            placeholder_ids = [
-                worker_id,
-                *[
-                    f"preview-worker-{index}"
-                    for index in range(1, required_count)
-                ],
-            ]
-            payout_result = calculate_order_payout(
-                total_amount=total_amount,
-                worker_discord_ids=placeholder_ids,
-            )
-            preview = next(
-                (
-                    item
-                    for item in payout_result.worker_payouts
-                    if str(item.worker_discord_id) == worker_id
-                ),
-                None,
-            )
-            if preview is not None:
-                return {
-                    "label": "預估分潤",
-                    "amount": int(round(float(preview.final_payout or 0))),
-                    "is_estimate": True,
-                }
-
-    return {
-        "label": "分潤",
-        "amount": None,
-        "is_estimate": True,
-    }
-
-
-def create_demo_orders_if_empty(db: Session) -> None:
-    # 正式環境不再自動建立 DEMO 測試訂單。
-    return
-
-
-def list_active_orders(db: Session) -> list[WebOrder]:
-    statement = (
-        select(WebOrder)
-        .where(WebOrder.status.in_(VISIBLE_DISPATCH_STATUSES))
-        .options(selectinload(WebOrder.assignments))
-        .options(selectinload(WebOrder.payouts))
-        .order_by(WebOrder.created_at.desc())
-    )
-
-    orders = list(db.scalars(statement).all())
-    attach_acceptance_claims_to_orders(db, orders)
-    attach_dispatch_operational_context(orders)
-    return orders
-
-def list_admin_orders(db: Session, status_filter: str | None = "active") -> list[WebOrder]:
-    statement = (
-        select(WebOrder)
-        .options(selectinload(WebOrder.assignments))
-        .options(selectinload(WebOrder.payouts))
-        .order_by(WebOrder.created_at.desc())
-    )
-
-    if status_filter and status_filter != "all":
-        statement = statement.where(WebOrder.status == str(status_filter))
-
-    return list(db.scalars(statement).all())
-
-
-def get_worker_active_assignments(db: Session, worker_discord_id: str) -> list[OrderAssignment]:
-    statement = (
-        select(OrderAssignment)
-        .join(WebOrder, WebOrder.id == OrderAssignment.order_id)
-        .where(OrderAssignment.worker_discord_id == str(worker_discord_id))
-        .where(OrderAssignment.is_active.is_(True))
-        .where(WebOrder.status == OrderStatus.ACTIVE.value)
-        .order_by(OrderAssignment.assigned_at.desc())
-    )
-
-    return list(db.scalars(statement).all())
-
-
-def get_worker_active_order_count(db: Session, worker_discord_id: str) -> int:
-    return len(get_worker_active_order_ids(db, worker_discord_id))
-
-
-def get_worker_active_order_ids(db: Session, worker_discord_id: str) -> set[int]:
-    active_ids = {
-        assignment.order_id
-        for assignment in get_worker_active_assignments(db, worker_discord_id)
-    }
-
-    active_ids.update(_prepay_claimed_order_ids(db, str(worker_discord_id)))
-
-    return active_ids
-
-def create_sync_event(
-    db: Session,
-    *,
-    event_type: SyncEventType,
-    order_id: int,
-    payload: dict,
-) -> None:
-    db.add(
-        SyncEvent(
-            event_type=event_type.value,
-            status=SyncEventStatus.PENDING.value,
-            order_id=order_id,
-            payload_json=json.dumps(payload, ensure_ascii=False),
-        )
-    )
-
-
-def get_payout_override(
-    db: Session,
-    *,
-    order_id: int,
-    worker_discord_id: str,
-) -> WorkerPayoutOverride | None:
-    return db.scalar(
-        select(WorkerPayoutOverride)
-        .where(WorkerPayoutOverride.order_id == order_id)
-        .where(WorkerPayoutOverride.worker_discord_id == str(worker_discord_id))
-        .limit(1)
-    )
-
-
-def _customer_service_payout_base(order: WebOrder) -> int:
-    return calculate_customer_service_payout_base_amount(
-        payout_base_amount=int(
-            getattr(order, "payout_base_amount", None)
-            or getattr(order, "amount", 0)
-            or 0
-        ),
-        price_snapshot_json=getattr(order, "price_snapshot_json", None),
-    )
+from shared.payout import calculate_order_payout
+from web.app.services import order_service_legacy as _legacy
+from web.app.services.order_service_legacy import *  # noqa: F401,F403
 
 
 def recalculate_order_payouts(db: Session, order_id: int) -> None:
     order = db.get(WebOrder, order_id)
-
     if order is None:
         raise ValueError("找不到這張訂單，無法計算分潤。")
 
-    ensure_not_unpaid_prepay_order_for_legacy_assignment(
+    _legacy.ensure_not_unpaid_prepay_order_for_legacy_assignment(
         db,
         order,
         action_label="計算分潤",
@@ -524,17 +45,16 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         ).all()
     )
 
-    worker_ids = [
-        assignment.worker_discord_id
-        for assignment in assignments
-    ]
-
+    worker_ids = [assignment.worker_discord_id for assignment in assignments]
     named_bonus_worker_ids = [
         assignment.worker_discord_id
         for assignment in assignments
         if assignment.has_named_bonus
     ]
 
+    current_policy = uses_current_financial_policy(
+        getattr(order, "price_snapshot_json", None)
+    )
     payout_result = calculate_order_payout(
         total_amount=int(
             getattr(order, "payout_base_amount", None)
@@ -543,7 +63,8 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         ),
         worker_discord_ids=worker_ids,
         named_bonus_worker_ids=named_bonus_worker_ids,
-        customer_service_total_amount=_customer_service_payout_base(order),
+        customer_service_total_amount=_legacy._customer_service_payout_base(order),
+        legacy_customer_service_flat=not current_policy,
     )
 
     overrides = {
@@ -595,10 +116,7 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         if order.customer_service_discord_id
         else "demo_customer_service"
     )
-    customer_service_display_name = (
-        order.customer_service_display_name
-        or "測試客服"
-    )
+    customer_service_display_name = order.customer_service_display_name or "測試客服"
 
     db.add(
         CustomerServicePayout(
@@ -612,123 +130,6 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
     )
 
 
-def claim_order_for_worker(
-    db: Session,
-    *,
-    order_id: int,
-    user: dict,
-) -> WebOrder:
-    worker_discord_id = str(user["id"])
-    worker_display_name = get_display_name(user)
-
-    order = db.get(WebOrder, order_id)
-
-    if order is None:
-        raise ValueError("找不到這張訂單。")
-
-    if str(order.status) in PREPAY_DISPATCH_STATUSES:
-        staff_role_ids = _user_role_ids(user)
-
-        if not staff_role_ids:
-            raise ValueError("網站登入資料缺少 Discord 身分組，請重新登入後再接單。")
-
-        state = claim_acceptance_order(
-            order_id=order_id,
-            staff_discord_id=worker_discord_id,
-            staff_display_name=worker_display_name,
-            staff_role_ids=staff_role_ids,
-            source="web",
-        )
-
-        create_sync_event(
-            db,
-            event_type=SyncEventType.ORDER_CLAIMED,
-            order_id=order_id,
-            payload={
-                "order_id": order_id,
-                "worker_discord_id": worker_discord_id,
-                "worker_display_name": worker_display_name,
-                "source": "web",
-                "prepay_acceptance": True,
-                "accepted_count": state.accepted_count,
-                "required_staff_count": state.required_staff_count,
-                "status": state.status,
-            },
-        )
-
-        db.commit()
-        db.expire_all()
-
-        refreshed_order = db.scalar(
-            select(WebOrder)
-            .where(WebOrder.id == order_id)
-            .options(selectinload(WebOrder.assignments))
-            .options(selectinload(WebOrder.payouts))
-        )
-
-        if refreshed_order is None:
-            raise ValueError("接單成功，但重新讀取訂單失敗。")
-
-        return refreshed_order
-
-    if get_acceptance_meta_status_for_order(db, order_id) is not None:
-        raise ValueError("這張訂單已離開付款前接單階段，網站不能再新增接單。")
-
-    raise ValueError("這張訂單不是付款前接單狀態，不能在網站接單。")
-
-def unclaim_order_for_worker(
-    db: Session,
-    *,
-    order_id: int,
-    user: dict,
-) -> WebOrder:
-    worker_discord_id = str(user["id"])
-    worker_display_name = get_display_name(user)
-
-    order = db.get(WebOrder, order_id)
-
-    if order is None:
-        raise ValueError("找不到這張訂單。")
-
-    if str(order.status) in PREPAY_DISPATCH_STATUSES:
-        state = unclaim_acceptance_order(
-            order_id=order_id,
-            staff_discord_id=worker_discord_id,
-            source="web",
-        )
-
-        create_sync_event(
-            db,
-            event_type=SyncEventType.ORDER_UNCLAIMED,
-            order_id=order_id,
-            payload={
-                "order_id": order_id,
-                "worker_discord_id": worker_discord_id,
-                "worker_display_name": worker_display_name,
-                "source": "web",
-                "prepay_acceptance": True,
-                "accepted_count": state.accepted_count,
-                "required_staff_count": state.required_staff_count,
-                "status": state.status,
-            },
-        )
-
-        db.commit()
-        db.expire_all()
-
-        refreshed_order = db.scalar(
-            select(WebOrder)
-            .where(WebOrder.id == order_id)
-            .options(selectinload(WebOrder.assignments))
-            .options(selectinload(WebOrder.payouts))
-        )
-
-        if refreshed_order is None:
-            raise ValueError("取消接單成功，但重新讀取訂單失敗。")
-
-        return refreshed_order
-
-    if get_acceptance_meta_status_for_order(db, order_id) is not None:
-        raise ValueError("這張訂單已離開付款前接單階段，網站不能取消接單。")
-
-    raise ValueError("這張訂單不是付款前接單狀態，不能在網站取消接單。")
+# Existing functions in the preserved module look this name up from their own
+# globals at runtime. Patch it so claim/assignment flows cannot bypass cutover.
+_legacy.recalculate_order_payouts = recalculate_order_payouts
