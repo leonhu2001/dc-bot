@@ -21,6 +21,16 @@ def test_dispatch_lobby_has_operational_sections_and_realtime_controls():
     assert 'data-busy-label="接單中…"' in template
 
 
+def test_support_admin_shortcut_is_available_even_for_dual_role_users():
+    template = _read("web/app/templates/dispatch.html")
+
+    assert (
+        '{% if support_can_manage %}<a class="dispatch-my-link" href="/admin">'
+        "開啟客服後台</a>{% endif %}"
+    ) in template
+    assert template.count("開啟客服後台</a>") == 1
+
+
 def test_dispatch_alert_client_updates_on_state_changes_without_full_reload():
     script = _read("web/app/static/js/dispatch_alerts.js")
 
