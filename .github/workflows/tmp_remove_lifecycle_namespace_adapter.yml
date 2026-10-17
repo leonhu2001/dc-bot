@@ -70,6 +70,8 @@ jobs:
           test_path.write_text(test, encoding='utf-8')
           PY
       - name: Validate focused lifecycle boundaries
+        env:
+          PYTHONPATH: .
         run: |
           python -m compileall -q services/order_lifecycle_runtime.py
           pytest -q tests/test_order_lifecycle_runtime_extraction.py tests/test_runtime_extraction_boundaries.py
