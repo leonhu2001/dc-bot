@@ -21,6 +21,11 @@ def test_active_resume_prefers_canonical_active_assignments():
 
 
 def test_resume_flow_still_applies_acceptance_state_before_rendering_receivers():
-    apply_index = STORAGE_SOURCE.index("_apply_acceptance_state_to_claim_data(claim_data, acceptance_state)")
-    receiver_index = STORAGE_SOURCE.index('companion_ids = sorted(claim_data.get("companion", set()))')
+    resume_source = STORAGE_SOURCE.split("async def resume_stored_order(", 1)[1]
+    apply_index = resume_source.index(
+        "_apply_acceptance_state_to_claim_data(claim_data, acceptance_state)"
+    )
+    receiver_index = resume_source.index(
+        'companion_ids = sorted(claim_data.get("companion", set()))'
+    )
     assert apply_index < receiver_index
