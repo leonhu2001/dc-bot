@@ -198,7 +198,10 @@ def install_self_service_promotion_integration() -> None:
                 "coupon_id": int(selected_id),
                 "coupon_title": str(benefit.get("title") or "優惠福利"),
                 "service_note": promotion.benefit_note(benefit),
-                "service_value": int(discount),
+                # Promotion effects waive part of the service already being
+                # purchased. They are not an *extra* gifted service unit, so they
+                # must not be removed from the CS payroll basis later.
+                "service_value": 0,
                 "discount_amount": int(discount),
             }
 
@@ -212,11 +215,23 @@ def install_self_service_promotion_integration() -> None:
             benefit = result.get("benefit_coupon")
             if not isinstance(benefit, dict) or str(benefit.get("source") or "") != "promotion":
                 return result
+
             discount = max(0, int(result.get("benefit_discount_amount") or 0))
-            if str(benefit.get("funding") or "") == FUNDING_SHARED and discount > 0:
+            issued_id = int(benefit.get("issued_benefit_id") or 0)
+            funding = str(benefit.get("funding") or promotion.FUNDING_STORE)
+
+            # Persist an explicit promotion snapshot marker so lifecycle balance
+            # coupons can deduct exactly what this order consumed on redemption.
+            result["promotion_benefit_id"] = issued_id
+            result["promotion_discount_amount"] = discount
+            result["promotion_funding"] = funding
+            result["promotion_rules_snapshot"] = dict(benefit.get("rules") or {})
+            result["benefit_service_value"] = 0
+
+            if funding == FUNDING_SHARED and discount > 0:
                 # Shared benefit affects customer payment and payout basis once at
                 # order level. The base financial engine initially treats member
-                # service benefits as store-funded, so reverse only that subsidy.
+                # benefits as store-funded, so reverse only that subsidy.
                 result["payout_base_amount"] = max(
                     0,
                     int(result.get("payout_base_amount") or 0) - discount,
