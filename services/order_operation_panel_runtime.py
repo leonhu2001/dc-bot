@@ -6,8 +6,17 @@ from typing import Any
 
 import discord
 
+from core.database import remember_order_data
+
 
 _REPOSITION_LOCKS: dict[int, asyncio.Lock] = {}
+
+
+def _to_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _is_active_order(order_data: object) -> bool:
@@ -17,15 +26,28 @@ def _is_active_order(order_data: object) -> bool:
     )
 
 
+async def validate_staff_order_operation_interaction(
+    interaction: discord.Interaction,
+    is_staff: Callable[[discord.Member], bool],
+) -> bool:
+    if not isinstance(interaction.user, discord.Member):
+        await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+        return False
+    if not is_staff(interaction.user):
+        await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
+        return False
+    if not isinstance(interaction.channel, discord.TextChannel):
+        await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+        return False
+    return True
+
+
 async def _reposition_panel(
     channel: discord.TextChannel,
     *,
     expected_panel_message_id: int,
     order_selections: dict[int, dict[str, Any]],
-    to_int: Callable[[Any], int | None],
     operation_view_factory: Callable[[], discord.ui.View],
-    remember_order: Callable[[int, dict[str, Any]], None],
-    save_data: Callable[[], None],
 ) -> None:
     lock = _REPOSITION_LOCKS.setdefault(channel.id, asyncio.Lock())
     async with lock:
@@ -33,7 +55,7 @@ async def _reposition_panel(
         if not _is_active_order(order_data):
             return
 
-        panel_message_id = to_int(order_data.get("operation_panel_message_id"))
+        panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
         if panel_message_id is None or panel_message_id != expected_panel_message_id:
             return
 
@@ -48,7 +70,7 @@ async def _reposition_panel(
         order_data = order_selections.get(channel.id)
         if not _is_active_order(order_data):
             return
-        if to_int(order_data.get("operation_panel_message_id")) != panel_message_id:
+        if _to_int(order_data.get("operation_panel_message_id")) != panel_message_id:
             return
 
         operation_embed = discord.Embed(
@@ -66,8 +88,7 @@ async def _reposition_panel(
 
         order_data["operation_panel_message_id"] = new_panel.id
         order_selections[channel.id] = order_data
-        remember_order(channel.id, order_data)
-        save_data()
+        remember_order_data(channel.id, order_data)
 
 
 async def handle_order_operation_panel_interaction(
@@ -75,10 +96,7 @@ async def handle_order_operation_panel_interaction(
     *,
     order_selections: dict[int, dict[str, Any]],
     is_staff: Callable[[discord.Member], bool],
-    to_int: Callable[[Any], int | None],
     operation_view_factory: Callable[[], discord.ui.View],
-    remember_order: Callable[[int, dict[str, Any]], None],
-    save_data: Callable[[], None],
 ) -> None:
     if interaction.type is not discord.InteractionType.component:
         return
@@ -101,7 +119,7 @@ async def handle_order_operation_panel_interaction(
     if not _is_active_order(order_data):
         return
 
-    panel_message_id = to_int(order_data.get("operation_panel_message_id"))
+    panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
     if panel_message_id is None:
         return
 
@@ -111,8 +129,22 @@ async def handle_order_operation_panel_interaction(
         interaction.channel,
         expected_panel_message_id=panel_message_id,
         order_selections=order_selections,
-        to_int=to_int,
         operation_view_factory=operation_view_factory,
-        remember_order=remember_order,
-        save_data=save_data,
     )
+
+
+def register_order_operation_panel_listener(
+    bot: discord.Client,
+    order_selections: dict[int, dict[str, Any]],
+    is_staff: Callable[[discord.Member], bool],
+    operation_view_factory: Callable[[], discord.ui.View],
+) -> None:
+    async def _listener(interaction: discord.Interaction) -> None:
+        await handle_order_operation_panel_interaction(
+            interaction,
+            order_selections=order_selections,
+            is_staff=is_staff,
+            operation_view_factory=operation_view_factory,
+        )
+
+    bot.add_listener(_listener, "on_interaction")
