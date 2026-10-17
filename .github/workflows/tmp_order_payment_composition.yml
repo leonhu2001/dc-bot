@@ -26,12 +26,13 @@ jobs:
         run: python -m py_compile services/wallet_discord_runtime.py services/order_payment_composition.py services/order_child_composition.py services/order_runtime.py bot.py
       - name: Run bounded static checks
         run: |
-          python -m pytest -q tests/test_architecture_growth_budget.py
           python - <<'PY'
           from pathlib import Path
           order_runtime = Path('services/order_runtime.py').read_text(encoding='utf-8')
           child = Path('services/order_child_composition.py').read_text(encoding='utf-8')
-          bot = Path('bot.py').read_text(encoding='utf-8')
+          bot_path = Path('bot.py')
+          bot = bot_path.read_text(encoding='utf-8')
+          assert bot_path.stat().st_size <= 235000
           assert 'payment_keys =' not in order_runtime
           assert 'configure_order_payment_runtime(' not in order_runtime
           assert 'storage_keys =' in order_runtime
