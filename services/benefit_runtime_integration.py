@@ -19,6 +19,7 @@ def install_root_benefit_integrations() -> None:
     from services import promotion_benefits as promotion
     from services import promotion_benefit_lifecycle as promotion_lifecycle
     from services.payout_policy_migration import freeze_existing_orders_on_legacy_cs_policy
+    from services.self_service_promotion_integration import install_self_service_promotion_integration
     from services.vip_monthly_cash_policy import install_cash_entitlement_wrapper
 
     # First startup after deployment is the policy boundary. Orders that already
@@ -29,6 +30,7 @@ def install_root_benefit_integrations() -> None:
     # spend. The Black Diamond service benefit keeps its existing activity gate
     # until that separate policy is decided.
     install_cash_entitlement_wrapper()
+    install_self_service_promotion_integration()
 
     if not hasattr(loyalty, "_promotion_original_reserve_coupon_in_session"):
         loyalty._promotion_original_reserve_coupon_in_session = loyalty.reserve_coupon_in_session
