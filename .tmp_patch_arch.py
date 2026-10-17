@@ -19,25 +19,31 @@ assert import_anchor in bot_source, "bot import anchor drifted"
 if import_block not in bot_source:
     bot_source = bot_source.replace(import_anchor, import_anchor + import_block, 1)
 
-validation_block = '''        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
 
-        if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
-            return
-
-        if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
-            return
-'''
-validation_call = '''        if not await validate_staff_order_operation_interaction(
+def replace_method_prefix(source: str, method_marker: str, next_marker: str) -> str:
+    assert source.count(method_marker) == 1, f"method marker drifted: {method_marker!r}"
+    start = source.index(method_marker)
+    body_start = start + len(method_marker)
+    next_index = source.index(next_marker, body_start)
+    replacement = method_marker + '''        if not await validate_staff_order_operation_interaction(
             interaction, is_customer_staff
         ):
             return
+
 '''
-assert bot_source.count(validation_block) == 2, "staff operation validation block drifted"
-bot_source = bot_source.replace(validation_block, validation_call)
+    return source[:start] + replacement + source[next_index:]
+
+
+bot_source = replace_method_prefix(
+    bot_source,
+    "    async def callback(self, interaction: discord.Interaction):\n",
+    "        STAFF_ORDER_OPERATION_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]\n",
+)
+bot_source = replace_method_prefix(
+    bot_source,
+    "    async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):\n",
+    "        selected = STAFF_ORDER_OPERATION_SELECTIONS.get((interaction.channel.id, interaction.user.id))\n",
+)
 
 block_start = "\n\n_ORDER_OPERATION_PANEL_REPOSITION_LOCKS: dict[int, asyncio.Lock] = {}\n"
 block_end = "\n\nclass OrderControlView(discord.ui.View):\n"
@@ -115,12 +121,39 @@ runtime_source = (
 ORDER_RUNTIME_PATH.write_text(runtime_source, encoding="utf-8")
 
 
-test_source = PANEL_TEST_PATH.read_text(encoding="utf-8")
-test_source = test_source.replace(
-    'assert "handle_order_operation_panel_interaction" in BOT_SOURCE',
-    'assert "register_order_operation_panel_listener" in BOT_SOURCE',
+PANEL_TEST_PATH.write_text(
+    '''from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+BOT_SOURCE = (ROOT / "bot.py").read_text(encoding="utf-8")
+RUNTIME_SOURCE = (ROOT / "services" / "order_operation_panel_runtime.py").read_text(
+    encoding="utf-8"
 )
-PANEL_TEST_PATH.write_text(test_source, encoding="utf-8")
+
+
+def test_active_ticket_actions_delegate_panel_reposition_to_runtime():
+    assert "register_order_operation_panel_listener" in BOT_SOURCE
+    assert "validate_staff_order_operation_interaction" in BOT_SOURCE
+    assert "SELF_SERVICE_ORDER_SELECTIONS" in BOT_SOURCE
+    assert "StaffOrderOperationView" in BOT_SOURCE
+    assert 'bot.add_listener(_listener, "on_interaction")' in RUNTIME_SOURCE
+
+
+def test_panel_runtime_skips_terminal_and_ephemeral_operation_flow():
+    assert "interaction.type is not discord.InteractionType.component" in RUNTIME_SOURCE
+    assert "interaction.message.flags.ephemeral" in RUNTIME_SOURCE
+    assert '"staff_order_operation_select",' in RUNTIME_SOURCE
+    assert '"staff_order_operation_confirm",' in RUNTIME_SOURCE
+    assert 'str(order_data.get("status") or "").strip().lower() == "active"' in RUNTIME_SOURCE
+    assert "await old_panel.delete()" in RUNTIME_SOURCE
+    assert "view=operation_view_factory()" in RUNTIME_SOURCE
+    assert 'order_data["operation_panel_message_id"] = new_panel.id' in RUNTIME_SOURCE
+    assert "remember_order_data(channel.id, order_data)" in RUNTIME_SOURCE
+    assert "save_data" not in RUNTIME_SOURCE
+''',
+    encoding="utf-8",
+)
 
 
 bot_size = BOT_PATH.stat().st_size
