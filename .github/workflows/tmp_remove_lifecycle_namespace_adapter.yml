@@ -1,0 +1,86 @@
+name: Temporary lifecycle adapter cleanup
+
+on:
+  push:
+    branches:
+      - refactor/remove-lifecycle-namespace-adapter-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Remove unused lifecycle namespace adapter
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service_path = Path('services/order_lifecycle_runtime.py')
+          service = service_path.read_text(encoding='utf-8')
+
+          if 'def configure_order_lifecycle_runtime(namespace:' in service:
+              service = service.replace('from typing import Any, Mapping\n\n', '', 1)
+
+              legacy_comment = '# Only these dependencies are still owned by the bot composition root.'
+              legacy_start = service.index(legacy_comment)
+              configured_start = service.index('_CONFIGURED = False', legacy_start)
+              service = service[:legacy_start] + service[configured_start:]
+
+              adapter_start = service.index('def configure_order_lifecycle_runtime(namespace:')
+              next_def = service.index('def validate_order_ready_to_close', adapter_start)
+              service = service[:adapter_start] + service[next_def:]
+              service_path.write_text(service, encoding='utf-8')
+
+          test_path = Path('tests/test_order_lifecycle_runtime_extraction.py')
+          test = test_path.read_text(encoding='utf-8')
+          test = test.replace(
+              '    assert callable(module.configure_order_lifecycle_runtime)\n',
+              '    assert not hasattr(module, "configure_order_lifecycle_runtime")\n',
+              1,
+          )
+          legacy_inspection = '''    assert "globals()[" not in inspect.getsource(\n        order_lifecycle_runtime.configure_order_lifecycle_runtime\n    )\n\n'''
+          test = test.replace(
+              legacy_inspection,
+              '    assert not hasattr(order_lifecycle_runtime, "configure_order_lifecycle_runtime")\n\n',
+              1,
+          )
+          legacy_contract = '''\n    assert order_lifecycle_runtime._LEGACY_RUNTIME_NAMES == {\n        "RECEIPT_CHANNEL_ID",\n        "SELF_SERVICE_ORDER_SELECTIONS",\n        "sync_web_order_closed_from_bot",\n        "sync_web_order_cancelled_from_bot",\n    }\n'''
+          test = test.replace(legacy_contract, '', 1)
+
+          if '    assert "from bot import" not in source\n' in test and 'def configure_order_lifecycle_runtime(" not in source' not in test:
+              test = test.replace(
+                  '    assert "from bot import" not in source\n',
+                  '    assert "from bot import" not in source\n    assert "def configure_order_lifecycle_runtime(" not in source\n',
+                  1,
+              )
+
+          obsolete_test = '\n\ndef test_lifecycle_legacy_configurator_only_validates_and_delegates():'
+          if obsolete_test in test:
+              test = test[:test.index(obsolete_test)].rstrip() + '\n'
+          test_path.write_text(test, encoding='utf-8')
+          PY
+      - name: Validate focused lifecycle boundaries
+        run: |
+          python -m compileall -q services/order_lifecycle_runtime.py
+          pytest -q tests/test_order_lifecycle_runtime_extraction.py tests/test_runtime_extraction_boundaries.py
+      - name: Commit cleanup
+        run: |
+          if git diff --quiet -- services/order_lifecycle_runtime.py tests/test_order_lifecycle_runtime_extraction.py; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add services/order_lifecycle_runtime.py tests/test_order_lifecycle_runtime_extraction.py
+          git commit -m 'Remove legacy order lifecycle namespace adapter'
+          git push origin HEAD:refactor/remove-lifecycle-namespace-adapter-20261017
