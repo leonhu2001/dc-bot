@@ -42,7 +42,7 @@ def test_order_lifecycle_is_canonical_in_service():
 
 def test_order_lifecycle_runtime_import_smoke():
     module = importlib.import_module("services.order_lifecycle_runtime")
-    assert callable(module.configure_order_lifecycle_runtime)
+    assert not hasattr(module, "configure_order_lifecycle_runtime")
     assert callable(module.configure_order_lifecycle_runtime_explicit)
     assert callable(module.ensure_payment_submit_receipt)
     assert issubclass(module.ConfirmCloseOrderView, module.discord.ui.View)
@@ -53,9 +53,8 @@ def test_lifecycle_runtime_uses_explicit_dependency_contract():
     source = SERVICE.read_text(encoding="utf-8")
     assert "import bot" not in source
     assert "from bot import" not in source
-    assert "globals()[" not in inspect.getsource(
-        order_lifecycle_runtime.configure_order_lifecycle_runtime
-    )
+    assert "def configure_order_lifecycle_runtime(" not in source
+    assert not hasattr(order_lifecycle_runtime, "configure_order_lifecycle_runtime")
 
     signature = inspect.signature(
         order_lifecycle_runtime.configure_order_lifecycle_runtime_explicit
@@ -70,18 +69,3 @@ def test_lifecycle_runtime_uses_explicit_dependency_contract():
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
         for parameter in signature.parameters.values()
     )
-
-    assert order_lifecycle_runtime._LEGACY_RUNTIME_NAMES == {
-        "RECEIPT_CHANNEL_ID",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "sync_web_order_closed_from_bot",
-        "sync_web_order_cancelled_from_bot",
-    }
-
-
-def test_lifecycle_legacy_configurator_only_validates_and_delegates():
-    source = inspect.getsource(
-        order_lifecycle_runtime.configure_order_lifecycle_runtime
-    )
-    assert "configure_order_lifecycle_runtime_explicit(" in source
-    assert "globals()[" not in source
