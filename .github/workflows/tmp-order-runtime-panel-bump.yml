@@ -1,0 +1,288 @@
+name: Temporary order runtime and panel bump patch
+
+on:
+  push:
+    branches:
+      - refactor/order-runtime-bind-and-panel-bump-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply focused changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          order_path = Path('services/order_runtime.py')
+          order_source = order_path.read_text(encoding='utf-8')
+          anchor = '\n\ndef configure_order_runtime(namespace: Mapping[str, Any]) -> None:\n'
+          assert order_source.count(anchor) == 1, 'order runtime configure anchor drifted'
+          explicit = r'''
+
+
+def configure_order_runtime_explicit(
+    *,
+    db_file,
+    dispatch_channel_id,
+    order_control_selections,
+    order_selections,
+    self_service_order_view_type,
+    defer_and_refresh_self_service_panel,
+    self_service_rule_getter,
+    payment_method_embed_builder,
+    self_service_panel_embed_builder,
+    can_operate_self_service_order_func,
+    amount_formatter,
+    order_customer_id_getter,
+    wallet_balance_getter,
+    customer_staff_checker,
+    remember_order,
+    ticket_channel_renamer,
+    order_log_sender,
+) -> None:
+    """Bind only dependencies directly consumed by this module's own UI runtime.
+
+    Child order runtimes are intentionally still composed by the legacy namespace
+    adapter until they are moved out one at a time in later refactors.
+    """
+    global DB_FILE, DISPATCH_CHANNEL_ID, ORDER_CONTROL_SELECTIONS, SELF_SERVICE_ORDER_SELECTIONS
+    global SelfServiceOrderView, _defer_and_refresh_self_service_panel
+    global _get_rule_from_self_service_data, build_payment_method_embed
+    global build_self_service_panel_embed, can_operate_self_service_order
+    global format_t_amount, get_order_customer_id_from_channel, get_wallet_balance
+    global is_customer_staff, remember_order_data, rename_ticket_channel, send_order_log
+
+    DB_FILE = db_file
+    DISPATCH_CHANNEL_ID = dispatch_channel_id
+    ORDER_CONTROL_SELECTIONS = order_control_selections
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
+    SelfServiceOrderView = self_service_order_view_type
+    _defer_and_refresh_self_service_panel = defer_and_refresh_self_service_panel
+    _get_rule_from_self_service_data = self_service_rule_getter
+    build_payment_method_embed = payment_method_embed_builder
+    build_self_service_panel_embed = self_service_panel_embed_builder
+    can_operate_self_service_order = can_operate_self_service_order_func
+    format_t_amount = amount_formatter
+    get_order_customer_id_from_channel = order_customer_id_getter
+    get_wallet_balance = wallet_balance_getter
+    is_customer_staff = customer_staff_checker
+    remember_order_data = remember_order
+    rename_ticket_channel = ticket_channel_renamer
+    send_order_log = order_log_sender
+'''
+          order_source = order_source.replace(anchor, explicit + anchor, 1)
+          order_path.write_text(order_source, encoding='utf-8')
+
+          test_path = Path('tests/test_order_runtime_dependency_boundary.py')
+          test_source = test_path.read_text(encoding='utf-8')
+          addition = r'''
+
+
+def test_order_runtime_explicit_binding_assigns_direct_dependencies(monkeypatch):
+    values = {
+        "DB_FILE": object(),
+        "DISPATCH_CHANNEL_ID": 987654,
+        "ORDER_CONTROL_SELECTIONS": object(),
+        "SELF_SERVICE_ORDER_SELECTIONS": object(),
+        "SelfServiceOrderView": object(),
+        "_defer_and_refresh_self_service_panel": object(),
+        "_get_rule_from_self_service_data": object(),
+        "build_payment_method_embed": object(),
+        "build_self_service_panel_embed": object(),
+        "can_operate_self_service_order": object(),
+        "format_t_amount": object(),
+        "get_order_customer_id_from_channel": object(),
+        "get_wallet_balance": object(),
+        "is_customer_staff": object(),
+        "remember_order_data": object(),
+        "rename_ticket_channel": object(),
+        "send_order_log": object(),
+    }
+
+    for name in EXPECTED_BINDING_NAMES:
+        monkeypatch.setattr(order_runtime, name, object(), raising=False)
+    monkeypatch.setattr(order_runtime, "_CONFIGURED", False)
+
+    order_runtime.configure_order_runtime_explicit(
+        db_file=values["DB_FILE"],
+        dispatch_channel_id=values["DISPATCH_CHANNEL_ID"],
+        order_control_selections=values["ORDER_CONTROL_SELECTIONS"],
+        order_selections=values["SELF_SERVICE_ORDER_SELECTIONS"],
+        self_service_order_view_type=values["SelfServiceOrderView"],
+        defer_and_refresh_self_service_panel=values["_defer_and_refresh_self_service_panel"],
+        self_service_rule_getter=values["_get_rule_from_self_service_data"],
+        payment_method_embed_builder=values["build_payment_method_embed"],
+        self_service_panel_embed_builder=values["build_self_service_panel_embed"],
+        can_operate_self_service_order_func=values["can_operate_self_service_order"],
+        amount_formatter=values["format_t_amount"],
+        order_customer_id_getter=values["get_order_customer_id_from_channel"],
+        wallet_balance_getter=values["get_wallet_balance"],
+        customer_staff_checker=values["is_customer_staff"],
+        remember_order=values["remember_order_data"],
+        ticket_channel_renamer=values["rename_ticket_channel"],
+        order_log_sender=values["send_order_log"],
+    )
+
+    for name, value in values.items():
+        assert getattr(order_runtime, name) is value
+    assert order_runtime._CONFIGURED is False
+'''
+          assert 'test_order_runtime_explicit_binding_assigns_direct_dependencies' not in test_source
+          test_path.write_text(test_source.rstrip() + addition + '\n', encoding='utf-8')
+
+          bot_path = Path('bot.py')
+          bot_source = bot_path.read_text(encoding='utf-8')
+          bot_anchor = '\n\nclass OrderControlView(discord.ui.View):\n'
+          assert bot_source.count(bot_anchor) == 1, 'StaffOrderOperationView anchor drifted'
+          panel_code = r'''
+
+
+_ORDER_OPERATION_PANEL_REPOSITION_LOCKS: dict[int, asyncio.Lock] = {}
+
+
+async def _reposition_active_order_operation_panel(
+    channel: discord.TextChannel,
+    *,
+    expected_panel_message_id: int,
+) -> None:
+    lock = _ORDER_OPERATION_PANEL_REPOSITION_LOCKS.setdefault(channel.id, asyncio.Lock())
+
+    async with lock:
+        order_data = SELF_SERVICE_ORDER_SELECTIONS.get(channel.id)
+        if not isinstance(order_data, dict):
+            return
+        if str(order_data.get("status") or "").strip().lower() != "active":
+            return
+
+        panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
+        if panel_message_id is None or panel_message_id != expected_panel_message_id:
+            return
+
+        try:
+            old_panel = await channel.fetch_message(panel_message_id)
+            await old_panel.delete()
+        except discord.NotFound:
+            pass
+        except (discord.Forbidden, discord.HTTPException):
+            return
+
+        order_data = SELF_SERVICE_ORDER_SELECTIONS.get(channel.id)
+        if not isinstance(order_data, dict):
+            return
+        if str(order_data.get("status") or "").strip().lower() != "active":
+            return
+        if _to_int(order_data.get("operation_panel_message_id")) != panel_message_id:
+            return
+
+        operation_embed = discord.Embed(
+            title="訂單操作",
+            description="請客服從下拉式清單選擇後，按下確認。",
+            color=discord.Color.green(),
+        )
+
+        try:
+            new_panel = await channel.send(
+                embed=operation_embed,
+                view=StaffOrderOperationView(),
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            return
+
+        order_data["operation_panel_message_id"] = new_panel.id
+        SELF_SERVICE_ORDER_SELECTIONS[channel.id] = order_data
+        remember_order_data(channel.id, order_data)
+        save_bot_data()
+
+
+@bot.listen("on_interaction")
+async def reposition_order_operation_panel_after_ticket_action(
+    interaction: discord.Interaction,
+) -> None:
+    if interaction.type is not discord.InteractionType.component:
+        return
+    if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+        return
+    if not isinstance(interaction.channel, discord.TextChannel):
+        return
+    if interaction.message is None or interaction.message.flags.ephemeral:
+        return
+
+    interaction_data = interaction.data if isinstance(interaction.data, dict) else {}
+    custom_id = str(interaction_data.get("custom_id") or "")
+    if not custom_id or custom_id in {
+        "staff_order_operation_select",
+        "staff_order_operation_confirm",
+    }:
+        return
+
+    order_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id)
+    if not isinstance(order_data, dict):
+        return
+    if str(order_data.get("status") or "").strip().lower() != "active":
+        return
+
+    panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
+    if panel_message_id is None:
+        return
+
+    # Let the component callback finish first; terminal/storage actions either
+    # use the operation panel itself (ignored above) or leave active status.
+    await asyncio.sleep(0.8)
+    await _reposition_active_order_operation_panel(
+        interaction.channel,
+        expected_panel_message_id=panel_message_id,
+    )
+'''
+          bot_source = bot_source.replace(bot_anchor, panel_code + bot_anchor, 1)
+          bot_path.write_text(bot_source, encoding='utf-8')
+
+          regression_path = Path('tests/test_order_operation_panel_reposition_regression.py')
+          regression_path.write_text(r'''from pathlib import Path
+
+
+BOT_SOURCE = (Path(__file__).resolve().parents[1] / "bot.py").read_text(encoding="utf-8")
+
+
+def test_active_ticket_actions_reposition_existing_order_operation_panel():
+    assert "async def _reposition_active_order_operation_panel(" in BOT_SOURCE
+    assert "@bot.listen(\"on_interaction\")" in BOT_SOURCE
+    assert "interaction.type is not discord.InteractionType.component" in BOT_SOURCE
+    assert "interaction.message.flags.ephemeral" in BOT_SOURCE
+    assert "\"staff_order_operation_select\"," in BOT_SOURCE
+    assert "\"staff_order_operation_confirm\"," in BOT_SOURCE
+    assert 'str(order_data.get("status") or "").strip().lower() != "active"' in BOT_SOURCE
+    assert "await old_panel.delete()" in BOT_SOURCE
+    assert "view=StaffOrderOperationView()" in BOT_SOURCE
+    assert 'order_data["operation_panel_message_id"] = new_panel.id' in BOT_SOURCE
+''', encoding='utf-8')
+          PY
+      - name: Install focused test dependencies
+        run: python -m pip install -q -r requirements.txt -r requirements-dev.txt
+      - name: Run focused validation
+        run: |
+          python -m compileall -q bot.py services/order_runtime.py
+          pytest -q \
+            tests/test_order_runtime_dependency_boundary.py \
+            tests/test_order_operation_panel_reposition_regression.py \
+            tests/test_runtime_extraction_boundaries.py
+      - name: Commit focused changes and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/tmp-order-runtime-panel-bump.yml
+          git add bot.py services/order_runtime.py tests/test_order_runtime_dependency_boundary.py tests/test_order_operation_panel_reposition_regression.py
+          git commit -m "Add explicit order binding API and keep ticket panel near bottom"
+          git push origin HEAD
