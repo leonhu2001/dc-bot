@@ -1935,6 +1935,104 @@ class StaffOrderOperationView(discord.ui.View):
             )
 
 
+
+_ORDER_OPERATION_PANEL_REPOSITION_LOCKS: dict[int, asyncio.Lock] = {}
+
+
+async def _reposition_active_order_operation_panel(
+    channel: discord.TextChannel,
+    *,
+    expected_panel_message_id: int,
+) -> None:
+    lock = _ORDER_OPERATION_PANEL_REPOSITION_LOCKS.setdefault(channel.id, asyncio.Lock())
+
+    async with lock:
+        order_data = SELF_SERVICE_ORDER_SELECTIONS.get(channel.id)
+        if not isinstance(order_data, dict):
+            return
+        if str(order_data.get("status") or "").strip().lower() != "active":
+            return
+
+        panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
+        if panel_message_id is None or panel_message_id != expected_panel_message_id:
+            return
+
+        try:
+            old_panel = await channel.fetch_message(panel_message_id)
+            await old_panel.delete()
+        except discord.NotFound:
+            pass
+        except (discord.Forbidden, discord.HTTPException):
+            return
+
+        order_data = SELF_SERVICE_ORDER_SELECTIONS.get(channel.id)
+        if not isinstance(order_data, dict):
+            return
+        if str(order_data.get("status") or "").strip().lower() != "active":
+            return
+        if _to_int(order_data.get("operation_panel_message_id")) != panel_message_id:
+            return
+
+        operation_embed = discord.Embed(
+            title="訂單操作",
+            description="請客服從下拉式清單選擇後，按下確認。",
+            color=discord.Color.green(),
+        )
+
+        try:
+            new_panel = await channel.send(
+                embed=operation_embed,
+                view=StaffOrderOperationView(),
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            return
+
+        order_data["operation_panel_message_id"] = new_panel.id
+        SELF_SERVICE_ORDER_SELECTIONS[channel.id] = order_data
+        remember_order_data(channel.id, order_data)
+        save_bot_data()
+
+
+@bot.listen("on_interaction")
+async def reposition_order_operation_panel_after_ticket_action(
+    interaction: discord.Interaction,
+) -> None:
+    if interaction.type is not discord.InteractionType.component:
+        return
+    if not isinstance(interaction.user, discord.Member) or not is_customer_staff(interaction.user):
+        return
+    if not isinstance(interaction.channel, discord.TextChannel):
+        return
+    if interaction.message is None or interaction.message.flags.ephemeral:
+        return
+
+    interaction_data = interaction.data if isinstance(interaction.data, dict) else {}
+    custom_id = str(interaction_data.get("custom_id") or "")
+    if not custom_id or custom_id in {
+        "staff_order_operation_select",
+        "staff_order_operation_confirm",
+    }:
+        return
+
+    order_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id)
+    if not isinstance(order_data, dict):
+        return
+    if str(order_data.get("status") or "").strip().lower() != "active":
+        return
+
+    panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
+    if panel_message_id is None:
+        return
+
+    # Let the component callback finish first; terminal/storage actions either
+    # use the operation panel itself (ignored above) or leave active status.
+    await asyncio.sleep(0.8)
+    await _reposition_active_order_operation_panel(
+        interaction.channel,
+        expected_panel_message_id=panel_message_id,
+    )
+
+
 class OrderControlView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
