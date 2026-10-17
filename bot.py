@@ -144,6 +144,10 @@ from services.smart_dispatch import (
     set_specified_dm_results,
 )
 from services.payment_review_runtime import ensure_payment_review_worker_started
+from services.order_operation_panel_runtime import (
+    register_order_operation_panel_listener,
+    validate_staff_order_operation_interaction,
+)
 from services.wallet_service import (
     ensure_wallet_tables as _wallet_ensure_tables,
     get_wallet_balance as _wallet_get_balance,
@@ -1820,16 +1824,9 @@ class StaffOrderOperationSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
-
-        if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
-            return
-
-        if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+        if not await validate_staff_order_operation_interaction(
+            interaction, is_customer_staff
+        ):
             return
 
         STAFF_ORDER_OPERATION_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]
@@ -1849,16 +1846,9 @@ class StaffOrderOperationView(discord.ui.View):
         row=1
     )
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
-            return
-
-        if not is_customer_staff(interaction.user):
-            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
-            return
-
-        if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+        if not await validate_staff_order_operation_interaction(
+            interaction, is_customer_staff
+        ):
             return
 
         selected = STAFF_ORDER_OPERATION_SELECTIONS.get((interaction.channel.id, interaction.user.id))
@@ -1933,6 +1923,15 @@ class StaffOrderOperationView(discord.ui.View):
                 "選擇項目異常，請重新選擇一次。",
                 ephemeral=True
             )
+
+
+
+register_order_operation_panel_listener(
+    bot,
+    SELF_SERVICE_ORDER_SELECTIONS,
+    is_customer_staff,
+    StaffOrderOperationView,
+)
 
 
 class OrderControlView(discord.ui.View):
