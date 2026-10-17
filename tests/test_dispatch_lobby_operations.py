@@ -44,7 +44,7 @@ def test_dispatch_clickable_controls_are_visually_distinct_from_status_pills():
     assert 'button[data-dispatch-notification-toggle][data-state="online"]' in css
     assert "body > .dispatch-alert-toggle" in css
     assert "body > .dispatch-alert-toggle:hover" in css
-    assert "background: linear-gradient(135deg, #f5c66b, #cf8f32) !important" in css
+    assert "background: linear-gradient(135deg, rgba(245, 198, 107, .96), rgba(210, 145, 47, .9));" in css
     assert "translateY(-2px)" in css
     assert "focus-visible" in css
     assert 'content: "↗"' in css
