@@ -8,8 +8,44 @@ from web.app.services.admin_service import (
 )
 
 
-def attach_stream_bonus_workspace_state(db, order_id: int, rows: list[dict]) -> bool:
-    """Attach report/effective stream state without mutating approved report evidence."""
+def load_stream_bonus_workspace_rows(db, order_id: int) -> tuple[list[dict], bool]:
+    """Load assignment/payout rows and attach effective livestream bonus state."""
+    rows = db.execute(
+        text(
+            """
+            SELECT
+                oa.id AS assignment_id,
+                oa.worker_discord_id,
+                oa.worker_display_name,
+                oa.has_named_bonus,
+                oa.stream_bonus_override,
+                oa.is_active,
+                wp.id AS payout_id,
+                wp.gross_share,
+                wp.base_payout,
+                wp.named_bonus_amount,
+                wp.final_payout,
+                wp.payout_status,
+                wp.paid_at
+            FROM order_assignments oa
+            LEFT JOIN worker_payouts wp
+              ON wp.id = (
+                    SELECT wp2.id
+                    FROM worker_payouts wp2
+                    WHERE wp2.order_id = oa.order_id
+                      AND wp2.worker_discord_id = oa.worker_discord_id
+                    ORDER BY wp2.id DESC
+                    LIMIT 1
+                )
+            WHERE oa.order_id = :order_id
+              AND COALESCE(oa.is_active, 1) = 1
+            ORDER BY oa.id ASC
+            """
+        ),
+        {"order_id": int(order_id)},
+    ).mappings().all()
+    result = [dict(row) for row in rows]
+
     stream_rows = db.execute(
         text(
             """
@@ -28,7 +64,7 @@ def attach_stream_bonus_workspace_state(db, order_id: int, rows: list[dict]) -> 
         if str(row.get("worker_discord_id") or "").strip()
     }
 
-    for row in rows:
+    for row in result:
         worker_id = str(row.get("worker_discord_id") or "")
         report_streamed = bool(report_stream_map.get(worker_id))
         override = row.get("stream_bonus_override")
@@ -38,7 +74,8 @@ def attach_stream_bonus_workspace_state(db, order_id: int, rows: list[dict]) -> 
         )
         row["stream_bonus_override_active"] = override is not None
 
-    return can_override_stream_bonus_for_order(db, int(order_id))
+    editable = can_override_stream_bonus_for_order(db, int(order_id))
+    return result, editable
 
 
 def _snapshot_payout_status(db, order_id: int) -> dict[str, dict[str, dict]]:
