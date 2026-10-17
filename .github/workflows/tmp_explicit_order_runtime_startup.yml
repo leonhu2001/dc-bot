@@ -1,0 +1,154 @@
+name: Temporary explicit order runtime startup refactor
+
+on:
+  push:
+    branches:
+      - refactor/explicit-order-runtime-startup-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-ci-web.db
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Verify composition-root dependencies exist
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          tree = ast.parse(Path('bot.py').read_text(encoding='utf-8'))
+          defined = set()
+
+          def add_target(target):
+              if isinstance(target, ast.Name):
+                  defined.add(target.id)
+              elif isinstance(target, (ast.Tuple, ast.List)):
+                  for item in target.elts:
+                      add_target(item)
+
+          def visit_statements(statements):
+              for node in statements:
+                  if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                      defined.add(node.name)
+                  elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                      targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                      for target in targets:
+                          add_target(target)
+                  elif isinstance(node, ast.AugAssign):
+                      add_target(node.target)
+                  elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                      for alias in node.names:
+                          defined.add(alias.asname or alias.name.split('.')[0])
+                  elif isinstance(node, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith)):
+                      visit_statements(node.body)
+                      visit_statements(node.orelse)
+                  elif isinstance(node, ast.Try):
+                      visit_statements(node.body)
+                      visit_statements(node.orelse)
+                      visit_statements(node.finalbody)
+                      for handler in node.handlers:
+                          visit_statements(handler.body)
+
+          visit_statements(tree.body)
+
+          required = {
+              'BOOSTER_RECEIVER_ROLE_ID', 'DISPATCH_CHANNEL_ID', 'ORDER_CLAIMS',
+              'SELF_SERVICE_ORDER_SELECTIONS', '_apply_acceptance_state_to_claim_data',
+              '_member_display_name', '_member_role_id_texts', '_order_requires_credentials',
+              'revoke_order_credential_messages', 'send_acceptance_payment_panel_if_ready',
+              'CREDENTIAL_OWNER_USER_ID', 'GUILD_ID', '_to_int', 'bot', 'fetch_member_safely',
+              'get_taipei_now_iso', 'remember_order_data', 'save_bot_data', 'CUSTOMER_REWARDS',
+              'get_current_reward_points', 'get_customer_reward_data', 'get_order_point_item',
+              'send_order_log', 'ORDER_CATEGORY_LABELS', 'StaffOrderOperationView',
+              '_build_receiver_text_from_claim_data', 'add_customer_reward_from_order',
+              'adjust_customer_wallet_balance', 'build_payment_method_embed',
+              'build_self_service_order_embed', 'ensure_payment_submit_receipt', 'format_t_amount',
+              'remember_claim_data', 'rename_ticket_channel', 'send_wallet_log',
+              '_get_rule_from_self_service_data', 'delete_claim_row_from_db',
+              'prepare_initial_smart_dispatch', 'send_initial_smart_dispatch_alert',
+              'send_specified_staff_dispatch_dms', 'set_specified_dm_results',
+              'DB_FILE', 'ORDER_CONTROL_SELECTIONS', 'SelfServiceOrderView',
+              '_defer_and_refresh_self_service_panel', 'build_self_service_panel_embed',
+              'can_operate_self_service_order', 'get_order_customer_id_from_channel',
+              'get_wallet_balance', 'is_customer_staff',
+          }
+          missing = sorted(required - defined)
+          if missing:
+              raise SystemExit('bot.py composition root is missing: ' + ', '.join(missing))
+          print(f'composition-root preflight OK: {len(required)} dependencies found')
+          PY
+      - name: Apply explicit startup wiring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime_path = Path('services/order_runtime.py')
+          runtime = runtime_path.read_text(encoding='utf-8')
+          marker = '\ndef configure_order_runtime(namespace: Mapping[str, Any]) -> None:\n'
+          if 'def configure_order_runtime_explicit(' not in runtime:
+              if marker not in runtime:
+                  raise SystemExit('order runtime legacy configurator marker not found')
+              explicit = '''\ndef configure_order_runtime_explicit(\n    *,\n    db_file,\n    dispatch_channel_id,\n    order_control_selections,\n    order_selections,\n    self_service_order_view_type,\n    defer_and_refresh_self_service_panel,\n    self_service_rule_getter,\n    payment_method_embed_builder,\n    self_service_panel_embed_builder,\n    can_operate_self_service_order_func,\n    amount_formatter,\n    order_customer_id_getter,\n    wallet_balance_getter,\n    customer_staff_checker,\n    remember_order,\n    ticket_channel_renamer,\n    order_log_sender,\n) -> None:\n    \"\"\"Bind only the dependencies directly owned by the order UI runtime.\"\"\"\n    global DB_FILE\n    global DISPATCH_CHANNEL_ID\n    global ORDER_CONTROL_SELECTIONS\n    global SELF_SERVICE_ORDER_SELECTIONS\n    global SelfServiceOrderView\n    global _defer_and_refresh_self_service_panel\n    global _get_rule_from_self_service_data\n    global build_payment_method_embed\n    global build_self_service_panel_embed\n    global can_operate_self_service_order\n    global format_t_amount\n    global get_order_customer_id_from_channel\n    global get_wallet_balance\n    global is_customer_staff\n    global remember_order_data\n    global rename_ticket_channel\n    global send_order_log\n    global _CONFIGURED\n\n    DB_FILE = db_file\n    DISPATCH_CHANNEL_ID = dispatch_channel_id\n    ORDER_CONTROL_SELECTIONS = order_control_selections\n    SELF_SERVICE_ORDER_SELECTIONS = order_selections\n    SelfServiceOrderView = self_service_order_view_type\n    _defer_and_refresh_self_service_panel = defer_and_refresh_self_service_panel\n    _get_rule_from_self_service_data = self_service_rule_getter\n    build_payment_method_embed = payment_method_embed_builder\n    build_self_service_panel_embed = self_service_panel_embed_builder\n    can_operate_self_service_order = can_operate_self_service_order_func\n    format_t_amount = amount_formatter\n    get_order_customer_id_from_channel = order_customer_id_getter\n    get_wallet_balance = wallet_balance_getter\n    is_customer_staff = customer_staff_checker\n    remember_order_data = remember_order\n    rename_ticket_channel = ticket_channel_renamer\n    send_order_log = order_log_sender\n    _CONFIGURED = True\n\n'''
+              runtime = runtime.replace(marker, explicit + marker, 1)
+              runtime_path.write_text(runtime, encoding='utf-8')
+
+          bot_path = Path('bot.py')
+          bot = bot_path.read_text(encoding='utf-8')
+          old_import = '''from services.order_runtime import (\n    configure_order_runtime,\n'''
+          new_imports = '''from services.order_credential_runtime import configure_order_credentials\nfrom services.order_point_redemption import configure_order_point_redemption\nfrom services.order_payment_runtime import configure_order_payment_runtime\nfrom services.order_storage_runtime import configure_order_storage_runtime\nfrom services.order_dispatch_runtime import configure_order_dispatch_runtime_explicit\nfrom services.order_runtime import (\n    configure_order_runtime_explicit,\n'''
+          if old_import in bot:
+              bot = bot.replace(old_import, new_imports, 1)
+          elif 'configure_order_runtime_explicit,' not in bot:
+              raise SystemExit('bot.py order runtime import marker not found')
+
+          old_startup = 'configure_web_sync_runtime(globals())\nconfigure_order_runtime(globals())\nconfigure_order_lifecycle_runtime_explicit(\n'
+          new_startup = '''configure_web_sync_runtime(globals())\nconfigure_order_dispatch_runtime_explicit(\n    booster_receiver_role_id=BOOSTER_RECEIVER_ROLE_ID,\n    dispatch_channel_id=DISPATCH_CHANNEL_ID,\n    order_claims=ORDER_CLAIMS,\n    order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n    acceptance_state_applier=_apply_acceptance_state_to_claim_data,\n    member_display_name=_member_display_name,\n    member_role_ids=_member_role_id_texts,\n    order_requires_credentials=_order_requires_credentials,\n    revoke_credential_messages=revoke_order_credential_messages,\n    send_payment_panel=send_acceptance_payment_panel_if_ready,\n)\nconfigure_order_credentials(\n    credential_owner_user_id=CREDENTIAL_OWNER_USER_ID,\n    guild_id=GUILD_ID,\n    self_service_order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n    to_int=_to_int,\n    bot_instance=bot,\n    fetch_member=fetch_member_safely,\n    taipei_now_iso=get_taipei_now_iso,\n    remember_data=remember_order_data,\n    save_data=save_bot_data,\n)\nconfigure_order_point_redemption(\n    customer_rewards=CUSTOMER_REWARDS,\n    to_int=_to_int,\n    current_reward_points=get_current_reward_points,\n    customer_reward_data=get_customer_reward_data,\n    order_point_item=get_order_point_item,\n    taipei_now_iso=get_taipei_now_iso,\n    remember_data=remember_order_data,\n    save_data=save_bot_data,\n    order_log_sender=send_order_log,\n)\nconfigure_order_payment_runtime(\n    dispatch_channel_id=DISPATCH_CHANNEL_ID,\n    dispatch_claim_view=DispatchClaimView,\n    order_category_labels=ORDER_CATEGORY_LABELS,\n    order_claims=ORDER_CLAIMS,\n    payment_method_view=PaymentMethodView,\n    self_service_order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n    staff_order_operation_view=StaffOrderOperationView,\n    receiver_text_builder=_build_receiver_text_from_claim_data,\n    to_int=_to_int,\n    customer_reward_adder=add_customer_reward_from_order,\n    wallet_adjuster=adjust_customer_wallet_balance,\n    payment_method_embed_builder=build_payment_method_embed,\n    self_service_order_embed_builder=build_self_service_order_embed,\n    payment_receipt_ensurer=ensure_payment_submit_receipt,\n    fetch_member=fetch_member_safely,\n    amount_formatter=format_t_amount,\n    taipei_now_iso=get_taipei_now_iso,\n    remember_claim=remember_claim_data,\n    remember_order=remember_order_data,\n    ticket_channel_renamer=rename_ticket_channel,\n    save_data=save_bot_data,\n    order_log_sender=send_order_log,\n    wallet_log_sender=send_wallet_log,\n)\nconfigure_order_storage_runtime(\n    dispatch_channel_id=DISPATCH_CHANNEL_ID,\n    dispatch_claim_view=DispatchClaimView,\n    order_category_labels=ORDER_CATEGORY_LABELS,\n    order_claims=ORDER_CLAIMS,\n    self_service_order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n    to_int=_to_int,\n    self_service_order_embed_builder=build_self_service_order_embed,\n    taipei_now_iso=get_taipei_now_iso,\n    remember_claim=remember_claim_data,\n    remember_order=remember_order_data,\n    save_data=save_bot_data,\n    acceptance_state_applier=_apply_acceptance_state_to_claim_data,\n    self_service_rule_getter=_get_rule_from_self_service_data,\n    claim_row_deleter=delete_claim_row_from_db,\n    initial_dispatch_preparer=prepare_initial_smart_dispatch,\n    initial_dispatch_alert_sender=send_initial_smart_dispatch_alert,\n    specified_staff_dm_sender=send_specified_staff_dispatch_dms,\n    specified_dm_result_setter=set_specified_dm_results,\n    web_order_status_syncer=sync_web_order_status_from_bot,\n)\nconfigure_order_runtime_explicit(\n    db_file=DB_FILE,\n    dispatch_channel_id=DISPATCH_CHANNEL_ID,\n    order_control_selections=ORDER_CONTROL_SELECTIONS,\n    order_selections=SELF_SERVICE_ORDER_SELECTIONS,\n    self_service_order_view_type=SelfServiceOrderView,\n    defer_and_refresh_self_service_panel=_defer_and_refresh_self_service_panel,\n    self_service_rule_getter=_get_rule_from_self_service_data,\n    payment_method_embed_builder=build_payment_method_embed,\n    self_service_panel_embed_builder=build_self_service_panel_embed,\n    can_operate_self_service_order_func=can_operate_self_service_order,\n    amount_formatter=format_t_amount,\n    order_customer_id_getter=get_order_customer_id_from_channel,\n    wallet_balance_getter=get_wallet_balance,\n    customer_staff_checker=is_customer_staff,\n    remember_order=remember_order_data,\n    ticket_channel_renamer=rename_ticket_channel,\n    order_log_sender=send_order_log,\n)\nconfigure_order_lifecycle_runtime_explicit(\n'''
+          if old_startup in bot:
+              bot = bot.replace(old_startup, new_startup, 1)
+          elif 'configure_order_runtime(globals())' in bot:
+              raise SystemExit('bot.py startup marker drifted')
+          bot_path.write_text(bot, encoding='utf-8')
+
+          test_path = Path('tests/test_order_runtime_dependency_boundary.py')
+          test = test_path.read_text(encoding='utf-8')
+          if 'test_order_runtime_explicit_configuration_binds_direct_dependencies' not in test:
+              test += '''\n\ndef test_order_runtime_explicit_configuration_binds_direct_dependencies(monkeypatch):\n    bindings = {\n        "DB_FILE": object(),\n        "DISPATCH_CHANNEL_ID": object(),\n        "ORDER_CONTROL_SELECTIONS": object(),\n        "SELF_SERVICE_ORDER_SELECTIONS": object(),\n        "SelfServiceOrderView": object(),\n        "_defer_and_refresh_self_service_panel": object(),\n        "_get_rule_from_self_service_data": object(),\n        "build_payment_method_embed": object(),\n        "build_self_service_panel_embed": object(),\n        "can_operate_self_service_order": object(),\n        "format_t_amount": object(),\n        "get_order_customer_id_from_channel": object(),\n        "get_wallet_balance": object(),\n        "is_customer_staff": object(),\n        "remember_order_data": object(),\n        "rename_ticket_channel": object(),\n        "send_order_log": object(),\n    }\n    for name in bindings:\n        monkeypatch.setattr(order_runtime, name, None, raising=False)\n    monkeypatch.setattr(order_runtime, "_CONFIGURED", False)\n\n    order_runtime.configure_order_runtime_explicit(\n        db_file=bindings["DB_FILE"],\n        dispatch_channel_id=bindings["DISPATCH_CHANNEL_ID"],\n        order_control_selections=bindings["ORDER_CONTROL_SELECTIONS"],\n        order_selections=bindings["SELF_SERVICE_ORDER_SELECTIONS"],\n        self_service_order_view_type=bindings["SelfServiceOrderView"],\n        defer_and_refresh_self_service_panel=bindings["_defer_and_refresh_self_service_panel"],\n        self_service_rule_getter=bindings["_get_rule_from_self_service_data"],\n        payment_method_embed_builder=bindings["build_payment_method_embed"],\n        self_service_panel_embed_builder=bindings["build_self_service_panel_embed"],\n        can_operate_self_service_order_func=bindings["can_operate_self_service_order"],\n        amount_formatter=bindings["format_t_amount"],\n        order_customer_id_getter=bindings["get_order_customer_id_from_channel"],\n        wallet_balance_getter=bindings["get_wallet_balance"],\n        customer_staff_checker=bindings["is_customer_staff"],\n        remember_order=bindings["remember_order_data"],\n        ticket_channel_renamer=bindings["rename_ticket_channel"],\n        order_log_sender=bindings["send_order_log"],\n    )\n\n    assert order_runtime._CONFIGURED is True\n    for name, value in bindings.items():\n        assert getattr(order_runtime, name) is value\n\n\ndef test_bot_uses_explicit_order_runtime_startup_wiring():\n    source = (Path(__file__).resolve().parents[1] / "bot.py").read_text(encoding="utf-8")\n\n    assert "configure_order_runtime(globals())" not in source\n    assert "configure_order_runtime_explicit(" in source\n    assert "configure_order_dispatch_runtime_explicit(" in source\n    assert "configure_order_credentials(" in source\n    assert "configure_order_point_redemption(" in source\n    assert "configure_order_payment_runtime(" in source\n    assert "configure_order_storage_runtime(" in source\n'''
+              if 'from pathlib import Path\n' not in test:
+                  test = 'from pathlib import Path\n' + test
+              test_path.write_text(test, encoding='utf-8')
+          PY
+      - name: Validate focused order runtime boundaries
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m compileall -q bot.py services/order_runtime.py services/order_dispatch_runtime.py services/order_credential_runtime.py services/order_point_redemption.py services/order_payment_runtime.py services/order_storage_runtime.py
+          pytest -q tests/test_order_runtime_dependency_boundary.py tests/test_runtime_extraction_boundaries.py
+      - name: Commit refactor
+        run: |
+          if git diff --quiet -- bot.py services/order_runtime.py tests/test_order_runtime_dependency_boundary.py; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bot.py services/order_runtime.py tests/test_order_runtime_dependency_boundary.py
+          git commit -m 'Use explicit order runtime startup wiring'
+          git push origin HEAD:refactor/explicit-order-runtime-startup-20261017
