@@ -32,6 +32,11 @@ def install_root_benefit_integrations() -> None:
     install_cash_entitlement_wrapper()
     install_self_service_promotion_integration()
 
+    # Keep one canonical reservation implementation. promotion_benefits retains
+    # its public compatibility name, but production callers are routed through
+    # the transaction-safe lifecycle service rather than the retired draft path.
+    promotion.reserve_issued_benefit_in_session = promotion_lifecycle.reserve_in_session
+
     if not hasattr(loyalty, "_promotion_original_reserve_coupon_in_session"):
         loyalty._promotion_original_reserve_coupon_in_session = loyalty.reserve_coupon_in_session
         loyalty._promotion_original_release_coupon_for_order = loyalty.release_coupon_for_order
