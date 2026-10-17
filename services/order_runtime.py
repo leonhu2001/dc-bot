@@ -37,10 +37,7 @@ from services.order_point_redemption import (
     precheck_order_point_benefit_for_payment,
     redeem_order_point_benefit_on_payment,
 )
-from services.order_payment_runtime import (
-    configure_order_payment_runtime,
-    finalize_accepted_pending_payment,
-)
+from services.order_payment_runtime import finalize_accepted_pending_payment
 from services.order_storage_runtime import (
     configure_order_storage_runtime,
     lock_dispatch_claim_panel,
@@ -143,56 +140,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
     for name in _ORDER_RUNTIME_BINDING_NAMES:
         if name in namespace:
             globals()[name] = namespace[name]
-
-    payment_keys = {
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CATEGORY_LABELS",
-        "ORDER_CLAIMS",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "StaffOrderOperationView",
-        "_build_receiver_text_from_claim_data",
-        "_to_int",
-        "add_customer_reward_from_order",
-        "adjust_customer_wallet_balance",
-        "build_payment_method_embed",
-        "build_self_service_order_embed",
-        "ensure_payment_submit_receipt",
-        "fetch_member_safely",
-        "format_t_amount",
-        "get_taipei_now_iso",
-        "remember_claim_data",
-        "remember_order_data",
-        "rename_ticket_channel",
-        "save_bot_data",
-        "send_order_log",
-        "send_wallet_log",
-    }
-    if payment_keys.issubset(namespace):
-        configure_order_payment_runtime(
-            dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
-            dispatch_claim_view=DispatchClaimView,
-            order_category_labels=namespace["ORDER_CATEGORY_LABELS"],
-            order_claims=namespace["ORDER_CLAIMS"],
-            payment_method_view=PaymentMethodView,
-            self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            staff_order_operation_view=namespace["StaffOrderOperationView"],
-            receiver_text_builder=namespace["_build_receiver_text_from_claim_data"],
-            to_int=namespace["_to_int"],
-            customer_reward_adder=namespace["add_customer_reward_from_order"],
-            wallet_adjuster=namespace["adjust_customer_wallet_balance"],
-            payment_method_embed_builder=namespace["build_payment_method_embed"],
-            self_service_order_embed_builder=namespace["build_self_service_order_embed"],
-            payment_receipt_ensurer=namespace["ensure_payment_submit_receipt"],
-            fetch_member=namespace["fetch_member_safely"],
-            amount_formatter=namespace["format_t_amount"],
-            taipei_now_iso=namespace["get_taipei_now_iso"],
-            remember_claim=namespace["remember_claim_data"],
-            remember_order=namespace["remember_order_data"],
-            ticket_channel_renamer=namespace["rename_ticket_channel"],
-            save_data=namespace["save_bot_data"],
-            order_log_sender=namespace["send_order_log"],
-            wallet_log_sender=namespace["send_wallet_log"],
-        )
 
     storage_keys = {
         "DISPATCH_CHANNEL_ID",

@@ -15,6 +15,8 @@ def test_runtime_import_smoke_module_is_importable():
     module = importlib.import_module("tools.runtime_import_smoke")
     assert "services.payment_review_runtime" in module.CRITICAL_RUNTIME_MODULES
     assert "services.vip_voice_runtime" in module.CRITICAL_RUNTIME_MODULES
+    assert "services.order_payment_composition" in module.CRITICAL_RUNTIME_MODULES
+    assert "services.wallet_discord_runtime" in module.CRITICAL_RUNTIME_MODULES
     assert "views.review" in module.CRITICAL_RUNTIME_MODULES
 
 
@@ -57,13 +59,17 @@ def test_wallet_compatibility_adapters_use_explicit_canonical_imports():
             "services.wallet_service",
             "get_wallet_balance",
         ),
-        "_wallet_adjust_balance": (
-            "services.wallet_service",
-            "adjust_wallet_balance",
-        ),
         "_wallet_get_transactions": (
             "services.wallet_service",
             "get_wallet_transactions",
+        ),
+        "adjust_customer_wallet_balance": (
+            "services.wallet_discord_runtime",
+            "adjust_customer_wallet_balance",
+        ),
+        "send_wallet_log": (
+            "services.wallet_discord_runtime",
+            "send_wallet_log",
         ),
     }
     for alias_name, owner in expected.items():

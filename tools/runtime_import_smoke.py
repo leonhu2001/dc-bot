@@ -19,6 +19,8 @@ CRITICAL_RUNTIME_MODULES = (
     "services.order_lifecycle_runtime",
     "services.order_storage_runtime",
     "services.order_payment_runtime",
+    "services.order_payment_composition",
+    "services.wallet_discord_runtime",
     "services.order_credential_runtime",
     "services.order_point_redemption",
     "services.self_service_runtime",
@@ -46,13 +48,17 @@ REQUIRED_BOT_IMPORT_ALIASES = {
         "services.wallet_service",
         "get_wallet_balance",
     ),
-    "_wallet_adjust_balance": (
-        "services.wallet_service",
-        "adjust_wallet_balance",
-    ),
     "_wallet_get_transactions": (
         "services.wallet_service",
         "get_wallet_transactions",
+    ),
+    "adjust_customer_wallet_balance": (
+        "services.wallet_discord_runtime",
+        "adjust_customer_wallet_balance",
+    ),
+    "send_wallet_log": (
+        "services.wallet_discord_runtime",
+        "send_wallet_log",
     ),
     "_truncate_select_text": (
         "services.self_service_selection_runtime",
