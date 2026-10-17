@@ -43,7 +43,8 @@
 .dispatch-shell a.dispatch-support-link:focus-visible,
 .dispatch-shell .dispatch-footer .button:focus-visible,
 .dispatch-shell .dispatch-support-tools button:focus-visible,
-.dispatch-shell .dispatch-tag-button:focus-visible {
+.dispatch-shell .dispatch-tag-button:focus-visible,
+.dispatch-alert-toggle:focus-visible {
   outline: 3px solid rgba(255, 230, 169, .95);
   outline-offset: 3px;
 }
@@ -70,20 +71,75 @@
   box-shadow: 0 11px 24px rgba(226, 78, 108, .32), inset 0 1px rgba(255, 255, 255, .22);
 }
 
-.dispatch-shell .dispatch-tag-button {
-  border: 1px solid rgba(245, 198, 107, .7);
-  background: rgba(245, 198, 107, .18);
-  color: #ffe4a8;
+/* Runtime controls are actions, not passive status pills. */
+.dispatch-shell button[data-dispatch-notification-toggle] {
+  min-height: 40px;
+  padding: 9px 15px;
+  border: 1px solid rgba(255, 224, 154, .95);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f5c66b, #cf8f32);
+  color: #1b1307;
+  font-weight: 950;
+  letter-spacing: .01em;
   cursor: pointer;
-  box-shadow: 0 5px 14px rgba(245, 198, 107, .12), inset 0 0 0 1px rgba(255, 255, 255, .04);
-  transition: transform .15s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease;
+  box-shadow: 0 7px 18px rgba(245, 198, 107, .25), inset 0 1px rgba(255,255,255,.35);
+  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 
-.dispatch-shell .dispatch-tag-button:hover {
+.dispatch-shell button[data-dispatch-notification-toggle]:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 225, 158, .95);
-  background: rgba(245, 198, 107, .28);
-  box-shadow: 0 9px 20px rgba(245, 198, 107, .2), inset 0 0 0 1px rgba(255, 255, 255, .07);
+  filter: brightness(1.09);
+  border-color: #fff0bf;
+  box-shadow: 0 11px 24px rgba(245, 198, 107, .36), inset 0 1px rgba(255,255,255,.45);
+}
+
+.dispatch-shell button[data-dispatch-notification-toggle][data-state="online"] {
+  border-color: rgba(159, 255, 194, .95);
+  background: linear-gradient(135deg, #79e5a5, #2ea866);
+  color: #06150c;
+  box-shadow: 0 7px 18px rgba(88, 224, 142, .25), inset 0 1px rgba(255,255,255,.32);
+}
+
+.dispatch-shell button[data-dispatch-notification-toggle][data-state="blocked"] {
+  border-color: rgba(255, 153, 173, .92);
+  background: linear-gradient(135deg, #df627c, #a52f4a);
+  color: #fff7f8;
+  box-shadow: 0 7px 18px rgba(226, 78, 108, .22), inset 0 1px rgba(255,255,255,.18);
+}
+
+.dispatch-shell button[data-dispatch-notification-toggle]:disabled {
+  cursor: not-allowed;
+  opacity: .78;
+  transform: none;
+  filter: none;
+}
+
+.dispatch-alert-toggle {
+  min-height: 44px;
+  padding: 11px 17px;
+  border: 1px solid rgba(255, 224, 154, .98);
+  border-radius: 13px;
+  background: linear-gradient(135deg, #f5c66b, #cf8f32);
+  color: #1b1307;
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: .015em;
+  cursor: pointer;
+  box-shadow: 0 9px 24px rgba(245, 198, 107, .3), inset 0 1px rgba(255,255,255,.38);
+  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.dispatch-alert-toggle:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  border-color: #fff0bf;
+  box-shadow: 0 13px 30px rgba(245, 198, 107, .4), inset 0 1px rgba(255,255,255,.45);
+}
+
+.dispatch-alert-toggle:active {
+  transform: translateY(0);
+  filter: brightness(.98);
+  box-shadow: 0 5px 15px rgba(245, 198, 107, .24);
 }
 
 .dispatch-shell .dispatch-footer button:disabled,
