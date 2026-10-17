@@ -32,29 +32,20 @@ def test_self_service_financial_runtime_configures_without_bot_reexport(monkeypa
         lambda *_args, **_kwargs: None,
     )
 
-    namespace = {
-        "CUSTOMER_CATEGORY_ID": 1,
-        "CUSTOMER_ROLE_ID": 2,
-        "DISPATCH_CHANNEL_ID": 3,
-        "ORDER_CLAIMS": {},
-        "POINT_REDEEM_ITEMS": [],
-        "POINT_REDEEM_ITEMS_BY_KEY": {},
-        "SELF_SERVICE_ORDER_SELECTIONS": {},
-        "OrderControlView": object,
-        # Stable helpers below must remain ignored in favor of canonical imports.
-        "_to_int": lambda value, default=0: default,
-        "allocate_store_absorbed_fixed_discount": lambda *args, **kwargs: None,
-        "get_current_reward_points": lambda *args, **kwargs: 0,
-        "get_customer_reward_data": lambda *args, **kwargs: {},
-        "get_effective_member_level": lambda *args, **kwargs: {"name": "普通魔丸"},
-        "get_self_service_quantity_unit": lambda *args, **kwargs: "小時",
-        "get_vip_discount_pay_rate": lambda *args, **kwargs: 100,
-    }
-
-    self_service_runtime.configure_self_service_runtime(namespace)
+    point_redeem_items_by_key = {}
+    self_service_runtime.configure_self_service_runtime_explicit(
+        customer_category_id=1,
+        customer_role_id=2,
+        dispatch_channel_id=3,
+        order_claims={},
+        point_redeem_items=[],
+        point_redeem_items_by_key=point_redeem_items_by_key,
+        order_selections={},
+        order_control_view_type=object,
+    )
 
     assert captured["order_point_benefit_specs"] is self_service_runtime.ORDER_POINT_BENEFIT_SPECS
-    assert captured["point_redeem_items_by_key"] is namespace["POINT_REDEEM_ITEMS_BY_KEY"]
+    assert captured["point_redeem_items_by_key"] is point_redeem_items_by_key
     assert captured["to_int"] is self_service_runtime._to_int
     assert (
         captured["store_absorbed_discount_allocator"]
@@ -72,6 +63,7 @@ def test_self_service_financial_runtime_configures_without_bot_reexport(monkeypa
         self_service_runtime.is_self_service_staff_price_required
         is self_service_financials.is_self_service_staff_price_required
     )
+    assert not hasattr(self_service_runtime, "configure_self_service_runtime")
 
 
 def test_admin_dashboard_meta_loader_handles_existing_table():
