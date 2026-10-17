@@ -146,7 +146,7 @@
             <div class="dispatch-column-head">
                 <div><p class="dispatch-eyebrow">{% if support_can_manage and not user_can_claim %}SUPPORT DUTY{% else %}MY MISSIONS{% endif %}</p><h2>{% if support_can_manage and not user_can_claim %}客服值班{% else %}我的接單狀態{% endif %}</h2></div>
                 <div class="dispatch-my-links">
-                    {% if support_can_manage %}<a class="dispatch-my-link" href="/admin">開啟客服後台</a>{% endif %}
+                    {% if support_can_manage %}<a class="dispatch-my-link" href="/admin" target="_blank" rel="noopener">開啟客服後台</a>{% endif %}
                     {% if user_can_claim %}<span class="dispatch-pill dispatch-count">{{ claimed_orders|length }} 筆</span>{% endif %}
                 </div>
             </div>
