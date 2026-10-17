@@ -21,7 +21,8 @@ def test_stream_bonus_override_is_additive_and_workspace_controlled():
     model = (ROOT / "shared/models.py").read_text(encoding="utf-8")
     schema = (ROOT / "shared/db.py").read_text(encoding="utf-8")
     service = (ROOT / "web/app/services/admin_service.py").read_text(encoding="utf-8")
-    router = (ROOT / "web/app/routers/admin_order_workspace.py").read_text(encoding="utf-8")
+    router_path = ROOT / "web/app/routers/admin_order_workspace.py"
+    router = router_path.read_text(encoding="utf-8")
     workspace = (ROOT / "web/app/services/admin_stream_bonus_workspace.py").read_text(encoding="utf-8")
     template = (ROOT / "web/app/templates/admin_order_detail.html").read_text(encoding="utf-8")
 
@@ -33,6 +34,7 @@ def test_stream_bonus_override_is_additive_and_workspace_controlled():
     assert "load_stream_bonus_workspace_rows" in workspace
     assert "update_stream_bonus_from_workspace" in workspace
     assert "管理端修正直播（新制 +2%）" in template
+    assert router_path.stat().st_size <= 47000
 
 
 def test_payout_engine_reads_override_without_mutating_report_rows():
