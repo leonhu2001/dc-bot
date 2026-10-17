@@ -3,6 +3,8 @@ from pathlib import Path
 
 BOT_PATH = Path("bot.py")
 ORDER_RUNTIME_PATH = Path("services/order_runtime.py")
+PANEL_RUNTIME_PATH = Path("services/order_operation_panel_runtime.py")
+PANEL_TEST_PATH = Path("tests/test_order_operation_panel_reposition_regression.py")
 
 
 bot_source = BOT_PATH.read_text(encoding="utf-8")
@@ -11,7 +13,7 @@ import_anchor = (
 )
 import_line = (
     "from services.order_operation_panel_runtime import "
-    "handle_order_operation_panel_interaction\n"
+    "register_order_operation_panel_listener\n"
 )
 assert import_anchor in bot_source, "bot import anchor drifted"
 if import_line not in bot_source:
@@ -22,23 +24,19 @@ block_end = "\n\nclass OrderControlView(discord.ui.View):\n"
 assert bot_source.count(block_start) == 1, "panel block start drifted"
 start_index = bot_source.index(block_start)
 end_index = bot_source.index(block_end, start_index)
-thin_listener = '''
+registration = '''
 
-@bot.listen("on_interaction")
-async def reposition_order_operation_panel_after_ticket_action(
-    interaction: discord.Interaction,
-) -> None:
-    await handle_order_operation_panel_interaction(
-        interaction,
-        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-        is_staff=is_customer_staff,
-        to_int=_to_int,
-        operation_view_factory=StaffOrderOperationView,
-        remember_order=remember_order_data,
-        save_data=save_bot_data,
-    )
+register_order_operation_panel_listener(
+    bot,
+    SELF_SERVICE_ORDER_SELECTIONS,
+    is_customer_staff,
+    _to_int,
+    StaffOrderOperationView,
+    remember_order_data,
+    save_bot_data,
+)
 '''
-bot_source = bot_source[:start_index] + thin_listener + bot_source[end_index:]
+bot_source = bot_source[:start_index] + registration + bot_source[end_index:]
 BOT_PATH.write_text(bot_source, encoding="utf-8")
 
 
@@ -98,6 +96,45 @@ runtime_source = (
     + runtime_source[end_index:]
 )
 ORDER_RUNTIME_PATH.write_text(runtime_source, encoding="utf-8")
+
+
+panel_source = PANEL_RUNTIME_PATH.read_text(encoding="utf-8")
+register_marker = "\ndef register_order_operation_panel_listener("
+if register_marker not in panel_source:
+    panel_source = panel_source.rstrip() + '''
+
+
+def register_order_operation_panel_listener(
+    bot: discord.Client,
+    order_selections: dict[int, dict[str, Any]],
+    is_staff: Callable[[discord.Member], bool],
+    to_int: Callable[[Any], int | None],
+    operation_view_factory: Callable[[], discord.ui.View],
+    remember_order: Callable[[int, dict[str, Any]], None],
+    save_data: Callable[[], None],
+) -> None:
+    async def _listener(interaction: discord.Interaction) -> None:
+        await handle_order_operation_panel_interaction(
+            interaction,
+            order_selections=order_selections,
+            is_staff=is_staff,
+            to_int=to_int,
+            operation_view_factory=operation_view_factory,
+            remember_order=remember_order,
+            save_data=save_data,
+        )
+
+    bot.add_listener(_listener, "on_interaction")
+'''
+PANEL_RUNTIME_PATH.write_text(panel_source, encoding="utf-8")
+
+
+test_source = PANEL_TEST_PATH.read_text(encoding="utf-8")
+test_source = test_source.replace(
+    'assert "handle_order_operation_panel_interaction" in BOT_SOURCE',
+    'assert "register_order_operation_panel_listener" in BOT_SOURCE',
+)
+PANEL_TEST_PATH.write_text(test_source, encoding="utf-8")
 
 
 bot_size = BOT_PATH.stat().st_size
