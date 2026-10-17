@@ -17,6 +17,7 @@ def install_root_benefit_integrations() -> None:
 
     from services import loyalty_benefits as loyalty
     from services import promotion_benefits as promotion
+    from services import promotion_benefit_lifecycle as promotion_lifecycle
     from services import vip_monthly_benefits as vip_monthly
 
     # New VIP monthly cash policy: tier entitlement opens the monthly benefit;
@@ -40,7 +41,7 @@ def install_root_benefit_integrations() -> None:
             player_count: int = 1,
         ) -> None:
             if promotion.decode_selection_id(coupon_id) is not None:
-                promotion.reserve_in_sqlalchemy_session(
+                promotion_lifecycle.reserve_in_session(
                     db,
                     selection_id=coupon_id,
                     customer_discord_id=customer_id,
@@ -58,12 +59,12 @@ def install_root_benefit_integrations() -> None:
 
         def release_coupon_for_order(order_id: int) -> int:
             loyalty_count = loyalty._promotion_original_release_coupon_for_order(order_id)
-            promotion_count = promotion.release_for_order(order_id)
+            promotion_count = promotion_lifecycle.release_for_order(order_id)
             return int(loyalty_count or 0) + int(promotion_count or 0)
 
         def redeem_coupon_for_order(order_id: int) -> int:
             loyalty_count = loyalty._promotion_original_redeem_coupon_for_order(order_id)
-            promotion_count = promotion.redeem_for_order(order_id)
+            promotion_count = promotion_lifecycle.redeem_for_order(order_id)
             return int(loyalty_count or 0) + int(promotion_count or 0)
 
         loyalty.reserve_coupon_in_session = reserve_coupon_in_session
