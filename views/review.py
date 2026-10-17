@@ -1021,7 +1021,7 @@ class ConfirmCloseTicketView(discord.ui.View):
 
 class ReviewButtonView(discord.ui.View):
     def __init__(self, customer_id: int, order_content: str | None = None):
-        super().__init__(timeout=86400)
+        super().__init__(timeout=None)
         self.customer_id = customer_id
         self.order_content = order_content
         ensure_review_tables()

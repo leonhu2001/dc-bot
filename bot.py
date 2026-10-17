@@ -148,6 +148,7 @@ from services.order_operation_panel_runtime import (
     register_order_operation_panel_listener,
     validate_staff_order_operation_interaction,
 )
+from services.review_persistent_runtime import restore_persistent_review_views
 from services.wallet_service import (
     ensure_wallet_tables as _wallet_ensure_tables,
     get_wallet_balance as _wallet_get_balance,
@@ -2910,6 +2911,12 @@ async def register_core_persistent_views_once() -> None:
     bot.add_view(ComplaintResolveView())
     bot.add_view(SupportCallActionView())
     bot.add_view(WebSupportActionView())
+
+    restored_review_views = restore_persistent_review_views(
+    bot, SELF_SERVICE_ORDER_SELECTIONS, ReviewButtonView, get_order_summary_from_channel
+)
+    if restored_review_views:
+        print(f"Restored post-close review views: {restored_review_views}", flush=True)
 
     if not getattr(bot, "_web_support_listener_registered", False):
         bot.add_listener(
