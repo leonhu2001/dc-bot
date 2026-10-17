@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
 
 import discord
 
@@ -129,8 +128,6 @@ from services.self_service_ui_runtime import (
 # startup boundary.
 _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     {
-        "Any",
-        "Mapping",
         "discord",
         "json",
         "ORDER_CATEGORY_LABELS",
@@ -179,21 +176,6 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
         "cleanup_failed_self_service_dispatch",
         "SelfServiceDispatchDeps",
         "create_self_service_waiting_acceptance_order",
-    }
-)
-
-# Compatibility-only names for callers that still use the legacy Mapping entry
-# point. The actual configuration path below is keyword-only and explicit.
-_LEGACY_RUNTIME_NAMES = frozenset(
-    {
-        "CUSTOMER_CATEGORY_ID",
-        "CUSTOMER_ROLE_ID",
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CLAIMS",
-        "POINT_REDEEM_ITEMS",
-        "POINT_REDEEM_ITEMS_BY_KEY",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "OrderControlView",
     }
 )
 
@@ -294,31 +276,6 @@ def configure_self_service_runtime_explicit(
     _CONFIGURED = True
 
 
-def configure_self_service_runtime(namespace: Mapping[str, Any]) -> None:
-    """Compatibility adapter for legacy callers that still pass a namespace."""
-    missing = sorted(
-        name
-        for name in _LEGACY_RUNTIME_NAMES
-        if name not in namespace
-    )
-    if missing:
-        raise RuntimeError(
-            "self-service runtime missing dependencies: "
-            + ", ".join(missing)
-        )
-
-    configure_self_service_runtime_explicit(
-        customer_category_id=namespace["CUSTOMER_CATEGORY_ID"],
-        customer_role_id=namespace["CUSTOMER_ROLE_ID"],
-        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
-        order_claims=namespace["ORDER_CLAIMS"],
-        point_redeem_items=namespace["POINT_REDEEM_ITEMS"],
-        point_redeem_items_by_key=namespace["POINT_REDEEM_ITEMS_BY_KEY"],
-        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-        order_control_view_type=namespace["OrderControlView"],
-    )
-
-
 def _extract_discord_ids_from_text(text_value: str) -> list[str]:
     import re
 
@@ -356,6 +313,7 @@ def _get_rule_from_self_service_data(data: dict):
             return rule
 
     raise ValueError("找不到這個訂單項目的規則，請重新選擇品項。")
+
 
 def _is_specify_preference(value: str | None) -> bool:
     text = str(value or "").strip()
@@ -397,7 +355,15 @@ def _role_key_for_member(rule, member: discord.Member):
         **(getattr(rule, "specify_fee_by_role", {}) or {}),
         **(getattr(rule, "specify_fee_by_game_role", {}) or {}),
     }
-    matched.sort(key=lambda role_key: int(fee_map.get(role_key, getattr(rule, "specify_fee_default", 0) or 0)), reverse=True)
+    matched.sort(
+        key=lambda role_key: int(
+            fee_map.get(
+                role_key,
+                getattr(rule, "specify_fee_default", 0) or 0,
+            )
+        ),
+        reverse=True,
+    )
     return matched[0]
 
 
