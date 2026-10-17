@@ -82,3 +82,4 @@ extraction_path.write_text(extraction, encoding="utf-8")
 
 print("bot.py bytes:", bot_path.stat().st_size)
 print("order_runtime.py bytes:", runtime_path.stat().st_size)
+# retrigger validation after dependency fix
