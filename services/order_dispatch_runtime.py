@@ -33,20 +33,61 @@ _DEPENDENCY_NAMES = (
 )
 
 
-def configure_order_dispatch_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind the bot-owned adapters needed by the Discord dispatch lifecycle."""
+def configure_order_dispatch_runtime_explicit(
+    *,
+    booster_receiver_role_id: int,
+    dispatch_channel_id: int,
+    order_claims: dict,
+    order_selections: dict,
+    acceptance_state_applier,
+    member_display_name,
+    member_role_ids,
+    order_requires_credentials,
+    revoke_credential_messages,
+    send_payment_panel,
+) -> None:
+    """Bind the remaining bot-owned dispatch adapters explicitly."""
     global _CONFIGURED
+    global BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID
+    global ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS
+    global _apply_acceptance_state_to_claim_data
+    global _member_display_name, _member_role_id_texts
+    global _order_requires_credentials
+    global revoke_order_credential_messages, send_acceptance_payment_panel_if_ready
 
+    BOOSTER_RECEIVER_ROLE_ID = booster_receiver_role_id
+    DISPATCH_CHANNEL_ID = dispatch_channel_id
+    ORDER_CLAIMS = order_claims
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
+    _apply_acceptance_state_to_claim_data = acceptance_state_applier
+    _member_display_name = member_display_name
+    _member_role_id_texts = member_role_ids
+    _order_requires_credentials = order_requires_credentials
+    revoke_order_credential_messages = revoke_credential_messages
+    send_acceptance_payment_panel_if_ready = send_payment_panel
+    _CONFIGURED = True
+
+
+def configure_order_dispatch_runtime(namespace: Mapping[str, Any]) -> None:
+    """Compatibility adapter for the remaining namespace-based order runtime."""
     missing = [name for name in _DEPENDENCY_NAMES if name not in namespace]
     if missing:
         raise RuntimeError(
             "order dispatch runtime missing dependencies: " + ", ".join(missing)
         )
 
-    for name in _DEPENDENCY_NAMES:
-        globals()[name] = namespace[name]
-
-    _CONFIGURED = True
+    configure_order_dispatch_runtime_explicit(
+        booster_receiver_role_id=namespace["BOOSTER_RECEIVER_ROLE_ID"],
+        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
+        order_claims=namespace["ORDER_CLAIMS"],
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        acceptance_state_applier=namespace["_apply_acceptance_state_to_claim_data"],
+        member_display_name=namespace["_member_display_name"],
+        member_role_ids=namespace["_member_role_id_texts"],
+        order_requires_credentials=namespace["_order_requires_credentials"],
+        revoke_credential_messages=namespace["revoke_order_credential_messages"],
+        send_payment_panel=namespace["send_acceptance_payment_panel_if_ready"],
+    )
 
 
 class DispatchCancelClaimButton(discord.ui.Button):
@@ -602,4 +643,3 @@ def sync_web_order_status_from_bot(ticket_channel_id, status: str, dispatch_mess
             f"ticket_channel_id={ticket_channel_id} "
             f"status={status}: {exc}"
         )
-
