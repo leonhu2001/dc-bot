@@ -1,0 +1,42 @@
+name: Retry order runtime and panel bump patch
+
+on:
+  push:
+    branches:
+      - refactor/order-runtime-bind-and-panel-bump-20261017
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply same focused patch
+        shell: bash
+        run: |
+          PAYLOAD=$(grep "base64 --decode > /tmp/patch.py" .github/workflows/tmp-order-runtime-panel-bump.yml | sed -E "s/.*echo '([^']+)'.*/\1/")
+          test -n "$PAYLOAD"
+          printf '%s' "$PAYLOAD" | base64 --decode > /tmp/patch.py
+          python /tmp/patch.py
+      - name: Install focused test dependencies
+        run: python -m pip install -q -r requirements.txt -r requirements-dev.txt
+      - name: Run focused validation
+        run: |
+          python -m compileall -q bot.py services/order_runtime.py
+          python -m pytest -q tests/test_order_runtime_dependency_boundary.py tests/test_order_operation_panel_reposition_regression.py tests/test_runtime_extraction_boundaries.py
+      - name: Commit focused changes and remove temporary workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/tmp-order-runtime-panel-bump.yml .github/workflows/tmp-order-runtime-panel-bump-retry.yml
+          git add bot.py services/order_runtime.py tests/test_order_runtime_dependency_boundary.py tests/test_order_operation_panel_reposition_regression.py
+          git commit -m "Add explicit order binding API and keep ticket panel near bottom"
+          git push origin HEAD
