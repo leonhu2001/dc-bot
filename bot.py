@@ -151,7 +151,7 @@ from services.wallet_service import (
     get_wallet_transactions as _wallet_get_transactions,
 )
 from services.order_lifecycle_runtime import (
-    configure_order_lifecycle_runtime,
+    configure_order_lifecycle_runtime_explicit,
     ensure_payment_submit_receipt,
     ReceiptModal,
     get_stored_order_amount_or_none,
@@ -6550,9 +6550,6 @@ except app_commands.CommandAlreadyRegistered:
     pass
 
 
-# Bind extracted runtimes only after bot.py has defined the remaining
-# Views/callbacks they depend on. Acceptance and self-service now use explicit
-# bot-owned dependencies; the other legacy adapters are migrated separately.
 configure_acceptance_runtime_explicit(
     dispatch_channel_id=DISPATCH_CHANNEL_ID,
     order_claims=ORDER_CLAIMS,
@@ -6564,7 +6561,12 @@ configure_acceptance_runtime_explicit(
 )
 configure_web_sync_runtime(globals())
 configure_order_runtime(globals())
-configure_order_lifecycle_runtime(globals())
+configure_order_lifecycle_runtime_explicit(
+    receipt_channel_id=RECEIPT_CHANNEL_ID,
+    order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+    sync_web_order_closed=sync_web_order_closed_from_bot,
+    sync_web_order_cancelled=sync_web_order_cancelled_from_bot,
+)
 configure_self_service_runtime_explicit(
     customer_category_id=CUSTOMER_CATEGORY_ID,
     customer_role_id=CUSTOMER_ROLE_ID,

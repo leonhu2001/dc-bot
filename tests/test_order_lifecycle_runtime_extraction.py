@@ -17,7 +17,15 @@ def test_order_lifecycle_is_canonical_in_service():
     service_source = SERVICE.read_text(encoding="utf-8")
 
     assert "from services.order_lifecycle_runtime import (" in bot_source
-    assert "configure_order_lifecycle_runtime(globals())" in bot_source
+    assert "configure_order_lifecycle_runtime_explicit(" in bot_source
+    assert "configure_order_lifecycle_runtime(globals())" not in bot_source
+    for dependency in (
+        "receipt_channel_id=RECEIPT_CHANNEL_ID",
+        "order_selections=SELF_SERVICE_ORDER_SELECTIONS",
+        "sync_web_order_closed=sync_web_order_closed_from_bot",
+        "sync_web_order_cancelled=sync_web_order_cancelled_from_bot",
+    ):
+        assert dependency in bot_source
 
     for symbol in (
         "async def ensure_payment_submit_receipt(",
