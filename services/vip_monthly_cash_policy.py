@@ -122,6 +122,24 @@ def install_cash_entitlement_wrapper() -> None:
 
     vip.sync_current_month_vip_benefits = wrapped
 
+    # The public snapshot's activity fields describe a gate that actually
+    # applies to the member's current monthly benefits. Platinum through White
+    # Diamond only have cash benefits, so their effective gate is now zero.
+    # Black Diamond keeps the historical activity gate for its free service.
+    original_snapshot = vip.get_customer_vip_monthly_snapshot
+    vip._cash_policy_original_get_customer_vip_monthly_snapshot = original_snapshot
+
+    def cash_policy_snapshot(*args, **kwargs):
+        result = original_snapshot(*args, **kwargs)
+        if not isinstance(result, dict) or bool(result.get("black_diamond_entitled")):
+            return result
+        result = dict(result)
+        result["recent_spend_required"] = 0
+        result["monthly_spend_eligible"] = True
+        return result
+
+    vip.get_customer_vip_monthly_snapshot = cash_policy_snapshot
+
     # A cancelled order must return a tier cash coupon even when the member no
     # longer meets the old trailing-spend threshold. That threshold is retained
     # only for the Black Diamond service benefit.
