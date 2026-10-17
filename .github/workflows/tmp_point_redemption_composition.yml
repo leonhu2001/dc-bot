@@ -1,0 +1,183 @@
+name: Temporary point redemption composition patch
+
+on:
+  push:
+    branches:
+      - refactor/point-redemption-composition-20261018
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/point-redemption-composition-20261018
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt -r web/requirements-web.txt
+      - name: Apply bounded composition refactor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bot = Path('bot.py')
+          text = bot.read_text(encoding='utf-8')
+          old_import = 'from services.order_dispatch_composition import configure_order_dispatch_composition\n'
+          new_import = 'from services.order_child_composition import configure_order_children\n'
+          assert text.count(old_import) == 1
+          text = text.replace(old_import, new_import, 1)
+          old_call = '''configure_order_dispatch_composition(
+              BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS
+          )'''
+          new_call = '''configure_order_children(
+              BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS,
+              CUSTOMER_REWARDS,
+          )'''
+          assert text.count(old_call) == 1
+          text = text.replace(old_call, new_call, 1)
+          bot.write_text(text, encoding='utf-8')
+
+          runtime = Path('services/order_runtime.py')
+          text = runtime.read_text(encoding='utf-8')
+          old = '''from services.order_point_redemption import (
+              configure_order_point_redemption,
+              _get_pending_order_point_benefit_info,
+              precheck_order_point_benefit_for_payment,
+              redeem_order_point_benefit_on_payment,
+          )'''
+          new = '''from services.order_point_redemption import (
+              _get_pending_order_point_benefit_info,
+              precheck_order_point_benefit_for_payment,
+              redeem_order_point_benefit_on_payment,
+          )'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          start = text.index('    redemption_keys = {')
+          end = text.index('    payment_keys = {', start)
+          text = text[:start] + text[end:]
+          runtime.write_text(text, encoding='utf-8')
+
+          Path('services/order_child_composition.py').write_text('''from __future__ import annotations
+
+from core.database import remember_order_data, save_bot_data
+from core.time_utils import get_taipei_now_iso
+from services.logging_service import send_order_log
+from services.order_dispatch_composition import configure_order_dispatch_composition
+from services.order_point_redemption import configure_order_point_redemption
+from services.orders import _to_int
+from services.rewards import get_current_reward_points, get_customer_reward_data
+from services.self_service_financials import get_order_point_item
+
+
+def configure_order_children(
+    booster_receiver_role_id,
+    dispatch_channel_id,
+    order_claims,
+    order_selections,
+    customer_rewards,
+) -> None:
+    """Wire extracted order child runtimes from bot-owned state only."""
+    configure_order_dispatch_composition(
+        booster_receiver_role_id,
+        dispatch_channel_id,
+        order_claims,
+        order_selections,
+    )
+    configure_order_point_redemption(
+        customer_rewards=customer_rewards,
+        to_int=_to_int,
+        current_reward_points=get_current_reward_points,
+        customer_reward_data=get_customer_reward_data,
+        order_point_item=get_order_point_item,
+        taipei_now_iso=get_taipei_now_iso,
+        remember_data=remember_order_data,
+        save_data=save_bot_data,
+        order_log_sender=send_order_log,
+    )
+''', encoding='utf-8')
+
+          Path('tests/test_order_child_composition.py').write_text('''from pathlib import Path
+
+from services import order_child_composition as composition
+
+
+ROOT = Path(__file__).resolve().parents[1]
+ORDER_RUNTIME_SOURCE = (ROOT / "services" / "order_runtime.py").read_text(encoding="utf-8")
+BOT_SOURCE = (ROOT / "bot.py").read_text(encoding="utf-8")
+
+
+def test_order_child_composition_wires_dispatch_and_point_redemption(monkeypatch):
+    dispatch_calls = []
+    point_kwargs = {}
+    sentinels = {
+        "to_int": object(),
+        "current_reward_points": object(),
+        "customer_reward_data": object(),
+        "order_point_item": object(),
+        "taipei_now_iso": object(),
+        "remember_data": object(),
+        "save_data": object(),
+        "order_log_sender": object(),
+    }
+    monkeypatch.setattr(
+        composition,
+        "configure_order_dispatch_composition",
+        lambda *args: dispatch_calls.append(args),
+    )
+    monkeypatch.setattr(
+        composition,
+        "configure_order_point_redemption",
+        lambda **kwargs: point_kwargs.update(kwargs),
+    )
+    monkeypatch.setattr(composition, "_to_int", sentinels["to_int"])
+    monkeypatch.setattr(composition, "get_current_reward_points", sentinels["current_reward_points"])
+    monkeypatch.setattr(composition, "get_customer_reward_data", sentinels["customer_reward_data"])
+    monkeypatch.setattr(composition, "get_order_point_item", sentinels["order_point_item"])
+    monkeypatch.setattr(composition, "get_taipei_now_iso", sentinels["taipei_now_iso"])
+    monkeypatch.setattr(composition, "remember_order_data", sentinels["remember_data"])
+    monkeypatch.setattr(composition, "save_bot_data", sentinels["save_data"])
+    monkeypatch.setattr(composition, "send_order_log", sentinels["order_log_sender"])
+
+    claims = {}
+    selections = {}
+    rewards = {}
+    composition.configure_order_children(11, 22, claims, selections, rewards)
+
+    assert dispatch_calls == [(11, 22, claims, selections)]
+    assert point_kwargs == {"customer_rewards": rewards, **sentinels}
+
+
+def test_point_redemption_composition_is_outside_legacy_order_runtime():
+    assert "configure_order_point_redemption" not in ORDER_RUNTIME_SOURCE
+    assert "redemption_keys" not in ORDER_RUNTIME_SOURCE
+    assert "configure_order_children" in BOT_SOURCE
+    assert "CUSTOMER_REWARDS" in BOT_SOURCE
+''', encoding='utf-8')
+
+          Path('.github/workflows/tmp_point_redemption_composition.yml').unlink()
+          PY
+      - name: Validate focused boundary
+        env:
+          WEB_SECRET_KEY: test-secret
+          WEB_BASE_URL: http://localhost:8000
+        run: |
+          python -m compileall -q bot.py services tests
+          python -m pytest -q \
+            tests/test_order_child_composition.py \
+            tests/test_order_dispatch_composition.py \
+            tests/test_order_runtime_dependency_boundary.py \
+            tests/test_architecture_growth_budget.py
+      - name: Commit bounded refactor
+        run: |
+          git config user.name leonhu2001
+          git config user.email leonhu2001@gmail.com
+          git add -A
+          git commit -m "Move point redemption wiring out of legacy order runtime"
+          git push origin HEAD:refactor/point-redemption-composition-20261018
