@@ -71,7 +71,7 @@ def calculate_customer_service_payout(
     worker_rate = max(0.0, min(1.0, float(effective_worker_rate or 0)))
     margin_share = max(0.0, min(1.0, float(customer_service_rate or 0)))
     margin_pool = amount * max(0.0, 1.0 - worker_rate)
-    return margin_pool * margin_share
+    return round(margin_pool * margin_share, 2)
 
 
 def calculate_customer_service_payout_base_amount(
@@ -208,7 +208,10 @@ def calculate_order_payout(
             0.0,
             min(1.0, float(legacy_customer_service_gross_rate or 0)),
         )
-        customer_service_payout = customer_service_amount * effective_customer_service_rate
+        customer_service_payout = round(
+            customer_service_amount * effective_customer_service_rate,
+            2,
+        )
     else:
         customer_service_payout = calculate_customer_service_payout(
             customer_service_amount,
