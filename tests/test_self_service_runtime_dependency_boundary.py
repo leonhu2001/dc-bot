@@ -3,8 +3,6 @@ from __future__ import annotations
 import inspect
 import json
 
-import pytest
-
 from core import database, permissions, time_utils, vip_levels
 from services import (
     logging_service,
@@ -81,39 +79,10 @@ def test_explicit_configurator_is_keyword_only_and_declares_the_bot_owned_bounda
     )
 
 
-def test_legacy_configurator_rejects_partial_or_unknown_only_namespace():
-    canonical_json = self_service_runtime.json
-    canonical_send_order_log = self_service_runtime.send_order_log
-    marker_name = "_self_service_dependency_boundary_marker"
-    if hasattr(self_service_runtime, marker_name):
-        delattr(self_service_runtime, marker_name)
-
-    with pytest.raises(RuntimeError, match="self-service runtime missing dependencies"):
-        self_service_runtime.configure_self_service_runtime(
-            {
-                "json": object(),
-                "send_order_log": object(),
-                marker_name: object(),
-            }
-        )
-
-    assert self_service_runtime.json is canonical_json
-    assert self_service_runtime.send_order_log is canonical_send_order_log
-    assert not hasattr(self_service_runtime, marker_name)
-
-
-def test_legacy_configurator_is_only_a_validating_delegate():
-    source = inspect.getsource(self_service_runtime.configure_self_service_runtime)
-    assert "globals()[" not in source
-    assert "configure_self_service_runtime_explicit(" in source
-    assert "configure_self_service_financials(" not in source
-    assert "configure_self_service_reorder(" not in source
-    assert "configure_self_service_selection_runtime(" not in source
-
-
 def test_module_owned_dependency_names_are_explicitly_guarded():
     expected = {
         "json",
+        "discord",
         "ORDER_CATEGORY_LABELS",
         "ORDER_ITEM_GROUPS_BY_CATEGORY",
         "ORDER_ITEM_TO_CATEGORY",
@@ -141,14 +110,6 @@ def test_module_owned_dependency_names_are_explicitly_guarded():
     assert expected <= self_service_runtime._MODULE_OWNED_RUNTIME_NAMES
 
 
-def test_remaining_legacy_boundary_is_only_bot_owned_state_and_config():
-    assert self_service_runtime._LEGACY_RUNTIME_NAMES == {
-        "CUSTOMER_CATEGORY_ID",
-        "CUSTOMER_ROLE_ID",
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CLAIMS",
-        "POINT_REDEEM_ITEMS",
-        "POINT_REDEEM_ITEMS_BY_KEY",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "OrderControlView",
-    }
+def test_self_service_runtime_has_no_legacy_namespace_configurator():
+    assert not hasattr(self_service_runtime, "configure_self_service_runtime")
+    assert not hasattr(self_service_runtime, "_LEGACY_RUNTIME_NAMES")
