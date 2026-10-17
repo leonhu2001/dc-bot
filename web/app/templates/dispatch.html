@@ -5,7 +5,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="/static/css/pages/dispatch_inline_1.css?v=20261017-actions-2">
-<link rel="stylesheet" href="/static/css/pages/dispatch_actions.css?v=20261017-actions-4">
+<link rel="stylesheet" href="/static/css/pages/dispatch_actions.css?v=20261017-actions-5">
 
 {% macro render_order_card(order, user, claimed_order_ids, request, support_can_manage, user_can_claim, companion_options) %}
     {% set active_assignments = [] %}
@@ -128,7 +128,7 @@
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管" data-dispatch-online-support>🟢 在線客服 {{ online_support_count }} 人</span>
                 <span class="dispatch-tag" data-dispatch-realtime-status data-state="reconnecting">🟡 即時連線中</span>
                 <span class="dispatch-tag" data-dispatch-last-sync>最後同步 --</span>
-                <button class="dispatch-tag dispatch-tag-button" type="button" data-dispatch-notification-toggle>🖥️ 桌面通知未啟用</button>
+                <button class="dispatch-tag dispatch-tag-button" type="button" data-dispatch-notification-toggle data-state="pending">🖥️ 桌面提示待授權</button>
             </div>
         </div>
         <div class="dispatch-panel dispatch-stats">
