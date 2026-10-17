@@ -128,6 +128,9 @@ def test_admin_benefits_ui_uses_normal_selects_and_checkbox_pickers():
     workspace = (root / "web/app/templates/admin_order_detail.html").read_text(encoding="utf-8")
 
     assert "<datalist" not in template
+    assert 'name="customer_discord_ids"' in template
+    assert 'data-benefit-filter="benefit-member-picker"' in template
+    assert 'data-benefit-member-count' in template
     assert 'name="scope_category_values"' in template
     assert 'name="scope_rule_values"' in template
     assert 'name="excluded_rule_keys"' in template

@@ -107,8 +107,14 @@
                 <div><small>BENEFITS</small><h3>我的福利</h3></div>
                 <a href="/order">使用福利 →</a>
             </div>
-            {% if benefits.coupons %}
+            {% if benefits.promotions or benefits.coupons %}
                 <div class="mc-coupon-stack">
+                {% for coupon in benefits.promotions[:4] %}
+                    <div class="mc-coupon">
+                        <div><small>ISSUED BENEFIT</small><b>{{ coupon.title }}</b></div>
+                        <span>{{ coupon.effect_text }} · 剩 {{ coupon.remaining_uses }} 次 · 有效至 {{ coupon.expires_at_text }}</span>
+                    </div>
+                {% endfor %}
                 {% for coupon in benefits.coupons[:4] %}
                     <div class="mc-coupon">
                         <div><small>AVAILABLE</small><b>{{ coupon.title }}</b></div>

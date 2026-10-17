@@ -14,6 +14,24 @@
     refreshScopePanels();
   }
 
+  const memberCheckboxes = Array.from(document.querySelectorAll('[data-benefit-member-checkbox]'));
+  const memberCount = document.querySelector('[data-benefit-member-count]');
+  const issueForm = document.querySelector('[data-benefit-issue-form]');
+  const refreshMemberCount = () => {
+    if (!memberCount) return;
+    const count = memberCheckboxes.filter((checkbox) => checkbox.checked).length;
+    memberCount.textContent = `已選 ${count} 位`;
+  };
+  memberCheckboxes.forEach((checkbox) => checkbox.addEventListener('change', refreshMemberCount));
+  refreshMemberCount();
+  if (issueForm) {
+    issueForm.addEventListener('submit', (event) => {
+      if (memberCheckboxes.some((checkbox) => checkbox.checked)) return;
+      event.preventDefault();
+      window.alert('請至少選擇一位要發放的會員。');
+    });
+  }
+
   document.querySelectorAll('[data-benefit-filter]').forEach((input) => {
     const targetId = input.dataset.benefitFilter;
     const target = document.getElementById(targetId);

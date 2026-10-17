@@ -7,6 +7,7 @@ from core.discord_settings import (
     GENERAL_MANAGER_ROLE_ID,
 )
 from services.loyalty_benefits import list_customer_loyalty
+from services.promotion_benefit_presentation import list_customer_promotion_benefits
 from services.vip_monthly_benefits import (
     BLACK_DIAMOND_CHOICES,
     benefit_status_label,
@@ -560,11 +561,21 @@ class MemberPortalView(discord.ui.View):
         monthly = get_customer_vip_monthly_snapshot(customer_id)
         coupons = benefits.get("coupons") or []
         progress = benefits.get("progress") or []
+        promotions = list_customer_promotion_benefits(customer_id, active_only=True)
         embed = discord.Embed(
             title="🎁 我的福利",
             description="VIP 月福利每月 1 日刷新，**未使用次數不會累積到下個月**。",
             color=discord.Color.green(),
         )
+
+        if promotions:
+            promo_lines = [
+                f"🎟️ **{item['title']}**｜{item['effect_text']}｜剩 {item['remaining_uses']} 次｜有效至 {item['expires_at_text']}"
+                for item in promotions[:5]
+            ]
+            if len(promotions) > 5:
+                promo_lines.append(f"另有 {len(promotions) - 5} 張可到網站會員中心查看。")
+            embed.add_field(name="已發放福利券", value="\n".join(promo_lines), inline=False)
 
         cash_rows = monthly.get("cash_benefits") or []
         if cash_rows:
