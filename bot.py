@@ -1,5 +1,6 @@
 from core.time_utils import utc_now_naive
 import os
+import discord
 from dotenv import load_dotenv
 
 from shared.web_order_sync import sync_web_worker_claim_from_dispatch
