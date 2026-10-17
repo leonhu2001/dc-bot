@@ -1,0 +1,96 @@
+.dispatch-shell a.dispatch-my-link,
+.dispatch-shell a.dispatch-support-link,
+.dispatch-shell .dispatch-footer .button,
+.dispatch-shell .dispatch-support-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 224, 154, .95);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245, 198, 107, .96), rgba(210, 145, 47, .9));
+  color: #1b1307;
+  text-decoration: none;
+  font-weight: 950;
+  letter-spacing: .02em;
+  cursor: pointer;
+  box-shadow: 0 7px 18px rgba(245, 198, 107, .24), inset 0 1px rgba(255, 255, 255, .35);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease, border-color .15s ease;
+}
+
+.dispatch-shell a.dispatch-my-link:hover,
+.dispatch-shell a.dispatch-support-link:hover,
+.dispatch-shell .dispatch-footer .button:hover,
+.dispatch-shell .dispatch-support-tools button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  border-color: #fff0bf;
+  box-shadow: 0 11px 24px rgba(245, 198, 107, .34), inset 0 1px rgba(255, 255, 255, .45);
+}
+
+.dispatch-shell a.dispatch-my-link:active,
+.dispatch-shell a.dispatch-support-link:active,
+.dispatch-shell .dispatch-footer .button:active,
+.dispatch-shell .dispatch-support-tools button:active {
+  transform: translateY(0);
+  filter: brightness(.98);
+  box-shadow: 0 4px 12px rgba(245, 198, 107, .2);
+}
+
+.dispatch-shell a.dispatch-my-link:focus-visible,
+.dispatch-shell a.dispatch-support-link:focus-visible,
+.dispatch-shell .dispatch-footer .button:focus-visible,
+.dispatch-shell .dispatch-support-tools button:focus-visible,
+.dispatch-shell .dispatch-tag-button:focus-visible {
+  outline: 3px solid rgba(255, 230, 169, .95);
+  outline-offset: 3px;
+}
+
+.dispatch-shell a.dispatch-my-link[target="_blank"]::after {
+  content: "↗";
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.dispatch-shell a.dispatch-support-link.danger,
+.dispatch-shell .dispatch-footer .button.danger,
+.dispatch-shell .dispatch-button.danger {
+  border-color: rgba(255, 153, 173, .95);
+  background: linear-gradient(135deg, rgba(226, 78, 108, .95), rgba(157, 42, 68, .92));
+  color: #fff7f8;
+  box-shadow: 0 7px 18px rgba(226, 78, 108, .24), inset 0 1px rgba(255, 255, 255, .18);
+}
+
+.dispatch-shell a.dispatch-support-link.danger:hover,
+.dispatch-shell .dispatch-footer .button.danger:hover,
+.dispatch-shell .dispatch-button.danger:hover {
+  border-color: #ffc0cd;
+  box-shadow: 0 11px 24px rgba(226, 78, 108, .32), inset 0 1px rgba(255, 255, 255, .22);
+}
+
+.dispatch-shell .dispatch-tag-button {
+  border: 1px solid rgba(245, 198, 107, .7);
+  background: rgba(245, 198, 107, .18);
+  color: #ffe4a8;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(245, 198, 107, .12), inset 0 0 0 1px rgba(255, 255, 255, .04);
+  transition: transform .15s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.dispatch-shell .dispatch-tag-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 225, 158, .95);
+  background: rgba(245, 198, 107, .28);
+  box-shadow: 0 9px 20px rgba(245, 198, 107, .2), inset 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+.dispatch-shell .dispatch-footer button:disabled,
+.dispatch-shell .dispatch-support-tools button:disabled {
+  opacity: .55;
+  cursor: wait;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
