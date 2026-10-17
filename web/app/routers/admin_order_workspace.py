@@ -33,6 +33,10 @@ from web.app.services.admin_service import (
     set_worker_payout_status,
     toggle_named_bonus_for_assignment,
 )
+from web.app.services.admin_stream_bonus_workspace import (
+    load_stream_bonus_workspace_rows,
+    update_stream_bonus_from_workspace,
+)
 from web.app.services.order_service import (
     create_demo_orders_if_empty,
     create_sync_event,
@@ -277,44 +281,6 @@ def _mw_r8_restore_payout_status(db, order_id: int, snapshot: dict) -> None:
         )
 
 
-def _mw_r8_worker_rows(db, order_id: int) -> list[dict]:
-    rows = db.execute(
-        text(
-            """
-            SELECT
-                oa.id AS assignment_id,
-                oa.worker_discord_id,
-                oa.worker_display_name,
-                oa.has_named_bonus,
-                oa.is_active,
-                wp.id AS payout_id,
-                wp.gross_share,
-                wp.base_payout,
-                wp.named_bonus_amount,
-                wp.final_payout,
-                wp.payout_status,
-                wp.paid_at
-            FROM order_assignments oa
-            LEFT JOIN worker_payouts wp
-              ON wp.id = (
-                    SELECT wp2.id
-                    FROM worker_payouts wp2
-                    WHERE wp2.order_id = oa.order_id
-                      AND wp2.worker_discord_id = oa.worker_discord_id
-                    ORDER BY wp2.id DESC
-                    LIMIT 1
-                )
-            WHERE oa.order_id = :order_id
-              AND COALESCE(oa.is_active, 1) = 1
-            ORDER BY oa.id ASC
-            """
-        ),
-        {"order_id": int(order_id)},
-    ).mappings().all()
-
-    return [dict(row) for row in rows]
-
-
 def _mw_r8_cs_payout_rows(db, order_id: int) -> list[dict]:
     rows = db.execute(
         text(
@@ -440,7 +406,9 @@ async def admin_order_workspace_r8(
 
         customer_service_members = _mw4a2r6_cs_members(db)
         worker_members = list_admin_worker_dropdown_members()
-        workspace_assignments = _mw_r8_worker_rows(db, int(order_id))
+        workspace_assignments, stream_bonus_editable = load_stream_bonus_workspace_rows(
+            db, int(order_id)
+        )
         workspace_cs_payouts = _mw_r8_cs_payout_rows(db, int(order_id))
 
         acceptance_state = None
@@ -466,6 +434,7 @@ async def admin_order_workspace_r8(
             "worker_members": worker_members,
             "workspace_assignments": workspace_assignments,
             "workspace_cs_payouts": workspace_cs_payouts,
+            "stream_bonus_editable": stream_bonus_editable,
             "acceptance_state": acceptance_state,
             "paid_status": PayoutStatus.PAID.value,
             "unpaid_status": PayoutStatus.UNPAID.value,
@@ -1073,6 +1042,35 @@ async def admin_order_workspace_named_bonus_r8(
         db.close()
 
     return _mw4a2r6_redirect(order_id,request=request, message="掛名加成已更新。")
+
+
+@router.post("/admin/order-workspace/{order_id}/assignments/{assignment_id}/stream-bonus")
+async def admin_order_workspace_stream_bonus_r8(
+    order_id: int,
+    assignment_id: int,
+    request: Request,
+    enabled: str | None = Form(default=None),
+):
+    user = require_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/service", status_code=303)
+
+    db = SessionLocal()
+    try:
+        update_stream_bonus_from_workspace(
+            db,
+            order_id=order_id,
+            assignment_id=assignment_id,
+            enabled=enabled == "on",
+            admin_user=user,
+        )
+    except ValueError as exc:
+        db.rollback()
+        return _mw4a2r6_redirect(order_id, request=request, error=str(exc))
+    finally:
+        db.close()
+
+    return _mw4a2r6_redirect(order_id, request=request, message="直播加成已更新。")
 
 
 @router.post("/admin/order-workspace/{order_id}/assignments/{assignment_id}/remove")

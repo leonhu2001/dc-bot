@@ -749,6 +749,24 @@
                             <button class="mw-r8-btn" type="submit">修正掛名</button>
                         </form>
 
+                        <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/assignments/{{ row.assignment_id }}/stream-bonus?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <label class="mw-r8-check">
+                                <input type="checkbox" name="enabled" value="on" {% if row.effective_stream_bonus %}checked{% endif %} {% if not stream_bonus_editable %}disabled{% endif %}>
+                                管理端修正直播（新制 +2%）
+                            </label>
+                            <button class="mw-r8-btn" type="submit" {% if not stream_bonus_editable %}disabled{% endif %}>修正直播</button>
+                            <small class="mw-r8-meta">
+                                {% if row.stream_bonus_override_active %}
+                                    管理端覆寫｜核准報單原值：{{ '有直播' if row.report_streamed else '無直播' }}
+                                {% elif stream_bonus_editable %}
+                                    目前跟隨核准報單
+                                {% else %}
+                                    需新制且報單審核通過
+                                {% endif %}
+                            </small>
+                        </form>
+
                         <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/manual-payout?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="worker_discord_id" value="{{ row.worker_discord_id }}">

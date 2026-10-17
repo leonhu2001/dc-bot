@@ -125,6 +125,7 @@ class OrderAssignment(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     has_named_bonus: Mapped[bool] = mapped_column(Boolean, default=False)
+    stream_bonus_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     assigned_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     removed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

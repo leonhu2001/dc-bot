@@ -104,6 +104,21 @@ def ensure_sqlite_additive_columns(bind=engine) -> None:
                 )
             )
 
+        if "order_assignments" in tables:
+            assignment_columns = {
+                str(row[1])
+                for row in conn.execute(
+                    text("PRAGMA table_info(order_assignments)")
+                ).fetchall()
+            }
+            if "stream_bonus_override" not in assignment_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE order_assignments "
+                        "ADD COLUMN stream_bonus_override INTEGER"
+                    )
+                )
+
 
 def create_all_tables() -> None:
     import shared.models  # noqa: F401

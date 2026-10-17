@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select, text
 
 from shared.db import SessionLocal
-from shared.models import CustomerServicePayout, PayoutStatus, WebOrder, WorkerPayout
+from shared.models import CustomerServicePayout, OrderAssignment, PayoutStatus, WebOrder, WorkerPayout
 from shared.payout import (
     CUSTOMER_SERVICE_PAYOUT_RATE,
     LEGACY_CUSTOMER_SERVICE_GROSS_RATE,
@@ -89,6 +89,37 @@ def _approved_stream_map(db, order_id: int) -> dict[str, bool]:
     }
 
 
+def _assignment_stream_override_map(db, order_id: int) -> dict[str, bool]:
+    rows = db.execute(
+        select(
+            OrderAssignment.worker_discord_id,
+            OrderAssignment.stream_bonus_override,
+        )
+        .where(OrderAssignment.order_id == int(order_id))
+        .where(OrderAssignment.is_active.is_(True))
+        .where(OrderAssignment.stream_bonus_override.is_not(None))
+        .order_by(OrderAssignment.id.asc())
+    ).all()
+    return {
+        str(worker_id): bool(override)
+        for worker_id, override in rows
+        if str(worker_id or "").strip()
+    }
+
+
+def _effective_stream_bonus(
+    *,
+    legacy: bool,
+    report_streamed: bool,
+    override: bool | None,
+) -> bool:
+    if legacy:
+        return False
+    if override is None:
+        return bool(report_streamed)
+    return bool(override)
+
+
 def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None = None) -> dict:
     """Apply report-reviewed worker bonuses and then refresh CS margin share.
 
@@ -103,6 +134,7 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
 
         legacy = _is_legacy_order(order)
         stream_map = _approved_stream_map(db, int(order_id))
+        stream_override_map = _assignment_stream_override_map(db, int(order_id))
         payouts = list(
             db.scalars(
                 select(WorkerPayout).where(WorkerPayout.order_id == int(order_id))
@@ -114,7 +146,12 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
             worker_id = str(payout.worker_discord_id or "")
             previous_salary = previous_month_paid_salary(db, worker_id, now=now)
             previous_bonus = (not legacy) and previous_salary >= WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD
-            streamed = (not legacy) and bool(stream_map.get(worker_id))
+            stream_override = stream_override_map.get(worker_id)
+            streamed = _effective_stream_bonus(
+                legacy=legacy,
+                report_streamed=bool(stream_map.get(worker_id)),
+                override=stream_override,
+            )
             named = bool(payout.has_named_bonus)
 
             if legacy:
@@ -154,6 +191,7 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 "worker_id": worker_id,
                 "rate": rate,
                 "streamed": streamed,
+                "stream_bonus_override": stream_override,
                 "named": named,
                 "previous_month_paid_salary": previous_salary,
                 "previous_month_bonus": previous_bonus,
