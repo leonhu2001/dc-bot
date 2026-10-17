@@ -34,7 +34,6 @@ from services.order_credential_runtime import (
     OrderCredentialEntryView,
 )
 from services.order_point_redemption import (
-    configure_order_point_redemption,
     _get_pending_order_point_benefit_info,
     precheck_order_point_benefit_for_payment,
     redeem_order_point_benefit_on_payment,
@@ -168,30 +167,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
             taipei_now_iso=namespace["get_taipei_now_iso"],
             remember_data=namespace["remember_order_data"],
             save_data=namespace["save_bot_data"],
-        )
-
-    redemption_keys = {
-        "CUSTOMER_REWARDS",
-        "_to_int",
-        "get_current_reward_points",
-        "get_customer_reward_data",
-        "get_order_point_item",
-        "get_taipei_now_iso",
-        "remember_order_data",
-        "save_bot_data",
-        "send_order_log",
-    }
-    if redemption_keys.issubset(namespace):
-        configure_order_point_redemption(
-            customer_rewards=namespace["CUSTOMER_REWARDS"],
-            to_int=namespace["_to_int"],
-            current_reward_points=namespace["get_current_reward_points"],
-            customer_reward_data=namespace["get_customer_reward_data"],
-            order_point_item=namespace["get_order_point_item"],
-            taipei_now_iso=namespace["get_taipei_now_iso"],
-            remember_data=namespace["remember_order_data"],
-            save_data=namespace["save_bot_data"],
-            order_log_sender=namespace["send_order_log"],
         )
 
     payment_keys = {
