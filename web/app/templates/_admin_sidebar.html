@@ -30,6 +30,13 @@
         </a>
 
         <a
+            class="{% if _p.startswith('/admin/benefit-center') %}active{% endif %}"
+            href="/admin/benefit-center"
+        >
+            優惠與福利
+        </a>
+
+        <a
             class="{% if _p.startswith('/admin/finance-center') or _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') or _p.startswith('/admin/payout') or _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
             href="/admin/finance-center"
         >
