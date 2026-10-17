@@ -1,0 +1,60 @@
+name: Temporary admin stream bonus patch
+
+on:
+  push:
+    branches:
+      - feature/admin-stream-bonus-override-20261018
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/admin-stream-bonus-override-20261018
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Apply bounded patch
+        run: python tools/tmp_patch_admin_stream_bonus.py
+      - name: Compile changed Python
+        run: >-
+          python -m py_compile
+          shared/models.py
+          shared/db.py
+          web/app/services/worker_bonus_payout.py
+          web/app/services/admin_service.py
+          web/app/routers/admin_order_workspace.py
+          tests/test_admin_stream_bonus_override.py
+      - name: Run dependency-free boundary checks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          model = Path('shared/models.py').read_text(encoding='utf-8')
+          schema = Path('shared/db.py').read_text(encoding='utf-8')
+          payout = Path('web/app/services/worker_bonus_payout.py').read_text(encoding='utf-8')
+          service = Path('web/app/services/admin_service.py').read_text(encoding='utf-8')
+          router = Path('web/app/routers/admin_order_workspace.py').read_text(encoding='utf-8')
+          template = Path('web/app/templates/admin_order_detail.html').read_text(encoding='utf-8')
+          assert 'stream_bonus_override: Mapped[bool | None]' in model
+          assert 'ADD COLUMN stream_bonus_override INTEGER' in schema
+          assert '_effective_stream_bonus' in payout
+          assert 'toggle_stream_bonus_for_assignment' in service
+          assert '/stream-bonus' in router
+          assert '管理端修正直播（新制 +2%）' in template
+          assert 'storage_keys =' in Path('services/order_runtime.py').read_text(encoding='utf-8')
+          PY
+      - name: Remove temporary helpers and commit
+        run: |
+          rm tools/tmp_patch_admin_stream_bonus.py
+          rm .github/workflows/tmp_admin_stream_bonus_patch.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Add admin stream bonus override control'
+          git push origin HEAD:feature/admin-stream-bonus-override-20261018
