@@ -18,18 +18,17 @@ def install_root_benefit_integrations() -> None:
     from services import loyalty_benefits as loyalty
     from services import promotion_benefits as promotion
     from services import promotion_benefit_lifecycle as promotion_lifecycle
-    from services import vip_monthly_benefits as vip_monthly
     from services.payout_policy_migration import freeze_existing_orders_on_legacy_cs_policy
+    from services.vip_monthly_cash_policy import install_cash_entitlement_wrapper
 
     # First startup after deployment is the policy boundary. Orders that already
     # exist keep the old gross-5% CS formula; new orders use margin-pool 25%.
     freeze_existing_orders_on_legacy_cs_policy()
 
-    # New VIP monthly cash policy: tier entitlement opens the monthly benefit;
-    # usage eligibility is enforced against the current order amount instead of
-    # a trailing-30-day spend gate.
-    for level_name in list(vip_monthly.VIP_MONTHLY_RECENT_SPEND_MINIMUM):
-        vip_monthly.VIP_MONTHLY_RECENT_SPEND_MINIMUM[level_name] = 0
+    # Cash coupons are tier entitlements and no longer require trailing-30-day
+    # spend. The Black Diamond service benefit keeps its existing activity gate
+    # until that separate policy is decided.
+    install_cash_entitlement_wrapper()
 
     if not hasattr(loyalty, "_promotion_original_reserve_coupon_in_session"):
         loyalty._promotion_original_reserve_coupon_in_session = loyalty.reserve_coupon_in_session
