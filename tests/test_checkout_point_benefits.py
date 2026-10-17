@@ -158,7 +158,7 @@ def test_multi_companion_reward_only_funds_one_seat():
     assert service_value == 300
 
 
-def test_point_cash_coupon_remains_store_absorbed():
+def test_point_cash_coupon_is_shared_and_reduces_payout_base():
     finance = checkout.calculate_checkout_financials(
         service_amount=600,
         vip_pay_rate=100,
@@ -168,8 +168,8 @@ def test_point_cash_coupon_remains_store_absorbed():
         use_wallet=False,
     )
     assert finance["customer_pay_amount"] == 500
-    assert finance["payout_base_amount"] == 600
-    assert finance["store_absorbed_amount"] == 100
+    assert finance["payout_base_amount"] == 500
+    assert finance["store_absorbed_amount"] == 0
 
 
 def test_point_added_service_uses_full_value_even_with_vip_discount():
