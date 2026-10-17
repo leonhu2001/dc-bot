@@ -8,6 +8,7 @@ WORKER_BASE_PAYOUT_RATE = 0.80
 CUSTOMER_SERVICE_PAYOUT_RATE = 0.25
 LEGACY_CUSTOMER_SERVICE_GROSS_RATE = 0.05
 WORKER_NAMED_BONUS_RATE = 0.03
+LEGACY_WORKER_NAMED_BONUS_RATE = 0.05
 LEGACY_CUSTOMER_SERVICE_POLICY = "legacy_gross_5_v1"
 
 
@@ -158,6 +159,17 @@ def calculate_order_payout(
     if legacy_customer_service_gross_rate is None and tagged_legacy_rate is not None:
         legacy_customer_service_gross_rate = float(tagged_legacy_rate)
 
+    # Orders frozen on the legacy policy must retain the pre-change named bonus
+    # as well as the old CS gross-rate formula. Without this, any later payout
+    # recalculation would silently rewrite a historical named order from +5% to
+    # the new +3% rule.
+    effective_named_bonus_rate = max(0.0, float(named_bonus_rate or 0))
+    if (
+        legacy_customer_service_gross_rate is not None
+        and abs(effective_named_bonus_rate - WORKER_NAMED_BONUS_RATE) < 1e-9
+    ):
+        effective_named_bonus_rate = LEGACY_WORKER_NAMED_BONUS_RATE
+
     customer_service_amount = (
         max(0, int(total_amount or 0))
         if customer_service_total_amount is None
@@ -197,7 +209,7 @@ def calculate_order_payout(
     effective_worker_rate = max(0.0, min(1.0, float(worker_base_rate or 0)))
     if worker_count > 0 and named_count > 0:
         effective_worker_rate += (
-            max(0.0, float(named_bonus_rate or 0))
+            effective_named_bonus_rate
             * named_count
             / worker_count
         )
@@ -230,7 +242,7 @@ def calculate_order_payout(
             worker_count=worker_count,
             worker_base_rate=worker_base_rate,
             customer_service_rate=effective_customer_service_rate,
-            named_bonus_rate=named_bonus_rate,
+            named_bonus_rate=effective_named_bonus_rate,
             customer_service_payout=customer_service_payout,
             worker_payouts=[],
             total_worker_payout=0,
@@ -243,7 +255,7 @@ def calculate_order_payout(
             worker_count=0,
             worker_base_rate=worker_base_rate,
             customer_service_rate=effective_customer_service_rate,
-            named_bonus_rate=named_bonus_rate,
+            named_bonus_rate=effective_named_bonus_rate,
             customer_service_payout=customer_service_payout,
             worker_payouts=[],
             total_worker_payout=0,
@@ -256,7 +268,11 @@ def calculate_order_payout(
     for worker_id in unique_worker_ids:
         base_payout = gross_share * worker_base_rate
         has_named_bonus = worker_id in named_bonus_worker_set
-        named_bonus_amount = gross_share * named_bonus_rate if has_named_bonus else 0
+        named_bonus_amount = (
+            gross_share * effective_named_bonus_rate
+            if has_named_bonus
+            else 0
+        )
         final_payout = base_payout + named_bonus_amount
 
         worker_payouts.append(
@@ -265,7 +281,7 @@ def calculate_order_payout(
                 gross_share=gross_share,
                 base_rate=worker_base_rate,
                 base_payout=base_payout,
-                named_bonus_rate=named_bonus_rate,
+                named_bonus_rate=effective_named_bonus_rate,
                 named_bonus_amount=named_bonus_amount,
                 final_payout=final_payout,
                 has_named_bonus=has_named_bonus,
@@ -280,7 +296,7 @@ def calculate_order_payout(
         worker_count=worker_count,
         worker_base_rate=worker_base_rate,
         customer_service_rate=effective_customer_service_rate,
-        named_bonus_rate=named_bonus_rate,
+        named_bonus_rate=effective_named_bonus_rate,
         customer_service_payout=customer_service_payout,
         worker_payouts=worker_payouts,
         total_worker_payout=total_worker_payout,
