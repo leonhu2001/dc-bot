@@ -28,6 +28,7 @@
                 </div>
             </div>
             <form class="benefit-form" method="post" action="/admin/benefits/issue">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <label>
                     會員 Discord ID
                     <input name="customer_discord_id" list="benefit-customers" value="{{ selected_customer }}" required placeholder="輸入或選擇會員 ID">
@@ -72,6 +73,7 @@
 
             {% if user and user.is_manager %}
             <form class="benefit-form" method="post" action="/admin/benefits/templates">
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                 <div class="benefit-form-grid">
                     <label>
                         模板名稱
@@ -204,6 +206,7 @@
                     <td>
                         {% if item.status in ['active','reserved'] %}
                         <form method="post" action="/admin/benefits/issued/{{ item.id }}/revoke">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="reason" value="管理端撤回">
                             <button class="button secondary" type="submit">撤回</button>
                         </form>
