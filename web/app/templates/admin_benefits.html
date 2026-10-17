@@ -3,14 +3,19 @@
 {% block page_title %}優惠與福利{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261017">
+<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261018">
+
+{% set form_template = editing_template or {} %}
+{% set form_scope_type = form_template.get('scope_type', 'all') %}
+{% set form_scope_values = form_template.get('scope_values', []) %}
+{% set form_excluded = form_template.get('excluded_rule_keys', []) %}
 
 <div class="benefits-page">
     <section class="panel compact-panel benefits-head">
         <div>
             <span class="eyebrow">BENEFITS & COUPONS</span>
             <h2>優惠與福利</h2>
-            <p class="muted-text">模板只負責建立規則；發出去的福利會保存當下規則快照，之後改模板不會偷改舊券。</p>
+            <p class="muted-text">模板預設不回寫已發出的福利；只有管理員在編輯時明確勾選「同步尚未使用福利」才會更新舊券。</p>
         </div>
         <a class="button secondary" href="/admin/customer-center">客戶中心</a>
     </section>
@@ -20,7 +25,7 @@
     {% endif %}
 
     <div class="benefit-grid">
-        <section class="panel">
+        <section class="panel benefit-issue-panel">
             <div class="benefit-section-head">
                 <div>
                     <span class="eyebrow">ISSUE</span>
@@ -29,15 +34,21 @@
             </div>
             <form class="benefit-form" method="post" action="/admin/benefits/issue">
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
                 <label>
-                    會員 Discord ID
-                    <input name="customer_discord_id" list="benefit-customers" value="{{ selected_customer }}" required placeholder="輸入或選擇會員 ID">
+                    會員
+                    <select class="benefit-member-select" name="customer_discord_id" required>
+                        <option value="">選擇會員</option>
+                        {% if selected_customer %}
+                        <option value="{{ selected_customer }}" selected>{{ selected_customer }}</option>
+                        {% endif %}
+                        {% for customer in customers if customer.customer_discord_id != selected_customer %}
+                        <option value="{{ customer.customer_discord_id }}">
+                            {{ customer.display_name }} · {{ customer.customer_discord_id }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </label>
-                <datalist id="benefit-customers">
-                    {% for customer in customers %}
-                    <option value="{{ customer.customer_discord_id }}">{{ customer.display_name }}</option>
-                    {% endfor %}
-                </datalist>
 
                 <label>
                     福利模板
@@ -63,114 +74,213 @@
             </form>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="benefit-template-editor">
             <div class="benefit-section-head">
                 <div>
                     <span class="eyebrow">TEMPLATES</span>
-                    <h3>券／福利模板</h3>
+                    <h3>{% if editing_template %}編輯模板 #{{ editing_template.id }}{% else %}建立福利模板{% endif %}</h3>
                 </div>
+                {% if editing_template %}
+                <a class="button secondary benefit-mini-button" href="/admin/benefits#benefit-template-editor">取消編輯</a>
+                {% endif %}
             </div>
 
             {% if user and user.is_manager %}
-            <form class="benefit-form" method="post" action="/admin/benefits/templates">
+            <form
+                class="benefit-form"
+                method="post"
+                action="{% if editing_template %}/admin/benefits/templates/{{ editing_template.id }}{% else %}/admin/benefits/templates{% endif %}"
+            >
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
                 <div class="benefit-form-grid">
                     <label>
                         模板名稱
-                        <input name="name" required placeholder="例如：主播宣傳 1500T">
+                        <input name="name" required value="{{ form_template.get('name', '') }}" placeholder="例如：主播宣傳 1500T">
                     </label>
+
                     <label>
                         抵免方式
                         <select name="effect_kind" required>
                             {% for value, label in effect_kinds %}
-                            <option value="{{ value }}">{{ label }}</option>
+                            <option value="{{ value }}" {% if form_template.get('effect_kind', 'fixed_cash') == value %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </label>
+
                     <label>
                         額度／百分比／時數／局數
-                        <input type="number" step="0.5" min="0" name="effect_value" value="0">
+                        <input type="number" step="0.5" min="0" name="effect_value" value="{{ form_template.get('effect_value', 0) }}">
                     </label>
+
                     <label>
                         負擔方式
                         <select name="funding" required>
-                            <option value="store">店家全吸收（打手／客服不降）</option>
-                            <option value="shared">共同分攤（折後再算分潤）</option>
+                            <option value="store" {% if form_template.get('funding', 'store') == 'store' %}selected{% endif %}>店家全吸收（打手／客服不降）</option>
+                            <option value="shared" {% if form_template.get('funding') == 'shared' %}selected{% endif %}>共同分攤（折後再算分潤）</option>
                         </select>
                     </label>
+
                     <label>
                         單筆最低原始服務金額
-                        <input type="number" min="0" name="min_order_amount" value="0">
+                        <input type="number" min="0" name="min_order_amount" value="{{ form_template.get('min_order_amount', 0) }}">
                     </label>
+
                     <label>
                         有效天數
-                        <input type="number" min="1" name="valid_days" placeholder="留空＝不自動到期">
+                        <input type="number" min="1" name="valid_days" value="{{ form_template.get('valid_days') or '' }}" placeholder="留空＝不自動到期">
                     </label>
+
                     <label>
                         可使用次數
-                        <input type="number" min="1" name="usage_limit" value="1">
+                        <input type="number" min="1" name="usage_limit" value="{{ form_template.get('usage_limit', 1) }}">
                     </label>
+
                     <label>
                         額度使用方式
                         <select name="consume_mode">
-                            <option value="one_shot">單次使用，未折完作廢</option>
-                            <option value="balance">保留剩餘額度</option>
+                            <option value="one_shot" {% if form_template.get('consume_mode', 'one_shot') == 'one_shot' %}selected{% endif %}>單次使用，未折完作廢</option>
+                            <option value="balance" {% if form_template.get('consume_mode') == 'balance' %}selected{% endif %}>保留剩餘額度</option>
                         </select>
                     </label>
+
                     <label>
                         適用範圍
-                        <select name="scope_type">
-                            <option value="all">全館</option>
-                            <option value="category">指定分類</option>
-                            <option value="rule">指定商品規則</option>
+                        <select name="scope_type" data-benefit-scope-select>
+                            <option value="all" {% if form_scope_type == 'all' %}selected{% endif %}>全館</option>
+                            <option value="category" {% if form_scope_type == 'category' %}selected{% endif %}>指定分類</option>
+                            <option value="rule" {% if form_scope_type == 'rule' %}selected{% endif %}>指定商品</option>
                         </select>
                     </label>
-                    <label>
-                        範圍值（逗號分隔）
-                        <input name="scope_values" placeholder="例如：valorant,apex 或 rule_key">
-                    </label>
-                    <label>
-                        排除商品 rule_key（逗號分隔）
-                        <input name="excluded_rule_keys" placeholder="可留空">
-                    </label>
+
                     <label>
                         時數／局數作用範圍
                         <select name="seat_mode">
-                            <option value="one_seat">一個陪玩席位</option>
-                            <option value="whole_order">整張單所有陪玩</option>
+                            <option value="one_seat" {% if form_template.get('seat_mode', 'one_seat') == 'one_seat' %}selected{% endif %}>一個陪玩席位</option>
+                            <option value="whole_order" {% if form_template.get('seat_mode') == 'whole_order' %}selected{% endif %}>整張單所有陪玩</option>
                         </select>
                     </label>
                 </div>
 
-                <div class="benefit-actions">
-                    <label><input type="checkbox" name="include_specify_fee" value="1"> 抵免可包含指定費</label>
-                    <label><input type="checkbox" name="allow_vip_discount" value="1" checked> 可與 VIP 百分比折扣併用</label>
-                    <label><input type="checkbox" name="high_risk" value="1"> 標記高風險模板</label>
+                <div class="benefit-picker-section" data-scope-panel="category">
+                    <div class="benefit-picker-head">
+                        <div>
+                            <strong>指定分類</strong>
+                            <small>勾選這張福利可以使用的分類。</small>
+                        </div>
+                    </div>
+                    <div class="benefit-check-grid compact">
+                        {% for category in category_options %}
+                        <label class="benefit-check-row">
+                            <input type="checkbox" name="scope_category_values" value="{{ category.key }}" {% if category.key in form_scope_values %}checked{% endif %}>
+                            <span>{{ category.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="benefit-picker-section" data-scope-panel="rule">
+                    <div class="benefit-picker-head">
+                        <div>
+                            <strong>指定商品</strong>
+                            <small>不用再貼 rule key，直接勾商品。</small>
+                        </div>
+                        <input class="benefit-filter-input" type="search" placeholder="搜尋商品" data-benefit-filter="scope-rule-picker">
+                    </div>
+                    <div class="benefit-check-grid" id="scope-rule-picker">
+                        {% for rule in rule_options %}
+                        <label class="benefit-check-row" data-benefit-option="{{ rule.category_label }} {{ rule.label }} {{ rule.key }}">
+                            <input type="checkbox" name="scope_rule_values" value="{{ rule.key }}" {% if rule.key in form_scope_values %}checked{% endif %}>
+                            <span><b>{{ rule.label }}</b><small>{{ rule.category_label }}</small></span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="benefit-picker-section">
+                    <div class="benefit-picker-head">
+                        <div>
+                            <strong>排除商品</strong>
+                            <small>即使上面選了全館或某分類，這裡勾選的商品仍不可使用。</small>
+                        </div>
+                        <input class="benefit-filter-input" type="search" placeholder="搜尋要排除的商品" data-benefit-filter="excluded-rule-picker">
+                    </div>
+                    <div class="benefit-check-grid" id="excluded-rule-picker">
+                        {% for rule in rule_options %}
+                        <label class="benefit-check-row" data-benefit-option="{{ rule.category_label }} {{ rule.label }} {{ rule.key }}">
+                            <input type="checkbox" name="excluded_rule_keys" value="{{ rule.key }}" {% if rule.key in form_excluded %}checked{% endif %}>
+                            <span><b>{{ rule.label }}</b><small>{{ rule.category_label }}</small></span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="benefit-toggle-grid">
+                    <label class="benefit-toggle">
+                        <input type="checkbox" name="include_specify_fee" value="1" {% if form_template.get('include_specify_fee') %}checked{% endif %}>
+                        <span><b>包含指定費</b><small>福利可一起抵免指定費</small></span>
+                    </label>
+                    <label class="benefit-toggle">
+                        <input type="checkbox" name="allow_vip_discount" value="1" {% if form_template.get('allow_vip_discount', 1) %}checked{% endif %}>
+                        <span><b>可疊 VIP 折扣</b><small>允許和 VIP 百分比折扣一起使用</small></span>
+                    </label>
+                    <label class="benefit-toggle">
+                        <input type="checkbox" name="high_risk" value="1" {% if form_template.get('is_high_risk') %}checked{% endif %}>
+                        <span><b>高風險模板</b><small>整單免單或高額補貼建議開啟</small></span>
+                    </label>
+                    {% if editing_template %}
+                    <label class="benefit-toggle">
+                        <input type="checkbox" name="is_active" value="1" {% if editing_template.is_active %}checked{% endif %}>
+                        <span><b>模板啟用</b><small>取消後不再提供新發放</small></span>
+                    </label>
+                    <label class="benefit-toggle danger-zone span-2">
+                        <input type="checkbox" name="sync_unused_issued" value="1">
+                        <span><b>同步尚未使用的舊福利</b><small>只更新未使用、未保留、未過期的舊券；已使用或正在訂單中的福利不動，到期時間也維持原值。</small></span>
+                    </label>
+                    {% endif %}
                 </div>
 
                 <div class="benefit-warning">
-                    整單免單、店家全吸收與高額券會讓客人付款降低甚至歸零，但打手／客服仍依原本結算基數拿應得金額。建立前請確認活動預算。
+                    整單免單、店家全吸收與高額券可能讓客人付款降到 0；店家吸收模式下，打手／客服仍依原本結算基數計算。請在儲存前確認活動預算與適用範圍。
                 </div>
-                <button class="button" type="submit">建立模板</button>
+
+                <div class="benefit-form-submit">
+                    <button class="button" type="submit">{% if editing_template %}儲存模板修改{% else %}建立模板{% endif %}</button>
+                    {% if editing_template %}<a class="button secondary" href="/admin/benefits#benefit-template-editor">取消</a>{% endif %}
+                </div>
             </form>
             {% else %}
-            <p class="muted-text">客服可從核准模板發券；只有管理員能建立高風險或新規則模板。</p>
+            <p class="muted-text">客服可從核准模板發券；只有管理員能建立、編輯或同步舊福利。</p>
             {% endif %}
 
-            <div class="benefit-table-wrap">
+            <div class="benefit-table-wrap benefit-template-table-wrap">
                 <table class="benefit-table">
-                    <thead><tr><th>模板</th><th>效果</th><th>負擔</th><th>門檻</th><th>期限</th></tr></thead>
+                    <thead>
+                        <tr><th>模板</th><th>效果</th><th>負擔</th><th>範圍</th><th>門檻</th><th>期限</th><th>操作</th></tr>
+                    </thead>
                     <tbody>
                     {% for item in templates %}
                     <tr>
                         <td><strong>#{{ item.id }} {{ item.name }}</strong>{% if not item.is_active %}<br><small>已停用</small>{% endif %}</td>
                         <td>{{ effect_labels.get(item.effect_kind, item.effect_kind) }}{% if item.effect_value %} {{ item.effect_value|float|round(2) }}{% endif %}</td>
                         <td><span class="benefit-tag {{ item.funding }}">{{ funding_labels.get(item.funding, item.funding) }}</span></td>
+                        <td>
+                            {% if item.scope_type == 'all' %}全館
+                            {% elif item.scope_type == 'category' %}{{ item.scope_values|length }} 個分類
+                            {% else %}{{ item.scope_values|length }} 個商品
+                            {% endif %}
+                            {% if item.excluded_rule_keys %}<br><small>排除 {{ item.excluded_rule_keys|length }} 項</small>{% endif %}
+                        </td>
                         <td>{% if item.min_order_amount %}滿 {{ item.min_order_amount }}T{% else %}無{% endif %}</td>
                         <td>{% if item.valid_days %}發放後 {{ item.valid_days }} 天{% else %}不限{% endif %}</td>
+                        <td>
+                            {% if user and user.is_manager %}
+                            <a class="button secondary benefit-mini-button" href="/admin/benefits?edit_template={{ item.id }}#benefit-template-editor">編輯</a>
+                            {% else %}—{% endif %}
+                        </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="5" class="muted-text">目前還沒有福利模板。</td></tr>
+                    <tr><td colspan="7" class="muted-text">目前還沒有福利模板。</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
@@ -208,7 +318,7 @@
                         <form method="post" action="/admin/benefits/issued/{{ item.id }}/revoke">
                             <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <input type="hidden" name="reason" value="管理端撤回">
-                            <button class="button secondary" type="submit">撤回</button>
+                            <button class="button secondary benefit-mini-button" type="submit">撤回</button>
                         </form>
                         {% else %}—{% endif %}
                     </td>
@@ -221,4 +331,6 @@
         </div>
     </section>
 </div>
+
+<script src="/static/js/pages/admin_benefits.js?v=20261018"></script>
 {% endblock %}
