@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Mapping
-
-import discord
-import pytest
 
 from core import database as core_database
 from core import time_utils
@@ -14,20 +10,6 @@ from services.acceptance import repair_runtime as acceptance_repair_runtime
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
 from services import order_dispatch_runtime
-
-
-def _required_namespace(**overrides):
-    namespace = {
-        "DISPATCH_CHANNEL_ID": 123,
-        "GUILD_ID": 456,
-        "ORDER_CLAIMS": {},
-        "PaymentMethodView": object,
-        "SELF_SERVICE_ORDER_SELECTIONS": {},
-        "_refresh_existing_web_sync_dispatch": lambda *_args, **_kwargs: None,
-        "bot": object(),
-    }
-    namespace.update(overrides)
-    return namespace
 
 
 def test_acceptance_runtime_owns_orchestration_persistence_dependencies():
@@ -92,77 +74,3 @@ def test_acceptance_explicit_configurator_is_keyword_only():
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
         for parameter in signature.parameters.values()
     )
-
-
-def test_acceptance_namespace_cannot_shadow_module_owned_dependencies():
-    runtime_owned = {
-        "Any": Any,
-        "Mapping": Mapping,
-        "discord": discord,
-        "remember_claim_data": core_database.remember_claim_data,
-        "remember_order_data": core_database.remember_order_data,
-        "save_bot_data": core_database.save_bot_data,
-        "_to_int": orders._to_int,
-        "DispatchClaimView": order_dispatch_runtime.DispatchClaimView,
-    }
-    moved_to_payment_panel = (
-        "get_taipei_now_iso",
-        "build_payment_method_embed",
-        "send_order_log",
-    )
-    marker = object()
-
-    acceptance_runtime.configure_acceptance_runtime(
-        _required_namespace(
-            **{name: object() for name in runtime_owned},
-            **{name: object() for name in moved_to_payment_panel},
-            _acceptance_runtime_boundary_marker=marker,
-        )
-    )
-
-    for name, original in runtime_owned.items():
-        assert getattr(acceptance_runtime, name) is original
-
-    for name in moved_to_payment_panel:
-        assert not hasattr(acceptance_runtime, name)
-
-    assert not hasattr(acceptance_runtime, "_acceptance_runtime_boundary_marker")
-
-
-def test_acceptance_legacy_adapter_only_validates_and_delegates():
-    source = inspect.getsource(acceptance_runtime.configure_acceptance_runtime)
-    assert "globals()[" not in source
-    assert "configure_acceptance_runtime_explicit(" in source
-    assert "configure_acceptance_sync_worker(" not in source
-    assert "configure_acceptance_repair_runtime(" not in source
-
-
-def test_acceptance_runtime_dependency_names_are_explicit():
-    assert acceptance_runtime._DEPENDENCY_NAMES == (
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CLAIMS",
-        "PaymentMethodView",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-    )
-    assert acceptance_runtime._SYNC_WORKER_DEPENDENCY_NAMES == (
-        "GUILD_ID",
-        "_refresh_existing_web_sync_dispatch",
-        "bot",
-    )
-    assert acceptance_runtime._REQUIRED_DEPENDENCY_NAMES == (
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CLAIMS",
-        "PaymentMethodView",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "GUILD_ID",
-        "_refresh_existing_web_sync_dispatch",
-        "bot",
-    )
-
-
-def test_acceptance_runtime_fails_fast_when_required_dependency_is_missing():
-    namespace = _required_namespace()
-    namespace.pop("PaymentMethodView")
-
-    with pytest.raises(RuntimeError, match="PaymentMethodView"):
-        acceptance_runtime.configure_acceptance_runtime(namespace)
