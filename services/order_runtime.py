@@ -23,7 +23,6 @@ from services.self_service_selection_state import (
 )
 
 from services.order_credential_runtime import (
-    configure_order_credentials,
     _order_requires_credentials,
     _credential_user_for_id,
     _credential_display_name,
@@ -144,30 +143,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
     for name in _ORDER_RUNTIME_BINDING_NAMES:
         if name in namespace:
             globals()[name] = namespace[name]
-
-    credential_keys = {
-        "CREDENTIAL_OWNER_USER_ID",
-        "GUILD_ID",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "_to_int",
-        "bot",
-        "fetch_member_safely",
-        "get_taipei_now_iso",
-        "remember_order_data",
-        "save_bot_data",
-    }
-    if credential_keys.issubset(namespace):
-        configure_order_credentials(
-            credential_owner_user_id=namespace["CREDENTIAL_OWNER_USER_ID"],
-            guild_id=namespace["GUILD_ID"],
-            self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            to_int=namespace["_to_int"],
-            bot_instance=namespace["bot"],
-            fetch_member=namespace["fetch_member_safely"],
-            taipei_now_iso=namespace["get_taipei_now_iso"],
-            remember_data=namespace["remember_order_data"],
-            save_data=namespace["save_bot_data"],
-        )
 
     payment_keys = {
         "DISPATCH_CHANNEL_ID",

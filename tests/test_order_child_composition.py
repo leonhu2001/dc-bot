@@ -8,8 +8,9 @@ ORDER_RUNTIME_SOURCE = (ROOT / "services" / "order_runtime.py").read_text(encodi
 BOT_SOURCE = (ROOT / "bot.py").read_text(encoding="utf-8")
 
 
-def test_order_child_composition_wires_dispatch_and_point_redemption(monkeypatch):
+def test_order_child_composition_wires_extracted_children(monkeypatch):
     dispatch_calls = []
+    credential_calls = []
     point_kwargs = {}
     sentinels = {
         "to_int": object(),
@@ -31,6 +32,11 @@ def test_order_child_composition_wires_dispatch_and_point_redemption(monkeypatch
         "configure_order_point_redemption",
         lambda **kwargs: point_kwargs.update(kwargs),
     )
+    monkeypatch.setattr(
+        composition,
+        "configure_order_credential_composition",
+        lambda *args: credential_calls.append(args),
+    )
     monkeypatch.setattr(composition, "_to_int", sentinels["to_int"])
     monkeypatch.setattr(composition, "get_current_reward_points", sentinels["current_reward_points"])
     monkeypatch.setattr(composition, "get_customer_reward_data", sentinels["customer_reward_data"])
@@ -43,14 +49,21 @@ def test_order_child_composition_wires_dispatch_and_point_redemption(monkeypatch
     claims = {}
     selections = {}
     rewards = {}
-    composition.configure_order_children(11, 22, claims, selections, rewards)
+    bot_instance = object()
+    composition.configure_order_children(
+        11, 22, claims, selections, rewards, 33, 44, bot_instance
+    )
 
     assert dispatch_calls == [(11, 22, claims, selections)]
     assert point_kwargs == {"customer_rewards": rewards, **sentinels}
+    assert credential_calls == [(33, 44, selections, bot_instance)]
 
 
-def test_point_redemption_composition_is_outside_legacy_order_runtime():
+def test_extracted_child_composition_is_outside_legacy_order_runtime():
     assert "configure_order_point_redemption" not in ORDER_RUNTIME_SOURCE
     assert "redemption_keys" not in ORDER_RUNTIME_SOURCE
+    assert "configure_order_credentials(" not in ORDER_RUNTIME_SOURCE
+    assert "credential_keys =" not in ORDER_RUNTIME_SOURCE
     assert "configure_order_children" in BOT_SOURCE
     assert "CUSTOMER_REWARDS" in BOT_SOURCE
+    assert "CREDENTIAL_OWNER_USER_ID" in BOT_SOURCE

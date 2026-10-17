@@ -7,6 +7,7 @@ from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
 from services.web_sync import runtime as web_sync_runtime
 from services import (
+    order_credential_composition,
     order_credential_runtime,
     order_dispatch_composition,
     order_payment_runtime,
@@ -34,6 +35,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(self_service_runtime.configure_self_service_runtime_explicit)
     assert not hasattr(self_service_runtime, "configure_self_service_runtime")
     assert callable(self_service_ui_runtime.configure_self_service_ui_runtime)
+    assert callable(order_credential_composition.configure_order_credential_composition)
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
     assert callable(order_payment_runtime.configure_order_payment_runtime)
@@ -157,6 +159,8 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
     assert "import bot" not in storage_source
     assert "from bot import" not in storage_source
     assert "class OrderCredentialModal" not in order_source
+    assert "credential_keys =" not in order_source
+    assert "configure_order_credentials(" not in order_source
     assert "async def redeem_order_point_benefit_on_payment" not in order_source
 
     assert "class OrderCredentialModal" in credentials_source

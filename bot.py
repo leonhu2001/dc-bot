@@ -6564,10 +6564,7 @@ configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch,
 )
 configure_web_sync_runtime(globals())
-configure_order_children(
-    BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS,
-    CUSTOMER_REWARDS,
-)
+configure_order_children(BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, CUSTOMER_REWARDS, CREDENTIAL_OWNER_USER_ID, GUILD_ID, bot)
 configure_order_runtime(globals())
 configure_order_lifecycle_runtime_explicit(
     receipt_channel_id=RECEIPT_CHANNEL_ID,
