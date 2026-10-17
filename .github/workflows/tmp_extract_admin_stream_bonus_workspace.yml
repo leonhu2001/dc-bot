@@ -1,0 +1,53 @@
+name: Temporary stream bonus workspace extraction
+
+on:
+  push:
+    branches:
+      - feature/admin-stream-bonus-override-20261018
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/admin-stream-bonus-override-20261018
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Apply bounded extraction
+        run: python tools/tmp_extract_admin_stream_bonus_workspace.py
+      - name: Compile changed Python
+        run: >-
+          python -m py_compile
+          web/app/routers/admin_order_workspace.py
+          web/app/services/admin_stream_bonus_workspace.py
+          tests/test_admin_stream_bonus_override.py
+      - name: Verify extraction boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          router = Path('web/app/routers/admin_order_workspace.py')
+          service = Path('web/app/services/admin_stream_bonus_workspace.py').read_text(encoding='utf-8')
+          source = router.read_text(encoding='utf-8')
+          assert router.stat().st_size <= 47000
+          assert 'def _mw_r8_worker_rows' not in source
+          assert 'load_stream_bonus_workspace_rows' in source
+          assert 'update_stream_bonus_from_workspace' in source
+          assert 'load_stream_bonus_workspace_rows' in service
+          assert 'storage_keys =' in Path('services/order_runtime.py').read_text(encoding='utf-8')
+          PY
+      - name: Remove temporary helpers and commit
+        run: |
+          rm tools/tmp_extract_admin_stream_bonus_workspace.py
+          rm .github/workflows/tmp_extract_admin_stream_bonus_workspace.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Extract stream bonus workspace glue'
+          git push origin HEAD:feature/admin-stream-bonus-override-20261018
