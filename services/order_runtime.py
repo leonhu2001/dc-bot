@@ -39,7 +39,6 @@ from services.order_point_redemption import (
 )
 from services.order_payment_runtime import finalize_accepted_pending_payment
 from services.order_storage_runtime import (
-    configure_order_storage_runtime,
     lock_dispatch_claim_panel,
     store_dispatch_claim_panel,
     resume_stored_order,
@@ -141,47 +140,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
         if name in namespace:
             globals()[name] = namespace[name]
 
-    storage_keys = {
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CATEGORY_LABELS",
-        "ORDER_CLAIMS",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "_apply_acceptance_state_to_claim_data",
-        "_get_rule_from_self_service_data",
-        "_to_int",
-        "build_self_service_order_embed",
-        "delete_claim_row_from_db",
-        "get_taipei_now_iso",
-        "prepare_initial_smart_dispatch",
-        "remember_claim_data",
-        "remember_order_data",
-        "save_bot_data",
-        "send_initial_smart_dispatch_alert",
-        "send_specified_staff_dispatch_dms",
-        "set_specified_dm_results",
-    }
-    if storage_keys.issubset(namespace):
-        configure_order_storage_runtime(
-            dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
-            dispatch_claim_view=DispatchClaimView,
-            order_category_labels=namespace["ORDER_CATEGORY_LABELS"],
-            order_claims=namespace["ORDER_CLAIMS"],
-            self_service_order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-            to_int=namespace["_to_int"],
-            self_service_order_embed_builder=namespace["build_self_service_order_embed"],
-            taipei_now_iso=namespace["get_taipei_now_iso"],
-            remember_claim=namespace["remember_claim_data"],
-            remember_order=namespace["remember_order_data"],
-            save_data=namespace["save_bot_data"],
-            acceptance_state_applier=namespace["_apply_acceptance_state_to_claim_data"],
-            self_service_rule_getter=namespace["_get_rule_from_self_service_data"],
-            claim_row_deleter=namespace["delete_claim_row_from_db"],
-            initial_dispatch_preparer=namespace["prepare_initial_smart_dispatch"],
-            initial_dispatch_alert_sender=namespace["send_initial_smart_dispatch_alert"],
-            specified_staff_dm_sender=namespace["send_specified_staff_dispatch_dms"],
-            specified_dm_result_setter=namespace["set_specified_dm_results"],
-            web_order_status_syncer=sync_web_order_status_from_bot,
-        )
 
     _CONFIGURED = True
 
