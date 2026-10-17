@@ -5,7 +5,7 @@ from core.database import remember_claim_data, remember_order_data, save_bot_dat
 import discord
 
 from services.acceptance.dispatch_refresh import (
-    _apply_acceptance_state_to_claim_data,
+    _apply_acceptance_state_to_claim_data as _apply_acceptance_state_to_claim_data_base,
     _build_receiver_text_from_claim_data,
     configure_acceptance_dispatch_refresh,
     refresh_acceptance_dispatch_from_web_order,
@@ -95,6 +95,66 @@ def configure_acceptance_runtime_explicit(
     )
 
     _CONFIGURED = True
+
+
+def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
+    """Apply acceptance state, then prefer formal active assignments after payment."""
+    _apply_acceptance_state_to_claim_data_base(claim_data, state)
+
+    if str(getattr(state, "status", "") or "").strip().lower() != "active":
+        return
+
+    order_id = _to_int(getattr(state, "order_id", None))
+    if order_id is None:
+        return
+
+    try:
+        from sqlalchemy import select
+        from shared.db import SessionLocal
+        from shared.models import OrderAssignment
+
+        db = SessionLocal()
+        try:
+            assignments = db.scalars(
+                select(OrderAssignment)
+                .where(OrderAssignment.order_id == int(order_id))
+                .where(OrderAssignment.is_active.is_(True))
+                .order_by(OrderAssignment.id.asc())
+            ).all()
+        finally:
+            db.close()
+    except Exception as exc:
+        print(
+            f"[acceptance] active assignment refresh failed order_id={order_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return
+
+    # Legacy active orders may predate formal assignments. Keep their saved
+    # acceptance snapshot if there is no canonical assignment row to replace it.
+    if not assignments:
+        return
+
+    companion_ids: set[int] = set()
+    booster_ids: set[int] = set()
+
+    for assignment in assignments:
+        worker_id = _to_int(getattr(assignment, "worker_discord_id", None))
+        if worker_id is None:
+            continue
+
+        role_type = str(getattr(assignment, "role_type", "") or "").strip().lower()
+        if role_type == "companion":
+            companion_ids.add(worker_id)
+        else:
+            booster_ids.add(worker_id)
+
+    if not companion_ids and not booster_ids:
+        return
+
+    claim_data["companion"] = companion_ids
+    claim_data["booster"] = booster_ids
 
 
 def _member_role_id_texts(member: discord.Member) -> list[str]:

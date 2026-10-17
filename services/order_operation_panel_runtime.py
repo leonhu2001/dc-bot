@@ -19,11 +19,18 @@ def _to_int(value: Any) -> int | None:
         return None
 
 
+def _order_status(order_data: object) -> str:
+    if not isinstance(order_data, dict):
+        return ""
+    return str(order_data.get("status") or "").strip().lower()
+
+
 def _is_active_order(order_data: object) -> bool:
-    return (
-        isinstance(order_data, dict)
-        and str(order_data.get("status") or "").strip().lower() == "active"
-    )
+    return _order_status(order_data) == "active"
+
+
+def _is_stored_order(order_data: object) -> bool:
+    return _order_status(order_data) == "stored"
 
 
 async def validate_staff_order_operation_interaction(
@@ -109,14 +116,19 @@ async def handle_order_operation_panel_interaction(
 
     interaction_data = interaction.data if isinstance(interaction.data, dict) else {}
     custom_id = str(interaction_data.get("custom_id") or "")
-    if not custom_id or custom_id in {
-        "staff_order_operation_select",
-        "staff_order_operation_confirm",
-    }:
+    if not custom_id or custom_id == "staff_order_operation_select":
         return
 
     order_data = order_selections.get(interaction.channel.id)
-    if not _is_active_order(order_data):
+
+    # The operation panel confirm button normally does not reposition itself.
+    # Resume is the exception: the interaction starts while the order is stored,
+    # then the callback switches it back to active. Waiting here lets the callback
+    # finish first, after which _reposition_panel can safely move the panel down.
+    if custom_id == "staff_order_operation_confirm":
+        if not _is_stored_order(order_data):
+            return
+    elif not _is_active_order(order_data):
         return
 
     panel_message_id = _to_int(order_data.get("operation_panel_message_id"))
