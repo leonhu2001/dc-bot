@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 # Phase 2 contract: moved responsibilities stay physically separated while the
 # parent runtimes expose only the startup/configuration surface still in use.
 from services.acceptance import dispatch_refresh as acceptance_dispatch_refresh
@@ -31,8 +29,8 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(web_sync_runtime._process_web_order_created_event)
     assert callable(order_runtime.configure_order_runtime)
     assert callable(order_storage_runtime.configure_order_storage_runtime)
-    assert callable(self_service_runtime.configure_self_service_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime_explicit)
+    assert not hasattr(self_service_runtime, "configure_self_service_runtime")
     assert callable(self_service_ui_runtime.configure_self_service_ui_runtime)
     assert callable(order_credential_runtime.configure_order_credentials)
     assert callable(order_point_redemption.configure_order_point_redemption)
@@ -233,10 +231,6 @@ def _order_dispatch_namespace() -> dict[str, object]:
 
 
 def test_runtime_configure_boundaries_match_current_migration_stage():
-    self_service_marker = "_self_service_runtime_test_marker"
-    if hasattr(self_service_runtime, self_service_marker):
-        delattr(self_service_runtime, self_service_marker)
-
     acceptance_runtime.configure_acceptance_runtime_explicit(
         dispatch_channel_id=123,
         order_claims={},
@@ -255,12 +249,18 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
             "_order_runtime_test_marker": object(),
         }
     )
-    with pytest.raises(RuntimeError, match="self-service runtime missing dependencies"):
-        self_service_runtime.configure_self_service_runtime(
-            {self_service_marker: object()}
-        )
+    self_service_runtime.configure_self_service_runtime_explicit(
+        customer_category_id=111,
+        customer_role_id=222,
+        dispatch_channel_id=333,
+        order_claims={},
+        point_redeem_items=(),
+        point_redeem_items_by_key={},
+        order_selections={},
+        order_control_view_type=object,
+    )
 
     assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     assert hasattr(order_runtime, "_order_runtime_test_marker")
-    assert not hasattr(self_service_runtime, self_service_marker)
+    assert not hasattr(self_service_runtime, "configure_self_service_runtime")
