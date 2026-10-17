@@ -13,6 +13,7 @@ def test_order_child_composition_wires_extracted_children(monkeypatch):
     credential_calls = []
     point_kwargs = {}
     payment_calls = []
+    storage_calls = []
     sentinels = {
         "to_int": object(),
         "current_reward_points": object(),
@@ -43,6 +44,11 @@ def test_order_child_composition_wires_extracted_children(monkeypatch):
         "configure_order_payment_composition",
         lambda *args: payment_calls.append(args),
     )
+    monkeypatch.setattr(
+        composition,
+        "configure_order_storage_composition",
+        lambda *args: storage_calls.append(args),
+    )
     monkeypatch.setattr(composition, "_to_int", sentinels["to_int"])
     monkeypatch.setattr(composition, "get_current_reward_points", sentinels["current_reward_points"])
     monkeypatch.setattr(composition, "get_customer_reward_data", sentinels["customer_reward_data"])
@@ -65,6 +71,7 @@ def test_order_child_composition_wires_extracted_children(monkeypatch):
     assert point_kwargs == {"customer_rewards": rewards, **sentinels}
     assert credential_calls == [(33, 44, selections, bot_instance)]
     assert payment_calls == [(22, claims, selections, staff_view)]
+    assert storage_calls == [(22, claims, selections)]
 
 
 def test_extracted_child_composition_is_outside_legacy_order_runtime():
@@ -74,6 +81,8 @@ def test_extracted_child_composition_is_outside_legacy_order_runtime():
     assert "credential_keys =" not in ORDER_RUNTIME_SOURCE
     assert "configure_order_payment_runtime(" not in ORDER_RUNTIME_SOURCE
     assert "payment_keys =" not in ORDER_RUNTIME_SOURCE
+    assert "configure_order_storage_runtime(" not in ORDER_RUNTIME_SOURCE
+    assert "storage_keys =" not in ORDER_RUNTIME_SOURCE
     assert "configure_order_children" in BOT_SOURCE
     assert "CUSTOMER_REWARDS" in BOT_SOURCE
     assert "CREDENTIAL_OWNER_USER_ID" in BOT_SOURCE

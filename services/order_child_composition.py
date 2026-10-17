@@ -7,6 +7,7 @@ from services.order_credential_composition import configure_order_credential_com
 from services.order_dispatch_composition import configure_order_dispatch_composition
 from services.order_payment_composition import configure_order_payment_composition
 from services.order_point_redemption import configure_order_point_redemption
+from services.order_storage_composition import configure_order_storage_composition
 from services.orders import _to_int
 from services.rewards import get_current_reward_points, get_customer_reward_data
 from services.self_service_financials import get_order_point_item
@@ -52,4 +53,9 @@ def configure_order_children(
         order_claims,
         order_selections,
         staff_order_operation_view,
+    )
+    configure_order_storage_composition(
+        dispatch_channel_id,
+        order_claims,
+        order_selections,
     )
