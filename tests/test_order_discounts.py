@@ -101,10 +101,10 @@ def test_named_worker_reduces_customer_service_share_with_margin_pool():
         named_bonus_worker_ids=["worker_a"],
     )
 
-    assert payout.worker_payouts[0].final_payout == pytest.approx(850)
-    # Margin pool is 150; CS receives 25% = 37.5T.
-    assert payout.customer_service_payout == pytest.approx(37.5)
-    assert payout.customer_service_rate == pytest.approx(0.0375)
+    assert payout.worker_payouts[0].final_payout == pytest.approx(830)
+    # Margin pool is 170; CS receives 25% = 42.5T.
+    assert payout.customer_service_payout == pytest.approx(42.5)
+    assert payout.customer_service_rate == pytest.approx(0.0425)
 
 
 def test_legacy_customer_service_gross_rate_is_available_for_old_orders():
