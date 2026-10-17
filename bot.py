@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from shared.web_order_sync import sync_web_worker_claim_from_dispatch
 
 load_dotenv()
-import os
 import json
 import re
 import random
@@ -148,6 +147,7 @@ from services.order_operation_panel_runtime import (
     register_order_operation_panel_listener,
     validate_staff_order_operation_interaction,
 )
+from services.order_dispatch_composition import configure_order_dispatch_composition
 from services.review_persistent_runtime import restore_persistent_review_views
 from services.wallet_service import (
     ensure_wallet_tables as _wallet_ensure_tables,
@@ -497,8 +497,6 @@ from views.welcome import (
     extract_welcome_member_mention,
 )
 
-import discord
-
 from services.ticket_identity import (
     configure_ticket_identity,
     _clean_ticket_channel_part,
@@ -513,7 +511,6 @@ from services.ticket_identity import (
 )
 from discord.ext import commands
 from discord import app_commands
-from dotenv import load_dotenv
 
 from core.permissions import (
     configure_permissions,
@@ -6566,6 +6563,9 @@ configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch,
 )
 configure_web_sync_runtime(globals())
+configure_order_dispatch_composition(
+    BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS
+)
 configure_order_runtime(globals())
 configure_order_lifecycle_runtime_explicit(
     receipt_channel_id=RECEIPT_CHANNEL_ID,
