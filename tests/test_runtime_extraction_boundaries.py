@@ -240,6 +240,8 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
         guild_id=456,
         refresh_existing_web_sync_dispatch=lambda *_args, **_kwargs: None,
     )
+    if hasattr(web_sync_runtime, "_web_sync_runtime_test_marker"):
+        delattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     web_sync_runtime.configure_web_sync_runtime(
         {"_web_sync_runtime_test_marker": object()}
     )
@@ -263,6 +265,6 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
     )
 
     assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
-    assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
+    assert not hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
     assert not hasattr(order_runtime, "_order_runtime_test_marker")
     assert not hasattr(self_service_runtime, "configure_self_service_runtime")
