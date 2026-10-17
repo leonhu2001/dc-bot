@@ -36,7 +36,7 @@ def test_dispatch_clickable_controls_are_visually_distinct_from_status_pills():
     css = _read("web/app/static/css/pages/dispatch_actions.css")
 
     assert 'dispatch_inline_1.css?v=20261017-actions-2' in template
-    assert 'dispatch_actions.css?v=20261017-actions-4' in template
+    assert 'dispatch_actions.css?v=20261017-actions-5' in template
     assert ".dispatch-shell a.dispatch-my-link" in css
     assert ".dispatch-shell a.dispatch-support-link" in css
     assert ".dispatch-shell .dispatch-footer .button" in css
@@ -44,7 +44,7 @@ def test_dispatch_clickable_controls_are_visually_distinct_from_status_pills():
     assert 'button[data-dispatch-notification-toggle][data-state="online"]' in css
     assert "body > .dispatch-alert-toggle" in css
     assert "body > .dispatch-alert-toggle:hover" in css
-    assert "background: linear-gradient(135deg, #f5c66b, #cf8f32) !important" in css
+    assert "background: linear-gradient(135deg, rgba(245, 198, 107, .96), rgba(210, 145, 47, .9));" in css
     assert "translateY(-2px)" in css
     assert "focus-visible" in css
     assert 'content: "↗"' in css
