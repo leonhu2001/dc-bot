@@ -3,6 +3,30 @@ from typing import Any, Mapping
 import discord
 
 from services import order_runtime
+from services.orders import ORDER_CATEGORY_LABELS
+
+
+EXPECTED_BINDING_NAMES = frozenset(
+    {
+        "DB_FILE",
+        "DISPATCH_CHANNEL_ID",
+        "ORDER_CONTROL_SELECTIONS",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "SelfServiceOrderView",
+        "_defer_and_refresh_self_service_panel",
+        "_get_rule_from_self_service_data",
+        "build_payment_method_embed",
+        "build_self_service_panel_embed",
+        "can_operate_self_service_order",
+        "format_t_amount",
+        "get_order_customer_id_from_channel",
+        "get_wallet_balance",
+        "is_customer_staff",
+        "remember_order_data",
+        "rename_ticket_channel",
+        "send_order_log",
+    }
+)
 
 
 def _dispatch_namespace() -> dict[str, object]:
@@ -23,25 +47,37 @@ def _dispatch_namespace() -> dict[str, object]:
     }
 
 
-def test_order_runtime_legacy_injection_cannot_shadow_module_owned_imports():
+def test_order_runtime_namespace_binding_is_explicitly_scoped(monkeypatch):
     originals = {
         "Any": Any,
         "Mapping": Mapping,
         "discord": discord,
+        "ORDER_CATEGORY_LABELS": ORDER_CATEGORY_LABELS,
     }
+    order_control = {}
     marker = object()
+
+    monkeypatch.delattr(order_runtime, "_order_runtime_boundary_marker", raising=False)
+    monkeypatch.setattr(order_runtime, "_CONFIGURED", False)
 
     order_runtime.configure_order_runtime(
         {
             **_dispatch_namespace(),
             **{name: object() for name in originals},
+            "ORDER_CONTROL_SELECTIONS": order_control,
             "_order_runtime_boundary_marker": marker,
         }
     )
 
+    assert order_runtime._CONFIGURED is True
+    assert order_runtime.ORDER_CONTROL_SELECTIONS is order_control
+    assert not hasattr(order_runtime, "_order_runtime_boundary_marker")
     for name, original in originals.items():
         assert getattr(order_runtime, name) is original
-    assert order_runtime._order_runtime_boundary_marker is marker
+
+
+def test_order_runtime_binding_allowlist_matches_direct_runtime_dependencies():
+    assert order_runtime._ORDER_RUNTIME_BINDING_NAMES == EXPECTED_BINDING_NAMES
 
 
 def test_order_runtime_owned_dependency_names_are_explicit():
