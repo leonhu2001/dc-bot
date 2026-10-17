@@ -72,19 +72,36 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     }
 )
 
+_ORDER_RUNTIME_BINDING_NAMES = frozenset(
+    {
+        "DB_FILE",
+        "DISPATCH_CHANNEL_ID",
+        "ORDER_CONTROL_SELECTIONS",
+        "SELF_SERVICE_ORDER_SELECTIONS",
+        "SelfServiceOrderView",
+        "_defer_and_refresh_self_service_panel",
+        "_get_rule_from_self_service_data",
+        "build_payment_method_embed",
+        "build_self_service_panel_embed",
+        "can_operate_self_service_order",
+        "format_t_amount",
+        "get_order_customer_id_from_channel",
+        "get_wallet_balance",
+        "is_customer_staff",
+        "remember_order_data",
+        "rename_ticket_channel",
+        "send_order_log",
+    }
+)
+
 
 def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
     """Bind remaining bot-owned legacy dependencies after bot.py is loaded."""
     global _CONFIGURED
 
-    for name, value in namespace.items():
-        if name.startswith("__"):
-            continue
-        if name == "configure_order_runtime":
-            continue
-        if name in _MODULE_OWNED_RUNTIME_NAMES:
-            continue
-        globals()[name] = value
+    for name in _ORDER_RUNTIME_BINDING_NAMES:
+        if name in namespace:
+            globals()[name] = namespace[name]
 
     dispatch_keys = {
         "BOOSTER_RECEIVER_ROLE_ID",
