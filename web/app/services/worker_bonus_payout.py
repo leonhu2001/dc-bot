@@ -1,0 +1,191 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import func, select, text
+
+from shared.db import SessionLocal
+from shared.models import CustomerServicePayout, PayoutStatus, WebOrder, WorkerPayout
+from shared.payout import (
+    CUSTOMER_SERVICE_PAYOUT_RATE,
+    LEGACY_CUSTOMER_SERVICE_GROSS_RATE,
+    LEGACY_CUSTOMER_SERVICE_POLICY,
+    WORKER_BASE_PAYOUT_RATE,
+    calculate_customer_service_payout,
+    calculate_customer_service_payout_base_amount,
+)
+
+
+TAIPEI_TZ = timezone(timedelta(hours=8))
+WORKER_NAMED_BONUS_RATE = 0.03
+WORKER_STREAM_BONUS_RATE = 0.02
+WORKER_PREVIOUS_MONTH_SALARY_BONUS_RATE = 0.02
+WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD = 5000
+LEGACY_WORKER_NAMED_BONUS_RATE = 0.05
+MAX_NORMAL_WORKER_RATE = 0.87
+
+
+def _finance_snapshot(order: WebOrder) -> dict:
+    try:
+        snapshot = json.loads(str(order.price_snapshot_json or "{}"))
+    except Exception:
+        return {}
+    if not isinstance(snapshot, dict):
+        return {}
+    preview = snapshot.get("preview") if isinstance(snapshot.get("preview"), dict) else snapshot
+    finance = preview.get("finance") if isinstance(preview, dict) else None
+    return finance if isinstance(finance, dict) else {}
+
+
+def _is_legacy_order(order: WebOrder) -> bool:
+    return str(_finance_snapshot(order).get("customer_service_payout_policy") or "") == LEGACY_CUSTOMER_SERVICE_POLICY
+
+
+def _previous_month_utc_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
+    current = now or datetime.now(TAIPEI_TZ)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=TAIPEI_TZ)
+    current = current.astimezone(TAIPEI_TZ)
+    this_month = datetime(current.year, current.month, 1, tzinfo=TAIPEI_TZ)
+    previous_day = this_month - timedelta(days=1)
+    previous_month = datetime(previous_day.year, previous_day.month, 1, tzinfo=TAIPEI_TZ)
+    return (
+        previous_month.astimezone(timezone.utc).replace(tzinfo=None),
+        this_month.astimezone(timezone.utc).replace(tzinfo=None),
+    )
+
+
+def previous_month_paid_salary(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
+    start_at, end_at = _previous_month_utc_bounds(now)
+    total = db.scalar(
+        select(func.coalesce(func.sum(WorkerPayout.final_payout), 0)).where(
+            WorkerPayout.worker_discord_id == str(worker_discord_id),
+            WorkerPayout.payout_status == PayoutStatus.PAID.value,
+            WorkerPayout.paid_at.is_not(None),
+            WorkerPayout.paid_at >= start_at,
+            WorkerPayout.paid_at < end_at,
+        )
+    )
+    return max(0, int(total or 0))
+
+
+def _approved_stream_map(db, order_id: int) -> dict[str, bool]:
+    rows = db.execute(
+        text(
+            """
+            SELECT rw.worker_discord_id, rw.streamed
+            FROM order_reports r
+            JOIN order_report_workers rw ON rw.report_id = r.id
+            WHERE r.order_id=:order_id AND r.status='approved'
+            """
+        ),
+        {"order_id": int(order_id)},
+    ).mappings().all()
+    return {
+        str(row["worker_discord_id"]): bool(row["streamed"])
+        for row in rows
+        if str(row.get("worker_discord_id") or "").strip()
+    }
+
+
+def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None = None) -> dict:
+    """Apply report-reviewed worker bonuses and then refresh CS margin share.
+
+    New-policy orders use 80% base + named 3% + streamed 2% + previous-month
+    paid salary >= 5000 bonus 2%, capped at the normal 87%. Existing orders
+    frozen by the deploy migration retain the historical 80% + named 5% rule.
+    """
+    with SessionLocal() as db:
+        order = db.get(WebOrder, int(order_id))
+        if order is None:
+            raise ValueError("找不到訂單。")
+
+        legacy = _is_legacy_order(order)
+        stream_map = _approved_stream_map(db, int(order_id))
+        payouts = list(
+            db.scalars(
+                select(WorkerPayout).where(WorkerPayout.order_id == int(order_id))
+            ).all()
+        )
+
+        details: list[dict] = []
+        for payout in payouts:
+            worker_id = str(payout.worker_discord_id or "")
+            previous_salary = previous_month_paid_salary(db, worker_id, now=now)
+            previous_bonus = (not legacy) and previous_salary >= WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD
+            streamed = (not legacy) and bool(stream_map.get(worker_id))
+            named = bool(payout.has_named_bonus)
+
+            if legacy:
+                rate = WORKER_BASE_PAYOUT_RATE + (LEGACY_WORKER_NAMED_BONUS_RATE if named else 0.0)
+            else:
+                rate = (
+                    WORKER_BASE_PAYOUT_RATE
+                    + (WORKER_NAMED_BONUS_RATE if named else 0.0)
+                    + (WORKER_STREAM_BONUS_RATE if streamed else 0.0)
+                    + (WORKER_PREVIOUS_MONTH_SALARY_BONUS_RATE if previous_bonus else 0.0)
+                )
+                rate = min(MAX_NORMAL_WORKER_RATE, rate)
+
+            gross = max(0, int(payout.gross_share or 0))
+            base_payout = int(round(gross * WORKER_BASE_PAYOUT_RATE))
+            named_amount = int(round(gross * (LEGACY_WORKER_NAMED_BONUS_RATE if legacy and named else WORKER_NAMED_BONUS_RATE if named else 0.0)))
+            final_amount = int(round(gross * rate))
+
+            # Never silently rewrite a payout that has already been paid or manually overridden.
+            manual_override = "手動指定分潤" in str(payout.note or "")
+            locked = payout.payout_status == PayoutStatus.PAID.value or manual_override
+            if not locked:
+                payout.base_rate = WORKER_BASE_PAYOUT_RATE
+                payout.base_payout = base_payout
+                payout.named_bonus_rate = LEGACY_WORKER_NAMED_BONUS_RATE if legacy else WORKER_NAMED_BONUS_RATE
+                payout.named_bonus_amount = named_amount
+                payout.final_payout = final_amount
+                payout.note = (
+                    f"分潤：基礎80%"
+                    + (f"＋掛名{5 if legacy else 3}%" if named else "")
+                    + ("＋直播2%" if streamed else "")
+                    + ("＋前月已結算薪資達5000T 2%" if previous_bonus else "")
+                    + f"｜前月已結算薪資 {previous_salary}T"
+                )
+
+            details.append({
+                "worker_id": worker_id,
+                "rate": rate,
+                "streamed": streamed,
+                "named": named,
+                "previous_month_paid_salary": previous_salary,
+                "previous_month_bonus": previous_bonus,
+                "locked": locked,
+            })
+
+        db.flush()
+
+        cs_row = db.scalar(
+            select(CustomerServicePayout).where(CustomerServicePayout.order_id == int(order_id))
+        )
+        if cs_row is not None and cs_row.payout_status != PayoutStatus.PAID.value:
+            payout_base = max(0, int(order.payout_base_amount if order.payout_base_amount is not None else order.amount or 0))
+            cs_base = calculate_customer_service_payout_base_amount(
+                payout_base_amount=payout_base,
+                price_snapshot_json=order.price_snapshot_json,
+            )
+            if legacy:
+                cs_rate = LEGACY_CUSTOMER_SERVICE_GROSS_RATE
+                cs_amount = int(round(int(cs_base) * cs_rate))
+            else:
+                total_worker = sum(max(0, int(row.final_payout or 0)) for row in payouts)
+                effective_worker_rate = min(1.0, total_worker / payout_base) if payout_base > 0 else WORKER_BASE_PAYOUT_RATE
+                raw = calculate_customer_service_payout(
+                    int(cs_base),
+                    CUSTOMER_SERVICE_PAYOUT_RATE,
+                    effective_worker_rate=effective_worker_rate,
+                )
+                cs_amount = int(round(raw))
+                cs_rate = (cs_amount / int(cs_base)) if int(cs_base) > 0 else 0.0
+            cs_row.rate = cs_rate
+            cs_row.payout_amount = cs_amount
+
+        db.commit()
+        return {"order_id": int(order_id), "legacy": legacy, "workers": details}
