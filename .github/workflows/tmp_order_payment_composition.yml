@@ -1,0 +1,49 @@
+name: Temporary order payment composition patch
+
+on:
+  push:
+    branches:
+      - refactor/order-payment-composition-20261018
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/order-payment-composition-20261018
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Apply bounded patch
+        run: python tools/tmp_patch_order_payment_composition.py
+      - name: Install focused test dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Compile changed Python
+        run: python -m py_compile services/wallet_discord_runtime.py services/order_payment_composition.py services/order_child_composition.py services/order_runtime.py bot.py
+      - name: Run focused tests
+        run: >-
+          pytest -q
+          tests/test_order_child_composition.py
+          tests/test_order_payment_composition.py
+          tests/test_wallet_discord_runtime.py
+          tests/test_wallet_service_canonicalization.py
+          tests/test_runtime_extraction_boundaries.py
+          tests/test_architecture_growth_budget.py
+          tests/test_payment_method_runtime_contract.py
+          tests/test_order_wallet_reconciliation.py
+          tests/test_zero_amount_checkout.py
+      - name: Remove temporary helpers and commit
+        run: |
+          rm tools/tmp_patch_order_payment_composition.py
+          rm .github/workflows/tmp_order_payment_composition.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Move order payment composition out of legacy runtime'
+          git push origin HEAD:refactor/order-payment-composition-20261018
