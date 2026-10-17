@@ -2,7 +2,7 @@ from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from shared.models import (
@@ -17,6 +17,7 @@ from shared.models import (
 )
 from web.app.services.order_service import create_sync_event, recalculate_order_payouts
 from web.app.services.audit_trail import sanitize_audit_payload
+from web.app.services.worker_bonus_payout import apply_approved_report_worker_bonuses
 
 
 def get_admin_display_name(user: dict) -> str:
@@ -26,6 +27,30 @@ def get_admin_display_name(user: dict) -> str:
         or user.get("id")
         or "未知管理員"
     )
+
+
+def _order_has_approved_report(db: Session, order_id: int) -> bool:
+    """Return whether bonus review has already been approved for this order."""
+    try:
+        row = db.execute(
+            text(
+                """
+                SELECT 1
+                FROM order_reports
+                WHERE order_id=:order_id AND status='approved'
+                LIMIT 1
+                """
+            ),
+            {"order_id": int(order_id)},
+        ).first()
+    except Exception:
+        return False
+    return row is not None
+
+
+def _reapply_approved_report_bonuses(order_id: int, enabled: bool) -> None:
+    if enabled:
+        apply_approved_report_worker_bonuses(int(order_id))
 
 
 def write_admin_audit_log(
@@ -86,6 +111,7 @@ def set_customer_service_for_order(
     if not customer_service_discord_id:
         raise ValueError("請輸入客服 Discord ID。")
 
+    report_approved = _order_has_approved_report(db, order_id)
     before = {
         "order_id": order.id,
         "customer_service_discord_id": order.customer_service_discord_id,
@@ -128,6 +154,7 @@ def set_customer_service_for_order(
     )
 
     db.commit()
+    _reapply_approved_report_bonuses(order_id, report_approved)
 
 
 def toggle_named_bonus_for_assignment(
@@ -142,6 +169,7 @@ def toggle_named_bonus_for_assignment(
     if assignment is None:
         raise ValueError("找不到這筆接單紀錄。")
 
+    report_approved = _order_has_approved_report(db, assignment.order_id)
     before = {
         "assignment_id": assignment.id,
         "order_id": assignment.order_id,
@@ -180,6 +208,7 @@ def toggle_named_bonus_for_assignment(
     )
 
     db.commit()
+    _reapply_approved_report_bonuses(assignment.order_id, report_approved)
 
 
 def remove_worker_from_order(
@@ -194,6 +223,7 @@ def remove_worker_from_order(
     if assignment is None:
         raise ValueError("找不到這筆接單紀錄。")
 
+    report_approved = _order_has_approved_report(db, assignment.order_id)
     before = {
         "assignment_id": assignment.id,
         "order_id": assignment.order_id,
@@ -240,6 +270,7 @@ def remove_worker_from_order(
     )
 
     db.commit()
+    _reapply_approved_report_bonuses(assignment.order_id, report_approved)
 
 
 def add_worker_to_order(
@@ -273,6 +304,7 @@ def add_worker_to_order(
     if existing_active is not None:
         raise ValueError("這位護航 / 陪玩已經在這張單裡。")
 
+    report_approved = _order_has_approved_report(db, order_id)
     assignment = OrderAssignment(
         order_id=order_id,
         worker_discord_id=worker_discord_id,
@@ -315,6 +347,7 @@ def add_worker_to_order(
     )
 
     db.commit()
+    _reapply_approved_report_bonuses(order_id, report_approved)
 
 
 def set_manual_worker_payout(
@@ -335,6 +368,7 @@ def set_manual_worker_payout(
     if manual_final_payout < 0:
         raise ValueError("手動分潤金額不能小於 0。")
 
+    report_approved = _order_has_approved_report(db, order_id)
     override = db.scalar(
         select(WorkerPayoutOverride)
         .where(WorkerPayoutOverride.order_id == order_id)
@@ -397,6 +431,7 @@ def set_manual_worker_payout(
     )
 
     db.commit()
+    _reapply_approved_report_bonuses(order_id, report_approved)
 
 
 def set_worker_payout_status(
