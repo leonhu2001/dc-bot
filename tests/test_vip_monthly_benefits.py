@@ -489,7 +489,7 @@ def test_monthly_cash_benefit_reserve_release_and_redeem_by_channel(tmp_path):
     ) == []
 
 
-def test_white_diamond_monthly_benefits_require_5000_recent_spend(tmp_path):
+def test_white_diamond_monthly_benefits_no_longer_require_recent_spend(tmp_path):
     bot_db = tmp_path / "bot.db"
     web_db = tmp_path / "web_dashboard.db"
     customer_id = "white-diamond-activity"
@@ -514,31 +514,15 @@ def test_white_diamond_monthly_benefits_require_5000_recent_spend(tmp_path):
         web_db=web_db,
     )
     assert snapshot["recent_spend"] == 4999
-    assert snapshot["recent_spend_required"] == 5000
-    assert snapshot["monthly_spend_eligible"] is False
-    assert snapshot["cash_benefits"] == []
-
-    with sqlite3.connect(bot_db) as conn:
-        conn.execute(
-            "UPDATE orders SET amount=5000 WHERE customer_id=?",
-            (customer_id,),
-        )
-        conn.commit()
-
-    unlocked = get_customer_vip_monthly_snapshot(
-        customer_id,
-        now=now,
-        bot_db=bot_db,
-        web_db=web_db,
-    )
-    assert unlocked["monthly_spend_eligible"] is True
-    assert {row["benefit_key"] for row in unlocked["cash_benefits"]} == {
+    assert snapshot["recent_spend_required"] == 0
+    assert snapshot["monthly_spend_eligible"] is True
+    assert {row["benefit_key"] for row in snapshot["cash_benefits"]} == {
         MONTHLY_COUPON_200,
         MONTHLY_COUPON_500,
     }
 
 
-def test_pre_policy_monthly_benefit_is_not_retroactively_revoked_by_activity_gate(tmp_path):
+def test_monthly_benefit_remains_available_without_activity_gate(tmp_path):
     bot_db = tmp_path / "bot.db"
     web_db = tmp_path / "web_dashboard.db"
     customer_id = "grandfathered-october"
@@ -571,15 +555,16 @@ def test_pre_policy_monthly_benefit_is_not_retroactively_revoked_by_activity_gat
         conn.commit()
 
     after_policy = datetime(2026, 10, 15, 12, tzinfo=TAIPEI_TZ)
-    grandfathered = get_customer_vip_monthly_snapshot(
+    snapshot = get_customer_vip_monthly_snapshot(
         customer_id,
         now=after_policy,
         bot_db=bot_db,
         web_db=web_db,
     )
-    assert grandfathered["recent_spend"] == 0
-    assert grandfathered["monthly_spend_eligible"] is False
-    assert {row["benefit_key"] for row in grandfathered["cash_benefits"]} == {
+    assert snapshot["recent_spend"] == 0
+    assert snapshot["recent_spend_required"] == 0
+    assert snapshot["monthly_spend_eligible"] is True
+    assert {row["benefit_key"] for row in snapshot["cash_benefits"]} == {
         MONTHLY_COUPON_200,
         MONTHLY_COUPON_500,
     }
