@@ -148,7 +148,7 @@ from services.order_operation_panel_runtime import (
     register_order_operation_panel_listener,
     validate_staff_order_operation_interaction,
 )
-from services.order_dispatch_composition import configure_order_dispatch_composition
+from services.order_child_composition import configure_order_children
 from services.review_persistent_runtime import restore_persistent_review_views
 from services.wallet_service import (
     ensure_wallet_tables as _wallet_ensure_tables,
@@ -6564,8 +6564,9 @@ configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch,
 )
 configure_web_sync_runtime(globals())
-configure_order_dispatch_composition(
-    BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS
+configure_order_children(
+    BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS,
+    CUSTOMER_REWARDS,
 )
 configure_order_runtime(globals())
 configure_order_lifecycle_runtime_explicit(
