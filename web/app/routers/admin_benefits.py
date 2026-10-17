@@ -8,6 +8,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from services.order_product_status import is_order_product_active
+from services.order_rules import CATEGORY_LABELS, ORDER_RULES
+from services.promotion_benefit_admin import update_template
 from services.promotion_benefits import (
     EFFECT_FIXED_CASH,
     EFFECT_FREE_GAMES,
@@ -32,6 +35,9 @@ ROOT = Path(__file__).resolve().parents[3]
 WEB_DB = ROOT / "web_dashboard.db"
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# Historical-only categories should not clutter the benefit picker.
+_HIDDEN_BENEFIT_CATEGORIES = {"general", "basic", "fun"}
 
 
 def _admin(request: Request) -> dict | None:
@@ -70,24 +76,105 @@ def _customer_options(limit: int = 400) -> list[dict]:
         return []
 
 
-def _redirect(message: str = "", *, customer_id: str = "") -> RedirectResponse:
+def _benefit_catalog_options() -> tuple[list[dict], list[dict]]:
+    rules: list[dict] = []
+    used_categories: set[str] = set()
+
+    for rule_key, rule in ORDER_RULES.items():
+        category = str(getattr(rule, "category", "") or "").strip()
+        if category in _HIDDEN_BENEFIT_CATEGORIES:
+            continue
+        if not is_order_product_active(rule_key):
+            continue
+        used_categories.add(category)
+        rules.append(
+            {
+                "key": str(rule_key),
+                "label": str(getattr(rule, "label", rule_key) or rule_key),
+                "category": category,
+                "category_label": CATEGORY_LABELS.get(category, category),
+            }
+        )
+
+    categories = [
+        {"key": key, "label": CATEGORY_LABELS.get(key, key)}
+        for key in CATEGORY_LABELS
+        if key in used_categories and key not in _HIDDEN_BENEFIT_CATEGORIES
+    ]
+    categories.sort(key=lambda item: (item["label"], item["key"]))
+    rules.sort(key=lambda item: (item["category_label"], item["label"], item["key"]))
+    return categories, rules
+
+
+def _template_rules_from_form(form) -> dict:
+    scope_type = str(form.get("scope_type") or "all").strip()
+    if scope_type == "category":
+        scope_values = [str(value) for value in form.getlist("scope_category_values")]
+    elif scope_type == "rule":
+        scope_values = [str(value) for value in form.getlist("scope_rule_values")]
+    else:
+        scope_values = []
+
+    effect_kind = str(form.get("effect_kind") or EFFECT_FIXED_CASH)
+    high_risk = (
+        effect_kind == EFFECT_FREE_ORDER
+        or str(form.get("high_risk") or "") == "1"
+    )
+    return {
+        "effect_kind": effect_kind,
+        "effect_value": form.get("effect_value") or 0,
+        "funding": str(form.get("funding") or FUNDING_STORE),
+        "min_order_amount": form.get("min_order_amount") or 0,
+        "scope_type": scope_type,
+        "scope_values": scope_values,
+        "excluded_rule_keys": [
+            str(value) for value in form.getlist("excluded_rule_keys")
+        ],
+        "valid_days": form.get("valid_days") or None,
+        "usage_limit": form.get("usage_limit") or 1,
+        "consume_mode": form.get("consume_mode") or "one_shot",
+        "seat_mode": form.get("seat_mode") or "one_seat",
+        "include_specify_fee": str(form.get("include_specify_fee") or "") == "1",
+        "allow_vip_discount": str(form.get("allow_vip_discount") or "") == "1",
+        "allow_points": False,
+        "is_high_risk": high_risk,
+    }
+
+
+def _redirect(
+    message: str = "",
+    *,
+    customer_id: str = "",
+    edit_template: int | str | None = None,
+) -> RedirectResponse:
     params = {}
     if message:
         params["message"] = message
     if customer_id:
         params["customer"] = customer_id
+    if edit_template:
+        params["edit_template"] = str(edit_template)
     query = f"?{urlencode(params)}" if params else ""
     return RedirectResponse(url=f"/admin/benefits{query}", status_code=303)
 
 
 @router.get("/admin/benefits")
-async def benefits_center(request: Request, customer: str = "", message: str = ""):
+async def benefits_center(
+    request: Request,
+    customer: str = "",
+    message: str = "",
+    edit_template: int | None = None,
+):
     user = _admin(request)
     if user is None:
         return RedirectResponse(url="/", status_code=303)
 
     ensure_promotion_benefit_tables()
     issued = list_issued_benefits(limit=300)
+    template_rows = list_templates(include_inactive=True)
+    editing_template = get_template(edit_template) if edit_template else None
+    category_options, rule_options = _benefit_catalog_options()
+
     effect_labels = {
         EFFECT_FIXED_CASH: "固定金額抵免",
         EFFECT_PERCENT: "百分比折扣",
@@ -106,13 +193,16 @@ async def benefits_center(request: Request, customer: str = "", message: str = "
         context={
             "title": "優惠與福利｜魔丸娛樂",
             "user": user,
-            "templates": list_templates(include_inactive=True),
+            "templates": template_rows,
+            "editing_template": editing_template,
             "issued": issued,
             "customers": _customer_options(),
             "selected_customer": str(customer or "").strip(),
             "message": str(message or ""),
             "effect_labels": effect_labels,
             "funding_labels": funding_labels,
+            "category_options": category_options,
+            "rule_options": rule_options,
             "effect_kinds": [
                 (EFFECT_FIXED_CASH, "固定金額抵免"),
                 (EFFECT_PERCENT, "百分比折扣"),
@@ -134,34 +224,41 @@ async def create_benefit_template(request: Request):
         return _redirect("只有管理員可以建立或修改福利模板。")
 
     form = await request.form()
-    effect_kind = str(form.get("effect_kind") or EFFECT_FIXED_CASH)
-    funding = str(form.get("funding") or FUNDING_STORE)
-    high_risk = effect_kind == EFFECT_FREE_ORDER or str(form.get("high_risk") or "") == "1"
     try:
         template_id = create_template(
             name=str(form.get("name") or ""),
-            rules={
-                "effect_kind": effect_kind,
-                "effect_value": form.get("effect_value") or 0,
-                "funding": funding,
-                "min_order_amount": form.get("min_order_amount") or 0,
-                "scope_type": form.get("scope_type") or "all",
-                "scope_values": str(form.get("scope_values") or ""),
-                "excluded_rule_keys": str(form.get("excluded_rule_keys") or ""),
-                "valid_days": form.get("valid_days") or None,
-                "usage_limit": form.get("usage_limit") or 1,
-                "consume_mode": form.get("consume_mode") or "one_shot",
-                "seat_mode": form.get("seat_mode") or "one_seat",
-                "include_specify_fee": str(form.get("include_specify_fee") or "") == "1",
-                "allow_vip_discount": str(form.get("allow_vip_discount") or "") == "1",
-                "allow_points": False,
-                "is_high_risk": high_risk,
-            },
+            rules=_template_rules_from_form(form),
             actor_discord_id=user.get("id"),
         )
     except ValueError as exc:
         return _redirect(str(exc))
     return _redirect(f"已建立福利模板 #{template_id}。")
+
+
+@router.post("/admin/benefits/templates/{template_id}")
+async def update_benefit_template(request: Request, template_id: int):
+    user = _admin(request)
+    if user is None:
+        return RedirectResponse(url="/", status_code=303)
+    if not bool(user.get("is_manager")):
+        return _redirect("只有管理員可以建立或修改福利模板。")
+
+    form = await request.form()
+    try:
+        result = update_template(
+            template_id,
+            name=str(form.get("name") or ""),
+            rules=_template_rules_from_form(form),
+            is_active=str(form.get("is_active") or "") == "1",
+            sync_unused_issued=str(form.get("sync_unused_issued") or "") == "1",
+            actor_discord_id=user.get("id"),
+        )
+    except ValueError as exc:
+        return _redirect(str(exc), edit_template=template_id)
+
+    synced = int(result.get("synced_count") or 0)
+    suffix = f"，並同步更新 {synced} 張尚未使用的舊福利" if synced else ""
+    return _redirect(f"已更新福利模板 #{template_id}{suffix}。")
 
 
 @router.post("/admin/benefits/issue")
