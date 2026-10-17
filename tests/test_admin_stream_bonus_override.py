@@ -22,6 +22,7 @@ def test_stream_bonus_override_is_additive_and_workspace_controlled():
     schema = (ROOT / "shared/db.py").read_text(encoding="utf-8")
     service = (ROOT / "web/app/services/admin_service.py").read_text(encoding="utf-8")
     router = (ROOT / "web/app/routers/admin_order_workspace.py").read_text(encoding="utf-8")
+    workspace = (ROOT / "web/app/services/admin_stream_bonus_workspace.py").read_text(encoding="utf-8")
     template = (ROOT / "web/app/templates/admin_order_detail.html").read_text(encoding="utf-8")
 
     assert "stream_bonus_override: Mapped[bool | None]" in model
@@ -29,6 +30,8 @@ def test_stream_bonus_override_is_additive_and_workspace_controlled():
     assert "toggle_stream_bonus_for_assignment" in service
     assert "直播加成只能在報單審核通過後修正" in service
     assert "/stream-bonus" in router
+    assert "load_stream_bonus_workspace_rows" in workspace
+    assert "update_stream_bonus_from_workspace" in workspace
     assert "管理端修正直播（新制 +2%）" in template
 
 
