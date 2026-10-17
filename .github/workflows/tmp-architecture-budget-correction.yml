@@ -44,6 +44,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/tmp-architecture-budget-correction.yml .tmp_patch_arch.py
-          git add bot.py services/order_runtime.py
+          git add bot.py services/order_runtime.py services/order_operation_panel_runtime.py tests/test_order_operation_panel_reposition_regression.py
           git commit -m "Keep panel behavior outside legacy runtime files"
           git push origin HEAD
