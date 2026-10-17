@@ -19,6 +19,11 @@ def install_root_benefit_integrations() -> None:
     from services import promotion_benefits as promotion
     from services import promotion_benefit_lifecycle as promotion_lifecycle
     from services import vip_monthly_benefits as vip_monthly
+    from services.payout_policy_migration import freeze_existing_orders_on_legacy_cs_policy
+
+    # First startup after deployment is the policy boundary. Orders that already
+    # exist keep the old gross-5% CS formula; new orders use margin-pool 25%.
+    freeze_existing_orders_on_legacy_cs_policy()
 
     # New VIP monthly cash policy: tier entitlement opens the monthly benefit;
     # usage eligibility is enforced against the current order amount instead of
