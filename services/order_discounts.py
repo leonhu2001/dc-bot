@@ -57,9 +57,8 @@ def allocate_fixed_discounts(
     """Allocate shared and store-funded fixed discounts in one canonical step.
 
     Shared cash discounts reduce both customer payment and the payout base.
-    Store-funded discounts reduce customer payment only.  Extra customer
-    charges (for example an effective specify fee) increase both payment and
-    payout base.
+    Store-funded discounts reduce customer payment only. Extra customer charges
+    (for example an effective specify fee) increase both payment and payout base.
     """
     after_percent = max(0, int(after_percent_amount or 0))
     shared_discount = max(
@@ -90,31 +89,22 @@ def allocate_store_absorbed_fixed_discount(
     additional_store_discount_amount: int = 0,
     extra_customer_charge_amount: int = 0,
 ) -> FixedDiscountAllocation:
-    """Legacy/store-funded allocation helper.
+    """Compatibility entry point for the current checkout callers.
 
-    Keep this helper for responsibility compensation and old-order snapshots.
-    New normal cash discounts should use ``allocate_fixed_discounts`` with the
-    amount in ``shared_discount_amount``.
+    Before the 2026-10-17 policy this function made every fixed cash discount
+    store-funded.  Current checkout callers pass normal manual fixed discounts,
+    point cash coupons and VIP monthly cash coupons here; those are now shared
+    discounts.  The old function name is retained only to avoid a broad runtime
+    wiring change.  True store-funded responsibility compensation must call
+    ``allocate_fixed_discounts(..., store_discount_amount=...)`` explicitly.
     """
-    after_percent = max(0, int(after_percent_amount or 0))
-    fixed_discount = max(
+    shared_total = max(0, int(fixed_discount_amount or 0)) + max(
         0,
-        min(after_percent, int(fixed_discount_amount or 0)),
+        int(additional_store_discount_amount or 0),
     )
-    after_fixed = max(0, after_percent - fixed_discount)
-    additional_store_discount = max(
-        0,
-        min(after_fixed, int(additional_store_discount_amount or 0)),
-    )
-    extra_charge = max(0, int(extra_customer_charge_amount or 0))
-
-    return FixedDiscountAllocation(
-        after_fixed_amount=after_fixed,
-        payout_base_amount=after_percent + extra_charge,
-        customer_pay_amount=max(
-            0,
-            after_fixed - additional_store_discount + extra_charge,
-        ),
-        store_absorbed_amount=fixed_discount + additional_store_discount,
-        shared_discount_amount=0,
+    return allocate_fixed_discounts(
+        after_percent_amount=after_percent_amount,
+        shared_discount_amount=shared_total,
+        store_discount_amount=0,
+        extra_customer_charge_amount=extra_customer_charge_amount,
     )
