@@ -141,14 +141,17 @@
     if (!btn) return;
 
     if (!enabled) {
-      btn.textContent = '🔕 開啟新單提示';
+      btn.dataset.state = 'blocked';
+      btn.textContent = '🔕 新單提示已關';
       return;
     }
+
+    btn.dataset.state = 'online';
 
     if (!isAudioReady()) {
       btn.textContent = pendingAlert
         ? '🔔 有新單｜點一下啟用聲音'
-        : '🔔 點一下啟用聲音';
+        : '🔔 新單提示已開｜點一下啟用聲音';
       return;
     }
 
@@ -262,7 +265,7 @@
     document.querySelectorAll('[data-dispatch-notification-toggle]').forEach((btn) => {
       if (!('Notification' in window)) {
         btn.dataset.state = 'blocked';
-        btn.textContent = '🖥️ 此瀏覽器不支援桌面通知';
+        btn.textContent = '🖥️ 此瀏覽器不支援桌面提示';
         btn.disabled = true;
         return;
       }
@@ -271,21 +274,24 @@
 
       if (Notification.permission === 'denied') {
         btn.dataset.state = 'blocked';
-        btn.textContent = '🖥️ 桌面通知已被瀏覽器封鎖';
+        btn.textContent = '🖥️ 桌面提示已封鎖';
         return;
       }
 
-      if (
-        desktopNotificationsEnabled
-        && Notification.permission === 'granted'
-      ) {
+      if (Notification.permission === 'default') {
+        btn.dataset.state = 'pending';
+        btn.textContent = '🖥️ 桌面提示待授權';
+        return;
+      }
+
+      if (desktopNotificationsEnabled) {
         btn.dataset.state = 'online';
-        btn.textContent = '🖥️ 桌面通知已開';
+        btn.textContent = '🖥️ 桌面提示已開';
         return;
       }
 
-      btn.dataset.state = '';
-      btn.textContent = '🖥️ 開啟桌面通知';
+      btn.dataset.state = 'blocked';
+      btn.textContent = '🖥️ 桌面提示已關';
     });
   }
 
@@ -380,6 +386,7 @@
         }
 
         updateSoundButton();
+        updateDesktopNotificationButton();
       }
     });
   }
@@ -395,6 +402,8 @@
       event.preventDefault();
       await toggleDesktopNotifications();
     });
+
+    window.addEventListener('focus', updateDesktopNotificationButton);
   }
 
   function normalizeKeys(keys) {
@@ -746,7 +755,7 @@
       refreshDispatch({ playAlert: false });
     }, HOURLY_REFRESH_MS);
 
-    console.log('[dispatch-alert] started v12 targeted-alerts');
+    console.log('[dispatch-alert] started v13 solid-status-capsules');
   }
 
   window.addEventListener('beforeunload', () => {
