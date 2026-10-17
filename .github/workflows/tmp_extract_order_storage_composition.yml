@@ -1,0 +1,82 @@
+name: Temporary order storage composition extraction
+
+on:
+  push:
+    branches:
+      - refactor/order-storage-composition-20261018
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-storage-extract.db
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/order-storage-composition-20261018
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Apply bounded legacy extraction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("services/order_runtime.py")
+          source = path.read_text(encoding="utf-8")
+
+          old_import = '''from services.order_storage_runtime import (\n    configure_order_storage_runtime,\n    lock_dispatch_claim_panel,\n    store_dispatch_claim_panel,\n    resume_stored_order,\n)'''
+          new_import = '''from services.order_storage_runtime import (\n    lock_dispatch_claim_panel,\n    store_dispatch_claim_panel,\n    resume_stored_order,\n)'''
+          if source.count(old_import) != 1:
+              raise SystemExit("guard failed: expected storage runtime import block exactly once")
+          source = source.replace(old_import, new_import, 1)
+
+          start_marker = "    storage_keys = {\n"
+          end_marker = "\n    _CONFIGURED = True"
+          if source.count(start_marker) != 1:
+              raise SystemExit("guard failed: expected storage_keys block exactly once")
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          removed = source[start:end]
+          required_tokens = (
+              "configure_order_storage_runtime(",
+              'dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"]',
+              'web_order_status_syncer=sync_web_order_status_from_bot',
+          )
+          for token in required_tokens:
+              if token not in removed:
+                  raise SystemExit(f"guard failed: storage block missing {token}")
+          source = source[:start] + source[end:]
+
+          if "configure_order_storage_runtime" in source or "storage_keys =" in source:
+              raise SystemExit("guard failed: legacy storage composition remains")
+          path.write_text(source, encoding="utf-8")
+          PY
+      - name: Install focused test dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Compile changed runtime files
+        run: |
+          python -m compileall -q services/order_runtime.py services/order_storage_composition.py services/order_child_composition.py
+      - name: Run focused composition guards
+        run: |
+          python -m pytest -q \
+            tests/test_order_storage_composition.py \
+            tests/test_order_child_composition.py \
+            tests/test_architecture_growth_budget.py
+      - name: Remove temporary workflow and commit
+        run: |
+          git rm .github/workflows/tmp_extract_order_storage_composition.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/order_runtime.py services/order_storage_composition.py services/order_child_composition.py tests/test_order_storage_composition.py tests/test_order_child_composition.py
+          git commit -m "Move order storage composition out of legacy runtime"
+          git push origin HEAD:refactor/order-storage-composition-20261018
