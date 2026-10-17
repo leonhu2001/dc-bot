@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from core import database as core_database
@@ -70,6 +72,26 @@ def test_order_dispatch_runtime_dependency_names_are_explicit_and_reduced():
     )
 
 
+def test_order_dispatch_explicit_configurator_is_keyword_only():
+    signature = inspect.signature(runtime.configure_order_dispatch_runtime_explicit)
+    assert list(signature.parameters) == [
+        "booster_receiver_role_id",
+        "dispatch_channel_id",
+        "order_claims",
+        "order_selections",
+        "acceptance_state_applier",
+        "member_display_name",
+        "member_role_ids",
+        "order_requires_credentials",
+        "revoke_credential_messages",
+        "send_payment_panel",
+    ]
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        for parameter in signature.parameters.values()
+    )
+
+
 def test_order_dispatch_runtime_owns_stable_direct_dependencies():
     for name, dependency in _stable_dependencies().items():
         assert getattr(runtime, name) is dependency
@@ -102,12 +124,42 @@ def test_missing_order_dispatch_dependency_fails_before_binding(monkeypatch):
     assert runtime._CONFIGURED is False
 
 
-def test_complete_order_dispatch_namespace_binds_only_legacy_adapters(monkeypatch):
+def test_complete_order_dispatch_namespace_is_only_a_compatibility_adapter(monkeypatch):
     namespace = _namespace()
     monkeypatch.setattr(runtime, "_CONFIGURED", False)
 
     runtime.configure_order_dispatch_runtime(namespace)
 
     assert runtime._CONFIGURED is True
-    for name in runtime._DEPENDENCY_NAMES:
-        assert getattr(runtime, name) is namespace[name]
+    assert runtime.BOOSTER_RECEIVER_ROLE_ID == namespace["BOOSTER_RECEIVER_ROLE_ID"]
+    assert runtime.DISPATCH_CHANNEL_ID == namespace["DISPATCH_CHANNEL_ID"]
+    assert runtime.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
+    assert runtime.SELF_SERVICE_ORDER_SELECTIONS is namespace["SELF_SERVICE_ORDER_SELECTIONS"]
+    assert runtime._apply_acceptance_state_to_claim_data is namespace["_apply_acceptance_state_to_claim_data"]
+    assert runtime._member_display_name is namespace["_member_display_name"]
+    assert runtime._member_role_id_texts is namespace["_member_role_id_texts"]
+    assert runtime._order_requires_credentials is namespace["_order_requires_credentials"]
+    assert runtime.revoke_order_credential_messages is namespace["revoke_order_credential_messages"]
+    assert runtime.send_acceptance_payment_panel_if_ready is namespace["send_acceptance_payment_panel_if_ready"]
+
+
+def test_explicit_order_dispatch_configuration_binds_same_runtime_contract(monkeypatch):
+    namespace = _namespace()
+    monkeypatch.setattr(runtime, "_CONFIGURED", False)
+
+    runtime.configure_order_dispatch_runtime_explicit(
+        booster_receiver_role_id=namespace["BOOSTER_RECEIVER_ROLE_ID"],
+        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
+        order_claims=namespace["ORDER_CLAIMS"],
+        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
+        acceptance_state_applier=namespace["_apply_acceptance_state_to_claim_data"],
+        member_display_name=namespace["_member_display_name"],
+        member_role_ids=namespace["_member_role_id_texts"],
+        order_requires_credentials=namespace["_order_requires_credentials"],
+        revoke_credential_messages=namespace["revoke_order_credential_messages"],
+        send_payment_panel=namespace["send_acceptance_payment_panel_if_ready"],
+    )
+
+    assert runtime._CONFIGURED is True
+    assert runtime.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
+    assert runtime.SELF_SERVICE_ORDER_SELECTIONS is namespace["SELF_SERVICE_ORDER_SELECTIONS"]
