@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from core.database import remember_claim_data, remember_order_data, save_bot_data
-from typing import Any, Mapping
 
 import discord
 
@@ -50,18 +49,6 @@ from services.self_service_financials import (
 
 
 _CONFIGURED = False
-_DEPENDENCY_NAMES = (
-    "DISPATCH_CHANNEL_ID",
-    "ORDER_CLAIMS",
-    "PaymentMethodView",
-    "SELF_SERVICE_ORDER_SELECTIONS",
-)
-_SYNC_WORKER_DEPENDENCY_NAMES = (
-    "GUILD_ID",
-    "_refresh_existing_web_sync_dispatch",
-    "bot",
-)
-_REQUIRED_DEPENDENCY_NAMES = _DEPENDENCY_NAMES + _SYNC_WORKER_DEPENDENCY_NAMES
 
 
 def configure_acceptance_runtime_explicit(
@@ -110,27 +97,6 @@ def configure_acceptance_runtime_explicit(
     _CONFIGURED = True
 
 
-def configure_acceptance_runtime(namespace: Mapping[str, Any]) -> None:
-    """Compatibility adapter for bot.py while final startup wiring is migrated."""
-    missing = [name for name in _REQUIRED_DEPENDENCY_NAMES if name not in namespace]
-    if missing:
-        raise RuntimeError(
-            "acceptance runtime missing dependencies: " + ", ".join(missing)
-        )
-
-    configure_acceptance_runtime_explicit(
-        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
-        order_claims=namespace["ORDER_CLAIMS"],
-        payment_method_view_type=namespace["PaymentMethodView"],
-        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-        bot_instance=namespace["bot"],
-        guild_id=namespace["GUILD_ID"],
-        refresh_existing_web_sync_dispatch=namespace[
-            "_refresh_existing_web_sync_dispatch"
-        ],
-    )
-
-
 def _member_role_id_texts(member: discord.Member) -> list[str]:
     return [
         str(role.id)
@@ -149,6 +115,6 @@ def _member_display_name(member: discord.Member) -> str:
     )
 
 
-# Backward-compatible export for bot.py / repair tests while presentation now
-# lives with the payment panel lifecycle instead of the orchestration runtime.
+# Compatibility export for existing imports while presentation now lives with the
+# payment panel lifecycle instead of the orchestration runtime.
 _acceptance_staff_display_text = acceptance_staff_display_text
