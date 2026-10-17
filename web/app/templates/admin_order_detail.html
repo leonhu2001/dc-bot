@@ -687,7 +687,7 @@
             <div>
                 <small>ASSIGNMENTS & PAYOUTS</small>
                 <h3>接單人員與分潤</h3>
-                <p>新增、移除、掛名、手動分潤與發放狀態都集中在這裡。</p>
+                <p>新制為基礎 80%＋掛名 3%＋直播 2%＋前月已發放薪資達 5000T 次月 2%；掛名與直播以客服審核通過的報單為準，舊單保留原制度。此處保留管理端修正與手動分潤功能。</p>
             </div>
         </div>
 
@@ -744,9 +744,9 @@
 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
                             <label class="mw-r8-check">
                                 <input type="checkbox" name="enabled" value="on" {% if row.has_named_bonus %}checked{% endif %}>
-                                掛名 +5%
+                                管理端修正掛名（新制 +3%；舊單依原制度）
                             </label>
-                            <button class="mw-r8-btn" type="submit">套用</button>
+                            <button class="mw-r8-btn" type="submit">修正掛名</button>
                         </form>
 
                         <form class="mw-r8-inline-form" method="post" action="/admin/order-workspace/{{ order.id }}/manual-payout?return_to={{ request.query_params.get('return_to', '') | urlencode }}">
@@ -846,7 +846,7 @@
 </section>
 <!-- END MAWAN_R8_WORKSPACE_EDITOR -->
 
-<script src="/static/js/pages/admin_order_detail_inline_1.js?v=20261013"></script>
+<script src="/static/js/pages/admin_order_detail_inline_1.js?v=20261018_1"></script>
 
 
 </main>
