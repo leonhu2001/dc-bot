@@ -6,18 +6,20 @@ from dataclasses import dataclass
 FUNDING_SHARED = "shared"
 FUNDING_STORE = "store"
 
-# 單一規則來源：價格型百分比折扣降低分潤基準；會員資產／固定補償由店家吸收。
+# 單一規則來源：正常銷售優惠由顧客 / 打手 / 客服 / 店家共同承擔；
+# 店家責任補償與「送服務」福利仍由店家吸收。
 DISCOUNT_FUNDING_POLICY: dict[str, str] = {
     "vip_percent": FUNDING_SHARED,
     "manual_percent": FUNDING_SHARED,
     "promotion_percent": FUNDING_SHARED,
-    "manual_fixed": FUNDING_STORE,
+    "manual_fixed": FUNDING_SHARED,
+    "point_cash": FUNDING_SHARED,
+    "vip_monthly_cash": FUNDING_SHARED,
+
     "customer_compensation": FUNDING_STORE,
-    "point_cash": FUNDING_STORE,
     "point_specify": FUNDING_STORE,
     "point_service": FUNDING_STORE,
     "loyalty_coupon": FUNDING_STORE,
-    "vip_monthly_cash": FUNDING_STORE,
     "vip_monthly_service": FUNDING_STORE,
 }
 
@@ -38,12 +40,47 @@ def is_store_funded_discount(source: str | None) -> bool:
 
 @dataclass(frozen=True)
 class FixedDiscountAllocation:
-    """Resolved financial amounts for a store-absorbed fixed discount."""
-
     after_fixed_amount: int
     payout_base_amount: int
     customer_pay_amount: int
     store_absorbed_amount: int
+    shared_discount_amount: int = 0
+
+
+def allocate_fixed_discounts(
+    *,
+    after_percent_amount: int,
+    shared_discount_amount: int = 0,
+    store_discount_amount: int = 0,
+    extra_customer_charge_amount: int = 0,
+) -> FixedDiscountAllocation:
+    """Allocate shared and store-funded fixed discounts in one canonical step.
+
+    Shared cash discounts reduce both customer payment and the payout base.
+    Store-funded discounts reduce customer payment only.  Extra customer
+    charges (for example an effective specify fee) increase both payment and
+    payout base.
+    """
+    after_percent = max(0, int(after_percent_amount or 0))
+    shared_discount = max(
+        0,
+        min(after_percent, int(shared_discount_amount or 0)),
+    )
+    after_shared = max(0, after_percent - shared_discount)
+
+    store_discount = max(
+        0,
+        min(after_shared, int(store_discount_amount or 0)),
+    )
+    extra_charge = max(0, int(extra_customer_charge_amount or 0))
+
+    return FixedDiscountAllocation(
+        after_fixed_amount=after_shared,
+        payout_base_amount=after_shared + extra_charge,
+        customer_pay_amount=max(0, after_shared - store_discount + extra_charge),
+        store_absorbed_amount=store_discount,
+        shared_discount_amount=shared_discount,
+    )
 
 
 def allocate_store_absorbed_fixed_discount(
@@ -53,22 +90,18 @@ def allocate_store_absorbed_fixed_discount(
     additional_store_discount_amount: int = 0,
     extra_customer_charge_amount: int = 0,
 ) -> FixedDiscountAllocation:
-    """Allocate store-funded fixed/member-asset benefits without cutting payout.
+    """Legacy/store-funded allocation helper.
 
-    Percentage/VIP discounts are applied before this function and therefore
-    lower both customer payment and the payout base. Fixed discounts, points,
-    monthly VIP cash benefits, loyalty benefits and service compensation are
-    store-funded and must not further reduce worker payout.
+    Keep this helper for responsibility compensation and old-order snapshots.
+    New normal cash discounts should use ``allocate_fixed_discounts`` with the
+    amount in ``shared_discount_amount``.
     """
-
     after_percent = max(0, int(after_percent_amount or 0))
     fixed_discount = max(
         0,
         min(after_percent, int(fixed_discount_amount or 0)),
     )
-
     after_fixed = max(0, after_percent - fixed_discount)
-
     additional_store_discount = max(
         0,
         min(after_fixed, int(additional_store_discount_amount or 0)),
@@ -78,13 +111,10 @@ def allocate_store_absorbed_fixed_discount(
     return FixedDiscountAllocation(
         after_fixed_amount=after_fixed,
         payout_base_amount=after_percent + extra_charge,
-        customer_pay_amount=(
-            after_fixed
-            - additional_store_discount
-            + extra_charge
+        customer_pay_amount=max(
+            0,
+            after_fixed - additional_store_discount + extra_charge,
         ),
-        store_absorbed_amount=(
-            fixed_discount
-            + additional_store_discount
-        ),
+        store_absorbed_amount=fixed_discount + additional_store_discount,
+        shared_discount_amount=0,
     )
