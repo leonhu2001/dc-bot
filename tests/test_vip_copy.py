@@ -39,17 +39,21 @@ def test_vip_page_uses_refreshed_public_policy_copy():
         / "vip.html"
     ).read_text(encoding="utf-8")
 
-    assert "儲值返利1%" in template
-    assert "儲值返利2%" in template
-    assert template.count("儲值返利3%") >= 2
-    assert "儲值返利4%" not in template
-    assert "儲值返利5%" not in template
-    assert "退款以尚未消費的實付本金為限" in template
+    assert "儲值返利 1%" in template
+    assert "儲值返利 2%" in template
+    assert template.count("儲值返利 3%") >= 2
+    assert "儲值返利 4%" not in template
+    assert "儲值返利 5%" not in template
+    assert "退款以尚未消費的實付本金為上限" in template
     assert "雞腿／打賞僅能使用實付本金" in template
-    assert "白金／鑽石 2,000T、白鑽 5,000T、黑鑽 8,000T" in template
-    assert "儲值本身不計入此門檻" in template
-    assert "2026/10/14 前已發放的當月福利不因新門檻追溯失效" in template
-    assert "2026/10/14 起成立的新訂單與新儲值適用本規則" in template
+    assert "先使用 VIP／活動贈額，再使用實付本金" in template
+    assert "200T 代金券：單筆原始服務金額滿 1,500T" in template
+    assert "500T 代金券：單筆原始服務金額滿 4,000T" in template
+    assert "不再要求最近 30 日消費達到 2,000T／5,000T" in template
+    assert "黑鑽每月免費福利仍需最近 30 日實際訂單消費滿 8,000T" in template
+    assert "儲值本身不計入這個 8,000T 門檻" in template
+    assert "白金／鑽石 2,000T、白鑽 5,000T、黑鑽 8,000T" not in template
+    assert "2026/10/14 起成立的新訂單與新儲值適用新版 VIP／儲值規則" in template
     assert "優先安排熟悉／收藏陪玩" in template
     assert "銀級 30 天、金級 45 天、白金 60 天、鑽石 90 天、白鑽 120 天、黑鑽 180 天" in template
     assert "VIP 專屬私人文字頻道" not in template
