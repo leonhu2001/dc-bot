@@ -44,18 +44,18 @@ def test_two_workers_with_named_bonus_for_one_worker():
         named_bonus_worker_ids=["worker_a"],
     )
 
-    # Effective worker share is 82.5%, leaving a 175T margin pool.
-    # Customer service receives 25% of that pool = 43.75T.
-    assert result.customer_service_payout == 43.75
-    assert result.total_worker_payout == 825
-    assert result.total_payout == 868.75
+    # One of two equal worker shares gets +3%: total effective worker share is
+    # 81.5%, leaving a 185T margin pool. CS receives 25% = 46.25T.
+    assert result.customer_service_payout == 46.25
+    assert result.total_worker_payout == 815
+    assert result.total_payout == 861.25
 
     payouts = {
         worker.worker_discord_id: worker.final_payout
         for worker in result.worker_payouts
     }
 
-    assert payouts["worker_a"] == 425
+    assert payouts["worker_a"] == 415
     assert payouts["worker_b"] == 400
 
 
