@@ -6,6 +6,7 @@ WORKER_BASE_PAYOUT_RATE = 0.80
 # 客服不再固定抽訂單總額 5%。改為抽「打手分潤後毛利池」的 25%。
 # 基本打手 80% 時：20% 毛利池 × 25% = 訂單總額 5%，因此一般單與舊體感一致。
 CUSTOMER_SERVICE_PAYOUT_RATE = 0.25
+LEGACY_CUSTOMER_SERVICE_GROSS_RATE = 0.05
 WORKER_NAMED_BONUS_RATE = 0.05
 
 
@@ -26,6 +27,8 @@ class OrderPayoutResult:
     total_amount: int
     worker_count: int
     worker_base_rate: float
+    # Persist/display the effective share of the order payout basis. Under the
+    # new 25%-of-margin policy this is 5% at 80% worker, 3.75% at 85% worker.
     customer_service_rate: float
     named_bonus_rate: float
     customer_service_payout: float
@@ -41,6 +44,9 @@ def calculate_customer_service_payout(
     effective_worker_rate: float = WORKER_BASE_PAYOUT_RATE,
 ) -> float:
     """Return CS payout as a share of the positive post-worker margin pool.
+
+    ``customer_service_rate`` is the margin-pool share (25% by current policy),
+    not a gross-order percentage.
 
     ``total_amount`` is the CS-eligible payout basis, not necessarily what the
     customer paid. Store-funded coupons therefore do not erase CS pay. Store-
@@ -118,6 +124,7 @@ def calculate_order_payout(
     customer_service_rate: float = CUSTOMER_SERVICE_PAYOUT_RATE,
     named_bonus_rate: float = WORKER_NAMED_BONUS_RATE,
     customer_service_total_amount: int | None = None,
+    legacy_customer_service_gross_rate: float | None = None,
 ) -> OrderPayoutResult:
     customer_service_amount = (
         max(0, int(total_amount or 0))
@@ -164,18 +171,30 @@ def calculate_order_payout(
         )
     effective_worker_rate = max(0.0, min(1.0, effective_worker_rate))
 
-    customer_service_payout = calculate_customer_service_payout(
-        customer_service_amount,
-        customer_service_rate,
-        effective_worker_rate=effective_worker_rate,
-    )
+    if legacy_customer_service_gross_rate is not None:
+        effective_customer_service_rate = max(
+            0.0,
+            min(1.0, float(legacy_customer_service_gross_rate or 0)),
+        )
+        customer_service_payout = customer_service_amount * effective_customer_service_rate
+    else:
+        customer_service_payout = calculate_customer_service_payout(
+            customer_service_amount,
+            customer_service_rate,
+            effective_worker_rate=effective_worker_rate,
+        )
+        effective_customer_service_rate = (
+            customer_service_payout / customer_service_amount
+            if customer_service_amount > 0
+            else 0.0
+        )
 
     if total_amount <= 0:
         return OrderPayoutResult(
             total_amount=0,
             worker_count=worker_count,
             worker_base_rate=worker_base_rate,
-            customer_service_rate=customer_service_rate,
+            customer_service_rate=effective_customer_service_rate,
             named_bonus_rate=named_bonus_rate,
             customer_service_payout=customer_service_payout,
             worker_payouts=[],
@@ -188,7 +207,7 @@ def calculate_order_payout(
             total_amount=total_amount,
             worker_count=0,
             worker_base_rate=worker_base_rate,
-            customer_service_rate=customer_service_rate,
+            customer_service_rate=effective_customer_service_rate,
             named_bonus_rate=named_bonus_rate,
             customer_service_payout=customer_service_payout,
             worker_payouts=[],
@@ -225,7 +244,7 @@ def calculate_order_payout(
         total_amount=total_amount,
         worker_count=worker_count,
         worker_base_rate=worker_base_rate,
-        customer_service_rate=customer_service_rate,
+        customer_service_rate=effective_customer_service_rate,
         named_bonus_rate=named_bonus_rate,
         customer_service_payout=customer_service_payout,
         worker_payouts=worker_payouts,
