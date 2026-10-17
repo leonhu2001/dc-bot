@@ -1,0 +1,75 @@
+name: Temporary restore review views patch
+
+on:
+  push:
+    branches:
+      - fix/persistent-post-close-review-20261017
+    paths:
+      - .github/workflows/tmp-restore-review-views.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply persistent review patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          review_path = Path("views/review.py")
+          review_source = review_path.read_text(encoding="utf-8")
+          old_timeout = "        super().__init__(timeout=86400)\n"
+          new_timeout = "        super().__init__(timeout=None)\n"
+          assert review_source.count(old_timeout) == 1, "ReviewButtonView timeout marker drifted"
+          review_path.write_text(review_source.replace(old_timeout, new_timeout, 1), encoding="utf-8")
+
+          bot_path = Path("bot.py")
+          bot_source = bot_path.read_text(encoding="utf-8")
+          import_marker = '''from services.order_operation_panel_runtime import (
+              register_order_operation_panel_listener,
+              validate_staff_order_operation_interaction,
+          )
+          '''
+          import_replacement = import_marker + "from services.review_persistent_runtime import restore_persistent_review_views\n"
+          assert bot_source.count(import_marker) == 1, "bot import marker drifted"
+          bot_source = bot_source.replace(import_marker, import_replacement, 1)
+
+          view_marker = '''    bot.add_view(WebSupportActionView())
+
+          '''
+          view_replacement = view_marker + '''    restored_review_views = restore_persistent_review_views(
+              bot, SELF_SERVICE_ORDER_SELECTIONS, ReviewButtonView, get_order_summary_from_channel
+          )
+              if restored_review_views:
+                  print(f"Restored post-close review views: {restored_review_views}", flush=True)
+
+          '''
+          assert bot_source.count(view_marker) == 1, "core persistent view marker drifted"
+          bot_source = bot_source.replace(view_marker, view_replacement, 1)
+          bot_path.write_text(bot_source, encoding="utf-8")
+          PY
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Focused validation
+        run: |
+          python -m compileall -q bot.py views/review.py services/review_persistent_runtime.py
+          python -m pytest -q tests/test_review_persistent_runtime.py tests/test_architecture_growth_budget.py
+      - name: Commit patch and remove temporary workflow
+        run: |
+          rm .github/workflows/tmp-restore-review-views.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py views/review.py services/review_persistent_runtime.py tests/test_review_persistent_runtime.py .github/workflows/tmp-restore-review-views.yml
+          git commit -m "Restore post-close review panels after restart"
+          git push origin HEAD:fix/persistent-post-close-review-20261017
