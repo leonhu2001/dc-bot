@@ -6,6 +6,7 @@ from pathlib import Path
 
 from services import promotion_benefits as benefits
 from services.promotion_benefit_admin import update_template
+from services.self_service_financial_copy import _rewrite_quote_text
 
 
 def _rules(amount: int = 1500) -> dict:
@@ -134,3 +135,19 @@ def test_admin_benefits_ui_uses_normal_selects_and_checkbox_pickers():
     assert "input[type=checkbox]" in css
     assert "新制 +3%" in workspace_js
     assert "前月已發放薪資達 5000T" in workspace_js
+
+
+def test_checkout_copy_keeps_shared_cash_and_store_promotion_distinct():
+    original = (
+        "點數折價 -50（店內吸收）｜"
+        "固定折扣 -100（活動，店內吸收，不影響打手分潤）｜"
+        "累積福利 -500（店內吸收，不影響打手分潤）"
+    )
+
+    store_text = _rewrite_quote_text(original, promotion_funding="store")
+    assert "點數折價 -50（共同分攤，折後金額計入分潤基準）" in store_text
+    assert "固定折扣 -100（活動，共同分攤，折後金額計入分潤基準）" in store_text
+    assert "累積福利 -500（店家吸收，不降低打手／客服分潤基準）" in store_text
+
+    shared_text = _rewrite_quote_text(original, promotion_funding="shared")
+    assert "累積福利 -500（共同分攤，折後金額計入分潤基準）" in shared_text
