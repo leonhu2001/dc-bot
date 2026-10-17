@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 
 _INSTALLED = False
 _SHARED_COPY = "共同分攤，折後金額計入分潤基準"
@@ -30,20 +32,30 @@ def _promotion_funding(data: dict) -> str | None:
     return None
 
 
-def _rewrite_text(value: str, *, promotion_funding: str | None = None) -> str:
+def _rewrite_standard_discount_text(value: str) -> str:
     text = str(value or "")
     text = text.replace("店內吸收，不影響打手分潤", _SHARED_COPY)
     text = text.replace("店內吸收，不扣打手分潤", _SHARED_COPY)
     text = text.replace("（店內吸收）", f"（{_SHARED_COPY}）")
-
-    if "累積福利" in text and "店內吸收，不影響打手分潤" in str(value or ""):
-        # Loyalty/service coupons remain store-funded. Generic promotion
-        # benefits may explicitly opt into shared funding.
-        if promotion_funding == "shared":
-            text = text.replace(_STORE_COPY, _SHARED_COPY)
-        else:
-            text = text.replace(_SHARED_COPY, _STORE_COPY)
     return text
+
+
+def _rewrite_quote_text(value: str, *, promotion_funding: str | None) -> str:
+    text = str(value or "")
+
+    # Protect the generic-benefit clause first. Loyalty benefits remain
+    # store-funded; web-issued promotions can explicitly be shared.
+    benefit_copy = _SHARED_COPY if promotion_funding == "shared" else _STORE_COPY
+    text = re.sub(
+        r"(累積福利\s+-[0-9,]+)(?:（店內吸收，不影響打手分潤）)",
+        lambda match: f"{match.group(1)}（{benefit_copy}）",
+        text,
+    )
+
+    # Ordinary manual fixed / point-cash discounts are shared under the current
+    # funding policy. Any untouched store-funded generic clause is no longer an
+    # exact match after the replacement above, so these replacements are safe.
+    return _rewrite_standard_discount_text(text)
 
 
 def install_self_service_financial_copy_policy() -> None:
@@ -68,7 +80,7 @@ def install_self_service_financial_copy_policy() -> None:
             for index, field in enumerate(list(result.fields)):
                 if field.name not in {"固定折扣", "點數折價"}:
                     continue
-                rewritten = _rewrite_text(str(field.value or ""))
+                rewritten = _rewrite_standard_discount_text(str(field.value or ""))
                 if rewritten != str(field.value or ""):
                     result.set_field_at(
                         index,
@@ -90,31 +102,16 @@ def install_self_service_financial_copy_policy() -> None:
         def quote_preview_lines(data: dict, guild=None):
             rows = financials._funding_copy_original_quote_lines(data, guild)
             promotion_funding = _promotion_funding(data)
-            rewritten_rows = []
-            for name, value in rows:
-                text = str(value or "")
-                # Ordinary manual fixed and point-cash discounts are shared.
-                text = text.replace(
-                    "（店內吸收）",
-                    f"（{_SHARED_COPY}）",
+            return [
+                (
+                    name,
+                    _rewrite_quote_text(
+                        str(value or ""),
+                        promotion_funding=promotion_funding,
+                    ),
                 )
-                text = text.replace(
-                    "店內吸收，不影響打手分潤",
-                    _SHARED_COPY,
-                )
-                text = text.replace(
-                    "店內吸收，不扣打手分潤",
-                    _SHARED_COPY,
-                )
-                # The generic benefit line is store-funded by default, but a
-                # manager can explicitly create a shared-funding promotion.
-                if "累積福利" in text:
-                    if promotion_funding == "shared":
-                        text = text.replace(_STORE_COPY, _SHARED_COPY)
-                    elif promotion_funding == "store":
-                        text = text.replace(_SHARED_COPY, _STORE_COPY)
-                rewritten_rows.append((name, text))
-            return rewritten_rows
+                for name, value in rows
+            ]
 
         financials._quote_preview_lines_for_self_service = quote_preview_lines
 
