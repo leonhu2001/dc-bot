@@ -74,3 +74,10 @@ def test_acceptance_explicit_configurator_is_keyword_only():
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
         for parameter in signature.parameters.values()
     )
+
+
+def test_acceptance_legacy_namespace_startup_boundary_is_retired():
+    assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
+    assert not hasattr(acceptance_runtime, "_DEPENDENCY_NAMES")
+    assert not hasattr(acceptance_runtime, "_SYNC_WORKER_DEPENDENCY_NAMES")
+    assert not hasattr(acceptance_runtime, "_REQUIRED_DEPENDENCY_NAMES")
