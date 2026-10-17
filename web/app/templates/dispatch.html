@@ -143,10 +143,16 @@
 
     <section class="dispatch-board">
         <aside class="dispatch-panel dispatch-column">
-            <div class="dispatch-column-head"><div><p class="dispatch-eyebrow">{% if support_can_manage and not user_can_claim %}SUPPORT DUTY{% else %}MY MISSIONS{% endif %}</p><h2>{% if support_can_manage and not user_can_claim %}客服值班{% else %}我的接單狀態{% endif %}</h2></div>{% if user_can_claim %}<span class="dispatch-pill dispatch-count">{{ claimed_orders|length }} 筆</span>{% endif %}</div>
+            <div class="dispatch-column-head">
+                <div><p class="dispatch-eyebrow">{% if support_can_manage and not user_can_claim %}SUPPORT DUTY{% else %}MY MISSIONS{% endif %}</p><h2>{% if support_can_manage and not user_can_claim %}客服值班{% else %}我的接單狀態{% endif %}</h2></div>
+                <div class="dispatch-my-links">
+                    {% if support_can_manage %}<a class="dispatch-my-link" href="/admin">開啟客服後台</a>{% endif %}
+                    {% if user_can_claim %}<span class="dispatch-pill dispatch-count">{{ claimed_orders|length }} 筆</span>{% endif %}
+                </div>
+            </div>
 
             {% if support_can_manage and not user_can_claim %}
-                <article class="dispatch-support-duty"><span class="dispatch-pill">🟢 值班中</span><h3>直接處理派單狀況</h3><p>右側每張訂單都有客服操作區，可快速指派陪玩；需要改價格、內容、狀態或取消訂單時，點「修改訂單」或「取消訂單」即可進入該筆訂單工作區。</p><div class="dispatch-my-links"><a class="dispatch-my-link" href="/admin">開啟客服後台</a></div></article>
+                <article class="dispatch-support-duty"><span class="dispatch-pill">🟢 值班中</span><h3>直接處理派單狀況</h3><p>右側每張訂單都有客服操作區，可快速指派陪玩；需要改價格、內容、狀態或取消訂單時，點「修改訂單」或「取消訂單」即可進入該筆訂單工作區。</p></article>
             {% elif claimed_orders %}
                 <div class="dispatch-list">
                     {% for claimed_order in claimed_orders %}
