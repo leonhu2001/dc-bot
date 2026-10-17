@@ -243,6 +243,8 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
     web_sync_runtime.configure_web_sync_runtime(
         {"_web_sync_runtime_test_marker": object()}
     )
+    if hasattr(order_runtime, "_order_runtime_test_marker"):
+        delattr(order_runtime, "_order_runtime_test_marker")
     order_runtime.configure_order_runtime(
         {
             **_order_dispatch_namespace(),
@@ -262,5 +264,5 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
 
     assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
     assert hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
-    assert hasattr(order_runtime, "_order_runtime_test_marker")
+    assert not hasattr(order_runtime, "_order_runtime_test_marker")
     assert not hasattr(self_service_runtime, "configure_self_service_runtime")
