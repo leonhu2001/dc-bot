@@ -116,35 +116,28 @@ def configure_order_runtime_explicit(
     ticket_channel_renamer,
     order_log_sender,
 ) -> None:
-    """Bind only dependencies directly consumed by this module's own UI runtime.
-
-    Child order runtimes are intentionally still composed by the legacy namespace
-    adapter until they are moved out one at a time in later refactors.
-    """
-    global DB_FILE, DISPATCH_CHANNEL_ID, ORDER_CONTROL_SELECTIONS, SELF_SERVICE_ORDER_SELECTIONS
-    global SelfServiceOrderView, _defer_and_refresh_self_service_panel
-    global _get_rule_from_self_service_data, build_payment_method_embed
-    global build_self_service_panel_embed, can_operate_self_service_order
-    global format_t_amount, get_order_customer_id_from_channel, get_wallet_balance
-    global is_customer_staff, remember_order_data, rename_ticket_channel, send_order_log
-
-    DB_FILE = db_file
-    DISPATCH_CHANNEL_ID = dispatch_channel_id
-    ORDER_CONTROL_SELECTIONS = order_control_selections
-    SELF_SERVICE_ORDER_SELECTIONS = order_selections
-    SelfServiceOrderView = self_service_order_view_type
-    _defer_and_refresh_self_service_panel = defer_and_refresh_self_service_panel
-    _get_rule_from_self_service_data = self_service_rule_getter
-    build_payment_method_embed = payment_method_embed_builder
-    build_self_service_panel_embed = self_service_panel_embed_builder
-    can_operate_self_service_order = can_operate_self_service_order_func
-    format_t_amount = amount_formatter
-    get_order_customer_id_from_channel = order_customer_id_getter
-    get_wallet_balance = wallet_balance_getter
-    is_customer_staff = customer_staff_checker
-    remember_order_data = remember_order
-    rename_ticket_channel = ticket_channel_renamer
-    send_order_log = order_log_sender
+    # Explicit args keep the transitional module-global binding allowlisted.
+    globals().update(
+        {
+            "DB_FILE": db_file,
+            "DISPATCH_CHANNEL_ID": dispatch_channel_id,
+            "ORDER_CONTROL_SELECTIONS": order_control_selections,
+            "SELF_SERVICE_ORDER_SELECTIONS": order_selections,
+            "SelfServiceOrderView": self_service_order_view_type,
+            "_defer_and_refresh_self_service_panel": defer_and_refresh_self_service_panel,
+            "_get_rule_from_self_service_data": self_service_rule_getter,
+            "build_payment_method_embed": payment_method_embed_builder,
+            "build_self_service_panel_embed": self_service_panel_embed_builder,
+            "can_operate_self_service_order": can_operate_self_service_order_func,
+            "format_t_amount": amount_formatter,
+            "get_order_customer_id_from_channel": order_customer_id_getter,
+            "get_wallet_balance": wallet_balance_getter,
+            "is_customer_staff": customer_staff_checker,
+            "remember_order_data": remember_order,
+            "rename_ticket_channel": ticket_channel_renamer,
+            "send_order_log": order_log_sender,
+        }
+    )
 
 
 def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
