@@ -77,7 +77,11 @@ def test_legacy_tag_survives_normal_recalculation_path():
         named_bonus_worker_ids=["worker"],
         customer_service_total_amount=base,
     )
-    # Old order stays fixed gross 5% even though the worker is at 85%.
+    # Historical orders keep both pieces of the pre-change settlement policy:
+    # named +5% and CS gross 5%.
+    assert payout.worker_payouts[0].final_payout == pytest.approx(850)
+    assert payout.worker_payouts[0].named_bonus_rate == pytest.approx(0.05)
+    assert payout.named_bonus_rate == pytest.approx(0.05)
     assert payout.customer_service_payout == pytest.approx(50)
     assert payout.customer_service_rate == pytest.approx(0.05)
 
@@ -93,5 +97,8 @@ def test_new_order_uses_margin_pool_policy():
         named_bonus_worker_ids=["worker"],
         customer_service_total_amount=base,
     )
-    assert payout.customer_service_payout == pytest.approx(37.5)
-    assert payout.customer_service_rate == pytest.approx(0.0375)
+    # New named policy is +3%; CS receives 25% of the remaining 17% margin.
+    assert payout.worker_payouts[0].final_payout == pytest.approx(830)
+    assert payout.worker_payouts[0].named_bonus_rate == pytest.approx(0.03)
+    assert payout.customer_service_payout == pytest.approx(42.5)
+    assert payout.customer_service_rate == pytest.approx(0.0425)
