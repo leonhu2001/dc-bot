@@ -1,7 +1,7 @@
 """Web-service package initialization.
 
 Keep public checkout copy aligned with the shared pricing rules applied by the
-root services package.
+root services package and install the centralized promotion-benefit adapter.
 """
 
 from __future__ import annotations
@@ -59,3 +59,12 @@ for _spec in _order_groups.GROUP_SPECS:
 
 
 del _spec, _description, _category, _key
+
+# Load the established checkout module once, then attach the promotion-benefit
+# policy adapter. All public-order entry points import the same module object, so
+# preview and formal-create revalidation cannot drift apart.
+from .benefit_checkout_integration import (
+    install_checkout_benefit_integration as _install_checkout_benefits,
+)
+
+_install_checkout_benefits()

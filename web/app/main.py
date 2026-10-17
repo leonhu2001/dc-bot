@@ -19,6 +19,7 @@ from services.smart_dispatch import ensure_smart_dispatch_tables
 from services.web_support_chat import ensure_web_support_tables
 from services.ai_support_knowledge import ensure_ai_support_knowledge_tables
 from services.order_rule_store import ensure_order_rule_store
+from services.promotion_benefits import ensure_promotion_benefit_tables
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -33,6 +34,7 @@ from web.app.routers.admin_anomalies import router as admin_anomalies_router
 from web.app.routers.admin_accounting_reconciliation import router as admin_accounting_reconciliation_router
 from web.app.routers.admin_order_rules import router as admin_order_rules_router
 from web.app.routers.admin_centers import router as admin_centers_router
+from web.app.routers.admin_benefits import router as admin_benefits_router
 from web.app.routers.admin_payouts import router as admin_payouts_router
 from web.app.routers.admin_payout_summary import router as admin_payout_summary_router
 from web.app.routers.admin_operations_report import router as admin_operations_report_router
@@ -269,6 +271,7 @@ app.include_router(admin_anomalies_router)
 app.include_router(admin_accounting_reconciliation_router)
 app.include_router(admin_order_rules_router)
 app.include_router(admin_centers_router)
+app.include_router(admin_benefits_router)
 app.include_router(admin_payouts_router)
 app.include_router(admin_operations_report_router)
 app.include_router(admin_payout_summary_router)
@@ -292,6 +295,7 @@ async def startup_event():
     ensure_ai_support_knowledge_tables()
     ensure_marketing_tables()
     ensure_order_rule_store()
+    ensure_promotion_benefit_tables()
 
     if config.AI_SUPPORT_API_KEY:
         print(
@@ -357,10 +361,3 @@ try:
     app.include_router(discord_avatars_router)
 except Exception as exc:
     print(f"[discord_avatars] router load failed: {exc}")
-
-# AUTO ORDER REVIEWS ROUTER
-try:
-    from web.app.routers.admin_reviews import router as admin_reviews_router
-    app.include_router(admin_reviews_router)
-except Exception as exc:
-    print(f"[admin_reviews] router load failed: {exc}")

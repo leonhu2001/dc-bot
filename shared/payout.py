@@ -3,8 +3,21 @@ from dataclasses import dataclass
 
 
 WORKER_BASE_PAYOUT_RATE = 0.80
-CUSTOMER_SERVICE_PAYOUT_RATE = 0.05
+# 客服不再固定抽訂單總額 5%。改為抽「打手分潤後毛利池」的 25%。
+# 基本打手 80% 時：20% 毛利池 × 25% = 訂單總額 5%，因此一般單與舊體感一致。
+CUSTOMER_SERVICE_PAYOUT_RATE = 0.25
+LEGACY_CUSTOMER_SERVICE_GROSS_RATE = 0.05
 WORKER_NAMED_BONUS_RATE = 0.05
+LEGACY_CUSTOMER_SERVICE_POLICY = "legacy_gross_5_v1"
+
+
+class CustomerServicePayoutBase(int):
+    """Int-compatible payout basis carrying the frozen CS policy for an order."""
+
+    def __new__(cls, value: int, *, legacy_gross_rate: float | None = None):
+        obj = int.__new__(cls, max(0, int(value or 0)))
+        obj.legacy_gross_rate = legacy_gross_rate
+        return obj
 
 
 @dataclass(frozen=True)
@@ -24,6 +37,8 @@ class OrderPayoutResult:
     total_amount: int
     worker_count: int
     worker_base_rate: float
+    # Persist/display the effective share of the order payout basis. Under the
+    # new 25%-of-margin policy this is 5% at 80% worker, 3.75% at 85% worker.
     customer_service_rate: float
     named_bonus_rate: float
     customer_service_payout: float
@@ -35,11 +50,28 @@ class OrderPayoutResult:
 def calculate_customer_service_payout(
     total_amount: int,
     customer_service_rate: float = CUSTOMER_SERVICE_PAYOUT_RATE,
+    *,
+    effective_worker_rate: float = WORKER_BASE_PAYOUT_RATE,
 ) -> float:
-    if total_amount <= 0:
+    """Return CS payout as a share of the positive post-worker margin pool.
+
+    ``customer_service_rate`` is the margin-pool share (25% by current policy),
+    not a gross-order percentage.
+
+    ``total_amount`` is the CS-eligible payout basis, not necessarily what the
+    customer paid. Store-funded coupons therefore do not erase CS pay. Store-
+    funded *extra service* is removed from this basis by
+    ``calculate_customer_service_payout_base_amount`` so it does not create a
+    second commission on a service the store is gifting.
+    """
+    amount = max(0, int(total_amount or 0))
+    if amount <= 0:
         return 0
 
-    return total_amount * customer_service_rate
+    worker_rate = max(0.0, min(1.0, float(effective_worker_rate or 0)))
+    margin_share = max(0.0, min(1.0, float(customer_service_rate or 0)))
+    margin_pool = amount * max(0.0, 1.0 - worker_rate)
+    return round(margin_pool * margin_share, 2)
 
 
 def calculate_customer_service_payout_base_amount(
@@ -47,12 +79,17 @@ def calculate_customer_service_payout_base_amount(
     payout_base_amount: int,
     price_snapshot_json=None,
 ) -> int:
-    """Return the amount eligible for customer-service commission.
+    """Return the amount eligible for customer-service margin sharing.
 
     Store-funded free service (points / cross-order benefit service value)
     still counts toward companion payout value, but must not create extra
-    customer-service commission. This pure helper is the single source used by
-    payout creation, safe repair, and accounting reconciliation.
+    customer-service commission. Store-funded cash coupons are intentionally
+    *not* removed here: the customer may pay less or zero, while workers and
+    customer service still receive their normal payout on the subsidised basis.
+
+    Existing orders tagged by the one-time deploy migration carry the old gross
+    5% policy through this int-compatible value, so later payout recalculation
+    cannot silently rewrite a pre-deploy order.
     """
     base = max(0, int(payout_base_amount or 0))
 
@@ -65,7 +102,7 @@ def calculate_customer_service_payout_base_amount(
             snapshot = {}
 
     if not isinstance(snapshot, dict):
-        return base
+        snapshot = {}
 
     preview = (
         snapshot.get("preview")
@@ -89,7 +126,17 @@ def calculate_customer_service_payout_base_amount(
         _amount("point_service_value")
         + _amount("benefit_service_value")
     )
-    return max(0, base - store_funded_service)
+    eligible = max(0, base - store_funded_service)
+    legacy_rate = (
+        LEGACY_CUSTOMER_SERVICE_GROSS_RATE
+        if str(finance.get("customer_service_payout_policy") or "")
+        == LEGACY_CUSTOMER_SERVICE_POLICY
+        else None
+    )
+    return CustomerServicePayoutBase(
+        eligible,
+        legacy_gross_rate=legacy_rate,
+    )
 
 
 def calculate_order_payout(
@@ -101,29 +148,21 @@ def calculate_order_payout(
     customer_service_rate: float = CUSTOMER_SERVICE_PAYOUT_RATE,
     named_bonus_rate: float = WORKER_NAMED_BONUS_RATE,
     customer_service_total_amount: int | None = None,
+    legacy_customer_service_gross_rate: float | None = None,
 ) -> OrderPayoutResult:
+    tagged_legacy_rate = (
+        getattr(customer_service_total_amount, "legacy_gross_rate", None)
+        if customer_service_total_amount is not None
+        else None
+    )
+    if legacy_customer_service_gross_rate is None and tagged_legacy_rate is not None:
+        legacy_customer_service_gross_rate = float(tagged_legacy_rate)
+
     customer_service_amount = (
         max(0, int(total_amount or 0))
         if customer_service_total_amount is None
         else max(0, int(customer_service_total_amount or 0))
     )
-
-    if total_amount <= 0:
-        customer_service_payout = calculate_customer_service_payout(
-            customer_service_amount,
-            customer_service_rate,
-        )
-        return OrderPayoutResult(
-            total_amount=0,
-            worker_count=0,
-            worker_base_rate=worker_base_rate,
-            customer_service_rate=customer_service_rate,
-            named_bonus_rate=named_bonus_rate,
-            customer_service_payout=customer_service_payout,
-            worker_payouts=[],
-            total_worker_payout=0,
-            total_payout=customer_service_payout,
-        )
 
     unique_worker_ids = []
     seen_worker_ids = set()
@@ -141,18 +180,56 @@ def calculate_order_payout(
         seen_worker_ids.add(worker_id_text)
 
     worker_count = len(unique_worker_ids)
+    named_bonus_worker_set = {
+        str(worker_id)
+        for worker_id in (named_bonus_worker_ids or [])
+        if str(worker_id)
+    }
+    named_count = sum(
+        1
+        for worker_id in unique_worker_ids
+        if worker_id in named_bonus_worker_set
+    )
 
-    if worker_count <= 0:
+    # Each active worker receives an equal gross share. Therefore the order-wide
+    # effective worker rate is base + the named bonus weighted by the share of
+    # workers who actually receive that bonus.
+    effective_worker_rate = max(0.0, min(1.0, float(worker_base_rate or 0)))
+    if worker_count > 0 and named_count > 0:
+        effective_worker_rate += (
+            max(0.0, float(named_bonus_rate or 0))
+            * named_count
+            / worker_count
+        )
+    effective_worker_rate = max(0.0, min(1.0, effective_worker_rate))
+
+    if legacy_customer_service_gross_rate is not None:
+        effective_customer_service_rate = max(
+            0.0,
+            min(1.0, float(legacy_customer_service_gross_rate or 0)),
+        )
+        customer_service_payout = round(
+            customer_service_amount * effective_customer_service_rate,
+            2,
+        )
+    else:
         customer_service_payout = calculate_customer_service_payout(
             customer_service_amount,
             customer_service_rate,
+            effective_worker_rate=effective_worker_rate,
+        )
+        effective_customer_service_rate = (
+            customer_service_payout / customer_service_amount
+            if customer_service_amount > 0
+            else 0.0
         )
 
+    if total_amount <= 0:
         return OrderPayoutResult(
-            total_amount=total_amount,
-            worker_count=0,
+            total_amount=0,
+            worker_count=worker_count,
             worker_base_rate=worker_base_rate,
-            customer_service_rate=customer_service_rate,
+            customer_service_rate=effective_customer_service_rate,
             named_bonus_rate=named_bonus_rate,
             customer_service_payout=customer_service_payout,
             worker_payouts=[],
@@ -160,11 +237,18 @@ def calculate_order_payout(
             total_payout=customer_service_payout,
         )
 
-    named_bonus_worker_set = {
-        str(worker_id)
-        for worker_id in (named_bonus_worker_ids or [])
-        if str(worker_id)
-    }
+    if worker_count <= 0:
+        return OrderPayoutResult(
+            total_amount=total_amount,
+            worker_count=0,
+            worker_base_rate=worker_base_rate,
+            customer_service_rate=effective_customer_service_rate,
+            named_bonus_rate=named_bonus_rate,
+            customer_service_payout=customer_service_payout,
+            worker_payouts=[],
+            total_worker_payout=0,
+            total_payout=customer_service_payout,
+        )
 
     gross_share = total_amount / worker_count
     worker_payouts = []
@@ -188,11 +272,6 @@ def calculate_order_payout(
             )
         )
 
-    customer_service_payout = calculate_customer_service_payout(
-        customer_service_amount,
-        customer_service_rate,
-    )
-
     total_worker_payout = sum(worker.final_payout for worker in worker_payouts)
     total_payout = total_worker_payout + customer_service_payout
 
@@ -200,7 +279,7 @@ def calculate_order_payout(
         total_amount=total_amount,
         worker_count=worker_count,
         worker_base_rate=worker_base_rate,
-        customer_service_rate=customer_service_rate,
+        customer_service_rate=effective_customer_service_rate,
         named_bonus_rate=named_bonus_rate,
         customer_service_payout=customer_service_payout,
         worker_payouts=worker_payouts,

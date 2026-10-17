@@ -13,6 +13,7 @@
             <p class="muted-text">{{ customer.id }}｜不同遊戲的累積與福利彼此獨立。</p>
         </div>
         <div class="center-actions">
+            <a class="button" href="/admin/benefits?customer={{ customer.id }}">＋ 發放福利</a>
             <a class="button secondary" href="/admin/customer-center">← 返回客戶中心</a>
             <a class="button secondary" href="/admin/search/customer/{{ customer.id }}?return_to=/admin/customer-center/{{ customer.id }}/benefits">客戶資料</a>
         </div>

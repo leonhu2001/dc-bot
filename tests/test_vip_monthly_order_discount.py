@@ -16,21 +16,29 @@ def test_no_selected_monthly_voucher_has_no_discount():
     assert amount == 0
 
 
+def _coupon(benefit_key: str, amount: int, benefit_id: int = 9) -> dict:
+    return {
+        "id": benefit_id,
+        "benefit_key": benefit_key,
+        "title": f"VIP 每月 {amount}T 折現券",
+        "amount": amount,
+    }
+
+
 def test_selected_monthly_voucher_is_revalidated_and_clamped(monkeypatch):
     calls = []
 
     def fake_get(benefit_id, *, customer_id):
         calls.append((benefit_id, customer_id))
-        return {
-            "id": 9,
-            "benefit_key": "monthly_coupon_200",
-            "title": "VIP 每月 200T 折現券",
-            "amount": 200,
-        }
+        return _coupon("monthly_coupon_200", 200)
 
     monkeypatch.setattr(vip_monthly_benefits, "get_available_cash_benefit", fake_get)
     selected, amount = monthly_discount.resolve_vip_monthly_cash_discount(
-        {"customer_id": "123", "selected_vip_monthly_benefit_id": 9},
+        {
+            "customer_id": "123",
+            "selected_vip_monthly_benefit_id": 9,
+            "service_original_amount": 1500,
+        },
         has_point_benefit=False,
         max_discount_amount=150,
     )
@@ -50,6 +58,58 @@ def test_selected_monthly_voucher_is_revalidated_and_clamped(monkeypatch):
         "vip_monthly_benefit_title": "VIP 每月 200T 折現券",
         "vip_monthly_cash_amount": 150,
     }
+
+
+def test_200_coupon_requires_1500_original_service_amount(monkeypatch):
+    monkeypatch.setattr(
+        vip_monthly_benefits,
+        "get_available_cash_benefit",
+        lambda *args, **kwargs: _coupon("monthly_coupon_200", 200),
+    )
+    with pytest.raises(ValueError, match="1,500T"):
+        monthly_discount.resolve_vip_monthly_cash_discount(
+            {
+                "customer_id": "123",
+                "selected_vip_monthly_benefit_id": 9,
+                "service_original_amount": 1499,
+            },
+            has_point_benefit=False,
+            max_discount_amount=1499,
+        )
+
+
+def test_500_coupon_requires_4000_original_service_amount(monkeypatch):
+    monkeypatch.setattr(
+        vip_monthly_benefits,
+        "get_available_cash_benefit",
+        lambda *args, **kwargs: _coupon("monthly_coupon_500", 500),
+    )
+    with pytest.raises(ValueError, match="4,000T"):
+        monthly_discount.resolve_vip_monthly_cash_discount(
+            {
+                "customer_id": "123",
+                "selected_vip_monthly_benefit_id": 9,
+                "service_original_amount": 3999,
+            },
+            has_point_benefit=False,
+            max_discount_amount=3999,
+        )
+
+
+def test_threshold_uses_original_amount_before_vip_discount(monkeypatch):
+    monkeypatch.setattr(
+        vip_monthly_benefits,
+        "get_available_cash_benefit",
+        lambda *args, **kwargs: _coupon("monthly_coupon_200", 200),
+    )
+    selected, amount = monthly_discount.resolve_vip_monthly_cash_discount(
+        {"customer_id": "123", "selected_vip_monthly_benefit_id": 9},
+        has_point_benefit=False,
+        max_discount_amount=1410,
+        original_service_amount=1500,
+    )
+    assert selected["benefit_key"] == "monthly_coupon_200"
+    assert amount == 200
 
 
 def test_monthly_voucher_rejects_point_benefit_conflict():
