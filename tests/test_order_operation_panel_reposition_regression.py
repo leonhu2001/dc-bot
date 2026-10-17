@@ -19,6 +19,7 @@ def test_active_ticket_actions_delegate_panel_reposition_to_runtime():
 def test_panel_runtime_skips_terminal_and_ephemeral_operation_flow():
     assert "interaction.type is not discord.InteractionType.component" in RUNTIME_SOURCE
     assert "interaction.message.flags.ephemeral" in RUNTIME_SOURCE
+    # The operation panel's own select/confirm controls must never reposition itself.
     assert '"staff_order_operation_select",' in RUNTIME_SOURCE
     assert '"staff_order_operation_confirm",' in RUNTIME_SOURCE
     assert 'str(order_data.get("status") or "").strip().lower() == "active"' in RUNTIME_SOURCE
