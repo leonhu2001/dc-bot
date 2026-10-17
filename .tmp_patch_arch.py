@@ -3,7 +3,6 @@ from pathlib import Path
 
 BOT_PATH = Path("bot.py")
 ORDER_RUNTIME_PATH = Path("services/order_runtime.py")
-PANEL_RUNTIME_PATH = Path("services/order_operation_panel_runtime.py")
 PANEL_TEST_PATH = Path("tests/test_order_operation_panel_reposition_regression.py")
 
 
@@ -11,13 +10,34 @@ bot_source = BOT_PATH.read_text(encoding="utf-8")
 import_anchor = (
     "from services.payment_review_runtime import ensure_payment_review_worker_started\n"
 )
-import_line = (
-    "from services.order_operation_panel_runtime import "
-    "register_order_operation_panel_listener\n"
+import_block = '''from services.order_operation_panel_runtime import (
+    register_order_operation_panel_listener,
+    validate_staff_order_operation_interaction,
 )
+'''
 assert import_anchor in bot_source, "bot import anchor drifted"
-if import_line not in bot_source:
-    bot_source = bot_source.replace(import_anchor, import_anchor + import_line, 1)
+if import_block not in bot_source:
+    bot_source = bot_source.replace(import_anchor, import_anchor + import_block, 1)
+
+validation_block = '''        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
+            return
+
+        if not is_customer_staff(interaction.user):
+            await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
+            return
+
+        if not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
+            return
+'''
+validation_call = '''        if not await validate_staff_order_operation_interaction(
+            interaction, is_customer_staff
+        ):
+            return
+'''
+assert bot_source.count(validation_block) == 2, "staff operation validation block drifted"
+bot_source = bot_source.replace(validation_block, validation_call)
 
 block_start = "\n\n_ORDER_OPERATION_PANEL_REPOSITION_LOCKS: dict[int, asyncio.Lock] = {}\n"
 block_end = "\n\nclass OrderControlView(discord.ui.View):\n"
@@ -30,10 +50,7 @@ register_order_operation_panel_listener(
     bot,
     SELF_SERVICE_ORDER_SELECTIONS,
     is_customer_staff,
-    _to_int,
     StaffOrderOperationView,
-    remember_order_data,
-    save_bot_data,
 )
 '''
 bot_source = bot_source[:start_index] + registration + bot_source[end_index:]
@@ -96,37 +113,6 @@ runtime_source = (
     + runtime_source[end_index:]
 )
 ORDER_RUNTIME_PATH.write_text(runtime_source, encoding="utf-8")
-
-
-panel_source = PANEL_RUNTIME_PATH.read_text(encoding="utf-8")
-register_marker = "\ndef register_order_operation_panel_listener("
-if register_marker not in panel_source:
-    panel_source = panel_source.rstrip() + '''
-
-
-def register_order_operation_panel_listener(
-    bot: discord.Client,
-    order_selections: dict[int, dict[str, Any]],
-    is_staff: Callable[[discord.Member], bool],
-    to_int: Callable[[Any], int | None],
-    operation_view_factory: Callable[[], discord.ui.View],
-    remember_order: Callable[[int, dict[str, Any]], None],
-    save_data: Callable[[], None],
-) -> None:
-    async def _listener(interaction: discord.Interaction) -> None:
-        await handle_order_operation_panel_interaction(
-            interaction,
-            order_selections=order_selections,
-            is_staff=is_staff,
-            to_int=to_int,
-            operation_view_factory=operation_view_factory,
-            remember_order=remember_order,
-            save_data=save_data,
-        )
-
-    bot.add_listener(_listener, "on_interaction")
-'''
-PANEL_RUNTIME_PATH.write_text(panel_source, encoding="utf-8")
 
 
 test_source = PANEL_TEST_PATH.read_text(encoding="utf-8")
