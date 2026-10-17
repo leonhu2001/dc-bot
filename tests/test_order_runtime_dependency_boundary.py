@@ -29,24 +29,6 @@ EXPECTED_BINDING_NAMES = frozenset(
 )
 
 
-def _dispatch_namespace() -> dict[str, object]:
-    async def async_noop(*_args, **_kwargs):
-        return None
-
-    return {
-        "BOOSTER_RECEIVER_ROLE_ID": 1,
-        "DISPATCH_CHANNEL_ID": 123,
-        "ORDER_CLAIMS": {},
-        "SELF_SERVICE_ORDER_SELECTIONS": {},
-        "_apply_acceptance_state_to_claim_data": lambda *_args, **_kwargs: None,
-        "_member_display_name": lambda member: str(getattr(member, "id", "worker")),
-        "_member_role_id_texts": lambda _member: [],
-        "_order_requires_credentials": lambda _data: False,
-        "revoke_order_credential_messages": async_noop,
-        "send_acceptance_payment_panel_if_ready": async_noop,
-    }
-
-
 def test_order_runtime_namespace_binding_is_explicitly_scoped(monkeypatch):
     originals = {
         "Any": Any,
@@ -62,7 +44,6 @@ def test_order_runtime_namespace_binding_is_explicitly_scoped(monkeypatch):
 
     order_runtime.configure_order_runtime(
         {
-            **_dispatch_namespace(),
             **{name: object() for name in originals},
             "ORDER_CONTROL_SELECTIONS": order_control,
             "_order_runtime_boundary_marker": marker,

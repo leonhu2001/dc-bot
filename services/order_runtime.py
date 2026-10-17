@@ -50,8 +50,6 @@ from services.order_storage_runtime import (
     resume_stored_order,
 )
 from services.order_dispatch_runtime import (
-    configure_order_dispatch_runtime,
-    configure_order_dispatch_runtime_explicit,
     DispatchCancelClaimButton,
     sync_single_discord_claim_event_to_web,
     maybe_handle_prepay_acceptance_claim,
@@ -147,37 +145,6 @@ def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
     for name in _ORDER_RUNTIME_BINDING_NAMES:
         if name in namespace:
             globals()[name] = namespace[name]
-
-    dispatch_keys = {
-        "BOOSTER_RECEIVER_ROLE_ID",
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CLAIMS",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "_apply_acceptance_state_to_claim_data",
-        "_member_display_name",
-        "_member_role_id_texts",
-        "_order_requires_credentials",
-        "revoke_order_credential_messages",
-        "send_acceptance_payment_panel_if_ready",
-    }
-    missing_dispatch_keys = sorted(dispatch_keys.difference(namespace))
-    if missing_dispatch_keys:
-        raise RuntimeError(
-            "order dispatch runtime missing dependencies: " + ", ".join(missing_dispatch_keys)
-        )
-
-    configure_order_dispatch_runtime_explicit(
-        booster_receiver_role_id=namespace["BOOSTER_RECEIVER_ROLE_ID"],
-        dispatch_channel_id=namespace["DISPATCH_CHANNEL_ID"],
-        order_claims=namespace["ORDER_CLAIMS"],
-        order_selections=namespace["SELF_SERVICE_ORDER_SELECTIONS"],
-        acceptance_state_applier=namespace["_apply_acceptance_state_to_claim_data"],
-        member_display_name=namespace["_member_display_name"],
-        member_role_ids=namespace["_member_role_id_texts"],
-        order_requires_credentials=namespace["_order_requires_credentials"],
-        revoke_credential_messages=namespace["revoke_order_credential_messages"],
-        send_payment_panel=namespace["send_acceptance_payment_panel_if_ready"],
-    )
 
     credential_keys = {
         "CREDENTIAL_OWNER_USER_ID",

@@ -8,6 +8,7 @@ from services.acceptance import sync_worker as acceptance_sync_worker
 from services.web_sync import runtime as web_sync_runtime
 from services import (
     order_credential_runtime,
+    order_dispatch_composition,
     order_payment_runtime,
     order_point_redemption,
     order_runtime,
@@ -28,6 +29,7 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(acceptance_sync_worker.process_acceptance_sync_events_once)
     assert callable(web_sync_runtime._process_web_order_created_event)
     assert callable(order_runtime.configure_order_runtime)
+    assert callable(order_dispatch_composition.configure_order_dispatch_composition)
     assert callable(order_storage_runtime.configure_order_storage_runtime)
     assert callable(self_service_runtime.configure_self_service_runtime_explicit)
     assert not hasattr(self_service_runtime, "configure_self_service_runtime")
@@ -47,13 +49,14 @@ def test_runtime_dependency_binding_is_explicitly_deferred_to_bot_startup():
 
     acceptance_bind = bot_source.index("configure_acceptance_runtime_explicit(")
     web_bind = bot_source.index("configure_web_sync_runtime(globals())")
+    dispatch_bind = bot_source.index("configure_order_dispatch_composition(")
     order_bind = bot_source.index("configure_order_runtime(globals())")
     lifecycle_bind = bot_source.index("configure_order_lifecycle_runtime_explicit(")
     self_service_bind = bot_source.index("configure_self_service_runtime_explicit(")
     bot_run = bot_source.index("bot.run(TOKEN)")
 
     assert acceptance_bind < bot_run
-    assert web_bind < bot_run
+    assert web_bind < dispatch_bind < order_bind < bot_run
     assert order_bind < bot_run
     assert lifecycle_bind < bot_run
     assert self_service_bind < bot_run
@@ -140,6 +143,8 @@ def test_phase2_order_runtime_responsibilities_are_physically_extracted():
     assert callable(order_runtime.DispatchClaimView)
     assert "class DispatchClaimView" in dispatch_source
     assert "def configure_order_dispatch_runtime" in dispatch_source
+    assert "dispatch_keys =" not in order_source
+    assert "configure_order_dispatch_runtime_explicit(" not in order_source
     assert "import bot" not in dispatch_source
     assert "from bot import" not in dispatch_source
     assert "async def lock_dispatch_claim_panel" not in order_source
@@ -213,24 +218,6 @@ def test_bot_ticket_identity_helpers_are_extracted():
     assert "def get_order_customer_id_from_channel" in helper_source
 
 
-def _order_dispatch_namespace() -> dict[str, object]:
-    async def async_noop(*_args, **_kwargs):
-        return None
-
-    return {
-        "BOOSTER_RECEIVER_ROLE_ID": 1,
-        "DISPATCH_CHANNEL_ID": 123,
-        "ORDER_CLAIMS": {},
-        "SELF_SERVICE_ORDER_SELECTIONS": {},
-        "_apply_acceptance_state_to_claim_data": lambda *_args, **_kwargs: None,
-        "_member_display_name": lambda member: str(getattr(member, "id", "worker")),
-        "_member_role_id_texts": lambda _member: [],
-        "_order_requires_credentials": lambda _data: False,
-        "revoke_order_credential_messages": async_noop,
-        "send_acceptance_payment_panel_if_ready": async_noop,
-    }
-
-
 def test_runtime_configure_boundaries_match_current_migration_stage():
     acceptance_runtime.configure_acceptance_runtime_explicit(
         dispatch_channel_id=123,
@@ -250,7 +237,6 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
         delattr(order_runtime, "_order_runtime_test_marker")
     order_runtime.configure_order_runtime(
         {
-            **_order_dispatch_namespace(),
             "_order_runtime_test_marker": object(),
         }
     )
