@@ -4,7 +4,7 @@ from shared.web_order_sync import _order_payout_base_amount
 from shared.payout import calculate_order_payout
 
 
-def test_single_worker_payout():
+def test_single_worker_payout_keeps_normal_cs_at_five_percent_equivalent():
     result = calculate_order_payout(
         total_amount=1000,
         worker_discord_ids=["worker_a"],
@@ -15,6 +15,7 @@ def test_single_worker_payout():
     assert result.total_worker_payout == 800
     assert result.total_payout == 850
     assert result.worker_payouts[0].final_payout == 800
+    assert result.customer_service_rate == 0.25
 
 
 def test_two_workers_without_named_bonus():
@@ -37,16 +38,16 @@ def test_two_workers_without_named_bonus():
     assert payouts["worker_b"] == 400
 
 
-def test_two_workers_with_named_bonus_for_one_worker():
+def test_named_bonus_reduces_cs_only_through_smaller_margin_pool():
     result = calculate_order_payout(
         total_amount=1000,
         worker_discord_ids=["worker_a", "worker_b"],
         named_bonus_worker_ids=["worker_a"],
     )
 
-    assert result.customer_service_payout == 50
     assert result.total_worker_payout == 825
-    assert result.total_payout == 875
+    assert result.customer_service_payout == 43.75
+    assert result.total_payout == 868.75
 
     payouts = {
         worker.worker_discord_id: worker.final_payout
@@ -55,6 +56,19 @@ def test_two_workers_with_named_bonus_for_one_worker():
 
     assert payouts["worker_a"] == 425
     assert payouts["worker_b"] == 400
+
+
+def test_legacy_order_can_still_use_flat_five_percent_cs():
+    result = calculate_order_payout(
+        total_amount=1000,
+        worker_discord_ids=["worker_a"],
+        named_bonus_worker_ids=["worker_a"],
+        legacy_customer_service_flat=True,
+    )
+
+    assert result.total_worker_payout == 850
+    assert result.customer_service_payout == 50
+    assert result.customer_service_rate == 0.05
 
 
 def test_zero_payout_base_does_not_fall_back_to_customer_amount():
