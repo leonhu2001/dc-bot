@@ -27,6 +27,7 @@ from web.app.services.order_reporting import (
     send_pending_order_report_reminders,
     submit_order_report,
 )
+from web.app.services.worker_bonus_payout import apply_approved_report_worker_bonuses
 
 
 router = APIRouter(tags=["order-reports"])
@@ -376,6 +377,7 @@ async def order_report_review_submit(request: Request, order_id: int):
             streamed_by_worker=streamed_map,
             stream_url_by_worker=stream_url_map,
         )
+        apply_approved_report_worker_bonuses(order_id)
     except ValueError as exc:
         return _redirect(
             f"/dispatch/reports/review/{order_id}",
