@@ -45,16 +45,7 @@ def test_subruntime_configurators_use_module_owned_dependencies_directly():
         assert binding in source
 
 
-def test_self_service_legacy_boundary_only_contains_bot_owned_state_and_config():
-    expected = {
-        "CUSTOMER_CATEGORY_ID",
-        "CUSTOMER_ROLE_ID",
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CLAIMS",
-        "POINT_REDEEM_ITEMS",
-        "POINT_REDEEM_ITEMS_BY_KEY",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "OrderControlView",
-    }
-
-    assert self_service_runtime._LEGACY_RUNTIME_NAMES == expected
+def test_self_service_runtime_is_explicit_only_startup_boundary():
+    assert callable(self_service_runtime.configure_self_service_runtime_explicit)
+    assert not hasattr(self_service_runtime, "configure_self_service_runtime")
+    assert not hasattr(self_service_runtime, "_LEGACY_RUNTIME_NAMES")
