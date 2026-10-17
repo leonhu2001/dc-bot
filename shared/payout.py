@@ -7,7 +7,7 @@ WORKER_BASE_PAYOUT_RATE = 0.80
 # 基本打手 80% 時：20% 毛利池 × 25% = 訂單總額 5%，因此一般單與舊體感一致。
 CUSTOMER_SERVICE_PAYOUT_RATE = 0.25
 LEGACY_CUSTOMER_SERVICE_GROSS_RATE = 0.05
-WORKER_NAMED_BONUS_RATE = 0.05
+WORKER_NAMED_BONUS_RATE = 0.03
 LEGACY_CUSTOMER_SERVICE_POLICY = "legacy_gross_5_v1"
 
 
@@ -38,7 +38,7 @@ class OrderPayoutResult:
     worker_count: int
     worker_base_rate: float
     # Persist/display the effective share of the order payout basis. Under the
-    # new 25%-of-margin policy this is 5% at 80% worker, 3.75% at 85% worker.
+    # new 25%-of-margin policy this is 5% at 80% worker, 4.25% at 83% worker.
     customer_service_rate: float
     named_bonus_rate: float
     customer_service_payout: float
