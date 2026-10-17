@@ -49,14 +49,14 @@ def test_runtime_dependency_binding_is_explicitly_deferred_to_bot_startup():
 
     acceptance_bind = bot_source.index("configure_acceptance_runtime_explicit(")
     web_bind = bot_source.index("configure_web_sync_runtime(globals())")
-    dispatch_bind = bot_source.index("configure_order_dispatch_composition(")
+    child_bind = bot_source.index("configure_order_children(")
     order_bind = bot_source.index("configure_order_runtime(globals())")
     lifecycle_bind = bot_source.index("configure_order_lifecycle_runtime_explicit(")
     self_service_bind = bot_source.index("configure_self_service_runtime_explicit(")
     bot_run = bot_source.index("bot.run(TOKEN)")
 
     assert acceptance_bind < bot_run
-    assert web_bind < dispatch_bind < order_bind < bot_run
+    assert web_bind < child_bind < order_bind < bot_run
     assert order_bind < bot_run
     assert lifecycle_bind < bot_run
     assert self_service_bind < bot_run
