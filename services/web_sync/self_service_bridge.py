@@ -27,8 +27,6 @@ from shared.order_state import (
 )
 
 
-_CONFIGURED = False
-
 CUSTOMER_ROLE_ID: int
 OrderControlView: type[discord.ui.View]
 SELF_SERVICE_ORDER_SELECTIONS: dict[int, dict[str, Any]]
@@ -41,13 +39,11 @@ def configure_web_sync_self_service_bridge(
     order_selections: dict[int, dict[str, Any]],
 ) -> None:
     """Bind only bot-owned state needed by the website self-service bridge."""
-    global _CONFIGURED
     global CUSTOMER_ROLE_ID, OrderControlView, SELF_SERVICE_ORDER_SELECTIONS
 
     CUSTOMER_ROLE_ID = int(customer_role_id)
     OrderControlView = order_control_view_type
     SELF_SERVICE_ORDER_SELECTIONS = order_selections
-    _CONFIGURED = True
 
 
 # BEGIN MAWAN_R13_UNIFIED_WEBSITE_ORDER_FLOW
