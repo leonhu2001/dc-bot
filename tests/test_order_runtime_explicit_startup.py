@@ -32,6 +32,8 @@ def test_bot_uses_explicit_order_runtime_startup():
         assert keyword in BOT_SOURCE
 
 
-def test_legacy_adapter_is_retained_but_not_used_by_startup():
-    assert "def configure_order_runtime(namespace: Mapping[str, Any])" in RUNTIME_SOURCE
+def test_legacy_adapter_is_removed_after_explicit_startup_rollout():
+    assert "def configure_order_runtime(namespace:" not in RUNTIME_SOURCE
+    assert "_ORDER_RUNTIME_BINDING_NAMES" not in RUNTIME_SOURCE
+    assert "_CONFIGURED" not in RUNTIME_SOURCE
     assert "configure_order_runtime(globals())" not in BOT_SOURCE
