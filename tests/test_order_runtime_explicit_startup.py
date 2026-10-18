@@ -33,7 +33,9 @@ def test_bot_uses_explicit_order_runtime_startup():
 
 
 def test_legacy_adapter_is_removed_after_explicit_startup_rollout():
-    assert "def configure_order_runtime(namespace:" not in RUNTIME_SOURCE
+    assert "def configure_order_runtime(" not in RUNTIME_SOURCE
+    assert "from typing import Any, Mapping" not in RUNTIME_SOURCE
     assert "_ORDER_RUNTIME_BINDING_NAMES" not in RUNTIME_SOURCE
+    assert "_MODULE_OWNED_RUNTIME_NAMES" not in RUNTIME_SOURCE
     assert "_CONFIGURED" not in RUNTIME_SOURCE
     assert "configure_order_runtime(globals())" not in BOT_SOURCE
