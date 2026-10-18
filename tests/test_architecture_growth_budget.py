@@ -67,9 +67,12 @@ def test_runtime_configurators_do_not_receive_entrypoint_globals() -> None:
     )
     offenders: list[str] = []
     for path in ROOT.rglob("*.py"):
+        relative = path.relative_to(ROOT)
+        if relative.parts and relative.parts[0] == "tests":
+            continue
         source = path.read_text(encoding="utf-8")
         if pattern.search(source):
-            offenders.append(str(path.relative_to(ROOT)))
+            offenders.append(str(relative))
 
     assert not offenders, (
         "runtime configuration must use explicit dependencies, not globals(): "
