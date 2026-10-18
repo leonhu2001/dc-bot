@@ -48,9 +48,6 @@ from services.self_service_financials import (
 )
 
 
-_CONFIGURED = False
-
-
 def configure_acceptance_runtime_explicit(
     *,
     dispatch_channel_id: int,
@@ -62,7 +59,6 @@ def configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch,
 ) -> None:
     """Bind the acceptance runtime from explicit bot-owned dependencies."""
-    global _CONFIGURED
     global DISPATCH_CHANNEL_ID, ORDER_CLAIMS, PaymentMethodView
     global SELF_SERVICE_ORDER_SELECTIONS
 
@@ -93,8 +89,6 @@ def configure_acceptance_runtime_explicit(
         refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
         sync_ticket_access_from_state=sync_acceptance_ticket_access_from_state,
     )
-
-    _CONFIGURED = True
 
 
 def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
