@@ -54,6 +54,7 @@ CUSTOMER_ROLE_ID: int
 DISPATCH_CHANNEL_ID: int
 GUILD_ID: int
 ORDER_CLAIMS: dict[int, dict[str, Any]]
+SELF_SERVICE_ORDER_SELECTIONS: dict[int, dict[str, Any]]
 bot: discord.Client
 
 
@@ -64,18 +65,20 @@ def configure_web_sync_order_created(
     dispatch_channel_id: int,
     guild_id: int,
     order_claims: dict[int, dict[str, Any]],
+    order_selections: dict[int, dict[str, Any]],
     bot_instance: discord.Client,
 ) -> None:
     """Bind only entrypoint-owned state used by the order-created pipeline."""
     global _CONFIGURED
     global CUSTOMER_CATEGORY_ID, CUSTOMER_ROLE_ID, DISPATCH_CHANNEL_ID, GUILD_ID
-    global ORDER_CLAIMS, bot
+    global ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, bot
 
     CUSTOMER_CATEGORY_ID = int(customer_category_id)
     CUSTOMER_ROLE_ID = int(customer_role_id)
     DISPATCH_CHANNEL_ID = int(dispatch_channel_id)
     GUILD_ID = int(guild_id)
     ORDER_CLAIMS = order_claims
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
     bot = bot_instance
     _CONFIGURED = True
 

@@ -11,6 +11,7 @@ EXPECTED_ORDER_CREATED_DEPENDENCIES = {
     "dispatch_channel_id",
     "guild_id",
     "order_claims",
+    "order_selections",
     "bot_instance",
 }
 
@@ -58,3 +59,21 @@ def test_order_created_pipeline_is_physically_extracted():
         web_sync_runtime._web_order_created_seed_state
         is order_created._web_order_created_seed_state
     )
+
+
+def test_web_sync_order_created_binds_shared_selection_state():
+    claims = {}
+    selections = {}
+    bot_instance = object()
+    order_created.configure_web_sync_order_created(
+        customer_category_id=1,
+        customer_role_id=2,
+        dispatch_channel_id=3,
+        guild_id=4,
+        order_claims=claims,
+        order_selections=selections,
+        bot_instance=bot_instance,
+    )
+    assert order_created.ORDER_CLAIMS is claims
+    assert order_created.SELF_SERVICE_ORDER_SELECTIONS is selections
+    assert order_created.bot is bot_instance

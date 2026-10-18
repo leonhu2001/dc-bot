@@ -57,6 +57,7 @@ def configure_web_sync_runtime_explicit(
         dispatch_channel_id=dispatch_channel_id,
         guild_id=guild_id,
         order_claims=order_claims,
+        order_selections=order_selections,
         bot_instance=bot_instance,
     )
     configure_web_sync_cs_review(
