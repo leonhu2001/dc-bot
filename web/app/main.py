@@ -128,6 +128,15 @@ async def security_and_refresh_access(request: Request, call_next):
     if is_admin_path(request.url.path):
         user = request.session.get("user")
 
+        if not user and request.method.upper() in {"GET", "HEAD"}:
+            next_path = request.url.path
+            if request.url.query:
+                next_path += "?" + request.url.query
+            return RedirectResponse(
+                url="/auth/discord/login?next=" + quote(next_path, safe=""),
+                status_code=303,
+            )
+
         if user:
             refreshed_user = dict(user)
             discord_id = str(refreshed_user.get("id") or "").strip()
