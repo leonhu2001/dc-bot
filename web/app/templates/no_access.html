@@ -4,12 +4,7 @@
 
 {% block content %}
     {% if not user %}
-        <script nonce="{{ request.state.csp_nonce }}">
-            (() => {
-                const nextPath = `${window.location.pathname}${window.location.search}`;
-                window.location.replace(`/auth/discord/login?next=${encodeURIComponent(nextPath)}`);
-            })();
-        </script>
+        <script src="/static/js/pages/no_access_login_redirect.js?v=20261019"></script>
     {% endif %}
 
     <div class="panel">

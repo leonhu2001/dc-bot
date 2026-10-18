@@ -19,6 +19,7 @@ def install_root_benefit_integrations() -> None:
     from services import promotion_benefits as promotion
     from services import promotion_benefit_lifecycle as promotion_lifecycle
     from services.payout_policy_migration import freeze_existing_orders_on_legacy_cs_policy
+    from services.self_service_financial_copy import install_self_service_financial_copy_policy
     from services.self_service_promotion_integration import install_self_service_promotion_integration
     from services.vip_monthly_cash_policy import install_cash_entitlement_wrapper
 
@@ -31,6 +32,7 @@ def install_root_benefit_integrations() -> None:
     # until that separate policy is decided.
     install_cash_entitlement_wrapper()
     install_self_service_promotion_integration()
+    install_self_service_financial_copy_policy()
 
     # Keep one canonical reservation implementation. promotion_benefits retains
     # its public compatibility name, but production callers are routed through
