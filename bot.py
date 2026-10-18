@@ -221,7 +221,7 @@ from services.acceptance.runtime import (
     _build_receiver_text_from_claim_data,
 )
 from services.web_sync.runtime import (
-    configure_web_sync_runtime,
+    configure_web_sync_runtime_explicit,
     _web_dashboard_db_path_for_bot,
     _web_order_created_ensure_ticket,
     _web_order_created_find_dispatch_message,
@@ -6507,7 +6507,16 @@ configure_acceptance_runtime_explicit(
     guild_id=GUILD_ID,
     refresh_existing_web_sync_dispatch=_refresh_existing_web_sync_dispatch,
 )
-configure_web_sync_runtime(globals())
+configure_web_sync_runtime_explicit(
+    customer_category_id=CUSTOMER_CATEGORY_ID,
+    customer_role_id=CUSTOMER_ROLE_ID,
+    dispatch_channel_id=DISPATCH_CHANNEL_ID,
+    guild_id=GUILD_ID,
+    order_claims=ORDER_CLAIMS,
+    order_control_view_type=OrderControlView,
+    order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+    bot_instance=bot,
+)
 configure_order_children(BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, CUSTOMER_REWARDS, CREDENTIAL_OWNER_USER_ID, GUILD_ID, bot, StaffOrderOperationView)
 configure_order_runtime_explicit(
     db_file=DB_FILE,
