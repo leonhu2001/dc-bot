@@ -5,6 +5,7 @@ from pathlib import Path
 from services.acceptance import dispatch_refresh as acceptance_dispatch_refresh
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
+from services.web_sync import cs_review as web_sync_cs_review
 from services.web_sync import runtime as web_sync_runtime
 from services import (
     order_credential_composition,
@@ -113,7 +114,15 @@ def test_large_runtime_implementations_no_longer_live_in_bot():
         is acceptance_dispatch_refresh.refresh_acceptance_dispatch_from_web_order
     )
     assert "async def _web_order_created_ensure_ticket" in web_source
-    assert "class WebsiteOrderCsConfirmView" in web_source
+    cs_review_source = Path("services/web_sync/cs_review.py").read_text(
+        encoding="utf-8"
+    )
+    assert "class WebsiteOrderCsConfirmView" not in web_source
+    assert "class WebsiteOrderCsConfirmView" in cs_review_source
+    assert (
+        web_sync_runtime.WebsiteOrderCsConfirmView
+        is web_sync_cs_review.WebsiteOrderCsConfirmView
+    )
     assert "async def _process_web_order_created_event" in web_source
 
 
