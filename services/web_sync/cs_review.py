@@ -33,8 +33,6 @@ from services.web_sync.presentation import (
 )
 
 
-_CONFIGURED = False
-
 SELF_SERVICE_ORDER_SELECTIONS: dict[int, dict[str, Any]]
 _ensure_dispatch: Callable[..., Any]
 _seed_state: Callable[..., Any]
@@ -47,13 +45,11 @@ def configure_web_sync_cs_review(
     seed_state: Callable[..., Any],
 ) -> None:
     """Bind the small set of runtime callbacks/state used by the CS review UI."""
-    global _CONFIGURED
     global SELF_SERVICE_ORDER_SELECTIONS, _ensure_dispatch, _seed_state
 
     SELF_SERVICE_ORDER_SELECTIONS = order_selections
     _ensure_dispatch = ensure_dispatch
     _seed_state = seed_state
-    _CONFIGURED = True
 
 
 def _web_dashboard_db_path_for_bot() -> str:
