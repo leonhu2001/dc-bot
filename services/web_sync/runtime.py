@@ -58,8 +58,6 @@ from views.smart_dispatch import (
 )
 
 
-_CONFIGURED = False
-
 CUSTOMER_CATEGORY_ID: int
 CUSTOMER_ROLE_ID: int
 DISPATCH_CHANNEL_ID: int
@@ -81,7 +79,6 @@ def configure_web_sync_runtime_explicit(
     bot_instance: discord.Client,
 ) -> None:
     """Bind only the entrypoint-owned state required by Web sync."""
-    global _CONFIGURED
     global CUSTOMER_CATEGORY_ID, CUSTOMER_ROLE_ID, DISPATCH_CHANNEL_ID, GUILD_ID
     global ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, bot
 
@@ -106,7 +103,6 @@ def configure_web_sync_runtime_explicit(
         *args, **kwargs
     ),
 )
-    _CONFIGURED = True
 
 
 # zYao 3C3B web order created bridge v1
