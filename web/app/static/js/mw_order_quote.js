@@ -1496,8 +1496,8 @@
         const ruleKey =
             String(
                 byId(
-                    "mw-rule-key"
-                )?.textContent
+                    "mw-variant"
+                )?.value
                 || ""
             ).trim();
 
