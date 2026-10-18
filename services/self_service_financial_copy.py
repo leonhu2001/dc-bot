@@ -32,6 +32,39 @@ def _promotion_funding(data: dict) -> str | None:
     return None
 
 
+def _vip_monthly_display(data: dict) -> tuple[str, int] | None:
+    title = str(data.get("vip_monthly_benefit_title") or "").strip()
+    try:
+        amount = max(0, int(data.get("vip_monthly_cash_amount") or 0))
+    except (TypeError, ValueError):
+        amount = 0
+
+    if title and amount > 0:
+        return title, amount
+
+    selection_id = data.get("selected_vip_monthly_benefit_id")
+    customer_id = str(data.get("customer_id") or "").strip()
+    if selection_id in (None, "") or not customer_id:
+        return None
+
+    try:
+        from services.vip_monthly_benefits import get_available_cash_benefit
+
+        selected = get_available_cash_benefit(selection_id, customer_id=customer_id)
+    except Exception:
+        selected = None
+
+    if not selected:
+        return None
+
+    title = str(selected.get("title") or "VIP 每月折現券").strip()
+    try:
+        amount = max(0, int(selected.get("amount") or 0))
+    except (TypeError, ValueError):
+        amount = 0
+    return (title, amount) if amount > 0 else None
+
+
 def _rewrite_standard_discount_text(value: str) -> str:
     text = str(value or "")
     text = text.replace("店內吸收，不影響打手分潤", _SHARED_COPY)
@@ -88,6 +121,15 @@ def install_self_service_financial_copy_policy() -> None:
                         value=rewritten,
                         inline=field.inline,
                     )
+
+            vip_monthly = _vip_monthly_display(dict(src or {}))
+            if vip_monthly and not any(field.name == "VIP 月券" for field in result.fields):
+                title, amount = vip_monthly
+                result.add_field(
+                    name="VIP 月券",
+                    value=f"{title}\n-{financials._format_plain_amount(amount)}",
+                    inline=False,
+                )
             return result
 
         financials.add_self_service_financial_breakdown_fields = (
@@ -102,7 +144,7 @@ def install_self_service_financial_copy_policy() -> None:
         def quote_preview_lines(data: dict, guild=None):
             rows = financials._funding_copy_original_quote_lines(data, guild)
             promotion_funding = _promotion_funding(data)
-            return [
+            rewritten_rows = [
                 (
                     name,
                     _rewrite_quote_text(
@@ -112,6 +154,17 @@ def install_self_service_financial_copy_policy() -> None:
                 )
                 for name, value in rows
             ]
+
+            vip_monthly = _vip_monthly_display(data)
+            if vip_monthly and not any(name == "VIP 月券" for name, _ in rewritten_rows):
+                title, amount = vip_monthly
+                rewritten_rows.append(
+                    (
+                        "VIP 月券",
+                        f"{title}｜-{financials._format_plain_amount(amount)}",
+                    )
+                )
+            return rewritten_rows
 
         financials._quote_preview_lines_for_self_service = quote_preview_lines
 
