@@ -21,6 +21,7 @@ from services.self_service_financials import (
     _price_snapshot,
     add_self_service_financial_breakdown_fields,
 )
+from shared.order_state import WAITING_ACCEPTANCE
 
 
 DISPATCH_CHANNEL_ID = 0
@@ -64,7 +65,7 @@ def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
     claim_data["status"] = str(
         getattr(state, "status", None)
         or claim_data.get("status")
-        or "waiting_acceptance"
+        or WAITING_ACCEPTANCE
     )
 
 
