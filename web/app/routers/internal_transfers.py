@@ -17,6 +17,12 @@ from web.app.services.internal_transfers import (
     list_internal_transfers,
     review_internal_transfer,
 )
+from web.app.services.internal_wallet_transfers import (
+    SELF_WALLET_DESTINATION,
+    create_internal_wallet_transfer,
+    is_internal_wallet_transfer,
+    review_internal_wallet_transfer,
+)
 
 
 router = APIRouter(tags=["employee-internal-transfers"])
@@ -130,6 +136,7 @@ async def internal_transfer_page(request: Request):
             "available": get_available_unpaid_balance(user_id),
             "pending_reviews": pending_reviews,
             "transfer_rows": my_rows,
+            "wallet_destination_value": SELF_WALLET_DESTINATION,
             "message": request.query_params.get("message", ""),
             "error": request.query_params.get("error", ""),
         },
@@ -150,18 +157,25 @@ async def create_transfer(request: Request):
         if reviewer
         else actor_id
     )
+    to_id = str(form.get("to_employee_discord_id") or "").strip()
 
     try:
-        result = create_internal_transfer(
-            actor_discord_id=actor_id,
-            actor_display_name=_display_name(user),
-            from_employee_discord_id=from_id,
-            to_employee_discord_id=str(form.get("to_employee_discord_id") or "").strip(),
-            amount=int(str(form.get("amount") or "0")),
-            reason=str(form.get("reason") or ""),
-            actor_is_customer_service=bool(user.get("is_customer_service")),
-            actor_is_manager=bool(user.get("is_manager")),
-        )
+        common_args = {
+            "actor_discord_id": actor_id,
+            "actor_display_name": _display_name(user),
+            "from_employee_discord_id": from_id,
+            "amount": int(str(form.get("amount") or "0")),
+            "reason": str(form.get("reason") or ""),
+            "actor_is_customer_service": bool(user.get("is_customer_service")),
+            "actor_is_manager": bool(user.get("is_manager")),
+        }
+        if to_id == SELF_WALLET_DESTINATION:
+            result = create_internal_wallet_transfer(**common_args)
+        else:
+            result = create_internal_transfer(
+                **common_args,
+                to_employee_discord_id=to_id,
+            )
     except (TypeError, ValueError) as exc:
         return _redirect(error=str(exc))
 
@@ -182,16 +196,19 @@ async def approve_transfer(transfer_id: int, request: Request):
         return RedirectResponse("/no-access", status_code=303)
 
     form = await request.form()
+    reviewer_args = {
+        "transfer_id": transfer_id,
+        "reviewer_discord_id": str(user.get("id") or ""),
+        "reviewer_display_name": _display_name(user),
+        "reviewer_is_customer_service": bool(user.get("is_customer_service")),
+        "reviewer_is_manager": bool(user.get("is_manager")),
+        "review_note": str(form.get("review_note") or ""),
+    }
     try:
-        review_internal_transfer(
-            transfer_id=transfer_id,
-            reviewer_discord_id=str(user.get("id") or ""),
-            reviewer_display_name=_display_name(user),
-            approve=True,
-            reviewer_is_customer_service=bool(user.get("is_customer_service")),
-            reviewer_is_manager=bool(user.get("is_manager")),
-            review_note=str(form.get("review_note") or ""),
-        )
+        if is_internal_wallet_transfer(transfer_id):
+            review_internal_wallet_transfer(**reviewer_args, approve=True)
+        else:
+            review_internal_transfer(**reviewer_args, approve=True)
     except ValueError as exc:
         return _redirect(error=str(exc))
 
@@ -205,16 +222,19 @@ async def reject_transfer(transfer_id: int, request: Request):
         return RedirectResponse("/no-access", status_code=303)
 
     form = await request.form()
+    reviewer_args = {
+        "transfer_id": transfer_id,
+        "reviewer_discord_id": str(user.get("id") or ""),
+        "reviewer_display_name": _display_name(user),
+        "reviewer_is_customer_service": bool(user.get("is_customer_service")),
+        "reviewer_is_manager": bool(user.get("is_manager")),
+        "review_note": str(form.get("review_note") or ""),
+    }
     try:
-        review_internal_transfer(
-            transfer_id=transfer_id,
-            reviewer_discord_id=str(user.get("id") or ""),
-            reviewer_display_name=_display_name(user),
-            approve=False,
-            reviewer_is_customer_service=bool(user.get("is_customer_service")),
-            reviewer_is_manager=bool(user.get("is_manager")),
-            review_note=str(form.get("review_note") or ""),
-        )
+        if is_internal_wallet_transfer(transfer_id):
+            review_internal_wallet_transfer(**reviewer_args, approve=False)
+        else:
+            review_internal_transfer(**reviewer_args, approve=False)
     except ValueError as exc:
         return _redirect(error=str(exc))
 
