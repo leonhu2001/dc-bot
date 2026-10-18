@@ -506,7 +506,7 @@ def _merge_wave_notification_ids(
     return list(dict.fromkeys([*specified, *general]))
 
 
-def _exclude_busy_repeat_ids(
+def _exclude_busy_notification_ids(
     candidate_ids: Iterable[str | int],
     *,
     db_file: str | Path | None = None,
@@ -631,8 +631,25 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                 # T+7 分鐘（公開後 6 分鐘）：第三輪全量通知並請客服介入。
                 # 若 Bot 曾離線到超過此時間，直接進入全量通知，避免補發多輪舊提醒。
                 if age >= FULL_EXPANSION_SECONDS and stage < 3:
+                    third_notification_ids = _exclude_busy_notification_ids(
+                        _merge_wave_notification_ids(
+                            unresolved_specified,
+                            remaining_general_ids,
+                            unrestricted_missing=unrestricted_missing,
+                        )
+                    )
+                    third_notification_set = set(third_notification_ids)
+                    notified_specified_ids = [
+                        worker_id
+                        for worker_id in unresolved_specified
+                        if worker_id in third_notification_set
+                    ]
                     final_user_ids = (
-                        remaining_general_ids
+                        [
+                            worker_id
+                            for worker_id in remaining_general_ids
+                            if worker_id in third_notification_set
+                        ]
                         if unrestricted_missing > 0
                         else []
                     )
@@ -642,12 +659,12 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
                     ]
 
-                    if unresolved_specified:
+                    if notified_specified_ids:
                         lines.append(
                             "尚未接單的指定人員："
                             + " ".join(
                                 f"<@{worker_id}>"
-                                for worker_id in unresolved_specified
+                                for worker_id in notified_specified_ids
                             )
                         )
                         lines.append(
@@ -717,11 +734,19 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                             )
                         ]
 
-                    reminder_ids = _merge_wave_notification_ids(
-                        unresolved_specified,
-                        second_ids,
-                        unrestricted_missing=unrestricted_missing,
+                    reminder_ids = _exclude_busy_notification_ids(
+                        _merge_wave_notification_ids(
+                            unresolved_specified,
+                            second_ids,
+                            unrestricted_missing=unrestricted_missing,
+                        )
                     )
+                    reminder_id_set = set(reminder_ids)
+                    notified_second_ids = [
+                        worker_id
+                        for worker_id in second_ids
+                        if worker_id in reminder_id_set
+                    ]
 
                     if reminder_ids:
                         lines = [
@@ -751,7 +776,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     mark_smart_dispatch_stage(
                         order_id,
                         stage=2,
-                        newly_notified_ids=second_ids,
+                        newly_notified_ids=notified_second_ids,
                     )
                     continue
 
@@ -791,11 +816,19 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     if unrestricted_missing > 0 and not general_first_ids:
                         general_first_ids = list(remaining_general_ids)
 
-                    first_ids = _merge_wave_notification_ids(
-                        unresolved_specified,
-                        general_first_ids,
-                        unrestricted_missing=unrestricted_missing,
+                    first_ids = _exclude_busy_notification_ids(
+                        _merge_wave_notification_ids(
+                            unresolved_specified,
+                            general_first_ids,
+                            unrestricted_missing=unrestricted_missing,
+                        )
                     )
+                    first_id_set = set(first_ids)
+                    notified_general_first_ids = [
+                        worker_id
+                        for worker_id in general_first_ids
+                        if worker_id in first_id_set
+                    ]
 
                     if first_ids:
                         lines = [
@@ -829,7 +862,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     mark_smart_dispatch_stage(
                         order_id,
                         stage=1,
-                        newly_notified_ids=general_first_ids,
+                        newly_notified_ids=notified_general_first_ids,
                     )
                     continue
 
@@ -854,7 +887,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     if seconds_since_update < REPEAT_REMINDER_SECONDS:
                         continue
 
-                    repeat_ids = _exclude_busy_repeat_ids(
+                    repeat_ids = _exclude_busy_notification_ids(
                         _merge_wave_notification_ids(
                             unresolved_specified,
                             remaining_general_ids,

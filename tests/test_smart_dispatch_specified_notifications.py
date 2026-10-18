@@ -27,13 +27,20 @@ def test_wave_targets_are_deduplicated():
     ) == ["S1", "A"]
 
 
-def test_first_and_repeat_waves_use_reserved_slot_targeting():
+def test_all_ping_waves_filter_busy_staff_after_reserved_slot_targeting():
     source = Path("views/smart_dispatch.py").read_text(encoding="utf-8")
 
-    assert "first_ids = _merge_wave_notification_ids(" in source
-    assert "repeat_ids = _exclude_busy_repeat_ids(" in source
+    assert "third_notification_ids = _exclude_busy_notification_ids(" in source
+    assert "reminder_ids = _exclude_busy_notification_ids(" in source
+    assert "first_ids = _exclude_busy_notification_ids(" in source
+    assert "repeat_ids = _exclude_busy_notification_ids(" in source
 
-    repeat_start = source.index("repeat_ids = _exclude_busy_repeat_ids(")
-    repeat_end = source.index("if repeat_ids:", repeat_start)
-    repeat_block = source[repeat_start:repeat_end]
-    assert "_merge_wave_notification_ids(" in repeat_block
+    for marker in (
+        "third_notification_ids = _exclude_busy_notification_ids(",
+        "reminder_ids = _exclude_busy_notification_ids(",
+        "first_ids = _exclude_busy_notification_ids(",
+        "repeat_ids = _exclude_busy_notification_ids(",
+    ):
+        start = source.index(marker)
+        block = source[start:start + 700]
+        assert "_merge_wave_notification_ids(" in block
