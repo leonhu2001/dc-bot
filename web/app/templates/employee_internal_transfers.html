@@ -14,7 +14,7 @@
             <h2>{% if is_reviewer %}建立內部轉帳{% else %}發起內部轉帳{% endif %}</h2>
             <div class="it-muted">
                 不綁任何訂單。一般員工送出後由客服審核；客服或總管操作會直接生效。
-                核准後會形成一筆轉出薪資調整與一筆轉入薪資調整，總額不變。
+                可分給其他內部員工，也可把待發放薪資轉入轉出人自己的店內錢包。
             </div>
 
             {% if not is_reviewer %}
@@ -47,7 +47,8 @@
                 <div class="it-field">
                     <label for="toEmployee">收款人</label>
                     <select class="it-select" id="toEmployee" name="to_employee_discord_id" required>
-                        <option value="">選擇內部員工</option>
+                        <option value="">選擇收款人</option>
+                        <option value="{{ wallet_destination_value }}">我的錢包｜轉入「轉出人」本人的店內錢包</option>
                         {% for employee in employees %}
                         <option value="{{ employee.discord_id }}">{{ employee.name }}</option>
                         {% endfor %}
@@ -67,7 +68,7 @@
 
                 <div class="it-field">
                     <label for="reason">原因</label>
-                    <textarea class="it-textarea" id="reason" name="reason" maxlength="500" required placeholder="例如：同一場陪單，實際時數不同，補分 1 小時薪資"></textarea>
+                    <textarea class="it-textarea" id="reason" name="reason" maxlength="500" required placeholder="例如：同一場陪單補分，或薪資轉入自己的錢包點單"></textarea>
                 </div>
 
                 <button class="it-btn" type="submit">{% if is_reviewer %}直接轉帳{% else %}送客服審核{% endif %}</button>
@@ -78,10 +79,10 @@
             <h2>規則</h2>
             <div class="it-note csp-sa-0dc9ede002">
                 ① 可以轉給任何目前有效的內部員工，不需要兩人接過同一張單。<br>
-                ② 金額只看轉出人的「待發放薪資可用額度」，不看某張訂單是多少。<br>
-                ③ 一般員工送出後先保留額度，客服核准才真正入帳。<br>
-                ④ 客服／總管建立的轉帳直接生效，但一樣會留下完整操作人與時間。<br>
-                ⑤ 已經發放出去的薪資不會被回頭竄改；內部轉帳會獨立列成薪資調整流水。
+                ② 選「我的錢包」時，永遠轉入「轉出人」本人錢包；客服代操作也不會轉進客服自己的錢包。<br>
+                ③ 金額只看轉出人的「待發放薪資可用額度」，不看某張訂單是多少。<br>
+                ④ 一般員工送出後先保留額度，客服核准才真正入帳；客服／總管建立則直接生效。<br>
+                ⑤ 薪資轉錢包會留下薪資扣除流水與錢包入帳流水；已發放薪資不會被回頭竄改。
             </div>
         </aside>
     </div>
