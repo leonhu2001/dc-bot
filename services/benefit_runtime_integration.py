@@ -21,6 +21,7 @@ def install_root_benefit_integrations() -> None:
     from services.payout_policy_migration import freeze_existing_orders_on_legacy_cs_policy
     from services.self_service_financial_copy import install_self_service_financial_copy_policy
     from services.self_service_promotion_integration import install_self_service_promotion_integration
+    from services.self_service_vip_monthly_ux import install_self_service_vip_monthly_ux
     from services.vip_monthly_cash_policy import install_cash_entitlement_wrapper
 
     # First startup after deployment is the policy boundary. Orders that already
@@ -33,6 +34,7 @@ def install_root_benefit_integrations() -> None:
     install_cash_entitlement_wrapper()
     install_self_service_promotion_integration()
     install_self_service_financial_copy_policy()
+    install_self_service_vip_monthly_ux()
 
     # Keep one canonical reservation implementation. promotion_benefits retains
     # its public compatibility name, but production callers are routed through
