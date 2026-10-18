@@ -51,6 +51,49 @@ def _original_service_amount(
     return after_percent
 
 
+def get_vip_monthly_cash_order_status(
+    selected: dict[str, Any] | None,
+    *,
+    original_service_amount: int,
+) -> dict[str, Any]:
+    """Return the canonical current-order eligibility status for a VIP cash voucher."""
+    selected = dict(selected or {})
+    benefit_key = str(selected.get("benefit_key") or "")
+    amount = max(0, int(selected.get("amount") or 0))
+    minimum = max(0, int(VIP_MONTHLY_CASH_ORDER_MINIMUMS.get(benefit_key, 0) or 0))
+    current = max(0, int(original_service_amount or 0))
+    shortfall = max(0, minimum - current)
+    return {
+        "benefit_key": benefit_key,
+        "title": str(selected.get("title") or "VIP 每月折現券").strip() or "VIP 每月折現券",
+        "amount": amount,
+        "minimum": minimum,
+        "current": current,
+        "shortfall": shortfall,
+        "eligible": minimum <= 0 or current >= minimum,
+    }
+
+
+def format_vip_monthly_cash_order_requirement(status: dict[str, Any]) -> str:
+    title = str(status.get("title") or "VIP 每月折現券")
+    minimum = max(0, int(status.get("minimum") or 0))
+    current = max(0, int(status.get("current") or 0))
+    shortfall = max(0, int(status.get("shortfall") or 0))
+    eligible = bool(status.get("eligible"))
+
+    if minimum <= 0:
+        return f"{title}：目前可使用。"
+    if eligible:
+        return (
+            f"{title}：低消 {minimum:,}T（以原始服務金額判定）；"
+            f"目前 {current:,}T，可使用。"
+        )
+    return (
+        f"{title}：低消 {minimum:,}T（以原始服務金額判定）；"
+        f"目前 {current:,}T，尚差 {shortfall:,}T。"
+    )
+
+
 def resolve_vip_monthly_cash_discount(
     data: dict[str, Any],
     *,
@@ -81,18 +124,17 @@ def resolve_vip_monthly_cash_discount(
     if selected is None:
         raise ValueError("這張 VIP 每月折現券已使用、已保留或已失效。")
 
-    benefit_key = str(selected.get("benefit_key") or "")
-    minimum = int(VIP_MONTHLY_CASH_ORDER_MINIMUMS.get(benefit_key, 0) or 0)
     original_amount = _original_service_amount(
         data,
         fallback_after_percent=max_discount_amount,
         explicit_amount=original_service_amount,
     )
-    if minimum > 0 and original_amount < minimum:
-        amount_label = int(selected.get("amount") or 0)
-        raise ValueError(
-            f"VIP {amount_label}T 月券需單筆原始服務金額滿 {minimum:,}T 才能使用。"
-        )
+    status = get_vip_monthly_cash_order_status(
+        selected,
+        original_service_amount=original_amount,
+    )
+    if not status["eligible"]:
+        raise ValueError(format_vip_monthly_cash_order_requirement(status))
 
     amount = max(
         0,
