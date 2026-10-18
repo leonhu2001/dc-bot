@@ -3,8 +3,10 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from core.time_utils import get_taipei_now_iso
-from services.wallet_service import ensure_wallet_tables
+from services.wallet_service import (
+    credit_wallet_principal_in_connection,
+    ensure_wallet_tables,
+)
 from web.app.services import internal_transfers as payroll
 
 
@@ -111,89 +113,18 @@ def _credit_wallet(
     if not wallet_id:
         raise ValueError("無法確認要入帳的本人錢包。")
 
-    existing = conn.execute(
-        """
-        SELECT id, amount
-        FROM walletdb.wallet_transactions
-        WHERE customer_discord_id = ?
-          AND order_no = ?
-          AND type = ?
-        LIMIT 1
-        """,
-        (wallet_id, f"salary-wallet:{int(transfer_id)}", WALLET_TRANSACTION_TYPE),
-    ).fetchone()
-    if existing is not None:
-        if int(existing["amount"] or 0) != int(amount):
-            raise ValueError("這筆薪資轉錢包已存在不同金額的入帳紀錄，已停止重複入帳。")
-        return int(existing["id"])
-
-    row = conn.execute(
-        """
-        SELECT balance, principal_balance, bonus_balance, refund_offset_balance
-        FROM walletdb.customer_wallets
-        WHERE customer_discord_id = ?
-        """,
-        (wallet_id,),
-    ).fetchone()
-
-    before = int(row["balance"] or 0) if row else 0
-    principal_before = int(row["principal_balance"] or 0) if row else 0
-    bonus_before = int(row["bonus_balance"] or 0) if row else 0
-    refund_offset_before = int(row["refund_offset_balance"] or 0) if row else 0
-    after = before + int(amount)
-    principal_after = principal_before + int(amount)
-    now_iso = get_taipei_now_iso()
-
-    if row is None:
-        conn.execute(
-            """
-            INSERT INTO walletdb.customer_wallets (
-                customer_discord_id, balance, principal_balance,
-                bonus_balance, refund_offset_balance, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (wallet_id, after, principal_after, 0, 0, now_iso),
-        )
-    else:
-        conn.execute(
-            """
-            UPDATE walletdb.customer_wallets
-            SET balance = ?, principal_balance = ?, bonus_balance = ?,
-                refund_offset_balance = ?, updated_at = ?
-            WHERE customer_discord_id = ?
-            """,
-            (
-                after,
-                principal_after,
-                bonus_before,
-                refund_offset_before,
-                now_iso,
-                wallet_id,
-            ),
-        )
-
-    cur = conn.execute(
-        """
-        INSERT INTO walletdb.wallet_transactions (
-            customer_discord_id, amount, balance_before, balance_after, type,
-            order_channel_id, order_no, operator_discord_id,
-            operator_display_name, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
-        """,
-        (
-            wallet_id,
-            int(amount),
-            before,
-            after,
-            WALLET_TRANSACTION_TYPE,
-            f"salary-wallet:{int(transfer_id)}",
-            str(operator_discord_id or "").strip() or None,
-            str(operator_display_name or "").strip() or None,
-            f"待發放薪資轉入本人錢包｜{source_display_name}｜{reason}"[:500],
-            now_iso,
-        ),
+    result = credit_wallet_principal_in_connection(
+        conn,
+        customer_id=wallet_id,
+        amount=int(amount),
+        tx_type=WALLET_TRANSACTION_TYPE,
+        order_no=f"salary-wallet:{int(transfer_id)}",
+        operator_discord_id=operator_discord_id,
+        operator_display_name=operator_display_name,
+        note=f"待發放薪資轉入本人錢包｜{source_display_name}｜{reason}",
+        schema="walletdb",
     )
-    return int(cur.lastrowid)
+    return int(result["transaction_id"])
 
 
 def create_internal_wallet_transfer(
@@ -215,8 +146,8 @@ def create_internal_wallet_transfer(
         raise ValueError("登入資料或轉出人不完整。")
     try:
         amount = int(amount)
-    except (TypeError, ValueError):
-        raise ValueError("金額格式錯誤。")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("金額格式錯誤。") from exc
     if amount <= 0:
         raise ValueError("轉帳金額必須大於 0T。")
     if amount > 1_000_000:
