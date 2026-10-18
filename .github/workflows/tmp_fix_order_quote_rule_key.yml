@@ -17,69 +17,19 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           quote_path = Path('web/app/static/js/mw_order_quote.js')
           source = quote_path.read_text(encoding='utf-8')
 
-          helper_anchor = '\n\n    function invalidatePrice() {'
-          assert source.count(helper_anchor) == 1, 'quote helper anchor changed'
-
-          helper = '\n'.join([
-              '',
-              '',
-              '    function readSelectedRuleKey() {',
-              '',
-              '        const select =',
-              '            byId(',
-              '                "mw-variant"',
-              '            );',
-              '',
-              '',
-              '        if (',
-              '            !select',
-              '            || select.selectedIndex < 0',
-              '        ) {',
-              '            return "";',
-              '        }',
-              '',
-              '',
-              '        const option =',
-              '            select.options[',
-              '                select.selectedIndex',
-              '            ];',
-              '',
-              '',
-              '        return String(',
-              '            option?.dataset?.ruleKey',
-              '            || option?.getAttribute(',
-              '                "data-rule-key"',
-              '            )',
-              '            || option?.value',
-              '            || select.value',
-              '            || ""',
-              '        ).trim();',
-              '    }',
-          ])
-          source = source.replace(helper_anchor, helper + helper_anchor, 1)
-
-          old_block = '\n'.join([
-              '        const ruleKey =',
-              '            String(',
-              '                byId(',
-              '                    "mw-rule-key"',
-              '                )?.textContent',
-              '                || ""',
-              '            ).trim();',
-          ])
-          assert source.count(old_block) == 2, 'expected two legacy rule-key reads'
-          source = source.replace(
-              old_block,
-              '        const ruleKey =\n            readSelectedRuleKey();',
+          pattern = re.compile(
+              r'byId\(\s*"mw-rule-key"\s*\)\?\.textContent'
           )
-
+          replacement = 'byId(\n                    "mw-variant"\n                )?.value'
+          source, count = pattern.subn(replacement, source)
+          assert count == 2, f'expected two legacy rule-key reads, got {count}'
           assert '"mw-rule-key"' not in source
-          assert source.count('readSelectedRuleKey();') == 2
-          assert '"mw-variant"' in source
+          assert source.count('"mw-variant"') >= 2
           quote_path.write_text(source, encoding='utf-8')
 
           test_path = Path('tests/test_order_quote_rule_key_source.py')
@@ -92,11 +42,8 @@ jobs:
               '',
               '',
               'def test_quote_reads_rule_key_from_selected_variant():',
-              '    assert "function readSelectedRuleKey()" in QUOTE_SOURCE',
-              '    assert "\\\"mw-variant\\\"" in QUOTE_SOURCE',
-              '    assert "selectedIndex" in QUOTE_SOURCE',
-              '    assert "option?.value" in QUOTE_SOURCE',
-              '    assert QUOTE_SOURCE.count("readSelectedRuleKey();") == 2',
+              '    assert QUOTE_SOURCE.count("\\\"mw-variant\\\"") >= 2',
+              '    assert QUOTE_SOURCE.count(")?.value") >= 2',
               '',
               '',
               'def test_quote_does_not_depend_on_removed_rule_key_node():',
@@ -107,7 +54,13 @@ jobs:
       - name: Validate patch
         run: |
           node --check web/app/static/js/mw_order_quote.js
-          python -m pytest -q tests/test_order_quote_rule_key_source.py
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('web/app/static/js/mw_order_quote.js').read_text(encoding='utf-8')
+          assert '"mw-rule-key"' not in source
+          assert source.count('"mw-variant"') >= 2
+          assert source.count(')?.value') >= 2
+          PY
       - name: Remove temporary workflow and commit
         run: |
           rm .github/workflows/tmp_fix_order_quote_rule_key.yml
