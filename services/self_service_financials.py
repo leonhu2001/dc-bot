@@ -13,6 +13,7 @@ from services.point_benefit_catalog import (
     get_point_benefit_item,
     is_service_bonus_allowed_for_rule,
 )
+from services import self_service_manual_pricing as manual_pricing
 from services.vip_monthly_order_discount import (
     build_vip_monthly_discount_note,
     build_vip_monthly_discount_result,
@@ -497,77 +498,9 @@ def _format_percent_value(value) -> str:
     return f"{number:.2f}".rstrip("0").rstrip(".")
 
 
-def _parse_discount_percent_text(value: str | None) -> float:
-    raw = str(value or "").strip().replace("%", "")
-
-    if not raw:
-        return 100.0
-
-    try:
-        value = float(raw)
-    except ValueError as exc:
-        raise ValueError(
-            "折後比例請輸入數字，例如 90 代表 9 折。"
-        ) from exc
-
-    if value < 0 or value > 100:
-        raise ValueError(
-            "折後比例只能輸入 0～100。"
-        )
-
-    return value
-
-
-def _parse_cash_amount_text(value: str | None) -> int:
-    raw = str(value or "").strip().replace(",", "")
-
-    if not raw:
-        return 0
-
-    try:
-        amount = int(float(raw))
-    except ValueError as exc:
-        raise ValueError(
-            "固定折扣金額請輸入數字，例如 100。"
-        ) from exc
-
-    if amount < 0:
-        raise ValueError(
-            "固定折扣金額不能小於 0。"
-        )
-
-    return amount
-
-
-def _resolve_manual_discount_rate_percent(data: dict) -> float:
-    raw = data.get("manual_discount_percent")
-
-    if raw is None or str(raw).strip() == "":
-        return 100.0
-
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        value = 0.0
-
-    value = max(
-        0.0,
-        min(100.0, value),
-    )
-
-    if (
-        str(
-            data.get("manual_discount_mode")
-            or ""
-        ).strip().lower()
-        == "pay_rate"
-    ):
-        return value
-
-    # legacy：
-    # 舊資料 10 = 折掉 10%
-    # 新制等同折後 90%
-    return 100.0 - value
+_parse_discount_percent_text = manual_pricing.parse_discount_percent_text
+_parse_cash_amount_text = manual_pricing.parse_cash_amount_text
+_resolve_manual_discount_rate_percent = manual_pricing.resolve_manual_discount_rate_percent
 
 
 def _resolve_self_service_discount_rate(
@@ -668,114 +601,21 @@ def calculate_manual_price_adjustment(
     base_amount: int,
     data: dict,
 ) -> dict:
-    original = max(
-        0,
-        int(base_amount or 0),
+    return manual_pricing.calculate_manual_price_adjustment(
+        base_amount,
+        data,
+        to_int=_to_int,
+        allocate_store_absorbed_fixed_discount=allocate_store_absorbed_fixed_discount,
     )
-
-    rate = (
-        _resolve_manual_discount_rate_percent(
-            data
-        )
-    )
-
-    after_percent = max(
-        0,
-        min(
-            original,
-            int(
-                round(
-                    original
-                    * rate
-                    / 100
-                )
-            ),
-        ),
-    )
-
-    percent_off = (
-        original
-        - after_percent
-    )
-
-    raw_fixed = data.get(
-        "fixed_discount_amount"
-    )
-
-    if raw_fixed is None:
-        raw_fixed = data.get(
-            "cash_coupon_amount"
-        )
-
-    fixed = max(
-        0,
-        min(
-            after_percent,
-            _to_int(
-                raw_fixed,
-                0,
-            )
-            or 0,
-        ),
-    )
-
-    allocation = allocate_store_absorbed_fixed_discount(
-        after_percent_amount=after_percent,
-        fixed_discount_amount=fixed,
-    )
-
-    return {
-        "price_formula_version": 2,
-        "manual_discount_mode": "pay_rate",
-
-        "service_original_amount": original,
-        "original_amount": original,
-
-        "manual_discount_percent": rate,
-        "discount_rate_percent": rate,
-
-        "manual_discount_amount": percent_off,
-        "percent_discount_amount": percent_off,
-
-        # 百分比折扣仍會降低分潤基準；客服固定金額折扣由店內全額吸收。
-        "payout_base_amount": allocation.payout_base_amount,
-
-        # 舊 DB 欄位仍保留相容，
-        # 但畫面統一叫固定折扣。
-        "cash_coupon_amount": fixed,
-        "fixed_discount_amount": fixed,
-
-        "store_absorbed_amount": allocation.store_absorbed_amount,
-
-        "customer_pay_amount": allocation.customer_pay_amount,
-
-        "manual_discount_reason": str(
-            data.get(
-                "manual_discount_reason"
-            )
-            or ""
-        ).strip(),
-
-        "cash_coupon_reason": str(
-            data.get(
-                "cash_coupon_reason"
-            )
-            or ""
-        ).strip(),
-    }
 
 
 def apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) -> dict:
-    adjustment = calculate_manual_price_adjustment(base_amount, data)
-
-    for key, value in adjustment.items():
-        data[key] = value
-
-    data["amount"] = adjustment["customer_pay_amount"]
-    data["total_amount"] = adjustment["customer_pay_amount"]
-    data["amount_text"] = _format_plain_amount(adjustment["customer_pay_amount"])
-
-    return adjustment
+    return manual_pricing.apply_manual_price_adjustment_to_order_data(
+        data,
+        base_amount,
+        calculate_adjustment=calculate_manual_price_adjustment,
+        format_amount=_format_plain_amount,
+    )
 
 
 def _quote_preview_lines_for_self_service(data: dict, guild: discord.Guild | None = None) -> list[tuple[str, str]]:
