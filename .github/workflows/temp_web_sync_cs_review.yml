@@ -56,7 +56,7 @@ jobs:
           helper_end = source.index(helper_end_marker, helper_start)
           source = source[:helper_start] + source[helper_end:]
 
-          amount_pattern = re.compile(
+          amount_pattern = script_re.compile(
               r'    amount_text = \(\n'
               r'\s+_format_plain_amount\(\n\s+amount\n\s+\)\n'
               r'\s+if "_format_plain_amount"\n\s+in globals\(\)\n'
