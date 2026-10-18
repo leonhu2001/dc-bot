@@ -1,4 +1,4 @@
-name: Temporary web sync event-store extraction
+name: Temporary web sync event store extraction
 
 on:
   push:
@@ -10,26 +10,26 @@ permissions:
 
 jobs:
   extract:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - name: Check out branch
+        uses: actions/checkout@v7
         with:
           ref: refactor/web-sync-event-store-deps-20261018
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-      - name: Move event-store dependencies out of namespace bridge
+
+      - name: Move event store dependencies out of namespace bridge
+        shell: bash
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('services/web_sync/runtime.py')
-          source = path.read_text(encoding='utf-8')
+          path = Path("services/web_sync/runtime.py")
+          source = path.read_text(encoding="utf-8")
 
-          anchor = 'import discord\n\n\n_CONFIGURED = False\n'
-          assert source.count(anchor) == 1, 'runtime import anchor changed'
-          imports = '''import discord
+          anchor = "import discord\n\n\n_CONFIGURED = False\n"
+          assert source.count(anchor) == 1, "runtime import anchor changed"
+          imports = """import discord
 
 from services.web_sync.event_store import (
     load_order_created_bundle as _web_order_created_load_bundle,
@@ -41,41 +41,38 @@ from services.web_sync.event_store import (
 
 
 _CONFIGURED = False
-'''
+"""
           source = source.replace(anchor, imports, 1)
 
           names = (
-              '_web_order_created_load_bundle',
-              '_web_order_created_mark_processing',
-              '_web_order_created_update_links',
-              '_web_sync_mark_event_done',
-              '_web_sync_mark_event_failed',
+              "_web_order_created_load_bundle",
+              "_web_order_created_mark_processing",
+              "_web_order_created_update_links",
+              "_web_sync_mark_event_done",
+              "_web_sync_mark_event_failed",
           )
           for name in names:
               line = f'        "{name}",\n'
-              assert source.count(line) == 1, f'allowlist entry changed: {name}'
-              source = source.replace(line, '', 1)
+              assert source.count(line) == 1, f"allowlist entry changed: {name}"
+              source = source.replace(line, "", 1)
 
-          for name in names:
-              assert f'        "{name}",\n' not in source
-          assert 'def configure_web_sync_runtime(namespace: Mapping[str, Any])' in source
-          path.write_text(source, encoding='utf-8')
+          assert "def configure_web_sync_runtime(namespace: Mapping[str, Any])" in source
+          path.write_text(source, encoding="utf-8")
           PY
-      - name: Compile and static guard
+
+      - name: Compile and guard
+        shell: bash
         run: |
-          python -m compileall -q services/web_sync/runtime.py services/web_sync/event_store.py
-          python - <<'PY'
-          from pathlib import Path
-          source = Path('services/web_sync/runtime.py').read_text(encoding='utf-8')
-          assert 'load_order_created_bundle as _web_order_created_load_bundle' in source
-          assert 'mark_event_failed as _web_sync_mark_event_failed' in source
-          assert 'configure_web_sync_runtime(namespace: Mapping[str, Any])' in source
-          PY
-      - name: Remove temporary workflow and commit
+          python3 -m compileall -q services/web_sync/runtime.py services/web_sync/event_store.py
+          grep -q "load_order_created_bundle as _web_order_created_load_bundle" services/web_sync/runtime.py
+          grep -q "mark_event_failed as _web_sync_mark_event_failed" services/web_sync/runtime.py
+
+      - name: Commit bounded extraction
+        shell: bash
         run: |
           git rm .github/workflows/tmp_web_sync_event_store_deps.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add services/web_sync/runtime.py
-          git commit -m 'Move web sync event-store dependencies to owner module'
+          git commit -m "Move web sync event-store dependencies to owner module"
           git push origin HEAD:refactor/web-sync-event-store-deps-20261018
