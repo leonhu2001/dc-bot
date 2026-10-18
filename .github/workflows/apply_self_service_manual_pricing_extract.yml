@@ -1,0 +1,43 @@
+name: Apply self-service manual pricing extraction
+
+on:
+  push:
+    branches:
+      - refactor/self-service-manual-pricing-20261019
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/self-service-manual-pricing-20261019
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply extraction
+        run: python tools/apply_self_service_manual_pricing_extract.py
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+      - name: Validate extraction
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m py_compile services/self_service_financials.py services/self_service_manual_pricing.py
+          python -m pytest -q tests/test_self_service_manual_pricing.py tests/test_self_service_financial_runtime_contract.py tests/test_architecture_growth_budget.py
+          python tools/runtime_import_smoke.py
+      - name: Commit extraction and remove one-shot tooling
+        run: |
+          rm .github/workflows/apply_self_service_manual_pricing_extract.yml tools/apply_self_service_manual_pricing_extract.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Extract self-service manual pricing"
+          git push
