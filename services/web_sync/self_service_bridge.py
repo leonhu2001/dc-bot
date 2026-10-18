@@ -22,6 +22,7 @@ from services.web_sync.discord_helpers import (
 from services.web_sync.presentation import (
     build_order_created_details as _web_order_created_details,
 )
+from services.web_sync.self_service_finance_seed import seed_settled_website_finance
 from shared.order_state import (
     PENDING_CS_DISPATCH as WEB_ORDER_PENDING_CS_DISPATCH,
 )
@@ -164,73 +165,11 @@ def _r13_seed_website_order_into_self_service(
     data["web_submission_request_key"] = str(details.get("request_key") or "").strip() or None
     data["web_order_note"] = order.get("note")
 
-    # Carry forward the complete settled website quote.  Both the ticket-side
-    # self-service preview and the later dispatch panel consume this same state,
-    # so benefits must not disappear just because the order originated on Web.
-    for key in (
-        "price_formula_version",
-        "manual_discount_mode",
-        "service_original_amount",
-        "manual_staff_amount",
-        "manual_staff_price_reason",
-        "manual_discount_percent",
-        "discount_rate_percent",
-        "manual_discount_amount",
-        "percent_discount_amount",
-        "manual_discount_reason",
-        "cash_coupon_amount",
-        "fixed_discount_amount",
-        "cash_coupon_reason",
-        "specified_fee_before_waiver",
-        "effective_specify_fee",
-        "point_benefit_key",
-        "point_benefit_name",
-        "point_benefit_cost",
-        "point_discount_coupon_amount",
-        "point_waived_specify_fee",
-        "point_free_first_hour_amount",
-        "point_extra_hours",
-        "point_extra_games",
-        "vip_monthly_benefit_id",
-        "vip_monthly_benefit_key",
-        "vip_monthly_benefit_title",
-        "vip_monthly_cash_amount",
-        "benefit_coupon_id",
-        "benefit_coupon_title",
-        "benefit_coupon",
-        "benefit_service_value",
-        "benefit_discount_amount",
-        "benefit_service_note",
-        "service_bonus_text",
-        "service_quantity",
-        "service_bonus_quantity",
-        "service_promotion_text",
-        "original_amount",
-        "rule_original_amount",
-        "payout_base_amount",
-        "customer_pay_amount",
-        "store_absorbed_amount",
-    ):
-        value = price_snapshot.get(key)
-        if value is None:
-            value = order.get(key)
-        if value is not None:
-            data[key] = value
-
-    point_key = str(price_snapshot.get("point_benefit_key") or "").strip()
-    if point_key:
-        data["selected_point_benefit_key"] = point_key
-        data["point_benefit_key"] = point_key
-
-    vip_monthly_id = price_snapshot.get("vip_monthly_benefit_id")
-    if vip_monthly_id not in (None, ""):
-        data["selected_vip_monthly_benefit_id"] = vip_monthly_id
-
-    benefit_coupon_id = price_snapshot.get("benefit_coupon_id")
-    if benefit_coupon_id not in (None, ""):
-        data["selected_benefit_coupon_id"] = benefit_coupon_id
-
-    data["website_finance_settled"] = True
+    seed_settled_website_finance(
+        data,
+        price_snapshot=price_snapshot,
+        order=order,
+    )
     data["web_order_source"] = "website"
     data["web_order_id"] = int(order_id)
     data["status"] = WEB_ORDER_PENDING_CS_DISPATCH
