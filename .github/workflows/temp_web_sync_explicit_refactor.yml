@@ -1,9 +1,6 @@
 name: Temporary Web Sync Explicit Dependency Refactor
 
 on:
-  push:
-    branches:
-      - refactor/web-sync-explicit-deps-20261018
   pull_request:
     branches:
       - main
@@ -17,8 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Check out repository
+      - name: Check out refactor branch
         uses: actions/checkout@v7
+        with:
+          ref: refactor/web-sync-explicit-deps-20261018
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -148,12 +147,13 @@ jobs:
 
           bot_path = Path("bot.py")
           bot_source = bot_path.read_text(encoding="utf-8")
-          old_import = "    configure_web_sync_runtime,\n"
-          new_import = "    configure_web_sync_runtime_explicit,\n"
-          if bot_source.count(old_import) != 1:
-              raise SystemExit(f"expected one web sync runtime import, found {bot_source.count(old_import)}")
-          bot_source = bot_source.replace(old_import, new_import, 1)
-
+          if bot_source.count("    configure_web_sync_runtime,\n") != 1:
+              raise SystemExit("unexpected Web Sync import count")
+          bot_source = bot_source.replace(
+              "    configure_web_sync_runtime,\n",
+              "    configure_web_sync_runtime_explicit,\n",
+              1,
+          )
           old_call = "configure_web_sync_runtime(globals())"
           new_call = '''configure_web_sync_runtime_explicit(
               customer_category_id=CUSTOMER_CATEGORY_ID,
@@ -166,11 +166,10 @@ jobs:
               bot_instance=bot,
           )'''
           if bot_source.count(old_call) != 1:
-              raise SystemExit(f"expected one legacy Web Sync configure call, found {bot_source.count(old_call)}")
-          bot_source = bot_source.replace(old_call, new_call, 1)
-          bot_path.write_text(bot_source, encoding="utf-8")
+              raise SystemExit("unexpected legacy Web Sync configure count")
+          bot_path.write_text(bot_source.replace(old_call, new_call, 1), encoding="utf-8")
 
-          boundary_test = '''import inspect
+          Path("tests/test_web_sync_runtime_dependency_boundary.py").write_text('''import inspect
 
           from services.web_sync import runtime as web_sync_runtime
 
@@ -188,9 +187,7 @@ jobs:
 
 
           def test_web_sync_runtime_uses_explicit_entrypoint_dependencies():
-              signature = inspect.signature(
-                  web_sync_runtime.configure_web_sync_runtime_explicit
-              )
+              signature = inspect.signature(web_sync_runtime.configure_web_sync_runtime_explicit)
               assert set(signature.parameters) == ENTRYPOINT_DEPENDENCIES
               assert all(
                   parameter.kind is inspect.Parameter.KEYWORD_ONLY
@@ -210,51 +207,27 @@ jobs:
 
           def test_web_sync_module_owned_dependencies_are_not_entrypoint_parameters():
               module_owned_names = {
-                  "asyncio",
-                  "re",
-                  "sqlite3",
-                  "CANCEL_REASON_OPTIONS",
-                  "ORDER_CATEGORY_LABELS",
-                  "ORDER_ITEM_GROUPS_BY_CATEGORY",
-                  "OrderCancellationReasonSelect",
-                  "SelfServiceOrderView",
-                  "_apply_acceptance_state_to_claim_data",
-                  "_format_plain_amount",
-                  "_to_int",
-                  "_web_order_created_details",
-                  "_web_order_created_find_ticket",
-                  "_web_order_created_get_channel",
-                  "_web_order_created_get_member",
-                  "_web_order_created_has_footer",
-                  "build_self_service_panel_embed",
-                  "build_ticket_channel_name",
-                  "create_smart_dispatch_plan",
-                  "delete_order_row_from_db",
-                  "format_t_amount",
-                  "get_order_item_details_for_group",
-                  "get_order_item_group_label",
-                  "get_smart_dispatch_plan",
-                  "get_taipei_now_iso",
-                  "is_customer_staff",
+                  "asyncio", "re", "sqlite3", "CANCEL_REASON_OPTIONS",
+                  "ORDER_CATEGORY_LABELS", "ORDER_ITEM_GROUPS_BY_CATEGORY",
+                  "OrderCancellationReasonSelect", "SelfServiceOrderView",
+                  "_apply_acceptance_state_to_claim_data", "_format_plain_amount",
+                  "_to_int", "_web_order_created_details",
+                  "_web_order_created_find_ticket", "_web_order_created_get_channel",
+                  "_web_order_created_get_member", "_web_order_created_has_footer",
+                  "build_self_service_panel_embed", "build_ticket_channel_name",
+                  "create_smart_dispatch_plan", "delete_order_row_from_db",
+                  "format_t_amount", "get_order_item_details_for_group",
+                  "get_order_item_group_label", "get_smart_dispatch_plan",
+                  "get_taipei_now_iso", "is_customer_staff",
                   "prepare_initial_smart_dispatch",
-                  "refresh_acceptance_dispatch_from_web_order",
-                  "remember_claim_data",
-                  "remember_order_data",
-                  "save_bot_data",
-                  "send_initial_smart_dispatch_alert",
-                  "send_order_log",
-                  "send_specified_staff_dispatch_dms",
-                  "set_specified_dm_results",
+                  "refresh_acceptance_dispatch_from_web_order", "remember_claim_data",
+                  "remember_order_data", "save_bot_data",
+                  "send_initial_smart_dispatch_alert", "send_order_log",
+                  "send_specified_staff_dispatch_dms", "set_specified_dm_results",
               }
-              signature = inspect.signature(
-                  web_sync_runtime.configure_web_sync_runtime_explicit
-              )
+              signature = inspect.signature(web_sync_runtime.configure_web_sync_runtime_explicit)
               assert module_owned_names.isdisjoint(signature.parameters)
-          '''
-          Path("tests/test_web_sync_runtime_dependency_boundary.py").write_text(
-              boundary_test,
-              encoding="utf-8",
-          )
+          ''', encoding="utf-8")
 
           growth_path = Path("tests/test_architecture_growth_budget.py")
           growth_source = growth_path.read_text(encoding="utf-8")
@@ -264,17 +237,14 @@ jobs:
                   "from pathlib import Path\nimport re\n",
                   1,
               )
-          budget_anchor = '    "services/self_service_runtime.py": 70_000,\n'
-          web_sync_budget = '    "services/web_sync/runtime.py": 62_000,\n'
-          if web_sync_budget not in growth_source:
-              if budget_anchor not in growth_source:
+          anchor = '    "services/self_service_runtime.py": 70_000,\n'
+          budget = '    "services/web_sync/runtime.py": 62_000,\n'
+          if budget not in growth_source:
+              if anchor not in growth_source:
                   raise SystemExit("architecture budget anchor not found")
-              growth_source = growth_source.replace(
-                  budget_anchor,
-                  budget_anchor + web_sync_budget,
-                  1,
-              )
-          guard = '''\n\ndef test_runtime_configurators_do_not_receive_entrypoint_globals() -> None:
+              growth_source = growth_source.replace(anchor, anchor + budget, 1)
+          if "def test_runtime_configurators_do_not_receive_entrypoint_globals" not in growth_source:
+              growth_source += '''\n\ndef test_runtime_configurators_do_not_receive_entrypoint_globals() -> None:
               source = (ROOT / "bot.py").read_text(encoding="utf-8")
               pattern = re.compile(
                   r"configure_[A-Za-z0-9_]*runtime\\s*\\(\\s*globals\\s*\\(\\s*\\)\\s*\\)"
@@ -283,8 +253,6 @@ jobs:
                   "runtime configuration must use explicit dependencies, not globals()"
               )
           '''
-          if "def test_runtime_configurators_do_not_receive_entrypoint_globals" not in growth_source:
-              growth_source += guard
           growth_path.write_text(growth_source, encoding="utf-8")
           PY
 
@@ -292,6 +260,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
           python -m pip install -r requirements-dev.txt
 
       - name: Compile changed Python sources
@@ -311,4 +280,4 @@ jobs:
           git rm .github/workflows/temp_web_sync_explicit_refactor.yml
           git add bot.py services/web_sync/runtime.py tests/test_web_sync_runtime_dependency_boundary.py tests/test_architecture_growth_budget.py
           git commit -m "Refactor web sync runtime to explicit dependencies"
-          git push
+          git push origin HEAD:refactor/web-sync-explicit-deps-20261018
