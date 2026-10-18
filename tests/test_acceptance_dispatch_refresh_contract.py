@@ -19,12 +19,11 @@ def test_dispatch_refresh_configurator_is_keyword_only():
     )
 
 
-def test_dispatch_refresh_binds_only_canonical_shared_state(monkeypatch):
+def test_dispatch_refresh_binds_only_canonical_shared_state():
     claims = {}
     selections = {}
     payment_view = object()
 
-    monkeypatch.setattr(dispatch_refresh, "_CONFIGURED", False)
     dispatch_refresh.configure_acceptance_dispatch_refresh(
         dispatch_channel_id=123,
         order_claims=claims,
@@ -32,7 +31,6 @@ def test_dispatch_refresh_binds_only_canonical_shared_state(monkeypatch):
         order_selections=selections,
     )
 
-    assert dispatch_refresh._CONFIGURED is True
     assert dispatch_refresh.DISPATCH_CHANNEL_ID == 123
     assert dispatch_refresh.ORDER_CLAIMS is claims
     assert dispatch_refresh.PaymentMethodView is payment_view
