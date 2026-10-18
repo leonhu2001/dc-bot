@@ -2,7 +2,17 @@ from typing import Any, Mapping
 
 import discord
 
+from services.web_sync import event_store
 from services.web_sync import runtime as web_sync_runtime
+
+
+EVENT_STORE_RUNTIME_BINDINGS = {
+    "_web_order_created_load_bundle": event_store.load_order_created_bundle,
+    "_web_order_created_mark_processing": event_store.mark_order_created_processing,
+    "_web_order_created_update_links": event_store.update_order_created_links,
+    "_web_sync_mark_event_done": event_store.mark_event_done,
+    "_web_sync_mark_event_failed": event_store.mark_event_failed,
+}
 
 
 def test_web_sync_legacy_injection_cannot_shadow_module_owned_imports_or_add_unknowns():
@@ -10,6 +20,7 @@ def test_web_sync_legacy_injection_cannot_shadow_module_owned_imports_or_add_unk
         "Any": Any,
         "Mapping": Mapping,
         "discord": discord,
+        **EVENT_STORE_RUNTIME_BINDINGS,
     }
     marker_name = "_web_sync_runtime_boundary_marker"
     allowed_name = "GUILD_ID"
@@ -51,6 +62,12 @@ def test_web_sync_owned_dependency_names_are_explicit():
     )
 
 
+def test_web_sync_event_store_bindings_are_owned_by_event_store():
+    for name, owner in EVENT_STORE_RUNTIME_BINDINGS.items():
+        assert getattr(web_sync_runtime, name) is owner
+        assert name not in web_sync_runtime._ALLOWED_RUNTIME_DEPENDENCY_NAMES
+
+
 def test_web_sync_legacy_dependency_allowlist_is_explicit_and_separate_from_owned_names():
     assert web_sync_runtime._ALLOWED_RUNTIME_DEPENDENCY_NAMES == frozenset(
         {
@@ -74,11 +91,6 @@ def test_web_sync_legacy_dependency_allowlist_is_explicit_and_separate_from_owne
             "_web_order_created_get_channel",
             "_web_order_created_get_member",
             "_web_order_created_has_footer",
-            "_web_order_created_load_bundle",
-            "_web_order_created_mark_processing",
-            "_web_order_created_update_links",
-            "_web_sync_mark_event_done",
-            "_web_sync_mark_event_failed",
             "asyncio",
             "bot",
             "build_self_service_panel_embed",
