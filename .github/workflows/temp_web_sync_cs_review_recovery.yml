@@ -1,0 +1,112 @@
+name: Temporary Web Sync CS Review Recovery
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-ci-web.db
+    steps:
+      - name: Check out extraction branch
+        uses: actions/checkout@v7
+        with:
+          ref: refactor/web-sync-cs-review-20261018
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Apply extraction with robust configuration insertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path(".github/workflows/temp_web_sync_cs_review.yml").read_text(
+              encoding="utf-8"
+          )
+          marker = "          python - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY", start)
+          script = textwrap.dedent(workflow[start:end])
+
+          config_start = script.index("configure_anchor = '''")
+          config_end = script.index("runtime_path.write_text(source", config_start)
+          replacement = '''configured_marker = "    _CONFIGURED = True\\n"
+          if source.count(configured_marker) != 1:
+              raise SystemExit(
+                  f"expected one runtime configured marker, found {source.count(configured_marker)}"
+              )
+          cs_configuration = """    configure_web_sync_cs_review(
+              order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+              ensure_dispatch=lambda *args, **kwargs: _web_order_created_ensure_dispatch(
+                  *args, **kwargs
+              ),
+              seed_state=lambda *args, **kwargs: _web_order_created_seed_state(
+                  *args, **kwargs
+              ),
+          )
+          """
+          source = source.replace(
+              configured_marker,
+              cs_configuration + configured_marker,
+              1,
+          )
+          '''
+          script = script[:config_start] + textwrap.dedent(replacement) + script[config_end:]
+          exec(compile(script, "cs_review_extraction", "exec"), {})
+          PY
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+
+      - name: Compile extracted modules
+        run: |
+          python -m compileall -q \
+            services/web_sync/runtime.py \
+            services/web_sync/cs_review.py \
+            tests/test_web_sync_cs_review_boundary.py \
+            tests/test_runtime_extraction_boundaries.py \
+            tests/test_architecture_growth_budget.py
+
+      - name: Run targeted extraction tests
+        run: |
+          python -m pytest -q \
+            tests/test_web_sync_runtime_dependency_boundary.py \
+            tests/test_web_sync_cs_review_boundary.py \
+            tests/test_web_sync_self_service_bridge_boundary.py \
+            tests/test_runtime_extraction_boundaries.py \
+            tests/test_architecture_growth_budget.py
+
+      - name: Commit extraction and remove temporary workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm \
+            .github/workflows/temp_web_sync_cs_review.yml \
+            .github/workflows/temp_web_sync_cs_review_recovery.yml
+          git add \
+            services/web_sync/runtime.py \
+            services/web_sync/cs_review.py \
+            tests/test_web_sync_cs_review_boundary.py \
+            tests/test_runtime_extraction_boundaries.py \
+            tests/test_architecture_growth_budget.py
+          git commit -m "Extract Web Sync CS review gate"
+          git push origin HEAD:refactor/web-sync-cs-review-20261018
