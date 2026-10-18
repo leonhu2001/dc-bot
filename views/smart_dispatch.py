@@ -25,6 +25,7 @@ from services.order_rules import role_ids_match_requirements
 from services.smart_dispatch import (
     choose_initial_candidate_ids,
     get_completed_favorite_worker_ids,
+    get_worker_assignment_metrics,
     complete_smart_dispatch_plan,
     list_pending_smart_dispatch_plans,
     mark_smart_dispatch_stage,
@@ -505,6 +506,27 @@ def _merge_wave_notification_ids(
     return list(dict.fromkeys([*specified, *general]))
 
 
+def _exclude_busy_repeat_ids(
+    candidate_ids: Iterable[str | int],
+    *,
+    db_file: str | Path | None = None,
+) -> list[str]:
+    ids = list(dict.fromkeys(
+        str(item)
+        for item in candidate_ids
+        if str(item).strip()
+    ))
+    metrics = get_worker_assignment_metrics(
+        ids,
+        db_file=db_file,
+    )
+    return [
+        worker_id
+        for worker_id in ids
+        if int((metrics.get(worker_id) or {}).get("active_count") or 0) <= 0
+    ]
+
+
 async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
     from shared.order_acceptance import WAITING_ACCEPTANCE, get_acceptance_state
 
@@ -832,10 +854,12 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     if seconds_since_update < REPEAT_REMINDER_SECONDS:
                         continue
 
-                    repeat_ids = _merge_wave_notification_ids(
-                        unresolved_specified,
-                        remaining_general_ids,
-                        unrestricted_missing=unrestricted_missing,
+                    repeat_ids = _exclude_busy_repeat_ids(
+                        _merge_wave_notification_ids(
+                            unresolved_specified,
+                            remaining_general_ids,
+                            unrestricted_missing=unrestricted_missing,
+                        )
                     )
 
                     if repeat_ids:

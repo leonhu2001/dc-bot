@@ -31,4 +31,9 @@ def test_first_and_repeat_waves_use_reserved_slot_targeting():
     source = Path("views/smart_dispatch.py").read_text(encoding="utf-8")
 
     assert "first_ids = _merge_wave_notification_ids(" in source
-    assert "repeat_ids = _merge_wave_notification_ids(" in source
+    assert "repeat_ids = _exclude_busy_repeat_ids(" in source
+
+    repeat_start = source.index("repeat_ids = _exclude_busy_repeat_ids(")
+    repeat_end = source.index("if repeat_ids:", repeat_start)
+    repeat_block = source[repeat_start:repeat_end]
+    assert "_merge_wave_notification_ids(" in repeat_block
