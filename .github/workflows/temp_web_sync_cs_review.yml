@@ -32,6 +32,7 @@ jobs:
       - name: Extract CS review gate
         run: |
           python - <<'PY'
+          import re as script_re
           from pathlib import Path
 
           runtime_path = Path("services/web_sync/runtime.py")
@@ -55,30 +56,34 @@ jobs:
           helper_end = source.index(helper_end_marker, helper_start)
           source = source[:helper_start] + source[helper_end:]
 
-          old_amount = '''    amount_text = (
-              _format_plain_amount(
-                  amount
-              )
-              if "_format_plain_amount"
-              in globals()
-              else format_t_amount(
-                  amount
-              )
+          amount_pattern = re.compile(
+              r'    amount_text = \(\n'
+              r'\s+_format_plain_amount\(\n\s+amount\n\s+\)\n'
+              r'\s+if "_format_plain_amount"\n\s+in globals\(\)\n'
+              r'\s+else format_t_amount\(\n\s+amount\n\s+\)\n\s+\)\n'
           )
-          '''
-          new_amount = '''    amount_text = _format_plain_amount(amount)
-          '''
-          if old_amount not in block:
-              raise SystemExit("CS review amount formatting fallback not found")
-          block = block.replace(old_amount, new_amount, 1)
+          block, amount_replacements = amount_pattern.subn(
+              "    amount_text = _format_plain_amount(amount)\n",
+              block,
+              count=1,
+          )
+          if amount_replacements != 1:
+              raise SystemExit(
+                  f"expected one CS amount fallback, replaced {amount_replacements}"
+              )
+
+          if block.count("_web_order_created_ensure_dispatch(") != 1:
+              raise SystemExit("unexpected CS ensure-dispatch call count")
           block = block.replace(
-              "await _web_order_created_ensure_dispatch(\n",
-              "await _ensure_dispatch(\n",
+              "_web_order_created_ensure_dispatch(",
+              "_ensure_dispatch(",
               1,
           )
+          if block.count("_web_order_created_seed_state(") != 1:
+              raise SystemExit("unexpected CS seed-state call count")
           block = block.replace(
-              "            _web_order_created_seed_state(\n",
-              "            _seed_state(\n",
+              "_web_order_created_seed_state(",
+              "_seed_state(",
               1,
           )
 
