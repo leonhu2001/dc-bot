@@ -4,6 +4,14 @@ from typing import Any, Mapping
 
 import discord
 
+from services.web_sync.event_store import (
+    load_order_created_bundle as _web_order_created_load_bundle,
+    mark_order_created_processing as _web_order_created_mark_processing,
+    update_order_created_links as _web_order_created_update_links,
+    mark_event_done as _web_sync_mark_event_done,
+    mark_event_failed as _web_sync_mark_event_failed,
+)
+
 
 _CONFIGURED = False
 
@@ -37,11 +45,6 @@ _ALLOWED_RUNTIME_DEPENDENCY_NAMES = frozenset(
         "_web_order_created_get_channel",
         "_web_order_created_get_member",
         "_web_order_created_has_footer",
-        "_web_order_created_load_bundle",
-        "_web_order_created_mark_processing",
-        "_web_order_created_update_links",
-        "_web_sync_mark_event_done",
-        "_web_sync_mark_event_failed",
         "asyncio",
         "bot",
         "build_self_service_panel_embed",
