@@ -3,10 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from services.wallet_service import (
-    credit_wallet_principal_in_connection,
-    ensure_wallet_tables,
-)
+from services.wallet_atomic_credit import credit_principal_in_connection
+from services.wallet_service import ensure_wallet_tables
 from web.app.services import internal_transfers as payroll
 
 
@@ -113,7 +111,7 @@ def _credit_wallet(
     if not wallet_id:
         raise ValueError("無法確認要入帳的本人錢包。")
 
-    result = credit_wallet_principal_in_connection(
+    result = credit_principal_in_connection(
         conn,
         customer_id=wallet_id,
         amount=int(amount),
