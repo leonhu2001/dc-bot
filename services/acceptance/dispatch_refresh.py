@@ -23,7 +23,6 @@ from services.self_service_financials import (
 )
 
 
-_CONFIGURED = False
 DISPATCH_CHANNEL_ID = 0
 ORDER_CLAIMS: dict = {}
 PaymentMethodView = None
@@ -38,7 +37,6 @@ def configure_acceptance_dispatch_refresh(
     order_selections: dict,
 ) -> None:
     """Bind only the state needed to sync acceptance into Discord surfaces."""
-    global _CONFIGURED
     global DISPATCH_CHANNEL_ID, ORDER_CLAIMS, PaymentMethodView
     global SELF_SERVICE_ORDER_SELECTIONS
 
@@ -46,7 +44,6 @@ def configure_acceptance_dispatch_refresh(
     ORDER_CLAIMS = order_claims
     PaymentMethodView = payment_method_view_type
     SELF_SERVICE_ORDER_SELECTIONS = order_selections
-    _CONFIGURED = True
 
 
 def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
