@@ -88,7 +88,7 @@ def test_acceptance_worker_is_single_owner_for_claim_events():
 
 
 def test_cs_dispatch_failure_does_not_claim_rollback_succeeded_when_it_failed():
-    source = Path("services/web_sync/runtime.py").read_text(
+    source = Path("services/web_sync/cs_review.py").read_text(
         encoding="utf-8"
     )
 
