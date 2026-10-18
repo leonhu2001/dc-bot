@@ -283,15 +283,8 @@ async def _web_order_created_ensure_ticket(
     )
 
     if not has_intro:
-        amount_text = (
-            _format_plain_amount(
-                details["amount"]
-            )
-            if "_format_plain_amount"
-            in globals()
-            else format_t_amount(
-                details["amount"]
-            )
+        amount_text = _format_plain_amount(
+            details["amount"]
         )
 
         embed = discord.Embed(
@@ -868,15 +861,8 @@ def _web_order_created_seed_state(
     data["amount"] = amount
     data["total_amount"] = amount
 
-    data["amount_text"] = (
-        _format_plain_amount(
-            amount
-        )
-        if "_format_plain_amount"
-        in globals()
-        else format_t_amount(
-            amount
-        )
+    data["amount_text"] = _format_plain_amount(
+        amount
     )
 
     for key in (
