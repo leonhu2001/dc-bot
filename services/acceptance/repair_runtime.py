@@ -70,7 +70,7 @@ async def repair_pending_acceptance_dispatch_panels_once(
     repaired = 0
 
     for order_id in _list_repair_order_ids(
-        ("waiting_acceptance", "accepted_pending_pay"),
+        (WAITING_ACCEPTANCE, ACCEPTED_PENDING_PAY),
         limit=limit,
     ):
         try:
@@ -211,7 +211,7 @@ async def repair_pending_acceptance_payment_panels_once(
     repaired = 0
 
     for order_id in _list_repair_order_ids(
-        ("accepted_pending_pay", "waiting_acceptance"),
+        (ACCEPTED_PENDING_PAY, WAITING_ACCEPTANCE),
         limit=limit,
     ):
         try:
@@ -243,7 +243,7 @@ async def repair_pending_acceptance_ticket_access_once(
     try:
         rows = db.execute(
             select(WebOrder.id, WebOrder.ticket_channel_id)
-            .where(WebOrder.status.in_(("waiting_acceptance", "accepted_pending_pay")))
+            .where(WebOrder.status.in_((WAITING_ACCEPTANCE, ACCEPTED_PENDING_PAY)))
             .where(WebOrder.ticket_channel_id.is_not(None))
             .order_by(WebOrder.id.desc())
             .limit(max(0, int(limit)))
