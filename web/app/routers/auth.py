@@ -1,4 +1,4 @@
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 import secrets
 
 import httpx
@@ -38,6 +38,28 @@ def _safe_return_path(value: str | None) -> str:
     return path
 
 
+def _same_origin_referrer_path(request: Request) -> str:
+    """Use the current same-origin page as the login return target when next is omitted."""
+    referrer = str(request.headers.get("referer") or "").strip()
+    if not referrer:
+        return "/"
+
+    try:
+        parsed = urlsplit(referrer)
+    except ValueError:
+        return "/"
+
+    if parsed.scheme not in {"http", "https"}:
+        return "/"
+    if parsed.netloc != request.url.netloc:
+        return "/"
+
+    path = parsed.path or "/"
+    if parsed.query:
+        path += f"?{parsed.query}"
+    return _safe_return_path(path)
+
+
 @router.get("/discord/login")
 async def discord_login(
     request: Request,
@@ -49,7 +71,8 @@ async def discord_login(
 
     state = secrets.token_urlsafe(32)
     request.session["oauth_state"] = state
-    request.session["oauth_next"] = _safe_return_path(next)
+    return_path = _safe_return_path(next) if next is not None else _same_origin_referrer_path(request)
+    request.session["oauth_next"] = return_path
     request.session["oauth_reauth"] = bool(int(reauth or 0))
 
     params = {
