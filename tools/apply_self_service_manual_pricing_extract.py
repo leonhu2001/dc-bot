@@ -190,7 +190,7 @@ replace_between(
 replace_between(
     FINANCIALS,
     '''\ndef calculate_manual_price_adjustment(\n''',
-    '''\ndef _quote_preview_lines_for_self_service(\n''',
+    '''\ndef _quote_preview_lines_for_self_service''',
     '''\ndef calculate_manual_price_adjustment(\n    base_amount: int,\n    data: dict,\n) -> dict:\n    return manual_pricing.calculate_manual_price_adjustment(\n        base_amount,\n        data,\n        to_int=_to_int,\n        allocate_store_absorbed_fixed_discount=allocate_store_absorbed_fixed_discount,\n    )\n\n\ndef apply_manual_price_adjustment_to_order_data(data: dict, base_amount: int) -> dict:\n    return manual_pricing.apply_manual_price_adjustment_to_order_data(\n        data,\n        base_amount,\n        calculate_adjustment=calculate_manual_price_adjustment,\n        format_amount=_format_plain_amount,\n    )\n\n''',
 )
 
