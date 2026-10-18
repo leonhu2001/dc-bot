@@ -85,15 +85,12 @@ async def dispatch_dashboard(
     user = get_current_user(request)
 
     if not user:
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "請先登入",
-                "message": "請先使用 Discord 登入。",
-                "user": None,
-            },
-            status_code=401,
+        next_path = request.url.path
+        if request.url.query:
+            next_path += f"?{request.url.query}"
+        return RedirectResponse(
+            url="/auth/discord/login?" + urlencode({"next": next_path}),
+            status_code=303,
         )
 
     if not can_use_dispatch(user):
