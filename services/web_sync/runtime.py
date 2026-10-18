@@ -13,7 +13,6 @@ from core.time_utils import get_taipei_now_iso
 from services.acceptance.runtime import _apply_acceptance_state_to_claim_data
 from services.logging_service import send_order_log
 from services.orders import _to_int
-from services.rewards import format_t_amount
 from services.self_service_financials import _format_plain_amount
 from services.smart_dispatch import (
     create_smart_dispatch_plan,
