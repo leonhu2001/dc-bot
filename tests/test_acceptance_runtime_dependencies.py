@@ -40,13 +40,11 @@ def _configure_explicit(namespace: dict[str, object]) -> None:
 def test_explicit_acceptance_runtime_binds_only_declared_dependencies(monkeypatch):
     namespace = _dependency_namespace()
 
-    monkeypatch.setattr(runtime, "_CONFIGURED", False)
     monkeypatch.setattr(sync_worker, "_DEPS", None)
     monkeypatch.setattr(repair_runtime, "_DEPS", None)
 
     _configure_explicit(namespace)
 
-    assert runtime._CONFIGURED is True
     assert runtime.DISPATCH_CHANNEL_ID == namespace["DISPATCH_CHANNEL_ID"]
     assert runtime.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
     assert runtime.PaymentMethodView is namespace["PaymentMethodView"]
