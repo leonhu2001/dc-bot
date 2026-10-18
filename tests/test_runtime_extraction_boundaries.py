@@ -26,7 +26,8 @@ from services import (
 def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(acceptance_runtime.configure_acceptance_runtime_explicit)
     assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
-    assert callable(web_sync_runtime.configure_web_sync_runtime)
+    assert callable(web_sync_runtime.configure_web_sync_runtime_explicit)
+    assert not hasattr(web_sync_runtime, "configure_web_sync_runtime")
     assert callable(acceptance_runtime.process_acceptance_sync_events_once)
     assert callable(acceptance_sync_worker.process_acceptance_sync_events_once)
     assert callable(web_sync_runtime._process_web_order_created_event)
@@ -53,7 +54,7 @@ def test_runtime_dependency_binding_is_explicitly_deferred_to_bot_startup():
     bot_source = Path("bot.py").read_text(encoding="utf-8")
 
     acceptance_bind = bot_source.index("configure_acceptance_runtime_explicit(")
-    web_bind = bot_source.index("configure_web_sync_runtime(globals())")
+    web_bind = bot_source.index("configure_web_sync_runtime_explicit(")
     child_bind = bot_source.index("configure_order_children(")
     order_bind = bot_source.index("configure_order_runtime_explicit(")
     lifecycle_bind = bot_source.index("configure_order_lifecycle_runtime_explicit(")
@@ -66,6 +67,7 @@ def test_runtime_dependency_binding_is_explicitly_deferred_to_bot_startup():
     assert lifecycle_bind < bot_run
     assert self_service_bind < bot_run
     assert "configure_acceptance_runtime(globals())" not in bot_source
+    assert "configure_web_sync_runtime(globals())" not in bot_source
     assert "configure_order_lifecycle_runtime(globals())" not in bot_source
     assert "configure_self_service_runtime(globals())" not in bot_source
 
@@ -237,10 +239,15 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
         guild_id=456,
         refresh_existing_web_sync_dispatch=lambda *_args, **_kwargs: None,
     )
-    if hasattr(web_sync_runtime, "_web_sync_runtime_test_marker"):
-        delattr(web_sync_runtime, "_web_sync_runtime_test_marker")
-    web_sync_runtime.configure_web_sync_runtime(
-        {"_web_sync_runtime_test_marker": object()}
+    web_sync_runtime.configure_web_sync_runtime_explicit(
+        customer_category_id=111,
+        customer_role_id=222,
+        dispatch_channel_id=333,
+        guild_id=444,
+        order_claims={},
+        order_control_view_type=object,
+        order_selections={},
+        bot_instance=object(),
     )
     if hasattr(order_runtime, "_order_runtime_test_marker"):
         delattr(order_runtime, "_order_runtime_test_marker")
@@ -258,6 +265,6 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
     )
 
     assert not hasattr(acceptance_runtime, "configure_acceptance_runtime")
-    assert not hasattr(web_sync_runtime, "_web_sync_runtime_test_marker")
+    assert not hasattr(web_sync_runtime, "configure_web_sync_runtime")
     assert not hasattr(order_runtime, "_order_runtime_test_marker")
     assert not hasattr(self_service_runtime, "configure_self_service_runtime")
