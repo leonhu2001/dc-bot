@@ -1,9 +1,4 @@
-from typing import Any, Mapping
-
-import discord
-
 from services import order_runtime
-from services.orders import ORDER_CATEGORY_LABELS
 
 
 EXPECTED_BINDING_NAMES = frozenset(
@@ -29,48 +24,6 @@ EXPECTED_BINDING_NAMES = frozenset(
 )
 
 
-def test_order_runtime_namespace_binding_is_explicitly_scoped(monkeypatch):
-    originals = {
-        "Any": Any,
-        "Mapping": Mapping,
-        "discord": discord,
-        "ORDER_CATEGORY_LABELS": ORDER_CATEGORY_LABELS,
-    }
-    order_control = {}
-    marker = object()
-
-    monkeypatch.delattr(order_runtime, "_order_runtime_boundary_marker", raising=False)
-    monkeypatch.setattr(order_runtime, "_CONFIGURED", False)
-
-    order_runtime.configure_order_runtime(
-        {
-            **{name: object() for name in originals},
-            "ORDER_CONTROL_SELECTIONS": order_control,
-            "_order_runtime_boundary_marker": marker,
-        }
-    )
-
-    assert order_runtime._CONFIGURED is True
-    assert order_runtime.ORDER_CONTROL_SELECTIONS is order_control
-    assert not hasattr(order_runtime, "_order_runtime_boundary_marker")
-    for name, original in originals.items():
-        assert getattr(order_runtime, name) is original
-
-
-def test_order_runtime_binding_allowlist_matches_direct_runtime_dependencies():
-    assert order_runtime._ORDER_RUNTIME_BINDING_NAMES == EXPECTED_BINDING_NAMES
-
-
-def test_order_runtime_owned_dependency_names_are_explicit():
-    assert order_runtime._MODULE_OWNED_RUNTIME_NAMES == frozenset(
-        {
-            "Any",
-            "Mapping",
-            "discord",
-        }
-    )
-
-
 def test_order_runtime_explicit_binding_assigns_direct_dependencies(monkeypatch):
     values = {
         "DB_FILE": object(),
@@ -94,7 +47,6 @@ def test_order_runtime_explicit_binding_assigns_direct_dependencies(monkeypatch)
 
     for name in EXPECTED_BINDING_NAMES:
         monkeypatch.setattr(order_runtime, name, object(), raising=False)
-    monkeypatch.setattr(order_runtime, "_CONFIGURED", False)
 
     order_runtime.configure_order_runtime_explicit(
         db_file=values["DB_FILE"],
@@ -118,5 +70,11 @@ def test_order_runtime_explicit_binding_assigns_direct_dependencies(monkeypatch)
 
     for name, value in values.items():
         assert getattr(order_runtime, name) is value
-    assert order_runtime._CONFIGURED is False
 
+
+def test_order_runtime_legacy_namespace_adapter_is_removed():
+    assert callable(order_runtime.configure_order_runtime_explicit)
+    assert not hasattr(order_runtime, "configure_order_runtime")
+    assert not hasattr(order_runtime, "_ORDER_RUNTIME_BINDING_NAMES")
+    assert not hasattr(order_runtime, "_MODULE_OWNED_RUNTIME_NAMES")
+    assert not hasattr(order_runtime, "_CONFIGURED")

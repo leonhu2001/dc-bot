@@ -30,7 +30,8 @@ def test_extracted_runtime_modules_import_without_importing_bot():
     assert callable(acceptance_runtime.process_acceptance_sync_events_once)
     assert callable(acceptance_sync_worker.process_acceptance_sync_events_once)
     assert callable(web_sync_runtime._process_web_order_created_event)
-    assert callable(order_runtime.configure_order_runtime)
+    assert callable(order_runtime.configure_order_runtime_explicit)
+    assert not hasattr(order_runtime, "configure_order_runtime")
     assert callable(order_dispatch_composition.configure_order_dispatch_composition)
     assert callable(order_payment_composition.configure_order_payment_composition)
     assert callable(order_storage_runtime.configure_order_storage_runtime)
@@ -243,11 +244,8 @@ def test_runtime_configure_boundaries_match_current_migration_stage():
     )
     if hasattr(order_runtime, "_order_runtime_test_marker"):
         delattr(order_runtime, "_order_runtime_test_marker")
-    order_runtime.configure_order_runtime(
-        {
-            "_order_runtime_test_marker": object(),
-        }
-    )
+    assert callable(order_runtime.configure_order_runtime_explicit)
+    assert not hasattr(order_runtime, "configure_order_runtime")
     self_service_runtime.configure_self_service_runtime_explicit(
         customer_category_id=111,
         customer_role_id=222,

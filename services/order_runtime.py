@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
-
 import discord
 
 from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD
@@ -54,40 +52,6 @@ from services.order_dispatch_runtime import (
 )
 
 
-_CONFIGURED = False
-
-_MODULE_OWNED_RUNTIME_NAMES = frozenset(
-    {
-        "Any",
-        "Mapping",
-        "discord",
-    }
-)
-
-_ORDER_RUNTIME_BINDING_NAMES = frozenset(
-    {
-        "DB_FILE",
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CONTROL_SELECTIONS",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "SelfServiceOrderView",
-        "_defer_and_refresh_self_service_panel",
-        "_get_rule_from_self_service_data",
-        "build_payment_method_embed",
-        "build_self_service_panel_embed",
-        "can_operate_self_service_order",
-        "format_t_amount",
-        "get_order_customer_id_from_channel",
-        "get_wallet_balance",
-        "is_customer_staff",
-        "remember_order_data",
-        "rename_ticket_channel",
-        "send_order_log",
-    }
-)
-
-
-
 def configure_order_runtime_explicit(
     *,
     db_file,
@@ -131,17 +95,6 @@ def configure_order_runtime_explicit(
         }
     )
 
-
-def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind remaining bot-owned legacy dependencies after bot.py is loaded."""
-    global _CONFIGURED
-
-    for name in _ORDER_RUNTIME_BINDING_NAMES:
-        if name in namespace:
-            globals()[name] = namespace[name]
-
-
-    _CONFIGURED = True
 
 
 class OrderControlSelect(discord.ui.Select):
