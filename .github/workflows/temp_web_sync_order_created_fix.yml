@@ -1,0 +1,151 @@
+name: Temporary Web Sync Order Created Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WEB_SECRET_KEY: ci-only-secret-key-not-for-production
+      WEB_COOKIE_HTTPS_ONLY: "false"
+      WEB_ALLOWED_ORIGINS: http://127.0.0.1:8000
+      DATABASE_URL: sqlite:////tmp/dc-bot-ci-web.db
+    steps:
+      - name: Check out refactor branch
+        uses: actions/checkout@v7
+        with:
+          ref: refactor/web-sync-order-created-20261018
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Bind shared selection state and tighten budgets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          owner_path = Path("services/web_sync/order_created.py")
+          owner = owner_path.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "ORDER_CLAIMS: dict[int, dict[str, Any]]\nbot: discord.Client\n",
+                  "ORDER_CLAIMS: dict[int, dict[str, Any]]\nSELF_SERVICE_ORDER_SELECTIONS: dict[int, dict[str, Any]]\nbot: discord.Client\n",
+              ),
+              (
+                  "    order_claims: dict[int, dict[str, Any]],\n    bot_instance: discord.Client,\n",
+                  "    order_claims: dict[int, dict[str, Any]],\n    order_selections: dict[int, dict[str, Any]],\n    bot_instance: discord.Client,\n",
+              ),
+              (
+                  "    global ORDER_CLAIMS, bot\n",
+                  "    global ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, bot\n",
+              ),
+              (
+                  "    ORDER_CLAIMS = order_claims\n    bot = bot_instance\n",
+                  "    ORDER_CLAIMS = order_claims\n    SELF_SERVICE_ORDER_SELECTIONS = order_selections\n    bot = bot_instance\n",
+              ),
+          ]
+          for old, new in replacements:
+              if owner.count(old) != 1:
+                  raise SystemExit(f"unexpected owner patch anchor count: {old!r} -> {owner.count(old)}")
+              owner = owner.replace(old, new, 1)
+          owner_path.write_text(owner, encoding="utf-8")
+
+          runtime_path = Path("services/web_sync/runtime.py")
+          runtime = runtime_path.read_text(encoding="utf-8")
+          old_runtime = "        order_claims=order_claims,\n        bot_instance=bot_instance,\n"
+          new_runtime = "        order_claims=order_claims,\n        order_selections=order_selections,\n        bot_instance=bot_instance,\n"
+          if runtime.count(old_runtime) != 1:
+              raise SystemExit("runtime order-created configuration anchor not found exactly once")
+          runtime_path.write_text(runtime.replace(old_runtime, new_runtime, 1), encoding="utf-8")
+
+          test_path = Path("tests/test_web_sync_order_created_boundary.py")
+          test_source = test_path.read_text(encoding="utf-8")
+          dep_anchor = '    "order_claims",\n    "bot_instance",\n'
+          if test_source.count(dep_anchor) != 1:
+              raise SystemExit("order-created dependency test anchor not found exactly once")
+          test_source = test_source.replace(
+              dep_anchor,
+              '    "order_claims",\n    "order_selections",\n    "bot_instance",\n',
+              1,
+          )
+          binding_test = '''\n\ndef test_web_sync_order_created_binds_shared_selection_state():
+              claims = {}
+              selections = {}
+              bot_instance = object()
+              order_created.configure_web_sync_order_created(
+                  customer_category_id=1,
+                  customer_role_id=2,
+                  dispatch_channel_id=3,
+                  guild_id=4,
+                  order_claims=claims,
+                  order_selections=selections,
+                  bot_instance=bot_instance,
+              )
+              assert order_created.ORDER_CLAIMS is claims
+              assert order_created.SELF_SERVICE_ORDER_SELECTIONS is selections
+              assert order_created.bot is bot_instance
+          '''
+          if "def test_web_sync_order_created_binds_shared_selection_state" not in test_source:
+              test_source += binding_test
+          test_path.write_text(test_source, encoding="utf-8")
+
+          growth_path = Path("tests/test_architecture_growth_budget.py")
+          growth = growth_path.read_text(encoding="utf-8")
+          for old, new in (
+              ('    "services/web_sync/runtime.py": 6_000,\n', '    "services/web_sync/runtime.py": 3_000,\n'),
+              ('    "services/web_sync/order_created.py": 32_000,\n', '    "services/web_sync/order_created.py": 30_000,\n'),
+          ):
+              if growth.count(old) != 1:
+                  raise SystemExit(f"growth budget anchor not found exactly once: {old!r}")
+              growth = growth.replace(old, new, 1)
+          growth_path.write_text(growth, encoding="utf-8")
+          PY
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r web/requirements-web.txt
+          python -m pip install -r requirements-dev.txt
+
+      - name: Compile changed modules
+        run: |
+          python -m compileall -q \
+            services/web_sync/runtime.py \
+            services/web_sync/order_created.py \
+            tests/test_web_sync_order_created_boundary.py \
+            tests/test_runtime_extraction_boundaries.py \
+            tests/test_architecture_growth_budget.py
+
+      - name: Run targeted Web Sync boundary tests
+        run: |
+          python -m pytest -q \
+            tests/test_web_sync_runtime_dependency_boundary.py \
+            tests/test_web_sync_order_created_boundary.py \
+            tests/test_web_sync_cs_review_boundary.py \
+            tests/test_web_sync_self_service_bridge_boundary.py \
+            tests/test_runtime_extraction_boundaries.py \
+            tests/test_architecture_growth_budget.py
+
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/temp_web_sync_order_created_fix.yml
+          git add \
+            services/web_sync/runtime.py \
+            services/web_sync/order_created.py \
+            tests/test_web_sync_order_created_boundary.py \
+            tests/test_architecture_growth_budget.py
+          git commit -m "Bind Web Sync order-created shared state"
+          git push origin HEAD:refactor/web-sync-order-created-20261018
