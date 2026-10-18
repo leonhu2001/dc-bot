@@ -237,7 +237,7 @@ from services.web_sync.runtime import (
     _process_web_order_created_event,
 )
 from services.order_runtime import (
-    configure_order_runtime,
+    configure_order_runtime_explicit,
     OrderControlSelect,
     SelfServiceOrderCategorySelect,
     SelfServiceOrderItemSelect,
@@ -6509,7 +6509,25 @@ configure_acceptance_runtime_explicit(
 )
 configure_web_sync_runtime(globals())
 configure_order_children(BOOSTER_RECEIVER_ROLE_ID, DISPATCH_CHANNEL_ID, ORDER_CLAIMS, SELF_SERVICE_ORDER_SELECTIONS, CUSTOMER_REWARDS, CREDENTIAL_OWNER_USER_ID, GUILD_ID, bot, StaffOrderOperationView)
-configure_order_runtime(globals())
+configure_order_runtime_explicit(
+    db_file=DB_FILE,
+    dispatch_channel_id=DISPATCH_CHANNEL_ID,
+    order_control_selections=ORDER_CONTROL_SELECTIONS,
+    order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+    self_service_order_view_type=SelfServiceOrderView,
+    defer_and_refresh_self_service_panel=_defer_and_refresh_self_service_panel,
+    self_service_rule_getter=_get_rule_from_self_service_data,
+    payment_method_embed_builder=build_payment_method_embed,
+    self_service_panel_embed_builder=build_self_service_panel_embed,
+    can_operate_self_service_order_func=can_operate_self_service_order,
+    amount_formatter=format_t_amount,
+    order_customer_id_getter=get_order_customer_id_from_channel,
+    wallet_balance_getter=get_wallet_balance,
+    customer_staff_checker=is_customer_staff,
+    remember_order=remember_order_data,
+    ticket_channel_renamer=rename_ticket_channel,
+    order_log_sender=send_order_log,
+)
 configure_order_lifecycle_runtime_explicit(
     receipt_channel_id=RECEIPT_CHANNEL_ID,
     order_selections=SELF_SERVICE_ORDER_SELECTIONS,
