@@ -144,6 +144,7 @@ async def refresh_acceptance_dispatch_from_web_order(
         )
 
         web_price_data.setdefault("customer_pay_amount", amount)
+
         absorbed = _to_int(
             getattr(order, "store_absorbed_amount", None),
             0,
@@ -443,6 +444,7 @@ async def send_acceptance_payment_panel_if_ready(
         from shared.order_acceptance import ACCEPTED_PENDING_PAY
     except Exception:
         ACCEPTED_PENDING_PAY = "accepted_pending_pay"
+
     if str(getattr(state, "status", "")) != ACCEPTED_PENDING_PAY:
         return
 
