@@ -108,6 +108,7 @@ def configure_order_runtime_explicit(
     ticket_channel_renamer,
     order_log_sender,
 ) -> None:
+    global _CONFIGURED
     # Explicit args keep the transitional module-global binding allowlisted.
     globals().update(
         {
@@ -130,6 +131,7 @@ def configure_order_runtime_explicit(
             "send_order_log": order_log_sender,
         }
     )
+    _CONFIGURED = True
 
 
 def configure_order_runtime(namespace: Mapping[str, Any]) -> None:
