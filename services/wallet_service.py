@@ -177,7 +177,7 @@ def credit_wallet_principal_in_connection(
     """Credit principal using the caller's existing SQLite transaction.
 
     This is the canonical primitive for a workflow that must atomically update
-    another SQLite ledger and a wallet attached to the same connection.  It does
+    another SQLite ledger and a wallet attached to the same connection. It does
     not commit or roll back; transaction ownership stays with the caller.
     """
     customer_text = str(customer_id or "").strip()
@@ -635,7 +635,7 @@ def list_wallet_transaction_totals_by_type(
             """,
             params,
         ).fetchall()
-        return {str(tx_type): int(total or 0) for tx_type, total in rows]
+        return {str(tx_type): int(total or 0) for tx_type, total in rows}
 
 
 def reverse_wallet_transaction(
