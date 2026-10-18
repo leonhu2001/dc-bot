@@ -6,7 +6,7 @@
     {% set return_target = request.url.path ~ (('?' ~ request.url.query) if request.url.query else '') %}
     <div class="panel">
         <h2>{{ title }}</h2>
-        <p>{{ message }}</p>
+        <p>{{ message if message is defined else reason }}</p>
 
         <div class="actions">
             {% if user %}
