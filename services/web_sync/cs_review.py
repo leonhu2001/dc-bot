@@ -33,6 +33,7 @@ from services.web_sync.presentation import (
 )
 from shared.order_state import (
     PENDING_CS_DISPATCH as WEB_ORDER_PENDING_CS_DISPATCH,
+    WAITING_ACCEPTANCE as WEB_ORDER_WAITING_ACCEPTANCE,
 )
 
 
@@ -513,7 +514,7 @@ class WebsiteOrderCsConfirmView(
             # 先放行為正式等待接單。
             _web_cs_set_status(
                 order_id,
-                "waiting_acceptance",
+                WEB_ORDER_WAITING_ACCEPTANCE,
                 cs_user=interaction.user,
             )
 
