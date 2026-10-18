@@ -10,6 +10,7 @@ from core.database import (
     save_bot_data,
 )
 from core.time_utils import get_taipei_now_iso
+from shared.order_state import WAITING_ACCEPTANCE
 from services.acceptance.runtime import _apply_acceptance_state_to_claim_data
 from services.logging_service import send_order_log
 from services.orders import _to_int
@@ -988,7 +989,7 @@ def _web_order_created_seed_state(
         or order.get(
             "status"
         )
-        or "waiting_acceptance"
+        or WAITING_ACCEPTANCE
     )
 
     data[
