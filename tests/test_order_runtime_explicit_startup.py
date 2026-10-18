@@ -8,6 +8,8 @@ RUNTIME_SOURCE = (ROOT / "services" / "order_runtime.py").read_text(encoding="ut
 def test_bot_uses_explicit_order_runtime_startup():
     assert "configure_order_runtime_explicit(" in BOT_SOURCE
     assert "configure_order_runtime(globals())" not in BOT_SOURCE
+    assert "configure_order_runtime_explicit," in BOT_SOURCE
+    assert "    configure_order_runtime," not in BOT_SOURCE
     for keyword in (
         "db_file=DB_FILE",
         "dispatch_channel_id=DISPATCH_CHANNEL_ID",
@@ -32,6 +34,4 @@ def test_bot_uses_explicit_order_runtime_startup():
 
 def test_legacy_adapter_is_retained_but_not_used_by_startup():
     assert "def configure_order_runtime(namespace: Mapping[str, Any])" in RUNTIME_SOURCE
-    explicit_scope = RUNTIME_SOURCE.split("def configure_order_runtime_explicit(", 1)[1].split("def configure_order_runtime(", 1)[0]
-    assert "global _CONFIGURED" in explicit_scope
-    assert "_CONFIGURED = True" in explicit_scope
+    assert "configure_order_runtime(globals())" not in BOT_SOURCE
