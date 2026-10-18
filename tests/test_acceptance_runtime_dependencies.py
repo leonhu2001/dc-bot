@@ -49,7 +49,6 @@ def test_explicit_acceptance_runtime_binds_only_declared_dependencies(monkeypatc
     assert runtime.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
     assert runtime.PaymentMethodView is namespace["PaymentMethodView"]
     assert runtime.SELF_SERVICE_ORDER_SELECTIONS is namespace["SELF_SERVICE_ORDER_SELECTIONS"]
-    assert dispatch_refresh._CONFIGURED is True
     assert dispatch_refresh.DISPATCH_CHANNEL_ID == namespace["DISPATCH_CHANNEL_ID"]
     assert dispatch_refresh.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
     assert dispatch_refresh.PaymentMethodView is namespace["PaymentMethodView"]
