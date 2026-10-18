@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,10 +62,16 @@ def test_new_services_do_not_import_bot_entrypoint() -> None:
 
 
 def test_runtime_configurators_do_not_receive_entrypoint_globals() -> None:
-    source = (ROOT / "bot.py").read_text(encoding="utf-8")
     pattern = re.compile(
         r"configure_[A-Za-z0-9_]*runtime\s*\(\s*globals\s*\(\s*\)\s*\)"
     )
-    assert pattern.search(source) is None, (
-        "runtime configuration must use explicit dependencies, not globals()"
+    offenders: list[str] = []
+    for path in ROOT.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if pattern.search(source):
+            offenders.append(str(path.relative_to(ROOT)))
+
+    assert not offenders, (
+        "runtime configuration must use explicit dependencies, not globals(): "
+        + ", ".join(offenders)
     )
