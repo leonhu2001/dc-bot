@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -154,6 +155,154 @@ def ensure_wallet_tables(db_file: str | Path | None = None) -> None:
         conn.commit()
 
 
+def _wallet_schema_prefix(schema: str) -> str:
+    name = str(schema or "main").strip()
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+        raise ValueError("Invalid wallet database schema name.")
+    return f"{name}."
+
+
+def credit_wallet_principal_in_connection(
+    conn: sqlite3.Connection,
+    *,
+    customer_id: str | int,
+    amount: int,
+    tx_type: str,
+    order_no: str,
+    operator_discord_id: str | int | None = None,
+    operator_display_name: str | None = None,
+    note: str = "",
+    schema: str = "main",
+) -> dict[str, Any]:
+    """Credit principal using the caller's existing SQLite transaction.
+
+    This is the canonical primitive for a workflow that must atomically update
+    another SQLite ledger and a wallet attached to the same connection.  It does
+    not commit or roll back; transaction ownership stays with the caller.
+    """
+    customer_text = str(customer_id or "").strip()
+    tx_type_text = str(tx_type or "").strip()
+    order_no_text = str(order_no or "").strip()
+    if not customer_text:
+        raise ValueError("customer_id is required")
+    try:
+        amount_int = int(amount)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("wallet credit amount must be an integer") from exc
+    if amount_int <= 0:
+        raise ValueError("wallet credit amount must be greater than zero")
+    if not tx_type_text or not order_no_text:
+        raise ValueError("wallet transaction type and reference are required")
+
+    prefix = _wallet_schema_prefix(schema)
+    existing = conn.execute(
+        f"""
+        SELECT id, amount, balance_before, balance_after
+        FROM {prefix}wallet_transactions
+        WHERE customer_discord_id = ?
+          AND order_no = ?
+          AND type = ?
+        LIMIT 1
+        """,
+        (customer_text, order_no_text, tx_type_text),
+    ).fetchone()
+    if existing is not None:
+        existing_amount = int(existing["amount"] if isinstance(existing, sqlite3.Row) else existing[1])
+        if existing_amount != amount_int:
+            raise ValueError("wallet transaction reference already exists with a different amount")
+        return {
+            "transaction_id": int(existing["id"] if isinstance(existing, sqlite3.Row) else existing[0]),
+            "amount": existing_amount,
+            "created": False,
+        }
+
+    row = conn.execute(
+        f"""
+        SELECT balance, principal_balance, bonus_balance, refund_offset_balance
+        FROM {prefix}customer_wallets
+        WHERE customer_discord_id = ?
+        """,
+        (customer_text,),
+    ).fetchone()
+
+    if row is None:
+        before = 0
+        principal_before = 0
+        bonus_before = 0
+        refund_offset_before = 0
+    elif isinstance(row, sqlite3.Row):
+        before = int(row["balance"] or 0)
+        principal_before = int(row["principal_balance"] or 0)
+        bonus_before = int(row["bonus_balance"] or 0)
+        refund_offset_before = int(row["refund_offset_balance"] or 0)
+    else:
+        before = int(row[0] or 0)
+        principal_before = int(row[1] or 0)
+        bonus_before = int(row[2] or 0)
+        refund_offset_before = int(row[3] or 0)
+
+    after = before + amount_int
+    principal_after = principal_before + amount_int
+    now_iso = get_taipei_now_iso()
+
+    if row is None:
+        conn.execute(
+            f"""
+            INSERT INTO {prefix}customer_wallets (
+                customer_discord_id, balance, principal_balance,
+                bonus_balance, refund_offset_balance, updated_at
+            ) VALUES (?, ?, ?, 0, 0, ?)
+            """,
+            (customer_text, after, principal_after, now_iso),
+        )
+    else:
+        conn.execute(
+            f"""
+            UPDATE {prefix}customer_wallets
+            SET balance = ?, principal_balance = ?, bonus_balance = ?,
+                refund_offset_balance = ?, updated_at = ?
+            WHERE customer_discord_id = ?
+            """,
+            (
+                after,
+                principal_after,
+                bonus_before,
+                refund_offset_before,
+                now_iso,
+                customer_text,
+            ),
+        )
+
+    cur = conn.execute(
+        f"""
+        INSERT INTO {prefix}wallet_transactions (
+            customer_discord_id, amount, balance_before, balance_after, type,
+            order_channel_id, order_no, operator_discord_id,
+            operator_display_name, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+        """,
+        (
+            customer_text,
+            amount_int,
+            before,
+            after,
+            tx_type_text,
+            order_no_text,
+            str(operator_discord_id or "").strip() or None,
+            str(operator_display_name or "").strip() or None,
+            str(note or "")[:500],
+            now_iso,
+        ),
+    )
+    return {
+        "transaction_id": int(cur.lastrowid),
+        "amount": amount_int,
+        "balance_before": before,
+        "balance_after": after,
+        "created": True,
+    }
+
+
 def get_wallet_balance(customer_id: str | int, db_file: str | Path | None = None) -> int:
     ensure_wallet_tables(db_file)
     path = _db_path(db_file)
@@ -266,165 +415,58 @@ def get_wallet_payment_transaction(
 def get_wallet_transactions(
     customer_id: str | int,
     *,
-    limit: int = 10,
+    limit: int = 50,
     db_file: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     ensure_wallet_tables(db_file)
     path = _db_path(db_file)
-    safe_limit = max(1, min(int(limit or 10), 25))
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT
-                id, customer_discord_id, amount, balance_before, balance_after,
-                type, order_channel_id, order_no, operator_discord_id,
-                operator_display_name, note, created_at
-            FROM wallet_transactions
-            WHERE customer_discord_id = ?
+            SELECT * FROM wallet_transactions
+            WHERE customer_discord_id=?
             ORDER BY id DESC
             LIMIT ?
             """,
-            (str(customer_id), safe_limit),
+            (str(customer_id), max(1, min(int(limit), 200))),
         ).fetchall()
         return [dict(row) for row in rows]
 
 
-def _apply_bucket_change(
-    *,
-    principal_before: int,
-    bonus_before: int,
-    refund_offset_before: int,
-    amount: int,
-    tx_type: str,
-    allow_negative: bool,
-) -> tuple[int, int, int]:
-    principal_after = int(principal_before)
-    bonus_after = int(bonus_before)
-    refund_offset_after = max(0, int(refund_offset_before))
-
-    if amount > 0:
-        if tx_type in BONUS_CREDIT_TYPES:
-            bonus_after += amount
-        else:
-            principal_after += amount
-        return principal_after, bonus_after, refund_offset_after
-
-    debit = abs(int(amount))
-    total_before = principal_before + bonus_before
-    if debit > total_before and not allow_negative:
-        raise ValueError(
-            f"錢包餘額不足，目前餘額 {total_before:,}T，無法扣除 {debit:,}T。"
-        )
-
-    if tx_type in PRINCIPAL_ONLY_DEBIT_TYPES:
-        if debit > principal_before and not allow_negative:
-            if tx_type == "tip_payment":
-                raise ValueError(
-                    "雞腿只能使用實付本金。"
-                    f"目前可用本金 {principal_before:,}T，無法支付 {debit:,}T。"
-                )
-            refundable = max(0, principal_before - refund_offset_before)
-            raise ValueError(
-                f"可退款實付本金不足，目前最多可退 {refundable:,}T。"
-            )
-        principal_after -= debit
-        # 雞腿與退款都會消耗實付本金；已使用贈額形成的退款抵扣額，
-        # 會隨本金真正被消費／退回而沖抵，避免之後再次重複扣除。
-        refund_offset_after = max(0, refund_offset_after - debit)
-        return principal_after, bonus_after, refund_offset_after
-
-    if tx_type in BONUS_ONLY_DEBIT_TYPES:
-        if debit > bonus_before and not allow_negative:
-            raise ValueError(
-                f"贈額不足，目前贈額 {bonus_before:,}T，無法撤銷 {debit:,}T。"
-            )
-        bonus_after -= debit
-        return principal_after, bonus_after, refund_offset_after
-
-    # 一般消費固定先使用贈額，再使用實付本金。
-    # 若只花到贈額，該金額暫列為退款抵扣；之後同一錢包有本金實際消費時會自動沖抵。
-    bonus_used = min(max(0, bonus_before), debit)
-    bonus_after -= bonus_used
-    remaining = debit - bonus_used
-    principal_used = remaining
-    principal_after -= principal_used
-
-    refund_offset_after += bonus_used
-    if principal_used > 0:
-        refund_offset_after = max(0, refund_offset_after - principal_used)
-
-    return principal_after, bonus_after, refund_offset_after
-
-
 def adjust_wallet_balance(
-    *,
     customer_id: str | int,
-    amount: int,
+    delta: int,
+    *,
     tx_type: str,
-    operator_discord_id: str | int | None = None,
-    operator_display_name: str | None = None,
     order_channel_id: str | int | None = None,
     order_no: str | None = None,
+    operator_discord_id: str | int | None = None,
+    operator_display_name: str | None = None,
     note: str | None = None,
-    allow_negative: bool = False,
     db_file: str | Path | None = None,
 ) -> dict[str, Any]:
     ensure_wallet_tables(db_file)
+    customer_id = str(customer_id)
+    delta = int(delta)
+    order_channel_id = str(order_channel_id) if order_channel_id is not None else None
+    order_no = str(order_no) if order_no is not None else None
     path = _db_path(db_file)
-    amount = int(amount or 0)
-    if amount == 0:
-        raise ValueError("異動金額不能為 0。")
-
-    normalized_order_no = str(order_no or "").strip() or None
-    normalized_order_channel_id = str(order_channel_id or "").strip() or None
-    normalized_type = str(tx_type)
 
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("BEGIN IMMEDIATE")
-
-        if normalized_type == "payment" and normalized_order_channel_id:
+        if order_no:
             existing = conn.execute(
                 """
-                SELECT *
-                FROM wallet_transactions
-                WHERE customer_discord_id=? AND order_channel_id=? AND type='payment'
-                ORDER BY id ASC
-                LIMIT 1
-                """,
-                (str(customer_id), normalized_order_channel_id),
-            ).fetchone()
-            if existing is not None:
-                if int(existing["amount"] or 0) != amount:
-                    raise ValueError(
-                        "同一訂單票口已有不同金額的錢包扣款；已拒絕再次扣款，請通知客服確認。"
-                    )
-                conn.rollback()
-                result = dict(existing)
-                result["idempotent_replay"] = True
-                return result
-
-        if normalized_order_no:
-            existing = conn.execute(
-                """
-                SELECT *
-                FROM wallet_transactions
+                SELECT * FROM wallet_transactions
                 WHERE customer_discord_id=? AND order_no=? AND type=?
-                ORDER BY id ASC
                 LIMIT 1
                 """,
-                (str(customer_id), normalized_order_no, normalized_type),
+                (customer_id, order_no, tx_type),
             ).fetchone()
-            if existing is not None:
-                if int(existing["amount"] or 0) != amount:
-                    raise ValueError(
-                        "同一錢包交易識別碼已存在，但金額不同；已拒絕重複入帳。"
-                    )
-                conn.rollback()
-                result = dict(existing)
-                result["idempotent_replay"] = True
-                return result
+            if existing:
+                return dict(existing)
 
         row = conn.execute(
             """
@@ -432,75 +474,111 @@ def adjust_wallet_balance(
             FROM customer_wallets
             WHERE customer_discord_id=?
             """,
-            (str(customer_id),),
+            (customer_id,),
         ).fetchone()
         before = int(row["balance"] or 0) if row else 0
         principal_before = int(row["principal_balance"] or 0) if row else 0
         bonus_before = int(row["bonus_balance"] or 0) if row else 0
         refund_offset_before = int(row["refund_offset_balance"] or 0) if row else 0
+        if delta < 0 and before + delta < 0:
+            raise ValueError("錢包餘額不足")
 
-        principal_after, bonus_after, refund_offset_after = _apply_bucket_change(
-            principal_before=principal_before,
-            bonus_before=bonus_before,
-            refund_offset_before=refund_offset_before,
-            amount=amount,
-            tx_type=normalized_type,
-            allow_negative=allow_negative,
-        )
-        after = principal_after + bonus_after
-        if after < 0 and not allow_negative:
-            raise ValueError(
-                f"錢包餘額不足，目前餘額 {before:,}T，無法扣除 {abs(amount):,}T。"
+        debit = abs(delta) if delta < 0 else 0
+        if delta < 0:
+            if tx_type in BONUS_ONLY_DEBIT_TYPES:
+                if bonus_before < debit:
+                    raise ValueError("錢包贈額不足")
+                principal_after = principal_before
+                bonus_after = bonus_before - debit
+                refund_offset_after = refund_offset_before
+            elif tx_type in PRINCIPAL_ONLY_DEBIT_TYPES:
+                if principal_before < debit:
+                    raise ValueError("可用本金不足")
+                principal_after = principal_before - debit
+                bonus_after = bonus_before
+                refund_offset_after = refund_offset_before + (debit if tx_type == "refund" else 0)
+            else:
+                bonus_used = min(bonus_before, debit)
+                principal_used = debit - bonus_used
+                if principal_before < principal_used:
+                    raise ValueError("錢包餘額不足")
+                principal_after = principal_before - principal_used
+                bonus_after = bonus_before - bonus_used
+                refund_offset_after = refund_offset_before
+        else:
+            if tx_type in BONUS_CREDIT_TYPES:
+                principal_after = principal_before
+                bonus_after = bonus_before + delta
+            else:
+                principal_after = principal_before + delta
+                bonus_after = bonus_before
+            refund_offset_after = refund_offset_before
+
+        after = before + delta
+        now_iso = get_taipei_now_iso()
+
+        if row is None:
+            conn.execute(
+                """
+                INSERT INTO customer_wallets (
+                    customer_discord_id, balance, principal_balance,
+                    bonus_balance, refund_offset_balance, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    customer_id,
+                    after,
+                    principal_after,
+                    bonus_after,
+                    refund_offset_after,
+                    now_iso,
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE customer_wallets
+                SET balance=?, principal_balance=?, bonus_balance=?,
+                    refund_offset_balance=?, updated_at=?
+                WHERE customer_discord_id=?
+                """,
+                (
+                    after,
+                    principal_after,
+                    bonus_after,
+                    refund_offset_after,
+                    now_iso,
+                    customer_id,
+                ),
             )
 
-        now_text = get_taipei_now_iso()
-        conn.execute(
-            """
-            INSERT INTO customer_wallets(
-                customer_discord_id, balance, principal_balance, bonus_balance,
-                refund_offset_balance, updated_at
-            ) VALUES(?,?,?,?,?,?)
-            ON CONFLICT(customer_discord_id)
-            DO UPDATE SET
-                balance=excluded.balance,
-                principal_balance=excluded.principal_balance,
-                bonus_balance=excluded.bonus_balance,
-                refund_offset_balance=excluded.refund_offset_balance,
-                updated_at=excluded.updated_at
-            """,
-            (
-                str(customer_id),
-                after,
-                principal_after,
-                bonus_after,
-                refund_offset_after,
-                now_text,
-            ),
-        )
         cur = conn.execute(
             """
-            INSERT INTO wallet_transactions(
+            INSERT INTO wallet_transactions (
                 customer_discord_id, amount, balance_before, balance_after, type,
                 order_channel_id, order_no, operator_discord_id,
                 operator_display_name, note, created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                str(customer_id), amount, before, after, normalized_type,
-                normalized_order_channel_id, normalized_order_no,
-                str(operator_discord_id) if operator_discord_id else None,
-                str(operator_display_name or "").strip() or None,
-                str(note or "").strip() or None,
-                now_text,
+                customer_id,
+                delta,
+                before,
+                after,
+                tx_type,
+                order_channel_id,
+                order_no,
+                str(operator_discord_id) if operator_discord_id is not None else None,
+                operator_display_name,
+                note,
+                now_iso,
             ),
         )
-        tx_id = int(cur.lastrowid)
         conn.commit()
-
-        transaction = {
-            "id": tx_id,
-            "customer_discord_id": str(customer_id),
-            "amount": amount,
+        return {
+            "transaction_id": cur.lastrowid,
+            "customer_discord_id": customer_id,
+            "amount": delta,
             "balance_before": before,
             "balance_after": after,
             "principal_before": principal_before,
@@ -509,52 +587,90 @@ def adjust_wallet_balance(
             "bonus_after": bonus_after,
             "refund_offset_before": refund_offset_before,
             "refund_offset_after": refund_offset_after,
-            "type": normalized_type,
-            "order_no": normalized_order_no,
-            "order_channel_id": normalized_order_channel_id,
+            "type": tx_type,
+            "order_channel_id": order_channel_id,
+            "order_no": order_no,
+            "operator_discord_id": str(operator_discord_id) if operator_discord_id is not None else None,
+            "operator_display_name": operator_display_name,
             "note": note,
-            "created_at": now_text,
-            "idempotent_replay": False,
+            "created_at": now_iso,
         }
 
-    if operator_discord_id:
-        try:
-            from web.app.services.audit_trail import write_sqlite_audit_log
 
-            audit_db_file = Path(db_file).with_name("web_dashboard.db") if db_file is not None else None
-            write_sqlite_audit_log(
-                admin_discord_id=str(operator_discord_id),
-                action="wallet_adjustment",
-                target_type="customer_wallet",
-                target_id=str(customer_id),
-                before={
-                    "customer_discord_id": str(customer_id),
-                    "balance": before,
-                    "principal_balance": principal_before,
-                    "bonus_balance": bonus_before,
-                    "refund_offset_balance": refund_offset_before,
-                },
-                after={
-                    "customer_discord_id": str(customer_id),
-                    "balance": after,
-                    "principal_balance": principal_after,
-                    "bonus_balance": bonus_after,
-                    "refund_offset_balance": refund_offset_after,
-                    "amount": amount,
-                    "transaction_id": tx_id,
-                    "transaction_type": normalized_type,
-                    "order_no": normalized_order_no,
-                    "order_channel_id": str(order_channel_id) if order_channel_id is not None else None,
-                    "note": str(note or "").strip() or None,
-                    "operator_display_name": str(operator_display_name or "").strip() or None,
-                },
-                reason=str(note or "").strip() or None,
-                db_file=audit_db_file,
-            )
-        except Exception as exc:
-            print(
-                f"[audit] wallet log failed tx_id={tx_id}: {type(exc).__name__}: {exc}",
-                flush=True,
-            )
+def get_wallet_transaction_by_id(
+    transaction_id: int,
+    *,
+    db_file: str | Path | None = None,
+) -> dict[str, Any] | None:
+    ensure_wallet_tables(db_file)
+    path = _db_path(db_file)
+    with sqlite3.connect(path, timeout=15) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM wallet_transactions WHERE id=? LIMIT 1",
+            (int(transaction_id),),
+        ).fetchone()
+        return dict(row) if row else None
 
-    return transaction
+
+def list_wallet_transaction_totals_by_type(
+    *,
+    customer_id: str | int | None = None,
+    db_file: str | Path | None = None,
+) -> dict[str, int]:
+    ensure_wallet_tables(db_file)
+    path = _db_path(db_file)
+    with sqlite3.connect(path, timeout=15) as conn:
+        where = ""
+        params: list[Any] = []
+        if customer_id is not None:
+            where = "WHERE customer_discord_id = ?"
+            params.append(str(customer_id))
+        rows = conn.execute(
+            f"""
+            SELECT type, COALESCE(SUM(amount), 0) AS total
+            FROM wallet_transactions
+            {where}
+            GROUP BY type
+            """,
+            params,
+        ).fetchall()
+        return {str(tx_type): int(total or 0) for tx_type, total in rows]
+
+
+def reverse_wallet_transaction(
+    transaction_id: int,
+    *,
+    operator_discord_id: str | int | None = None,
+    operator_display_name: str | None = None,
+    note: str | None = None,
+    db_file: str | Path | None = None,
+) -> dict[str, Any]:
+    original = get_wallet_transaction_by_id(transaction_id, db_file=db_file)
+    if original is None:
+        raise ValueError("找不到錢包交易紀錄")
+
+    if str(original.get("type") or "").startswith("reversal:"):
+        raise ValueError("反向交易不能再次反轉")
+
+    reversal_order_no = f"wallet-reversal:{int(transaction_id)}"
+    existing = find_wallet_transaction(
+        customer_id=original["customer_discord_id"],
+        order_no=reversal_order_no,
+        tx_type=f"reversal:{original['type']}",
+        db_file=db_file,
+    )
+    if existing:
+        return existing
+
+    delta = -int(original["amount"] or 0)
+    return adjust_wallet_balance(
+        original["customer_discord_id"],
+        delta,
+        tx_type=f"reversal:{original['type']}",
+        order_no=reversal_order_no,
+        operator_discord_id=operator_discord_id,
+        operator_display_name=operator_display_name,
+        note=note or f"反轉錢包交易 #{transaction_id}",
+        db_file=db_file,
+    )
