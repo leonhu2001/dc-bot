@@ -31,6 +31,9 @@ from services.web_sync.event_store import (
 from services.web_sync.presentation import (
     build_order_created_details as _web_order_created_details,
 )
+from shared.order_state import (
+    PENDING_CS_DISPATCH as WEB_ORDER_PENDING_CS_DISPATCH,
+)
 
 
 SELF_SERVICE_ORDER_SELECTIONS: dict[int, dict[str, Any]]
@@ -57,10 +60,6 @@ def _web_dashboard_db_path_for_bot() -> str:
 
 
 # zYao 3C3B2R3 CS review gate v1
-
-WEB_ORDER_PENDING_CS_DISPATCH = (
-    "pending_cs_dispatch"
-)
 
 
 def _web_cs_order_id_from_channel(
