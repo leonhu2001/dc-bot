@@ -1,0 +1,125 @@
+name: Temporary explicit order runtime startup switch
+
+on:
+  push:
+    branches:
+      - refactor/order-runtime-explicit-startup-20261018
+
+permissions:
+  contents: write
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refactor/order-runtime-explicit-startup-20261018
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Apply guarded startup switch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          bot_path = Path('bot.py')
+          bot = bot_path.read_text(encoding='utf-8')
+          old_import = '    configure_order_runtime,\n'
+          new_import = '    configure_order_runtime_explicit,\n'
+          if bot.count(old_import) != 1:
+              raise SystemExit(f'expected one legacy order runtime import, got {bot.count(old_import)}')
+          bot = bot.replace(old_import, new_import, 1)
+
+          old_call = 'configure_order_runtime(globals())'
+          new_call = '''configure_order_runtime_explicit(
+              db_file=DB_FILE,
+              dispatch_channel_id=DISPATCH_CHANNEL_ID,
+              order_control_selections=ORDER_CONTROL_SELECTIONS,
+              order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+              self_service_order_view_type=SelfServiceOrderView,
+              defer_and_refresh_self_service_panel=_defer_and_refresh_self_service_panel,
+              self_service_rule_getter=_get_rule_from_self_service_data,
+              payment_method_embed_builder=build_payment_method_embed,
+              self_service_panel_embed_builder=build_self_service_panel_embed,
+              can_operate_self_service_order_func=can_operate_self_service_order,
+              amount_formatter=format_t_amount,
+              order_customer_id_getter=get_order_customer_id_from_channel,
+              wallet_balance_getter=get_wallet_balance,
+              customer_staff_checker=is_customer_staff,
+              remember_order=remember_order_data,
+              ticket_channel_renamer=rename_ticket_channel,
+              order_log_sender=send_order_log,
+          )'''
+          if bot.count(old_call) != 1:
+              raise SystemExit(f'expected one legacy startup call, got {bot.count(old_call)}')
+          bot = bot.replace(old_call, new_call, 1)
+          bot_path.write_text(bot, encoding='utf-8')
+
+          runtime_path = Path('services/order_runtime.py')
+          runtime = runtime_path.read_text(encoding='utf-8')
+          old_sig = '''def configure_order_runtime_explicit(
+              *,'''
+          if runtime.count(old_sig) != 1:
+              raise SystemExit('explicit runtime signature changed unexpectedly')
+          runtime = runtime.replace(
+              old_sig,
+              '''def configure_order_runtime_explicit(
+              *,''',
+              1,
+          )
+          marker = '''    # Explicit args keep the transitional module-global binding allowlisted.
+              globals().update('''
+          if runtime.count(marker) != 1:
+              raise SystemExit('explicit runtime body marker changed unexpectedly')
+          runtime = runtime.replace(
+              marker,
+              '''    global _CONFIGURED
+              # Explicit args keep the transitional module-global binding allowlisted.
+              globals().update(''',
+              1,
+          )
+          closing = '''            "send_order_log": order_log_sender,
+                  }
+              )
+
+
+          def configure_order_runtime(namespace: Mapping[str, Any]) -> None:'''
+          replacement = '''            "send_order_log": order_log_sender,
+                  }
+              )
+              _CONFIGURED = True
+
+
+          def configure_order_runtime(namespace: Mapping[str, Any]) -> None:'''
+          if runtime.count(closing) != 1:
+              raise SystemExit('explicit runtime closing marker changed unexpectedly')
+          runtime = runtime.replace(closing, replacement, 1)
+          runtime_path.write_text(runtime, encoding='utf-8')
+
+          test_path = Path('tests/test_order_runtime_explicit_startup.py')
+          test_path.write_text('''from pathlib import Path\n\nROOT = Path(__file__).resolve().parents[1]\nBOT_SOURCE = (ROOT / "bot.py").read_text(encoding="utf-8")\nRUNTIME_SOURCE = (ROOT / "services" / "order_runtime.py").read_text(encoding="utf-8")\n\n\ndef test_bot_uses_explicit_order_runtime_startup():\n    assert "configure_order_runtime_explicit(" in BOT_SOURCE\n    assert "configure_order_runtime(globals())" not in BOT_SOURCE\n    for keyword in (\n        "db_file=DB_FILE",\n        "dispatch_channel_id=DISPATCH_CHANNEL_ID",\n        "order_control_selections=ORDER_CONTROL_SELECTIONS",\n        "order_selections=SELF_SERVICE_ORDER_SELECTIONS",\n        "self_service_order_view_type=SelfServiceOrderView",\n        "defer_and_refresh_self_service_panel=_defer_and_refresh_self_service_panel",\n        "self_service_rule_getter=_get_rule_from_self_service_data",\n        "payment_method_embed_builder=build_payment_method_embed",\n        "self_service_panel_embed_builder=build_self_service_panel_embed",\n        "can_operate_self_service_order_func=can_operate_self_service_order",\n        "amount_formatter=format_t_amount",\n        "order_customer_id_getter=get_order_customer_id_from_channel",\n        "wallet_balance_getter=get_wallet_balance",\n        "customer_staff_checker=is_customer_staff",\n        "remember_order=remember_order_data",\n        "ticket_channel_renamer=rename_ticket_channel",\n        "order_log_sender=send_order_log",\n    ):\n        assert keyword in BOT_SOURCE\n\n\ndef test_legacy_adapter_is_retained_but_not_used_by_startup():\n    assert "def configure_order_runtime(namespace: Mapping[str, Any])" in RUNTIME_SOURCE\n    explicit_scope = RUNTIME_SOURCE.split("def configure_order_runtime_explicit(", 1)[1].split("def configure_order_runtime(", 1)[0]\n    assert "global _CONFIGURED" in explicit_scope\n    assert "_CONFIGURED = True" in explicit_scope\n''', encoding='utf-8')
+          PY
+      - name: Compile changed files
+        run: python -m py_compile bot.py services/order_runtime.py tests/test_order_runtime_explicit_startup.py
+      - name: Run static startup guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          bot = Path('bot.py').read_text(encoding='utf-8')
+          runtime = Path('services/order_runtime.py').read_text(encoding='utf-8')
+          assert 'configure_order_runtime(globals())' not in bot
+          assert bot.count('configure_order_runtime_explicit(') == 1
+          assert 'def configure_order_runtime(namespace: Mapping[str, Any])' in runtime
+          assert Path('bot.py').stat().st_size <= 235000
+          print('explicit startup guard passed')
+          PY
+      - name: Remove temporary workflow and commit
+        run: |
+          git rm .github/workflows/tmp_switch_order_runtime_explicit.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py services/order_runtime.py tests/test_order_runtime_explicit_startup.py
+          git commit -m "Switch order runtime startup to explicit wiring"
+          git push origin HEAD:refactor/order-runtime-explicit-startup-20261018
