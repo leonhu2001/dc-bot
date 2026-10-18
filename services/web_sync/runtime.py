@@ -1,9 +1,54 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+import asyncio
+import re
+import sqlite3
+from typing import Any
 
 import discord
 
+from core.database import (
+    delete_order_row_from_db,
+    remember_claim_data,
+    remember_order_data,
+    save_bot_data,
+)
+from core.permissions import is_customer_staff
+from core.time_utils import get_taipei_now_iso
+from services.acceptance.runtime import (
+    _apply_acceptance_state_to_claim_data,
+    refresh_acceptance_dispatch_from_web_order,
+)
+from services.logging_service import send_order_log
+from services.order_lifecycle_runtime import (
+    CANCEL_REASON_OPTIONS,
+    OrderCancellationReasonSelect,
+)
+from services.orders import (
+    ORDER_CATEGORY_LABELS,
+    ORDER_ITEM_GROUPS_BY_CATEGORY,
+    _to_int,
+    get_order_item_details_for_group,
+    get_order_item_group_label,
+)
+from services.rewards import format_t_amount
+from services.self_service_financials import _format_plain_amount
+from services.self_service_ui_runtime import (
+    SelfServiceOrderView,
+    build_self_service_panel_embed,
+)
+from services.smart_dispatch import (
+    create_smart_dispatch_plan,
+    get_smart_dispatch_plan,
+    set_specified_dm_results,
+)
+from services.ticket_identity import build_ticket_channel_name
+from services.web_sync.discord_helpers import (
+    find_ticket as _web_order_created_find_ticket,
+    get_channel as _web_order_created_get_channel,
+    get_member as _web_order_created_get_member,
+    has_footer as _web_order_created_has_footer,
+)
 from services.web_sync.event_store import (
     load_order_created_bundle as _web_order_created_load_bundle,
     mark_order_created_processing as _web_order_created_mark_processing,
@@ -11,79 +56,52 @@ from services.web_sync.event_store import (
     mark_event_done as _web_sync_mark_event_done,
     mark_event_failed as _web_sync_mark_event_failed,
 )
+from services.web_sync.presentation import (
+    build_order_created_details as _web_order_created_details,
+)
+from views.smart_dispatch import (
+    prepare_initial_smart_dispatch,
+    send_initial_smart_dispatch_alert,
+    send_specified_staff_dispatch_dms,
+)
 
 
 _CONFIGURED = False
 
-_MODULE_OWNED_RUNTIME_NAMES = frozenset(
-    {
-        "Any",
-        "Mapping",
-        "discord",
-    }
-)
-
-_ALLOWED_RUNTIME_DEPENDENCY_NAMES = frozenset(
-    {
-        "CANCEL_REASON_OPTIONS",
-        "CUSTOMER_CATEGORY_ID",
-        "CUSTOMER_ROLE_ID",
-        "DISPATCH_CHANNEL_ID",
-        "GUILD_ID",
-        "ORDER_CATEGORY_LABELS",
-        "ORDER_CLAIMS",
-        "ORDER_ITEM_GROUPS_BY_CATEGORY",
-        "OrderCancellationReasonSelect",
-        "OrderControlView",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "SelfServiceOrderView",
-        "_apply_acceptance_state_to_claim_data",
-        "_format_plain_amount",
-        "_to_int",
-        "_web_order_created_details",
-        "_web_order_created_find_ticket",
-        "_web_order_created_get_channel",
-        "_web_order_created_get_member",
-        "_web_order_created_has_footer",
-        "asyncio",
-        "bot",
-        "build_self_service_panel_embed",
-        "build_ticket_channel_name",
-        "create_smart_dispatch_plan",
-        "delete_order_row_from_db",
-        "format_t_amount",
-        "get_order_item_details_for_group",
-        "get_order_item_group_label",
-        "get_smart_dispatch_plan",
-        "get_taipei_now_iso",
-        "is_customer_staff",
-        "prepare_initial_smart_dispatch",
-        "re",
-        "refresh_acceptance_dispatch_from_web_order",
-        "remember_claim_data",
-        "remember_order_data",
-        "save_bot_data",
-        "send_initial_smart_dispatch_alert",
-        "send_order_log",
-        "send_specified_staff_dispatch_dms",
-        "set_specified_dm_results",
-        "sqlite3",
-    }
-)
+CUSTOMER_CATEGORY_ID: int
+CUSTOMER_ROLE_ID: int
+DISPATCH_CHANNEL_ID: int
+GUILD_ID: int
+ORDER_CLAIMS: dict[int, dict[str, Any]]
+OrderControlView: type[discord.ui.View]
+SELF_SERVICE_ORDER_SELECTIONS: dict[int, dict[str, Any]]
+bot: discord.Client
 
 
-def configure_web_sync_runtime(namespace: Mapping[str, Any]) -> None:
-    """Bind only the legacy bot-owned dependencies used by Web sync.
-
-    This remains behavior-compatible with the current bot wiring while making
-    the temporary namespace bridge explicit. Unknown bot globals are ignored.
-    """
+def configure_web_sync_runtime_explicit(
+    *,
+    customer_category_id: int,
+    customer_role_id: int,
+    dispatch_channel_id: int,
+    guild_id: int,
+    order_claims: dict[int, dict[str, Any]],
+    order_control_view_type: type[discord.ui.View],
+    order_selections: dict[int, dict[str, Any]],
+    bot_instance: discord.Client,
+) -> None:
+    """Bind only the entrypoint-owned state required by Web sync."""
     global _CONFIGURED
+    global CUSTOMER_CATEGORY_ID, CUSTOMER_ROLE_ID, DISPATCH_CHANNEL_ID, GUILD_ID
+    global ORDER_CLAIMS, OrderControlView, SELF_SERVICE_ORDER_SELECTIONS, bot
 
-    for name in _ALLOWED_RUNTIME_DEPENDENCY_NAMES:
-        if name in namespace:
-            globals()[name] = namespace[name]
-
+    CUSTOMER_CATEGORY_ID = int(customer_category_id)
+    CUSTOMER_ROLE_ID = int(customer_role_id)
+    DISPATCH_CHANNEL_ID = int(dispatch_channel_id)
+    GUILD_ID = int(guild_id)
+    ORDER_CLAIMS = order_claims
+    OrderControlView = order_control_view_type
+    SELF_SERVICE_ORDER_SELECTIONS = order_selections
+    bot = bot_instance
     _CONFIGURED = True
 
 

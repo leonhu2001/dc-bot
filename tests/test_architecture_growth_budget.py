@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,7 @@ MAX_BYTES = {
     "services/order_credential_runtime.py": 23_500,
     "services/order_point_redemption.py": 7_000,
     "services/self_service_runtime.py": 70_000,
+    "services/web_sync/runtime.py": 62_000,
     "services/self_service_reorder.py": 33_000,
     "services/self_service_selection_runtime.py": 30_000,
     "services/self_service_financials.py": 42_000,
@@ -56,4 +58,14 @@ def test_new_services_do_not_import_bot_entrypoint() -> None:
     assert not offenders, (
         "services must depend on explicit APIs, not bot.py globals: "
         + ", ".join(offenders)
+    )
+
+
+def test_runtime_configurators_do_not_receive_entrypoint_globals() -> None:
+    source = (ROOT / "bot.py").read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"configure_[A-Za-z0-9_]*runtime\s*\(\s*globals\s*\(\s*\)\s*\)"
+    )
+    assert pattern.search(source) is None, (
+        "runtime configuration must use explicit dependencies, not globals()"
     )
