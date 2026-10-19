@@ -186,7 +186,7 @@ def test_worker_live_fields_require_each_worker_and_url_for_streamers():
 def test_reporting_ui_contracts_are_present():
     root = Path(__file__).resolve().parents[1]
     router_source = (root / "web/app/routers/order_reports.py").read_text(encoding="utf-8")
-    sidebar_source = (root / "web/app/templates/_employee_sidebar.html").read_text(encoding="utf-8")
+    hero_source = (root / "web/app/templates/_employee_workspace_hero.html").read_text(encoding="utf-8")
     ui_source = (root / "web/app/static/js/ui_tweaks.js").read_text(encoding="utf-8")
     detail_source = (root / "web/app/templates/order_report_detail.html").read_text(encoding="utf-8")
     report_js = (root / "web/app/static/js/order_reports.js").read_text(encoding="utf-8")
@@ -198,7 +198,7 @@ def test_reporting_ui_contracts_are_present():
     assert 'name="stream_url_{{ worker.worker_discord_id }}"' in detail_source
     assert "data-worker-live-row" in detail_source
     assert "data-worker-stream-url" in report_js
-    assert "報單系統" in sidebar_source
+    assert "報單系統" in hero_source
     assert "target = \"_blank\"" in ui_source
     assert "/dispatch/reports/statuses.json" in ui_source
 

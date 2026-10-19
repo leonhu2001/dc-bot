@@ -1,6 +1,7 @@
 {% set _p = request.url.path %}
 <link rel="stylesheet" href="/static/css/pages/employee_workspace_unified.css?v=20261020-1">
-<link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-3">
+<link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-2">
+<link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-4">
 
 <header class="ewu-site-header">
   <div class="ewu-site-header-inner">
@@ -29,25 +30,9 @@
   </div>
 </header>
 
-<aside class="mw-r5-sidebar">
-  <div class="mw-r5-brand">
-    <small>EMPLOYEE CENTER</small>
-    <strong>{{ (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工中心' }}</strong>
-    <div class="ewu-workspace-description">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
-  </div>
-  <nav class="mw-r5-nav" aria-label="員工工作區導覽">
-    <a class="home-link" href="/employee">員工中心</a>
-    {% if _p != '/dispatch' %}<a href="/dispatch">接單大廳</a>{% endif %}
-    {% if not (_p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review')) %}<a href="/dispatch/reports">報單系統</a>{% endif %}
-    {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
-      {% if not _p.startswith('/dispatch/reports/review') %}<a id="order-report-review-nav" href="/dispatch/reports/review">報單審核</a>{% endif %}
-      {% if not _p.startswith('/employee/store-bindings') %}<a href="/employee/store-bindings">綁店管理</a>{% endif %}
-    {% endif %}
-    {% if not _p.startswith('/employee/internal-transfers') %}<a href="/employee/internal-transfers">內部轉帳</a>{% endif %}
-    {% if user and user.id %}<a href="/staff/{{ user.id }}">公開個人牆</a>{% endif %}
-    <a href="/me">個人中心</a>
-  </nav>
-</aside>
+<div class="ec employee-workspace-top">
+  {% include "_employee_workspace_hero.html" %}
+</div>
 
 {% if _p == '/dispatch' %}
 <script src="/static/js/dispatch_navigation.js?v=20261013-1" defer></script>

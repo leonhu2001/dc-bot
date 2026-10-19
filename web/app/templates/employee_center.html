@@ -1,27 +1,10 @@
 {% extends "site_layout.html" %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-1">
+<link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-2">
 <link rel="stylesheet" href="/static/css/pages/employee_center_payout.css?v=20261020-1">
 
 <section class="ec">
-    <div class="ec-hero">
-        <div>
-            <div class="ec-k">EMPLOYEE CENTER</div>
-            <h1>{{ member.name }}</h1>
-            <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
-        </div>
-        <div class="ec-actions">
-            <a class="ec-btn primary" href="/dispatch">接單大廳</a>
-            <a class="ec-btn" href="/dispatch/reports">報單系統</a>
-            {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
-            <a class="ec-btn" href="/dispatch/reports/review">報單審核</a>
-            <a class="ec-btn" href="/employee/store-bindings">綁店管理</a>
-            {% endif %}
-            <a class="ec-btn" href="/employee/internal-transfers">內部轉帳</a>
-            <a class="ec-btn" href="/staff/{{ member.discord_id }}">公開個人牆</a>
-            <a class="ec-btn" href="/me">個人中心</a>
-        </div>
-    </div>
+    {% include "_employee_workspace_hero.html" %}
 
     {% if request.query_params.get('message') %}
     <div class="ec-alert success">{{ request.query_params.get('message') }}</div>
@@ -159,6 +142,6 @@
     </div>
 </section>
 
-<script src="/static/js/pages/employee_center_inline_1.js?v=20261013"></script>
+<script src="/static/js/pages/employee_center_inline_1.js?v=20261020-2"></script>
 <script src="/static/js/pages/store_binding_employee.js?v=20261020-2"></script>
 {% endblock %}
