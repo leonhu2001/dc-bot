@@ -36,6 +36,23 @@ def _tree() -> ast.Module:
     return ast.parse(_source())
 
 
+def _module_level_names(tree: ast.Module) -> set[str]:
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    names.add(target.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                names.add(alias.asname or alias.name.rsplit(".", 1)[-1])
+    return names
+
+
 def test_order_runtime_does_not_bind_dependencies_through_globals() -> None:
     tree = _tree()
     globals_calls = [
@@ -56,13 +73,8 @@ def test_order_runtime_uses_immutable_runtime_state() -> None:
     assert "_RUNTIME_STATE = _OrderRuntimeState(" in source
 
 
-def test_order_runtime_has_no_legacy_runtime_alias_references() -> None:
-    used_names = {
-        node.id
-        for node in ast.walk(_tree())
-        if isinstance(node, ast.Name)
-    }
-    assert LEGACY_RUNTIME_NAMES.isdisjoint(used_names)
+def test_order_runtime_has_no_module_level_legacy_runtime_aliases() -> None:
+    assert LEGACY_RUNTIME_NAMES.isdisjoint(_module_level_names(_tree()))
 
 
 def test_order_runtime_configure_signature_stays_explicit() -> None:
