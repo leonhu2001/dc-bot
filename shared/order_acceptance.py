@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from core.time_utils import utc_now_naive
 import json
 from dataclasses import dataclass
@@ -465,6 +466,29 @@ def _validate_specified_slot(
         raise ValueError("這張單已指定其他人員，剩餘名額不可由你接單。")
 
 
+@contextmanager
+def _acceptance_claim_transaction():
+    """Serialize capacity checks and writes for one acceptance claim on SQLite."""
+    if getattr(engine.dialect, "name", "") != "sqlite":
+        with engine.begin() as conn:
+            yield conn
+        return
+
+    with engine.connect() as conn:
+        # SQLite's default deferred transaction allows two claimers to both
+        # read the same remaining slot before either writes. Taking the write
+        # reservation up front makes the capacity read and insert one atomic
+        # critical section; the next claimer re-reads after this commit.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+        try:
+            yield conn
+        except BaseException:
+            conn.rollback()
+            raise
+        else:
+            conn.commit()
+
+
 def claim_acceptance_order(
     *,
     order_id: int,
@@ -482,7 +506,7 @@ def claim_acceptance_order(
     if not staff_discord_id:
         raise ValueError("無法確認接單人員。")
 
-    with engine.begin() as conn:
+    with _acceptance_claim_transaction() as conn:
         order_status = _get_order_status(conn, int(order_id))
 
         if order_status not in PREPAY_ACCEPTANCE_STATUSES:
@@ -846,7 +870,6 @@ def close_acceptance_order(order_id: int, *, source: str = "closed") -> Acceptan
         )
 
     return get_acceptance_state(int(order_id))
-
 def find_acceptance_order_id_by_dispatch_message_id(dispatch_message_id) -> int | None:
     ensure_acceptance_tables()
 
