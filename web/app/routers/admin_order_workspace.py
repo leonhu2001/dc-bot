@@ -31,7 +31,9 @@ from web.app.services.admin_order_workspace_data import (
     _mw4a2r6_cs_members,
     _mw4a2r6_load_order_bundle,
     _mw4a2r6_safe_int,
-    _mw4a2r6_table_exists,
+)
+from web.app.services.admin_order_workspace_field_write import (
+    write_order_workspace_fields,
 )
 from web.app.services.admin_order_workspace_meta import (
     save_order_attention,
@@ -55,7 +57,6 @@ from web.app.services.admin_stream_bonus_workspace import (
     load_stream_bonus_workspace_rows,
     update_stream_bonus_from_workspace,
 )
-from web.app.services.order_financial_edit import preserve_order_financial_gaps
 from web.app.services.order_service import create_sync_event
 from web.app.services.staff_service import (
     get_staff_display_name,
@@ -345,126 +346,27 @@ async def admin_order_workspace_edit_r8(
             )
 
         payout_snapshot = _mw_r8_snapshot_payout_status(db, int(order_id))
-
-        previous_amount_for_finance = _mw4a2r6_safe_int(before.get("amount"), 0) or 0
-        previous_customer_pay_for_finance = _mw4a2r6_safe_int(
-            before.get("customer_pay_amount"), None
+        field_write = write_order_workspace_fields(
+            db,
+            order_id=int(order_id),
+            before=before,
+            customer_display_name=customer_display_name,
+            customer_discord_id=customer_discord_id,
+            category=category,
+            item=item,
+            quantity=int(quantity),
+            amount=int(amount),
+            payment_method=payment_method,
+            status=status,
+            closed_date=closed_date,
+            closed_date_auto=closed_date_auto,
+            closed_date_touched=closed_date_touched,
+            customer_service_discord_id=customer_service_discord_id,
         )
-        previous_payout_base_for_finance = _mw4a2r6_safe_int(
-            before.get("payout_base_amount"), None
-        )
-        preserved_financials = preserve_order_financial_gaps(
-            previous_amount=int(previous_amount_for_finance),
-            previous_customer_pay_amount=previous_customer_pay_for_finance,
-            previous_payout_base_amount=previous_payout_base_for_finance,
-            new_amount=int(amount),
-        )
-        new_customer_pay_amount = preserved_financials["customer_pay_amount"]
-        new_payout_base_amount = int(
-            preserved_financials["payout_base_amount"] or 0
-        )
-
-        if not customer_service_discord_id:
-            customer_service_discord_id = str(
-                before.get("customer_service_discord_id") or ""
-            ).strip()
-
-        customer_service_display_name = str(
-            before.get("customer_service_display_name") or ""
-        ).strip()
-        if customer_service_discord_id:
-            staff_member = get_staff_member_by_id(
-                db, discord_id=customer_service_discord_id
-            )
-            customer_service_display_name = (
-                get_staff_display_name(staff_member)
-                if staff_member is not None
-                else customer_service_display_name or customer_service_discord_id
-            )
-
-        db.execute(
-            text(
-                """
-                UPDATE web_orders
-                SET
-                    customer_display_name = :customer_display_name,
-                    customer_discord_id = :customer_discord_id,
-                    customer_service_discord_id = :customer_service_discord_id,
-                    customer_service_display_name = :customer_service_display_name,
-                    category = :category,
-                    item = :item,
-                    quantity = :quantity,
-                    amount = :amount,
-                    payout_base_amount = :payout_base_amount,
-                    customer_pay_amount = :customer_pay_amount,
-                    payment_method = :payment_method,
-                    status = :status,
-                    closed_at = CASE
-                        WHEN COALESCE(closed_at, '') <> ''
-                             AND :closed_date_touched NOT IN ('1', 'true', 'yes', 'on')
-                             AND substr(closed_at, 1, 10) = :closed_date
-                        THEN closed_at
-                        WHEN :closed_date_auto IN ('1', 'true', 'yes', 'on')
-                             AND :status IN ('closed', 'completed', 'done', 'cancelled', 'canceled')
-                             AND COALESCE(closed_at, '') = ''
-                        THEN datetime('now', '+8 hours')
-                        WHEN :closed_date_touched IN ('1', 'true', 'yes', 'on')
-                             AND :closed_date <> ''
-                        THEN :closed_date
-                        WHEN :status IN ('closed', 'completed', 'done', 'cancelled', 'canceled')
-                             AND COALESCE(closed_at, '') = ''
-                             AND :closed_date = ''
-                        THEN datetime('now', '+8 hours')
-                        ELSE closed_at
-                    END,
-                    updated_at = datetime('now')
-                WHERE id = :order_id
-                """
-            ),
-            {
-                "customer_display_name": customer_display_name,
-                "customer_discord_id": customer_discord_id,
-                "customer_service_discord_id": customer_service_discord_id or None,
-                "customer_service_display_name": customer_service_display_name or None,
-                "category": category,
-                "item": item,
-                "quantity": int(quantity),
-                "amount": int(amount),
-                "payout_base_amount": int(new_payout_base_amount),
-                "customer_pay_amount": (
-                    int(new_customer_pay_amount)
-                    if new_customer_pay_amount is not None
-                    else None
-                ),
-                "payment_method": payment_method or None,
-                "status": status,
-                "closed_date": closed_date,
-                "closed_date_auto": closed_date_auto,
-                "closed_date_touched": closed_date_touched,
-                "order_id": int(order_id),
-            },
-        )
-
-        if _mw4a2r6_table_exists(db, "order_acceptance_meta"):
-            meta_status_map = {
-                "completed": "closed",
-                "done": "closed",
-                "canceled": "cancelled",
-            }
-            meta_status = meta_status_map.get(status, status)
-            db.execute(
-                text(
-                    """
-                    UPDATE order_acceptance_meta
-                    SET status = :status,
-                        updated_at = datetime('now')
-                    WHERE order_id = :order_id
-                    """
-                ),
-                {"status": meta_status, "order_id": int(order_id)},
-            )
-
-        db.flush()
+        customer_service_discord_id = field_write.customer_service_discord_id
+        previous_amount_for_finance = field_write.previous_amount
+        previous_customer_pay_for_finance = field_write.previous_customer_pay_amount
+        new_customer_pay_amount = field_write.new_customer_pay_amount
 
         previous_amount = int(previous_amount_for_finance)
         previous_effective_pay_amount = (
