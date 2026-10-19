@@ -14,6 +14,7 @@ SMOKE = ROOT / "tools" / "runtime_import_smoke.py"
 def test_runtime_import_smoke_module_is_importable():
     module = importlib.import_module("tools.runtime_import_smoke")
     assert "cogs.wallet_commands" in module.CRITICAL_RUNTIME_MODULES
+    assert "cogs.staff_profile_commands" in module.CRITICAL_RUNTIME_MODULES
     assert "services.payment_review_runtime" in module.CRITICAL_RUNTIME_MODULES
     assert "services.vip_voice_runtime" in module.CRITICAL_RUNTIME_MODULES
     assert "services.order_payment_composition" in module.CRITICAL_RUNTIME_MODULES
