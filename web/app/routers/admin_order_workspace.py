@@ -29,11 +29,13 @@ from web.app.routers.admin_common import (
 )
 from web.app.services.admin_order_workspace_data import (
     _mw4a2r6_cs_members,
-    _mw4a2r6_ensure_meta_table,
     _mw4a2r6_load_order_bundle,
     _mw4a2r6_safe_int,
     _mw4a2r6_table_exists,
-    _mw4a2r6_user_name,
+)
+from web.app.services.admin_order_workspace_meta import (
+    save_order_attention,
+    save_order_internal_note,
 )
 from web.app.services.admin_order_workspace_payout_state import (
     _mw_r8_cs_payout_rows,
@@ -956,55 +958,16 @@ async def admin_order_internal_note_r6(
 
     db = SessionLocal()
     try:
-        exists = db.execute(
-            text(
-                """
-                SELECT 1
-                FROM web_orders
-                WHERE id = :order_id
-                LIMIT 1
-                """
-            ),
-            {"order_id": int(order_id)},
-        ).fetchone()
-        if exists is None:
+        saved = save_order_internal_note(
+            db,
+            order_id=int(order_id),
+            internal_note=internal_note,
+            admin_user=user,
+        )
+        if not saved:
             return _mw4a2r6_redirect(
                 order_id, request=request, error="找不到這筆訂單。"
             )
-
-        _mw4a2r6_ensure_meta_table(db)
-        db.execute(
-            text(
-                """
-                INSERT INTO web_admin_order_meta (
-                    order_id,
-                    internal_note,
-                    updated_by_discord_id,
-                    updated_by_display_name,
-                    updated_at
-                )
-                VALUES (
-                    :order_id,
-                    :internal_note,
-                    :updated_by_discord_id,
-                    :updated_by_display_name,
-                    CURRENT_TIMESTAMP
-                )
-                ON CONFLICT(order_id)
-                DO UPDATE SET
-                    internal_note = excluded.internal_note,
-                    updated_by_discord_id = excluded.updated_by_discord_id,
-                    updated_by_display_name = excluded.updated_by_display_name,
-                    updated_at = CURRENT_TIMESTAMP
-                """
-            ),
-            {
-                "order_id": int(order_id),
-                "internal_note": internal_note,
-                "updated_by_discord_id": str(user.get("id") or ""),
-                "updated_by_display_name": _mw4a2r6_user_name(user),
-            },
-        )
         db.commit()
     except Exception as exc:
         db.rollback()
@@ -1049,59 +1012,17 @@ async def admin_order_attention_r6(
 
     db = SessionLocal()
     try:
-        exists = db.execute(
-            text(
-                """
-                SELECT 1
-                FROM web_orders
-                WHERE id = :order_id
-                LIMIT 1
-                """
-            ),
-            {"order_id": int(order_id)},
-        ).fetchone()
-        if exists is None:
+        saved = save_order_attention(
+            db,
+            order_id=int(order_id),
+            needs_attention=bool(enabled_value),
+            attention_reason=attention_reason,
+            admin_user=user,
+        )
+        if not saved:
             return _mw4a2r6_redirect(
                 order_id, request=request, error="找不到這筆訂單。"
             )
-
-        _mw4a2r6_ensure_meta_table(db)
-        db.execute(
-            text(
-                """
-                INSERT INTO web_admin_order_meta (
-                    order_id,
-                    needs_attention,
-                    attention_reason,
-                    updated_by_discord_id,
-                    updated_by_display_name,
-                    updated_at
-                )
-                VALUES (
-                    :order_id,
-                    :needs_attention,
-                    :attention_reason,
-                    :updated_by_discord_id,
-                    :updated_by_display_name,
-                    CURRENT_TIMESTAMP
-                )
-                ON CONFLICT(order_id)
-                DO UPDATE SET
-                    needs_attention = excluded.needs_attention,
-                    attention_reason = excluded.attention_reason,
-                    updated_by_discord_id = excluded.updated_by_discord_id,
-                    updated_by_display_name = excluded.updated_by_display_name,
-                    updated_at = CURRENT_TIMESTAMP
-                """
-            ),
-            {
-                "order_id": int(order_id),
-                "needs_attention": enabled_value,
-                "attention_reason": attention_reason,
-                "updated_by_discord_id": str(user.get("id") or ""),
-                "updated_by_display_name": _mw4a2r6_user_name(user),
-            },
-        )
         db.commit()
     except Exception as exc:
         db.rollback()
