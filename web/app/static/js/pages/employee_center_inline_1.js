@@ -1,8 +1,4 @@
 (function(){
-    document.querySelectorAll('.ec-actions .ec-btn.primary').forEach(button => {
-        button.classList.remove('primary');
-    });
-
     const money = value => `${new Intl.NumberFormat('zh-TW').format(Number(value || 0))}T`;
     const rowsHost = document.getElementById('salaryRows');
     const tabs = Array.from(document.querySelectorAll('.salary-tab'));
