@@ -36,9 +36,11 @@ def build_customer_info_with_wallet_embed(
 ) -> discord.Embed:
     data = get_customer_reward_data(member.id)
     embed = build_member_info_embed(member, data, show_points=True)
+
+    wallet_balance = get_wallet_balance(member.id)
     embed.add_field(
         name="錢包餘額",
-        value=format_t_amount(get_wallet_balance(member.id)),
+        value=format_t_amount(wallet_balance),
         inline=True,
     )
 
@@ -54,23 +56,24 @@ def build_customer_info_with_wallet_embed(
     return embed
 
 
+def wallet_transaction_history(customer_id, limit: int = 10) -> list[dict]:
+    return get_wallet_transactions(customer_id, limit=limit)
+
+
 def build_wallet_history_embed(
     customer: discord.Member | discord.User,
     *,
     limit: int = 10,
     staff_view: bool = False,
 ) -> discord.Embed:
-    safe_limit = max(1, min(int(limit or 10), 25))
     balance = get_wallet_balance(customer.id)
-    transactions = get_wallet_transactions(customer.id, limit=safe_limit)
+    transactions = wallet_transaction_history(customer.id, limit=limit)
 
     embed = discord.Embed(
-        title=(
-            "錢包流水｜"
-            f"{getattr(customer, 'display_name', getattr(customer, 'name', customer.id))}"
-        ),
+        title=f"錢包流水｜{getattr(customer, 'display_name', getattr(customer, 'name', customer.id))}",
         color=discord.Color.gold(),
     )
+
     embed.add_field(
         name="顧客",
         value=getattr(customer, "mention", f"<@{customer.id}>"),
@@ -195,6 +198,7 @@ class WalletCommands(commands.Cog):
             operator=interaction.user,
             note=note or "客服儲值",
         )
+
         embed = build_customer_info_with_wallet_embed(customer, show_staff_notes=True)
         embed.title = "錢包儲值完成"
 
@@ -291,6 +295,7 @@ class WalletCommands(commands.Cog):
             operator=interaction.user,
             note=note or "客服退款",
         )
+
         embed = build_customer_info_with_wallet_embed(customer, show_staff_notes=True)
         embed.title = "錢包退款完成"
 
@@ -322,10 +327,8 @@ class WalletCommands(commands.Cog):
             )
             return
 
-        await interaction.response.send_message(
-            embed=build_wallet_history_embed(customer, limit=limit, staff_view=True),
-            ephemeral=True,
-        )
+        embed = build_wallet_history_embed(customer, limit=limit, staff_view=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="my_wallet_history", description="查詢自己的錢包流水")
     @app_commands.describe(limit="顯示最近幾筆，最多 25 筆")
@@ -341,14 +344,8 @@ class WalletCommands(commands.Cog):
             )
             return
 
-        await interaction.response.send_message(
-            embed=build_wallet_history_embed(
-                interaction.user,
-                limit=limit,
-                staff_view=False,
-            ),
-            ephemeral=True,
-        )
+        embed = build_wallet_history_embed(interaction.user, limit=limit, staff_view=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="wallet_refund_order",
@@ -377,12 +374,16 @@ class WalletCommands(commands.Cog):
             return
 
         order_no = str(order_no or "").strip()
+
         if not order_no:
             await interaction.response.send_message("請填寫訂單編號。", ephemeral=True)
             return
+
         if amount <= 0:
             await interaction.response.send_message("退款金額必須大於 0。", ephemeral=True)
             return
+
+        refund_note = str(note or "").strip() or f"訂單 {order_no} 手動退款"
 
         tx = adjust_customer_wallet_balance(
             customer_id=customer.id,
@@ -390,7 +391,7 @@ class WalletCommands(commands.Cog):
             tx_type="refund",
             operator=interaction.user,
             order_no=order_no,
-            note=str(note or "").strip() or f"訂單 {order_no} 手動退款",
+            note=refund_note,
         )
 
         embed = build_wallet_history_embed(customer, limit=5, staff_view=True)
@@ -419,14 +420,15 @@ class WalletCommands(commands.Cog):
             )
             return
 
-        await interaction.response.send_message(
-            embed=build_customer_info_with_wallet_embed(
-                interaction.user,
-                show_staff_notes=False,
-            ),
-            ephemeral=True,
+        embed = build_customer_info_with_wallet_embed(
+            interaction.user,
+            show_staff_notes=False,
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(WalletCommands(bot))
+    guild_id = int(getattr(bot, "guild_id_value", 0) or 0)
+    if guild_id:
+        bot.tree.copy_global_to(guild=discord.Object(id=guild_id))
