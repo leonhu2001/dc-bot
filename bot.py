@@ -3901,7 +3901,6 @@ def _require_customer_staff_or_manager(interaction: discord.Interaction) -> bool
 
 
 # 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py
-# 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py
 
 
 @bot.tree.command(
