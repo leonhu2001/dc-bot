@@ -120,12 +120,89 @@ def ensure_sqlite_additive_columns(bind=engine) -> None:
                 )
 
 
+def ensure_store_binding_constraints(bind=engine) -> None:
+    """Guarantee that one staff member cannot have two active bindings.
+
+    Older deployments only enforced this in service code. Before installing
+    the SQLite partial unique index, repair any pre-existing duplicates by
+    keeping the newest active row and ending the older rows at the newer row's
+    start time. Historical eligibility before that boundary is preserved.
+    """
+    if getattr(bind.dialect, "name", "") != "sqlite":
+        return
+
+    with bind.begin() as conn:
+        table_exists = conn.execute(
+            text(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='staff_store_bindings'"
+            )
+        ).first()
+        if not table_exists:
+            return
+
+        duplicate_ids = [
+            str(row[0])
+            for row in conn.execute(
+                text(
+                    "SELECT staff_discord_id "
+                    "FROM staff_store_bindings "
+                    "WHERE status='active' "
+                    "GROUP BY staff_discord_id HAVING COUNT(*) > 1"
+                )
+            ).all()
+        ]
+
+        for staff_id in duplicate_ids:
+            rows = conn.execute(
+                text(
+                    "SELECT id, started_at, created_at "
+                    "FROM staff_store_bindings "
+                    "WHERE staff_discord_id=:staff_id AND status='active' "
+                    "ORDER BY COALESCE(started_at, created_at) DESC, id DESC"
+                ),
+                {"staff_id": staff_id},
+            ).mappings().all()
+            if len(rows) < 2:
+                continue
+
+            keep = rows[0]
+            boundary = keep.get("started_at") or keep.get("created_at") or datetime.utcnow()
+            for stale in rows[1:]:
+                conn.execute(
+                    text(
+                        "UPDATE staff_store_bindings "
+                        "SET status='ended', "
+                        "ended_at=COALESCE(ended_at, :boundary), "
+                        "note=CASE "
+                        "WHEN note IS NULL OR note='' THEN :repair_note "
+                        "ELSE note || '｜' || :repair_note END "
+                        "WHERE id=:row_id"
+                    ),
+                    {
+                        "boundary": boundary,
+                        "repair_note": "系統修復：重複綁店資格已自動結束",
+                        "row_id": int(stale["id"]),
+                    },
+                )
+
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "uq_staff_store_bindings_one_active "
+                "ON staff_store_bindings(staff_discord_id) "
+                "WHERE status='active'"
+            )
+        )
+
+
 def create_all_tables() -> None:
     import shared.models  # noqa: F401
     import shared.staff_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     ensure_sqlite_additive_columns(engine)
+    ensure_store_binding_constraints(engine)
 
     # order_acceptance_meta / claims are maintained outside SQLAlchemy's
     # declarative metadata. Run their additive schema migration as part of the
