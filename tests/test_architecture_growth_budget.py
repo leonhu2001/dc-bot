@@ -24,7 +24,7 @@ MAX_BYTES = {
     "services/order_credential_runtime.py": 20_000,
     "services/order_credential_revocation.py": 6_500,
     "services/order_point_redemption.py": 7_000,
-    "services/self_service_runtime.py": 70_000,
+    "services/self_service_runtime.py": 20_000,
     "services/web_sync/runtime.py": 3_000,
     "services/web_sync/order_created.py": 24_000,
     "services/web_sync/cs_review.py": 25_000,
