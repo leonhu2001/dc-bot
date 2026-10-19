@@ -251,14 +251,6 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-# 營運報表已拆到專用 router；從舊 payout summary router 移除同一路徑，
-# 避免同一路由疊兩層覆寫，其他薪資總表功能仍沿用原 router。
-admin_payout_summary_router.routes = [
-    route
-    for route in admin_payout_summary_router.routes
-    if getattr(route, "path", None) != "/admin/payouts/report"
-]
-
 app.include_router(auth_router)
 app.include_router(site_router)
 app.include_router(web_support_router)
