@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 BOT_PATH = ROOT / "bot.py"
 CRITICAL_RUNTIME_MODULES = (
     "cogs.wallet_commands",
+    "cogs.staff_profile_commands",
     "services.payment_review_runtime",
     "services.vip_voice_runtime",
     "services.order_runtime",
