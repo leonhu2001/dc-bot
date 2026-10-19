@@ -121,14 +121,10 @@
         <div class="dispatch-panel dispatch-hero-main">
             <p class="dispatch-eyebrow">MISSION DISPATCH</p>
             <h1 class="dispatch-title">接單大廳</h1>
-            <p class="dispatch-desc">陪玩可在這裡接單；客服值班時可直接指派陪玩，並進入訂單工作區修改或取消訂單。提示音只會在你此刻真的符合資格、而且已經可以立即接單時播放；指定對象可直接繞過 1 分鐘接單保護期。</p>
             <div class="dispatch-tags">
-                {% if support_can_manage %}<span class="dispatch-tag" data-state="online">🛎️ 客服值班操作已開啟</span>{% endif %}
-                <span class="dispatch-tag">護航接單</span><span class="dispatch-tag">陪玩接單</span>
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的接單人員" data-dispatch-online-companions>🟢 在線陪玩 {{ online_companion_count }} 人</span>
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管" data-dispatch-online-support>🟢 在線客服 {{ online_support_count }} 人</span>
                 <span class="dispatch-tag" data-dispatch-realtime-status data-state="reconnecting">🟡 即時連線中</span>
-                <span class="dispatch-tag" data-dispatch-last-sync>最後同步 --</span>
                 <button class="dispatch-tag dispatch-tag-button" type="button" data-dispatch-notification-toggle data-state="pending">🖥️ 桌面提示待授權</button>
             </div>
         </div>
@@ -154,7 +150,7 @@
             </div>
 
             {% if support_can_manage and not user_can_claim %}
-                <article class="dispatch-support-duty"><span class="dispatch-pill">🟢 值班中</span><h3>直接處理派單狀況</h3><p>右側每張訂單都有客服操作區，可快速指派陪玩；需要改價格、內容、狀態或取消訂單時，點「修改訂單」或「取消訂單」即可進入該筆訂單工作區。</p></article>
+                <article class="dispatch-support-duty"><span class="dispatch-pill">🟢 值班中</span></article>
             {% elif claimed_orders %}
                 <div class="dispatch-list">
                     {% for claimed_order in claimed_orders %}
@@ -162,13 +158,13 @@
                         <article class="dispatch-my-card"><div><p class="dispatch-eyebrow">{{ claimed_order.bot_order_no or ("WEB-" ~ claimed_order.id) }}</p><h3>{{ claimed_order.category }}｜{{ claimed_order.item }}</h3></div><div class="dispatch-my-status"><div><span>任務狀態</span><strong>{{ summary.get("status_label",claimed_order.status) }}</strong></div><div><span>接單進度</span><strong>{{ summary.get("current_staff_count",0) }}/{{ summary.get("required_staff_count",0) or "?" }}</strong></div><div><span>服務內容</span><strong>{{ claimed_order.dispatch_service_text or ((claimed_order.quantity|string) ~ " 單") }}</strong></div><div><span>實際服務</span><strong>{{ claimed_order.dispatch_actual_service_text or claimed_order.dispatch_service_text }}</strong></div><div><span>{{ payout.get("label","分潤") }}</span><strong>{% if payout.get("amount") is not none %}{{ payout.get("amount") }}T{% else %}待計算{% endif %}</strong></div><div><span>剩餘缺額</span><strong>{{ summary.get("missing_staff_count",0) }} 人</strong></div></div><div class="dispatch-money"><span>訂單金額</span><strong>{{ claimed_order.customer_pay_amount if claimed_order.customer_pay_amount is not none else claimed_order.amount }}T</strong></div>{% if summary.get("ticket_url") or summary.get("dispatch_url") %}<div class="dispatch-my-links">{% if summary.get("ticket_url") %}<a class="dispatch-my-link" href="{{ summary.get('ticket_url') }}" target="_blank" rel="noopener">前往票口</a>{% endif %}{% if summary.get("dispatch_url") %}<a class="dispatch-my-link" href="{{ summary.get('dispatch_url') }}" target="_blank" rel="noopener">前往派單訊息</a>{% endif %}</div>{% endif %}</article>
                     {% endfor %}
                 </div>
-            {% else %}<div class="dispatch-empty"><strong>目前尚未接任何訂單。</strong><span>可接任務會顯示在右側任務區。</span></div>{% endif %}
+            {% else %}<div class="dispatch-empty"><strong>目前尚未接任何訂單。</strong></div>{% endif %}
         </aside>
 
         <section class="dispatch-panel dispatch-column">
-            <div class="dispatch-column-head"><div><p class="dispatch-eyebrow">MISSION BOARD</p><h2>派單任務</h2><p class="dispatch-desc">可接任務優先顯示；名額已滿或已付款成立的任務收進下方進行中區域。</p></div><span class="dispatch-pill dispatch-count">可接 {{ claimable_orders|length }}｜進行中 {{ non_claimable_orders|length }}</span></div>
-            <section class="dispatch-subsection"><div class="dispatch-subsection-head"><div><p class="dispatch-eyebrow">AVAILABLE</p><h3>可接任務</h3></div><span class="dispatch-pill">{{ claimable_orders|length }} 筆</span></div>{% if claimable_orders %}<div class="dispatch-list">{% for order in claimable_orders %}{{ render_order_card(order,user,claimed_order_ids,request,support_can_manage,user_can_claim,companion_options) }}{% endfor %}</div>{% else %}<div class="dispatch-empty"><strong>目前沒有可接任務。</strong><span>新單抵達後會即時出現在這裡。</span></div>{% endif %}</section>
-            <details class="dispatch-progress-group"><summary class="dispatch-subsection-head"><div><p class="dispatch-eyebrow">IN PROGRESS</p><h3>進行中／已滿任務</h3></div><span class="dispatch-pill">{{ non_claimable_orders|length }} 筆 ▾</span></summary><div class="dispatch-progress-body">{% if non_claimable_orders %}<div class="dispatch-list">{% for order in non_claimable_orders %}{{ render_order_card(order,user,claimed_order_ids,request,support_can_manage,user_can_claim,companion_options) }}{% endfor %}</div>{% else %}<div class="dispatch-empty"><strong>目前沒有進行中任務。</strong><span>已滿或付款成立的任務會收在這裡。</span></div>{% endif %}</div></details>
+            <div class="dispatch-column-head"><div><p class="dispatch-eyebrow">MISSION BOARD</p><h2>派單任務</h2></div><span class="dispatch-pill dispatch-count">可接 {{ claimable_orders|length }}｜進行中 {{ non_claimable_orders|length }}</span></div>
+            <section class="dispatch-subsection"><div class="dispatch-subsection-head"><div><p class="dispatch-eyebrow">AVAILABLE</p><h3>可接任務</h3></div><span class="dispatch-pill">{{ claimable_orders|length }} 筆</span></div>{% if claimable_orders %}<div class="dispatch-list">{% for order in claimable_orders %}{{ render_order_card(order,user,claimed_order_ids,request,support_can_manage,user_can_claim,companion_options) }}{% endfor %}</div>{% else %}<div class="dispatch-empty"><strong>目前沒有可接任務。</strong></div>{% endif %}</section>
+            <details class="dispatch-progress-group"><summary class="dispatch-subsection-head"><div><p class="dispatch-eyebrow">IN PROGRESS</p><h3>進行中／已滿任務</h3></div><span class="dispatch-pill">{{ non_claimable_orders|length }} 筆 ▾</span></summary><div class="dispatch-progress-body">{% if non_claimable_orders %}<div class="dispatch-list">{% for order in non_claimable_orders %}{{ render_order_card(order,user,claimed_order_ids,request,support_can_manage,user_can_claim,companion_options) }}{% endfor %}</div>{% else %}<div class="dispatch-empty"><strong>目前沒有進行中任務。</strong></div>{% endif %}</div></details>
         </section>
     </section>
 </div>
