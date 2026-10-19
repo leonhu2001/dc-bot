@@ -1,6 +1,6 @@
 {% extends "site_layout.html" %}
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261013">
+<link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-1">
 
 <section class="ec">
     <div class="ec-hero">
@@ -17,12 +17,51 @@
         </div>
     </div>
 
+    {% if request.query_params.get('message') %}
+    <div class="ec-alert success">{{ request.query_params.get('message') }}</div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+    <div class="ec-alert error">{{ request.query_params.get('error') }}</div>
+    {% endif %}
+
     <div class="ec-overview">
         <div class="ec-stat"><span>服務訂單</span><b>{{ stats.orders }}</b></div>
         <div class="ec-stat"><span>評價</span><b>{{ stats.reviews }}</b></div>
         <div class="ec-stat"><span>平均評分</span><b>{{ stats.rating }}</b></div>
         <div class="ec-stat"><span>收藏</span><b>{{ stats.favorites }}</b></div>
     </div>
+
+    <section class="binding-card loading" id="storeBindingCard" aria-labelledby="bindingTitle">
+        <div class="binding-copy">
+            <div class="ec-k">EXCLUSIVE STAFF</div>
+            <div class="binding-title-row">
+                <h2 id="bindingTitle">綁店計畫</h2>
+                <span class="binding-status" id="bindingStatus">讀取中</span>
+            </div>
+            <p id="bindingDescription">正在確認你的綁店資格與 Discord 身分組狀態。</p>
+            <div class="binding-benefits">
+                <div><span>一般分潤上限</span><b>87%</b></div>
+                <div class="binding-arrow">→</div>
+                <div class="boost"><span>綁店分潤上限</span><b>90%</b></div>
+                <div class="binding-extra"><span>綁店加成</span><b>+3%</b></div>
+            </div>
+        </div>
+        <div class="binding-side">
+            <div class="binding-meta" id="bindingMeta">
+                <span>資格狀態</span>
+                <b>同步中…</b>
+                <small>Web 資格為正式紀錄，Discord Role 會自動同步。</small>
+            </div>
+            <form id="bindingApplyForm" method="post" action="/employee/store-binding/apply" hidden>
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                <button class="binding-action primary" type="submit">申請綁店</button>
+            </form>
+            <form id="bindingWithdrawForm" method="post" action="/employee/store-binding/withdraw" hidden>
+                <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                <button class="binding-action" type="submit">撤回申請</button>
+            </form>
+        </div>
+    </section>
 
     <section class="ec-salary" aria-labelledby="salaryTitle">
         <div class="ec-salary-head">
@@ -34,7 +73,7 @@
             <span class="ec-chip">與薪資結算同步</span>
         </div>
 
-        <div class="ec-note">現行一般單：基礎 80%｜掛名 +3%｜直播 +2%｜上月實際已發薪資滿 5,000T，本月 +2%｜一般最高 87%。掛名與直播以報單審核結果為準；制度生效前的歷史訂單維持原分潤規則。</div>
+        <div class="ec-note">現行一般單：基礎 80%｜掛名 +3%｜直播 +2%｜上月實際已發薪資滿 5,000T，本月 +2%｜一般最高 87%。綁店資格額外 +3%，綁店最高 90%。掛名與直播以報單審核結果為準；制度生效前的歷史訂單維持原分潤規則。</div>
 
         <div class="salary-summary">
             <div class="salary-card pending">
@@ -102,4 +141,5 @@
 </section>
 
 <script src="/static/js/pages/employee_center_inline_1.js?v=20261013"></script>
+<script src="/static/js/pages/store_binding_employee.js?v=20261020-1"></script>
 {% endblock %}
