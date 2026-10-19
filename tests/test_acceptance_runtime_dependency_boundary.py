@@ -102,7 +102,7 @@ def test_acceptance_explicit_configurator_does_not_rebind_module_globals():
         if isinstance(node, ast.Global)
         for name in node.names
     }
-    assert LEGACY_BINDING_NAMES.isdisjoint(global_names)
+    assert not global_names
 
 
 def test_acceptance_legacy_binding_aliases_are_not_exported():
