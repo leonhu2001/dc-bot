@@ -16,7 +16,7 @@ MAX_BYTES = {
     "cogs/reward_redeem_commands.py": 3_500,
     "services/vip_voice_runtime.py": 12_000,
     "services/order_lifecycle_runtime.py": 36_000,
-    "services/order_runtime.py": 45_000,
+    "services/order_runtime.py": 40_000,
     "services/order_dispatch_runtime.py": 30_000,
     "services/order_storage_runtime.py": 32_000,
     "services/order_payment_runtime.py": 23_000,

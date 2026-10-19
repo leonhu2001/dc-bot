@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import discord
 
 from services.payment_methods import PAYMENT_METHOD_OPTIONS, WALLET_PAYMENT_METHOD
@@ -52,6 +54,37 @@ from services.order_dispatch_runtime import (
 )
 
 
+@dataclass(frozen=True)
+class _OrderRuntimeState:
+    db_file: object
+    dispatch_channel_id: object
+    order_control_selections: dict
+    order_selections: dict
+    self_service_order_view_type: object
+    defer_and_refresh_self_service_panel: object
+    self_service_rule_getter: object
+    payment_method_embed_builder: object
+    self_service_panel_embed_builder: object
+    can_operate_self_service_order: object
+    amount_formatter: object
+    order_customer_id_getter: object
+    wallet_balance_getter: object
+    customer_staff_checker: object
+    remember_order: object
+    ticket_channel_renamer: object
+    order_log_sender: object
+
+
+_RUNTIME_STATE: _OrderRuntimeState | None = None
+
+
+def _require_runtime_state() -> _OrderRuntimeState:
+    state = _RUNTIME_STATE
+    if state is None:
+        raise RuntimeError("order runtime is not configured")
+    return state
+
+
 def configure_order_runtime_explicit(
     *,
     db_file,
@@ -72,29 +105,26 @@ def configure_order_runtime_explicit(
     ticket_channel_renamer,
     order_log_sender,
 ) -> None:
-    # Explicit args keep the transitional module-global binding allowlisted.
-    globals().update(
-        {
-            "DB_FILE": db_file,
-            "DISPATCH_CHANNEL_ID": dispatch_channel_id,
-            "ORDER_CONTROL_SELECTIONS": order_control_selections,
-            "SELF_SERVICE_ORDER_SELECTIONS": order_selections,
-            "SelfServiceOrderView": self_service_order_view_type,
-            "_defer_and_refresh_self_service_panel": defer_and_refresh_self_service_panel,
-            "_get_rule_from_self_service_data": self_service_rule_getter,
-            "build_payment_method_embed": payment_method_embed_builder,
-            "build_self_service_panel_embed": self_service_panel_embed_builder,
-            "can_operate_self_service_order": can_operate_self_service_order_func,
-            "format_t_amount": amount_formatter,
-            "get_order_customer_id_from_channel": order_customer_id_getter,
-            "get_wallet_balance": wallet_balance_getter,
-            "is_customer_staff": customer_staff_checker,
-            "remember_order_data": remember_order,
-            "rename_ticket_channel": ticket_channel_renamer,
-            "send_order_log": order_log_sender,
-        }
+    global _RUNTIME_STATE
+    _RUNTIME_STATE = _OrderRuntimeState(
+        db_file=db_file,
+        dispatch_channel_id=dispatch_channel_id,
+        order_control_selections=order_control_selections,
+        order_selections=order_selections,
+        self_service_order_view_type=self_service_order_view_type,
+        defer_and_refresh_self_service_panel=defer_and_refresh_self_service_panel,
+        self_service_rule_getter=self_service_rule_getter,
+        payment_method_embed_builder=payment_method_embed_builder,
+        self_service_panel_embed_builder=self_service_panel_embed_builder,
+        can_operate_self_service_order=can_operate_self_service_order_func,
+        amount_formatter=amount_formatter,
+        order_customer_id_getter=order_customer_id_getter,
+        wallet_balance_getter=wallet_balance_getter,
+        customer_staff_checker=customer_staff_checker,
+        remember_order=remember_order,
+        ticket_channel_renamer=ticket_channel_renamer,
+        order_log_sender=order_log_sender,
     )
-
 
 
 class OrderControlSelect(discord.ui.Select):
@@ -126,7 +156,7 @@ class OrderControlSelect(discord.ui.Select):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
-        if not is_customer_staff(interaction.user):
+        if not _require_runtime_state().customer_staff_checker(interaction.user):
             await interaction.response.send_message("只有客服可以操作訂單。", ephemeral=True)
             return
 
@@ -134,7 +164,7 @@ class OrderControlSelect(discord.ui.Select):
             await interaction.response.send_message("這個功能只能在下單票口內使用。", ephemeral=True)
             return
 
-        ORDER_CONTROL_SELECTIONS[(interaction.channel.id, interaction.user.id)] = self.values[0]
+        _require_runtime_state().order_control_selections[(interaction.channel.id, interaction.user.id)] = self.values[0]
 
         await interaction.response.defer()
 
@@ -163,16 +193,16 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
+        if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單。", ephemeral=True)
             return
 
         selected_category = self.values[0]
 
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data = _require_runtime_state().order_selections.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         apply_self_service_category_selection(data, selected_category)
-        remember_order_data(self.channel_id, data)
+        _require_runtime_state().remember_order(self.channel_id, data)
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
@@ -181,8 +211,12 @@ class SelfServiceOrderCategorySelect(discord.ui.Select):
         )
 
         await interaction.response.edit_message(
-            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
-            view=SelfServiceOrderView(
+            embed=_require_runtime_state().self_service_panel_embed_builder(
+                self.customer_id,
+                data,
+                interaction.guild,
+            ),
+            view=_require_runtime_state().self_service_order_view_type(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
                 selected_category=selected_category
@@ -202,7 +236,7 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         self.channel_id = channel_id
         self.selected_category = selected_category
 
-        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        data = _require_runtime_state().order_selections.get(channel_id, {})
         selected_group = data.get("item_group") or (
             get_order_item_group_label(selected_item) if selected_item else None
         )
@@ -256,17 +290,17 @@ class SelfServiceOrderItemSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
+        if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單項目。", ephemeral=True)
             return
 
         selected_group = self.values[0]
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data = _require_runtime_state().order_selections.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         apply_self_service_item_group_selection(data, selected_group)
-        remember_order_data(self.channel_id, data)
+        _require_runtime_state().remember_order(self.channel_id, data)
 
-        await _defer_and_refresh_self_service_panel(
+        await _require_runtime_state().defer_and_refresh_self_service_panel(
             interaction,
             customer_id=self.customer_id,
             channel_id=self.channel_id,
@@ -293,7 +327,7 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
         self.customer_id = customer_id
         self.channel_id = channel_id
 
-        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        data = _require_runtime_state().order_selections.get(channel_id, {})
         category = data.get("category")
         selected_group = data.get("item_group")
         selected_value = str(data.get("item_detail_value") or "")
@@ -347,7 +381,7 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
+        if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單規格。", ephemeral=True)
             return
 
@@ -356,7 +390,7 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
             await interaction.response.defer()
             return
 
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data = _require_runtime_state().order_selections.setdefault(self.channel_id, {})
         category = data.get("category")
         selected_group = data.get("item_group")
         detail = get_order_item_detail_for_selection(category, selected_group, selected_value)
@@ -366,9 +400,9 @@ class SelfServiceOrderDetailSelect(discord.ui.Select):
             return
 
         apply_self_service_detail_selection(data, detail)
-        remember_order_data(self.channel_id, data)
+        _require_runtime_state().remember_order(self.channel_id, data)
 
-        await _defer_and_refresh_self_service_panel(
+        await _require_runtime_state().defer_and_refresh_self_service_panel(
             interaction,
             customer_id=self.customer_id,
             channel_id=self.channel_id,
@@ -412,7 +446,7 @@ def normalize_self_service_staff_count(data: dict) -> None:
         return
 
     try:
-        rule = _get_rule_from_self_service_data(data)
+        rule = _require_runtime_state().self_service_rule_getter(data)
     except Exception:
         return
 
@@ -489,7 +523,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         self.customer_id = customer_id
         self.channel_id = channel_id
         self.selected_item = selected_item
-        data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        data = _require_runtime_state().order_selections.get(channel_id, {})
         quantity = selected_quantity or 1
 
         if selected_item is None:
@@ -544,7 +578,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
+        if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇訂單單數。", ephemeral=True)
             return
 
@@ -552,7 +586,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
             await interaction.response.defer()
             return
 
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data = _require_runtime_state().order_selections.setdefault(self.channel_id, {})
         selected_item = data.get("item")
 
         try:
@@ -576,7 +610,7 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         data["customer_id"] = self.customer_id
         data["quantity"] = quantity
         data.pop("payment_method", None)
-        remember_order_data(self.channel_id, data)
+        _require_runtime_state().remember_order(self.channel_id, data)
 
         await log_self_service_proxy_action(
             interaction,
@@ -586,13 +620,18 @@ class SelfServiceOrderQuantitySelect(discord.ui.Select):
         )
 
         await interaction.response.edit_message(
-            embed=build_self_service_panel_embed(self.customer_id, data, interaction.guild),
-            view=SelfServiceOrderView(
+            embed=_require_runtime_state().self_service_panel_embed_builder(
+                self.customer_id,
+                data,
+                interaction.guild,
+            ),
+            view=_require_runtime_state().self_service_order_view_type(
                 customer_id=self.customer_id,
                 channel_id=self.channel_id,
                 selected_category=data.get("category"),
             ),
         )
+
 
 async def log_self_service_proxy_action(
     interaction: discord.Interaction,
@@ -616,7 +655,7 @@ async def log_self_service_proxy_action(
         fields.append(("內容", detail, False))
 
     try:
-        await send_order_log(
+        await _require_runtime_state().order_log_sender(
             interaction.guild,
             title="自助下單代操作",
             fields=fields,
@@ -624,49 +663,6 @@ async def log_self_service_proxy_action(
         )
     except Exception as e:
         print(f"寫入自助下單代操作日誌失敗：{e}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class StoreOrderModal(discord.ui.Modal, title="存單"):
@@ -697,7 +693,7 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
             await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
-        if not is_customer_staff(interaction.user):
+        if not _require_runtime_state().customer_staff_checker(interaction.user):
             await interaction.response.send_message("只有客服可以存單。", ephemeral=True)
             return
 
@@ -722,12 +718,16 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
                 expected_time=self.expected_time.value.strip() or None,
                 note=self.note.value.strip() or None,
             )
-            store_data = SELF_SERVICE_ORDER_SELECTIONS.get(interaction.channel.id, {})
+            store_data = _require_runtime_state().order_selections.get(interaction.channel.id, {})
             store_item = str(store_data.get("item") or store_data.get("category_label") or "訂單")
-            store_customer_id = get_order_customer_id_from_channel(interaction.channel)
+            store_customer_id = _require_runtime_state().order_customer_id_getter(interaction.channel)
             store_customer_member = guild.get_member(store_customer_id) if store_customer_id is not None else None
-            await rename_ticket_channel(interaction.channel, f"存單-{store_item}", member=store_customer_member)
-            await send_order_log(
+            await _require_runtime_state().ticket_channel_renamer(
+                interaction.channel,
+                f"存單-{store_item}",
+                member=store_customer_member,
+            )
+            await _require_runtime_state().order_log_sender(
                 guild,
                 title="訂單已存單",
                 fields=[
@@ -758,7 +758,6 @@ class StoreOrderModal(discord.ui.Modal, title="存單"):
         await interaction.followup.send("已存單，派單頻道接單面板已鎖定。", ephemeral=True)
 
 
-
 async def finalize_payment_and_dispatch(
     *,
     interaction: discord.Interaction,
@@ -782,7 +781,7 @@ async def finalize_payment_and_dispatch(
         await send_ephemeral("無法確認目前票口頻道。")
         return
 
-    data = SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+    data = _require_runtime_state().order_selections.get(channel_id, {})
     status = str(data.get("status") or "").lower().strip()
 
     if status == "accepted_pending_pay":
@@ -806,7 +805,10 @@ async def finalize_payment_and_dispatch(
         return
 
     dispatch_message_id = _to_int(data.get("dispatch_message_id"))
-    dispatch_channel_id = _to_int(data.get("dispatch_channel_id"), DISPATCH_CHANNEL_ID) or DISPATCH_CHANNEL_ID
+    dispatch_channel_id = (
+        _to_int(data.get("dispatch_channel_id"), _require_runtime_state().dispatch_channel_id)
+        or _require_runtime_state().dispatch_channel_id
+    )
 
     if dispatch_message_id is not None:
         dispatch_channel = guild.get_channel(dispatch_channel_id)
@@ -823,10 +825,6 @@ async def finalize_payment_and_dispatch(
         "舊付款後派單流程已停用。\n"
         "請使用現在的流程：自助下單送出等待接單 → 接單人數滿 → 顧客付款 → 訂單成立。"
     )
-
-
-
-
 
 
 class PaymentMethodSelect(discord.ui.Select):
@@ -866,11 +864,11 @@ class PaymentMethodSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
+        if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以選擇付款方式。", ephemeral=True)
             return
 
-        data = SELF_SERVICE_ORDER_SELECTIONS.setdefault(self.channel_id, {})
+        data = _require_runtime_state().order_selections.setdefault(self.channel_id, {})
         data["customer_id"] = self.customer_id
         selected_method = self.values[0]
         data["payment_method"] = selected_method
@@ -879,7 +877,7 @@ class PaymentMethodSelect(discord.ui.Select):
         for option in self.options:
             option.default = option.value == selected_method
 
-        remember_order_data(self.channel_id, data)
+        _require_runtime_state().remember_order(self.channel_id, data)
         await log_self_service_proxy_action(
             interaction,
             self.customer_id,
@@ -894,7 +892,7 @@ class PaymentMethodSelect(discord.ui.Select):
         amount = _to_int(data.get("amount"), 0) or _to_int(data.get("total_amount"), 0) or 0
 
         if category is not None and item is not None:
-            payment_embed = build_payment_method_embed(
+            payment_embed = _require_runtime_state().payment_method_embed_builder(
                 customer_id=self.customer_id,
                 category_label=ORDER_CATEGORY_LABELS.get(category, str(category)),
                 item=str(item),
@@ -912,34 +910,34 @@ class PaymentMethodSelect(discord.ui.Select):
                 wallet_tx = get_wallet_payment_transaction(
                     self.customer_id,
                     self.channel_id,
-                    db_file=DB_FILE,
+                    db_file=_require_runtime_state().db_file,
                 )
                 if wallet_tx is not None:
                     data["wallet_transaction_id"] = wallet_tx["id"]
                     data["wallet_paid_amount"] = abs(int(wallet_tx.get("amount") or 0))
                     data["wallet_balance_before"] = int(wallet_tx.get("balance_before") or 0)
                     data["wallet_balance_after"] = int(wallet_tx.get("balance_after") or 0)
-                    remember_order_data(self.channel_id, data)
+                    _require_runtime_state().remember_order(self.channel_id, data)
                     wallet_text = (
-                        f"✅ 錢包已扣款：{format_t_amount(abs(int(wallet_tx.get('amount') or 0)))}\n"
-                        f"扣款後餘額：{format_t_amount(int(wallet_tx.get('balance_after') or 0))}\n"
+                        f"✅ 錢包已扣款：{_require_runtime_state().amount_formatter(abs(int(wallet_tx.get('amount') or 0)))}\n"
+                        f"扣款後餘額：{_require_runtime_state().amount_formatter(int(wallet_tx.get('balance_after') or 0))}\n"
                         "重新送出只會繼續完成訂單，不會再次扣款。"
                     )
                 else:
-                    wallet_balance = get_wallet_balance(self.customer_id)
+                    wallet_balance = _require_runtime_state().wallet_balance_getter(self.customer_id)
                     if amount > 0:
                         after_balance = wallet_balance - amount
                         wallet_text = (
-                            f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
-                            f"本單金額：{format_t_amount(amount)}\n"
+                            f"目前錢包餘額：{_require_runtime_state().amount_formatter(wallet_balance)}\n"
+                            f"本單金額：{_require_runtime_state().amount_formatter(amount)}\n"
                         )
                         if after_balance >= 0:
-                            wallet_text += f"扣款後餘額：{format_t_amount(after_balance)}"
+                            wallet_text += f"扣款後餘額：{_require_runtime_state().amount_formatter(after_balance)}"
                         else:
-                            wallet_text += f"尚不足：{format_t_amount(abs(after_balance))}"
+                            wallet_text += f"尚不足：{_require_runtime_state().amount_formatter(abs(after_balance))}"
                     else:
                         wallet_text = (
-                            f"目前錢包餘額：{format_t_amount(wallet_balance)}\n"
+                            f"目前錢包餘額：{_require_runtime_state().amount_formatter(wallet_balance)}\n"
                             "本單金額：待客服填寫"
                         )
 
@@ -988,7 +986,7 @@ class PaymentMethodView(discord.ui.View):
         row=1
     )
     async def submit_payment(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not can_operate_self_service_order(interaction.user, self.customer_id):
+        if not _require_runtime_state().can_operate_self_service_order(interaction.user, self.customer_id):
             await interaction.response.send_message("只有開這張票口的用戶或客服可以送出付款方式。", ephemeral=True)
             return
 

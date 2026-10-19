@@ -1,75 +1,53 @@
 from services import order_runtime
 
 
-EXPECTED_BINDING_NAMES = frozenset(
-    {
-        "DB_FILE",
-        "DISPATCH_CHANNEL_ID",
-        "ORDER_CONTROL_SELECTIONS",
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        "SelfServiceOrderView",
-        "_defer_and_refresh_self_service_panel",
-        "_get_rule_from_self_service_data",
-        "build_payment_method_embed",
-        "build_self_service_panel_embed",
-        "can_operate_self_service_order",
-        "format_t_amount",
-        "get_order_customer_id_from_channel",
-        "get_wallet_balance",
-        "is_customer_staff",
-        "remember_order_data",
-        "rename_ticket_channel",
-        "send_order_log",
-    }
-)
+EXPECTED_STATE_FIELDS = {
+    "db_file": object(),
+    "dispatch_channel_id": 987654,
+    "order_control_selections": object(),
+    "order_selections": object(),
+    "self_service_order_view_type": object(),
+    "defer_and_refresh_self_service_panel": object(),
+    "self_service_rule_getter": object(),
+    "payment_method_embed_builder": object(),
+    "self_service_panel_embed_builder": object(),
+    "can_operate_self_service_order": object(),
+    "amount_formatter": object(),
+    "order_customer_id_getter": object(),
+    "wallet_balance_getter": object(),
+    "customer_staff_checker": object(),
+    "remember_order": object(),
+    "ticket_channel_renamer": object(),
+    "order_log_sender": object(),
+}
 
 
-def test_order_runtime_explicit_binding_assigns_direct_dependencies(monkeypatch):
-    values = {
-        "DB_FILE": object(),
-        "DISPATCH_CHANNEL_ID": 987654,
-        "ORDER_CONTROL_SELECTIONS": object(),
-        "SELF_SERVICE_ORDER_SELECTIONS": object(),
-        "SelfServiceOrderView": object(),
-        "_defer_and_refresh_self_service_panel": object(),
-        "_get_rule_from_self_service_data": object(),
-        "build_payment_method_embed": object(),
-        "build_self_service_panel_embed": object(),
-        "can_operate_self_service_order": object(),
-        "format_t_amount": object(),
-        "get_order_customer_id_from_channel": object(),
-        "get_wallet_balance": object(),
-        "is_customer_staff": object(),
-        "remember_order_data": object(),
-        "rename_ticket_channel": object(),
-        "send_order_log": object(),
-    }
-
-    for name in EXPECTED_BINDING_NAMES:
-        monkeypatch.setattr(order_runtime, name, object(), raising=False)
+def test_order_runtime_explicit_binding_assigns_runtime_state(monkeypatch):
+    monkeypatch.setattr(order_runtime, "_RUNTIME_STATE", None)
 
     order_runtime.configure_order_runtime_explicit(
-        db_file=values["DB_FILE"],
-        dispatch_channel_id=values["DISPATCH_CHANNEL_ID"],
-        order_control_selections=values["ORDER_CONTROL_SELECTIONS"],
-        order_selections=values["SELF_SERVICE_ORDER_SELECTIONS"],
-        self_service_order_view_type=values["SelfServiceOrderView"],
-        defer_and_refresh_self_service_panel=values["_defer_and_refresh_self_service_panel"],
-        self_service_rule_getter=values["_get_rule_from_self_service_data"],
-        payment_method_embed_builder=values["build_payment_method_embed"],
-        self_service_panel_embed_builder=values["build_self_service_panel_embed"],
-        can_operate_self_service_order_func=values["can_operate_self_service_order"],
-        amount_formatter=values["format_t_amount"],
-        order_customer_id_getter=values["get_order_customer_id_from_channel"],
-        wallet_balance_getter=values["get_wallet_balance"],
-        customer_staff_checker=values["is_customer_staff"],
-        remember_order=values["remember_order_data"],
-        ticket_channel_renamer=values["rename_ticket_channel"],
-        order_log_sender=values["send_order_log"],
+        db_file=EXPECTED_STATE_FIELDS["db_file"],
+        dispatch_channel_id=EXPECTED_STATE_FIELDS["dispatch_channel_id"],
+        order_control_selections=EXPECTED_STATE_FIELDS["order_control_selections"],
+        order_selections=EXPECTED_STATE_FIELDS["order_selections"],
+        self_service_order_view_type=EXPECTED_STATE_FIELDS["self_service_order_view_type"],
+        defer_and_refresh_self_service_panel=EXPECTED_STATE_FIELDS["defer_and_refresh_self_service_panel"],
+        self_service_rule_getter=EXPECTED_STATE_FIELDS["self_service_rule_getter"],
+        payment_method_embed_builder=EXPECTED_STATE_FIELDS["payment_method_embed_builder"],
+        self_service_panel_embed_builder=EXPECTED_STATE_FIELDS["self_service_panel_embed_builder"],
+        can_operate_self_service_order_func=EXPECTED_STATE_FIELDS["can_operate_self_service_order"],
+        amount_formatter=EXPECTED_STATE_FIELDS["amount_formatter"],
+        order_customer_id_getter=EXPECTED_STATE_FIELDS["order_customer_id_getter"],
+        wallet_balance_getter=EXPECTED_STATE_FIELDS["wallet_balance_getter"],
+        customer_staff_checker=EXPECTED_STATE_FIELDS["customer_staff_checker"],
+        remember_order=EXPECTED_STATE_FIELDS["remember_order"],
+        ticket_channel_renamer=EXPECTED_STATE_FIELDS["ticket_channel_renamer"],
+        order_log_sender=EXPECTED_STATE_FIELDS["order_log_sender"],
     )
 
-    for name, value in values.items():
-        assert getattr(order_runtime, name) is value
+    state = order_runtime._require_runtime_state()
+    for name, value in EXPECTED_STATE_FIELDS.items():
+        assert getattr(state, name) is value
 
 
 def test_order_runtime_legacy_namespace_adapter_is_removed():
