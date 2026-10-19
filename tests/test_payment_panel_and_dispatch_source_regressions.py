@@ -4,7 +4,10 @@ from pathlib import Path
 def test_payment_panel_repair_command_has_readable_copy():
     source = Path("bot.py").read_text(encoding="utf-8")
     start = source.index('name="fix_acceptance_payment_panel"')
-    end = source.index('# ========= 點數兌換面板 =========', start)
+    end = source.index(
+        "# 點數兌換面板 / slash 指令已搬到 cogs/reward_redeem_commands.py",
+        start,
+    )
     block = source[start:end]
 
     assert "???" not in block

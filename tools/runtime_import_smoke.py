@@ -15,6 +15,7 @@ BOT_PATH = ROOT / "bot.py"
 CRITICAL_RUNTIME_MODULES = (
     "cogs.wallet_commands",
     "cogs.staff_profile_commands",
+    "cogs.reward_redeem_commands",
     "services.payment_review_runtime",
     "services.vip_voice_runtime",
     "services.order_runtime",

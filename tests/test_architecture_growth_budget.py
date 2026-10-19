@@ -9,9 +9,10 @@ ROOT = Path(__file__).resolve().parents[1]
 # These are ceilings, not targets. Existing large modules should shrink over time;
 # the guard prevents unrelated features from silently making them larger again.
 MAX_BYTES = {
-    "bot.py": 213_000,
+    "bot.py": 206_000,
     "cogs/wallet_commands.py": 16_000,
     "cogs/staff_profile_commands.py": 15_000,
+    "cogs/reward_redeem_commands.py": 10_000,
     "services/vip_voice_runtime.py": 12_000,
     "services/order_lifecycle_runtime.py": 36_000,
     "services/order_runtime.py": 45_000,
