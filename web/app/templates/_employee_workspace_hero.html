@@ -1,1 +1,23 @@
-x
+{% set _employee_path = request.url.path %}
+{% set _employee_member = member if member is defined and member else {} %}
+{% set _employee_name = _employee_member.get('name') or _employee_member.get('display_name') or (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
+{% set _employee_id = _employee_member.get('discord_id') or (user.id if user else '') %}
+
+<div class="ec-hero employee-workspace-hero">
+    <div>
+        <div class="ec-k">EMPLOYEE CENTER</div>
+        <h1>{{ _employee_name }}</h1>
+        <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
+    </div>
+    <div class="ec-actions" aria-label="員工中心快捷入口">
+        <a class="ec-btn{% if _employee_path == '/dispatch' %} active{% endif %}" href="/dispatch">接單大廳</a>
+        <a class="ec-btn{% if _employee_path.startswith('/dispatch/reports') and not _employee_path.startswith('/dispatch/reports/review') %} active{% endif %}" href="/dispatch/reports">報單系統</a>
+        {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
+        <a class="ec-btn{% if _employee_path.startswith('/dispatch/reports/review') %} active{% endif %}" href="/dispatch/reports/review">報單審核</a>
+        <a class="ec-btn{% if _employee_path.startswith('/employee/store-bindings') %} active{% endif %}" href="/employee/store-bindings">綁店管理</a>
+        {% endif %}
+        <a class="ec-btn{% if _employee_path.startswith('/employee/internal-transfers') %} active{% endif %}" href="/employee/internal-transfers">內部轉帳</a>
+        {% if _employee_id %}<a class="ec-btn{% if _employee_path == '/staff/' ~ _employee_id %} active{% endif %}" href="/staff/{{ _employee_id }}">公開個人牆</a>{% endif %}
+        <a class="ec-btn{% if _employee_path == '/me' %} active{% endif %}" href="/me">個人中心</a>
+    </div>
+</div>
