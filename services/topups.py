@@ -13,6 +13,7 @@ from core.vip_levels import (
 )
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
+DEFAULT_STALE_CREDITING_MINUTES = 10
 
 TOPUP_PAYMENT_METHODS = {
     "bank_transfer": "銀行轉帳",
@@ -381,16 +382,33 @@ def get_topup_order(topup_id: int, db_file: str | Path | None = None) -> dict[st
 def get_pending_credit_topups(
     *,
     limit: int = 20,
+    stale_crediting_minutes: int = DEFAULT_STALE_CREDITING_MINUTES,
     db_file: str | Path | None = None,
 ) -> list[dict[str, Any]]:
+    """Return queued credits after reclaiming abandoned crediting leases."""
     ensure_topup_tables(db_file)
     path = _db_path(db_file)
+    safe_limit = max(1, min(int(limit or 20), 100))
+    stale_minutes = max(1, int(stale_crediting_minutes or DEFAULT_STALE_CREDITING_MINUTES))
+    now_text = _now_iso()
+
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE topup_orders
+            SET status='approved_pending_credit', updated_at=?
+            WHERE status='crediting'
+              AND datetime(updated_at) <= datetime('now', ?)
+            """,
+            (now_text, f"-{stale_minutes} minutes"),
+        )
         rows = conn.execute(
             "SELECT * FROM topup_orders WHERE status='approved_pending_credit' ORDER BY id ASC LIMIT ?",
-            (max(1, min(int(limit or 20), 100)),),
+            (safe_limit,),
         ).fetchall()
+        conn.commit()
         return [dict(row) for row in rows]
 
 

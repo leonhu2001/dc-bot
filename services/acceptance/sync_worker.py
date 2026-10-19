@@ -3,11 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Awaitable, Callable
 
 import discord
 
 from core.time_utils import utc_now_naive
+
+
+ACCEPTANCE_SYNC_STALE_PROCESSING_MINUTES = 10
+ACCEPTANCE_SYNC_MAX_RETRIES = 20
 
 
 @dataclass(frozen=True)
@@ -53,7 +58,7 @@ def _require_deps() -> AcceptanceSyncWorkerDeps:
 
 
 async def process_acceptance_sync_events_once() -> None:
-    from sqlalchemy import select, update
+    from sqlalchemy import and_, func, or_, select, update
 
     from shared.db import SessionLocal
     from shared.models import SyncEvent, SyncEventStatus, SyncEventType, WebOrder
@@ -87,12 +92,31 @@ async def process_acceptance_sync_events_once() -> None:
             return None
 
     db = SessionLocal()
+    stale_before = utc_now_naive() - timedelta(
+        minutes=ACCEPTANCE_SYNC_STALE_PROCESSING_MINUTES
+    )
+    retry_count_expr = func.coalesce(SyncEvent.retry_count, 0)
+    retryable_state = or_(
+        SyncEvent.status == SyncEventStatus.PENDING.value,
+        and_(
+            SyncEvent.status == SyncEventStatus.FAILED.value,
+            retry_count_expr < ACCEPTANCE_SYNC_MAX_RETRIES,
+        ),
+        and_(
+            SyncEvent.status == SyncEventStatus.PROCESSING.value,
+            retry_count_expr < ACCEPTANCE_SYNC_MAX_RETRIES,
+            or_(
+                SyncEvent.processed_at.is_(None),
+                SyncEvent.processed_at <= stale_before,
+            ),
+        ),
+    )
 
     try:
         events = list(
             db.scalars(
                 select(SyncEvent)
-                .where(SyncEvent.status == SyncEventStatus.PENDING.value)
+                .where(retryable_state)
                 .where(SyncEvent.event_type.in_([
                     SyncEventType.ORDER_CLAIMED.value,
                     SyncEventType.ORDER_UNCLAIMED.value,
@@ -117,10 +141,11 @@ async def process_acceptance_sync_events_once() -> None:
             claimed = db.execute(
                 update(SyncEvent)
                 .where(SyncEvent.id == int(event.id))
-                .where(SyncEvent.status == SyncEventStatus.PENDING.value)
+                .where(retryable_state)
                 .values(
                     status=SyncEventStatus.PROCESSING.value,
                     retry_count=int(event.retry_count or 0) + 1,
+                    error_message=None,
                     processed_at=utc_now_naive(),
                 )
             )
