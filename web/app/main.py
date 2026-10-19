@@ -45,6 +45,7 @@ from web.app.routers.web_support import router as web_support_router
 from web.app.routers.dispatch import router as dispatch_router
 from web.app.routers.payouts import router as payouts_router
 from web.app.routers.order_history import router as order_history_router
+from web.app.routers.store_bindings import router as store_bindings_router
 from web.app.routers.topups import router as topups_router
 from web.app.routers.payment_reviews import router as payment_reviews_router
 from web.app.routers.ticket_archives import router as ticket_archives_router
@@ -283,6 +284,7 @@ app.include_router(admin_payout_exports_router)
 app.include_router(dispatch_router)
 app.include_router(payouts_router)
 app.include_router(order_history_router)
+app.include_router(store_bindings_router)
 app.include_router(admin_payouts_grouped.router)
 
 
