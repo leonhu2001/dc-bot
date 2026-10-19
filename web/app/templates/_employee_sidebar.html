@@ -1,10 +1,11 @@
 {% set _p = request.url.path %}
+<link rel="stylesheet" href="/static/css/pages/employee_workspace_unified.css?v=20261020-1">
 <aside class="mw-r5-sidebar">
   <div class="mw-r5-brand">
-    <small>MOWAN STAFF</small>
-    <strong>魔丸娛樂</strong>
+    <small>EMPLOYEE CENTER</small>
+    <strong>魔丸娛樂・員工工作區</strong>
   </div>
-  <nav class="mw-r5-nav">
+  <nav class="mw-r5-nav" aria-label="員工工作區導覽">
     <a class="{% if _p == '/employee' or _p.startswith('/my/payouts') %}active{% endif %}" href="/employee">員工中心</a>
     <a class="{% if _p == '/dispatch' %}active{% endif %}" href="/dispatch">接單大廳</a>
     <a class="{% if _p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports">報單系統</a>
@@ -13,6 +14,7 @@
       <a class="{% if _p.startswith('/employee/store-bindings') %}active{% endif %}" href="/employee/store-bindings">綁店管理</a>
     {% endif %}
     <a class="{% if _p.startswith('/employee/internal-transfers') %}active{% endif %}" href="/employee/internal-transfers">內部轉帳</a>
+    <a href="/me">個人中心</a>
     <a href="/">返回官網</a>
   </nav>
 </aside>
