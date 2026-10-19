@@ -1,0 +1,40 @@
+name: One-shot bot wallet cleanup
+
+on:
+  push:
+    branches:
+      - ceiling-bot-wallet-commands
+    paths:
+      - .github/workflows/cleanup_bot_wallet_once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ceiling-bot-wallet-commands
+      - name: Remove duplicate migration comment
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('bot.py')
+          source = path.read_text(encoding='utf-8')
+          duplicate = '# 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py\n# 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py\n'
+          if source.count(duplicate) != 1:
+              raise SystemExit('unexpected duplicate comment count')
+          source = source.replace(duplicate, '# 營運統計 / VIP 降階查詢 slash 指令已搬到 cogs/stats_commands.py\n', 1)
+          path.write_text(source, encoding='utf-8')
+          PY
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.py
+          git diff --cached --check
+          git commit -m "Clean bot wallet extraction marker"
+          git push origin HEAD:ceiling-bot-wallet-commands
