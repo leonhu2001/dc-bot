@@ -76,8 +76,11 @@ _archive/
 bot_data.json
 *.db-wal
 *.db-shm
+*.db-journal
 *.sqlite-wal
 *.sqlite-shm
+*.sqlite-journal
+*.sqlite3-journal
 *.bak.*
 *.before_*
 cogs.bak.*/
