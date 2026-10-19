@@ -36,14 +36,14 @@
     <div class="ewu-workspace-description">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
   </div>
   <nav class="mw-r5-nav" aria-label="員工工作區導覽">
-    <a class="{% if _p == '/employee' %}active{% endif %}" href="/employee">員工中心</a>
-    <a class="{% if _p == '/dispatch' %}active{% endif %}" href="/dispatch">接單大廳</a>
-    <a class="{% if _p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports">報單系統</a>
+    <a class="home-link" href="/employee">員工中心</a>
+    {% if _p != '/dispatch' %}<a href="/dispatch">接單大廳</a>{% endif %}
+    {% if not (_p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review')) %}<a href="/dispatch/reports">報單系統</a>{% endif %}
     {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
-      <a id="order-report-review-nav" class="{% if _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports/review">報單審核</a>
-      <a class="{% if _p.startswith('/employee/store-bindings') %}active{% endif %}" href="/employee/store-bindings">綁店管理</a>
+      {% if not _p.startswith('/dispatch/reports/review') %}<a id="order-report-review-nav" href="/dispatch/reports/review">報單審核</a>{% endif %}
+      {% if not _p.startswith('/employee/store-bindings') %}<a href="/employee/store-bindings">綁店管理</a>{% endif %}
     {% endif %}
-    <a class="{% if _p.startswith('/employee/internal-transfers') %}active{% endif %}" href="/employee/internal-transfers">內部轉帳</a>
+    {% if not _p.startswith('/employee/internal-transfers') %}<a href="/employee/internal-transfers">內部轉帳</a>{% endif %}
     {% if user and user.id %}<a href="/staff/{{ user.id }}">公開個人牆</a>{% endif %}
     <a href="/me">個人中心</a>
   </nav>
