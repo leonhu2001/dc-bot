@@ -21,6 +21,7 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
     hero = _read("web/app/templates/_employee_workspace_hero.html")
 
     for label in (
+        "員工中心",
         "接單大廳",
         "報單系統",
         "報單審核",
@@ -34,6 +35,7 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
     assert "完整薪資" not in hero
     assert "{% if _employee_path != '/dispatch' %}" not in hero
     assert "active{% endif %}" in hero
+    assert "_employee_path == '/employee'" in hero
     assert "_employee_path == '/dispatch'" in hero
     assert "_employee_path.startswith('/employee/store-bindings')" in hero
 
@@ -46,3 +48,16 @@ def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
     assert "employee-workspace-top" in sidebar
     assert "width: min(1180px, calc(100% - 28px))" in css
     assert ".employee-workspace-hero .ec-btn.active" in css
+
+
+def test_workspace_uses_public_site_header_markup_and_styles():
+    sidebar = _read("web/app/templates/_employee_sidebar.html")
+
+    assert "/static/css/mw_site.css?v=16" in sidebar
+    assert 'class="site-header employee-site-header"' in sidebar
+    assert 'class="site-nav-shell"' in sidebar
+    assert 'class="site-desktop-nav"' in sidebar
+    assert 'class="account-menu"' in sidebar
+    assert 'class="site-mobile-nav"' in sidebar
+    assert "/static/js/mw_site.js?v=3-order-rule-intro" in sidebar
+    assert "ewu-site-header" not in sidebar
