@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 
 import discord
@@ -179,7 +180,28 @@ _MODULE_OWNED_RUNTIME_NAMES = frozenset(
     }
 )
 
+
+@dataclass(frozen=True)
+class _SelfServiceRuntimeState:
+    customer_category_id: int
+    customer_role_id: int
+    dispatch_channel_id: int
+    order_claims: dict
+    point_redeem_items: object
+    point_redeem_items_by_key: object
+    order_selections: dict
+    order_control_view_type: object
+
+
 _CONFIGURED = False
+_RUNTIME_STATE: _SelfServiceRuntimeState | None = None
+
+
+def _require_runtime_state() -> _SelfServiceRuntimeState:
+    state = _RUNTIME_STATE
+    if state is None:
+        raise RuntimeError("self-service runtime is not configured")
+    return state
 
 
 def configure_self_service_runtime_explicit(
@@ -194,25 +216,25 @@ def configure_self_service_runtime_explicit(
     order_control_view_type,
 ) -> None:
     """Bind the remaining bot-owned self-service dependencies explicitly."""
-    global _CONFIGURED
-    global CUSTOMER_CATEGORY_ID, CUSTOMER_ROLE_ID, DISPATCH_CHANNEL_ID
-    global ORDER_CLAIMS, POINT_REDEEM_ITEMS, POINT_REDEEM_ITEMS_BY_KEY
-    global SELF_SERVICE_ORDER_SELECTIONS, OrderControlView
+    global _CONFIGURED, _RUNTIME_STATE
 
-    CUSTOMER_CATEGORY_ID = customer_category_id
-    CUSTOMER_ROLE_ID = customer_role_id
-    DISPATCH_CHANNEL_ID = dispatch_channel_id
-    ORDER_CLAIMS = order_claims
-    POINT_REDEEM_ITEMS = point_redeem_items
-    POINT_REDEEM_ITEMS_BY_KEY = point_redeem_items_by_key
-    SELF_SERVICE_ORDER_SELECTIONS = order_selections
-    OrderControlView = order_control_view_type
+    state = _SelfServiceRuntimeState(
+        customer_category_id=customer_category_id,
+        customer_role_id=customer_role_id,
+        dispatch_channel_id=dispatch_channel_id,
+        order_claims=order_claims,
+        point_redeem_items=point_redeem_items,
+        point_redeem_items_by_key=point_redeem_items_by_key,
+        order_selections=order_selections,
+        order_control_view_type=order_control_view_type,
+    )
+    _RUNTIME_STATE = state
 
     configure_reorder_ticket_creator(create_reorder_ticket_from_closed_order)
 
     configure_self_service_financials(
         order_point_benefit_specs=ORDER_POINT_BENEFIT_SPECS,
-        point_redeem_items_by_key=POINT_REDEEM_ITEMS_BY_KEY,
+        point_redeem_items_by_key=state.point_redeem_items_by_key,
         get_rule_from_data=_get_rule_from_self_service_data,
         is_specify_preference=_is_specify_preference,
         role_key_for_member=_role_key_for_member,
@@ -236,12 +258,12 @@ def configure_self_service_runtime_explicit(
         self_service_quantity_meta=get_self_service_quantity_meta,
         taipei_now_iso=get_taipei_now_iso,
         staff_price_required=is_self_service_staff_price_required,
-        customer_role_id=CUSTOMER_ROLE_ID,
-        customer_category_id=CUSTOMER_CATEGORY_ID,
-        order_control_view=OrderControlView,
+        customer_role_id=state.customer_role_id,
+        customer_category_id=state.customer_category_id,
+        order_control_view=state.order_control_view_type,
         self_service_order_view=SelfServiceOrderView,
         panel_embed_builder=build_self_service_panel_embed,
-        self_service_order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+        self_service_order_selections=state.order_selections,
         remember_data=remember_order_data,
         save_data=save_bot_data,
         ticket_channel_name_builder=build_ticket_channel_name,
@@ -250,8 +272,8 @@ def configure_self_service_runtime_explicit(
     )
 
     configure_self_service_selection_runtime(
-        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-        point_redeem_items=POINT_REDEEM_ITEMS,
+        order_selections=state.order_selections,
+        point_redeem_items=state.point_redeem_items,
         role_key_for_member=_role_key_for_member,
         remember_data=remember_order_data,
         panel_embed_builder=build_self_service_panel_embed,
@@ -265,9 +287,9 @@ def configure_self_service_runtime_explicit(
     )
 
     configure_self_service_ui_runtime(
-        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-        order_claims=ORDER_CLAIMS,
-        dispatch_channel_id=DISPATCH_CHANNEL_ID,
+        order_selections=state.order_selections,
+        order_claims=state.order_claims,
+        dispatch_channel_id=state.dispatch_channel_id,
         get_rule_from_data=_get_rule_from_self_service_data,
         is_specify_preference=_is_specify_preference,
         create_waiting_order=create_waiting_acceptance_order_from_self_service,
@@ -455,14 +477,15 @@ async def create_waiting_acceptance_order_from_self_service(
     customer_id: int,
     channel_id: int,
 ) -> str:
+    state = _require_runtime_state()
     return await create_self_service_waiting_acceptance_order(
         interaction,
         customer_id=customer_id,
         channel_id=channel_id,
         deps=SelfServiceDispatchDeps(
-            dispatch_channel_id=DISPATCH_CHANNEL_ID,
-            order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-            order_claims=ORDER_CLAIMS,
+            dispatch_channel_id=state.dispatch_channel_id,
+            order_selections=state.order_selections,
+            order_claims=state.order_claims,
             to_int=_to_int,
             get_rule_from_data=_get_rule_from_self_service_data,
             normalize_staff_count=normalize_self_service_staff_count,
@@ -497,12 +520,13 @@ async def retract_waiting_acceptance_order_from_self_service(
     channel_id: int,
 ) -> str:
     """Adapter from the legacy self-service runtime into the retract lifecycle."""
+    state = _require_runtime_state()
     return await retract_self_service_dispatch(
         interaction,
         channel_id=channel_id,
-        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-        order_claims=ORDER_CLAIMS,
-        dispatch_channel_id=DISPATCH_CHANNEL_ID,
+        order_selections=state.order_selections,
+        order_claims=state.order_claims,
+        dispatch_channel_id=state.dispatch_channel_id,
         remember_order=remember_order_data,
         save_data=save_bot_data,
         delete_claim_row=delete_claim_row_from_db,

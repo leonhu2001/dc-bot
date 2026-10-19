@@ -116,7 +116,7 @@ def test_discord_self_service_submit_reaches_waiting_acceptance_and_is_idempoten
 
     This intentionally exercises the actual create_waiting_acceptance_order_from_self_service
     function instead of manufacturing a WebOrder directly. External Discord/storage seams are
-    faked, but unresolved/moved runtime globals still fail the test immediately.
+    faked, while the runtime state boundary is still exercised by the real submit adapter.
     """
 
     source_channel = _FakeTextChannel(6001)
@@ -150,17 +150,24 @@ def test_discord_self_service_submit_reaches_waiting_acceptance_and_is_idempoten
     remembered_claims = []
     web_upserts = []
     acceptance_writes = []
+    order_claims = {}
 
     monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
     monkeypatch.setattr(self_service_runtime, "json", json, raising=False)
-    monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", dispatch_channel.id, raising=False)
     monkeypatch.setattr(
         self_service_runtime,
-        "SELF_SERVICE_ORDER_SELECTIONS",
-        {source_channel.id: selection},
-        raising=False,
+        "_RUNTIME_STATE",
+        self_service_runtime._SelfServiceRuntimeState(
+            customer_category_id=0,
+            customer_role_id=0,
+            dispatch_channel_id=dispatch_channel.id,
+            order_claims=order_claims,
+            point_redeem_items=[],
+            point_redeem_items_by_key={},
+            order_selections={source_channel.id: selection},
+            order_control_view_type=object,
+        ),
     )
-    monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", {}, raising=False)
     monkeypatch.setattr(self_service_runtime, "ORDER_CATEGORY_LABELS", {"delta": "三角洲"}, raising=False)
     monkeypatch.setattr(
         self_service_runtime,
@@ -259,7 +266,7 @@ def test_discord_self_service_submit_reaches_waiting_acceptance_and_is_idempoten
     assert selection["dispatch_channel_id"] == 6002
     assert selection["web_order_id"] == 321
     assert selection["status"] == WAITING_ACCEPTANCE
-    assert self_service_runtime.ORDER_CLAIMS[7001]["status"] == WAITING_ACCEPTANCE
+    assert order_claims[7001]["status"] == WAITING_ACCEPTANCE
     assert remembered_orders
     assert remembered_claims
 

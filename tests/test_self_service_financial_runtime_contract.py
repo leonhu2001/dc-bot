@@ -40,8 +40,9 @@ def test_self_service_runtime_reexports_canonical_staff_price_helpers():
 def test_financial_runtime_only_takes_bot_owned_point_item_mapping_from_explicit_config():
     runtime_source = (ROOT / "services" / "self_service_runtime.py").read_text(encoding="utf-8")
 
-    assert "POINT_REDEEM_ITEMS_BY_KEY = point_redeem_items_by_key" in runtime_source
-    assert "point_redeem_items_by_key=POINT_REDEEM_ITEMS_BY_KEY" in runtime_source
+    assert "point_redeem_items_by_key=point_redeem_items_by_key" in runtime_source
+    assert "point_redeem_items_by_key=state.point_redeem_items_by_key" in runtime_source
+    assert "POINT_REDEEM_ITEMS_BY_KEY = point_redeem_items_by_key" not in runtime_source
     assert 'if "POINT_REDEEM_ITEMS_BY_KEY" in namespace:' not in runtime_source
 
     # Stable domain helpers must come from their owning modules, not bot globals.

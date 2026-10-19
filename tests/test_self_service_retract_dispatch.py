@@ -112,6 +112,29 @@ async def _noop_log(*_args, **_kwargs):
     return None
 
 
+def _set_runtime_state(
+    monkeypatch,
+    *,
+    dispatch_channel_id: int,
+    order_selections: dict,
+    order_claims: dict,
+) -> None:
+    monkeypatch.setattr(
+        self_service_runtime,
+        "_RUNTIME_STATE",
+        self_service_runtime._SelfServiceRuntimeState(
+            customer_category_id=0,
+            customer_role_id=0,
+            dispatch_channel_id=dispatch_channel_id,
+            order_claims=order_claims,
+            point_redeem_items=[],
+            point_redeem_items_by_key={},
+            order_selections=order_selections,
+            order_control_view_type=object,
+        ),
+    )
+
+
 def test_retract_dispatch_allows_partial_claim_and_cleans_prepay_state(monkeypatch):
     ticket = _FakeTextChannel(6001)
     dispatch = _FakeTextChannel(6002)
@@ -152,9 +175,12 @@ def test_retract_dispatch_allows_partial_claim_and_cleans_prepay_state(monkeypat
     deleted_web = []
 
     monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
-    monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6001: draft}, raising=False)
-    monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", claims, raising=False)
-    monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", 6002, raising=False)
+    _set_runtime_state(
+        monkeypatch,
+        dispatch_channel_id=6002,
+        order_selections={6001: draft},
+        order_claims=claims,
+    )
     monkeypatch.setattr(self_service_runtime, "remember_order_data", lambda *args: remembered.append(args))
     monkeypatch.setattr(self_service_runtime, "save_bot_data", lambda: None)
     monkeypatch.setattr(
@@ -274,9 +300,12 @@ def test_retract_blocks_paid_local_state_even_without_web_order_id(monkeypatch):
     }
 
     monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
-    monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6101: draft}, raising=False)
-    monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", {}, raising=False)
-    monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", 6102, raising=False)
+    _set_runtime_state(
+        monkeypatch,
+        dispatch_channel_id=6102,
+        order_selections={6101: draft},
+        order_claims={},
+    )
     monkeypatch.setattr(self_service_runtime, "remember_order_data", lambda *_args: None, raising=False)
     monkeypatch.setattr(self_service_runtime, "save_bot_data", lambda: None, raising=False)
     monkeypatch.setattr(self_service_runtime, "delete_claim_row_from_db", lambda **_kwargs: None, raising=False)
@@ -317,9 +346,12 @@ def test_retract_marks_local_cancelled_before_later_cleanup_failure(monkeypatch)
     remembered = []
 
     monkeypatch.setattr(self_service_runtime.discord, "TextChannel", _FakeTextChannel)
-    monkeypatch.setattr(self_service_runtime, "SELF_SERVICE_ORDER_SELECTIONS", {6201: draft}, raising=False)
-    monkeypatch.setattr(self_service_runtime, "ORDER_CLAIMS", {}, raising=False)
-    monkeypatch.setattr(self_service_runtime, "DISPATCH_CHANNEL_ID", 6202, raising=False)
+    _set_runtime_state(
+        monkeypatch,
+        dispatch_channel_id=6202,
+        order_selections={6201: draft},
+        order_claims={},
+    )
     monkeypatch.setattr(self_service_runtime, "remember_order_data", lambda *_args: remembered.append(dict(draft)))
     monkeypatch.setattr(self_service_runtime, "save_bot_data", lambda: None)
     monkeypatch.setattr(self_service_runtime, "get_taipei_now_iso", lambda: "2026-10-15T03:00:00+08:00")
