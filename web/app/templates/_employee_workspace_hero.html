@@ -10,6 +10,7 @@
         <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
     </div>
     <div class="ec-actions" aria-label="員工中心快捷入口">
+        <a class="ec-btn{% if _employee_path == '/employee' %} active{% endif %}" href="/employee">員工中心</a>
         <a class="ec-btn{% if _employee_path == '/dispatch' %} active{% endif %}" href="/dispatch">接單大廳</a>
         <a class="ec-btn{% if _employee_path.startswith('/dispatch/reports') and not _employee_path.startswith('/dispatch/reports/review') %} active{% endif %}" href="/dispatch/reports">報單系統</a>
         {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
