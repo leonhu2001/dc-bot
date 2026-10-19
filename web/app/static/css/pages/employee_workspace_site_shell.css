@@ -1,0 +1,206 @@
+/* Employee workspace shell aligned with /employee.
+   This intentionally overrides the legacy portal chrome only for employee pages. */
+body.mw-r5-employee {
+  --ews-bg: #080809;
+  --ews-panel: #11110f;
+  --ews-line: rgba(255,255,255,.09);
+  --ews-gold: #f2d68d;
+  --ews-gold-strong: #dfb75c;
+  --ews-text: #ebe8de;
+  --ews-muted: rgba(235,232,222,.55);
+}
+
+body.mw-r5-employee .mw-r5-shell {
+  width: min(1180px, calc(100% - 28px)) !important;
+  margin: 0 auto 90px !important;
+}
+
+.ewu-site-header {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  border-bottom: 1px solid rgba(255,255,255,.055);
+  background: rgba(7,7,8,.96);
+}
+
+.ewu-site-header-inner {
+  width: min(1180px, calc(100% - 28px));
+  min-height: 78px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 28px;
+}
+
+.ewu-site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--ews-text);
+  text-decoration: none;
+}
+
+.ewu-site-brand-logo {
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 11px;
+  border: 1px solid rgba(255,255,255,.09);
+  background: #151515;
+}
+
+.ewu-site-brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ewu-site-brand-copy { display: grid; gap: 2px; }
+.ewu-site-brand-copy strong { font-size: 14px; color: var(--ews-text); }
+.ewu-site-brand-copy small { font-size: 8px; letter-spacing: .23em; color: rgba(235,232,222,.35); }
+
+.ewu-site-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+}
+
+.ewu-site-nav a {
+  color: rgba(235,232,222,.68);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 800;
+}
+.ewu-site-nav a:hover { color: var(--ews-gold); }
+
+.ewu-account-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: var(--ews-text);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.ewu-account-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(242,214,141,.10);
+  color: var(--ews-gold);
+}
+.ewu-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+body.mw-r5-employee .mw-r5-sidebar {
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) auto !important;
+  align-items: end !important;
+  gap: 20px !important;
+  margin: 52px 0 16px !important;
+  padding: 26px !important;
+  border-radius: 24px !important;
+  border: 1px solid var(--ews-line) !important;
+  background: linear-gradient(145deg,rgba(242,214,141,.08),rgba(255,255,255,.025)),var(--ews-panel) !important;
+  box-shadow: 0 18px 50px rgba(0,0,0,.22) !important;
+}
+
+body.mw-r5-employee .mw-r5-brand small {
+  color: var(--ews-gold-strong) !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: .18em !important;
+}
+body.mw-r5-employee .mw-r5-brand strong {
+  display: block;
+  margin: 7px 0 4px !important;
+  color: var(--ews-text) !important;
+  font-size: clamp(34px,5vw,54px) !important;
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+.ewu-workspace-description {
+  max-width: 620px;
+  color: var(--ews-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+body.mw-r5-employee .mw-r5-nav {
+  max-width: 580px;
+  justify-content: flex-end !important;
+  align-content: end;
+  gap: 8px !important;
+}
+body.mw-r5-employee .mw-r5-nav a {
+  min-height: 0 !important;
+  padding: 10px 13px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+/* The workspace hero above is now the single page hero. */
+body.mw-r5-employee .mw-r5-page-header { display: none !important; }
+
+/* Dispatch keeps status controls but no longer repeats its title/description. */
+body.mw-r5-employee .dispatch-hero-main > .dispatch-eyebrow,
+body.mw-r5-employee .dispatch-hero-main > .dispatch-title,
+body.mw-r5-employee .dispatch-hero-main > .dispatch-desc { display: none !important; }
+body.mw-r5-employee .dispatch-hero-main {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 104px;
+}
+body.mw-r5-employee .dispatch-tags { margin-top: 0 !important; }
+
+/* Report/store-binding pages had their own second hero. The common employee hero replaces it. */
+body.mw-r5-employee .report-hero,
+body.mw-r5-employee .sbm-hero { display: none !important; }
+
+body.mw-r5-employee .mw-r5-content { width: 100%; }
+body.mw-r5-employee :is(.dispatch-shell,.report-shell,.it-wrap,.sbm) {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+@media (max-width: 980px) {
+  .ewu-site-header-inner { grid-template-columns: auto auto; }
+  .ewu-site-nav { display: none; }
+  .ewu-account-link { justify-self: end; }
+  body.mw-r5-employee .mw-r5-sidebar {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+  }
+  body.mw-r5-employee .mw-r5-nav { max-width: none; justify-content: flex-start !important; }
+}
+
+@media (max-width: 720px) {
+  .ewu-site-header-inner { min-height: 66px; }
+  .ewu-site-brand-copy small { display: none; }
+  .ewu-account-link > span:last-child { display: none; }
+  body.mw-r5-employee .mw-r5-sidebar {
+    margin-top: 28px !important;
+    padding: 19px !important;
+    border-radius: 20px !important;
+  }
+  body.mw-r5-employee .mw-r5-nav {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+  body.mw-r5-employee .mw-r5-nav a {
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}
