@@ -10,7 +10,7 @@ import aiohttp
 
 from services.support_calls import build_support_call_snapshot
 from web.app.config import config
-from web.app.routers.admin_payout_summary import build_operations_report
+from web.app.routers.admin_operations_report import build_operations_report
 from web.app.services.anomaly_detection import build_anomaly_snapshot
 from web.app.services.marketing_funnel import build_marketing_snapshot
 
