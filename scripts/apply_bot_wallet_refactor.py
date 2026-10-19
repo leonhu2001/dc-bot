@@ -26,7 +26,7 @@ def main() -> None:
 
     source = replace_between(
         source,
-        "def build_customer_info_with_wallet_embed(\n",
+        "def build_customer_info_with_wallet_embed(member: discord.Member, *, show_staff_notes: bool = True) -> discord.Embed:\n",
         "class StaffOrderOperationSelect(discord.ui.Select):\n",
         "# 錢包資訊 / 流水 Embed 已搬到 cogs/wallet_commands.py\n\n\n",
     )
