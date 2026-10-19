@@ -48,6 +48,9 @@ from web.app.routers.order_history import router as order_history_router
 from web.app.routers.topups import router as topups_router
 from web.app.routers.payment_reviews import router as payment_reviews_router
 from web.app.routers.ticket_archives import router as ticket_archives_router
+from web.app.routers.dispatch_state import router as dispatch_state_router
+from web.app.routers.admin_wallets import router as admin_wallets_router
+from web.app.routers.discord_avatars import router as discord_avatars_router
 from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
@@ -361,14 +364,6 @@ async def health():
     }
 
 
-from web.app.routers import dispatch_state
-from web.app.routers import admin_wallets
-app.include_router(dispatch_state.router)
-app.include_router(admin_wallets.router)
-
-# AUTO DISCORD AVATAR ROUTER
-try:
-    from web.app.routers.discord_avatars import router as discord_avatars_router
-    app.include_router(discord_avatars_router)
-except Exception as exc:
-    print(f"[discord_avatars] router load failed: {exc}")
+app.include_router(dispatch_state_router)
+app.include_router(admin_wallets_router)
+app.include_router(discord_avatars_router)
