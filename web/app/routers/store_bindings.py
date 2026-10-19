@@ -12,6 +12,7 @@ from sqlalchemy import select
 from shared.db import SessionLocal
 from shared.staff_models import WebStaffMember
 from web.app.services.admin_service import write_admin_audit_log
+from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
 from web.app.services.store_binding_service import (
     ACTIVE,
     ENDED,
@@ -22,6 +23,7 @@ from web.app.services.store_binding_service import (
     binding_payload,
     end_store_binding,
     get_active_binding,
+    get_latest_binding,
     get_pending_binding,
     get_staff_binding_payload,
     grant_store_binding,
@@ -49,12 +51,14 @@ def _discord_id(user: dict | None) -> str:
 
 
 def _can_manage(user: dict | None) -> bool:
-    user = user or {}
-    return bool(
-        user.get("is_admin")
-        or user.get("is_customer_service")
-        or user.get("is_manager")
-    )
+    staff_id = _discord_id(user)
+    if not staff_id:
+        return False
+    try:
+        access = get_dashboard_access(get_member_role_ids(staff_id))
+    except Exception:
+        return False
+    return bool(access.get("is_manager") or access.get("is_customer_service"))
 
 
 def _redirect(path: str, *, message: str | None = None, error: str | None = None):
@@ -164,7 +168,6 @@ async def store_binding_management(
             member = members.get(str(row.staff_discord_id))
             data = binding_payload(row)
             data["display_name"] = member_display_name(member, row.staff_discord_id)
-            data["member"] = member
             return data
 
         pending = [present(row) for row in pending_rows]
@@ -173,7 +176,10 @@ async def store_binding_management(
 
         if q:
             def matches(item):
-                return q in str(item.get("display_name") or "").lower() or q in str(item.get("staff_discord_id") or "").lower()
+                return (
+                    q in str(item.get("display_name") or "").lower()
+                    or q in str(item.get("staff_discord_id") or "").lower()
+                )
             pending = [item for item in pending if matches(item)]
             active = [item for item in active if matches(item)]
             history = [item for item in history if matches(item)]
@@ -234,7 +240,7 @@ async def store_binding_grant(request: Request):
 
     db = SessionLocal()
     try:
-        before = _snapshot(get_staff_binding_payload(db, staff_id) and get_active_binding(db, staff_id))
+        before = _snapshot(get_latest_binding(db, staff_id))
         row = grant_store_binding(
             db,
             staff_discord_id=staff_id,
