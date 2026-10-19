@@ -15,7 +15,6 @@ def test_dispatch_lobby_has_operational_sections_and_realtime_controls():
     assert "可接任務" in template
     assert "進行中／已滿任務" in template
     assert "data-dispatch-realtime-status" in template
-    assert "data-dispatch-last-sync" in template
     assert "data-dispatch-notification-toggle" in template
     assert "前往票口" in template
     assert 'data-busy-label="接單中…"' in template

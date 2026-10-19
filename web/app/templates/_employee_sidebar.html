@@ -1,6 +1,6 @@
 {% set _p = request.url.path %}
 <link rel="stylesheet" href="/static/css/pages/employee_workspace_unified.css?v=20261020-1">
-<link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-2">
+<link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-3">
 
 <header class="ewu-site-header">
   <div class="ewu-site-header-inner">
@@ -29,44 +29,21 @@
   </div>
 </header>
 
-{% set workspace_title = '員工工作區' %}
-{% set workspace_description = '接單、報單、薪資與內部操作都集中在這裡。' %}
-{% if _p == '/dispatch' %}
-  {% set workspace_title = '接單大廳' %}
-  {% set workspace_description = '查看目前可接訂單、進行中的任務與客服值班狀態。' %}
-{% elif _p.startswith('/dispatch/reports/review') %}
-  {% set workspace_title = '報單審核' %}
-  {% set workspace_description = '集中處理待審核報單、退回修改與分潤確認。' %}
-{% elif _p.startswith('/dispatch/reports') %}
-  {% set workspace_title = '報單系統' %}
-  {% set workspace_description = '查看自己參與過的已結單訂單，填寫與追蹤報單狀態。' %}
-{% elif _p.startswith('/employee/store-bindings') %}
-  {% set workspace_title = '綁店管理' %}
-  {% set workspace_description = '審核、直接授予或解除綁店資格；Web 資格為正式紀錄，Discord Role 1503828415063785634 會同步跟上。' %}
-{% elif _p.startswith('/employee/internal-transfers') %}
-  {% set workspace_title = '內部轉帳' %}
-  {% set workspace_description = '處理員工間薪資轉帳、客服審核與薪資轉入店內錢包。' %}
-{% elif _p.startswith('/my/payouts') %}
-  {% set workspace_title = '完整薪資' %}
-  {% set workspace_description = '依月份查看服務薪資、結算狀態與完整明細。' %}
-{% endif %}
-
 <aside class="mw-r5-sidebar">
   <div class="mw-r5-brand">
     <small>EMPLOYEE CENTER</small>
-    <strong>{{ workspace_title }}</strong>
-    <div class="ewu-workspace-description">{{ workspace_description }}</div>
+    <strong>{{ (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工中心' }}</strong>
+    <div class="ewu-workspace-description">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
   </div>
   <nav class="mw-r5-nav" aria-label="員工工作區導覽">
-    <a class="{% if _p == '/employee' %}active{% endif %}" href="/employee">員工中心</a>
-    <a class="{% if _p == '/dispatch' %}active{% endif %}" href="/dispatch">接單大廳</a>
-    <a class="{% if _p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports">報單系統</a>
+    <a class="home-link" href="/employee">員工中心</a>
+    {% if _p != '/dispatch' %}<a href="/dispatch">接單大廳</a>{% endif %}
+    {% if not (_p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review')) %}<a href="/dispatch/reports">報單系統</a>{% endif %}
     {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
-      <a id="order-report-review-nav" class="{% if _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports/review">報單審核</a>
-      <a class="{% if _p.startswith('/employee/store-bindings') %}active{% endif %}" href="/employee/store-bindings">綁店管理</a>
+      {% if not _p.startswith('/dispatch/reports/review') %}<a id="order-report-review-nav" href="/dispatch/reports/review">報單審核</a>{% endif %}
+      {% if not _p.startswith('/employee/store-bindings') %}<a href="/employee/store-bindings">綁店管理</a>{% endif %}
     {% endif %}
-    <a class="{% if _p.startswith('/employee/internal-transfers') %}active{% endif %}" href="/employee/internal-transfers">內部轉帳</a>
-    <a class="{% if _p.startswith('/my/payouts') %}active{% endif %}" href="/my/payouts">完整薪資</a>
+    {% if not _p.startswith('/employee/internal-transfers') %}<a href="/employee/internal-transfers">內部轉帳</a>{% endif %}
     {% if user and user.id %}<a href="/staff/{{ user.id }}">公開個人牆</a>{% endif %}
     <a href="/me">個人中心</a>
   </nav>
