@@ -12,6 +12,7 @@ PENDING = "pending"
 PROCESSING = "processing"
 COMPLETED = "completed"
 FAILED = "failed"
+DEFAULT_STALE_PROCESSING_MINUTES = 10
 
 
 def _db_path(db_file: str | Path | None = None) -> Path:
@@ -145,13 +146,34 @@ def create_wallet_refund_request(
 def list_pending_wallet_refunds(
     *,
     limit: int = 20,
+    stale_processing_minutes: int = DEFAULT_STALE_PROCESSING_MINUTES,
     db_file: str | Path | None = None,
 ) -> list[dict[str, Any]]:
+    """Return queued refunds after reclaiming abandoned processing leases."""
     ensure_wallet_refund_tables(db_file)
     path = _db_path(db_file)
     safe_limit = max(1, min(int(limit or 20), 100))
+    stale_minutes = max(1, int(stale_processing_minutes or DEFAULT_STALE_PROCESSING_MINUTES))
+    now_text = get_taipei_now_iso()
+
     with sqlite3.connect(path, timeout=15) as conn:
         conn.row_factory = sqlite3.Row
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            """
+            UPDATE wallet_refund_requests
+            SET status='pending',
+                processing_at=NULL,
+                error_message='退款處理程序中斷，系統已自動重新排隊',
+                updated_at=?
+            WHERE status='processing'
+              AND (
+                  processing_at IS NULL
+                  OR datetime(processing_at) <= datetime('now', ?)
+              )
+            """,
+            (now_text, f"-{stale_minutes} minutes"),
+        )
         rows = conn.execute(
             """
             SELECT * FROM wallet_refund_requests
@@ -161,6 +183,7 @@ def list_pending_wallet_refunds(
             """,
             (safe_limit,),
         ).fetchall()
+        conn.commit()
         return [dict(row) for row in rows]
 
 
