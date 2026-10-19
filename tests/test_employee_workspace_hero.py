@@ -41,17 +41,25 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
 
 
 def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
+    employee = _read("web/app/templates/employee_center.html")
     sidebar = _read("web/app/templates/_employee_sidebar.html")
     css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
 
     assert "employee_center_inline_1.css?v=20261020-2" in sidebar
+    assert "employee_workspace_site_shell.css?v=20261020-6" in sidebar
+    assert "employee_workspace_site_shell.css?v=20261020-6" in employee
     assert "employee-workspace-top" in sidebar
     assert "width: min(1180px, calc(100% - 28px))" in css
+
+    # /employee uses site_layout while inner employee pages use layout.html.
+    # The active state must therefore not depend on body.mw-r5-employee.
     assert ".employee-workspace-hero .ec-btn.active" in css
+    assert "body.mw-r5-employee .employee-workspace-hero .ec-btn.active" not in css
 
 
 def test_workspace_uses_public_site_header_markup_and_styles():
     sidebar = _read("web/app/templates/_employee_sidebar.html")
+    css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
 
     assert "/static/css/mw_site.css?v=16" in sidebar
     assert 'class="site-header employee-site-header"' in sidebar
@@ -61,3 +69,15 @@ def test_workspace_uses_public_site_header_markup_and_styles():
     assert 'class="site-mobile-nav"' in sidebar
     assert "/static/js/mw_site.js?v=3-order-rule-intro" in sidebar
     assert "ewu-site-header" not in sidebar
+
+    # mw_portal_r5.css applies a backoffice-wide font/line-height/button reset
+    # with !important. The employee copy of the public header must explicitly
+    # restore the real public-site typography and mobile button dimensions.
+    assert 'font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif !important;' in css
+    assert ".employee-site-header .site-brand-copy small" in css
+    assert "font-size: 9px !important;" in css
+    assert ".employee-site-header .site-desktop-nav a" in css
+    assert "font-size: 14px !important;" in css
+    assert ".employee-site-header .mobile-nav-button" in css
+    assert "width: 42px !important;" in css
+    assert "height: 42px !important;" in css
