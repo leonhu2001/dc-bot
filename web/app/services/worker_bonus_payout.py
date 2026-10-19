@@ -15,6 +15,11 @@ from shared.payout import (
     calculate_customer_service_payout,
     calculate_customer_service_payout_base_amount,
 )
+from web.app.services.store_binding_payout import is_store_binding_effective_at
+from web.app.services.store_binding_service import (
+    STORE_BINDING_BONUS_RATE,
+    STORE_BINDING_MAX_RATE,
+)
 
 
 TAIPEI_TZ = timezone(timedelta(hours=8))
@@ -120,12 +125,38 @@ def _effective_stream_bonus(
     return bool(override)
 
 
+def _calculate_worker_rate(
+    *,
+    legacy: bool,
+    named: bool,
+    streamed: bool,
+    previous_bonus: bool,
+    store_bound: bool,
+) -> float:
+    """Calculate the worker rate without reading mutable current staff state."""
+    if legacy:
+        return WORKER_BASE_PAYOUT_RATE + (LEGACY_WORKER_NAMED_BONUS_RATE if named else 0.0)
+
+    normal_rate = (
+        WORKER_BASE_PAYOUT_RATE
+        + (WORKER_NAMED_BONUS_RATE if named else 0.0)
+        + (WORKER_STREAM_BONUS_RATE if streamed else 0.0)
+        + (WORKER_PREVIOUS_MONTH_SALARY_BONUS_RATE if previous_bonus else 0.0)
+    )
+    normal_rate = min(MAX_NORMAL_WORKER_RATE, normal_rate)
+    if not store_bound:
+        return normal_rate
+    return min(STORE_BINDING_MAX_RATE, normal_rate + STORE_BINDING_BONUS_RATE)
+
+
 def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None = None) -> dict:
     """Apply report-reviewed worker bonuses and then refresh CS margin share.
 
     New-policy orders use 80% base + named 3% + streamed 2% + previous-month
-    paid salary >= 5000 bonus 2%, capped at the normal 87%. Existing orders
-    frozen by the deploy migration retain the historical 80% + named 5% rule.
+    paid salary >= 5000 bonus 2%, capped at the normal 87%. A worker who had an
+    effective Web DB store binding when the order closed receives another 3%,
+    capped at 90%. Existing legacy orders retain their historical 80% + named 5%
+    rule and never receive the new store-binding bonus.
     """
     with SessionLocal() as db:
         order = db.get(WebOrder, int(order_id))
@@ -153,17 +184,18 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 override=stream_override,
             )
             named = bool(payout.has_named_bonus)
-
-            if legacy:
-                rate = WORKER_BASE_PAYOUT_RATE + (LEGACY_WORKER_NAMED_BONUS_RATE if named else 0.0)
-            else:
-                rate = (
-                    WORKER_BASE_PAYOUT_RATE
-                    + (WORKER_NAMED_BONUS_RATE if named else 0.0)
-                    + (WORKER_STREAM_BONUS_RATE if streamed else 0.0)
-                    + (WORKER_PREVIOUS_MONTH_SALARY_BONUS_RATE if previous_bonus else 0.0)
-                )
-                rate = min(MAX_NORMAL_WORKER_RATE, rate)
+            store_bound = (not legacy) and is_store_binding_effective_at(
+                db,
+                worker_id,
+                order.closed_at,
+            )
+            rate = _calculate_worker_rate(
+                legacy=legacy,
+                named=named,
+                streamed=streamed,
+                previous_bonus=previous_bonus,
+                store_bound=store_bound,
+            )
 
             gross = max(0, int(payout.gross_share or 0))
             base_payout = int(round(gross * WORKER_BASE_PAYOUT_RATE))
@@ -184,6 +216,7 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     + (f"＋掛名{5 if legacy else 3}%" if named else "")
                     + ("＋直播2%" if streamed else "")
                     + ("＋前月已結算薪資達5000T 2%" if previous_bonus else "")
+                    + ("＋綁店3%" if store_bound else "")
                     + f"｜前月已結算薪資 {previous_salary}T"
                 )
 
@@ -195,6 +228,7 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 "named": named,
                 "previous_month_paid_salary": previous_salary,
                 "previous_month_bonus": previous_bonus,
+                "store_bound_at_close": store_bound,
                 "locked": locked,
             })
 
