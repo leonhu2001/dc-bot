@@ -18,10 +18,12 @@ def _create_report_db(path):
                 customer_display_name TEXT,
                 amount INTEGER,
                 customer_pay_amount INTEGER,
+                payout_base_amount INTEGER,
                 manual_discount_amount INTEGER,
                 cash_coupon_amount INTEGER,
                 store_absorbed_amount INTEGER,
                 payment_method TEXT,
+                note TEXT,
                 status TEXT,
                 closed_at TEXT,
                 updated_at TEXT,
@@ -32,7 +34,8 @@ def _create_report_db(path):
                 order_id INTEGER,
                 worker_discord_id TEXT,
                 worker_display_name TEXT,
-                final_payout INTEGER
+                final_payout INTEGER,
+                named_bonus_amount INTEGER
             );
 
             CREATE TABLE customer_service_payouts (
@@ -76,7 +79,7 @@ def _create_report_db(path):
                     1000,
                     100,
                     50,
-                    25,
+                    75,
                     "wallet",
                     "closed",
                     "2026-09-10 12:00:00",
@@ -309,6 +312,7 @@ def test_operations_report_zero_previous_window_keeps_history_context(
     report_without_history = report_module.build_operations_report("month")
     assert report_without_history["comparison_history_exists"] is False
 
+
 def test_report_period_uses_full_calendar_day_for_comparison(monkeypatch):
     fixed_now = datetime(2026, 10, 1, 15, 9, 0)
     monkeypatch.setattr(report_module, "utc_now_naive", lambda: fixed_now)
@@ -328,4 +332,3 @@ def test_report_period_uses_full_calendar_day_for_comparison(monkeypatch):
     assert previous_start_at == "2026-07-01 00:00:00"
     assert previous_end_at == "2026-07-02 00:00:00"
     assert previous_label == "上季同期"
-
