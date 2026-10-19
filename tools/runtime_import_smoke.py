@@ -24,6 +24,7 @@ CRITICAL_RUNTIME_MODULES = (
     "services.order_payment_runtime",
     "services.order_payment_composition",
     "services.wallet_discord_runtime",
+    "services.wallet_discord_presenter",
     "services.order_credential_runtime",
     "services.order_point_redemption",
     "services.self_service_runtime",
