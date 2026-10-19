@@ -2,7 +2,7 @@ from core.time_utils import utc_now_naive
 import json
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.db import Base
@@ -25,6 +25,36 @@ class WebStaffMember(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class StaffStoreBinding(Base):
+    __tablename__ = "staff_store_bindings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    staff_discord_id: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    source: Mapped[str] = mapped_column(String(32), default="self_application")
+
+    requested_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    reviewed_by_discord_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    reviewed_by_display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    discord_sync_status: Mapped[str] = mapped_column(String(24), default="not_required")
+    discord_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    discord_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
+    )
+
 
 # === receiver role display helpers start ===
 RECEIVER_ROLE_LABELS = {
