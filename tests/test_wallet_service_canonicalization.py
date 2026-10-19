@@ -12,6 +12,7 @@ from services.wallet_service import (
 
 def test_bot_delegates_wallet_persistence_to_canonical_service():
     bot_source = Path("bot.py").read_text(encoding="utf-8")
+    wallet_cog_source = Path("cogs/wallet_commands.py").read_text(encoding="utf-8")
     service_source = Path("services/wallet_service.py").read_text(encoding="utf-8")
     discord_runtime_source = Path("services/wallet_discord_runtime.py").read_text(encoding="utf-8")
 
@@ -21,7 +22,12 @@ def test_bot_delegates_wallet_persistence_to_canonical_service():
     assert "INSERT INTO wallet_transactions" not in bot_source
     assert "_wallet_adjust_balance(" not in bot_source
     assert "from services.wallet_discord_runtime import (" in bot_source
-    assert "_wallet_get_transactions(" in bot_source
+
+    assert "CREATE TABLE IF NOT EXISTS customer_wallets" not in wallet_cog_source
+    assert "CREATE TABLE IF NOT EXISTS wallet_transactions" not in wallet_cog_source
+    assert "from services.wallet_service import get_wallet_balance, get_wallet_transactions" in wallet_cog_source
+    assert "get_wallet_transactions(customer_id, limit=limit)" in wallet_cog_source
+    assert "from services.wallet_discord_runtime import (" in wallet_cog_source
     assert "def adjust_customer_wallet_balance(" in discord_runtime_source
     assert "adjust_wallet_balance(" in discord_runtime_source
 
