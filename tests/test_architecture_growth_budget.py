@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # the guard prevents unrelated features from silently making them larger again.
 MAX_BYTES = {
     "bot.py": 206_000,
-    "cogs/wallet_commands.py": 16_000,
+    "cogs/wallet_commands.py": 11_000,
     "cogs/staff_profile_commands.py": 15_000,
     "cogs/reward_commands.py": 14_500,
     "cogs/reward_redeem_commands.py": 3_500,
@@ -34,6 +34,7 @@ MAX_BYTES = {
     "services/self_service_financials.py": 30_500,
     "services/self_service_point_benefits.py": 4_500,
     "services/self_service_point_benefit_policy.py": 4_000,
+    "services/wallet_discord_presenter.py": 6_500,
     "web/app/main.py": 18_500,
     "web/app/routers/admin.py": 14_000,
     "web/app/routers/admin_dashboard.py": 29_000,
