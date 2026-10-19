@@ -12,7 +12,7 @@ MAX_BYTES = {
     "bot.py": 206_000,
     "cogs/wallet_commands.py": 16_000,
     "cogs/staff_profile_commands.py": 15_000,
-    "cogs/reward_redeem_commands.py": 10_000,
+    "cogs/reward_redeem_commands.py": 3_500,
     "services/vip_voice_runtime.py": 12_000,
     "services/order_lifecycle_runtime.py": 36_000,
     "services/order_runtime.py": 45_000,
