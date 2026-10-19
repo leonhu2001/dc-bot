@@ -15,20 +15,81 @@ body.mw-r5-employee .mw-r5-shell {
   padding: 0 !important;
 }
 
-/* Employee pages now use the real public-site header classes and mw_site.css. */
+/* Employee pages reuse the public-site header classes, but the backoffice
+   layout applies a global Inter/line-height/button reset with !important.
+   Neutralize that reset here so the copied public header renders exactly like
+   the real site header instead of merely sharing its markup. */
+body.mw-r5-employee .employee-site-header,
+body.mw-r5-employee .employee-site-header * {
+  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif !important;
+}
 body.mw-r5-employee .employee-site-header {
   width: 100%;
+  font-weight: 400 !important;
+  line-height: normal !important;
+  letter-spacing: normal !important;
+}
+body.mw-r5-employee .employee-site-header .site-brand-copy strong {
+  font-size: 17px !important;
+}
+body.mw-r5-employee .employee-site-header .site-brand-copy small {
+  margin-top: 6px !important;
+  font-size: 9px !important;
+  font-weight: 400 !important;
+  letter-spacing: .18em !important;
+}
+body.mw-r5-employee .employee-site-header .site-desktop-nav a {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: normal !important;
+}
+body.mw-r5-employee .employee-site-header .account-name {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+body.mw-r5-employee .employee-site-header .account-dropdown-head strong {
+  font-size: 14px !important;
+}
+body.mw-r5-employee .employee-site-header .account-dropdown-head small {
+  font-size: 10px !important;
+  font-weight: 400 !important;
+}
+body.mw-r5-employee .employee-site-header .account-dropdown a {
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+body.mw-r5-employee .employee-site-header .mobile-nav-button {
+  width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+}
+
+/* The hero is shared by /employee and every employee workspace page. Keep the
+   backoffice global font reset from changing its typography on inner pages. */
+body.mw-r5-employee .employee-workspace-hero,
+body.mw-r5-employee .employee-workspace-hero * {
+  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif !important;
+}
+body.mw-r5-employee .employee-workspace-hero {
+  font-weight: 400 !important;
+  line-height: normal !important;
+  letter-spacing: normal !important;
+}
+
+/* Active state is intentionally NOT body-scoped: /employee uses site_layout,
+   while the other workspace pages use the employee backoffice layout. */
+.employee-workspace-hero .ec-btn.active {
+  border-color: rgba(223,183,92,.35);
+  background: rgba(223,183,92,.09);
+  color: #f2d68d;
 }
 
 /* This is literally the same .ec/.ec-hero component used by /employee. */
 body.mw-r5-employee .employee-workspace-top {
   margin-top: 52px !important;
   margin-bottom: 16px !important;
-}
-body.mw-r5-employee .employee-workspace-hero .ec-btn.active {
-  border-color: rgba(223,183,92,.35);
-  background: rgba(223,183,92,.09);
-  color: #f2d68d;
 }
 
 /* Every page body starts on the exact same 1180px rail as the hero. */
