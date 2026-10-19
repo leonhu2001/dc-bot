@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import inspect
+from pathlib import Path
 
 from core import database as core_database
 from core import time_utils
@@ -10,6 +12,16 @@ from services.acceptance import repair_runtime as acceptance_repair_runtime
 from services.acceptance import runtime as acceptance_runtime
 from services.acceptance import sync_worker as acceptance_sync_worker
 from services import order_dispatch_runtime
+
+
+ROOT = Path(__file__).resolve().parents[1]
+ACCEPTANCE_RUNTIME_PATH = ROOT / "services/acceptance/runtime.py"
+LEGACY_BINDING_NAMES = {
+    "DISPATCH_CHANNEL_ID",
+    "ORDER_CLAIMS",
+    "PaymentMethodView",
+    "SELF_SERVICE_ORDER_SELECTIONS",
+}
 
 
 def test_acceptance_runtime_owns_orchestration_persistence_dependencies():
@@ -74,6 +86,28 @@ def test_acceptance_explicit_configurator_is_keyword_only():
         parameter.kind is inspect.Parameter.KEYWORD_ONLY
         for parameter in signature.parameters.values()
     )
+
+
+def test_acceptance_explicit_configurator_does_not_rebind_module_globals():
+    tree = ast.parse(ACCEPTANCE_RUNTIME_PATH.read_text(encoding="utf-8"))
+    configure = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "configure_acceptance_runtime_explicit"
+    )
+    global_names = {
+        name
+        for node in ast.walk(configure)
+        if isinstance(node, ast.Global)
+        for name in node.names
+    }
+    assert not global_names
+
+
+def test_acceptance_legacy_binding_aliases_are_not_exported():
+    for name in LEGACY_BINDING_NAMES:
+        assert not hasattr(acceptance_runtime, name)
 
 
 def test_acceptance_legacy_namespace_startup_boundary_is_retired():

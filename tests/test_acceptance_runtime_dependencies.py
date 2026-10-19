@@ -37,7 +37,7 @@ def _configure_explicit(namespace: dict[str, object]) -> None:
     )
 
 
-def test_explicit_acceptance_runtime_binds_only_declared_dependencies(monkeypatch):
+def test_explicit_acceptance_runtime_forwards_only_declared_dependencies(monkeypatch):
     namespace = _dependency_namespace()
 
     monkeypatch.setattr(sync_worker, "_DEPS", None)
@@ -45,10 +45,11 @@ def test_explicit_acceptance_runtime_binds_only_declared_dependencies(monkeypatc
 
     _configure_explicit(namespace)
 
-    assert runtime.DISPATCH_CHANNEL_ID == namespace["DISPATCH_CHANNEL_ID"]
-    assert runtime.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
-    assert runtime.PaymentMethodView is namespace["PaymentMethodView"]
-    assert runtime.SELF_SERVICE_ORDER_SELECTIONS is namespace["SELF_SERVICE_ORDER_SELECTIONS"]
+    assert not hasattr(runtime, "DISPATCH_CHANNEL_ID")
+    assert not hasattr(runtime, "ORDER_CLAIMS")
+    assert not hasattr(runtime, "PaymentMethodView")
+    assert not hasattr(runtime, "SELF_SERVICE_ORDER_SELECTIONS")
+
     assert dispatch_refresh.DISPATCH_CHANNEL_ID == namespace["DISPATCH_CHANNEL_ID"]
     assert dispatch_refresh.ORDER_CLAIMS is namespace["ORDER_CLAIMS"]
     assert dispatch_refresh.PaymentMethodView is namespace["PaymentMethodView"]
