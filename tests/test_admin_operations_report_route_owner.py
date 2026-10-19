@@ -4,7 +4,6 @@ from pathlib import Path
 
 from fastapi.routing import APIRoute
 
-from web.app.main import app
 from web.app.routers import admin_operations_report, admin_payout_summary
 
 
@@ -27,16 +26,19 @@ def test_payout_summary_no_longer_owns_operations_report_route() -> None:
     assert _get_report_routes(admin_payout_summary.router.routes) == []
 
 
-def test_operations_report_has_one_app_route_owner() -> None:
+def test_operations_report_has_one_canonical_route_owner() -> None:
     owner_routes = _get_report_routes(admin_operations_report.router.routes)
-    app_routes = _get_report_routes(app.routes)
 
     assert len(owner_routes) == 1
-    assert len(app_routes) == 1
-    assert app_routes[0].endpoint is owner_routes[0].endpoint
-    assert app_routes[0].endpoint.__module__ == "web.app.routers.admin_operations_report"
+    assert owner_routes[0].endpoint.__module__ == "web.app.routers.admin_operations_report"
 
 
-def test_main_does_not_mutate_router_route_lists() -> None:
+def test_main_registers_canonical_operations_report_router_without_mutation() -> None:
     source = MAIN_PATH.read_text(encoding="utf-8")
+
+    assert (
+        "from web.app.routers.admin_operations_report import router as "
+        "admin_operations_report_router"
+    ) in source
+    assert "app.include_router(admin_operations_report_router)" in source
     assert "admin_payout_summary_router.routes" not in source
