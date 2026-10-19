@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
-
-import pytest
 
 from services import order_payment_review_submission as review_submission
 
@@ -39,8 +38,7 @@ def _kwargs(interaction: FakeInteraction, data: dict) -> dict:
     }
 
 
-@pytest.mark.asyncio
-async def test_non_external_payment_is_not_handled(monkeypatch) -> None:
+def test_non_external_payment_is_not_handled(monkeypatch) -> None:
     monkeypatch.setattr(
         review_submission,
         "requires_external_payment_review",
@@ -48,16 +46,17 @@ async def test_non_external_payment_is_not_handled(monkeypatch) -> None:
     )
     interaction = FakeInteraction()
 
-    handled = await review_submission.submit_external_payment_review_if_needed(
-        **_kwargs(interaction, {})
+    handled = asyncio.run(
+        review_submission.submit_external_payment_review_if_needed(
+            **_kwargs(interaction, {})
+        )
     )
 
     assert handled is False
     assert interaction.response.calls == []
 
 
-@pytest.mark.asyncio
-async def test_approved_external_review_continues_finalization(monkeypatch) -> None:
+def test_approved_external_review_continues_finalization(monkeypatch) -> None:
     monkeypatch.setattr(
         review_submission,
         "requires_external_payment_review",
@@ -65,16 +64,17 @@ async def test_approved_external_review_continues_finalization(monkeypatch) -> N
     )
     interaction = FakeInteraction()
 
-    handled = await review_submission.submit_external_payment_review_if_needed(
-        **_kwargs(interaction, {"payment_review_approved": True})
+    handled = asyncio.run(
+        review_submission.submit_external_payment_review_if_needed(
+            **_kwargs(interaction, {"payment_review_approved": True})
+        )
     )
 
     assert handled is False
     assert interaction.response.calls == []
 
 
-@pytest.mark.asyncio
-async def test_pending_external_review_stops_duplicate_submission(monkeypatch) -> None:
+def test_pending_external_review_stops_duplicate_submission(monkeypatch) -> None:
     monkeypatch.setattr(
         review_submission,
         "requires_external_payment_review",
@@ -82,8 +82,10 @@ async def test_pending_external_review_stops_duplicate_submission(monkeypatch) -
     )
     interaction = FakeInteraction()
 
-    handled = await review_submission.submit_external_payment_review_if_needed(
-        **_kwargs(interaction, {"payment_review_pending": True})
+    handled = asyncio.run(
+        review_submission.submit_external_payment_review_if_needed(
+            **_kwargs(interaction, {"payment_review_pending": True})
+        )
     )
 
     assert handled is True
