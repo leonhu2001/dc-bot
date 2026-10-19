@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from services import order_runtime
 from services.order_rules import ORDER_RULES
 from services.orders import (
@@ -43,7 +45,11 @@ def test_desktop_entertain_detail_enables_hour_quantity(monkeypatch):
     assert "customer_pay_amount" not in data
 
     state = {channel_id: data}
-    monkeypatch.setattr(order_runtime, "SELF_SERVICE_ORDER_SELECTIONS", state, raising=False)
+    monkeypatch.setattr(
+        order_runtime,
+        "_RUNTIME_STATE",
+        SimpleNamespace(order_selections=state),
+    )
     select = order_runtime.SelfServiceOrderQuantitySelect(
         customer_id=42,
         channel_id=channel_id,
