@@ -1,32 +1,28 @@
 from __future__ import annotations
 
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 
+from core.time_utils import get_taipei_now_iso
 from core.database import save_bot_data
 from core.permissions import has_role, is_customer_staff, is_manager_or_admin
-from core.time_utils import get_taipei_now_iso
 from services.logging_service import send_order_log
 from services.rewards import (
-    add_manual_purchase,
-    adjust_customer_points,
-    build_member_info_embed,
-    ensure_reward_member_benefits,
-    format_t_amount,
-    get_current_reward_points,
     get_customer_reward_data,
+    build_member_info_embed,
+    adjust_customer_points,
+    add_manual_purchase,
+    format_t_amount,
     parse_manual_purchase_date,
+    get_current_reward_points,
+    ensure_reward_member_benefits,
 )
 from services.wallet_service import get_wallet_balance
 
 
-def add_wallet_field_to_member_embed(
-    embed: discord.Embed,
-    customer_id,
-) -> discord.Embed:
-    """Add wallet display without duplicating wallet persistence in this cog."""
-
+# Wallet persistence is canonical in services.wallet_service.
+def add_wallet_field_to_member_embed(embed: discord.Embed, customer_id) -> discord.Embed:
     embed.add_field(
         name="錢包餘額",
         value=format_t_amount(get_wallet_balance(customer_id)),
@@ -46,11 +42,7 @@ class RewardCommands(commands.Cog):
         return int(getattr(self.bot, "manager_role_id_value", 0) or 0)
 
     def can_customer_staff(self, member: discord.Member) -> bool:
-        return (
-            is_customer_staff(member)
-            or has_role(member, self.manager_role_id())
-            or member.guild_permissions.administrator
-        )
+        return is_customer_staff(member) or has_role(member, self.manager_role_id()) or member.guild_permissions.administrator
 
     @member.command(
         name="points",
@@ -58,11 +50,7 @@ class RewardCommands(commands.Cog):
     )
     async def my_points(self, interaction: discord.Interaction):
         data = get_customer_reward_data(interaction.user.id)
-        embed = build_member_info_embed(
-            interaction.user,
-            data,
-            show_points=True,
-        )
+        embed = build_member_info_embed(interaction.user, data, show_points=True)
         add_wallet_field_to_member_embed(embed, interaction.user.id)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -72,23 +60,13 @@ class RewardCommands(commands.Cog):
     )
     @app_commands.describe(customer="要查詢的顧客")
     @app_commands.default_permissions(manage_messages=True)
-    async def customer_points(
-        self,
-        interaction: discord.Interaction,
-        customer: discord.Member,
-    ):
+    async def customer_points(self, interaction: discord.Interaction, customer: discord.Member):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
         if not self.can_customer_staff(interaction.user):
-            await interaction.response.send_message(
-                "只有客服或店長可以查詢顧客會員資料。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有客服或店長可以查詢顧客會員資料。", ephemeral=True)
             return
 
         data = get_customer_reward_data(customer.id)
@@ -115,17 +93,11 @@ class RewardCommands(commands.Cog):
         reason: str | None = None,
     ):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
         if not self.can_customer_staff(interaction.user):
-            await interaction.response.send_message(
-                "只有客服或店長可以調整顧客點數。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有客服或店長可以調整顧客點數。", ephemeral=True)
             return
 
         ok, message = await adjust_customer_points(
@@ -170,25 +142,16 @@ class RewardCommands(commands.Cog):
         note: str | None = None,
     ):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
         if not self.can_customer_staff(interaction.user):
-            await interaction.response.send_message(
-                "只有客服或店長可以補登會員消費。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有客服或店長可以補登會員消費。", ephemeral=True)
             return
 
         guild = interaction.guild
         if guild is None:
-            await interaction.response.send_message(
-                "這個功能只能在伺服器內使用。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
             return
 
         ok, message = await add_manual_purchase(
@@ -222,38 +185,25 @@ class RewardCommands(commands.Cog):
     )
     @app_commands.describe(records="每行一筆：顧客ID,金額,日期,備註；備註可省略")
     @app_commands.default_permissions(manage_messages=True)
-    async def import_purchases(
-        self,
-        interaction: discord.Interaction,
-        records: str,
-    ):
+    async def import_purchases(self, interaction: discord.Interaction, records: str):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
         if not self.can_customer_staff(interaction.user):
-            await interaction.response.send_message(
-                "只有客服或店長可以批量補登會員消費。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有客服或店長可以批量補登會員消費。", ephemeral=True)
             return
 
         guild = interaction.guild
         if guild is None:
-            await interaction.response.send_message(
-                "這個功能只能在伺服器內使用。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         success_count = 0
         skipped_count = 0
-        result_lines: list[str] = []
+        result_lines = []
 
         for line_number, raw_line in enumerate(records.splitlines(), start=1):
             line = raw_line.strip()
@@ -263,31 +213,19 @@ class RewardCommands(commands.Cog):
             parts = [part.strip() for part in line.split(",")]
             if len(parts) < 3:
                 skipped_count += 1
-                result_lines.append(
-                    f"第 {line_number} 行失敗：格式不足，請用 顧客ID,金額,日期,備註"
-                )
+                result_lines.append(f"第 {line_number} 行失敗：格式不足，請用 顧客ID,金額,日期,備註")
                 continue
 
             customer_text, amount_text, date_text = parts[0], parts[1], parts[2]
             note = ",".join(parts[3:]).strip() if len(parts) >= 4 else None
-            customer_text = (
-                customer_text.replace("<@", "")
-                .replace(">", "")
-                .replace("!", "")
-            )
+            customer_text = customer_text.replace("<@", "").replace(">", "").replace("!", "")
 
             try:
                 customer_id = int(customer_text)
-                amount = int(
-                    amount_text.replace("T", "")
-                    .replace("t", "")
-                    .replace(",", "")
-                )
+                amount = int(amount_text.replace("T", "").replace("t", "").replace(",", ""))
             except ValueError:
                 skipped_count += 1
-                result_lines.append(
-                    f"第 {line_number} 行失敗：顧客 ID 或金額不是數字。"
-                )
+                result_lines.append(f"第 {line_number} 行失敗：顧客 ID 或金額不是數字。")
                 continue
 
             ok, message = await add_manual_purchase(
@@ -306,18 +244,12 @@ class RewardCommands(commands.Cog):
 
             result_lines.append(message)
 
-        summary = (
-            f"批量補登完成：成功 {success_count} 筆，"
-            f"跳過/失敗 {skipped_count} 筆。"
-        )
+        summary = f"批量補登完成：成功 {success_count} 筆，跳過/失敗 {skipped_count} 筆。"
         detail = "\n".join(result_lines)
         if len(detail) > 1700:
             detail = detail[:1700] + "\n...（結果太長，已截斷）"
 
-        await interaction.followup.send(
-            f"{summary}\n\n{detail}",
-            ephemeral=True,
-        )
+        await interaction.followup.send(f"{summary}\n\n{detail}", ephemeral=True)
 
     @reward.command(
         name="set_customer_rewards",
@@ -343,53 +275,30 @@ class RewardCommands(commands.Cog):
         reason: str | None = None,
     ):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message(
-                "無法確認你的身分組。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("無法確認你的身分組。", ephemeral=True)
             return
 
         if not is_manager_or_admin(interaction.user):
-            await interaction.response.send_message(
-                "只有管理員或店長可以手動修正顧客會員資料。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("只有管理員或店長可以手動修正顧客會員資料。", ephemeral=True)
             return
 
-        if (
-            total_spent is None
-            and order_count is None
-            and last_order_date is None
-            and point_adjustment is None
-        ):
-            await interaction.response.send_message(
-                "請至少填一個要修正的欄位。",
-                ephemeral=True,
-            )
+        if total_spent is None and order_count is None and last_order_date is None and point_adjustment is None:
+            await interaction.response.send_message("請至少填一個要修正的欄位。", ephemeral=True)
             return
 
         if total_spent is not None and total_spent < 0:
-            await interaction.response.send_message(
-                "累積消費不能小於 0。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("累積消費不能小於 0。", ephemeral=True)
             return
 
         if order_count is not None and order_count < 0:
-            await interaction.response.send_message(
-                "完成訂單數不能小於 0。",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("完成訂單數不能小於 0。", ephemeral=True)
             return
 
         date_iso = None
         if last_order_date is not None:
             date_iso, _display_date = parse_manual_purchase_date(last_order_date)
             if date_iso is None:
-                await interaction.response.send_message(
-                    "最後下單日期格式錯誤，請用 20260512、2026/05/12 或 2026-05-12。",
-                    ephemeral=True,
-                )
+                await interaction.response.send_message("最後下單日期格式錯誤，請用 20260512、2026/05/12 或 2026-05-12。", ephemeral=True)
                 return
 
         data = get_customer_reward_data(customer.id)
@@ -408,35 +317,15 @@ class RewardCommands(commands.Cog):
         data["last_manual_fixed_by"] = interaction.user.id
         data["last_manual_fixed_reason"] = (reason or "").strip()
 
-        benefit_notices = (
-            await ensure_reward_member_benefits(
-                interaction.guild,
-                customer,
-                data,
-            )
-            if interaction.guild
-            else []
-        )
+        benefit_notices = await ensure_reward_member_benefits(interaction.guild, customer, data) if interaction.guild else []
         save_bot_data()
 
-        after_embed = build_member_info_embed(
-            customer,
-            data,
-            show_points=True,
-        )
+        after_embed = build_member_info_embed(customer, data, show_points=True)
         after_embed.title = "顧客會員資料已修正"
         if reason:
-            after_embed.add_field(
-                name="修正原因",
-                value=reason,
-                inline=False,
-            )
+            after_embed.add_field(name="修正原因", value=reason, inline=False)
         if benefit_notices:
-            after_embed.add_field(
-                name="會員權益處理",
-                value="\n".join(benefit_notices),
-                inline=False,
-            )
+            after_embed.add_field(name="會員權益處理", value="\n".join(benefit_notices), inline=False)
 
         await send_order_log(
             interaction.guild,
@@ -444,30 +333,15 @@ class RewardCommands(commands.Cog):
             fields=[
                 ("顧客", customer.mention, True),
                 ("操作人員", interaction.user.mention, True),
-                (
-                    "累積消費",
-                    format_t_amount(int(data.get("total_spent", 0) or 0)),
-                    True,
-                ),
-                (
-                    "完成訂單",
-                    f"{int(data.get('order_count', 0) or 0)} 單",
-                    True,
-                ),
-                (
-                    "目前點數",
-                    f"{get_current_reward_points(data):,} 點",
-                    True,
-                ),
+                ("累積消費", format_t_amount(int(data.get("total_spent", 0) or 0)), True),
+                ("完成訂單", f"{int(data.get('order_count', 0) or 0)} 單", True),
+                ("目前點數", f"{get_current_reward_points(data):,} 點", True),
                 ("原因", reason or "未填寫", False),
             ],
             color=discord.Color.orange(),
         )
 
-        await interaction.response.send_message(
-            embed=after_embed,
-            ephemeral=True,
-        )
+        await interaction.response.send_message(embed=after_embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
