@@ -1,0 +1,145 @@
+{% extends "site_layout.html" %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/pages/store_bindings.css?v=20261020-1">
+
+<section class="sbm">
+  <header class="sbm-hero">
+    <div>
+      <div class="sbm-kicker">EXCLUSIVE STAFF</div>
+      <h1>綁店管理</h1>
+      <p>集中處理員工申請、直接授予與解除綁店資格。Web 資格是正式紀錄，Discord 身分組會同步跟上。</p>
+    </div>
+    <div class="sbm-role">Role · 1503828415063785634</div>
+  </header>
+
+  {% if message %}<div class="sbm-alert success">{{ message }}</div>{% endif %}
+  {% if error %}<div class="sbm-alert error">{{ error }}</div>{% endif %}
+
+  <div class="sbm-stats">
+    <div class="sbm-stat"><span>待審核</span><b>{{ stats.pending }}</b><small>員工主動申請</small></div>
+    <div class="sbm-stat"><span>綁店中</span><b>{{ stats.active }}</b><small>目前有效資格</small></div>
+    <div class="sbm-stat"><span>本月新增</span><b>{{ stats.added_this_month }}</b><small>本月生效</small></div>
+    <div class="sbm-stat {% if stats.sync_issues %}warn{% endif %}"><span>同步異常</span><b>{{ stats.sync_issues }}</b><small>Discord Role</small></div>
+  </div>
+
+  <div class="sbm-toolbar">
+    <form class="sbm-search" method="get" action="/employee/store-bindings">
+      <input type="search" name="q" value="{{ q }}" placeholder="搜尋名稱或 Discord ID">
+      <button type="submit">搜尋</button>
+      {% if q %}<a href="/employee/store-bindings">清除</a>{% endif %}
+    </form>
+  </div>
+
+  <section class="sbm-panel grant-panel">
+    <div class="sbm-panel-head">
+      <div><div class="sbm-kicker">DIRECT GRANT</div><h2>直接給予綁店資格</h2></div>
+      <span class="sbm-chip">不需要先申請</span>
+    </div>
+    <form class="grant-form" method="post" action="/employee/store-bindings/grant">
+      <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+      <label>
+        <span>選擇人員</span>
+        <select name="staff_discord_id" required>
+          <option value="">選擇目前啟用中的接單人員</option>
+          {% for member in candidates %}
+            <option value="{{ member.discord_id }}">{{ member.display_name or member.global_name or member.username or member.discord_id }} · {{ member.discord_id }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="grant-note">
+        <span>內部備註</span>
+        <input type="text" name="note" maxlength="1000" placeholder="例如：老闆直接核准、線下已確認">
+      </label>
+      <button class="sbm-btn primary" type="submit">確認綁店</button>
+    </form>
+  </section>
+
+  <section class="sbm-section">
+    <div class="sbm-section-title"><div><div class="sbm-kicker">REVIEW QUEUE</div><h2>待審核申請</h2></div><span>{{ pending|length }} 筆</span></div>
+    <div class="sbm-grid">
+      {% for item in pending %}
+      <article class="sbm-card pending">
+        <div class="sbm-person">
+          <div class="sbm-avatar">{{ item.display_name[:1] }}</div>
+          <div><h3>{{ item.display_name }}</h3><p>{{ item.staff_discord_id }}</p></div>
+          <span class="sbm-status pending">待審核</span>
+        </div>
+        <div class="sbm-facts">
+          <div><span>申請時間</span><b>{{ (item.requested_at or '—')[:16] | replace('T', ' ') }}</b></div>
+          <div><span>核准後</span><b>額外 +3% · 最高 90%</b></div>
+        </div>
+        <div class="sbm-actions split">
+          <form method="post" action="/employee/store-bindings/{{ item.staff_discord_id }}/reject">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <input type="text" name="note" maxlength="1000" placeholder="拒絕原因（可選）">
+            <button class="sbm-btn danger" type="submit">拒絕</button>
+          </form>
+          <form method="post" action="/employee/store-bindings/{{ item.staff_discord_id }}/approve">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <input type="text" name="note" maxlength="1000" placeholder="核准備註（可選）">
+            <button class="sbm-btn primary" type="submit">核准綁店</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <div class="sbm-empty">目前沒有待審核的綁店申請。</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="sbm-section">
+    <div class="sbm-section-title"><div><div class="sbm-kicker">ACTIVE STAFF</div><h2>綁店中</h2></div><span>{{ active|length }} 人</span></div>
+    <div class="sbm-grid">
+      {% for item in active %}
+      <article class="sbm-card active">
+        <div class="sbm-person">
+          <div class="sbm-avatar active">{{ item.display_name[:1] }}</div>
+          <div><h3>{{ item.display_name }}</h3><p>{{ item.staff_discord_id }}</p></div>
+          <span class="sbm-status active">綁店中</span>
+        </div>
+        <div class="sbm-rate">
+          <div><span>一般上限</span><b>87%</b></div><i>→</i><div><span>綁店上限</span><b>90%</b></div>
+        </div>
+        <div class="sbm-facts">
+          <div><span>生效時間</span><b>{{ (item.started_at or '—')[:16] | replace('T', ' ') }}</b></div>
+          <div><span>來源</span><b>{% if item.source == 'self_application' %}員工申請{% else %}客服直接給予{% endif %}</b></div>
+          <div><span>Discord</span><b class="{% if item.discord_sync_status == 'error' %}sync-error{% else %}sync-ok{% endif %}">{% if item.discord_sync_status == 'error' %}同步異常{% else %}身分組正常{% endif %}</b></div>
+        </div>
+        {% if item.discord_sync_error %}<div class="sbm-sync-error">{{ item.discord_sync_error }}</div>{% endif %}
+        <div class="sbm-actions active-actions">
+          {% if item.discord_sync_status == 'error' %}
+          <form method="post" action="/employee/store-bindings/{{ item.staff_discord_id }}/resync">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <button class="sbm-btn" type="submit">重新同步 Role</button>
+          </form>
+          {% endif %}
+          <form class="end-form" method="post" action="/employee/store-bindings/{{ item.staff_discord_id }}/end">
+            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+            <input type="text" name="note" maxlength="1000" placeholder="解除原因">
+            <button class="sbm-btn danger" type="submit">解除綁店</button>
+          </form>
+        </div>
+      </article>
+      {% else %}
+      <div class="sbm-empty">目前沒有綁店中的人員。</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="sbm-panel history-panel">
+    <div class="sbm-panel-head"><div><div class="sbm-kicker">HISTORY</div><h2>最近紀錄</h2></div><span class="sbm-chip">保留歷史，不刪紀錄</span></div>
+    <div class="sbm-history">
+      {% for item in history %}
+      <div class="history-row">
+        <div><b>{{ item.display_name }}</b><small>{{ item.staff_discord_id }}</small></div>
+        <span class="sbm-status muted">{{ item.status_label }}</span>
+        <span>{{ (item.ended_at or item.requested_at or '—')[:16] | replace('T', ' ') }}</span>
+        <span>{{ item.note or '—' }}</span>
+      </div>
+      {% else %}
+      <div class="sbm-empty">目前沒有解除、拒絕或撤回紀錄。</div>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}
