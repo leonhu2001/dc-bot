@@ -59,19 +59,11 @@ def configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch,
 ) -> None:
     """Bind the acceptance runtime from explicit bot-owned dependencies."""
-    global DISPATCH_CHANNEL_ID, ORDER_CLAIMS, PaymentMethodView
-    global SELF_SERVICE_ORDER_SELECTIONS
-
-    DISPATCH_CHANNEL_ID = dispatch_channel_id
-    ORDER_CLAIMS = order_claims
-    PaymentMethodView = payment_method_view_type
-    SELF_SERVICE_ORDER_SELECTIONS = order_selections
-
     configure_acceptance_dispatch_refresh(
-        dispatch_channel_id=DISPATCH_CHANNEL_ID,
-        order_claims=ORDER_CLAIMS,
-        payment_method_view_type=PaymentMethodView,
-        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
+        dispatch_channel_id=dispatch_channel_id,
+        order_claims=order_claims,
+        payment_method_view_type=payment_method_view_type,
+        order_selections=order_selections,
     )
 
     configure_acceptance_sync_worker(
@@ -84,8 +76,8 @@ def configure_acceptance_runtime_explicit(
         to_int=_to_int,
     )
     configure_acceptance_repair_runtime(
-        order_selections=SELF_SERVICE_ORDER_SELECTIONS,
-        payment_method_view_type=PaymentMethodView,
+        order_selections=order_selections,
+        payment_method_view_type=payment_method_view_type,
         refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
         sync_ticket_access_from_state=sync_acceptance_ticket_access_from_state,
     )
