@@ -36,7 +36,7 @@ def test_payment_requires_canonical_web_order_before_any_payment_path():
     source = inspect.getsource(finalize_accepted_pending_payment)
 
     web_order_guard = source.index("if web_order_id is None:")
-    external_review_branch = source.index("if requires_external_payment_review")
+    external_review_branch = source.index("submit_external_payment_review_if_needed")
     wallet_debit_branch = source.index("if requires_wallet_debit")
 
     assert web_order_guard < external_review_branch
