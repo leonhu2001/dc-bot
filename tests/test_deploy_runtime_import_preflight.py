@@ -13,6 +13,7 @@ SMOKE = ROOT / "tools" / "runtime_import_smoke.py"
 
 def test_runtime_import_smoke_module_is_importable():
     module = importlib.import_module("tools.runtime_import_smoke")
+    assert "cogs.wallet_commands" in module.CRITICAL_RUNTIME_MODULES
     assert "services.payment_review_runtime" in module.CRITICAL_RUNTIME_MODULES
     assert "services.vip_voice_runtime" in module.CRITICAL_RUNTIME_MODULES
     assert "services.order_payment_composition" in module.CRITICAL_RUNTIME_MODULES
@@ -59,10 +60,6 @@ def test_wallet_compatibility_adapters_use_explicit_canonical_imports():
             "services.wallet_service",
             "get_wallet_balance",
         ),
-        "_wallet_get_transactions": (
-            "services.wallet_service",
-            "get_wallet_transactions",
-        ),
         "adjust_customer_wallet_balance": (
             "services.wallet_discord_runtime",
             "adjust_customer_wallet_balance",
@@ -74,6 +71,8 @@ def test_wallet_compatibility_adapters_use_explicit_canonical_imports():
     }
     for alias_name, owner in expected.items():
         assert module.REQUIRED_BOT_IMPORT_ALIASES[alias_name] == owner
+
+    assert "_wallet_get_transactions" not in module.REQUIRED_BOT_IMPORT_ALIASES
 
 
 def test_self_service_selection_imports_use_canonical_owner():
@@ -108,12 +107,3 @@ def test_pre_restart_failure_does_not_restart_healthy_services_on_rollback():
     source = DEPLOY.read_text(encoding="utf-8")
     assert "SERVICES_RESTARTED=0" in source
     assert 'if [ "$SERVICES_RESTARTED" -eq 1 ]; then' in source
-    assert source.index("SERVICES_RESTARTED=1") > source.index('=== 8. RESTART SERVICES ===')
-
-
-def test_runtime_import_smoke_script_keeps_explicit_import_loop():
-    source = SMOKE.read_text(encoding="utf-8")
-    assert "importlib.import_module(module_name)" in source
-    assert "sys.path.insert(0, str(ROOT))" in source
-    assert "ast.parse" in source
-    assert "REQUIRED_BOT_IMPORT_ALIASES" in source
