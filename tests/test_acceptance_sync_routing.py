@@ -68,7 +68,7 @@ def test_generic_web_sync_atomically_claims_only_non_claim_events():
     assert "cursor.rowcount != len(event_ids)" in body
 
 
-def test_acceptance_worker_is_single_owner_for_claim_events():
+def test_acceptance_worker_retries_failed_and_abandoned_claim_events():
     source = Path("services/acceptance/sync_worker.py").read_text(
         encoding="utf-8"
     )
@@ -77,9 +77,15 @@ def test_acceptance_worker_is_single_owner_for_claim_events():
     end = source.index("async def acceptance_sync_event_worker", start)
     body = source[start:end]
 
-    assert "from sqlalchemy import select, update" in body
-    assert ".where(SyncEvent.status == SyncEventStatus.PENDING.value)" in body
+    assert "ACCEPTANCE_SYNC_STALE_PROCESSING_MINUTES = 10" in source
+    assert "ACCEPTANCE_SYNC_MAX_RETRIES = 20" in source
+    assert "SyncEvent.status == SyncEventStatus.PENDING.value" in body
+    assert "SyncEvent.status == SyncEventStatus.FAILED.value" in body
+    assert "SyncEvent.status == SyncEventStatus.PROCESSING.value" in body
+    assert "SyncEvent.processed_at <= stale_before" in body
+    assert "retry_count_expr < ACCEPTANCE_SYNC_MAX_RETRIES" in body
     assert "claimed.rowcount != 1" in body
+    assert "error_message=None" in body
     assert '"admin_added_worker"' in body
     assert '"admin_removed_worker"' in body
     assert "await deps.refresh_existing_web_sync_dispatch(" in body
