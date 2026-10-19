@@ -10,8 +10,22 @@
 
   const formatDate = (value) => {
     if (!value) return '—';
-    const text = String(value).replace('T', ' ');
-    return text.slice(0, 16);
+    const raw = String(value).trim();
+    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+    const date = new Date(`${raw}${hasZone ? '' : 'Z'}`);
+    if (Number.isNaN(date.getTime())) return raw.replace('T', ' ').slice(0, 16);
+
+    const parts = new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
   };
 
   const setMeta = (label, value, detail, detailClass = '') => {
@@ -49,7 +63,7 @@
       card.classList.add('state-active');
       statusEl.textContent = '綁店中';
       statusEl.dataset.state = 'active';
-      descriptionEl.textContent = '你的綁店資格已生效。一般分潤制度完成後，綁店加成會額外 +3%，最高 90%。';
+      descriptionEl.textContent = '你的綁店資格已生效。符合現行分潤規則的訂單會額外套用 +3% 綁店加成，最高 90%。';
       const syncError = data.discord_sync_status === 'error';
       setMeta(
         '生效時間',
