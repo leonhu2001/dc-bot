@@ -11,6 +11,9 @@
         </div>
         <div class="ec-actions">
             <a class="ec-btn primary" href="/dispatch">接單大廳</a>
+            {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
+            <a class="ec-btn" href="/employee/store-bindings">綁店管理</a>
+            {% endif %}
             <a class="ec-btn" href="/employee/internal-transfers">內部轉帳</a>
             <a class="ec-btn" href="/staff/{{ member.discord_id }}">公開個人牆</a>
             <a class="ec-btn" href="/me">個人中心</a>
