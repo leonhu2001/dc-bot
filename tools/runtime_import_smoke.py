@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 BOT_PATH = ROOT / "bot.py"
 CRITICAL_RUNTIME_MODULES = (
+    "cogs.wallet_commands",
     "services.payment_review_runtime",
     "services.vip_voice_runtime",
     "services.order_runtime",
@@ -47,10 +48,6 @@ REQUIRED_BOT_IMPORT_ALIASES = {
     "_wallet_get_balance": (
         "services.wallet_service",
         "get_wallet_balance",
-    ),
-    "_wallet_get_transactions": (
-        "services.wallet_service",
-        "get_wallet_transactions",
     ),
     "adjust_customer_wallet_balance": (
         "services.wallet_discord_runtime",
