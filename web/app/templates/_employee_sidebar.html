@@ -10,6 +10,7 @@
     <a class="{% if _p.startswith('/dispatch/reports') and not _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports">報單系統</a>
     {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
       <a id="order-report-review-nav" class="{% if _p.startswith('/dispatch/reports/review') %}active{% endif %}" href="/dispatch/reports/review">報單審核</a>
+      <a class="{% if _p.startswith('/employee/store-bindings') %}active{% endif %}" href="/employee/store-bindings">綁店管理</a>
     {% endif %}
     <a class="{% if _p.startswith('/employee/internal-transfers') %}active{% endif %}" href="/employee/internal-transfers">內部轉帳</a>
     <a href="/">返回官網</a>
