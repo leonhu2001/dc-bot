@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 
-from web.app.routers import admin_operations_report as report_module
+from web.app.services import operations_report as report_module
 
 
 def _create_report_db(path):

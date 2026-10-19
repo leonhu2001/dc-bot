@@ -44,6 +44,7 @@ MAX_BYTES = {
     "web/app/services/admin_order_workspace_field_write.py": 7_500,
     "web/app/services/admin_order_workspace_meta.py": 4_500,
     "web/app/services/admin_order_workspace_payout_state.py": 4_500,
+    "web/app/services/operations_report.py": 24_000,
     "views/review.py": 50_000,
     "services/review_storage.py": 25_000,
     "services/worker_tips.py": 11_000,
