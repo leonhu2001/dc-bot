@@ -8,7 +8,7 @@
         <div>
             <div class="ec-k">EMPLOYEE CENTER</div>
             <h1>{{ member.name }}</h1>
-            <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。薪資區直接同步結算資料，不再另外算一套。</div>
+            <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
         </div>
         <div class="ec-actions">
             <a class="ec-btn primary" href="/dispatch">接單大廳</a>
@@ -18,7 +18,6 @@
             <a class="ec-btn" href="/employee/store-bindings">綁店管理</a>
             {% endif %}
             <a class="ec-btn" href="/employee/internal-transfers">內部轉帳</a>
-            <a class="ec-btn" href="/my/payouts">完整薪資</a>
             <a class="ec-btn" href="/staff/{{ member.discord_id }}">公開個人牆</a>
             <a class="ec-btn" href="/me">個人中心</a>
         </div>
@@ -155,7 +154,6 @@
                 <div class="ec-item"><span>階級</span><b>{{ profile.role_title or "尚未設定" }}</b></div>
                 <div class="ec-item"><span>主要遊戲</span><b>{{ profile.main_games or "尚未設定" }}</b></div>
                 <div class="ec-item"><span>公開</span><b>{% if profile.is_public %}是{% else %}否{% endif %}</b></div>
-                <div class="ec-note">薪資不再從這個頁面的舊統計欄位計算；上方「我的薪資」會直接讀取正式分潤、雞腿與內部轉帳調整資料。</div>
             </div>
         </aside>
     </div>
