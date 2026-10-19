@@ -1,0 +1,320 @@
+/* Unified employee workspace visual language.
+   Scoped to the employee layout only; admin pages remain untouched. */
+body.mw-r5-employee {
+    --ewu-bg: #080809;
+    --ewu-panel: #11110f;
+    --ewu-panel-soft: #151512;
+    --ewu-line: rgba(255, 255, 255, .085);
+    --ewu-line-gold: rgba(242, 214, 141, .22);
+    --ewu-gold: #f2d68d;
+    --ewu-gold-strong: #dfb75c;
+    --ewu-text: #ebe8de;
+    --ewu-muted: rgba(235, 232, 222, .52);
+    background:
+        radial-gradient(circle at 86% 4%, rgba(110, 34, 45, .14), transparent 34%),
+        radial-gradient(circle at 12% 0%, rgba(242, 214, 141, .035), transparent 26%),
+        var(--ewu-bg) !important;
+    color: var(--ewu-text) !important;
+}
+
+body.mw-r5-employee .mw-r5-shell {
+    display: block !important;
+    width: min(1180px, calc(100% - 28px)) !important;
+    min-height: 0 !important;
+    margin: 34px auto 90px !important;
+    background: transparent !important;
+}
+
+body.mw-r5-employee .mw-r5-sidebar {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 18px !important;
+    padding: 15px 18px !important;
+    margin: 0 0 14px !important;
+    border: 1px solid var(--ewu-line) !important;
+    border-radius: 22px !important;
+    background: linear-gradient(145deg, rgba(242, 214, 141, .055), rgba(255, 255, 255, .016)), var(--ewu-panel) !important;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .18) !important;
+    backdrop-filter: none !important;
+}
+
+body.mw-r5-employee .mw-r5-brand {
+    flex: 0 0 auto;
+    padding: 0 !important;
+}
+
+body.mw-r5-employee .mw-r5-brand small {
+    color: var(--ewu-gold-strong) !important;
+    font-size: 9px !important;
+    letter-spacing: .18em !important;
+}
+
+body.mw-r5-employee .mw-r5-brand strong {
+    margin-top: 4px !important;
+    color: var(--ewu-text) !important;
+    font-size: 17px !important;
+}
+
+body.mw-r5-employee .mw-r5-nav {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    gap: 7px !important;
+}
+
+body.mw-r5-employee .mw-r5-nav a {
+    min-height: 36px !important;
+    padding: 0 12px !important;
+    border: 1px solid rgba(255, 255, 255, .10) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, .025) !important;
+    color: var(--ewu-text) !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+}
+
+body.mw-r5-employee .mw-r5-nav a:hover,
+body.mw-r5-employee .mw-r5-nav a.active {
+    border-color: rgba(242, 214, 141, .34) !important;
+    background: rgba(242, 214, 141, .09) !important;
+    color: var(--ewu-gold) !important;
+}
+
+body.mw-r5-employee .mw-r5-main-host {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+body.mw-r5-employee .mw-r5-page-header {
+    margin: 0 0 14px !important;
+    padding: 23px 24px !important;
+    border: 1px solid var(--ewu-line) !important;
+    border-radius: 24px !important;
+    background: linear-gradient(145deg, rgba(242, 214, 141, .07), rgba(255, 255, 255, .022)), var(--ewu-panel) !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .18) !important;
+}
+
+body.mw-r5-employee .mw-r5-kicker,
+body.mw-r5-employee .mw-r5-page-header .eyebrow {
+    color: var(--ewu-gold-strong) !important;
+    font-size: 10px !important;
+    letter-spacing: .17em !important;
+}
+
+body.mw-r5-employee .mw-r5-page-title,
+body.mw-r5-employee .mw-r5-page-header h1 {
+    color: var(--ewu-text) !important;
+    font-size: clamp(30px, 4vw, 46px) !important;
+    letter-spacing: -.035em !important;
+}
+
+body.mw-r5-employee .mw-r5-page-header p {
+    color: var(--ewu-muted) !important;
+}
+
+body.mw-r5-employee .mw-r5-content {
+    min-width: 0 !important;
+    padding: 0 !important;
+    gap: 14px !important;
+}
+
+/* Pages that already own a complete hero should not render a second global hero. */
+body.mw-r5-employee:has(.dispatch-shell) .mw-r5-page-header,
+body.mw-r5-employee:has(.report-shell) .mw-r5-page-header {
+    display: none !important;
+}
+
+body.mw-r5-employee :is(.dispatch-shell, .report-shell, .it-wrap) {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+}
+
+body.mw-r5-employee :is(
+    .dispatch-panel,
+    .dispatch-order-card,
+    .dispatch-my-card,
+    .dispatch-support-duty,
+    .report-hero,
+    .report-card,
+    .report-filter-bar,
+    .report-section,
+    .report-order-summary,
+    .report-review-topbar,
+    .report-reminder-panel,
+    .report-trace-details,
+    .it-card
+) {
+    border-color: var(--ewu-line) !important;
+    background: linear-gradient(145deg, rgba(242, 214, 141, .025), rgba(255, 255, 255, .012)), var(--ewu-panel) !important;
+    box-shadow: none !important;
+}
+
+body.mw-r5-employee :is(.dispatch-eyebrow, .report-kicker) {
+    color: var(--ewu-gold-strong) !important;
+}
+
+body.mw-r5-employee :is(.dispatch-title, .report-hero h2, .report-review-title h2, .it-card h2) {
+    color: var(--ewu-text) !important;
+}
+
+body.mw-r5-employee :is(.dispatch-desc, .dispatch-muted, .report-muted, .it-muted) {
+    color: var(--ewu-muted) !important;
+}
+
+body.mw-r5-employee .dispatch-hero {
+    gap: 12px !important;
+    margin-bottom: 14px !important;
+}
+
+body.mw-r5-employee .dispatch-hero-main {
+    padding: 22px !important;
+    border-radius: 22px !important;
+    background: linear-gradient(145deg, rgba(242, 214, 141, .07), rgba(255, 255, 255, .02)), var(--ewu-panel) !important;
+}
+
+body.mw-r5-employee .dispatch-stats {
+    border-radius: 22px !important;
+    background: var(--ewu-panel) !important;
+}
+
+body.mw-r5-employee .dispatch-stat {
+    background: rgba(255, 255, 255, .025) !important;
+    border-color: rgba(255, 255, 255, .075) !important;
+}
+
+body.mw-r5-employee .dispatch-stat strong,
+body.mw-r5-employee .dispatch-money strong,
+body.mw-r5-employee .dispatch-payout strong {
+    color: var(--ewu-gold) !important;
+}
+
+body.mw-r5-employee .dispatch-board {
+    gap: 12px !important;
+}
+
+body.mw-r5-employee .dispatch-column {
+    border-radius: 20px !important;
+    background: var(--ewu-panel) !important;
+}
+
+body.mw-r5-employee .dispatch-column:nth-child(2) {
+    top: 14px !important;
+}
+
+body.mw-r5-employee .dispatch-order-card,
+body.mw-r5-employee .dispatch-my-card {
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, .018) !important;
+}
+
+body.mw-r5-employee .dispatch-tag,
+body.mw-r5-employee .dispatch-pill,
+body.mw-r5-employee .dispatch-chip {
+    border-color: rgba(255, 255, 255, .09) !important;
+    background: rgba(255, 255, 255, .025) !important;
+}
+
+body.mw-r5-employee .report-hero {
+    padding: 22px !important;
+    border-radius: 22px !important;
+    background: linear-gradient(145deg, rgba(242, 214, 141, .07), rgba(255, 255, 255, .02)), var(--ewu-panel) !important;
+}
+
+body.mw-r5-employee .report-filter-bar,
+body.mw-r5-employee .report-card,
+body.mw-r5-employee .report-section,
+body.mw-r5-employee .report-review-topbar,
+body.mw-r5-employee .report-reminder-panel,
+body.mw-r5-employee .report-trace-details {
+    border-radius: 18px !important;
+}
+
+body.mw-r5-employee :is(.report-button-primary, .it-btn:not(.danger):not(.secondary)) {
+    border-color: rgba(242, 214, 141, .32) !important;
+    background: rgba(242, 214, 141, .11) !important;
+    color: var(--ewu-gold) !important;
+}
+
+body.mw-r5-employee :is(.report-button-secondary, .it-btn.secondary) {
+    border-color: rgba(255, 255, 255, .10) !important;
+    background: rgba(255, 255, 255, .03) !important;
+    color: var(--ewu-text) !important;
+}
+
+body.mw-r5-employee .it-grid {
+    gap: 12px !important;
+}
+
+body.mw-r5-employee .it-card {
+    border-radius: 20px !important;
+}
+
+body.mw-r5-employee :is(input, select, textarea) {
+    border-color: rgba(255, 255, 255, .10) !important;
+    background-color: rgba(255, 255, 255, .025) !important;
+    color: var(--ewu-text) !important;
+}
+
+body.mw-r5-employee :is(input, textarea)::placeholder {
+    color: rgba(235, 232, 222, .32) !important;
+}
+
+@media (max-width: 980px) {
+    body.mw-r5-employee .mw-r5-sidebar {
+        align-items: flex-start !important;
+        flex-direction: column !important;
+    }
+    body.mw-r5-employee .mw-r5-nav {
+        justify-content: flex-start !important;
+    }
+    body.mw-r5-employee .dispatch-board {
+        grid-template-columns: 1fr !important;
+    }
+    body.mw-r5-employee .dispatch-column:nth-child(2) {
+        position: static !important;
+    }
+}
+
+@media (max-width: 720px) {
+    body.mw-r5-employee .mw-r5-shell {
+        width: min(100% - 20px, 1180px) !important;
+        margin-top: 18px !important;
+    }
+    body.mw-r5-employee .mw-r5-sidebar {
+        padding: 14px !important;
+        border-radius: 18px !important;
+    }
+    body.mw-r5-employee .mw-r5-nav {
+        width: 100% !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    body.mw-r5-employee .mw-r5-nav a {
+        justify-content: center !important;
+        text-align: center !important;
+    }
+    body.mw-r5-employee .mw-r5-page-header,
+    body.mw-r5-employee .dispatch-hero-main,
+    body.mw-r5-employee .report-hero {
+        padding: 18px !important;
+        border-radius: 18px !important;
+    }
+}
+
+@media (max-width: 460px) {
+    body.mw-r5-employee .mw-r5-nav {
+        grid-template-columns: 1fr 1fr !important;
+    }
+    body.mw-r5-employee .mw-r5-nav a:last-child {
+        grid-column: 1 / -1;
+    }
+}
