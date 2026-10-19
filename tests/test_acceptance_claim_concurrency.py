@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 import threading
+import time
 
 from sqlalchemy import create_engine, text
 
@@ -55,23 +56,28 @@ def test_concurrent_claims_cannot_overfill_or_raise_database_lock(tmp_path, monk
         )
 
     original_active_claim_rows = order_acceptance._active_claim_rows
-    first_read_barrier = threading.Barrier(2)
+    start_barrier = threading.Barrier(2)
     thread_state = threading.local()
 
-    def synchronized_active_claim_rows(conn, order_id):
+    def delayed_first_active_claim_read(conn, order_id):
         rows = original_active_claim_rows(conn, order_id)
         if not getattr(thread_state, "passed_first_read", False):
             thread_state.passed_first_read = True
-            first_read_barrier.wait(timeout=5)
+            # Without a serialized write transaction both callers can read the
+            # same empty slot during this window and then both insert. With
+            # BEGIN IMMEDIATE the second caller cannot reach this read until
+            # the first claim has committed.
+            time.sleep(0.15)
         return rows
 
     monkeypatch.setattr(
         order_acceptance,
         "_active_claim_rows",
-        synchronized_active_claim_rows,
+        delayed_first_active_claim_read,
     )
 
     def claim(staff_id: str):
+        start_barrier.wait(timeout=5)
         try:
             state = order_acceptance.claim_acceptance_order(
                 order_id=1,
