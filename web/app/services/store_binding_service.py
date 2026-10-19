@@ -118,7 +118,138 @@ def binding_payload(binding: StaffStoreBinding | None) -> dict:
     }
 
 
+def _cached_role_ids(member: WebStaffMember | None) -> set[str]:
+    if member is None:
+        return set()
+    try:
+        values = json.loads(member.roles_json or "[]")
+    except Exception:
+        return set()
+    if not isinstance(values, list):
+        return set()
+    return {str(value) for value in values}
+
+
+def _sync_cached_role(db: Session, staff_discord_id: str, enabled: bool) -> None:
+    member = db.get(WebStaffMember, str(staff_discord_id))
+    if member is None:
+        return
+    role_ids = _cached_role_ids(member)
+    if enabled:
+        role_ids.add(STORE_BOUND_ROLE_ID)
+    else:
+        role_ids.discard(STORE_BOUND_ROLE_ID)
+    member.roles_json = json.dumps(sorted(role_ids), ensure_ascii=False)
+
+
+def _discord_role_request(staff_discord_id: str, enabled: bool) -> tuple[bool, str | None]:
+    guild_id = str(getattr(config, "DISCORD_GUILD_ID", "") or getattr(config, "GUILD_ID", "") or "").strip()
+    bot_token = str(getattr(config, "DISCORD_BOT_TOKEN", "") or "").strip()
+    if not guild_id or not bot_token:
+        return False, "Discord Bot 或 Guild 設定不完整。"
+
+    method = requests.put if enabled else requests.delete
+    try:
+        response = method(
+            f"{DISCORD_API_BASE}/guilds/{guild_id}/members/{staff_discord_id}/roles/{STORE_BOUND_ROLE_ID}",
+            headers={
+                "Authorization": f"Bot {bot_token}",
+                "X-Audit-Log-Reason": "Mowan store binding sync",
+            },
+            timeout=15,
+        )
+        if response.status_code != 204:
+            raise RuntimeError(f"Discord HTTP {response.status_code}")
+    except Exception as exc:
+        return False, str(exc)[:500]
+    return True, None
+
+
+def sync_store_binding_role(
+    db: Session,
+    *,
+    binding: StaffStoreBinding,
+    enabled: bool,
+) -> bool:
+    binding.discord_sync_status = "pending"
+    binding.discord_sync_error = None
+
+    ok, error = _discord_role_request(binding.staff_discord_id, enabled)
+    if not ok:
+        binding.discord_sync_status = "error"
+        binding.discord_sync_error = error or "Discord 同步失敗。"
+        return False
+
+    binding.discord_sync_status = "synced"
+    binding.discord_sync_error = None
+    binding.discord_synced_at = utc_now_naive()
+    _sync_cached_role(db, binding.staff_discord_id, enabled)
+    return True
+
+
+def reconcile_store_binding_role_from_cache(db: Session, staff_discord_id: str) -> bool:
+    """Repair a cached Discord role mismatch without changing financial truth.
+
+    The Web DB binding state is authoritative. Discord is only a mirror. This
+    helper uses the latest Discord member snapshot to decide whether an API
+    repair is necessary and never grants or ends a binding based on the role.
+    """
+    staff_id = str(staff_discord_id)
+    member = db.get(WebStaffMember, staff_id)
+    if member is None:
+        return True
+
+    active = get_active_binding(db, staff_id)
+    should_have_role = active is not None
+    has_role = STORE_BOUND_ROLE_ID in _cached_role_ids(member)
+    if should_have_role == has_role:
+        if active is not None and active.discord_sync_status == "error":
+            active.discord_sync_status = "synced"
+            active.discord_sync_error = None
+            active.discord_synced_at = utc_now_naive()
+        return True
+
+    if active is not None:
+        return sync_store_binding_role(db, binding=active, enabled=True)
+
+    ok, error = _discord_role_request(staff_id, False)
+    latest = get_latest_binding(db, staff_id)
+    if ok:
+        _sync_cached_role(db, staff_id, False)
+        if latest is not None:
+            latest.discord_sync_status = "synced"
+            latest.discord_sync_error = None
+            latest.discord_synced_at = utc_now_naive()
+        return True
+
+    if latest is not None:
+        latest.discord_sync_status = "error"
+        latest.discord_sync_error = error or "Discord 同步失敗。"
+    return False
+
+
+def reconcile_store_binding_roles_from_cache(db: Session) -> dict:
+    checked = 0
+    repaired = 0
+    failed = 0
+    members = list(db.scalars(select(WebStaffMember)).all())
+    for member in members:
+        staff_id = str(member.discord_id)
+        active = get_active_binding(db, staff_id)
+        expected = active is not None
+        actual = STORE_BOUND_ROLE_ID in _cached_role_ids(member)
+        checked += 1
+        if expected == actual:
+            continue
+        if reconcile_store_binding_role_from_cache(db, staff_id):
+            repaired += 1
+        else:
+            failed += 1
+    return {"checked": checked, "repaired": repaired, "failed": failed}
+
+
 def get_staff_binding_payload(db: Session, staff_discord_id: str) -> dict:
+    reconcile_store_binding_role_from_cache(db, staff_discord_id)
     active = get_active_binding(db, staff_discord_id)
     if active is not None:
         return binding_payload(active)
@@ -163,61 +294,6 @@ def withdraw_store_binding_application(db: Session, *, staff_discord_id: str) ->
     row.discord_sync_status = "not_required"
     db.flush()
     return row
-
-
-def _sync_cached_role(db: Session, staff_discord_id: str, enabled: bool) -> None:
-    member = db.get(WebStaffMember, str(staff_discord_id))
-    if member is None:
-        return
-    try:
-        role_ids = {str(value) for value in json.loads(member.roles_json or "[]")}
-    except Exception:
-        role_ids = set()
-    if enabled:
-        role_ids.add(STORE_BOUND_ROLE_ID)
-    else:
-        role_ids.discard(STORE_BOUND_ROLE_ID)
-    member.roles_json = json.dumps(sorted(role_ids), ensure_ascii=False)
-
-
-def sync_store_binding_role(
-    db: Session,
-    *,
-    binding: StaffStoreBinding,
-    enabled: bool,
-) -> bool:
-    binding.discord_sync_status = "pending"
-    binding.discord_sync_error = None
-    guild_id = str(getattr(config, "DISCORD_GUILD_ID", "") or "").strip()
-    bot_token = str(getattr(config, "DISCORD_BOT_TOKEN", "") or "").strip()
-
-    if not guild_id or not bot_token:
-        binding.discord_sync_status = "error"
-        binding.discord_sync_error = "Discord Bot 或 Guild 設定不完整。"
-        return False
-
-    method = requests.put if enabled else requests.delete
-    try:
-        response = method(
-            f"{DISCORD_API_BASE}/guilds/{guild_id}/members/{binding.staff_discord_id}/roles/{STORE_BOUND_ROLE_ID}",
-            headers={
-                "Authorization": f"Bot {bot_token}",
-                "X-Audit-Log-Reason": "Mowan store binding sync",
-            },
-            timeout=15,
-        )
-        if response.status_code != 204:
-            raise RuntimeError(f"Discord HTTP {response.status_code}")
-    except Exception as exc:
-        binding.discord_sync_status = "error"
-        binding.discord_sync_error = str(exc)[:500]
-        return False
-
-    binding.discord_sync_status = "synced"
-    binding.discord_sync_error = None
-    binding.discord_synced_at = utc_now_naive()
-    _sync_cached_role(db, binding.staff_discord_id, enabled)
-    return True
 
 
 def grant_store_binding(
@@ -312,6 +388,7 @@ def list_binding_rows(db: Session, *, status: str | None = None) -> list[StaffSt
 
 
 def list_binding_candidates(db: Session) -> list[WebStaffMember]:
+    reconcile_store_binding_roles_from_cache(db)
     active_ids = {
         str(row.staff_discord_id)
         for row in list_binding_rows(db, status=ACTIVE)
