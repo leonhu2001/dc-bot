@@ -26,6 +26,7 @@
   let backgroundAlertPending = false;
   let onlineCompanionCount = null;
   let onlineSupportCount = null;
+  let soundToggleBusy = false;
 
   function isDispatchPage() {
     return window.location.pathname === '/dispatch';
@@ -136,9 +137,75 @@
     return document.querySelector('.dispatch-alert-toggle');
   }
 
+  function animateSoundButton(btn) {
+    if (!btn) return;
+    btn.classList.remove('dispatch-alert-tap');
+    void btn.offsetWidth;
+    btn.classList.add('dispatch-alert-tap');
+    window.setTimeout(() => {
+      btn.classList.remove('dispatch-alert-tap');
+    }, 190);
+  }
+
+  function bindSoundButton(btn) {
+    if (!btn || btn.dataset.dispatchSoundBound === '1') return;
+    btn.dataset.dispatchSoundBound = '1';
+
+    btn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      animateSoundButton(btn);
+
+      if (soundToggleBusy) return;
+
+      if (!enabled) {
+        soundToggleBusy = true;
+        enabled = true;
+        pendingAlert = false;
+        localStorage.setItem(ENABLED_KEY, '1');
+        updateSoundButton();
+
+        try {
+          if (await unlockAudio()) {
+            await dingDong();
+          }
+        } finally {
+          soundToggleBusy = false;
+          updateSoundButton();
+        }
+        return;
+      }
+
+      if (!isAudioReady()) {
+        soundToggleBusy = true;
+        btn.setAttribute('aria-busy', 'true');
+        btn.textContent = '🔔 正在啟用聲音…';
+
+        try {
+          if (await unlockAudio()) {
+            pendingAlert = false;
+            await dingDong();
+          }
+        } finally {
+          soundToggleBusy = false;
+          btn.removeAttribute('aria-busy');
+          updateSoundButton();
+        }
+        return;
+      }
+
+      enabled = false;
+      pendingAlert = false;
+      localStorage.setItem(ENABLED_KEY, '0');
+      updateSoundButton();
+    });
+  }
+
   function updateSoundButton() {
     const btn = getSoundButton();
     if (!btn) return;
+
+    bindSoundButton(btn);
+    btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
 
     if (!enabled) {
       btn.dataset.state = 'blocked';
@@ -159,46 +226,16 @@
   }
 
   function makeSoundButton() {
-    if (getSoundButton()) {
-      updateSoundButton();
-      return;
+    let btn = getSoundButton();
+
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dispatch-alert-toggle';
+      document.body.appendChild(btn);
     }
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'dispatch-alert-toggle';
-
-    btn.addEventListener('click', async () => {
-      if (!enabled) {
-        enabled = true;
-        localStorage.setItem(ENABLED_KEY, '1');
-
-        if (await unlockAudio()) {
-          pendingAlert = false;
-          await dingDong();
-        }
-
-        updateSoundButton();
-        return;
-      }
-
-      if (!isAudioReady()) {
-        if (await unlockAudio()) {
-          pendingAlert = false;
-          await dingDong();
-        }
-
-        updateSoundButton();
-        return;
-      }
-
-      enabled = false;
-      pendingAlert = false;
-      localStorage.setItem(ENABLED_KEY, '0');
-      updateSoundButton();
-    });
-
-    document.body.appendChild(btn);
+    bindSoundButton(btn);
     updateSoundButton();
   }
 
@@ -755,7 +792,7 @@
       refreshDispatch({ playAlert: false });
     }, HOURLY_REFRESH_MS);
 
-    console.log('[dispatch-alert] started v13 solid-status-capsules');
+    console.log('[dispatch-alert] started v14 responsive-alert-toggle');
   }
 
   window.addEventListener('beforeunload', () => {
