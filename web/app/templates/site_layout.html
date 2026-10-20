@@ -21,6 +21,11 @@
     <link rel="stylesheet" href="/static/css/csp_style_attrs.css?v=20261013">
     <script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
 
+    {% if employee_workspace_shell|default(false) %}
+    <link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-2">
+    <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-10">
+    {% endif %}
+
     {% block head %}{% endblock %}
 
     <link rel="stylesheet" href="/static/css/mw_public_r5.css?v=scroll_perf_20260917_1">
@@ -46,11 +51,22 @@
     {% endfor %}
 </head>
 
-<body class="site-body mw-public-r5" data-page="{{ page_name or '' }}">
+<body class="site-body mw-public-r5{% if employee_workspace_shell|default(false) %} employee-workspace-site{% endif %}" data-page="{{ page_name or '' }}">
     {% include "_site_header.html" %}
 
     <main class="site-main">
+        {% if employee_workspace_shell|default(false) %}
+        <section class="ec employee-workspace-frame">
+            {% include "_employee_workspace_hero.html" %}
+            <div class="employee-workspace-page-content">
+        {% endif %}
+
         {% block content %}{% endblock %}
+
+        {% if employee_workspace_shell|default(false) %}
+            </div>
+        </section>
+        {% endif %}
     </main>
 
     <footer class="site-footer">
@@ -113,6 +129,19 @@
     <script src="/static/js/marketing_funnel.js?v=1" defer></script>
     <script src="/static/js/support_chat.js?v=1" defer></script>
     <script src="/static/js/home_crew_runtime.js?v=20261013" defer></script>
+    {% if employee_workspace_shell|default(false) %}
+    <script src="/static/js/pages/employee_workspace_identity.js?v=20261020-1"></script>
+    <script src="/static/js/ui_tweaks.js?v=1"></script>
+    <script src="/static/js/payout_status_i18n.js?v=1"></script>
+    <script src="/static/js/month_select.js?v=1"></script>
+    {% if request.url.path == '/dispatch' %}
+    <script src="/static/js/dispatch_navigation.js?v=20261013-1" defer></script>
+    <script src="/static/js/dispatch_alerts.js?v=58"></script>
+    {% endif %}
+    {% if request.url.path.startswith('/employee/store-bindings') %}
+    <script src="/static/js/pages/store_binding_time.js?v=20261020-2" defer></script>
+    {% endif %}
+    {% endif %}
     {% block scripts %}{% endblock %}
 </body>
 </html>
