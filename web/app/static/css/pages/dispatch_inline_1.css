@@ -10,3 +10,9 @@
 .dispatch-tag-button{cursor:pointer;border-color:rgba(245,198,107,.55);box-shadow:0 0 0 1px rgba(245,198,107,.09) inset,0 6px 16px rgba(245,198,107,.1);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
 .dispatch-tag-button:hover{transform:translateY(-2px);filter:brightness(1.14);box-shadow:0 0 0 1px rgba(245,198,107,.2) inset,0 10px 22px rgba(245,198,107,.18)}
 .dispatch-footer button:disabled,.dispatch-support-tools button:disabled{opacity:.56;cursor:wait;transform:none;filter:none;box-shadow:none}
+
+/* 20261020: keep the support worker assignment picker dark, including its native popup. */
+.dispatch-support-form select{color-scheme:dark;background-color:#11141d;color:#eef2f6}
+.dispatch-support-form select option,.dispatch-support-form select optgroup{background-color:#151a22;color:#e7edf3}
+.dispatch-support-form select option:checked{background-color:#26323a;color:#fff}
+.dispatch-support-form select option:disabled{color:#78838d}
