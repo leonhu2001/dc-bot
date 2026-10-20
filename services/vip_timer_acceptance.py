@@ -36,8 +36,8 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     install_vip_timer_self_service()
 
     # Build the timer-only selector tree first, then refine it to:
-    # category -> game -> gameplay -> headcount. Duration remains free-running
-    # and is never selected up front.
+    # category -> game -> gameplay -> service package. Duration remains
+    # free-running and is never selected up front.
     from services.vip_timer_select_flow import install_vip_timer_select_flow
     from services.vip_timer_selector_order_v2 import install_vip_timer_selector_order_v2
     from services.vip_timer_selector_order_v3 import install_vip_timer_selector_order_v3
@@ -46,6 +46,7 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     install_vip_timer_selector_order_v2()
     install_vip_timer_selector_order_v3()
 
+    from services.vip_timer_billing_guard import install_vip_timer_billing_guard
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services.vip_timer_runtime import (
         VipTimerControlView,
@@ -53,6 +54,9 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     )
     from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
 
+    # Runtime is imported before this guard so it can patch both canonical
+    # settlement and the Discord timer card with the 15-minute minimum rule.
+    install_vip_timer_billing_guard()
     install_acceptance_payment_hook()
     install_vip_timer_payment_recovery()
     install_vip_timer_runtime_guard(
