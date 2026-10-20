@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-LAYOUT = ROOT / "web" / "app" / "templates" / "layout.html"
+LAYOUT = ROOT / "web" / "app" / "templates" / "admin_layout.html"
 SHARED_STYLES = ROOT / "web" / "app" / "static" / "css" / "pages" / "layout_inline_1.css"
 REPORT_TEMPLATE = ROOT / "web" / "app" / "templates" / "order_report_detail.html"
 REPORT_ENTRY_STYLES = ROOT / "web" / "app" / "static" / "css" / "order_report_entry.css"

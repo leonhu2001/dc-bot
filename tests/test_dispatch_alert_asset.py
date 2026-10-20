@@ -9,7 +9,7 @@ def test_dispatch_alert_script_is_loaded_once():
         ROOT / "web" / "app" / "templates" / "dispatch.html"
     ).read_text(encoding="utf-8")
     layout_template = (
-        ROOT / "web" / "app" / "templates" / "layout.html"
+        ROOT / "web" / "app" / "templates" / "site_layout.html"
     ).read_text(encoding="utf-8")
 
     assert "dispatch_alerts.js" not in dispatch_template

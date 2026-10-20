@@ -8,18 +8,25 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_public_and_backoffice_layouts_share_global_scrollbar_lane():
+def test_public_and_admin_layouts_share_global_scrollbar_lane():
     site_layout = _read("web/app/templates/site_layout.html")
-    backoffice_layout = _read("web/app/templates/layout.html")
+    admin_layout = _read("web/app/templates/admin_layout.html")
     css = _read("web/app/static/css/mw_global_scrollbar.css")
 
     stylesheet = "/static/css/mw_global_scrollbar.css?v=20261020-1"
     assert stylesheet in site_layout
-    assert stylesheet in backoffice_layout
+    assert stylesheet in admin_layout
     assert "overflow-y: scroll" in css
     assert "scrollbar-gutter: stable" in css
     assert "html::-webkit-scrollbar-thumb" in css
     assert "#9b3842" in css
+
+
+def test_employee_bridge_never_loads_backoffice_shell_for_employee_routes():
+    bridge = _read("web/app/templates/layout.html")
+    assert 'extends "admin_layout.html" if request.url.path.startswith(\'/admin\') else "site_layout.html"' in bridge
+    assert "mw_portal_r5.css" not in bridge
+    assert "mw-r5-shell" not in bridge
 
 
 def test_store_binding_get_does_not_wait_for_live_discord_roles():
