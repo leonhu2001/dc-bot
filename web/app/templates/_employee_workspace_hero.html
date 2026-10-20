@@ -1,7 +1,7 @@
 {% set _employee_path = request.url.path %}
 {% set _employee_member = member if member is defined and member else {} %}
-{% set _employee_name = _employee_member.get('name') or _employee_member.get('display_name') or (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
-{% set _employee_id = _employee_member.get('discord_id') or (user.id if user else '') %}
+{% set _employee_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or _employee_member.get('name') or _employee_member.get('display_name') or '員工' %}
+{% set _employee_id = (user.id if user else '') or _employee_member.get('discord_id') %}
 
 <div class="ec-hero employee-workspace-hero">
     <div>
