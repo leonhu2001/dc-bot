@@ -63,15 +63,48 @@ def _upsert_field(
     embed.add_field(name=name, value=value[:1024], inline=inline)
 
 
-def _acceptance_status_text(claim_data: dict) -> str:
+def _remove_fields(embed: discord.Embed, names: set[str]) -> None:
+    """Remove obsolete UX fields before rebuilding the unified status block."""
+    kept = [
+        (str(field.name), str(field.value), bool(field.inline))
+        for field in embed.fields
+        if str(field.name) not in names
+    ]
+    if len(kept) == len(embed.fields):
+        return
+
+    embed.clear_fields()
+    for name, value, inline in kept:
+        embed.add_field(name=name, value=value, inline=inline)
+
+
+def _dispatch_phase_text(
+    claim_data: dict,
+    *,
+    now_ts: int | None = None,
+) -> str:
+    """Describe the visible phase without deciding whether a claim is allowed."""
     status = str(claim_data.get("status") or "").strip().lower()
     accepted_count = _to_int(claim_data.get("accepted_count"), 0) or 0
     required_staff_count = _to_int(claim_data.get("required_staff_count"), 1) or 1
+    specified_staff_ids = _normalized_ids(claim_data.get("specified_staff_ids"))
+    public_open_ts = _to_int(claim_data.get("public_acceptance_opens_at_unix"), None)
 
     if status == "accepted_pending_pay" or accepted_count >= required_staff_count:
-        return "✅ 人數已滿｜等待顧客付款"
+        return "✅ 已滿員｜等待顧客付款"
+
     if status == "waiting_acceptance":
-        return f"🟡 等待接單中｜{accepted_count}/{required_staff_count} 位"
+        current_ts = (
+            int(datetime.now(timezone.utc).timestamp())
+            if now_ts is None
+            else int(now_ts)
+        )
+        if public_open_ts is not None and current_ts < public_open_ts:
+            if specified_staff_ids:
+                return f"🎯 指定優先中｜公開接單 <t:{public_open_ts}:R>"
+            return f"🔒 接單保護中｜公開接單 <t:{public_open_ts}:R>"
+        return "🟢 公開接單中｜可依現有資格規則接單"
+
     if status == "stored":
         return "🔵 已存單｜接單暫停"
     if status in {"closed", "completed", "done"}:
@@ -83,20 +116,42 @@ def _acceptance_status_text(claim_data: dict) -> str:
     return str(claim_data.get("status") or "狀態未紀錄")
 
 
+def _acceptance_status_text(claim_data: dict) -> str:
+    """Backward-compatible alias for the unified dispatch phase label."""
+    return _dispatch_phase_text(claim_data)
+
+
 def apply_acceptance_dispatch_fields(
     embed: discord.Embed,
     claim_data: dict,
+    *,
+    now_ts: int | None = None,
 ) -> discord.Embed:
-    """Apply read-only acceptance context to a dispatch embed."""
+    """Apply one unified, read-only status hierarchy to a dispatch embed."""
     accepted_count = _to_int(claim_data.get("accepted_count"), 0) or 0
     required_staff_count = _to_int(claim_data.get("required_staff_count"), 1) or 1
     protector_count = _to_int(claim_data.get("protector_count"), 0) or 0
     min_protector_count = _to_int(claim_data.get("min_protector_count"), 0) or 0
+    specified_staff_ids = _normalized_ids(claim_data.get("specified_staff_ids"))
+    public_open_ts = _to_int(claim_data.get("public_acceptance_opens_at_unix"), None)
+
+    # Phase 1 used separate status/protection/specified-slot fields. Remove them
+    # first so refreshed messages do not accumulate stale sections.
+    _remove_fields(
+        embed,
+        {
+            "狀態",
+            "目前階段",
+            "接單保護",
+            "指定／公開名額",
+            "接單規則",
+        },
+    )
 
     _upsert_field(
         embed,
-        name="狀態",
-        value=_acceptance_status_text(claim_data),
+        name="目前階段",
+        value=_dispatch_phase_text(claim_data, now_ts=now_ts),
         inline=False,
     )
     _upsert_field(
@@ -114,34 +169,38 @@ def apply_acceptance_dispatch_fields(
             inline=True,
         )
 
-    specified_staff_ids = _normalized_ids(claim_data.get("specified_staff_ids"))
+    rule_lines: list[str] = []
     if specified_staff_ids:
         public_slots = max(0, required_staff_count - len(set(specified_staff_ids)))
-        _upsert_field(
-            embed,
-            name="指定／公開名額",
-            value=(
-                "指定人員："
-                + "、".join(f"<@{staff_id}>" for staff_id in specified_staff_ids)
-                + f"\n非指定公開名額：{public_slots} 位"
-            ),
-            inline=False,
+        rule_lines.append(
+            "指定人員："
+            + "、".join(f"<@{staff_id}>" for staff_id in specified_staff_ids)
         )
+        rule_lines.append(f"非指定公開名額：{public_slots} 位")
 
-    public_open_ts = _to_int(claim_data.get("public_acceptance_opens_at_unix"), None)
     if public_open_ts is not None:
-        protection_lines = [
-            f"公開接單時間：<t:{public_open_ts}:T>（<t:{public_open_ts}:R>）",
-            "派單建立後前 1 分鐘依既有規則保護。",
-        ]
-        if specified_staff_ids:
-            protection_lines.append(
-                "指定人員可略過時間鎖，但仍需符合原本遊戲身分與職位／階級資格。"
+        current_ts = (
+            int(datetime.now(timezone.utc).timestamp())
+            if now_ts is None
+            else int(now_ts)
+        )
+        if current_ts < public_open_ts:
+            rule_lines.append(
+                f"公開接單：<t:{public_open_ts}:T> 開放（<t:{public_open_ts}:R>）"
             )
+        else:
+            rule_lines.append(f"公開接單：已於 <t:{public_open_ts}:T> 開放")
+
+        if specified_staff_ids:
+            rule_lines.append(
+                "指定人員僅略過時間鎖；遊戲身分與職位／階級資格仍照原規則。"
+            )
+
+    if rule_lines:
         _upsert_field(
             embed,
-            name="接單保護",
-            value="\n".join(protection_lines),
+            name="接單規則",
+            value="\n".join(rule_lines),
             inline=False,
         )
 
