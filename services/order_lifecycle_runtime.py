@@ -12,6 +12,10 @@ from core.time_utils import (
 )
 from services.logging_service import send_order_log
 from services.order_dispatch_runtime import delete_dispatch_claim_panel_for_order
+from services.order_notification_presentation import (
+    build_cancelled_order_notice,
+    cancellation_reason_label,
+)
 from services.order_storage_runtime import lock_dispatch_claim_panel
 from services.payment_methods import WALLET_PAYMENT_METHOD
 from services.order_payment_policy import is_zero_amount_order
@@ -834,8 +838,13 @@ class ConfirmCancelOrderView(discord.ui.View):
             )
 
         await interaction.response.send_message(
-            "已確認取消訂單，這個頻道將在 3 秒後關閉，對應的派單訊息也會一併刪除。",
-            ephemeral=False
+            build_cancelled_order_notice(
+                cancellation_reason_label(
+                    self.cancellation_reason_code,
+                    CANCEL_REASON_OPTIONS,
+                )
+            ),
+            ephemeral=False,
         )
 
         await asyncio.sleep(3)
