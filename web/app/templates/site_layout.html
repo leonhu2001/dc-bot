@@ -2,85 +2,31 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="utf-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-
-    <meta
-        name="csrf-token"
-        content="{{ request.session.get('csrf_token', '') }}"
-    >
-
-    <script
-        src="/static/js/csrf.js?v=1"
-    ></script>
-
-    <meta
-        name="theme-color"
-        content="#09090b"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
+    <script src="/static/js/csrf.js?v=1"></script>
+    <meta name="theme-color" content="#09090b">
 
     {% set seo_data = seo or {} %}
+    <title>{{ seo_data.get("title") or title or "魔丸娛樂" }}</title>
+    <meta name="robots" content="{{ seo_data.get('robots') or 'index, follow' }}">
+    {% if seo_data.get("canonical") %}<link rel="canonical" href="{{ seo_data.get('canonical') }}">{% endif %}
 
-    <title>
-        {{ seo_data.get("title") or title or "魔丸娛樂" }}
-    </title>
-
-    <meta
-        name="robots"
-        content="{{ seo_data.get('robots') or 'index, follow' }}"
-    >
-
-    {% if seo_data.get("canonical") %}
-        <link
-            rel="canonical"
-            href="{{ seo_data.get('canonical') }}"
-        >
-    {% endif %}
-
-    <link
-        rel="stylesheet"
-        href="/static/css/mw_site.css?v=16"
-    >
-
-    <link
-        rel="stylesheet"
-        href="/static/css/support_chat.css?v=1"
-    >
-
-    <link
-        rel="stylesheet"
-        href="/static/css/site_public_extracted.css?v=20261013"
-    >
-
-    <link
-        rel="stylesheet"
-        href="/static/css/order_ui.css?v=20261016"
-    >
-
-    <script
-        src="/static/js/mw_order_ui.js?v=20261017a"
-        defer
-    ></script>
-
+    <link rel="stylesheet" href="/static/css/mw_site.css?v=16">
+    <link rel="stylesheet" href="/static/css/support_chat.css?v=1">
+    <link rel="stylesheet" href="/static/css/site_public_extracted.css?v=20261013">
+    <link rel="stylesheet" href="/static/css/order_ui.css?v=20261016">
+    <script src="/static/js/mw_order_ui.js?v=20261017a" defer></script>
     <link rel="stylesheet" href="/static/css/csp_style_attrs.css?v=20261013">
-<script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
+    <script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
 
-{% block head %}{% endblock %}
+    {% block head %}{% endblock %}
 
     <link rel="stylesheet" href="/static/css/mw_public_r5.css?v=scroll_perf_20260917_1">
-
-    <!-- MAWAN_SITE_IDENTITY -->
     <link rel="icon" type="image/png" href="/static/img/favicon.png?v=20260904-2">
     <link rel="apple-touch-icon" href="/static/img/favicon.png?v=20260904-2">
 
-    <!-- MAWAN_DYNAMIC_SEO -->
-    <meta
-        name="description"
-        content="{{ seo_data.get('description') or '魔丸娛樂陪玩、娛樂、開黑與遊戲服務。' }}"
-    >
-
+    <meta name="description" content="{{ seo_data.get('description') or '魔丸娛樂陪玩、娛樂、開黑與遊戲服務。' }}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="魔丸娛樂">
     <meta property="og:title" content="{{ seo_data.get('title') or title or '魔丸娛樂｜MOWAN Entertainment' }}">
@@ -89,7 +35,6 @@
     <meta property="og:image" content="{{ seo_data.get('image') or 'https://mowanentertainment.com/static/img/og-share.jpg?v=20260904-2' }}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ seo_data.get('title') or title or '魔丸娛樂｜MOWAN Entertainment' }}">
     <meta name="twitter:description" content="{{ seo_data.get('description') or '今晚，想怎麼玩？' }}">
@@ -98,201 +43,10 @@
     {% for schema in seo_data.get("schemas", []) %}
         <script nonce="{{ request.state.csp_nonce }}" type="application/ld+json">{{ schema|tojson }}</script>
     {% endfor %}
-
 </head>
 
-<!-- MAWAN_R5R1_VISUAL_FINAL PUBLIC -->
-<body
-    class="site-body mw-public-r5"
-    data-page="{{ page_name or '' }}"
->
-    {% set current_path = request.url.path %}
-
-    <header class="site-header">
-        <div class="site-nav-shell">
-
-            <a
-                class="site-brand"
-                href="/"
-                aria-label="魔丸娛樂首頁"
-            >
-                <span class="site-brand-logo">
-                    <img
-                        src="/static/img/server_logo.gif"
-                        alt="魔丸娛樂"
-                    >
-                </span>
-
-                <span class="site-brand-copy">
-                    <strong>魔丸娛樂</strong>
-                    <small>MOWAN ENTERTAINMENT</small>
-                </span>
-            </a>
-
-            <nav
-                class="site-desktop-nav"
-                aria-label="主要導覽"
-            >
-                <a
-                    href="/"
-                    class="{% if current_path == '/' %}is-active{% endif %}"
-                >
-                    首頁
-                </a>
-
-                <a
-                    href="/order"
-                    class="{% if current_path.startswith('/order') %}is-active{% endif %}"
-                >
-                    立即下單
-                </a>
-
-                <a
-                    href="/games/delta-force"
-                    class="{% if current_path == '/games/delta-force' %}is-active{% endif %}"
-                >
-                    三角洲行動
-                </a>
-
-                <a
-                    href="/staff"
-                    class="{% if current_path.startswith('/staff') %}is-active{% endif %}"
-                >
-                    陪玩陣容
-                </a>
-
-                <a
-                    href="/vip"
-                    class="{% if current_path.startswith('/vip') %}is-active{% endif %}"
-                >
-                    VIP
-                </a>
-
-                <a href="/#about">
-                    關於我們
-                </a>
-            </nav>
-
-            <div class="site-account">
-
-                {% if user %}
-                    <details class="account-menu">
-                        <summary>
-                            <span class="account-avatar">
-                                {% if user.avatar %}
-                                    <img
-                                        src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=128"
-                                        alt=""
-                                    >
-                                {% else %}
-                                    <span>
-                                        {{ (user.display_name or user.global_name or user.username or 'M')[:1] }}
-                                    </span>
-                                {% endif %}
-                            </span>
-
-                            <span class="account-name">
-                                {{ user.display_name or user.global_name or user.username }}
-                            </span>
-
-                            <span class="account-chevron">
-                                ▾
-                            </span>
-                        </summary>
-
-                        <div class="account-dropdown">
-                            <div class="account-dropdown-head">
-                                <strong>
-                                    {{ user.display_name or user.global_name or user.username }}
-                                </strong>
-
-                                <small>
-                                    Discord ID · {{ user.id }}
-                                </small>
-                            </div>
-
-                            <a href="/me">
-                                我的專區
-                            </a>
-
-                            {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
-                                <div class="account-divider"></div>
-
-                                <a
-                                    href="/employee"
-                                    class="account-special"
-                                >
-                                    員工中心
-                                </a>
-                            {% endif %}
-
-                            {% if user.is_customer_service %}
-                                <a
-                                    href="/service"
-                                    class="account-special"
-                                >
-                                    客服後台
-                                </a>
-                            {% endif %}
-
-                            <div class="account-divider"></div>
-
-                            <a
-                                href="/auth/logout"
-                                class="account-logout"
-                            >
-                                登出
-                            </a>
-                        </div>
-                    </details>
-                {% else %}
-                    <a
-                        class="discord-login"
-                        href="/auth/discord/login"
-                    >
-                        <span class="discord-dot"></span>
-                        Discord 登入
-                    </a>
-                {% endif %}
-
-                <button
-                    class="mobile-nav-button"
-                    type="button"
-                    aria-label="開啟選單"
-                    aria-expanded="false"
-                    data-mobile-nav-button
-                >
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-            </div>
-        </div>
-
-        <nav
-            class="site-mobile-nav"
-            data-mobile-nav
-        >
-            <a href="/">首頁</a>
-            <a href="/order">立即下單</a>
-            <a href="/games/delta-force">三角洲行動</a>
-            <a href="/staff">陪玩陣容</a>
-            <a href="/vip">VIP</a>
-            <a href="/#about">關於我們</a>
-
-            {% if user %}
-                <a href="/me">我的專區</a>
-
-                {% if user.is_employee or user.is_worker or user.is_companion or user.is_customer_service %}
-                    <a href="/employee">員工中心</a>
-                {% endif %}
-
-                {% if user.is_customer_service %}
-                    <a href="/service">客服後台</a>
-                {% endif %}
-            {% endif %}
-        </nav>
-    </header>
+<body class="site-body mw-public-r5" data-page="{{ page_name or '' }}">
+    {% include "_site_header.html" %}
 
     <main class="site-main">
         {% block content %}{% endblock %}
@@ -300,35 +54,16 @@
 
     <footer class="site-footer">
         <div class="footer-grid">
-
             <div class="footer-brand">
-                <a
-                    class="site-brand"
-                    href="/"
-                >
-                    <span class="site-brand-logo">
-                        <img
-                            src="/static/img/server_logo.gif"
-                            alt="魔丸娛樂"
-                        >
-                    </span>
-
-                    <span class="site-brand-copy">
-                        <strong>魔丸娛樂</strong>
-                        <small>MOWAN ENTERTAINMENT</small>
-                    </span>
+                <a class="site-brand" href="/">
+                    <span class="site-brand-logo"><img src="/static/img/server_logo.gif" alt="魔丸娛樂"></span>
+                    <span class="site-brand-copy"><strong>魔丸娛樂</strong><small>MOWAN ENTERTAINMENT</small></span>
                 </a>
-
-                <p>
-                    陪你玩，也陪你把今晚玩得有意思。
-                </p>
+                <p>陪你玩，也陪你把今晚玩得有意思。</p>
             </div>
 
             <div>
-                <strong class="footer-title">
-                    服務
-                </strong>
-
+                <strong class="footer-title">服務</strong>
                 <a href="/order">立即下單</a>
                 <a href="/games/delta-force">三角洲服務</a>
                 <a href="/staff">陪玩陣容</a>
@@ -336,30 +71,13 @@
             </div>
 
             <div>
-                <strong class="footer-title">
-                    會員
-                </strong>
-
-                {% if user %}
-                    <a href="/me">我的專區</a>
-                    {% else %}
-                    <a href="/auth/discord/login">
-                        Discord 登入
-                    </a>
-                {% endif %}
-
-                {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}
-                    <a href="/employee">
-                        員工中心
-                    </a>
-                {% endif %}
+                <strong class="footer-title">會員</strong>
+                {% if user %}<a href="/me">我的專區</a>{% else %}<a href="/auth/discord/login">Discord 登入</a>{% endif %}
+                {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}<a href="/employee">員工中心</a>{% endif %}
             </div>
 
             <div>
-                <strong class="footer-title">
-                    魔丸
-                </strong>
-
+                <strong class="footer-title">魔丸</strong>
                 <a href="/#about">關於我們</a>
                 <a class="mw-footer-link" href="/#social">社群網址</a>
                 <span><!-- MAWAN_PHASE_FOOTER_ORDER_NOTICE_V1 --><a class="mw-footer-link" href="/service-rules">下單須知</a></span>
@@ -367,115 +85,33 @@
         </div>
 
         <div class="footer-bottom">
-            <span>
-                © 魔丸娛樂 MOWAN ENTERTAINMENT
-            </span>
-
-            <span>
-                Discord OAuth 安全登入
-            </span>
+            <span>© 魔丸娛樂 MOWAN ENTERTAINMENT</span>
+            <span>Discord OAuth 安全登入</span>
         </div>
 
-<!-- MW SOCIAL LINKS -->
-<div class="mw-social-links">
+        <div class="mw-social-links"></div>
+    </footer>
 
+    <button class="mw-support-launcher" type="button" aria-label="開啟客服" aria-expanded="false" data-mw-support-launcher>💬</button>
 
-
-
-
-
-
-</div>
-<!-- /MW SOCIAL LINKS -->
-
-</footer>
-
-    <button
-        class="mw-support-launcher"
-        type="button"
-        aria-label="開啟客服"
-        aria-expanded="false"
-        data-mw-support-launcher
-    >💬</button>
-
-    <section
-        class="mw-support-panel"
-        aria-label="魔丸網站客服"
-        data-mw-support-panel
-    >
+    <section class="mw-support-panel" aria-label="魔丸網站客服" data-mw-support-panel>
         <header class="mw-support-head">
-            <div class="mw-support-head-copy">
-                <strong>魔丸客服</strong>
-                <span>AI 先協助，需要時轉真人</span>
-            </div>
-            <button
-                class="mw-support-close"
-                type="button"
-                aria-label="關閉客服"
-                data-mw-support-close
-            >×</button>
+            <div class="mw-support-head-copy"><strong>魔丸客服</strong><span>AI 先協助，需要時轉真人</span></div>
+            <button class="mw-support-close" type="button" aria-label="關閉客服" data-mw-support-close>×</button>
         </header>
-
-        <div
-            class="mw-support-status"
-            data-mw-support-status
-        >客服連線中</div>
-
-        <div
-            class="mw-support-messages"
-            aria-live="polite"
-            data-mw-support-messages
-        ></div>
-
-        <div class="mw-support-actions">
-            <button
-                class="mw-support-human"
-                type="button"
-                data-mw-support-human
-            >轉接真人客服</button>
-        </div>
-
-        <form
-            class="mw-support-form"
-            data-mw-support-form
-        >
-            <textarea
-                class="mw-support-input"
-                rows="1"
-                maxlength="2000"
-                placeholder="輸入你的問題…"
-                aria-label="客服訊息"
-                data-mw-support-input
-            ></textarea>
-            <button
-                class="mw-support-send"
-                type="submit"
-                aria-label="送出"
-                data-mw-support-send
-            >➤</button>
+        <div class="mw-support-status" data-mw-support-status>客服連線中</div>
+        <div class="mw-support-messages" aria-live="polite" data-mw-support-messages></div>
+        <div class="mw-support-actions"><button class="mw-support-human" type="button" data-mw-support-human>轉接真人客服</button></div>
+        <form class="mw-support-form" data-mw-support-form>
+            <textarea class="mw-support-input" rows="1" maxlength="2000" placeholder="輸入你的問題…" aria-label="客服訊息" data-mw-support-input></textarea>
+            <button class="mw-support-send" type="submit" aria-label="送出" data-mw-support-send>➤</button>
         </form>
     </section>
 
-    <script
-        src="/static/js/mw_site.js?v=3-order-rule-intro"
-        defer
-    ></script>
-
-    <script
-        src="/static/js/marketing_funnel.js?v=1"
-        defer
-    ></script>
-
-    <script
-        src="/static/js/support_chat.js?v=1"
-        defer
-    ></script>
-
-    <script
-        src="/static/js/home_crew_runtime.js?v=20261013"
-        defer
-    ></script>
-
+    <script src="/static/js/mw_site.js?v=3-order-rule-intro" defer></script>
+    <script src="/static/js/marketing_funnel.js?v=1" defer></script>
+    <script src="/static/js/support_chat.js?v=1" defer></script>
+    <script src="/static/js/home_crew_runtime.js?v=20261013" defer></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
