@@ -87,6 +87,13 @@ body.mw-r5-employee .mw-r5-shell {
   display: none !important;
 }
 
+/* Employee workspace pages wrap the mobile trigger. This outer guard is not a
+   button, so the backoffice-wide button reset cannot accidentally make it
+   visible on desktop. */
+.employee-mobile-nav-control {
+  display: none !important;
+}
+
 /* The employee hero is also one shared partial. Lock the typography to what
    /employee gets from site-body + mw-public-r5, then let employee_center CSS own
    only the component geometry/colors. */
@@ -206,6 +213,7 @@ body.mw-r5-employee .sbm-hero h1 { margin: 4px 0 0 !important; font-size: 24px !
   .mw-shared-site-header .site-desktop-nav { display: none !important; }
   .mw-shared-site-header .mobile-nav-button { display: block !important; }
   .mw-shared-site-header .site-nav-shell { grid-template-columns: 1fr auto !important; }
+  .employee-mobile-nav-control { display: block !important; }
 }
 
 @media (max-width: 980px) {
