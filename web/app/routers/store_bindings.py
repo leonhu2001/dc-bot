@@ -50,6 +50,27 @@ def _discord_id(user: dict | None) -> str:
     return str(user.get("discord_id") or user.get("id") or "").strip()
 
 
+def _can_manage_session(user: dict | None) -> bool:
+    """Fast read-only access check for rendering the management page.
+
+    The session roles were already verified during login / privileged actions. Page
+    rendering must not wait on Discord REST on every navigation. Mutating routes
+    still call _can_manage() below and therefore revalidate against Discord live.
+    """
+    if not user:
+        return False
+    if bool(user.get("is_manager") or user.get("is_customer_service")):
+        return True
+    role_ids = list(user.get("role_ids") or [])
+    if not role_ids:
+        return False
+    try:
+        access = get_dashboard_access(role_ids)
+    except Exception:
+        return False
+    return bool(access.get("is_manager") or access.get("is_customer_service"))
+
+
 def _can_manage(user: dict | None) -> bool:
     staff_id = _discord_id(user)
     if not staff_id:
@@ -141,7 +162,7 @@ async def store_binding_management(
     user = _current_user(request)
     if not user:
         return RedirectResponse("/auth/discord/login?next=/employee/store-bindings", status_code=303)
-    if not _can_manage(user):
+    if not _can_manage_session(user):
         return RedirectResponse("/no-access", status_code=303)
 
     q = str(q or "").strip().lower()

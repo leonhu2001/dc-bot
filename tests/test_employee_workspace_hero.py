@@ -66,12 +66,21 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
 
 def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
     employee = _read("web/app/templates/employee_center.html")
+    layout = _read("web/app/templates/layout.html")
     sidebar = _read("web/app/templates/_employee_sidebar.html")
     css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
 
-    assert "employee_center_inline_1.css?v=20261020-2" in sidebar
-    assert "employee_workspace_site_shell.css?v=20261020-8" in sidebar
-    assert "employee_workspace_site_shell.css?v=20261020-8" in employee
+    # Shared employee CSS must be loaded in <head>, not discovered inside body
+    # after the header has already painted. Late body styles caused visible
+    # reflow when navigating between employee pages.
+    assert "{% block head %}" in employee
+    assert "employee_center_inline_1.css?v=20261020-2" in employee
+    assert "employee_workspace_site_shell.css?v=20261020-9" in employee
+    assert "employee_center_inline_1.css?v=20261020-2" in layout
+    assert "employee_workspace_site_shell.css?v=20261020-9" in layout
+    assert "employee_center_inline_1.css" not in sidebar
+    assert "employee_workspace_site_shell.css" not in sidebar
+
     assert "employee-workspace-top" in sidebar
     assert "width: min(1180px, calc(100% - 28px))" in css
 
@@ -86,12 +95,13 @@ def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
 
 
 def test_workspace_header_matches_public_r5_typography_and_breakpoints():
+    layout = _read("web/app/templates/layout.html")
     sidebar = _read("web/app/templates/_employee_sidebar.html")
     header = _read("web/app/templates/_site_header.html")
     css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
     public_css = _read("web/app/static/css/mw_public_r5.css")
 
-    assert "/static/css/mw_site.css?v=16" in sidebar
+    assert "/static/css/mw_site.css?v=16" in layout
     assert "/static/js/mw_site.js?v=3-order-rule-intro" in sidebar
     assert "ewu-site-header" not in sidebar
 

@@ -1,0 +1,29 @@
+/* Global vertical scrollbar.
+   Always reserve the scrollbar lane so centered layouts do not shift horizontally
+   when navigating between short and long pages. */
+html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #9b3842 #09090b;
+}
+
+html::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+html::-webkit-scrollbar-track {
+    background: #09090b;
+}
+
+html::-webkit-scrollbar-thumb {
+    min-height: 48px;
+    border: 2px solid #09090b;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #a9414c 0%, #7c2932 100%);
+}
+
+html::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #bd4b57 0%, #91313b 100%);
+}

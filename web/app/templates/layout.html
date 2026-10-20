@@ -24,6 +24,15 @@
         {{ title or "魔丸娛樂" }}
     </title>
 
+    <link rel="stylesheet" href="/static/css/mw_global_scrollbar.css?v=20261020-1">
+
+    {% set _head_path = request.url.path %}
+    {% if not _head_path.startswith('/admin') %}
+    <link rel="stylesheet" href="/static/css/mw_site.css?v=16">
+    <link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-2">
+    <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
+    {% endif %}
+
     <link
         rel="stylesheet"
         href="/static/css/app.css"

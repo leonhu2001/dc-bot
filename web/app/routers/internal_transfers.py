@@ -49,6 +49,56 @@ def _display_name(user: dict) -> str:
     )
 
 
+def _session_employee_user(request: Request) -> dict | None:
+    """Resolve read-only page access from the already verified session.
+
+    Opening the page should not block on Discord REST. Any action that changes
+    salary data still uses _refresh_employee_user(), which performs a live role
+    check immediately before the mutation.
+    """
+    user = request.session.get("user")
+    if not user:
+        return None
+
+    if bool(
+        user.get("is_employee")
+        or user.get("is_manager")
+        or user.get("is_customer_service")
+        or user.get("is_worker")
+        or user.get("is_companion")
+    ):
+        return user
+
+    role_ids = list(user.get("role_ids") or [])
+    if not role_ids:
+        return None
+
+    try:
+        access = get_dashboard_access(role_ids)
+    except Exception:
+        return None
+
+    refreshed = dict(user)
+    is_manager = bool(access.get("is_manager") or access.get("is_admin"))
+    is_customer_service = bool(access.get("is_customer_service"))
+    is_worker = bool(access.get("is_worker"))
+    is_companion = bool(access.get("is_companion"))
+    refreshed.update(
+        {
+            "is_manager": is_manager,
+            "is_customer_service": is_customer_service,
+            "is_admin": bool(is_manager or is_customer_service),
+            "is_worker": is_worker,
+            "is_companion": is_companion,
+            "is_employee": bool(
+                is_manager or is_customer_service or is_worker or is_companion
+            ),
+        }
+    )
+    request.session["user"] = refreshed
+    return refreshed if refreshed["is_employee"] else None
+
+
 async def _refresh_employee_user(request: Request) -> dict | None:
     user = request.session.get("user")
     if not user:
@@ -94,7 +144,7 @@ def _is_reviewer(user: dict) -> bool:
 
 @router.get("/employee/internal-transfers")
 async def internal_transfer_page(request: Request):
-    user = await _refresh_employee_user(request)
+    user = _session_employee_user(request)
     if not user:
         if request.session.get("user"):
             return RedirectResponse("/no-access", status_code=303)
