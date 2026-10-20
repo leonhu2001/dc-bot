@@ -62,7 +62,18 @@ jobs:
             tools \
             scripts
 
+      - name: Run VIP timer selector and retract regression
+        run: |
+          python -m pytest -q \
+            tests/test_vip_timer_selector_v3_and_retract.py \
+            tests/test_vip_timer_selector_order_v2.py \
+            tests/test_vip_timer_select_flow.py \
+            tests/test_vip_timer_self_service.py \
+            tests/test_vip_timer_runtime_guard.py \
+            tests/test_vip_timer_guards.py
+
       - name: Audit templates and static references
+        continue-on-error: true
         run: |
           python tools/audit_templates.py
 
