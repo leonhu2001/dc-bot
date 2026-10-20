@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-def configure_vip_timer_acceptance(bot_instance) -> None:
+def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     """Install VIP timer acceptance hooks for a live Discord bot.
 
     Keep this out of services.acceptance.runtime so the legacy orchestration
@@ -17,9 +17,14 @@ def configure_vip_timer_acceptance(bot_instance) -> None:
         VipTimerControlView,
         install_acceptance_payment_hook,
     )
+    from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
 
     install_acceptance_payment_hook()
     install_vip_timer_payment_recovery()
+    install_vip_timer_runtime_guard(
+        bot_instance=bot_instance,
+        guild_id=int(guild_id),
+    )
 
     if getattr(bot_instance, "_vip_timer_control_view_registered", False):
         return
