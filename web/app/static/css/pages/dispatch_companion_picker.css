@@ -1,3 +1,5 @@
+@import url("./dispatch_desktop_notification_button.css?v=20261020-1");
+
 /* Custom dark companion picker for the dispatch support tools.
    Kept in an external stylesheet so CSP cannot block the component styles. */
 .dispatch-support-form.mw-picker-ready{
