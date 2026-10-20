@@ -46,7 +46,7 @@ def test_dispatch_fields_show_specified_priority_before_public_open_without_muta
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=1900)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🎯 指定優先 → 🟢 公開接單 <t:2000:R>"
+    assert fields["目前階段"] == "🎯 等待接單｜指定優先 → 公開 <t:2000:R>"
     assert fields["接單進度"] == "1/2 位"
     assert fields["護航需求"] == "1/1 位護級"
     assert "<@111>" in fields["接單規則"]
@@ -72,7 +72,7 @@ def test_dispatch_fields_show_generic_protection_without_specified_staff():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=1900)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🔒 接單保護 → 🟢 公開接單 <t:2000:R>"
+    assert fields["目前階段"] == "🔒 等待接單｜接單保護 → 公開 <t:2000:R>"
     assert "公開接單：<t:2000:T> 開放" in fields["接單規則"]
 
 
@@ -88,7 +88,7 @@ def test_dispatch_fields_show_public_acceptance_after_open_time():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=2000)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🟢 公開接單中｜可依現有資格規則接單"
+    assert fields["目前階段"] == "🟢 等待接單｜公開接單中"
     assert "已於 <t:2000:T> 開放" in fields["接單規則"]
 
 
@@ -103,5 +103,23 @@ def test_dispatch_fields_show_full_waiting_payment_state():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=2000)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "✅ 已滿員｜等待顧客付款"
+    assert fields["目前階段"] == "✅ 等待付款｜接單人數已滿"
     assert fields["接單進度"] == "2/2 位"
+
+
+def test_dispatch_fields_use_same_base_labels_as_web_for_active_and_stored():
+    active_embed = discord.Embed(title="派單")
+    apply_acceptance_dispatch_fields(
+        active_embed,
+        {"status": "active", "accepted_count": 1, "required_staff_count": 1},
+        now_ts=2000,
+    )
+    stored_embed = discord.Embed(title="派單")
+    apply_acceptance_dispatch_fields(
+        stored_embed,
+        {"status": "stored", "accepted_count": 0, "required_staff_count": 1},
+        now_ts=2000,
+    )
+
+    assert _field_map(active_embed)["目前階段"] == "🟢 進行中｜已付款"
+    assert _field_map(stored_embed)["目前階段"] == "🔵 已暫存｜接單暫停"
