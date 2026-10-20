@@ -1,0 +1,68 @@
+/* Order workspace toolbar polish: keep quick actions in one compact, balanced row. */
+
+.mw-r5-admin .mw-ops-sticky-bar {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(18, 20, 27, .9);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+
+.mw-r5-admin .mw-ops-sticky-bar > .mw-ops-sticky-actions:first-child {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    padding-right: 10px;
+    border-right: 1px solid rgba(255, 255, 255, .08);
+}
+
+.mw-r5-admin .mw-ops-sticky-bar > .mw-ops-sticky-actions:last-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+}
+
+.mw-r5-admin .mw-ops-sticky-bar .mw-ops-action {
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 9px;
+    white-space: nowrap;
+    transition: background .14s ease, border-color .14s ease, transform .14s ease;
+}
+
+.mw-r5-admin .mw-ops-sticky-bar .mw-ops-action:hover {
+    transform: translateY(-1px);
+}
+
+.mw-r5-admin .mw-ops-sticky-bar .mw-ops-copy-action {
+    border-color: rgba(230, 184, 82, .28);
+    background: rgba(230, 184, 82, .08);
+    color: #f3d98d;
+}
+
+.mw-r5-admin .mw-ops-sticky-bar .mw-ops-copy-action:hover {
+    border-color: rgba(230, 184, 82, .46);
+    background: rgba(230, 184, 82, .13);
+}
+
+@media (max-width: 820px) {
+    .mw-r5-admin .mw-ops-sticky-bar {
+        gap: 7px;
+        padding: 7px;
+    }
+
+    .mw-r5-admin .mw-ops-sticky-bar > .mw-ops-sticky-actions:first-child {
+        padding-right: 7px;
+        gap: 6px;
+    }
+
+    .mw-r5-admin .mw-ops-sticky-bar > .mw-ops-sticky-actions:last-child {
+        justify-content: flex-start;
+        gap: 6px;
+    }
+
+    .mw-r5-admin .mw-ops-sticky-bar .mw-ops-action {
+        min-height: 40px;
+        padding: 8px 10px;
+    }
+}
