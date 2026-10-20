@@ -14,7 +14,7 @@ def format_acceptance_claim_error(message: str) -> str:
 
     if "1 分鐘接單保護期" in text:
         return (
-            "🔒 目前狀態：等待接單｜接單保護中。\n"
+            "🔒 目前狀態：等待接單｜1 分鐘接單保護期。\n"
             "指定人員可立即接單；其他人請等派單面板顯示的公開開放時間後再按。"
         )
 
