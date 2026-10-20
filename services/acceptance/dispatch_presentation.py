@@ -90,10 +90,26 @@ def _dispatch_phase_text(
     specified_staff_ids = _normalized_ids(claim_data.get("specified_staff_ids"))
     public_open_ts = _to_int(claim_data.get("public_acceptance_opens_at_unix"), None)
 
-    if status == "accepted_pending_pay" or accepted_count >= required_staff_count:
+    # Canonical order state must win over acceptance counts. An active, stored,
+    # closed or cancelled order can legitimately retain a full acceptance count
+    # and must not be presented as still waiting for payment.
+    if status == "accepted_pending_pay":
         return "✅ 等待付款｜接單人數已滿"
+    if status == "stored":
+        return "🔵 已暫存｜接單暫停"
+    if status in {"closed", "completed", "done"}:
+        return "✅ 已結單｜接單面板已鎖定"
+    if status in {"cancelled", "canceled"}:
+        return "⛔ 已取消｜接單面板已停止"
+    if status in {"active", "paid"}:
+        return "🟢 進行中｜已付款"
 
     if status == "waiting_acceptance":
+        # Keep the historical count-based fallback only while the canonical
+        # state still says the order is waiting for acceptance.
+        if accepted_count >= required_staff_count:
+            return "✅ 等待付款｜接單人數已滿"
+
         current_ts = (
             int(datetime.now(timezone.utc).timestamp())
             if now_ts is None
@@ -105,14 +121,6 @@ def _dispatch_phase_text(
             return f"🔒 等待接單｜接單保護 → 公開 <t:{public_open_ts}:R>"
         return "🟢 等待接單｜公開接單中"
 
-    if status == "stored":
-        return "🔵 已暫存｜接單暫停"
-    if status in {"closed", "completed", "done"}:
-        return "✅ 已結單｜接單面板已鎖定"
-    if status in {"cancelled", "canceled"}:
-        return "⛔ 已取消｜接單面板已停止"
-    if status in {"active", "paid"}:
-        return "🟢 進行中｜已付款"
     return str(claim_data.get("status") or "狀態未紀錄")
 
 
