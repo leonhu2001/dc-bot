@@ -101,8 +101,8 @@ def _dispatch_phase_text(
         )
         if public_open_ts is not None and current_ts < public_open_ts:
             if specified_staff_ids:
-                return f"🎯 指定優先中｜公開接單 <t:{public_open_ts}:R>"
-            return f"🔒 接單保護中｜公開接單 <t:{public_open_ts}:R>"
+                return f"🎯 指定優先 → 🟢 公開接單 <t:{public_open_ts}:R>"
+            return f"🔒 接單保護 → 🟢 公開接單 <t:{public_open_ts}:R>"
         return "🟢 公開接單中｜可依現有資格規則接單"
 
     if status == "stored":
