@@ -6,7 +6,7 @@
   let enhanceQueued = false;
 
   function inEmployeeWorkspace() {
-    return Boolean(document.querySelector('.employee-workspace-page-content'));
+    return document.body.classList.contains('employee-workspace-site');
   }
 
   function closePicker(picker, restoreFocus = false) {
@@ -36,6 +36,7 @@
     if (!picker || picker.trigger.disabled) return;
     if (activePicker && activePicker !== picker) closePicker(activePicker);
 
+    syncSelectedState(picker);
     activePicker = picker;
     picker.root.classList.add('is-open');
     picker.trigger.setAttribute('aria-expanded', 'true');
@@ -56,10 +57,7 @@
       : picker.placeholder;
 
     picker.label.textContent = label || picker.placeholder;
-    picker.trigger.classList.toggle(
-      'is-placeholder',
-      !picker.select.value
-    );
+    picker.trigger.classList.toggle('is-placeholder', !picker.select.value);
     picker.trigger.classList.toggle(
       'is-invalid',
       picker.originallyRequired && !picker.select.value
@@ -75,6 +73,7 @@
 
   function selectValue(picker, value) {
     picker.select.value = value;
+    picker.select.dispatchEvent(new Event('input', { bubbles: true }));
     picker.select.dispatchEvent(new Event('change', { bubbles: true }));
     syncSelectedState(picker);
     closePicker(picker, true);
@@ -109,7 +108,7 @@
 
   function enhanceSelect(select) {
     if (!(select instanceof HTMLSelectElement)) return;
-    if (select.multiple) return;
+    if (select.multiple || Number(select.size || 0) > 1) return;
     if (select.dataset.mwEmployeeSelectPicker === '1') return;
     if (select.closest('.mw-employee-select')) return;
 
@@ -257,10 +256,9 @@
   }
 
   function enhanceAll() {
-    const root = document.querySelector('.employee-workspace-page-content');
-    if (!root) return;
+    if (!inEmployeeWorkspace()) return;
 
-    root
+    document.body
       .querySelectorAll('select:not([multiple]):not([data-mw-native-select])')
       .forEach(enhanceSelect);
   }
@@ -291,11 +289,8 @@
       }
     });
 
-    const workspace = document.querySelector('.employee-workspace-page-content');
-    if (workspace) {
-      const observer = new MutationObserver(queueEnhanceAll);
-      observer.observe(workspace, { childList: true, subtree: true });
-    }
+    const observer = new MutationObserver(queueEnhanceAll);
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   if (document.readyState === 'loading') {
