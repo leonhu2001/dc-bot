@@ -20,7 +20,7 @@ def test_csp_disallows_style_attributes_and_assets_are_external():
     assert "style-src-attr 'none'" in security
     assert "style-src-attr 'unsafe-inline'" not in security
 
-    for layout_name in ("layout.html", "site_layout.html"):
+    for layout_name in ("admin_layout.html", "site_layout.html"):
         layout = (TEMPLATES / layout_name).read_text(encoding="utf-8")
         assert "/static/css/csp_style_attrs.css" in layout
         assert "/static/js/csp_dynamic_styles.js" in layout
