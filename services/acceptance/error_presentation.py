@@ -14,7 +14,7 @@ def format_acceptance_claim_error(message: str) -> str:
 
     if "1 分鐘接單保護期" in text:
         return (
-            "🔒 目前仍在 1 分鐘接單保護期。\n"
+            "🔒 目前狀態：等待接單｜接單保護中。\n"
             "指定人員可立即接單；其他人請等派單面板顯示的公開開放時間後再按。"
         )
 
@@ -28,7 +28,7 @@ def format_acceptance_claim_error(message: str) -> str:
         return "✅ 你已經在這張單的接單名單裡，不需要重複接單。"
 
     if "已經滿人" in text:
-        return "👥 這張單已滿員，目前等待後續付款；若有人取消接單，面板會重新開放。"
+        return "👥 這張單目前為「等待付款」；接單人數已滿。若有人取消接單，面板會重新開放。"
 
     if "剩餘名額不可由你接單" in text:
         return "🔐 這張單的剩餘名額已保留給指定人員，目前沒有可由你接的公開名額。"
@@ -43,6 +43,6 @@ def format_acceptance_claim_error(message: str) -> str:
         return "🛡️ 這張單仍需要護級名額，剩餘位置不能再由陪級接單。"
 
     if "目前不是等待接單狀態" in text:
-        return "ℹ️ 這張單目前已不是可接單狀態，請以最新派單面板為準。"
+        return "ℹ️ 這張單目前已不是「等待接單」狀態，請以最新派單面板為準。"
 
     return text
