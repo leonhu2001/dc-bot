@@ -46,7 +46,11 @@ from services.self_service_financials import (
     _price_snapshot,
     add_self_service_financial_breakdown_fields,
 )
-from services.vip_timer_runtime import VipTimerControlView
+from services.vip_timer_recovery import install_vip_timer_payment_recovery
+from services.vip_timer_runtime import (
+    VipTimerControlView,
+    install_acceptance_payment_hook,
+)
 
 
 def configure_acceptance_runtime_explicit(
@@ -60,6 +64,12 @@ def configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch,
 ) -> None:
     """Bind the acceptance runtime from explicit bot-owned dependencies."""
+    # Install VIP timer routing only after the acceptance package is fully
+    # imported. Installing from acceptance.__init__ creates a circular import
+    # through order_dispatch_runtime -> dispatch_presentation.
+    install_acceptance_payment_hook()
+    install_vip_timer_payment_recovery()
+
     configure_acceptance_dispatch_refresh(
         dispatch_channel_id=dispatch_channel_id,
         order_claims=order_claims,
