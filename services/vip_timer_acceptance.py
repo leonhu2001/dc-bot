@@ -28,6 +28,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
 
     install_vip_timer_self_service()
 
+    # Refine the timer-only selector tree after the canonical bridge exists:
+    # category -> game -> service type -> concrete starting rule. The actual
+    # duration stays free-running and is never selected up front.
+    from services.vip_timer_select_flow import install_vip_timer_select_flow
+
+    install_vip_timer_select_flow()
+
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services.vip_timer_runtime import (
         VipTimerControlView,
