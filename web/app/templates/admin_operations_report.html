@@ -156,20 +156,72 @@
    return [x,r.width,r.height]
  }
 
+ function niceStep(maxValue,targetTicks=5){
+   const rough=Math.max(1,Number(maxValue)||0)/Math.max(1,targetTicks);
+   const power=Math.pow(10,Math.floor(Math.log10(rough)));
+   const fraction=rough/power;
+   const niceFraction=fraction<=1?1:fraction<=2?2:fraction<=5?5:10;
+   return Math.max(1,niceFraction*power);
+ }
+
+ function shortDate(label){
+   const raw=String(label||'');
+   const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+   return match?match[2]+'/'+match[3]:raw;
+ }
+
+ function fullDate(label){
+   const raw=String(label||'');
+   const match=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+   return match?match[1]+'/'+match[2]+'/'+match[3]:raw;
+ }
+
  function lineChart(progress,hoverIndex=lineHover){
    const c=document.getElementById('revenueTrend'),[x,w,h]=fit(c);
    x.clearRect(0,0,w,h);
-   const p=34,max=Math.max(1,...trendValues);
-   x.strokeStyle='rgba(223,183,92,.25)';x.fillStyle='rgba(255,255,255,.55)';x.font='11px sans-serif';
-   for(let i=0;i<5;i++){const y=p+(h-p*2)*i/4;x.beginPath();x.moveTo(p,y);x.lineTo(w-p,y);x.stroke();x.fillText(Math.round(max*(4-i)/4),2,y+4)}
    if(!trendValues.length){lineGeometry=null;return}
+
+   const rawMax=Math.max(0,...trendValues.map(value=>Number(value)||0));
+   const step=niceStep(rawMax,5);
+   const max=Math.max(step,Math.ceil(rawMax/step)*step);
+   const tickCount=Math.max(1,Math.round(max/step));
+   const top=14,right=12,bottom=34;
+   x.font='11px sans-serif';
+   const left=Math.max(46,Math.ceil(x.measureText(numberFormat.format(max)).width)+10);
+   const plotWidth=Math.max(1,w-left-right),plotHeight=Math.max(1,h-top-bottom);
+
+   x.strokeStyle='rgba(223,183,92,.25)';
+   x.fillStyle='rgba(255,255,255,.55)';
+   x.textBaseline='middle';
+   for(let i=0;i<=tickCount;i++){
+     const value=max-i*step;
+     const y=top+plotHeight*i/tickCount;
+     x.beginPath();x.moveTo(left,y);x.lineTo(w-right,y);x.stroke();
+     x.textAlign='right';x.fillText(numberFormat.format(value),left-7,y);
+   }
+
    const points=trendValues.map((v,i)=>({
-     x:p+(w-p*2)*(trendValues.length===1?.5:i/(trendValues.length-1)),
-     y:h-p-(h-p*2)*v/max,
-     value:v,
+     x:left+plotWidth*(trendValues.length===1?.5:i/(trendValues.length-1)),
+     y:top+plotHeight*(1-(Number(v)||0)/max),
+     value:Number(v)||0,
      label:trendLabels[i]||''
    }));
-   lineGeometry={points};
+   lineGeometry={points,left,right,top,bottom,max,step};
+
+   const maxXLabels=Math.max(2,Math.floor(plotWidth/64));
+   const labelEvery=trendLabels.length<=maxXLabels?1:Math.ceil((trendLabels.length-1)/(maxXLabels-1));
+   const labelIndexes=new Set([0,Math.max(0,trendLabels.length-1)]);
+   for(let i=0;i<trendLabels.length;i+=labelEvery)labelIndexes.add(i);
+   x.fillStyle='rgba(255,255,255,.55)';
+   x.textBaseline='top';
+   [...labelIndexes].sort((a,b)=>a-b).forEach((i)=>{
+     const pt=points[i];if(!pt)return;
+     if(i===0)x.textAlign='left';
+     else if(i===points.length-1)x.textAlign='right';
+     else x.textAlign='center';
+     x.fillText(shortDate(pt.label),pt.x,h-bottom+8);
+   });
+
    x.strokeStyle='#dfb75c';x.lineWidth=2;x.lineCap='round';x.lineJoin='round';x.beginPath();x.moveTo(points[0].x,points[0].y);
    if(points.length>1){
      const target=Math.max(0,Math.min(points.length-1,progress*(points.length-1)));
@@ -186,7 +238,6 @@
      const threshold=points.length===1?0:i/(points.length-1);
      if(progress+0.001<threshold)return;
      x.beginPath();x.arc(pt.x,pt.y,i===hoverIndex?5:3,0,Math.PI*2);x.fill();
-     if(i===hoverIndex){x.strokeStyle='rgba(223,183,92,.32)';x.lineWidth=5;x.beginPath();x.arc(pt.x,pt.y,8,0,Math.PI*2);x.stroke()}
    });
  }
 
@@ -220,10 +271,11 @@
  }
 
  function showTooltip(canvas,tip,x,y,title,value){
-   const strong=document.createElement('strong');strong.textContent=title;
-   tip.replaceChildren(strong,document.createTextNode(value));
-   tip.style.left=Math.min(canvas.offsetLeft+x+12,canvas.offsetLeft+canvas.clientWidth-150)+'px';
-   tip.style.top=Math.max(42,canvas.offsetTop+y-18)+'px';
+   const strong=document.createElement('strong');strong.textContent=title;strong.style.display='block';
+   const detail=document.createElement('span');detail.textContent=value;detail.style.display='block';
+   tip.replaceChildren(strong,detail);
+   tip.style.left=Math.min(canvas.offsetLeft+x+12,canvas.offsetLeft+canvas.clientWidth-170)+'px';
+   tip.style.top=Math.max(42,canvas.offsetTop+y-24)+'px';
    tip.classList.add('is-visible');
  }
  function hideTooltip(tip){tip.classList.remove('is-visible')}
@@ -237,7 +289,7 @@
      lineGeometry.points.forEach((pt,i)=>{const dx=mx-pt.x,dy=my-pt.y,d=Math.sqrt(dx*dx+dy*dy);if(d<bestDist){bestDist=d;best=i}});
      if(bestDist<=14){
        lineHover=best;const pt=lineGeometry.points[best];lineChart(1);
-       showTooltip(line,lineTip,pt.x,pt.y,pt.label,numberFormat.format(pt.value));
+       showTooltip(line,lineTip,pt.x,pt.y,fullDate(pt.label),'營收 '+numberFormat.format(pt.value)+' T');
      }else{lineHover=-1;lineChart(1);hideTooltip(lineTip)}
    });
    line.addEventListener('mouseleave',()=>{lineHover=-1;lineChart(1);hideTooltip(lineTip)});
