@@ -11,8 +11,20 @@
 .dispatch-tag-button:hover{transform:translateY(-2px);filter:brightness(1.14);box-shadow:0 0 0 1px rgba(245,198,107,.2) inset,0 10px 22px rgba(245,198,107,.18)}
 .dispatch-footer button:disabled,.dispatch-support-tools button:disabled{opacity:.56;cursor:wait;transform:none;filter:none;box-shadow:none}
 
-/* 20261020: keep the support worker assignment picker dark, including its native popup. */
+/* 20261020: keep the support worker assignment picker dark. */
 .dispatch-support-form select{color-scheme:dark;background-color:#11141d;color:#eef2f6}
 .dispatch-support-form select option,.dispatch-support-form select optgroup{background-color:#151a22;color:#e7edf3}
 .dispatch-support-form select option:checked{background-color:#26323a;color:#fff}
 .dispatch-support-form select option:disabled{color:#78838d}
+
+/* Chromium customizable select: opt out of the OS-native white popup entirely. */
+@supports (appearance:base-select){
+.dispatch-support-form select,.dispatch-support-form select::picker(select){appearance:base-select;-webkit-appearance:base-select}
+.dispatch-support-form select{cursor:pointer;padding:10px 12px;background:#11141d;color:#eef2f6;border:1px solid rgba(255,255,255,.14);border-radius:12px}
+.dispatch-support-form select::picker(select){margin-top:6px;padding:7px;border:1px solid rgba(117,232,255,.2);border-radius:14px;background:#0e131a;color:#e7edf3;box-shadow:0 18px 48px rgba(0,0,0,.5)}
+.dispatch-support-form select::picker-icon{color:#aeb8c2;transition:transform .16s ease}
+.dispatch-support-form select:open::picker-icon{transform:rotate(180deg)}
+.dispatch-support-form select option{padding:9px 10px;border-radius:9px;background:#0e131a;color:#e7edf3}
+.dispatch-support-form select option:hover,.dispatch-support-form select option:focus{background:#202a34;color:#fff}
+.dispatch-support-form select option:checked{background:#263642;color:#dff9ff}
+}
