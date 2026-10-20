@@ -15,78 +15,123 @@ body.mw-r5-employee .mw-r5-shell {
   padding: 0 !important;
 }
 
-/* Employee pages reuse the public-site header classes, but the backoffice
-   layout applies a global Inter/line-height/button reset with !important.
-   Neutralize that reset here so the copied public header renders exactly like
-   the real site header instead of merely sharing its markup. */
-body.mw-r5-employee .employee-site-header,
-body.mw-r5-employee .employee-site-header * {
-  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif !important;
+/* The public header is rendered from the same Jinja partial on the public site
+   and every employee page. The backoffice layout has a global Inter reset plus
+   button rules, while the public site has mw_public_r5 typography. Lock the
+   shared header to the public site's computed values so the two contexts cannot
+   drift again. */
+.mw-shared-site-header,
+.mw-shared-site-header * {
+  box-sizing: border-box;
+  font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
 }
-body.mw-r5-employee .employee-site-header {
+.mw-shared-site-header {
   width: 100%;
-  font-weight: 400 !important;
-  line-height: normal !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  line-height: 1.65 !important;
   letter-spacing: normal !important;
 }
-body.mw-r5-employee .employee-site-header .site-brand-copy strong {
+.mw-shared-site-header .site-brand-copy strong {
   font-size: 17px !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  letter-spacing: .12em !important;
 }
-body.mw-r5-employee .employee-site-header .site-brand-copy small {
+.mw-shared-site-header .site-brand-copy small {
   margin-top: 6px !important;
-  font-size: 9px !important;
-  font-weight: 400 !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.55 !important;
   letter-spacing: .18em !important;
 }
-body.mw-r5-employee .employee-site-header .site-desktop-nav a {
+.mw-shared-site-header .site-desktop-nav {
+  display: flex !important;
+}
+.mw-shared-site-header .site-desktop-nav a,
+.mw-shared-site-header .site-mobile-nav a {
   font-size: 14px !important;
-  font-weight: 400 !important;
-  line-height: normal !important;
+  font-weight: 700 !important;
+  line-height: 1.65 !important;
 }
-body.mw-r5-employee .employee-site-header .account-name {
+.mw-shared-site-header .account-name {
   font-size: 13px !important;
-  font-weight: 400 !important;
+  font-weight: 500 !important;
+  line-height: 1.65 !important;
 }
-body.mw-r5-employee .employee-site-header .account-dropdown-head strong {
+.mw-shared-site-header .account-dropdown-head strong {
   font-size: 14px !important;
+  font-weight: 700 !important;
 }
-body.mw-r5-employee .employee-site-header .account-dropdown-head small {
-  font-size: 10px !important;
-  font-weight: 400 !important;
+.mw-shared-site-header .account-dropdown-head small {
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.55 !important;
 }
-body.mw-r5-employee .employee-site-header .account-dropdown a {
+.mw-shared-site-header .account-dropdown a {
   font-size: 13px !important;
-  font-weight: 400 !important;
+  font-weight: 500 !important;
+  line-height: 1.65 !important;
 }
-body.mw-r5-employee .employee-site-header .mobile-nav-button {
+.mw-shared-site-header .mobile-nav-button {
+  display: none !important;
   width: 42px !important;
   height: 42px !important;
-  min-height: 42px !important;
+  min-height: 40px !important;
   padding: 0 !important;
   border-radius: 12px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+.mw-shared-site-header .site-mobile-nav {
+  display: none !important;
 }
 
-/* The hero is shared by /employee and every employee workspace page. Keep the
-   backoffice global font reset from changing its typography on inner pages. */
-body.mw-r5-employee .employee-workspace-hero,
-body.mw-r5-employee .employee-workspace-hero * {
-  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif !important;
+/* The employee hero is also one shared partial. Lock the typography to what
+   /employee gets from site-body + mw-public-r5, then let employee_center CSS own
+   only the component geometry/colors. */
+.employee-workspace-hero,
+.employee-workspace-hero * {
+  font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;
 }
-body.mw-r5-employee .employee-workspace-hero {
-  font-weight: 400 !important;
+.employee-workspace-hero {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  line-height: 1.65 !important;
+  letter-spacing: normal !important;
+}
+.employee-workspace-hero .ec-k {
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1.65 !important;
+  letter-spacing: .18em !important;
+}
+.employee-workspace-hero h1 {
+  margin: 7px 0 !important;
+  font-size: clamp(34px,5vw,54px) !important;
+  font-weight: 700 !important;
   line-height: normal !important;
   letter-spacing: normal !important;
 }
-
-/* Active state is intentionally NOT body-scoped: /employee uses site_layout,
-   while the other workspace pages use the employee backoffice layout. */
+.employee-workspace-hero .ec-muted {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  line-height: 1.65 !important;
+  letter-spacing: normal !important;
+}
+.employee-workspace-hero .ec-btn {
+  padding: 10px 13px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: normal !important;
+}
 .employee-workspace-hero .ec-btn.active {
-  border-color: rgba(223,183,92,.35);
-  background: rgba(223,183,92,.09);
-  color: #f2d68d;
+  border-color: rgba(223,183,92,.35) !important;
+  background: rgba(223,183,92,.09) !important;
+  color: #f2d68d !important;
 }
 
-/* This is literally the same .ec/.ec-hero component used by /employee. */
+/* The employee layout renders the shared hero above the page-specific content. */
 body.mw-r5-employee .employee-workspace-top {
   margin-top: 52px !important;
   margin-bottom: 16px !important;
@@ -157,7 +202,19 @@ body.mw-r5-employee .sbm-role { display: none !important; }
 body.mw-r5-employee .report-hero h2,
 body.mw-r5-employee .sbm-hero h1 { margin: 4px 0 0 !important; font-size: 24px !important; }
 
+@media (max-width: 1050px) {
+  .mw-shared-site-header .site-desktop-nav { display: none !important; }
+  .mw-shared-site-header .mobile-nav-button { display: block !important; }
+  .mw-shared-site-header .site-nav-shell { grid-template-columns: 1fr auto !important; }
+}
+
+@media (max-width: 980px) {
+  body.mw-r5-employee .employee-workspace-hero { grid-template-columns: 1fr !important; }
+  body.mw-r5-employee .employee-workspace-hero .ec-actions { justify-content: flex-start !important; }
+}
+
 @media (max-width: 720px) {
+  .mw-shared-site-header .site-mobile-nav.is-open { display: grid !important; }
   body.mw-r5-employee .employee-workspace-top { margin-top: 28px !important; }
   body.mw-r5-employee .mw-r5-page-header,
   body.mw-r5-employee .report-hero,
