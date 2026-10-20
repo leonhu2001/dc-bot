@@ -9,6 +9,10 @@ from typing import Any, Awaitable, Callable
 import discord
 
 from core.time_utils import utc_now_naive
+from services.order_notification_presentation import (
+    build_worker_change_embed,
+    worker_change_marker,
+)
 
 
 ACCEPTANCE_SYNC_STALE_PROCESSING_MINUTES = 10
@@ -55,6 +59,25 @@ def _require_deps() -> AcceptanceSyncWorkerDeps:
     if _DEPS is None:
         raise RuntimeError("acceptance sync worker is not configured")
     return _DEPS
+
+
+async def _channel_has_footer(
+    channel: discord.TextChannel,
+    footer_text: str,
+    *,
+    limit: int = 30,
+) -> bool:
+    try:
+        async for message in channel.history(limit=max(1, int(limit))):
+            for embed in message.embeds:
+                current = str(
+                    getattr(getattr(embed, "footer", None), "text", "") or ""
+                )
+                if current == footer_text:
+                    return True
+    except (discord.Forbidden, discord.HTTPException):
+        return False
+    return False
 
 
 async def process_acceptance_sync_events_once() -> None:
@@ -189,6 +212,7 @@ async def process_acceptance_sync_events_once() -> None:
                     )
 
                 worker_id = deps.to_int(payload.get("worker_discord_id"))
+                member = None
 
                 if worker_id is not None and ticket_channel_id is not None:
                     member = await _resolve_member(worker_id)
@@ -205,6 +229,37 @@ async def process_acceptance_sync_events_once() -> None:
                                 guild,
                                 ticket_channel_id,
                                 member,
+                            )
+
+                if is_admin_worker_change and ticket_channel_id is not None:
+                    ticket_channel = guild.get_channel(ticket_channel_id)
+                    if isinstance(ticket_channel, discord.TextChannel):
+                        marker = worker_change_marker(int(event.order_id), int(event.id))
+                        try:
+                            if not await _channel_has_footer(ticket_channel, marker):
+                                worker_mention = (
+                                    member.mention
+                                    if member is not None
+                                    else (f"<@{worker_id}>" if worker_id is not None else "未紀錄")
+                                )
+                                await ticket_channel.send(
+                                    embed=build_worker_change_embed(
+                                        order_id=int(event.order_id),
+                                        event_id=int(event.id),
+                                        action=str(payload.get("reason") or ""),
+                                        worker_mention=worker_mention,
+                                    ),
+                                    allowed_mentions=discord.AllowedMentions(
+                                        users=True,
+                                        roles=False,
+                                        everyone=False,
+                                    ),
+                                )
+                        except (discord.Forbidden, discord.HTTPException) as exc:
+                            print(
+                                "[acceptance-sync] 人員異動通知失敗 "
+                                f"event_id={event.id}: {exc}",
+                                flush=True,
                             )
 
                 event.status = SyncEventStatus.DONE.value

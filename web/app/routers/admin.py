@@ -255,7 +255,7 @@ async def admin_remove_worker(
     finally:
         db.close()
 
-    return redirect_to_admin(message="已移除這位護航 / 陪玩，分潤已重新計算。")
+    return redirect_to_admin(message="已移除這位服務人員，分潤已重新計算。")
 
 
 @router.post("/admin/orders/{order_id}/add-worker")
@@ -294,7 +294,7 @@ async def admin_add_worker(
     finally:
         db.close()
 
-    return redirect_to_admin(message="已新增/更換護航 / 陪玩，分潤已重新計算。")
+    return redirect_to_admin(message="已新增／更換服務人員，分潤已重新計算。")
 
 
 @router.post("/admin/orders/{order_id}/manual-payout")
@@ -329,7 +329,7 @@ async def admin_manual_payout(
     finally:
         db.close()
 
-    return redirect_to_admin(message="已手動更新護航 / 陪玩分潤金額。")
+    return redirect_to_admin(message="已手動更新服務人員分潤金額。")
 
 
 @router.post("/admin/worker-payouts/{payout_id}/status")
@@ -358,7 +358,7 @@ async def admin_set_worker_payout_status(
     finally:
         db.close()
 
-    return redirect_to_admin(message="護航 / 陪玩分潤狀態已更新。")
+    return redirect_to_admin(message="服務人員分潤狀態已更新。")
 
 
 @router.post("/admin/customer-service-payouts/{payout_id}/status")
@@ -387,7 +387,7 @@ async def admin_set_customer_service_payout_status(
     finally:
         db.close()
 
-    return redirect_to_admin(message="魔丸♫魔丸♫客服分潤狀態已更新。")
+    return redirect_to_admin(message="客服分潤狀態已更新。")
 
 # MAWAN PHASE 4A-2R6 ORDER WORKSPACE
 

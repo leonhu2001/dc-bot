@@ -88,15 +88,6 @@
         });
     }
 
-    function normalizeLegacySuccessCopy() {
-        document.querySelectorAll(".notice.success").forEach(function (notice) {
-            const current = text(notice);
-            if (current === "魔丸♫魔丸♫客服分潤狀態已更新。") {
-                notice.textContent = "客服分潤狀態已更新。";
-            }
-        });
-    }
-
     function apply() {
         if (!isOrderSurface()) {
             return;
@@ -104,7 +95,6 @@
         normalizeStatusSelects();
         normalizeOrderStatusCells();
         normalizeOrderBadges();
-        normalizeLegacySuccessCopy();
     }
 
     if (document.readyState === "loading") {

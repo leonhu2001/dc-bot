@@ -151,6 +151,41 @@
         });
     }
 
+    function queueMeta(panel) {
+        const titleNode = panel.querySelector(".panel-head strong");
+        const rawTitle = titleNode ? titleNode.textContent.trim() : "待處理";
+        const countNode = panel.querySelector(".panel-head .count");
+        const count = countNode ? countNode.textContent.trim() : "0";
+
+        if (/需注意/.test(rawTitle)) {
+            return {
+                priority: 0,
+                priorityLabel: "P0",
+                title: "需注意訂單",
+                count: count,
+                action: "立即處理 →"
+            };
+        }
+
+        if (/待客服確認/.test(rawTitle)) {
+            return {
+                priority: 1,
+                priorityLabel: "P1",
+                title: "待客服確認",
+                count: count,
+                action: "前往確認 →"
+            };
+        }
+
+        return {
+            priority: 9,
+            priorityLabel: "",
+            title: rawTitle,
+            count: count,
+            action: "查看處理 →"
+        };
+    }
+
     function enhanceWorkCenter() {
         const queues = document.querySelector(".queues");
 
@@ -161,14 +196,21 @@
         queues.dataset.mwOpsEnhanced = "1";
         queues.classList.add("mw-ops-work-center");
 
-        const panels = Array.from(queues.querySelectorAll(":scope > .panel"));
-        const counts = panels.map(function (panel) {
-            const title = panel.querySelector(".panel-head strong");
-            const count = panel.querySelector(".panel-head .count");
-            return {
-                title: title ? title.textContent.trim() : "待處理",
-                count: count ? count.textContent.trim() : "0"
-            };
+        const rankedPanels = Array.from(queues.querySelectorAll(":scope > .panel"))
+            .map(function (panel) {
+                return { panel: panel, meta: queueMeta(panel) };
+            })
+            .sort(function (left, right) {
+                return left.meta.priority - right.meta.priority;
+            });
+
+        rankedPanels.forEach(function (entry) {
+            queues.appendChild(entry.panel);
+            const title = entry.panel.querySelector(".panel-head strong");
+            if (title && entry.meta.priorityLabel) {
+                title.textContent = entry.meta.priorityLabel + " · " + entry.meta.title;
+            }
+            entry.panel.dataset.mwOpsPriority = entry.meta.priorityLabel || "normal";
         });
 
         const header = document.createElement("div");
@@ -183,7 +225,7 @@
         heading.textContent = "待處理中心";
 
         const description = document.createElement("p");
-        description.textContent = "先看需要人工介入的訂單，再進工作區完成處理；不用把整份訂單列表當監控器。";
+        description.textContent = "P0 是需要立即人工介入；P1 是待客服確認。等待接單、等待付款、進行中的訂單維持流程追蹤，不會因狀態本身被列成人工待辦。";
 
         text.appendChild(kicker);
         text.appendChild(heading);
@@ -193,14 +235,18 @@
         const summary = document.createElement("div");
         summary.className = "mw-ops-center-summary";
 
-        counts.forEach(function (item) {
+        rankedPanels.forEach(function (entry) {
             const pill = document.createElement("span");
             pill.className = "mw-ops-count-pill";
 
             const label = document.createElement("span");
-            label.textContent = item.title;
+            label.textContent = (
+                entry.meta.priorityLabel
+                    ? entry.meta.priorityLabel + " " + entry.meta.title
+                    : entry.meta.title
+            );
             const value = document.createElement("strong");
-            value.textContent = item.count;
+            value.textContent = entry.meta.count;
 
             pill.appendChild(label);
             pill.appendChild(value);
@@ -210,17 +256,15 @@
         header.appendChild(summary);
         queues.parentNode.insertBefore(header, queues);
 
-        panels.forEach(function (panel) {
-            const isAttention = /需注意/.test(panel.textContent || "");
-
-            panel.querySelectorAll(".queue-row").forEach(function (row) {
+        rankedPanels.forEach(function (entry) {
+            entry.panel.querySelectorAll(".queue-row").forEach(function (row) {
                 if (row.querySelector(".mw-ops-row-action")) {
                     return;
                 }
 
                 const action = document.createElement("span");
                 action.className = "mw-ops-row-action";
-                action.textContent = isAttention ? "查看處理 →" : "前往確認 →";
+                action.textContent = entry.meta.action;
                 row.appendChild(action);
             });
         });
