@@ -41,9 +41,12 @@ def test_legacy_status_aliases_only_change_display_copy():
     assert 'canceled: "已取消"' in source
 
 
-def test_legacy_customer_service_success_copy_is_cleaned_in_ui():
-    source = Path(
+def test_customer_service_success_copy_is_clean_at_source():
+    admin_source = Path("web/app/routers/admin.py").read_text(encoding="utf-8")
+    copy_source = Path(
         "web/app/static/js/pages/admin_order_copy_unification.js"
     ).read_text(encoding="utf-8")
-    assert "魔丸♫魔丸♫客服分潤狀態已更新。" in source
-    assert 'notice.textContent = "客服分潤狀態已更新。"' in source
+
+    assert "魔丸♫魔丸♫客服分潤狀態已更新。" not in admin_source
+    assert "魔丸♫魔丸♫客服分潤狀態已更新。" not in copy_source
+    assert 'message="客服分潤狀態已更新。"' in admin_source
