@@ -1,18 +1,26 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import re
 
 
 _INSTALLED = False
-_VIRTUAL_SWEET_SINGLE_KEY = "vip_timer_sweet_single_any"
 _HEADCOUNT_LABELS = {
     1: "單陪",
     2: "雙陪",
     3: "三陪",
     4: "四陪",
 }
-_HEADCOUNT_ORDER = {label: index for index, label in enumerate(_HEADCOUNT_LABELS.values())}
+_SERVICE_ORDER = {
+    "單陪": 0,
+    "雙陪": 1,
+    "三陪": 2,
+    "四陪": 3,
+    "女單陪": 0,
+    "男單陪": 1,
+    "女雙陪": 2,
+    "男雙陪": 3,
+    "1對1教學": 0,
+}
 
 
 def _strip_headcount(text: str) -> str:
@@ -23,9 +31,30 @@ def _strip_headcount(text: str) -> str:
 
 
 def _headcount_service_type(source_group: str, detail: dict, rule) -> str:
+    """Return the fourth-layer label for VIP 自由計時.
+
+    Normal gameplay uses pure headcount. Sweet orders preserve the companion
+    gender package because that changes which roles may receive the order.
+    Teaching is a single explicit 1-to-1 product instead of being disguised as
+    an ordinary single-companion option.
+    """
     from services import vip_timer_select_flow as flow
 
+    detail_text = str(detail.get("label") or "")
+    rule_text = str(getattr(rule, "label", "") or "")
+    text = f"{source_group}｜{detail_text}｜{rule_text}"
     count = flow._staff_count(rule, detail)
+
+    if "甜蜜" in text:
+        for label in ("女單陪", "男單陪", "女雙陪", "男雙陪"):
+            if label in text:
+                return label
+        # 不再提供舊的「雙陪(不限)」與泛用甜蜜規則；第四層必須明確選性別套餐。
+        return "不支援"
+
+    if "教學" in text or "導師" in text:
+        return "1對1教學" if int(count) == 1 else "不支援"
+
     return _HEADCOUNT_LABELS.get(int(count), "不支援")
 
 
@@ -89,15 +118,14 @@ def _group_sort_key(group: dict) -> tuple:
 
 
 def _detail_preference(detail: dict) -> tuple:
-    """Pick one canonical rule when old catalog rows collapse to one headcount."""
+    """Pick one canonical rule when catalog rows collapse to one service label."""
     from services.order_rules import ORDER_RULES
 
     key = str(detail.get("rule_key") or "")
     rule = ORDER_RULES.get(key)
     role_count = len(tuple(getattr(rule, "allowed_roles", ()) or ())) if rule is not None else 0
-    virtual = 1 if key == _VIRTUAL_SWEET_SINGLE_KEY else 0
     any_label = 1 if "不限" in str(detail.get("item") or detail.get("label") or "") else 0
-    return (virtual, role_count, any_label, -len(str(detail.get("value") or "")))
+    return (role_count, any_label, -len(str(detail.get("value") or "")))
 
 
 def _spec_groups(details: list[dict]) -> list[dict]:
@@ -107,23 +135,23 @@ def _spec_groups(details: list[dict]) -> list[dict]:
     grouped: dict[str, list[dict]] = {}
     for detail in details:
         service_type = str(detail.get("vip_timer_service_type") or "")
-        if service_type not in _HEADCOUNT_ORDER:
+        if service_type not in _SERVICE_ORDER:
             continue
         label = str(detail.get("vip_timer_spec_label") or "技術").strip() or "技術"
         grouped.setdefault(label, []).append(detail)
 
     result: list[dict] = []
     for label, rows in grouped.items():
-        by_headcount: dict[str, dict] = {}
+        by_service: dict[str, dict] = {}
         for detail in rows:
             service_type = str(detail.get("vip_timer_service_type") or "")
-            current = by_headcount.get(service_type)
+            current = by_service.get(service_type)
             if current is None or _detail_preference(detail) > _detail_preference(current):
-                by_headcount[service_type] = detail
+                by_service[service_type] = detail
 
         canonical = sorted(
-            by_headcount.values(),
-            key=lambda row: _HEADCOUNT_ORDER.get(str(row.get("vip_timer_service_type") or ""), 99),
+            by_service.values(),
+            key=lambda row: _SERVICE_ORDER.get(str(row.get("vip_timer_service_type") or ""), 99),
         )
         if not canonical:
             continue
@@ -141,90 +169,8 @@ def _spec_groups(details: list[dict]) -> list[dict]:
     return result
 
 
-def _install_virtual_sweet_single_rule() -> None:
-    from services.order_rules import COMPANION_ROLES, ORDER_RULES
-
-    if ORDER_RULES.get(_VIRTUAL_SWEET_SINGLE_KEY) is not None:
-        return
-
-    base = ORDER_RULES.get("basic_sweet_female_single") or ORDER_RULES.get("basic_sweet_male_single")
-    if base is None:
-        return
-
-    ORDER_RULES[_VIRTUAL_SWEET_SINGLE_KEY] = replace(
-        base,
-        key=_VIRTUAL_SWEET_SINGLE_KEY,
-        label="甜蜜單｜單陪",
-        allowed_roles=tuple(COMPANION_ROLES),
-        required_staff_count=1,
-    )
-
-
-def _install_virtual_rule_guard() -> None:
-    from services import vip_timer_catalog_guard as guard
-
-    if getattr(guard, "_vip_timer_v3_virtual_guard_installed", False):
-        return
-
-    original_public_keys = guard.public_timer_rule_keys
-
-    def public_timer_rule_keys() -> set[str]:
-        result = set(original_public_keys())
-        from services.order_rules import ORDER_RULES
-
-        if ORDER_RULES.get(_VIRTUAL_SWEET_SINGLE_KEY) is not None:
-            result.add(_VIRTUAL_SWEET_SINGLE_KEY)
-        return result
-
-    def is_public_timer_rule(rule_key) -> bool:
-        key = str(rule_key or "").strip()
-        return bool(key) and key in public_timer_rule_keys()
-
-    guard.public_timer_rule_keys = public_timer_rule_keys
-    guard.is_public_timer_rule = is_public_timer_rule
-    guard._vip_timer_v3_virtual_guard_installed = True
-
-
-def _inject_virtual_sweet_single_detail() -> None:
-    from services import orders
-    from services.vip_timer import VIP_TIMER_CATEGORY
-    from services import vip_timer_select_flow as flow
-
-    groups = orders.SELF_SERVICE_ORDER_CATALOG.get(VIP_TIMER_CATEGORY) or []
-    for group in groups:
-        details = list(group.get("details") or [])
-        if not any(str(row.get("vip_timer_spec_label") or "") == "甜蜜" for row in details):
-            continue
-        if any(str(row.get("rule_key") or "") == _VIRTUAL_SWEET_SINGLE_KEY for row in details):
-            continue
-        base = next(
-            (
-                row for row in details
-                if str(row.get("vip_timer_spec_label") or "") == "甜蜜"
-                and str(row.get("vip_timer_service_type") or "") == "單陪"
-            ),
-            None,
-        )
-        if base is None:
-            continue
-        virtual = dict(base)
-        virtual.update(
-            {
-                "label": "甜蜜",
-                "value": flow._timer_detail_value(_VIRTUAL_SWEET_SINGLE_KEY, 0),
-                "rule_key": _VIRTUAL_SWEET_SINGLE_KEY,
-                "item": "甜蜜單｜單陪",
-                "vip_timer_service_type": "單陪",
-                "vip_timer_spec_label": "甜蜜",
-            }
-        )
-        virtual.pop("player_count", None)
-        details.append(virtual)
-        group["details"] = details
-
-
 def install_vip_timer_selector_order_v3() -> None:
-    """Refine VIP timer selectors to game -> gameplay family -> 1/2/3/4 companions."""
+    """Refine VIP timer selectors to game -> gameplay family -> service package."""
     global _INSTALLED
     if _INSTALLED:
         return
@@ -233,11 +179,9 @@ def install_vip_timer_selector_order_v3() -> None:
     from services import vip_timer_self_service as bridge
     from services import vip_timer_selector_order_v2 as v2
 
-    _install_virtual_sweet_single_rule()
-    _install_virtual_rule_guard()
-
-    # Rebuild the timer catalog with the concise third-layer labels and pure
-    # headcount fourth layer requested by the storefront UX.
+    # Rebuild the timer catalog with concise third-layer labels. Normal gameplay
+    # uses 1–4 companion headcount, while sweet/teaching retain their meaningful
+    # package labels in the fourth layer.
     flow._service_type = _headcount_service_type
     flow._spec_label = _gameplay_label
     v2._service_type = _headcount_service_type
@@ -250,7 +194,6 @@ def install_vip_timer_selector_order_v3() -> None:
         flow._CATALOG_CACHE = None
         flow._CATALOG_CACHE_AT = 0.0
         original_refresh()
-        _inject_virtual_sweet_single_detail()
 
     flow.refresh_vip_timer_self_service_catalog = refresh_vip_timer_self_service_catalog
     bridge.refresh_vip_timer_self_service_catalog = refresh_vip_timer_self_service_catalog

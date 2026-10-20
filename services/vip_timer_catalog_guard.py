@@ -6,6 +6,13 @@ from typing import Any
 _INSTALLED = False
 
 
+def _allows_timer_minimum_override(key: str, rule) -> bool:
+    """Teaching keeps its normal-order minimum but is still valid for VIP timing."""
+    label = str(getattr(rule, "label", "") or "")
+    key_text = str(key or "").lower()
+    return "teaching" in key_text or "教學" in label
+
+
 def public_timer_rule_keys() -> set[str]:
     """Return rule keys actually selectable in the current Discord catalog."""
     from services.order_product_status import is_order_product_active
@@ -30,7 +37,10 @@ def public_timer_rule_keys() -> set[str]:
                     continue
                 if int(getattr(rule, "price", 0) or 0) <= 0:
                     continue
-                if int(getattr(rule, "min_quantity", 1) or 1) > 1:
+                if (
+                    int(getattr(rule, "min_quantity", 1) or 1) > 1
+                    and not _allows_timer_minimum_override(key, rule)
+                ):
                     continue
                 if not is_order_product_active(key):
                     continue
