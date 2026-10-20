@@ -29,6 +29,9 @@
     {% if request.url.path == '/dispatch' %}
     <link rel="stylesheet" href="/static/css/pages/dispatch_hero_controls.css?v=20261020-2">
     {% endif %}
+    {% if request.url.path.startswith('/employee/store-bindings') %}
+    <link rel="stylesheet" href="/static/css/pages/store_bindings_select_fix.css?v=20261020-1">
+    {% endif %}
     {% endif %}
 
     {% block head %}{% endblock %}
