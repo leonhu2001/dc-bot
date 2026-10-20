@@ -261,18 +261,78 @@ def _is_vip_timer_snapshot(row: dict) -> bool:
 
 
 def _install_loyalty_exclusion() -> None:
+    from sqlalchemy import text
     from services import loyalty_benefits as loyalty
 
     if getattr(loyalty, "_vip_timer_exclusion_installed", False):
         return
     original_bucket = loyalty._loyalty_bucket_from_order
+    original_process_closed_order = loyalty.process_closed_order
 
     def loyalty_bucket_from_order(row: dict):
         if _is_vip_timer_snapshot(row):
             return None
         return original_bucket(row)
 
+    def process_closed_order(order_id: int):
+        """Mark VIP timer orders processed without adding entertainment progress."""
+        loyalty.ensure_loyalty_tables()
+        with loyalty.engine.begin() as conn:
+            existing = conn.execute(
+                text(
+                    "SELECT order_id FROM loyalty_order_events "
+                    "WHERE order_id=:order_id LIMIT 1"
+                ),
+                {"order_id": int(order_id)},
+            ).first()
+            if existing is not None:
+                return None
+
+            row = conn.execute(
+                text(
+                    "SELECT id, customer_discord_id, status, price_snapshot_json, "
+                    "ticket_channel_id FROM web_orders WHERE id=:order_id LIMIT 1"
+                ),
+                {"order_id": int(order_id)},
+            ).mappings().first()
+            data = dict(row) if row is not None else {}
+            if (
+                not data
+                or str(data.get("status") or "").strip().lower() != "closed"
+                or not _is_vip_timer_snapshot(data)
+            ):
+                data = {}
+            else:
+                conn.execute(
+                    text(
+                        "INSERT INTO loyalty_order_events ("
+                        "order_id, customer_discord_id, scope_key, paid_units, "
+                        "issued_coupon_count, processed_at, note"
+                        ") VALUES ("
+                        ":order_id, :customer_id, NULL, 0, 0, :processed_at, 'vip_timer_excluded'"
+                        ")"
+                    ),
+                    {
+                        "order_id": int(order_id),
+                        "customer_id": str(data.get("customer_discord_id") or "").strip() or None,
+                        "processed_at": loyalty.get_taipei_now_iso(),
+                    },
+                )
+
+        if data:
+            return {
+                "order_id": int(order_id),
+                "customer_id": str(data.get("customer_discord_id") or "").strip(),
+                "ticket_channel_id": data.get("ticket_channel_id"),
+                "paid_units": 0.0,
+                "issued_coupon_count": 0,
+                "issued_coupons": [],
+                "note": "vip_timer_excluded",
+            }
+        return original_process_closed_order(int(order_id))
+
     loyalty._loyalty_bucket_from_order = loyalty_bucket_from_order
+    loyalty.process_closed_order = process_closed_order
     loyalty._vip_timer_exclusion_installed = True
 
 
