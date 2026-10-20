@@ -1,0 +1,214 @@
+/* Custom dark companion picker for the dispatch support tools.
+   Kept in an external stylesheet so CSP cannot block the component styles. */
+.dispatch-support-form.mw-picker-ready{
+    position:relative;
+    align-items:start;
+}
+
+.dispatch-support-form.mw-picker-ready .mw-companion-native{
+    position:absolute!important;
+    width:1px!important;
+    height:1px!important;
+    margin:0!important;
+    padding:0!important;
+    opacity:0!important;
+    pointer-events:none!important;
+    overflow:hidden!important;
+    clip:rect(0 0 0 0)!important;
+    clip-path:inset(50%)!important;
+    white-space:nowrap!important;
+}
+
+.dispatch-support-form .mw-companion-picker{
+    position:relative;
+    min-width:0;
+    width:100%;
+}
+
+.dispatch-support-tools button.mw-companion-trigger{
+    width:100%!important;
+    min-height:42px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+    border:1px solid rgba(255,255,255,.13)!important;
+    border-radius:12px!important;
+    padding:10px 12px!important;
+    background:#11161a!important;
+    color:#eef2f6!important;
+    box-shadow:none!important;
+    font:inherit!important;
+    font-weight:800!important;
+    text-align:left!important;
+    cursor:pointer!important;
+    transform:none!important;
+    filter:none!important;
+    transition:border-color .14s ease,background .14s ease!important;
+}
+
+.dispatch-support-tools button.mw-companion-trigger:hover{
+    border-color:rgba(245,198,107,.45)!important;
+    background:#151b20!important;
+    box-shadow:none!important;
+    transform:none!important;
+    filter:none!important;
+}
+
+.dispatch-support-tools button.mw-companion-trigger:focus-visible{
+    outline:2px solid rgba(245,198,107,.9)!important;
+    outline-offset:2px!important;
+}
+
+.dispatch-support-tools button.mw-companion-trigger.is-invalid{
+    border-color:rgba(255,107,138,.72)!important;
+}
+
+.mw-companion-trigger-label{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.mw-companion-trigger-chevron{
+    flex:0 0 auto;
+    color:#aeb7bf;
+    font-size:12px;
+    transition:transform .14s ease;
+}
+
+.mw-companion-picker.is-open .mw-companion-trigger-chevron{
+    transform:rotate(180deg);
+}
+
+.mw-companion-panel{
+    position:absolute;
+    z-index:120;
+    left:0;
+    right:0;
+    top:calc(100% + 7px);
+    display:none!important;
+    border:1px solid rgba(245,198,107,.22);
+    border-radius:14px;
+    background:#0d1216;
+    box-shadow:0 18px 48px rgba(0,0,0,.52);
+    overflow:hidden;
+}
+
+.mw-companion-picker.is-open .mw-companion-panel{
+    display:block!important;
+}
+
+.mw-companion-search-wrap{
+    padding:10px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+    background:#10161a;
+}
+
+.dispatch-support-tools .mw-companion-search{
+    width:100%;
+    box-sizing:border-box;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:10px;
+    background:#171d22;
+    color:#f4f6f8;
+    padding:9px 11px;
+    font:inherit;
+    outline:none;
+}
+
+.dispatch-support-tools .mw-companion-search::placeholder{
+    color:#78838d;
+}
+
+.dispatch-support-tools .mw-companion-search:focus{
+    border-color:rgba(245,198,107,.55);
+    box-shadow:0 0 0 2px rgba(245,198,107,.08);
+}
+
+.mw-companion-options{
+    max-height:min(360px,52vh);
+    overflow:auto;
+    padding:6px;
+    scrollbar-color:#59626a #11161a;
+    scrollbar-width:thin;
+}
+
+.dispatch-support-tools button.mw-companion-option{
+    width:100%!important;
+    min-height:0!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+    border:0!important;
+    border-radius:9px!important;
+    padding:9px 10px!important;
+    background:transparent!important;
+    color:#dfe5ea!important;
+    box-shadow:none!important;
+    font:inherit!important;
+    font-weight:700!important;
+    text-align:left!important;
+    cursor:pointer!important;
+    transform:none!important;
+    filter:none!important;
+    transition:background .12s ease,color .12s ease!important;
+}
+
+.dispatch-support-tools button.mw-companion-option[hidden]{
+    display:none!important;
+}
+
+.dispatch-support-tools button.mw-companion-option:hover,
+.dispatch-support-tools button.mw-companion-option:focus-visible{
+    background:rgba(245,198,107,.10)!important;
+    color:#fff4d2!important;
+    outline:none!important;
+    box-shadow:none!important;
+    transform:none!important;
+    filter:none!important;
+}
+
+.dispatch-support-tools button.mw-companion-option.is-selected{
+    background:rgba(245,198,107,.16)!important;
+    color:#ffe6aa!important;
+}
+
+.mw-companion-option-check{
+    opacity:0;
+    color:#f5c66b;
+    font-weight:900;
+}
+
+.mw-companion-option.is-selected .mw-companion-option-check{
+    opacity:1;
+}
+
+.mw-companion-empty{
+    display:none;
+    padding:16px 12px;
+    color:#8c969f;
+    font-size:13px;
+    text-align:center;
+}
+
+.mw-companion-empty.is-visible{
+    display:block;
+}
+
+@media(max-width:760px){
+    .mw-companion-panel{
+        position:fixed;
+        left:12px;
+        right:12px;
+        top:auto;
+        bottom:12px;
+        max-height:70vh;
+    }
+
+    .mw-companion-options{
+        max-height:52vh;
+    }
+}
