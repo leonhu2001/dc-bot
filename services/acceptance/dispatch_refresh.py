@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import discord
+from sqlalchemy import text
 
 from core.database import remember_claim_data, remember_order_data, save_bot_data
+from services.acceptance.dispatch_presentation import (
+    AcceptanceDispatchView,
+    acceptance_public_open_timestamp,
+    apply_acceptance_dispatch_fields,
+)
 from services.acceptance.payment_panel import (
     acceptance_staff_display_text,
     ensure_acceptance_payment_panel,
     invalidate_acceptance_payment_panel,
 )
 from services.acceptance.ticket_access import sync_acceptance_ticket_access_from_state
-from services.order_dispatch_runtime import DispatchClaimView
 from services.orders import (
     ORDER_CATEGORY_LABELS,
     _to_int,
@@ -75,7 +80,11 @@ async def refresh_acceptance_dispatch_from_web_order(
 ) -> None:
     from shared.db import SessionLocal
     from shared.models import WebOrder
-    from shared.order_acceptance import ACCEPTED_PENDING_PAY, get_acceptance_state
+    from shared.order_acceptance import (
+        ACCEPTED_PENDING_PAY,
+        PUBLIC_ACCEPTANCE_LOCK_SECONDS,
+        get_acceptance_state,
+    )
 
     db = SessionLocal()
 
@@ -168,6 +177,18 @@ async def refresh_acceptance_dispatch_from_web_order(
             getattr(order, "note", None)
             or ""
         ).strip()
+
+        acceptance_created_at = db.execute(
+            text(
+                """
+                SELECT created_at
+                FROM order_acceptance_meta
+                WHERE order_id = :order_id
+                LIMIT 1
+                """
+            ),
+            {"order_id": int(order_id)},
+        ).scalar_one_or_none()
     finally:
         db.close()
 
@@ -249,6 +270,16 @@ async def refresh_acceptance_dispatch_from_web_order(
     claim_data["dispatch_channel_id"] = dispatch_channel_id
     claim_data["companion_preference"] = companion_preference
     claim_data["status"] = str(state.status)
+    claim_data["web_order_id"] = int(order_id)
+
+    public_open_ts = acceptance_public_open_timestamp(
+        acceptance_created_at,
+        PUBLIC_ACCEPTANCE_LOCK_SECONDS,
+    )
+    if public_open_ts is not None:
+        claim_data["public_acceptance_opens_at_unix"] = public_open_ts
+    else:
+        claim_data.pop("public_acceptance_opens_at_unix", None)
 
     data["customer_id"] = customer_id
     data["category_label"] = category_label
@@ -257,6 +288,9 @@ async def refresh_acceptance_dispatch_from_web_order(
     data["amount"] = amount
     data["total_amount"] = amount
     data["amount_text"] = _format_plain_amount(amount)
+    data["accepted_count"] = int(state.accepted_count)
+    data["required_staff_count"] = int(state.required_staff_count)
+    data["status"] = str(state.status)
 
     for key, value in web_price_data.items():
         if value is not None:
@@ -287,7 +321,6 @@ async def refresh_acceptance_dispatch_from_web_order(
     data["dispatch_message_id"] = dispatch_message_id
     data["dispatch_channel_id"] = dispatch_channel_id
     data["web_order_id"] = int(order_id)
-    data["status"] = str(state.status)
     data.setdefault("payment_method", None)
 
     receiver_text = _build_receiver_text_from_claim_data(claim_data)
@@ -316,62 +349,23 @@ async def refresh_acceptance_dispatch_from_web_order(
         web_price_data,
     )
 
-    website_info_lines = [f"網站訂單：WEB-{order_id}"]
-
     service_terms_version = str(
         data.get("service_terms_version")
         or ""
     ).strip()
-
     if service_terms_version:
-        website_info_lines.append(
-            f"服務規章：已同意｜{service_terms_version}"
-        )
+        claim_data["service_terms_version"] = service_terms_version
+    else:
+        claim_data.pop("service_terms_version", None)
 
     specified_staff_ids = [
         str(value).strip()
         for value in (data.get("specified_staff_ids") or [])
         if str(value).strip()
     ]
+    claim_data["specified_staff_ids"] = specified_staff_ids
 
-    if specified_staff_ids:
-        website_info_lines.append(
-            "指定人員："
-            + "、".join(
-                f"<@{staff_id}>"
-                for staff_id in specified_staff_ids
-            )
-        )
-
-    dispatch_embed.add_field(
-        name="網站下單資訊",
-        value="\n".join(website_info_lines)[:1024],
-        inline=False,
-    )
-
-    dispatch_embed.add_field(
-        name="接單進度",
-        value=f"{state.accepted_count}/{state.required_staff_count}",
-        inline=True,
-    )
-
-    if int(getattr(state, "min_protector_count", 0) or 0) > 0:
-        dispatch_embed.add_field(
-            name="護航需求",
-            value=f"{state.protector_count}/{state.min_protector_count}",
-            inline=True,
-        )
-
-    dispatch_embed.add_field(
-        name="狀態",
-        value=(
-            "人數已滿，等待顧客付款"
-            if str(state.status) == ACCEPTED_PENDING_PAY
-            else "等待接單中"
-        ),
-        inline=False,
-    )
-
+    apply_acceptance_dispatch_fields(dispatch_embed, claim_data)
     dispatch_embed.set_footer(text=f"WEB-{order_id}｜網站訂單")
 
     try:
@@ -380,7 +374,7 @@ async def refresh_acceptance_dispatch_from_web_order(
         )
         await dispatch_message.edit(
             embed=dispatch_embed,
-            view=DispatchClaimView(
+            view=AcceptanceDispatchView(
                 customer_id=customer_id,
                 category_label=category_label,
                 item=item,
