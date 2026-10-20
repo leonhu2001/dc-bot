@@ -119,8 +119,13 @@
 
     <section class="dispatch-hero">
         <div class="dispatch-panel dispatch-hero-main">
-            <p class="dispatch-eyebrow">MISSION DISPATCH</p>
-            <h1 class="dispatch-title">接單大廳</h1>
+            <div class="dispatch-order-top">
+                <div>
+                    <p class="dispatch-eyebrow">MISSION DISPATCH</p>
+                    <h1 class="dispatch-title">接單大廳</h1>
+                </div>
+                <button class="dispatch-alert-toggle" type="button" data-state="blocked">🔕 新單提示已關</button>
+            </div>
             <div class="dispatch-tags">
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的接單人員" data-dispatch-online-companions>🟢 在線陪玩 {{ online_companion_count }} 人</span>
                 <span class="dispatch-tag" title="最近 90 秒仍在接單大廳的客服或總管" data-dispatch-online-support>🟢 在線客服 {{ online_support_count }} 人</span>
