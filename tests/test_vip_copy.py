@@ -53,7 +53,10 @@ def test_vip_page_uses_refreshed_public_policy_copy():
     assert "黑鑽每月免費福利仍需最近 30 日實際訂單消費滿 8,000T" in template
     assert "儲值本身不計入這個 8,000T 門檻" in template
     assert "白金／鑽石 2,000T、白鑽 5,000T、黑鑽 8,000T" not in template
-    assert "2026/10/14 起成立的新訂單與新儲值適用新版 VIP／儲值規則" in template
+    assert "2026/10/18 起成立的新訂單與新儲值適用新版規則" in template
+    assert "可使用「VIP 自由計時」" in template
+    assert "VIP 自由計時僅可使用 VIP 百分比折扣" in template
+    assert "娛樂陪累積送時數" in template
     assert "優先安排熟悉／收藏陪玩" in template
     assert "銀級 30 天、金級 45 天、白金 60 天、鑽石 90 天、白鑽 120 天、黑鑽 180 天" in template
     assert "VIP 專屬私人文字頻道" not in template

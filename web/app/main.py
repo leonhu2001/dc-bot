@@ -20,6 +20,7 @@ from services.web_support_chat import ensure_web_support_tables
 from services.ai_support_knowledge import ensure_ai_support_knowledge_tables
 from services.order_rule_store import ensure_order_rule_store
 from services.promotion_benefits import ensure_promotion_benefit_tables
+from services.vip_timer_policy_v5 import install_vip_timer_policy_v5
 from web.app.config import config
 from web.app.routers.admin import router as admin_router
 from web.app.routers.admin_staff import router as admin_staff_router
@@ -312,6 +313,9 @@ async def startup_event():
     ensure_marketing_tables()
     ensure_order_rule_store()
     ensure_promotion_benefit_tables()
+    # Keep VIP timer catalog/discount/loyalty exclusions identical in the web
+    # process, especially when admin reconciliation rebuilds loyalty progress.
+    install_vip_timer_policy_v5()
 
     if config.AI_SUPPORT_API_KEY:
         print(
