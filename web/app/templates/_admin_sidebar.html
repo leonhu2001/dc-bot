@@ -97,6 +97,10 @@
 
 <script src="/static/js/pages/admin_order_copy_unification.js?v=20261020_1" defer></script>
 
+{% if _p.startswith('/admin/order-workspace/') %}
+<script src="/static/js/pages/admin_order_workspace_copy_cleanup.js?v=20261020-1" defer></script>
+{% endif %}
+
 {% if _p == '/admin' %}
 <script src="/static/js/ui_tweaks.js?v=order_report_20261013_2" defer></script>
 {% endif %}
