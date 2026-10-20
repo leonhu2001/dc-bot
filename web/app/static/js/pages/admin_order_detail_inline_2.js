@@ -4,7 +4,7 @@
     function refreshOpsStyles() {
         const link = document.querySelector('link[href^="/static/css/pages/admin_ops_experience.css"]');
         if (link) {
-            link.setAttribute("href", "/static/css/pages/admin_ops_experience.css?v=20261020_2");
+            link.setAttribute("href", "/static/css/pages/admin_ops_experience.css?v=20261020_3");
         }
     }
 
@@ -177,7 +177,7 @@
         grid.appendChild(metric("顧客實付", moneyText(customerPay), "目前 customer pay", ""));
         grid.appendChild(metric("實付差額", moneyText(payDifference), "訂單金額 − 顧客實付；不猜折扣來源", payDifference > 0 ? "warning" : ""));
         grid.appendChild(metric("店家吸收", moneyText(storeAbsorbed), "現有店家吸收欄位", storeAbsorbed > 0 ? "warning" : ""));
-        grid.appendChild(metric("歷史折扣", moneyText(historicalDiscount), "舊制／歷史資料欄位", historicalDiscount > 0 ? "warning" : ""));
+        grid.appendChild(metric("歷史折扣", moneyText(historicalDiscount), "歷史資料欄位", historicalDiscount > 0 ? "warning" : ""));
         grid.appendChild(metric("分潤基礎", moneyText(payoutBase), "陪玩分潤使用的現有基礎金額", payoutGap > 0 ? "warning" : ""));
         grid.appendChild(metric("陪玩實拿合計", moneyText(workerTotal), workerRows.length + " 位目前已產生分潤", ""));
         grid.appendChild(metric("客服分潤合計", moneyText(customerServiceTotal), customerServiceRows.length + " 筆目前已產生分潤", ""));
@@ -257,6 +257,141 @@
         }
     }
 
+    function setupUnifiedToolbar() {
+        const oldCopy = document.querySelector(".mw-admin-inline-actions [data-copy]");
+        const ticketId = oldCopy ? String(oldCopy.getAttribute("data-copy") || "").trim() : "";
+        const leftActions = document.querySelector(".mw-ops-sticky-bar .mw-ops-sticky-actions:first-child");
+
+        if (ticketId && leftActions && !leftActions.querySelector('[data-copy="' + CSS.escape(ticketId) + '"]')) {
+            const copyButton = document.createElement("button");
+            copyButton.type = "button";
+            copyButton.className = "mw-ops-action";
+            copyButton.setAttribute("data-copy", ticketId);
+            copyButton.textContent = "複製票口 ID";
+            leftActions.appendChild(copyButton);
+        }
+
+        document.querySelectorAll(".mw-admin-backbar, .mw-admin-inline-actions").forEach(function (node) {
+            node.remove();
+        });
+    }
+
+    function simplifyPayoutPolicyCopy() {
+        const candidates = document.querySelectorAll("main.page p, main.page span, main.page small");
+        candidates.forEach(function (node) {
+            if (node.children.length) {
+                return;
+            }
+            let text = normalizedText(node);
+            if (!text) {
+                return;
+            }
+
+            text = text
+                .replace("管理端修正掛名（新制 +3%；舊單依原制度）", "管理端修正掛名（+3%）")
+                .replace("管理端修正直播（新制 +2%）", "管理端修正直播（+2%）")
+                .replace("需新制且報單審核通過", "需報單審核通過")
+                .replace("新制為基礎 80%", "基礎 80%")
+                .replace("；舊單保留原制度。", "。");
+
+            if (text !== normalizedText(node)) {
+                node.textContent = text;
+            }
+        });
+    }
+
+    const AUDIT_ACTION_LABELS = {
+        order_report_submitted: "報單送審",
+        order_report_approved: "報單審核通過",
+        order_report_changes_requested: "報單退回補件",
+        order_report_updated: "報單內容更新",
+        order_updated: "訂單資料更新",
+        order_status_updated: "訂單狀態更新",
+        order_closed: "訂單結單",
+        order_cancelled: "訂單取消",
+        worker_payout_override: "陪玩分潤調整"
+    };
+
+    function friendlyAuditTitle(value) {
+        const raw = String(value || "").trim();
+        if (AUDIT_ACTION_LABELS[raw]) {
+            return AUDIT_ACTION_LABELS[raw];
+        }
+        if (/^[a-z0-9_]+$/i.test(raw) && raw.indexOf("_") !== -1) {
+            return "後台操作紀錄";
+        }
+        return raw || "操作紀錄";
+    }
+
+    function friendlyAuditDetail(action, value) {
+        const raw = String(value || "").trim();
+        if (!raw) {
+            return "";
+        }
+
+        const parts = raw.split("｜");
+        const operator = parts.length && parts[0].indexOf("操作人員：") === 0
+            ? parts.shift()
+            : "";
+        const change = parts.join("｜").trim();
+        let summary = change;
+
+        if (action === "order_report_approved") {
+            summary = "報單狀態：待審核 → 已通過；審核後的掛名／直播等分潤條件已套用。";
+        } else if (action === "order_report_changes_requested") {
+            summary = "報單已退回補件，等待陪玩修正後重新送審。";
+        } else if (action === "order_report_submitted") {
+            summary = "報單已送出，等待客服審核。";
+        } else if (
+            change.length > 180
+            || change.indexOf("{'id':") !== -1
+            || change.indexOf('{"id":') !== -1
+            || (change.indexOf("{") !== -1 && change.indexOf("}") !== -1 && change.indexOf("->") !== -1)
+        ) {
+            summary = "欄位變更已記錄；詳細內容請至「完整操作紀錄」查看。";
+        }
+
+        return [operator, summary].filter(Boolean).join("｜");
+    }
+
+    function sanitizeTimelineItems() {
+        document.querySelectorAll(".mw-ops-timeline-foot").forEach(function (node) {
+            node.remove();
+        });
+
+        document.querySelectorAll(".mw-ops-timeline-item").forEach(function (item) {
+            if (item.dataset.mwTimelineClean === "1") {
+                return;
+            }
+
+            const title = item.querySelector(".mw-ops-timeline-body > strong");
+            const detail = item.querySelector(".mw-ops-timeline-body > small");
+            const rawAction = normalizedText(title);
+
+            if (title) {
+                title.textContent = friendlyAuditTitle(rawAction);
+            }
+            if (detail) {
+                detail.textContent = friendlyAuditDetail(rawAction, detail.textContent);
+            }
+            item.dataset.mwTimelineClean = "1";
+        });
+    }
+
+    function setupTimelineSanitizer() {
+        sanitizeTimelineItems();
+        const root = document.querySelector("main.page") || document.body;
+        if (!root || root.dataset.mwTimelineObserver === "1") {
+            return;
+        }
+        root.dataset.mwTimelineObserver = "1";
+
+        const observer = new MutationObserver(function () {
+            sanitizeTimelineItems();
+        });
+        observer.observe(root, { childList: true, subtree: true });
+    }
+
     document.addEventListener("click", function (event) {
         const button = event.target.closest("[data-copy]");
 
@@ -283,5 +418,8 @@
     document.addEventListener("DOMContentLoaded", function () {
         refreshOpsStyles();
         setupFinanceBreakdown();
+        setupUnifiedToolbar();
+        simplifyPayoutPolicyCopy();
+        setupTimelineSanitizer();
     });
 })();
