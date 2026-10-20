@@ -18,8 +18,6 @@ def test_employee_center_and_legacy_employee_pages_share_site_layout_shell():
     assert '"admin_layout.html" if request.url.path.startswith(\'/admin\') else "site_layout.html"' in bridge
     assert "employee_workspace_shell = not request.url.path.startswith('/admin')" in bridge
 
-    # Employee pages inherit the exact public header/body stack. Admin pages keep
-    # the original backoffice layout in a separate immutable base.
     assert '{% include "_site_header.html" %}' in site_layout
     assert 'class="site-body mw-public-r5' in site_layout
     assert 'class="mw-r5-layout' in admin_layout
@@ -36,9 +34,6 @@ def test_employee_center_and_workspace_render_the_same_hero_on_the_same_ec_rail(
     assert include in site_layout
     assert 'class="ec employee-workspace-frame"' in site_layout
     assert 'class="employee-workspace-page-content"' in site_layout
-
-    # /employee owns the canonical rail. Workspace pages reuse .ec instead of
-    # recreating the same width through a backoffice wrapper.
     assert ".ec{width:min(1180px,calc(100% - 28px));margin:52px auto 90px" in center_css
 
 
@@ -71,15 +66,21 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
     assert name_line.index("_employee_store_name") < name_line.index("user.display_name")
 
 
-def test_workspace_shell_does_not_restyle_shared_header_or_shared_hero():
+def test_workspace_reuses_employee_center_shared_css_and_isolates_page_content_css():
+    employee = _read("web/app/templates/employee_center.html")
     site_layout = _read("web/app/templates/site_layout.html")
-    css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
+    page_css = _read("web/app/static/css/pages/employee_workspace_page_content.css")
 
-    assert "employee_workspace_site_shell.css?v=20261020-10" in site_layout
-    assert ".employee-workspace-page-content" in css
-    assert ".mw-shared-site-header" not in css
-    assert ".employee-workspace-hero" not in css
-    assert "body.mw-r5-employee" not in css
+    shared = "employee_workspace_site_shell.css?v=20261020-9"
+    assert shared in employee
+    assert shared in site_layout
+    assert "employee_workspace_page_content.css?v=20261020-1" in site_layout
+
+    # Page-only CSS is forbidden from changing the site header or shared hero.
+    assert ".employee-workspace-page-content" in page_css
+    assert ".mw-shared-site-header" not in page_css
+    assert ".employee-workspace-hero" not in page_css
+    assert "body.mw-r5-employee" not in page_css
 
 
 def test_workspace_identity_cache_uses_store_name():
