@@ -123,36 +123,49 @@ html body .dispatch-alert-toggle[data-state="blocked"] {
   box-shadow: 0 5px 14px rgba(230,83,93,.14) !important;
 }
 
-/* Desktop notification is secondary to the main bell control. */
+/* Desktop notification stays compact, but it is an action and must read louder than passive status chips. */
 html body .dispatch-shell button[data-dispatch-notification-toggle] {
-  min-height: 34px !important;
-  padding: 7px 10px !important;
+  min-height: 36px !important;
+  padding: 8px 12px !important;
   border-radius: 10px !important;
   font-size: 12px !important;
-  box-shadow: none !important;
+  font-weight: 950 !important;
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="online"] {
-  border-color: rgba(91,218,145,.28) !important;
-  background: rgba(91,218,145,.1) !important;
-  color: #d9ffe8 !important;
+  border-color: rgba(100,232,162,.72) !important;
+  background: #249f63 !important;
+  color: #f1fff7 !important;
+  box-shadow:
+    0 0 0 1px rgba(134,255,191,.08) inset,
+    0 5px 13px rgba(36,159,99,.22) !important;
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="pending"] {
-  border-color: rgba(245,198,107,.3) !important;
-  background: rgba(245,198,107,.1) !important;
-  color: #ffe3a3 !important;
+  border-color: rgba(255,214,112,.8) !important;
+  background: #c99028 !important;
+  color: #fff5d5 !important;
+  box-shadow:
+    0 0 0 1px rgba(255,229,159,.08) inset,
+    0 5px 13px rgba(201,144,40,.22) !important;
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="blocked"] {
-  border-color: rgba(255,107,138,.28) !important;
-  background: rgba(255,107,138,.09) !important;
-  color: #ffd5df !important;
+  border-color: rgba(255,139,150,.78) !important;
+  background: #b83f4b !important;
+  color: #fff !important;
+  box-shadow:
+    0 0 0 1px rgba(255,189,196,.07) inset,
+    0 5px 13px rgba(184,63,75,.2) !important;
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle]:hover,
 html body .dispatch-alert-toggle:hover {
   transform: translateY(-1px);
+}
+
+html body .dispatch-shell button[data-dispatch-notification-toggle]:hover {
+  filter: brightness(1.08) !important;
 }
 
 html body .dispatch-shell button[data-dispatch-notification-toggle]:active,
