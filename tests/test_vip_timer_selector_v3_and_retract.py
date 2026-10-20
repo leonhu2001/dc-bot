@@ -39,25 +39,43 @@ def test_v3_gameplay_labels_match_requested_layers():
         source_group="甜蜜單",
         detail_label="女單陪",
         variant="",
-        service_type="單陪",
+        service_type="女單陪",
     ) == "甜蜜"
     assert v3._gameplay_label(
         source_group="教學單",
         detail_label="1對1教學",
         variant="",
-        service_type="單陪",
+        service_type="1對1教學",
     ) == "教學"
 
 
-def test_v3_fourth_layer_is_headcount_only():
-    from services import vip_timer_select_flow as flow
-
-    rule = SimpleNamespace(required_staff_count="player_count", min_player_count=1)
+def test_v3_fourth_layer_uses_headcount_for_normal_gameplay():
+    rule = SimpleNamespace(required_staff_count="player_count", min_player_count=1, label="娛樂陪")
     assert v3._headcount_service_type("娛樂陪", {"player_count": 1}, rule) == "單陪"
     assert v3._headcount_service_type("娛樂陪", {"player_count": 2}, rule) == "雙陪"
     assert v3._headcount_service_type("娛樂陪", {"player_count": 3}, rule) == "三陪"
     assert v3._headcount_service_type("娛樂陪", {"player_count": 4}, rule) == "四陪"
     assert v3._headcount_service_type("娛樂陪", {"player_count": 5}, rule) == "不支援"
+
+
+def test_v3_fourth_layer_preserves_sweet_gender_packages():
+    cases = [
+        ("女單陪", 1),
+        ("男單陪", 1),
+        ("女雙陪", 2),
+        ("男雙陪", 2),
+    ]
+    for label, count in cases:
+        rule = SimpleNamespace(required_staff_count=count, label=f"三角洲端遊｜甜蜜單｜{label}")
+        assert v3._headcount_service_type("甜蜜單", {"label": label}, rule) == label
+
+    any_rule = SimpleNamespace(required_staff_count=2, label="三角洲端遊｜甜蜜單｜雙陪(不限)")
+    assert v3._headcount_service_type("甜蜜單", {"label": "雙陪(不限)"}, any_rule) == "不支援"
+
+
+def test_v3_fourth_layer_teaching_is_explicit_one_to_one():
+    rule = SimpleNamespace(required_staff_count=1, label="APEX｜教學單｜1對1")
+    assert v3._headcount_service_type("教學單", {"label": "1對1"}, rule) == "1對1教學"
 
 
 def test_v3_gameplay_order_places_entertainment_then_technical_then_sweet_teaching():
