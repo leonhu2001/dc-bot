@@ -1,12 +1,12 @@
 {% set _employee_path = request.url.path %}
 {% set _employee_member = member if member is defined and member else {} %}
-{% set _employee_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or _employee_member.get('name') or _employee_member.get('display_name') or '員工' %}
-{% set _employee_id = (user.id if user else '') or _employee_member.get('discord_id') %}
+{% set _employee_name = _employee_member.get('name') or _employee_member.get('display_name') or (user.staff_display_name if user and user.staff_display_name is defined else '') or (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
+{% set _employee_id = _employee_member.get('discord_id') or (user.id if user else '') %}
 
-<div class="ec-hero employee-workspace-hero">
+<div class="ec-hero employee-workspace-hero" data-employee-store-name="{{ _employee_name }}" data-employee-user-id="{{ _employee_id }}">
     <div>
         <div class="ec-k">EMPLOYEE CENTER</div>
-        <h1>{{ _employee_name }}</h1>
+        <h1 data-employee-workspace-name>{{ _employee_name }}</h1>
         <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
     </div>
     <div class="ec-actions" aria-label="員工中心快捷入口">
