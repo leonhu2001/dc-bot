@@ -628,7 +628,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     specified_ids=specified_ids,
                 )
 
-                # T+7 分鐘（公開後 6 分鐘）：第三輪全量通知並請客服介入。
+                # T+7 分鐘（公開後 6 分鐘）：6 分鐘全量通知並請客服介入。
                 # 若 Bot 曾離線到超過此時間，直接進入全量通知，避免補發多輪舊提醒。
                 if age >= FULL_EXPANSION_SECONDS and stage < 3:
                     third_notification_ids = _exclude_busy_notification_ids(
@@ -655,7 +655,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
 
                     lines = [
-                        "⚠️ **派單仍缺人｜第三輪全量通知**",
+                        "⚠️ **派單仍缺人｜6 分鐘全量通知**",
                         f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
                     ]
 
@@ -685,7 +685,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                         lines.append(
                             "🚨 **客服介入提醒**｜"
                             f"{support_mention} "
-                            "智慧派單已進入第三輪全量通知，"
+                            "智慧派單已進入 6 分鐘全量通知，"
                             f"目前仍缺 **{missing} 人**，請協助確認人力。"
                         )
 
@@ -715,7 +715,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                # T+4 分鐘（公開後 3 分鐘）：恢復第一版的中間擴大通知。
+                # T+4 分鐘（公開後 3 分鐘）：中段擴大通知。
                 # stage=0 時先補第一輪，不跳過預留的第一輪候選人。
                 if age >= SECOND_WAVE_SECONDS and 1 <= stage < 2:
                     second_ids: list[str] = []
@@ -750,7 +750,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                     if reminder_ids:
                         lines = [
-                            "🔔 **派單仍缺人｜第二輪擴大通知**",
+                            "🔔 **派單仍缺人｜中段擴大通知**",
                             f"WEB-{order_id} 目前仍缺 **{missing} 人**。",
                             " ".join(f"<@{worker_id}>" for worker_id in reminder_ids),
                             f"前往原派單：{jump_url}",
@@ -866,7 +866,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
                     )
                     continue
 
-                # 第三輪全量通知完成後，才進入每 10 分鐘持續提醒。
+                # 6 分鐘全量通知完成後，才進入每 10 分鐘持續提醒。
                 if stage >= 3:
                     updated_text = str(plan.get("updated_at") or "").strip()
                     try:
@@ -922,7 +922,7 @@ async def smart_dispatch_escalation_loop(bot: discord.Client) -> None:
 
                     mark_smart_dispatch_stage(
                         order_id,
-                        # 保留第三輪 stage=3；循環提醒不可讓 stage 倒退。
+                        # 保留全量通知 stage=3；循環提醒不可讓 stage 倒退。
                         stage=stage,
                     )
 
