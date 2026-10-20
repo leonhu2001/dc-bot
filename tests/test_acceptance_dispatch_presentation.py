@@ -46,7 +46,7 @@ def test_dispatch_fields_show_specified_priority_before_public_open_without_muta
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=1900)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🎯 指定優先中｜公開接單 <t:2000:R>"
+    assert fields["目前階段"] == "🎯 指定優先 → 🟢 公開接單 <t:2000:R>"
     assert fields["接單進度"] == "1/2 位"
     assert fields["護航需求"] == "1/1 位護級"
     assert "<@111>" in fields["接單規則"]
@@ -72,7 +72,7 @@ def test_dispatch_fields_show_generic_protection_without_specified_staff():
     apply_acceptance_dispatch_fields(embed, claim_data, now_ts=1900)
 
     fields = _field_map(embed)
-    assert fields["目前階段"] == "🔒 接單保護中｜公開接單 <t:2000:R>"
+    assert fields["目前階段"] == "🔒 接單保護 → 🟢 公開接單 <t:2000:R>"
     assert "公開接單：<t:2000:T> 開放" in fields["接單規則"]
 
 
