@@ -21,6 +21,7 @@ def install_vip_timer_payment_recovery() -> None:
 
     from services.acceptance import dispatch_refresh as dispatch_module
     from services.acceptance import payment_panel as payment_module
+    from services.acceptance import repair_runtime as repair_module
 
     current = dispatch_module.ensure_acceptance_payment_panel
 
@@ -40,8 +41,12 @@ def install_vip_timer_payment_recovery() -> None:
                         data["vip_timer_pending_payment"] = True
         return await current(*args, **kwargs)
 
+    # Patch every module that keeps a local binding to the payment-panel
+    # function. repair_runtime imports it directly, so updating only the source
+    # module would leave startup/manual recovery on the stale pre-timer path.
     dispatch_module.ensure_acceptance_payment_panel = restart_safe_ensure
     payment_module.ensure_acceptance_payment_panel = restart_safe_ensure
+    repair_module.ensure_acceptance_payment_panel = restart_safe_ensure
 
 
 __all__ = ["install_vip_timer_payment_recovery"]
