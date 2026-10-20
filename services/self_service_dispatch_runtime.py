@@ -6,6 +6,11 @@ from typing import Any, Callable, Mapping
 
 import discord
 
+from services.acceptance.dispatch_presentation import (
+    AcceptanceDispatchView,
+    acceptance_public_open_timestamp,
+    apply_acceptance_dispatch_fields,
+)
 from services.self_service_dispatch_cleanup import cleanup_failed_self_service_dispatch
 
 
@@ -182,7 +187,11 @@ async def _create_waiting_acceptance_order_once(
         build_order_rule_snapshot,
         rule_role_labels,
     )
-    from shared.order_acceptance import WAITING_ACCEPTANCE, create_or_update_acceptance_meta
+    from shared.order_acceptance import (
+        PUBLIC_ACCEPTANCE_LOCK_SECONDS,
+        WAITING_ACCEPTANCE,
+        create_or_update_acceptance_meta,
+    )
     from shared.web_order_sync import upsert_web_order_from_dispatch
 
     quantity = _to_int(data.get("quantity"), 1) or 1
@@ -356,15 +365,6 @@ async def _create_waiting_acceptance_order_once(
             inline=True,
         )
 
-    if specified_mentions:
-        embed.add_field(
-            name="指定人員",
-            value="、".join(
-                specified_mentions
-            ),
-            inline=False,
-        )
-
     if not rule.point_benefits_allowed:
         embed.add_field(name="點數福利", value="此分類不可使用點數福利", inline=False)
 
@@ -510,6 +510,7 @@ async def _create_waiting_acceptance_order_once(
     except Exception as exc:
         raise RuntimeError("WebOrder 規則／價格快照寫入失敗。") from exc
 
+    acceptance_created_at = get_taipei_now_iso()
     create_or_update_acceptance_meta(
         order_id=int(web_order.id),
         order_rule_key=rule.key,
@@ -590,6 +591,22 @@ async def _create_waiting_acceptance_order_once(
         "specified_staff_ids": specified_staff_ids,
     }
 
+    public_open_ts = acceptance_public_open_timestamp(
+        acceptance_created_at,
+        PUBLIC_ACCEPTANCE_LOCK_SECONDS,
+    )
+    if public_open_ts is not None:
+        ORDER_CLAIMS[dispatch_message.id]["public_acceptance_opens_at_unix"] = public_open_ts
+
+    service_terms_version = str(data.get("service_terms_version") or "").strip()
+    if service_terms_version:
+        ORDER_CLAIMS[dispatch_message.id]["service_terms_version"] = service_terms_version
+
+    apply_acceptance_dispatch_fields(
+        embed,
+        ORDER_CLAIMS[dispatch_message.id],
+    )
+
     data["customer_id"] = customer_id
     data["category"] = rule.category
     data["category_label"] = category_label
@@ -638,7 +655,7 @@ async def _create_waiting_acceptance_order_once(
     data["status"] = WAITING_ACCEPTANCE
     data["closed"] = False
     data["specified_staff_ids"] = specified_staff_ids
-    data["waiting_acceptance_created_at"] = get_taipei_now_iso()
+    data["waiting_acceptance_created_at"] = acceptance_created_at
 
     remember_order_data(interaction.channel.id, data)
     remember_claim_data(dispatch_message.id, ORDER_CLAIMS[dispatch_message.id])
@@ -646,7 +663,8 @@ async def _create_waiting_acceptance_order_once(
 
     try:
         await dispatch_message.edit(
-            view=DispatchClaimView(
+            embed=embed,
+            view=AcceptanceDispatchView(
                 customer_id=customer_id,
                 category_label=category_label,
                 item=rule.label,
