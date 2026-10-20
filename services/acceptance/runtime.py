@@ -46,11 +46,7 @@ from services.self_service_financials import (
     _price_snapshot,
     add_self_service_financial_breakdown_fields,
 )
-from services.vip_timer_recovery import install_vip_timer_payment_recovery
-from services.vip_timer_runtime import (
-    VipTimerControlView,
-    install_acceptance_payment_hook,
-)
+from services.vip_timer_acceptance import configure_vip_timer_acceptance
 
 
 def configure_acceptance_runtime_explicit(
@@ -64,11 +60,7 @@ def configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch,
 ) -> None:
     """Bind the acceptance runtime from explicit bot-owned dependencies."""
-    # Install VIP timer routing only after the acceptance package is fully
-    # imported. Installing from acceptance.__init__ creates a circular import
-    # through order_dispatch_runtime -> dispatch_presentation.
-    install_acceptance_payment_hook()
-    install_vip_timer_payment_recovery()
+    configure_vip_timer_acceptance(bot_instance)
 
     configure_acceptance_dispatch_refresh(
         dispatch_channel_id=dispatch_channel_id,
@@ -92,18 +84,6 @@ def configure_acceptance_runtime_explicit(
         refresh_acceptance_dispatch=refresh_acceptance_dispatch_from_web_order,
         sync_ticket_access_from_state=sync_acceptance_ticket_access_from_state,
     )
-
-    # VIP timer buttons use stable custom_ids and resolve the order by the
-    # current ticket channel. Register one persistent view so an in-progress
-    # timer remains operable after a bot restart.
-    if not getattr(bot_instance, "_vip_timer_control_view_registered", False):
-        try:
-            bot_instance.add_view(VipTimerControlView())
-            bot_instance._vip_timer_control_view_registered = True
-        except ValueError:
-            # discord.py raises ValueError when an equivalent persistent view
-            # is already registered. Treat that state as successfully bound.
-            bot_instance._vip_timer_control_view_registered = True
 
 
 def _apply_acceptance_state_to_claim_data(claim_data: dict, state) -> None:
