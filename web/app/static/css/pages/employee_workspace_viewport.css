@@ -1,0 +1,14 @@
+/* Keep employee-workspace navigation visually stationary between short and long pages.
+   Long pages such as /employee need a vertical scrollbar while short pages such as
+   /dispatch may not. Reserving the root scrollbar gutter prevents centered rails,
+   the shared site header, and the employee hero from shifting horizontally. */
+html {
+    scrollbar-gutter: stable;
+}
+
+/* Fallback for browsers that do not support scrollbar-gutter. */
+@supports not (scrollbar-gutter: stable) {
+    html {
+        overflow-y: scroll;
+    }
+}

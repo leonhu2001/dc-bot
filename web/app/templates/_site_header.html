@@ -1,5 +1,8 @@
 {% set current_path = request.url.path %}
 {% set _employee_workspace_header = employee_workspace_header if employee_workspace_header is defined else false %}
+{% if current_path.startswith('/employee') or current_path.startswith('/dispatch') %}
+<link rel="stylesheet" href="/static/css/pages/employee_workspace_viewport.css?v=20261020-1">
+{% endif %}
 <header class="site-header mw-shared-site-header">
   <div class="site-nav-shell">
     <a class="site-brand" href="/" aria-label="魔丸娛樂首頁">
