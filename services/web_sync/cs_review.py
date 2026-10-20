@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 import discord
 
+import core.permissions as permissions_runtime
 from core.database import (
     delete_order_row_from_db,
     remember_order_data,
@@ -22,6 +23,10 @@ from services.order_lifecycle_runtime import (
 )
 from services.orders import _to_int
 from services.self_service_financials import _format_plain_amount
+from services.web_sync.cs_presentation import (
+    admin_order_workspace_url,
+    build_cs_review_alert_text,
+)
 from services.web_sync.discord_helpers import (
     has_footer as _web_order_created_has_footer,
 )
@@ -368,18 +373,39 @@ async def _web_cs_ensure_review_panel(
         )
 
 
+    embed.add_field(
+        name="Web 後台",
+        value=(
+            f"[開啟 WEB-{order_id}]"
+            f"({admin_order_workspace_url(order_id)})"
+        ),
+        inline=False,
+    )
+
+
     embed.set_footer(
         text=footer_text
     )
 
 
+    customer_service_role_id = getattr(
+        permissions_runtime,
+        "CUSTOMER_ROLE_ID",
+        None,
+    )
+
+
     await ticket_channel.send(
+        content=build_cs_review_alert_text(
+            order_id,
+            customer_service_role_id,
+        ),
         embed=embed,
         view=WebsiteOrderCsConfirmView(),
         allowed_mentions=(
             discord.AllowedMentions(
                 users=True,
-                roles=False,
+                roles=bool(customer_service_role_id),
                 everyone=False,
             )
         ),
@@ -816,8 +842,6 @@ class WebsiteOrderCsConfirmView(
             ),
             ephemeral=True,
         )
-
-
 
 
 class WebsitePendingCancelConfirmView(discord.ui.View):

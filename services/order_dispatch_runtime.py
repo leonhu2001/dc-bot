@@ -10,6 +10,7 @@ from core.database import (
     remember_claim_data,
     save_bot_data,
 )
+from services.acceptance.error_presentation import format_acceptance_claim_error
 from services.acceptance.ticket_access import (
     grant_order_ticket_access,
     revoke_order_ticket_access,
@@ -108,6 +109,7 @@ class DispatchCancelClaimButton(discord.ui.Button):
 
         await view.cancel_claim(interaction)
 
+
 def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action: str) -> None:
     """把 Discord 接單按鈕單一操作同步到網站。
 
@@ -137,6 +139,7 @@ def sync_single_discord_claim_event_to_web(interaction, claim_type: str, action:
             f"user_id={getattr(getattr(interaction, 'user', None), 'id', None)} "
             f"claim_type={claim_type} action={action}: {exc}"
         )
+
 
 async def maybe_handle_prepay_acceptance_claim(
     view: "DispatchClaimView",
@@ -187,7 +190,7 @@ async def maybe_handle_prepay_acceptance_claim(
             f"reason={exc}"
         )
         await interaction.followup.send(
-            str(exc),
+            format_acceptance_claim_error(str(exc)),
             ephemeral=True,
         )
         return True
@@ -242,6 +245,7 @@ async def maybe_handle_prepay_acceptance_claim(
         await send_acceptance_payment_panel_if_ready(view, interaction, state)
 
     return True
+
 
 async def maybe_handle_prepay_acceptance_unclaim(
     view: "DispatchClaimView",
@@ -332,6 +336,7 @@ async def maybe_handle_prepay_acceptance_unclaim(
     await view.refresh_panel(interaction)
     return True
 
+
 class DispatchClaimView(discord.ui.View):
     def __init__(
         self,
@@ -362,10 +367,8 @@ class DispatchClaimView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
 
-
     def get_receiver_label(self, claim_type: str) -> str:
         return "我要接單"
-
 
     def get_required_role_id(self, claim_type: str) -> int:
         return BOOSTER_RECEIVER_ROLE_ID
@@ -391,7 +394,6 @@ class DispatchClaimView(discord.ui.View):
         data.setdefault("status", self.status)
 
         return data
-
 
     def build_receiver_text(self, claim_data: dict) -> str | None:
         receiver_ids = sorted(
@@ -514,7 +516,6 @@ class DispatchClaimView(discord.ui.View):
                 **edit_kwargs
             )
 
-
     async def claim_order(self, interaction: discord.Interaction, claim_type: str):
         handled = await maybe_handle_prepay_acceptance_claim(self, interaction)
 
@@ -537,7 +538,6 @@ class DispatchClaimView(discord.ui.View):
             ephemeral=True,
         )
 
-
     async def companion_claim(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.claim_order(interaction, "companion")
 
@@ -548,6 +548,7 @@ class DispatchClaimView(discord.ui.View):
     )
     async def booster_claim(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.claim_order(interaction, "booster")
+
 
 async def delete_dispatch_claim_panel_for_order(
     guild: discord.Guild,
@@ -619,6 +620,7 @@ async def delete_dispatch_claim_panel_for_order(
         save_bot_data()
     elif dispatch_message_id is not None:
         save_bot_data()
+
 
 def sync_web_order_status_from_bot(ticket_channel_id, status: str, dispatch_message_id=None, note: str | None = None) -> None:
     """DC bot 訂單狀態變更後，同步網站 web_orders.status。"""
