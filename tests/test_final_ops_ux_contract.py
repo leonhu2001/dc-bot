@@ -22,12 +22,17 @@ def test_admin_worker_change_sync_sends_idempotent_notice():
 
 def test_payment_review_runtime_has_canonical_success_rejection_and_apply_error_copy():
     source = Path("services/payment_review_runtime.py").read_text(encoding="utf-8")
-    assert "build_payment_approved_notice(" in source
-    assert "build_payment_rejected_notice(" in source
+    order_section = source.split("async def _apply_order_approval", 1)[1].split(
+        "async def _notify_worker_tip_paid", 1
+    )[0]
+
+    assert "build_payment_approved_notice(" in order_section
+    assert "build_payment_rejected_notice(" in order_section
+    assert "付款審核已通過" not in order_section
+    assert "❌ **付款審核未通過**" not in order_section
+
     assert "build_payment_apply_error_notice(" in source
     assert "mark_payment_review_apply_error(" in source
-    assert "付款審核已通過" not in source
-    assert "❌ **付款審核未通過**" not in source
 
 
 def test_admin_action_center_has_explicit_p0_p1_priority_only():
