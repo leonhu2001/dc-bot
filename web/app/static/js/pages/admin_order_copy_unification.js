@@ -38,6 +38,11 @@
         "canceled": "已取消"
     });
 
+    function isOrderSurface() {
+        const path = String(window.location.pathname || "");
+        return path === "/admin" || path.startsWith("/admin/order-workspace/");
+    }
+
     function text(node) {
         return node ? String(node.textContent || "").replace(/\s+/g, " ").trim() : "";
     }
@@ -53,7 +58,7 @@
         document.querySelectorAll('select[name="status"]').forEach(function (select) {
             Array.from(select.options || []).forEach(function (option) {
                 const value = String(option.value || "").trim().toLowerCase();
-                if (STATUS_BY_VALUE[value]) {
+                if (value !== "all" && STATUS_BY_VALUE[value]) {
                     option.textContent = STATUS_BY_VALUE[value];
                 }
             });
@@ -83,17 +88,6 @@
         });
     }
 
-    function normalizeStatusFilters() {
-        document.querySelectorAll('select[name="status"]').forEach(function (select) {
-            Array.from(select.options || []).forEach(function (option) {
-                const value = String(option.value || "").trim().toLowerCase();
-                if (value !== "all" && STATUS_BY_VALUE[value]) {
-                    option.textContent = STATUS_BY_VALUE[value];
-                }
-            });
-        });
-    }
-
     function normalizeLegacySuccessCopy() {
         document.querySelectorAll(".notice.success").forEach(function (notice) {
             const current = text(notice);
@@ -104,10 +98,12 @@
     }
 
     function apply() {
+        if (!isOrderSurface()) {
+            return;
+        }
         normalizeStatusSelects();
         normalizeOrderStatusCells();
         normalizeOrderBadges();
-        normalizeStatusFilters();
         normalizeLegacySuccessCopy();
     }
 
