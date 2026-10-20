@@ -46,6 +46,7 @@ from services.self_service_financials import (
     _price_snapshot,
     add_self_service_financial_breakdown_fields,
 )
+from services.vip_timer_acceptance import configure_vip_timer_acceptance
 
 
 def configure_acceptance_runtime_explicit(
@@ -59,6 +60,8 @@ def configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch,
 ) -> None:
     """Bind the acceptance runtime from explicit bot-owned dependencies."""
+    configure_vip_timer_acceptance(bot_instance, guild_id)
+
     configure_acceptance_dispatch_refresh(
         dispatch_channel_id=dispatch_channel_id,
         order_claims=order_claims,
