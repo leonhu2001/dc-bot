@@ -130,3 +130,17 @@ def test_public_vip_page_documents_timer_policy():
     assert "整張單最低計費 15 分鐘" in text_value
     assert "娛樂陪累積送時數" in text_value
     assert "VIP 自由計時僅可使用 VIP 百分比折扣" in text_value
+
+
+def test_web_runtime_installs_timer_policy_for_admin_loyalty_reconciliation():
+    source = Path("web/app/main.py").read_text(encoding="utf-8")
+    assert "from services.vip_timer_policy_v5 import install_vip_timer_policy_v5" in source
+    assert "install_vip_timer_policy_v5()" in source
+
+
+def test_policy_source_excludes_sweet_teaching_and_mobile_black_tide():
+    source = Path("services/vip_timer_policy_v5.py").read_text(encoding="utf-8")
+    assert '"甜蜜" in text_value' in source
+    assert '"教學" in text_value' in source
+    assert 'category == "delta_mobile_basic" and "黑潮爆破" in text_value' in source
+    assert '"note": "vip_timer_excluded"' in source
