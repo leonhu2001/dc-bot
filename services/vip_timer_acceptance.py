@@ -12,6 +12,15 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     if not callable(add_view):
         return
 
+    # These two guards patch services.vip_timer itself. Install them before
+    # vip_timer_runtime imports timer functions into local bindings so every
+    # persistent Discord callback gets the guarded lifecycle/catalog behavior.
+    from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
+    from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
+
+    install_vip_timer_catalog_guard()
+    install_vip_timer_lifecycle_guard()
+
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services.vip_timer_runtime import (
         VipTimerControlView,
