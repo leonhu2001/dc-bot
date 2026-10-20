@@ -44,7 +44,7 @@ def test_admin_sidebar_is_navigation_only_and_consolidated():
 
 def test_page_level_backbar_contains_contextual_parent_routes():
     backbar = (TEMPLATES / "_admin_backbar.html").read_text(encoding="utf-8")
-    layout = (TEMPLATES / "layout.html").read_text(encoding="utf-8")
+    layout = (TEMPLATES / "admin_layout.html").read_text(encoding="utf-8")
 
     assert '_admin_backbar.html' in layout
 
@@ -69,6 +69,8 @@ def test_every_admin_template_has_shared_admin_navigation():
         uses_layout = "extends" in text and "layout.html" in text
         includes_sidebar = "_admin_sidebar.html" in text
 
+        if path.name == "admin_layout.html":
+            continue
         if not (uses_layout or includes_sidebar):
             missing.append(path.name)
 
@@ -104,7 +106,6 @@ def test_center_template_has_no_duplicate_full_list_entry_points():
     assert 'href="/admin/tickets?return_to=/admin/support-center"' not in center
     assert "/admin/search/customer/{{ row.customer_discord_id }}" in center
 
-    # These remain distinct operational tools rather than duplicate lists.
     assert "個人牆管理" in center
     assert "評價管理" in center
     assert "錢包帳本" in center
@@ -120,6 +121,7 @@ def test_admin_templates_compile_with_jinja():
 
     env.get_template("_admin_sidebar.html")
     env.get_template("_admin_backbar.html")
+    env.get_template("admin_layout.html")
     for path in sorted(TEMPLATES.glob("admin*.html")):
         env.get_template(path.name)
 
@@ -149,22 +151,12 @@ def test_system_maintenance_contains_operations_monitoring():
 
 
 def test_nested_drilldowns_preserve_return_destination():
-    order_page = (TEMPLATES / "admin_order_detail.html").read_text(
-        encoding="utf-8"
-    )
-    wallet_page = (TEMPLATES / "admin_wallet_detail.html").read_text(
-        encoding="utf-8"
-    )
-    customer_360 = (TEMPLATES / "admin_customer_360.html").read_text(
-        encoding="utf-8"
-    )
+    order_page = (TEMPLATES / "admin_order_detail.html").read_text(encoding="utf-8")
+    wallet_page = (TEMPLATES / "admin_wallet_detail.html").read_text(encoding="utf-8")
+    customer_360 = (TEMPLATES / "admin_customer_360.html").read_text(encoding="utf-8")
     routers = ROOT / "web" / "app" / "routers"
-    workspace_source = (routers / "admin_order_workspace.py").read_text(
-        encoding="utf-8"
-    )
-    search_source = (routers / "admin_global_search.py").read_text(
-        encoding="utf-8"
-    )
+    workspace_source = (routers / "admin_order_workspace.py").read_text(encoding="utf-8")
+    search_source = (routers / "admin_global_search.py").read_text(encoding="utf-8")
 
     assert "request.query_params.get('return_to', '') | urlencode" in order_page
     assert 'name="return_to"' in wallet_page
@@ -172,9 +164,6 @@ def test_nested_drilldowns_preserve_return_destination():
     assert 'params["return_to"] = return_to' in workspace_source
     assert "child_return_param" in customer_360
     assert "child_return_param" in search_source
-
-
-
 
 
 def test_primary_admin_workspaces_do_not_repeat_page_headers():
@@ -189,7 +178,7 @@ def test_primary_admin_workspaces_do_not_repeat_page_headers():
 
 
 def test_admin_uses_canonical_portal_css_without_overlay_theme():
-    layout = (TEMPLATES / "layout.html").read_text(encoding="utf-8")
+    layout = (TEMPLATES / "admin_layout.html").read_text(encoding="utf-8")
     static_css = ROOT / "web" / "app" / "static" / "css"
 
     assert "mw_portal_r5.css" in layout
@@ -200,6 +189,8 @@ def test_admin_uses_canonical_portal_css_without_overlay_theme():
 
 def test_standalone_admin_templates_do_not_load_overlay_css():
     for path in sorted(TEMPLATES.glob("admin*.html")):
+        if path.name == "admin_layout.html":
+            continue
         text = path.read_text(encoding="utf-8")
         uses_layout = "extends" in text and "layout.html" in text
         includes_sidebar = "_admin_sidebar.html" in text
@@ -215,9 +206,7 @@ def test_standalone_admin_templates_do_not_load_overlay_css():
 
 
 def test_portal_css_owns_admin_visual_tokens():
-    portal = (
-        ROOT / "web" / "app" / "static" / "css" / "mw_portal_r5.css"
-    ).read_text(encoding="utf-8")
+    portal = (ROOT / "web" / "app" / "static" / "css" / "mw_portal_r5.css").read_text(encoding="utf-8")
 
     for token in (
         "--r5-bg",
@@ -256,15 +245,12 @@ def test_core_admin_pages_no_longer_embed_visual_override_blocks():
         "admin_operations_report.html",
     ):
         text = (TEMPLATES / filename).read_text(encoding="utf-8")
-        assert "<style>" not in text, (
-            f"{filename} still embeds page-level visual CSS"
-        )
+        assert "<style>" not in text, f"{filename} still embeds page-level visual CSS"
+
 
 def test_dashboard_has_no_literal_newline_and_support_rows_have_no_link_underline():
     dashboard = (TEMPLATES / "admin.html").read_text(encoding="utf-8")
-    center_css = (
-        ROOT / "web/app/static/css/pages/admin_center_inline_1.css"
-    ).read_text(encoding="utf-8")
+    center_css = (ROOT / "web/app/static/css/pages/admin_center_inline_1.css").read_text(encoding="utf-8")
 
     assert "\\n</head>" not in dashboard
     assert ".center-row{" in center_css
@@ -275,9 +261,7 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     routers = ROOT / "web" / "app" / "routers"
     source = (routers / "admin_order_rules.py").read_text(encoding="utf-8")
     page = (TEMPLATES / "admin_order_rules.html").read_text(encoding="utf-8")
-    page_css = (
-        ROOT / "web/app/static/css/pages/admin_order_rules_inline_1.css"
-    ).read_text(encoding="utf-8")
+    page_css = (ROOT / "web/app/static/css/pages/admin_order_rules_inline_1.css").read_text(encoding="utf-8")
 
     assert 'ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}' in source
     assert "QUALIFICATION_GROUPS" in source
@@ -291,8 +275,6 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     assert '"key": "female_companion"' in source
 
     assert "<h3>接單職位</h3>" not in page
-    # Existing-rule editor and new-product form both use the same taxonomy,
-    # now presented inside the redesigned rule workspace.
     assert page.count("<h3>接單資格</h3>") == 2
     assert "＋ 新增商品" in page
     assert 'action="/admin/order-rules/create"' in page
@@ -314,14 +296,9 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
 
 def test_payout_summary_uses_shared_discord_avatar_resolver():
     page = (TEMPLATES / "admin_payout_summary.html").read_text(encoding="utf-8")
-    router = (
-        ROOT / "web" / "app" / "routers" / "admin_payout_summary.py"
-    ).read_text(encoding="utf-8")
+    router = (ROOT / "web" / "app" / "routers" / "admin_payout_summary.py").read_text(encoding="utf-8")
 
     assert "discord_avatar(" in page
     assert '"staff-avatar-img"' in page
     assert "row.avatar_url" not in page
-    assert (
-        "summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows, locked_rows)"
-        in router
-    )
+    assert "summary_rows = build_combined_summary_rows(unpaid_rows, paid_rows, locked_rows)" in router
