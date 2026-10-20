@@ -54,10 +54,14 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
     assert "_employee_path == '/dispatch'" in hero
     assert "_employee_path.startswith('/employee/store-bindings')" in hero
 
-    # The same logged-in user name must be shown on every workspace page even
-    # when /employee also has a WebStaffMember object in its template context.
+    # Employee UI must prefer the store/guild display nickname over the raw
+    # Discord OAuth name. Discord name is only a fallback.
+    store_line = next(line for line in hero.splitlines() if "_employee_store_name =" in line)
     name_line = next(line for line in hero.splitlines() if "_employee_name =" in line)
-    assert name_line.index("user.display_name") < name_line.index("_employee_member.get('name')")
+    assert "_employee_member.get('name')" in store_line
+    assert "_employee_member.get('display_name')" in store_line
+    assert "user.staff_display_name" in store_line
+    assert name_line.index("_employee_store_name") < name_line.index("user.display_name")
 
 
 def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
@@ -66,14 +70,11 @@ def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
     css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
 
     assert "employee_center_inline_1.css?v=20261020-2" in sidebar
-    assert "employee_workspace_site_shell.css?v=20261020-7" in sidebar
-    assert "employee_workspace_site_shell.css?v=20261020-7" in employee
+    assert "employee_workspace_site_shell.css?v=20261020-8" in sidebar
+    assert "employee_workspace_site_shell.css?v=20261020-8" in employee
     assert "employee-workspace-top" in sidebar
     assert "width: min(1180px, calc(100% - 28px))" in css
 
-    # /employee uses site_layout while inner employee pages use layout.html.
-    # The active state and hero typography must therefore not depend on the
-    # backoffice body class.
     assert ".employee-workspace-hero .ec-btn.active" in css
     assert "body.mw-r5-employee .employee-workspace-hero .ec-btn.active" not in css
     assert "font-size: 15px !important;" in css
@@ -86,6 +87,7 @@ def test_workspace_uses_employee_center_hero_css_and_same_content_rail():
 
 def test_workspace_header_matches_public_r5_typography_and_breakpoints():
     sidebar = _read("web/app/templates/_employee_sidebar.html")
+    header = _read("web/app/templates/_site_header.html")
     css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
     public_css = _read("web/app/static/css/mw_public_r5.css")
 
@@ -93,9 +95,6 @@ def test_workspace_header_matches_public_r5_typography_and_breakpoints():
     assert "/static/js/mw_site.js?v=3-order-rule-intro" in sidebar
     assert "ewu-site-header" not in sidebar
 
-    # Public pages use Inter first, 15px/500 body text, 14px/700 nav links and
-    # 12.5px small text. The employee copy must lock to the same values instead
-    # of the previous Noto Sans TC / 400 approximation.
     assert "Inter," in public_css
     assert 'font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif !important;' in css
     assert ".mw-shared-site-header .site-brand-copy small" in css
@@ -104,10 +103,22 @@ def test_workspace_header_matches_public_r5_typography_and_breakpoints():
     assert "font-size: 14px !important;" in css
     assert "font-weight: 700 !important;" in css
 
-    # Desktop and mobile controls are mutually exclusive; this prevents the
-    # empty outlined mobile-menu button from appearing beside the desktop nav.
-    assert ".mw-shared-site-header .mobile-nav-button" in css
+    # Employee workspace gets a non-button outer guard, so backoffice button
+    # rules cannot accidentally reveal the mobile trigger on desktop.
+    assert "employee_workspace_header = true" in sidebar
+    assert 'class="employee-mobile-nav-control"' in header
+    assert ".employee-mobile-nav-control" in css
     assert "display: none !important;" in css
     assert "@media (max-width: 1050px)" in css
-    assert ".mw-shared-site-header .site-desktop-nav { display: none !important; }" in css
-    assert ".mw-shared-site-header .mobile-nav-button { display: block !important; }" in css
+    assert ".employee-mobile-nav-control { display: block !important; }" in css
+
+
+def test_workspace_identity_cache_uses_store_name():
+    employee = _read("web/app/templates/employee_center.html")
+    sidebar = _read("web/app/templates/_employee_sidebar.html")
+    script = _read("web/app/static/js/pages/employee_workspace_identity.js")
+
+    assert "employee_workspace_identity.js?v=20261020-1" in employee
+    assert "employee_workspace_identity.js?v=20261020-1" in sidebar
+    assert "mw_employee_store_name:" in script
+    assert "data-employee-workspace-name" in _read("web/app/templates/_employee_workspace_hero.html")
