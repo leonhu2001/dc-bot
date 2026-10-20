@@ -1,4 +1,5 @@
 {% set current_path = request.url.path %}
+{% set _employee_workspace_header = employee_workspace_header if employee_workspace_header is defined else false %}
 <header class="site-header mw-shared-site-header">
   <div class="site-nav-shell">
     <a class="site-brand" href="/" aria-label="魔丸娛樂首頁">
@@ -59,9 +60,11 @@
       </a>
       {% endif %}
 
+      {% if _employee_workspace_header %}<span class="employee-mobile-nav-control">{% endif %}
       <button class="mobile-nav-button" type="button" aria-label="開啟選單" aria-expanded="false" data-mobile-nav-button>
         <span></span><span></span><span></span>
       </button>
+      {% if _employee_workspace_header %}</span>{% endif %}
     </div>
   </div>
 
