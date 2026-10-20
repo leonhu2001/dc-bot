@@ -12,6 +12,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     if not callable(add_view):
         return
 
+    # The persistent self-service retract view is registered later by bot.py.
+    # Patch its instance callback now so the refactored runtime state is used and
+    # Discord is acknowledged before any DB/network cleanup begins.
+    from services.self_service_retract_runtime_fix import install_self_service_retract_runtime_fix
+
+    install_self_service_retract_runtime_fix()
+
     # These guards patch services.vip_timer itself. Install them before
     # vip_timer_runtime imports timer functions into local bindings so every
     # persistent Discord callback gets the guarded lifecycle/catalog behavior.
@@ -29,13 +36,15 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     install_vip_timer_self_service()
 
     # Build the timer-only selector tree first, then refine it to:
-    # category -> game -> gameplay -> service/headcount. Duration remains
-    # free-running and is never selected up front.
+    # category -> game -> gameplay -> headcount. Duration remains free-running
+    # and is never selected up front.
     from services.vip_timer_select_flow import install_vip_timer_select_flow
     from services.vip_timer_selector_order_v2 import install_vip_timer_selector_order_v2
+    from services.vip_timer_selector_order_v3 import install_vip_timer_selector_order_v3
 
     install_vip_timer_select_flow()
     install_vip_timer_selector_order_v2()
+    install_vip_timer_selector_order_v3()
 
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services.vip_timer_runtime import (
