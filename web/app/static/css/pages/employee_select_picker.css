@@ -1,6 +1,6 @@
 /* Shared custom select for employee workspace pages.
    Avoid native Windows select popups so every employee tab keeps the same dark UI. */
-.employee-workspace-page-content .mw-employee-native-select{
+body.employee-workspace-site .mw-employee-native-select{
     position:absolute!important;
     width:1px!important;
     height:1px!important;
@@ -14,14 +14,14 @@
     white-space:nowrap!important;
 }
 
-.employee-workspace-page-content .mw-employee-select{
+body.employee-workspace-site .mw-employee-select{
     position:relative;
     min-width:0;
     width:100%;
     flex:1 1 180px;
 }
 
-.employee-workspace-page-content button.mw-employee-select-trigger{
+body.employee-workspace-site button.mw-employee-select-trigger{
     width:100%!important;
     min-height:42px!important;
     display:flex!important;
@@ -45,23 +45,23 @@
     transition:border-color .14s ease,background .14s ease,box-shadow .14s ease!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-trigger:hover:not(:disabled){
+body.employee-workspace-site button.mw-employee-select-trigger:hover:not(:disabled){
     border-color:rgba(245,198,107,.45)!important;
     background:#151b20!important;
     box-shadow:0 0 0 2px rgba(245,198,107,.045)!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-trigger:focus-visible{
+body.employee-workspace-site button.mw-employee-select-trigger:focus-visible{
     outline:2px solid rgba(245,198,107,.9)!important;
     outline-offset:2px!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-trigger:disabled{
+body.employee-workspace-site button.mw-employee-select-trigger:disabled{
     cursor:not-allowed!important;
     opacity:.55!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-trigger.is-invalid{
+body.employee-workspace-site button.mw-employee-select-trigger.is-invalid{
     border-color:rgba(255,107,138,.72)!important;
     box-shadow:0 0 0 2px rgba(255,107,138,.08)!important;
 }
@@ -113,7 +113,7 @@
     display:none!important;
 }
 
-.employee-workspace-page-content .mw-employee-select-search{
+body.employee-workspace-site .mw-employee-select-search{
     width:100%!important;
     box-sizing:border-box!important;
     min-height:40px!important;
@@ -128,11 +128,11 @@
     box-shadow:none!important;
 }
 
-.employee-workspace-page-content .mw-employee-select-search::placeholder{
+body.employee-workspace-site .mw-employee-select-search::placeholder{
     color:#78838d!important;
 }
 
-.employee-workspace-page-content .mw-employee-select-search:focus{
+body.employee-workspace-site .mw-employee-select-search:focus{
     border-color:rgba(245,198,107,.55)!important;
     box-shadow:0 0 0 2px rgba(245,198,107,.08)!important;
 }
@@ -145,7 +145,7 @@
     scrollbar-width:thin;
 }
 
-.employee-workspace-page-content button.mw-employee-select-option{
+body.employee-workspace-site button.mw-employee-select-option{
     width:100%!important;
     min-height:0!important;
     display:flex!important;
@@ -169,23 +169,23 @@
     transition:background .12s ease,color .12s ease!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-option[hidden]{
+body.employee-workspace-site button.mw-employee-select-option[hidden]{
     display:none!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-option:hover:not(:disabled),
-.employee-workspace-page-content button.mw-employee-select-option:focus-visible{
+body.employee-workspace-site button.mw-employee-select-option:hover:not(:disabled),
+body.employee-workspace-site button.mw-employee-select-option:focus-visible{
     background:rgba(245,198,107,.10)!important;
     color:#fff4d2!important;
     outline:none!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-option.is-selected{
+body.employee-workspace-site button.mw-employee-select-option.is-selected{
     background:rgba(245,198,107,.16)!important;
     color:#ffe6aa!important;
 }
 
-.employee-workspace-page-content button.mw-employee-select-option:disabled{
+body.employee-workspace-site button.mw-employee-select-option:disabled{
     cursor:not-allowed!important;
     opacity:.38!important;
 }
