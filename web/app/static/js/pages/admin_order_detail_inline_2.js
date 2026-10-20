@@ -1,6 +1,13 @@
 (function () {
     "use strict";
 
+    function refreshOpsStyles() {
+        const link = document.querySelector('link[href^="/static/css/pages/admin_ops_experience.css"]');
+        if (link) {
+            link.setAttribute("href", "/static/css/pages/admin_ops_experience.css?v=20261020_2");
+        }
+    }
+
     function normalizedText(node) {
         return node ? String(node.textContent || "").replace(/\s+/g, " ").trim() : "";
     }
@@ -215,7 +222,7 @@
 
         if (orderStatus === "已取消" && payoutTotal > 0) {
             notices.appendChild(notice(
-                "此單已取消但頁面仍有分潤紀錄。这里只顯示現況，是否作廢仍依既有帳務流程處理。",
+                "此單已取消但頁面仍有分潤紀錄。這裡只顯示現況，是否作廢仍依既有帳務流程處理。",
                 "warning"
             ));
         }
@@ -274,6 +281,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", function () {
+        refreshOpsStyles();
         setupFinanceBreakdown();
     });
 })();
