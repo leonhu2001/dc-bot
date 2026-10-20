@@ -34,7 +34,24 @@
     desktop.classList.add('dispatch-primary-control');
     bell.classList.add('dispatch-primary-control');
 
-    actions.append(desktop, bell);
+    // Do not append already-positioned controls again. append() on an existing
+    // child still removes/reinserts the node, which used to trigger the
+    // MutationObserver every animation frame and could cancel native clicks.
+    if (desktop.parentElement !== actions) {
+      actions.appendChild(desktop);
+    }
+    if (bell.parentElement !== actions) {
+      actions.appendChild(bell);
+    }
+
+    // Keep a stable order without touching the DOM when it is already correct.
+    if (actions.firstElementChild !== desktop) {
+      actions.insertBefore(desktop, actions.firstElementChild);
+    }
+    if (desktop.nextElementSibling !== bell) {
+      actions.insertBefore(bell, desktop.nextElementSibling);
+    }
+
     statusRow.classList.add('dispatch-status-row');
   }
 
@@ -45,6 +62,22 @@
       syncQueued = false;
       arrangeHero();
     });
+  }
+
+  function mutationNeedsArrange(records) {
+    return records.some((record) => Array.from(record.addedNodes || []).some((node) => {
+      if (!(node instanceof Element)) return false;
+
+      if (node.matches(
+        '.dispatch-shell, .dispatch-hero-main, .dispatch-alert-toggle, [data-dispatch-notification-toggle]'
+      )) {
+        return true;
+      }
+
+      return Boolean(node.querySelector?.(
+        '.dispatch-shell, .dispatch-hero-main, .dispatch-alert-toggle, [data-dispatch-notification-toggle]'
+      ));
+    }));
   }
 
   document.addEventListener('pointerdown', (event) => {
@@ -60,6 +93,13 @@
 
   arrangeHero();
 
-  const observer = new MutationObserver(queueArrangeHero);
+  // The dispatch runtime replaces the entire .dispatch-shell after SSE/form
+  // refreshes. Watch only for newly inserted dispatch UI, not every text-node
+  // update inside the page.
+  const observer = new MutationObserver((records) => {
+    if (mutationNeedsArrange(records)) {
+      queueArrangeHero();
+    }
+  });
   observer.observe(document.body, { childList: true, subtree: true });
 })();
