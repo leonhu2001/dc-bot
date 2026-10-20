@@ -13,12 +13,16 @@ from services.vip_timer import (
     get_session,
     get_session_by_ticket,
     list_segments,
-    pause_timer,
     public_hourly_rules,
     resume_timer,
     start_timer,
     switch_rule,
     is_vip_timer_order_data,
+)
+from services.vip_timer_pause_confirmation import (
+    clear_pause_request,
+    get_pause_request,
+    request_or_confirm_pause,
 )
 
 
@@ -28,6 +32,7 @@ _HOOK_INSTALLED = False
 
 def _unix(value: Any) -> int | None:
     from services.vip_timer import parse_dt
+
     parsed = parse_dt(value)
     return int(parsed.timestamp()) if parsed is not None else None
 
@@ -46,6 +51,7 @@ def _duration_text(seconds: int) -> str:
 def _accepted_staff_ids(order_id: int) -> list[str]:
     try:
         from shared.order_acceptance import get_acceptance_state
+
         state = get_acceptance_state(int(order_id))
     except Exception:
         return []
@@ -80,6 +86,7 @@ def _can_operate(interaction: discord.Interaction, session: dict) -> bool:
 def build_vip_timer_embed(order_id: int) -> discord.Embed:
     session = get_session(int(order_id)) or {}
     status = str(session.get("status") or "waiting_staff")
+    pause_request = get_pause_request(int(order_id)) if status == "running" else None
     status_text = {
         "waiting_staff": "🟡 等待接單",
         "ready": "🟡 等待開始",
@@ -88,6 +95,8 @@ def build_vip_timer_embed(order_id: int) -> discord.Embed:
         "pending_payment": "🟠 待付款",
         "paid": "✅ 已付款",
     }.get(status, status)
+    if pause_request is not None:
+        status_text = "🟢 計時中｜等待暫停確認"
 
     embed = discord.Embed(
         title="👑 VIP 自由計時",
@@ -127,13 +136,33 @@ def build_vip_timer_embed(order_id: int) -> discord.Embed:
             inline=True,
         )
 
+    if pause_request is not None:
+        requester_id = str(pause_request.get("requester_discord_id") or "").strip()
+        requester = f"<@{requester_id}>" if requester_id else "其中一方"
+        requester_side = str(pause_request.get("requester_side") or "")
+        waiting_for = "任一位已接單陪玩" if requester_side == "customer" else "老闆"
+        requested_unix = _unix(pause_request.get("requested_at"))
+        requested_text = f"\n申請：<t:{requested_unix}:R>" if requested_unix is not None else ""
+        embed.add_field(
+            name="⏸️ 暫停申請",
+            value=(
+                f"{requester} 已申請暫停，等待 **{waiting_for}** 再按一次「暫停」確認。"
+                f"{requested_text}\n確認前仍會繼續計時。"
+            ),
+            inline=False,
+        )
+
     segments = list_segments(int(order_id))
     if segments:
         lines: list[str] = []
         for segment in segments[-8:]:
             seconds = int(segment.get("billable_seconds") or 0)
             active_unix = _unix(segment.get("active_started_at"))
-            suffix = f"＋ <t:{active_unix}:R>" if active_unix is not None and status == "running" and not segment.get("ended_at") else ""
+            suffix = (
+                f"＋ <t:{active_unix}:R>"
+                if active_unix is not None and status == "running" and not segment.get("ended_at")
+                else ""
+            )
             lines.append(
                 f"`#{int(segment.get('seq') or 0)}` "
                 f"{segment.get('category_label') or ''}｜{segment.get('rule_label') or ''}\n"
@@ -193,40 +222,66 @@ class VipTimerControlView(discord.ui.View):
     @discord.ui.button(label="開始計時", style=discord.ButtonStyle.success, custom_id="vip_timer:start")
     async def start(self, interaction: discord.Interaction, button: discord.ui.Button):
         session = await self._session(interaction)
-        if session is None: return
+        if session is None:
+            return
+        order_id = int(session["order_id"])
         try:
-            start_timer(int(session["order_id"]), interaction.user.id, _accepted_staff_ids(int(session["order_id"])))
+            start_timer(order_id, interaction.user.id, _accepted_staff_ids(order_id))
         except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True); return
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        clear_pause_request(order_id, actor_id=interaction.user.id, reason="timer_started")
         await interaction.response.defer()
-        await _refresh_control_message(interaction, int(session["order_id"]))
+        await _refresh_control_message(interaction, order_id)
 
     @discord.ui.button(label="暫停", style=discord.ButtonStyle.secondary, custom_id="vip_timer:pause")
     async def pause(self, interaction: discord.Interaction, button: discord.ui.Button):
         session = await self._session(interaction)
-        if session is None: return
+        if session is None:
+            return
+        order_id = int(session["order_id"])
         try:
-            pause_timer(int(session["order_id"]), interaction.user.id)
+            result = request_or_confirm_pause(
+                order_id,
+                interaction.user.id,
+                _accepted_staff_ids(order_id),
+            )
         except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True); return
-        await interaction.response.defer()
-        await _refresh_control_message(interaction, int(session["order_id"]))
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+
+        if str(result.get("state") or "") == "pending":
+            waiting_for = "任一位陪玩" if result.get("waiting_for") == "staff" else "老闆"
+            if result.get("already_requested"):
+                text = f"暫停申請已送出，仍在等待{waiting_for}按「暫停」確認。計時目前持續中。"
+            else:
+                text = f"已送出暫停申請，等待{waiting_for}按「暫停」確認。確認前仍會繼續計時。"
+            await interaction.response.send_message(text, ephemeral=True)
+        else:
+            await interaction.response.defer()
+
+        await _refresh_control_message(interaction, order_id)
 
     @discord.ui.button(label="繼續", style=discord.ButtonStyle.success, custom_id="vip_timer:resume")
     async def resume(self, interaction: discord.Interaction, button: discord.ui.Button):
         session = await self._session(interaction)
-        if session is None: return
+        if session is None:
+            return
+        order_id = int(session["order_id"])
         try:
-            resume_timer(int(session["order_id"]), interaction.user.id)
+            resume_timer(order_id, interaction.user.id)
         except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True); return
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        clear_pause_request(order_id, actor_id=interaction.user.id, reason="timer_resumed")
         await interaction.response.defer()
-        await _refresh_control_message(interaction, int(session["order_id"]))
+        await _refresh_control_message(interaction, order_id)
 
     @discord.ui.button(label="切換遊戲／玩法", style=discord.ButtonStyle.primary, custom_id="vip_timer:switch")
     async def switch(self, interaction: discord.Interaction, button: discord.ui.Button):
         session = await self._session(interaction)
-        if session is None: return
+        if session is None:
+            return
         await interaction.response.send_message(
             "選擇要切換到的遊戲分類：",
             view=VipTimerCategoryView(int(session["order_id"])),
@@ -236,7 +291,8 @@ class VipTimerControlView(discord.ui.View):
     @discord.ui.button(label="結束計時", style=discord.ButtonStyle.danger, custom_id="vip_timer:end")
     async def end(self, interaction: discord.Interaction, button: discord.ui.Button):
         session = await self._session(interaction)
-        if session is None: return
+        if session is None:
+            return
         await interaction.response.send_message(
             "確定要結束這張 VIP 自由計時單嗎？結束後會立即產生待付款金額。",
             view=VipTimerEndConfirmView(int(session["order_id"])),
@@ -280,7 +336,9 @@ class VipTimerCategoryView(discord.ui.View):
 
 class VipTimerRuleSelect(discord.ui.Select):
     def __init__(self, order_id: int, category: str, page: int):
-        self.order_id = int(order_id); self.category = str(category); self.page = max(0, int(page))
+        self.order_id = int(order_id)
+        self.category = str(category)
+        self.page = max(0, int(page))
         rows = [row for row in public_hourly_rules() if str(row["category"]) == self.category]
         start = self.page * 24
         page_rows = rows[start:start + 24]
@@ -299,14 +357,18 @@ class VipTimerRuleSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         rule_key = self.values[0]
         if rule_key == "__none__":
-            await interaction.response.send_message("這一頁沒有可用方案。", ephemeral=True); return
+            await interaction.response.send_message("這一頁沒有可用方案。", ephemeral=True)
+            return
         session = get_session(self.order_id)
         if session is None or not _can_operate(interaction, session):
-            await interaction.response.send_message("你沒有操作這張計時單的權限。", ephemeral=True); return
+            await interaction.response.send_message("你沒有操作這張計時單的權限。", ephemeral=True)
+            return
         try:
             switch_rule(self.order_id, rule_key, interaction.user.id, _accepted_staff_ids(self.order_id))
         except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True); return
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        clear_pause_request(self.order_id, actor_id=interaction.user.id, reason="rule_switched")
         await interaction.response.edit_message(content="✅ 已切換玩法，新的計費區段已開始。", view=None)
         channel = interaction.channel
         if isinstance(channel, discord.TextChannel):
@@ -315,7 +377,10 @@ class VipTimerRuleSelect(discord.ui.Select):
             if message_id:
                 try:
                     message = await channel.fetch_message(message_id)
-                    await message.edit(embed=build_vip_timer_embed(self.order_id), view=VipTimerControlView(status=session.get("status")))
+                    await message.edit(
+                        embed=build_vip_timer_embed(self.order_id),
+                        view=VipTimerControlView(status=session.get("status")),
+                    )
                 except (discord.NotFound, discord.HTTPException):
                     pass
 
@@ -323,20 +388,36 @@ class VipTimerRuleSelect(discord.ui.Select):
 class VipTimerRulePageView(discord.ui.View):
     def __init__(self, order_id: int, category: str, page: int = 0):
         super().__init__(timeout=180)
-        self.order_id = int(order_id); self.category = str(category); self.page = max(0, int(page))
+        self.order_id = int(order_id)
+        self.category = str(category)
+        self.page = max(0, int(page))
         rows = [row for row in public_hourly_rules() if str(row["category"]) == self.category]
         self.pages = max(1, math.ceil(len(rows) / 24))
-        if self.page >= self.pages: self.page = self.pages - 1
+        if self.page >= self.pages:
+            self.page = self.pages - 1
         self.add_item(VipTimerRuleSelect(self.order_id, self.category, self.page))
         if self.pages > 1:
             prev = discord.ui.Button(label="上一頁", style=discord.ButtonStyle.secondary, disabled=self.page <= 0)
-            next_button = discord.ui.Button(label="下一頁", style=discord.ButtonStyle.secondary, disabled=self.page >= self.pages - 1)
+            next_button = discord.ui.Button(
+                label="下一頁",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.page >= self.pages - 1,
+            )
+
             async def prev_cb(interaction: discord.Interaction):
-                await interaction.response.edit_message(view=VipTimerRulePageView(self.order_id, self.category, self.page - 1))
+                await interaction.response.edit_message(
+                    view=VipTimerRulePageView(self.order_id, self.category, self.page - 1)
+                )
+
             async def next_cb(interaction: discord.Interaction):
-                await interaction.response.edit_message(view=VipTimerRulePageView(self.order_id, self.category, self.page + 1))
-            prev.callback = prev_cb; next_button.callback = next_cb
-            self.add_item(prev); self.add_item(next_button)
+                await interaction.response.edit_message(
+                    view=VipTimerRulePageView(self.order_id, self.category, self.page + 1)
+                )
+
+            prev.callback = prev_cb
+            next_button.callback = next_cb
+            self.add_item(prev)
+            self.add_item(next_button)
 
 
 class VipTimerEndConfirmView(discord.ui.View):
@@ -348,11 +429,14 @@ class VipTimerEndConfirmView(discord.ui.View):
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         session = get_session(self.order_id)
         if session is None or not _can_operate(interaction, session):
-            await interaction.response.send_message("你沒有操作這張計時單的權限。", ephemeral=True); return
+            await interaction.response.send_message("你沒有操作這張計時單的權限。", ephemeral=True)
+            return
         try:
             result = end_timer(self.order_id, interaction.user.id)
         except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True); return
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        clear_pause_request(self.order_id, actor_id=interaction.user.id, reason="timer_ended")
         await interaction.response.edit_message(
             content=f"✅ 計時已結束，應付 {_format_plain_amount(int(result['final_amount']))}。",
             view=None,
@@ -375,26 +459,32 @@ async def _finish_to_payment(interaction: discord.Interaction, order_id: int, re
     if message_id:
         try:
             message = await channel.fetch_message(message_id)
-            await message.edit(embed=build_vip_timer_embed(order_id), view=VipTimerControlView(status="pending_payment"))
+            await message.edit(
+                embed=build_vip_timer_embed(order_id),
+                view=VipTimerControlView(status="pending_payment"),
+            )
         except (discord.NotFound, discord.HTTPException):
             pass
 
     try:
         from services.acceptance import dispatch_refresh as dispatch_module
         from shared.order_acceptance import get_acceptance_state
+
         data = dispatch_module.SELF_SERVICE_ORDER_SELECTIONS.setdefault(channel.id, {})
         amount = int(result.get("final_amount") or 0)
-        data.update({
-            "vip_timer_order": True,
-            "vip_timer_pending_payment": True,
-            "amount": amount,
-            "total_amount": amount,
-            "original_amount": amount,
-            "payout_base_amount": amount,
-            "customer_pay_amount": amount,
-            "amount_text": _format_plain_amount(amount),
-            "payment_method": None,
-        })
+        data.update(
+            {
+                "vip_timer_order": True,
+                "vip_timer_pending_payment": True,
+                "amount": amount,
+                "total_amount": amount,
+                "original_amount": amount,
+                "payout_base_amount": amount,
+                "customer_pay_amount": amount,
+                "amount_text": _format_plain_amount(amount),
+                "payment_method": None,
+            }
+        )
         state = get_acceptance_state(int(order_id))
         if _ORIGINAL_ENSURE_PAYMENT_PANEL is not None:
             await _ORIGINAL_ENSURE_PAYMENT_PANEL(
@@ -412,10 +502,14 @@ async def _finish_to_payment(interaction: discord.Interaction, order_id: int, re
                 log_title="VIP 自由計時結束｜開放付款",
             )
             from core.database import remember_order_data, save_bot_data
+
             remember_order_data(channel.id, data)
             save_bot_data()
     except Exception as exc:
-        print(f"[vip-timer] payment panel failed order_id={order_id}: {type(exc).__name__}: {exc}", flush=True)
+        print(
+            f"[vip-timer] payment panel failed order_id={order_id}: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
 
 async def ensure_vip_timer_panel(*, guild, ticket_channel, data, customer_id, state, **kwargs):
