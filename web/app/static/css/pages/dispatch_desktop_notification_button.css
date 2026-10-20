@@ -1,0 +1,39 @@
+/* 2026-10-20: make the desktop notification control read as a real action button. */
+html body .dispatch-shell button[data-dispatch-notification-toggle] {
+  min-height: 36px !important;
+  padding: 8px 12px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  background-image: none !important;
+}
+
+html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="online"] {
+  border: 1px solid rgba(99,230,160,.76) !important;
+  background: #2fca77 !important;
+  color: #07150c !important;
+  box-shadow: 0 5px 14px rgba(47,202,119,.17) !important;
+}
+
+html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="pending"] {
+  border: 1px solid rgba(248,205,93,.78) !important;
+  background: #e9b33e !important;
+  color: #211600 !important;
+  box-shadow: 0 5px 14px rgba(242,184,63,.15) !important;
+}
+
+html body .dispatch-shell button[data-dispatch-notification-toggle][data-state="blocked"] {
+  border: 1px solid rgba(255,139,146,.78) !important;
+  background: #d94e58 !important;
+  color: #fff !important;
+  box-shadow: 0 5px 14px rgba(230,83,93,.14) !important;
+}
+
+html body .dispatch-shell button[data-dispatch-notification-toggle]:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06) !important;
+}
+
+html body .dispatch-shell button[data-dispatch-notification-toggle]:active {
+  transform: scale(.97);
+}
