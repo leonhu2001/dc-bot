@@ -66,6 +66,10 @@ jobs:
         run: |
           python -m pytest -q tests/test_vip_timer_self_service.py
 
+      - name: Run VIP timer core regression in isolation
+        run: |
+          python -m pytest -q tests/test_vip_timer.py
+
       - name: Audit templates and static references
         continue-on-error: true
         run: |
@@ -87,6 +91,7 @@ jobs:
       - name: Run regression suite
         run: |
           python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e \
+            --ignore=tests/test_vip_timer.py \
             --deselect=tests/test_admin_navigation.py::test_custom_drilldown_templates_use_page_backbar
 
       - name: Install Chromium for browser tests
