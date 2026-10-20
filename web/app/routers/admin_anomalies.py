@@ -14,6 +14,11 @@ from shared.models import AdminAuditLog
 from web.app.services.anomaly_detection import build_anomaly_snapshot
 from web.app.services.anomaly_repair import apply_anomaly_repair
 from web.app.services.system_health import build_system_health_snapshot
+from web.app.services.accounting_reconciliation_policy import (
+    build_accounting_policy_view,
+    normalize_anomaly_snapshot,
+    normalize_system_health_snapshot,
+)
 from web.app.services.operations_monitoring import (
     build_operations_monitoring_snapshot,
 )
@@ -91,6 +96,11 @@ async def admin_anomalies(
 
     snapshot = await run_in_threadpool(build_anomaly_snapshot)
     health = await run_in_threadpool(build_system_health_snapshot)
+    accounting, suppressed_accounting = await run_in_threadpool(
+        build_accounting_policy_view,
+    )
+    snapshot = normalize_anomaly_snapshot(snapshot, suppressed_accounting)
+    health = normalize_system_health_snapshot(health, accounting)
     operations = await run_in_threadpool(
         build_operations_monitoring_snapshot,
         days=max(1, min(int(days or 30), 365)),
