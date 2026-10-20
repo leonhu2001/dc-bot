@@ -1,21 +1,30 @@
-/* Dispatch hero: active controls live together; passive connection states live together. */
-html body .dispatch-shell .dispatch-panel.dispatch-hero-main > .dispatch-order-top{
+/* Dispatch hero: active controls live together; passive connection states live together.
+   This file intentionally overrides the older grid/display:contents layout in
+   dispatch_status_capsules_20261017.css. */
+html body.employee-workspace-site .dispatch-shell .dispatch-panel.dispatch-hero-main{
+    display:block!important;
+}
+
+html body.employee-workspace-site .dispatch-shell .dispatch-panel.dispatch-hero-main > .dispatch-order-top{
     display:flex!important;
     align-items:flex-start!important;
     justify-content:space-between!important;
     gap:24px!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions{
     display:flex!important;
     align-items:center!important;
     justify-content:flex-end!important;
     gap:10px!important;
     flex:0 0 auto!important;
-    min-width:420px!important;
+    min-width:410px!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control{
+    flex:0 0 auto!important;
+    width:auto!important;
+    min-width:0!important;
     min-height:40px!important;
     height:40px!important;
     max-width:none!important;
@@ -34,52 +43,53 @@ html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.disp
     transition:transform 90ms ease,filter 120ms ease,box-shadow 140ms ease!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button[data-dispatch-notification-toggle]{
-    min-width:158px!important;
-    flex:0 0 158px!important;
+/* Reserve room in the action group, not on the buttons themselves. This keeps
+   the compact ON labels compact while the longer pre-audio label can expand
+   without moving the page title. */
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button[data-dispatch-notification-toggle]{
+    max-width:180px!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-alert-toggle{
-    min-width:252px!important;
-    flex:0 0 252px!important;
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-alert-toggle{
+    max-width:258px!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control[data-state="online"]{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control[data-state="online"]{
     border:1px solid rgba(99,230,160,.76)!important;
     background:#2fca77!important;
     color:#07150c!important;
     box-shadow:0 6px 16px rgba(47,202,119,.24)!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control[data-state="pending"]{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control[data-state="pending"]{
     border:1px solid rgba(248,205,93,.82)!important;
     background:#e9b33e!important;
     color:#211600!important;
     box-shadow:0 6px 16px rgba(233,179,62,.22)!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control[data-state="blocked"]{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control[data-state="blocked"]{
     border:1px solid rgba(255,139,146,.82)!important;
     background:#d94e58!important;
     color:#fff!important;
     box-shadow:0 6px 16px rgba(217,78,88,.22)!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control:hover:not(:disabled){
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control:hover:not(:disabled){
     transform:translateY(-1px) scale(1)!important;
     filter:brightness(1.06)!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control:active:not(:disabled){
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control:active:not(:disabled){
     transform:translateY(0) scale(.965)!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control:focus-visible{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control:focus-visible{
     outline:2px solid rgba(245,198,107,.92)!important;
     outline-offset:3px!important;
 }
 
-html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control.dispatch-control-tap{
+html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control.dispatch-control-tap{
     animation:dispatch-control-tap 180ms ease-out!important;
 }
 
@@ -89,7 +99,7 @@ html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.disp
     100%{transform:scale(1)}
 }
 
-html body .dispatch-shell .dispatch-panel.dispatch-hero-main .dispatch-tags.dispatch-status-row{
+html body.employee-workspace-site .dispatch-shell .dispatch-panel.dispatch-hero-main .dispatch-tags.dispatch-status-row{
     display:flex!important;
     align-items:center!important;
     justify-content:flex-start!important;
@@ -100,44 +110,39 @@ html body .dispatch-shell .dispatch-panel.dispatch-hero-main .dispatch-tags.disp
     border-top:1px solid rgba(255,255,255,.07)!important;
 }
 
-html body .dispatch-shell .dispatch-panel.dispatch-hero-main .dispatch-status-row > .dispatch-tag{
+html body.employee-workspace-site .dispatch-shell .dispatch-panel.dispatch-hero-main .dispatch-status-row > .dispatch-tag{
     flex:0 0 auto!important;
 }
 
 @media(max-width:860px){
-    html body .dispatch-shell .dispatch-panel.dispatch-hero-main > .dispatch-order-top{
+    html body.employee-workspace-site .dispatch-shell .dispatch-panel.dispatch-hero-main > .dispatch-order-top{
         flex-direction:column!important;
         align-items:stretch!important;
         gap:16px!important;
     }
 
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions{
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions{
         width:100%!important;
         min-width:0!important;
         justify-content:flex-start!important;
     }
 
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button[data-dispatch-notification-toggle]{
-        flex:1 1 160px!important;
-        min-width:150px!important;
-        max-width:none!important;
-    }
-
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-alert-toggle{
-        flex:1 1 252px!important;
-        min-width:240px!important;
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button[data-dispatch-notification-toggle],
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-alert-toggle{
+        flex:1 1 auto!important;
+        width:auto!important;
         max-width:none!important;
     }
 }
 
 @media(max-width:560px){
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions{
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions{
         flex-direction:column!important;
         align-items:stretch!important;
     }
 
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button[data-dispatch-notification-toggle],
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-alert-toggle{
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button[data-dispatch-notification-toggle],
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-alert-toggle{
         width:100%!important;
         min-width:0!important;
         max-width:none!important;
@@ -146,10 +151,10 @@ html body .dispatch-shell .dispatch-panel.dispatch-hero-main .dispatch-status-ro
 }
 
 @media(prefers-reduced-motion:reduce){
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control{
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control{
         transition:none!important;
     }
-    html body .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control.dispatch-control-tap{
+    html body.employee-workspace-site .dispatch-shell .dispatch-hero-main .dispatch-hero-actions button.dispatch-primary-control.dispatch-control-tap{
         animation:none!important;
     }
 }
