@@ -7,6 +7,11 @@ from types import SimpleNamespace
 import discord
 
 from services import order_payment_runtime
+from services.order_notification_presentation import (
+    build_payment_apply_error_notice,
+    build_payment_approved_notice,
+    build_payment_rejected_notice,
+)
 from services.payment_reviews import (
     PAYMENT_REVIEW_APPROVED,
     PAYMENT_REVIEW_REJECTED,
@@ -286,10 +291,10 @@ async def _apply_order_approval(bot: discord.Client, row: dict) -> None:
     await _edit_review_notification(
         channel,
         row,
-        content=(
-            f"<@{customer_id}> ✅ **付款審核已通過**\n"
-            f"付款方式：**{row.get('payment_method')}**｜金額：**{int(row.get('amount') or 0):,}T**\n"
-            "客服已在網站確認收款，訂單已正式成立。"
+        content=build_payment_approved_notice(
+            customer_id=customer_id,
+            payment_method=str(row.get("payment_method") or ""),
+            amount=int(row.get("amount") or 0),
         ),
     )
 
@@ -352,7 +357,7 @@ async def _apply_order_rejection(bot: discord.Client, row: dict) -> None:
         amount=amount,
     )
     payment_embed.add_field(
-        name="付款審核",
+        name="付款異常",
         value=(
             "上一筆付款未通過審核，可以確認付款後重新按「送出」。\n"
             f"原因：{row.get('rejected_reason') or '客服未確認到款項'}"
@@ -388,10 +393,9 @@ async def _apply_order_rejection(bot: discord.Client, row: dict) -> None:
     await _edit_review_notification(
         channel,
         row,
-        content=(
-            f"<@{customer_id}> ❌ **付款審核未通過**\n"
-            f"原因：{row.get('rejected_reason') or '客服未確認到款項'}\n\n"
-            "請確認付款資訊／付款截圖後，再從付款面板重新送出審核。"
+        content=build_payment_rejected_notice(
+            customer_id=customer_id,
+            reason=str(row.get("rejected_reason") or ""),
         ),
     )
 
@@ -556,6 +560,27 @@ async def payment_review_worker(bot: discord.Client) -> None:
                         int(row["id"]),
                         f"{type(exc).__name__}: {exc}",
                     )
+
+                if str(row.get("source_type") or "") == "order":
+                    try:
+                        channel = await _fetch_ticket_channel(bot, row)
+                        if channel is not None:
+                            customer_id = _int_or_zero(row.get("customer_discord_id")) or None
+                            await _edit_review_notification(
+                                channel,
+                                row,
+                                content=build_payment_apply_error_notice(
+                                    customer_id=customer_id,
+                                    error_text=str(exc),
+                                ),
+                            )
+                    except Exception as notify_exc:
+                        print(
+                            "[payment-review] apply error notice failed "
+                            f"id={row.get('id')}: {notify_exc}",
+                            flush=True,
+                        )
+
                 print(
                     "[payment-review] apply failed "
                     f"id={row.get('id')} source={row.get('source_type')}:{row.get('source_id')}\n"
