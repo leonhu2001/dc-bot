@@ -8,6 +8,17 @@ import discord
 
 _INSTALLED = False
 _SPEC_PAGE_SIZE = 23
+_COUNT_LABELS = {
+    1: "單陪",
+    2: "雙陪",
+    3: "三陪",
+    4: "四陪",
+    5: "五陪",
+    6: "六陪",
+    7: "七陪",
+    8: "八陪",
+    9: "九陪",
+}
 
 
 def _service_type(source_group: str, detail: dict, rule) -> str:
@@ -24,13 +35,7 @@ def _service_type(source_group: str, detail: dict, rule) -> str:
     from services import vip_timer_select_flow as flow
 
     count = flow._staff_count(rule, detail)
-    if count == 1:
-        return "單陪"
-    if count == 2:
-        return "雙陪"
-    if count >= 3:
-        return f"{count}陪"
-    return "其他"
+    return _COUNT_LABELS.get(count, f"{count}陪" if count >= 3 else "其他")
 
 
 def _spec_label(*, source_group: str, detail_label: str, variant: str, service_type: str) -> str:
@@ -38,7 +43,7 @@ def _spec_label(*, source_group: str, detail_label: str, variant: str, service_t
 
     group_text = str(source_group or "").strip()
     detail_text = flow._strip_count_words(str(detail_label or "").strip())
-    detail_text = re.sub(r"(?:單陪|雙陪|[3-9]陪)", "", detail_text).strip("｜ ")
+    detail_text = re.sub(r"(?:單陪|雙陪|[三四五六七八九3-9]陪)", "", detail_text).strip("｜ ")
 
     parts: list[str] = []
     if variant:
@@ -379,6 +384,7 @@ def install_vip_timer_selector_order_v2() -> None:
             "六陪": 5,
             "七陪": 6,
             "八陪": 7,
+            "九陪": 8,
             "甜蜜陪": 20,
             "教學單": 21,
             "其他": 99,
