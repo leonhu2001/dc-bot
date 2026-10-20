@@ -25,8 +25,9 @@
     <link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-2">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_page_content.css?v=20261020-1">
+    <link rel="stylesheet" href="/static/css/pages/employee_select_picker.css?v=20261020-1">
     {% if request.url.path == '/dispatch' %}
-    <link rel="stylesheet" href="/static/css/pages/dispatch_companion_picker.css?v=20261020-3">
+    <link rel="stylesheet" href="/static/css/pages/dispatch_hero_controls.css?v=20261020-1">
     {% endif %}
     {% endif %}
 
@@ -138,10 +139,11 @@
     <script src="/static/js/ui_tweaks.js?v=1"></script>
     <script src="/static/js/payout_status_i18n.js?v=1"></script>
     <script src="/static/js/month_select.js?v=1"></script>
+    <script src="/static/js/pages/employee_select_picker.js?v=20261020-1" defer></script>
     {% if request.url.path == '/dispatch' %}
     <script src="/static/js/dispatch_navigation.js?v=20261013-1" defer></script>
     <script src="/static/js/dispatch_alerts.js?v=59"></script>
-    <script src="/static/js/pages/dispatch_companion_picker.js?v=20261020-1" defer></script>
+    <script src="/static/js/pages/dispatch_hero_controls.js?v=20261020-1" defer></script>
     {% endif %}
     {% if request.url.path.startswith('/employee/store-bindings') %}
     <script src="/static/js/pages/store_binding_time.js?v=20261020-2" defer></script>
