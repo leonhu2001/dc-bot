@@ -5,12 +5,14 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from shared.db import SessionLocal
 from web.app.config import config
 from web.app.services.discord_service import get_dashboard_access, get_member_role_ids
 from web.app.services.marketing_funnel import (
     export_marketing_session,
     restore_marketing_session,
 )
+from web.app.services.staff_service import get_staff_display_name, get_staff_member_by_id
 from web.app.services.web_security import (
     mark_authenticated_now,
     rotate_csrf_token,
@@ -187,6 +189,16 @@ async def discord_callback(
         or is_companion
     )
 
+    staff_display_name = ""
+    if is_employee:
+        try:
+            with SessionLocal() as db:
+                staff_member = get_staff_member_by_id(db, discord_id=discord_id)
+                if staff_member is not None:
+                    staff_display_name = get_staff_display_name(staff_member)
+        except Exception:
+            staff_display_name = ""
+
     next_path = _safe_return_path(
         request.session.get(
             "oauth_next",
@@ -211,6 +223,7 @@ async def discord_callback(
         "username": username,
         "global_name": global_name,
         "display_name": global_name or username,
+        "staff_display_name": staff_display_name,
         "avatar": avatar,
         "role_ids": role_ids,
         "is_manager": is_manager,
