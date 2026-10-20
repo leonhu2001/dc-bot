@@ -12,7 +12,7 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     if not callable(add_view):
         return
 
-    # These two guards patch services.vip_timer itself. Install them before
+    # These guards patch services.vip_timer itself. Install them before
     # vip_timer_runtime imports timer functions into local bindings so every
     # persistent Discord callback gets the guarded lifecycle/catalog behavior.
     from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
@@ -20,6 +20,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
 
     install_vip_timer_catalog_guard()
     install_vip_timer_lifecycle_guard()
+
+    # The timer core is shared by web and Discord. The Discord self-service
+    # storefront is a separate catalog/runtime, so install its bridge explicitly
+    # after the canonical timer guards are in place.
+    from services.vip_timer_self_service import install_vip_timer_self_service
+
+    install_vip_timer_self_service()
 
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services.vip_timer_runtime import (
