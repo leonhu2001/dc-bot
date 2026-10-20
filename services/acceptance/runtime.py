@@ -60,7 +60,7 @@ def configure_acceptance_runtime_explicit(
     refresh_existing_web_sync_dispatch,
 ) -> None:
     """Bind the acceptance runtime from explicit bot-owned dependencies."""
-    configure_vip_timer_acceptance(bot_instance)
+    configure_vip_timer_acceptance(bot_instance, guild_id)
 
     configure_acceptance_dispatch_refresh(
         dispatch_channel_id=dispatch_channel_id,
