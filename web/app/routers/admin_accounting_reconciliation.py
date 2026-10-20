@@ -8,8 +8,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from web.app.services.accounting_reconciliation import (
-    build_accounting_reconciliation_snapshot,
+from web.app.services.accounting_reconciliation_policy import (
+    build_policy_aware_accounting_reconciliation_snapshot,
 )
 from web.app.services.accounting_repair import (
     QUEUE_WALLET_ORDER_RECONCILIATION,
@@ -73,7 +73,7 @@ async def admin_accounting_reconciliation(
         )
 
     reconciliation = await run_in_threadpool(
-        build_accounting_reconciliation_snapshot,
+        build_policy_aware_accounting_reconciliation_snapshot,
     )
 
     return templates.TemplateResponse(
