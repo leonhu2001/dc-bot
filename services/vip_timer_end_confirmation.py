@@ -95,11 +95,13 @@ def install_vip_timer_end_confirmation() -> None:
         return
 
     from services import vip_timer_runtime as runtime
+    from services import vip_timer_roster_runtime as roster_runtime
 
     runtime.VipTimerEndConfirmView = VipTimerEndConfirmView
     original_embed = runtime.build_vip_timer_embed
     original_resume = runtime.resume_timer
     original_switch = runtime.switch_rule
+    original_adjust_roster = roster_runtime.adjust_roster
 
     def build_embed(order_id: int):
         embed = original_embed(int(order_id))
@@ -131,9 +133,19 @@ def install_vip_timer_end_confirmation() -> None:
         clear_end_request(int(order_id), actor_id=actor_id, reason="rule_switched")
         return result
 
+    def adjust_roster_with_clear(order_id: int, *args, **kwargs):
+        result = original_adjust_roster(int(order_id), *args, **kwargs)
+        clear_end_request(
+            int(order_id),
+            actor_id=kwargs.get("actor_id"),
+            reason="roster_changed",
+        )
+        return result
+
     runtime.build_vip_timer_embed = build_embed
     runtime.resume_timer = resume_with_clear
     runtime.switch_rule = switch_with_clear
+    roster_runtime.adjust_roster = adjust_roster_with_clear
     _INSTALLED = True
 
 
