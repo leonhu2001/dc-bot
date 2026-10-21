@@ -1,7 +1,6 @@
-/* The shared employee select is absolutely positioned inside the direct-grant
-   card. That card used overflow:hidden, which clipped the option list against
-   the review queue below it. Keep the card chrome but allow the picker to
-   escape the card and establish a higher stacking context while it is open. */
+/* Store-binding employee picker layering.
+   The picker is absolutely positioned inside the direct-grant card, so allow
+   it to escape the card and stay above the review queue while open. */
 .employee-workspace-site .sbm .grant-panel{
     position:relative!important;
     z-index:30!important;

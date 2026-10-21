@@ -51,6 +51,9 @@
         )
     );
 
+    const pendingGroupLoads =
+        new Map();
+
 
     const dialog =
         document.getElementById(
@@ -175,6 +178,11 @@
     const nextNotice =
         document.getElementById(
             "mw-next-notice"
+        );
+
+    const errorEl =
+        document.getElementById(
+            "mw-order-error"
         );
 
 
@@ -645,17 +653,151 @@
     }
 
 
-    function openGroup(
+    async function loadGroup(
         groupKey
     ) {
-        const group =
+        const key =
+            String(
+                groupKey || ""
+            ).trim();
+
+        if (!key) {
+            throw new Error(
+                "缺少商品資料。"
+            );
+        }
+
+        const cached =
+            groupMap.get(key);
+
+        if (
+            cached
+            && Array.isArray(
+                cached.variants
+            )
+        ) {
+            return cached;
+        }
+
+        if (
+            pendingGroupLoads.has(key)
+        ) {
+            return pendingGroupLoads.get(
+                key
+            );
+        }
+
+        const request = (
+            async () => {
+                const response =
+                    await fetch(
+                        `/order/group/${encodeURIComponent(key)}`,
+                        {
+                            headers: {
+                                "Accept":
+                                    "application/json",
+                            },
+                        }
+                    );
+
+                let result = null;
+
+                try {
+                    result =
+                        await response.json();
+                } catch (_) {
+                    result = null;
+                }
+
+                if (
+                    !response.ok
+                    || !result?.ok
+                    || !result?.group
+                ) {
+                    throw new Error(
+                        result?.error
+                        || "商品資料載入失敗，請稍後再試。"
+                    );
+                }
+
+                groupMap.set(
+                    key,
+                    result.group
+                );
+
+                return result.group;
+            }
+        )();
+
+        pendingGroupLoads.set(
+            key,
+            request
+        );
+
+        try {
+            return await request;
+        } finally {
+            pendingGroupLoads.delete(
+                key
+            );
+        }
+    }
+
+
+    async function openGroup(
+        groupKey,
+        button = null
+    ) {
+        const summary =
             groupMap.get(
                 groupKey
             );
 
 
-        if (!group) {
+        if (!summary) {
             return;
+        }
+
+        const originalHtml =
+            button?.innerHTML;
+
+        if (button) {
+            button.disabled = true;
+            button.textContent =
+                "載入中…";
+        }
+
+        let group = null;
+
+        try {
+            group = await loadGroup(
+                groupKey
+            );
+        } catch (error) {
+            console.error(
+                "order group load failed",
+                error
+            );
+
+            if (errorEl) {
+                errorEl.textContent =
+                    error?.message
+                    || "商品資料載入失敗，請稍後再試。";
+                errorEl.hidden = false;
+            }
+
+            return;
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML =
+                    originalHtml;
+            }
+        }
+
+        if (errorEl) {
+            errorEl.hidden = true;
+            errorEl.textContent = "";
         }
 
 
@@ -695,6 +837,9 @@
                     );
 
                 option.value =
+                    variant.rule_key;
+
+                option.dataset.ruleKey =
                     variant.rule_key;
 
                 option.textContent =
@@ -740,6 +885,18 @@
                 ""
             );
         }
+
+        // Lazy variants may arrive after the specified-staff guard's initial
+        // pass. Re-dispatch change only after the options exist so the guard
+        // can hide ineligible variants before the customer continues.
+        variantSelect.dispatchEvent(
+            new Event(
+                "change",
+                {
+                    bubbles: true,
+                }
+            )
+        );
     }
 
 
@@ -750,13 +907,42 @@
         .forEach(
             button => {
 
+                const groupKey =
+                    button.dataset
+                        .orderGroup;
+
                 button.addEventListener(
                     "click",
                     () => {
                         openGroup(
-                            button.dataset
-                                .orderGroup
+                            groupKey,
+                            button
                         );
+                    }
+                );
+
+                const preload =
+                    () => {
+                        loadGroup(
+                            groupKey
+                        ).catch(
+                            () => {}
+                        );
+                    };
+
+                button.addEventListener(
+                    "pointerenter",
+                    preload,
+                    {
+                        once: true,
+                    }
+                );
+
+                button.addEventListener(
+                    "focus",
+                    preload,
+                    {
+                        once: true,
                     }
                 );
             }

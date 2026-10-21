@@ -16,9 +16,10 @@ from .public_staff_refresh import (
 )
 
 
-# The public catalog asks for presentation overrides once per product variant.
-# Install a tiny live snapshot so one page render does not reopen SQLite dozens
-# of times; manager edits become visible again after at most one second.
+# Public storefront presentation uses a short shared snapshot/cache so normal
+# navigation does not repeatedly rebuild the catalog or reopen SQLite. Pricing,
+# checkout and formal order creation still revalidate against authoritative
+# rules before any money-affecting action.
 _install_order_catalog_read_cache(_order_groups)
 
 # Public pages should never wait for a full Discord guild-member sync. The last

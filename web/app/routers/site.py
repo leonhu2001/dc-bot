@@ -34,6 +34,10 @@ from web.app.services.order_groups import (
     get_grouped_order_catalog,
     get_public_order_categories,
 )
+from web.app.services.order_catalog_cards import (
+    get_grouped_order_catalog_cards,
+    get_order_group_detail,
+)
 
 from web.app.services.public_checkout import (
     build_public_quote,
@@ -492,7 +496,7 @@ async def member_order_detail(
 
 
 @router.get("/order")
-async def public_order(
+def public_order(
     request: Request,
     category: str = "all",
     staff: str | None = None,
@@ -509,38 +513,29 @@ async def public_order(
 
     view_key = str(view or "").strip().lower()
     category_filter = category
-    all_groups = get_grouped_order_catalog("all")
+    focus_key = str(focus or "").strip()
 
-    focus_key = str(
-        focus
-        or ""
-    ).strip()
+    needs_all_groups = bool(focus_key) or view_key in {
+        "technical",
+        "entertainment",
+        "teaching",
+    }
+    all_groups = (
+        get_grouped_order_catalog_cards("all")
+        if needs_all_groups
+        else []
+    )
 
     focused_groups = [
         group
-        for group
-        in all_groups
-        if str(
-            group.get(
-                "key"
-            )
-            or ""
-        )
-        == focus_key
+        for group in all_groups
+        if str(group.get("key") or "") == focus_key
     ]
 
-    if (
-        focus_key
-        and focused_groups
-    ):
+    if focus_key and focused_groups:
         groups = focused_groups
         category_filter = str(
-            focused_groups[
-                0
-            ].get(
-                "category"
-            )
-            or "all"
+            focused_groups[0].get("category") or "all"
         )
 
     elif view_key == "technical":
@@ -559,34 +554,12 @@ async def public_order(
 
         groups = [
             group
-            for group
-            in all_groups
+            for group in all_groups
             if (
-                str(
-                    group.get(
-                        "category"
-                    )
-                    or ""
-                )
-                not in excluded_categories
-                and str(
-                    group.get(
-                        "key"
-                    )
-                    or ""
-                )
-                not in excluded_group_keys
-                and not str(
-                    group.get("key")
-                    or ""
-                ).endswith(("_sweet", "_teaching"))
-                and "娛樂陪"
-                not in str(
-                    group.get(
-                        "label"
-                    )
-                    or ""
-                )
+                str(group.get("category") or "") not in excluded_categories
+                and str(group.get("key") or "") not in excluded_group_keys
+                and not str(group.get("key") or "").endswith(("_sweet", "_teaching"))
+                and "娛樂陪" not in str(group.get("label") or "")
             )
         ]
         category_filter = "all"
@@ -594,32 +567,21 @@ async def public_order(
     elif view_key == "entertainment":
         groups = [
             group
-            for group
-            in all_groups
-            if "娛樂陪"
-            in str(
-                group.get(
-                    "label"
-                )
-                or ""
-            )
+            for group in all_groups
+            if "娛樂陪" in str(group.get("label") or "")
         ]
         category_filter = "all"
 
     elif view_key == "teaching":
         groups = [
             group
-            for group
-            in all_groups
-            if str(
-                group.get("key")
-                or ""
-            ).endswith("_teaching")
+            for group in all_groups
+            if str(group.get("key") or "").endswith("_teaching")
         ]
         category_filter = "all"
 
     else:
-        groups = get_grouped_order_catalog(category)
+        groups = get_grouped_order_catalog_cards(category)
 
     return templates.TemplateResponse(
         request=request,
@@ -634,6 +596,31 @@ async def public_order(
             groups=groups,
             selected_staff=selected_staff,
         ),
+    )
+
+
+@router.get("/order/group/{group_key}")
+def public_order_group_detail(
+    group_key: str,
+):
+    group = get_order_group_detail(group_key)
+    if group is None:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "找不到這個商品。",
+            },
+            status_code=404,
+        )
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "group": group,
+        },
+        headers={
+            "Cache-Control": "public, max-age=30, stale-while-revalidate=60",
+        },
     )
 
 
@@ -1020,7 +1007,7 @@ async def public_sitemap():
 async def delta_force_landing(
     request: Request,
 ):
-    all_groups = get_grouped_order_catalog(
+    all_groups = get_grouped_order_catalog_cards(
         "all"
     )
 
