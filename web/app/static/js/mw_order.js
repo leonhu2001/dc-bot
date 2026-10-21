@@ -336,6 +336,7 @@
         group.variants.forEach(variant => {
             const option = document.createElement("option");
             option.value = variant.rule_key;
+            option.dataset.ruleKey = variant.rule_key;
             option.textContent = group.variants.length > 1
                 ? `${variant.label}｜${variant.price_text}`
                 : variant.label;
@@ -350,6 +351,16 @@
 
         renderVariant();
         showDialog();
+        window.dispatchEvent(
+            new CustomEvent(
+                "mawan:order-group-loaded",
+                {
+                    detail: {
+                        group_key: String(group.key || ""),
+                    },
+                }
+            )
+        );
     }
 
     async function openGroup(groupKey, button = null) {
