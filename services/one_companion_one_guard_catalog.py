@@ -69,7 +69,6 @@ def _install_rules() -> None:
             min_quantity=1,
             max_quantity=24,
             allow_specify=False,
-            catalog_group_label=GROUP_LABEL,
             min_protector_count=1,
             required_game_roles=game_roles,
         )
