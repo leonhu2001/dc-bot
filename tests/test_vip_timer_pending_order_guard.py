@@ -150,7 +150,8 @@ def test_website_order_service_and_vip_rules_are_wired():
     assert "install_web_pending_order_guard()" in bootstrap
     # The public order route imports the service inside the request handler, so
     # the bootstrap patch is what every subsequent normal website checkout sees.
-    assert "from web.app.services.public_order_create import create_public_order" in site
+    assert "from web.app.services.public_order_create import (" in site
+    assert "create_public_order as _create_public_order" in site
     assert "付款前不可建立任何新訂單" in vip
     assert "單次暫停最長 2 小時" in vip
     assert "跨越台灣時間的日曆日" in vip
