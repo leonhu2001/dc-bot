@@ -125,9 +125,19 @@ def _vip_monthly_display(data: dict) -> tuple[str, int] | None:
 
 def _rewrite_standard_discount_text(value: str) -> str:
     text = str(value or "")
-    text = text.replace("店內吸收，不影響打手分潤", _SHARED_COPY)
-    text = text.replace("店內吸收，不扣打手分潤", _SHARED_COPY)
+    for stale_copy in (
+        "店內吸收，不影響打手分潤",
+        "店內吸收，不扣打手分潤",
+        "店內吸收，不影響陪玩分潤",
+        "店內吸收，不扣陪玩分潤",
+        "店家吸收，不影響陪玩分潤",
+        "店家吸收，不扣陪玩分潤",
+        "店內吸收，不扣陪玩／團隊分潤",
+        "店家吸收，不扣陪玩／團隊分潤",
+    ):
+        text = text.replace(stale_copy, _SHARED_COPY)
     text = text.replace("（店內吸收）", f"（{_SHARED_COPY}）")
+    text = text.replace("（店家吸收）", f"（{_SHARED_COPY}）")
     return text
 
 
@@ -226,7 +236,10 @@ def install_self_service_financial_copy_policy() -> None:
                 title, amount = vip_monthly
                 result.add_field(
                     name="VIP 月券",
-                    value=f"{title}\n-{financials._format_plain_amount(amount)}",
+                    value=(
+                        f"{title}\n-{financials._format_plain_amount(amount)}\n"
+                        f"{_SHARED_COPY}"
+                    ),
                     inline=False,
                 )
             return result
@@ -264,7 +277,10 @@ def install_self_service_financial_copy_policy() -> None:
                 rewritten_rows.append(
                     (
                         "VIP 月券",
-                        f"{title}｜-{financials._format_plain_amount(amount)}",
+                        (
+                            f"{title}｜-{financials._format_plain_amount(amount)}｜"
+                            f"{_SHARED_COPY}"
+                        ),
                     )
                 )
             return rewritten_rows
