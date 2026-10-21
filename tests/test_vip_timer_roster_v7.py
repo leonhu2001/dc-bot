@@ -32,6 +32,14 @@ def test_scaled_integer_worker_shares_sum_to_canonical_payout_base():
     assert sum(shares.values()) == 900
 
 
+def test_timer_detection_fails_open_before_timer_schema_exists():
+    class NoTimerSchemaDb:
+        def execute(self, *args, **kwargs):
+            raise RuntimeError("no such table: vip_timer_sessions")
+
+    assert payout._is_timer_order(123, NoTimerSchemaDb()) is False
+
+
 def test_segment_roster_payout_follows_actual_participation(tmp_path, monkeypatch):
     engine = create_engine(
         f"sqlite:///{tmp_path / 'timer-roster.db'}",
