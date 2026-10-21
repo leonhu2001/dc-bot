@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from services.order_rules import (
     ORDER_RULES,
@@ -12,7 +12,7 @@ from services.order_rules import (
     get_required_game_role_ids,
     role_ids_match_requirements,
 )
-from services.vip_timer import SessionLocal, strip_vip_timer_rule_key, utc_iso
+from services.vip_timer import SessionLocal, ensure_vip_timer_tables, strip_vip_timer_rule_key, utc_iso
 
 
 _INSTALLED = False
@@ -32,17 +32,21 @@ def _guild(bot_instance, guild_id: int):
     return getter(int(guild_id)) if callable(getter) else None
 
 
-def _rule_rate_and_validate(
+def _validated_pricing_snapshot(
     *,
     bot_instance,
     guild_id: int,
     rule_key: str,
     staff_ids,
-) -> int:
+) -> dict:
+    from services import vip_timer_catalog_guard as catalog_guard
+
     key = strip_vip_timer_rule_key(rule_key)
     rule = ORDER_RULES.get(key)
     if rule is None or str(getattr(rule, "pricing_type", "")) != "hourly":
         raise ValueError("VIP 自由計時只能切換到小時計價方案。")
+    if not catalog_guard.is_public_timer_rule(key):
+        raise ValueError("這個玩法目前不能用於 VIP 自由計時，請改選其他玩法。")
 
     staff = _unique_staff_ids(staff_ids)
     staff_count = len(staff)
@@ -57,11 +61,14 @@ def _rule_rate_and_validate(
         if staff_count < minimum or (maximum is not None and staff_count > maximum):
             limit_text = f"{minimum}～{maximum} 位" if maximum is not None else f"至少 {minimum} 位"
             raise ValueError(f"這個玩法需要 {limit_text}接單人員，目前為 {staff_count} 位。")
-    elif staff_count != int(required_mode or 1):
-        raise ValueError(
-            f"這個玩法需要 {int(required_mode or 1)} 位接單人員，"
-            f"目前為 {staff_count} 位；自由計時第一版不支援中途增減人員。"
-        )
+        required_staff_count = staff_count
+    else:
+        required_staff_count = int(required_mode or 1)
+        if staff_count != required_staff_count:
+            raise ValueError(
+                f"這個玩法需要 {required_staff_count} 位接單人員，"
+                f"目前為 {staff_count} 位；自由計時第一版不支援中途增減人員。"
+            )
 
     guild = _guild(bot_instance, guild_id)
     if guild is None:
@@ -115,12 +122,58 @@ def _rule_rate_and_validate(
     if base_rate <= 0:
         raise ValueError("這個玩法目前沒有有效的小時價格。")
 
-    if bool(getattr(rule, "price_multiply_player_count", False)):
-        return base_rate * staff_count
-    return base_rate
+    effective_rate = base_rate * staff_count if bool(getattr(rule, "price_multiply_player_count", False)) else base_rate
+    return {
+        "rule_key": key,
+        "hourly_rate": int(effective_rate),
+        "player_count": int(staff_count),
+        "required_staff_count": int(required_staff_count),
+        "staff_ids": staff,
+    }
 
 
-def _write_effective_rate(order_id: int, rate: int) -> None:
+def _rule_rate_and_validate(
+    *,
+    bot_instance,
+    guild_id: int,
+    rule_key: str,
+    staff_ids,
+) -> int:
+    """Compatibility helper used by focused tests and callers that only need the rate."""
+    return int(
+        _validated_pricing_snapshot(
+            bot_instance=bot_instance,
+            guild_id=guild_id,
+            rule_key=rule_key,
+            staff_ids=staff_ids,
+        )["hourly_rate"]
+    )
+
+
+def _ensure_segment_snapshot_columns() -> None:
+    db = SessionLocal()
+    try:
+        ensure_vip_timer_tables(db)
+        # Inspect the same DB connection that created/owns the timer tables.
+        # This avoids visibility issues with transactional SQLite DDL.
+        connection = db.connection()
+        existing = {
+            str(column.get("name") or "")
+            for column in inspect(connection).get_columns("vip_timer_segments")
+        }
+        if "player_count" not in existing:
+            db.execute(text("ALTER TABLE vip_timer_segments ADD COLUMN player_count INTEGER"))
+        if "required_staff_count" not in existing:
+            db.execute(text("ALTER TABLE vip_timer_segments ADD COLUMN required_staff_count INTEGER"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _write_effective_snapshot(order_id: int, snapshot: dict, *, update_segment: bool) -> None:
     db = SessionLocal()
     try:
         now = utc_iso()
@@ -133,43 +186,58 @@ def _write_effective_rate(order_id: int, rate: int) -> None:
                 WHERE order_id = :order_id
                 """
             ),
-            {"rate": int(rate), "now": now, "order_id": int(order_id)},
+            {
+                "rate": int(snapshot.get("hourly_rate") or 0),
+                "now": now,
+                "order_id": int(order_id),
+            },
         )
-        db.execute(
-            text(
-                """
-                UPDATE vip_timer_segments
-                SET hourly_rate = :rate,
-                    updated_at = :now
-                WHERE id = (
-                    SELECT id
-                    FROM vip_timer_segments
-                    WHERE order_id = :order_id
-                      AND ended_at IS NULL
-                    ORDER BY seq DESC
-                    LIMIT 1
-                )
-                """
-            ),
-            {"rate": int(rate), "now": now, "order_id": int(order_id)},
-        )
+        if update_segment:
+            db.execute(
+                text(
+                    """
+                    UPDATE vip_timer_segments
+                    SET hourly_rate = :rate,
+                        player_count = :player_count,
+                        required_staff_count = :required_staff_count,
+                        updated_at = :now
+                    WHERE id = (
+                        SELECT id
+                        FROM vip_timer_segments
+                        WHERE order_id = :order_id
+                          AND ended_at IS NULL
+                        ORDER BY seq DESC
+                        LIMIT 1
+                    )
+                    """
+                ),
+                {
+                    "rate": int(snapshot.get("hourly_rate") or 0),
+                    "player_count": int(snapshot.get("player_count") or 0),
+                    "required_staff_count": int(snapshot.get("required_staff_count") or 0),
+                    "now": now,
+                    "order_id": int(order_id),
+                },
+            )
         db.commit()
     finally:
         db.close()
 
 
 def install_vip_timer_runtime_guard(*, bot_instance, guild_id: int) -> None:
-    """Make timer pricing and mode switches follow the accepted staff roster.
+    """Validate the accepted roster and lock each timer segment at action time.
 
-    Some hourly products are priced per person. The timer's hourly snapshot must
-    therefore use the already accepted staff count instead of blindly persisting
-    the one-person catalog price. Switching also re-validates the same staff
-    against the target product's staff-count and Discord role requirements.
+    Price-multiplied products use the actual accepted roster count. The first
+    segment is deliberately not priced when the ticket panel is created; its
+    authoritative price is resolved when somebody presses Start. Every new
+    segment also stores the roster size and required staff count used for that
+    price snapshot.
     """
     global _INSTALLED
     if _INSTALLED:
         return
-    _INSTALLED = True
+
+    _ensure_segment_snapshot_columns()
 
     from services import vip_timer_runtime as runtime
 
@@ -191,40 +259,47 @@ def install_vip_timer_runtime_guard(*, bot_instance, guild_id: int) -> None:
                 str(getattr(claim, "staff_discord_id", "") or "").strip()
                 for claim in (getattr(state, "claims", ()) or ())
             ]
-            rate = _rule_rate_and_validate(
+            # Validate eligibility when the panel opens, but do not persist the
+            # price yet. Start is the authoritative first price-lock moment.
+            _validated_pricing_snapshot(
                 bot_instance=bot_instance,
                 guild_id=guild_id,
                 rule_key=str(session.get("current_rule_key") or ""),
                 staff_ids=staff_ids,
             )
-            _write_effective_rate(order_id, rate)
         return await original_panel(*args, **kwargs)
 
     def guarded_start(order_id: int, actor_id: Any, staff_ids=None):
-        session = runtime.get_session(int(order_id)) or {}
-        rate = _rule_rate_and_validate(
+        snapshot = _validated_pricing_snapshot(
             bot_instance=bot_instance,
             guild_id=guild_id,
-            rule_key=str(session.get("current_rule_key") or ""),
+            rule_key=str((runtime.get_session(int(order_id)) or {}).get("current_rule_key") or ""),
             staff_ids=staff_ids,
         )
-        _write_effective_rate(int(order_id), rate)
-        return original_start(order_id, actor_id, staff_ids)
+        # original_start snapshots session.current_hourly_rate into the new
+        # segment, so update the session immediately before creating it.
+        _write_effective_snapshot(int(order_id), snapshot, update_segment=False)
+        result = original_start(order_id, actor_id, staff_ids)
+        _write_effective_snapshot(int(order_id), snapshot, update_segment=True)
+        return runtime.get_session(int(order_id)) or result
 
     def guarded_switch(order_id: int, new_rule_key: str, actor_id: Any, staff_ids=None):
-        rate = _rule_rate_and_validate(
+        snapshot = _validated_pricing_snapshot(
             bot_instance=bot_instance,
             guild_id=guild_id,
             rule_key=str(new_rule_key),
             staff_ids=staff_ids,
         )
         result = original_switch(order_id, new_rule_key, actor_id, staff_ids)
-        _write_effective_rate(int(order_id), rate)
+        _write_effective_snapshot(int(order_id), snapshot, update_segment=True)
         return runtime.get_session(int(order_id)) or result
 
     runtime.ensure_vip_timer_panel = guarded_panel
     runtime.start_timer = guarded_start
     runtime.switch_rule = guarded_switch
+    _INSTALLED = True
 
 
-__all__ = ["install_vip_timer_runtime_guard"]
+__all__ = [
+    "install_vip_timer_runtime_guard",
+]

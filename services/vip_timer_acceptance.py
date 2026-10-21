@@ -46,9 +46,14 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     )
     from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
     from services.vip_timer_runtime_order_v5 import install_vip_timer_runtime_order_v5
+    from services.vip_timer_runtime_selector_v6 import install_vip_timer_runtime_selector_v6
 
     install_vip_timer_billing_guard()
     install_vip_timer_runtime_order_v5()
+    # Replace the legacy two-level in-ticket switcher after the category-order
+    # compatibility patch. The switcher now mirrors checkout exactly:
+    # game -> gameplay -> currently-available headcount package.
+    install_vip_timer_runtime_selector_v6()
     install_acceptance_payment_hook()
     install_vip_timer_payment_recovery()
     install_vip_timer_runtime_guard(

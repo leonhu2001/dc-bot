@@ -37,6 +37,14 @@ def test_delta_special_gameplay_labels_are_third_layer_names():
     ) == "黑潮爆破"
 
 
+def test_delta_special_gameplays_are_desktop_only_policy():
+    source = Path("services/vip_timer_policy_v5.py").read_text(encoding="utf-8")
+    assert "basic_mobile_exbar_tech" not in source
+    assert 'category == "delta_mobile_basic" and (' in source
+    assert '"黑潮爆破" in text_value or "絕巴技術陪" in text_value' in source
+    assert "第三層" in source
+
+
 def test_vip_timer_snapshot_is_excluded_from_entertainment_loyalty():
     assert policy._is_vip_timer_snapshot(
         {"price_snapshot_json": json.dumps({"vip_timer": True})}
@@ -138,9 +146,9 @@ def test_web_runtime_installs_timer_policy_for_admin_loyalty_reconciliation():
     assert "install_vip_timer_policy_v5()" in source
 
 
-def test_policy_source_excludes_sweet_teaching_and_mobile_black_tide():
+def test_policy_source_excludes_sweet_teaching_and_mobile_delta_special_modes():
     source = Path("services/vip_timer_policy_v5.py").read_text(encoding="utf-8")
     assert '"甜蜜" in text_value' in source
     assert '"教學" in text_value' in source
-    assert 'category == "delta_mobile_basic" and "黑潮爆破" in text_value' in source
+    assert '"黑潮爆破" in text_value or "絕巴技術陪" in text_value' in source
     assert '"note": "vip_timer_excluded"' in source

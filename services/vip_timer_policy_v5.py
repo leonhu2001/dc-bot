@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
 
 
 _INSTALLED = False
-_MOBILE_EXBAR_KEY = "basic_mobile_exbar_tech"
 _GAME_LABELS = {
     "delta_desktop_basic": "三角洲端遊",
     "delta_mobile_basic": "三角洲手遊",
@@ -27,26 +25,6 @@ def _rule_text(rule) -> str:
     )
 
 
-def _install_mobile_exbar_rule() -> None:
-    from services.order_rules import (
-        DELTA_MOBILE_GAME_ROLE,
-        ORDER_RULES,
-    )
-
-    if ORDER_RULES.get(_MOBILE_EXBAR_KEY) is not None:
-        return
-    desktop = ORDER_RULES.get("basic_exbar_tech")
-    if desktop is None:
-        return
-    ORDER_RULES[_MOBILE_EXBAR_KEY] = replace(
-        desktop,
-        key=_MOBILE_EXBAR_KEY,
-        category="delta_mobile_basic",
-        label="絕巴技術陪〈手遊〉",
-        required_game_roles=DELTA_MOBILE_GAME_ROLE,
-    )
-
-
 def _install_catalog_guard_policy() -> None:
     from services import vip_timer_catalog_guard as guard
     from services.order_rules import ORDER_RULES
@@ -58,8 +36,6 @@ def _install_catalog_guard_policy() -> None:
 
     def public_timer_rule_keys() -> set[str]:
         result = set(original_public_keys())
-        if ORDER_RULES.get(_MOBILE_EXBAR_KEY) is not None:
-            result.add(_MOBILE_EXBAR_KEY)
 
         filtered: set[str] = set()
         for key in result:
@@ -72,7 +48,10 @@ def _install_catalog_guard_policy() -> None:
             text_value = _rule_text(rule)
             if "甜蜜" in text_value or "教學" in text_value or "導師" in text_value:
                 continue
-            if category == "delta_mobile_basic" and "黑潮爆破" in text_value:
+            # 絕巴技術陪、黑潮爆破都只屬於三角洲端遊第三層玩法。
+            if category == "delta_mobile_basic" and (
+                "黑潮爆破" in text_value or "絕巴技術陪" in text_value
+            ):
                 continue
             # VIP 自由計時整張單會套 VIP 百分比折扣，因此不收錄原本
             # 明確標示「不適用 VIP 折扣」的來源商品。
@@ -142,8 +121,8 @@ def _install_selector_policy() -> None:
     if getattr(flow, "_vip_timer_v5_policy_installed", False):
         return
 
-    # Exact second-layer names. The wrapper below regroups by source category,
-    # so old aliases such as 「三角洲行動｜端遊」 cannot leak back into the UI.
+    # 第二層只放遊戲；絕巴技術陪、黑潮爆破等玩法交由 v2/v3
+    # 在三角洲端遊底下組成第三層，第四層才是單／雙／三／四陪。
     flow._GAME_META.update({key: (label, "") for key, label in _GAME_LABELS.items()})
 
     v3._vip_timer_v5_original_gameplay_label = v3._gameplay_label
@@ -175,7 +154,9 @@ def _install_selector_policy() -> None:
                 text_value = f"{_rule_text(rule)}｜{detail.get('label') or ''}｜{detail.get('item') or ''}"
                 if "甜蜜" in text_value or "教學" in text_value or "導師" in text_value:
                     continue
-                if category == "delta_mobile_basic" and "黑潮爆破" in text_value:
+                if category == "delta_mobile_basic" and (
+                    "黑潮爆破" in text_value or "絕巴技術陪" in text_value
+                ):
                     continue
                 try:
                     player_count = int(detail.get("player_count") or 0)
@@ -186,26 +167,6 @@ def _install_selector_policy() -> None:
                     continue
                 seen.add(unique)
                 regrouped[game_label].append(detail)
-
-        # 絕巴技術陪在一般價目目前只有端遊 canonical rule；VIP timer
-        # 需要手遊入口，因此建立一個只供 timer 使用的手遊 rule snapshot。
-        mobile_rule = ORDER_RULES.get(_MOBILE_EXBAR_KEY)
-        if mobile_rule is not None and (_MOBILE_EXBAR_KEY, 0) not in seen:
-            regrouped["三角洲手遊"].append(
-                {
-                    "label": "絕巴技術陪",
-                    "value": f"vt:{_MOBILE_EXBAR_KEY}:0",
-                    "rule_key": _MOBILE_EXBAR_KEY,
-                    "item": str(getattr(mobile_rule, "label", "絕巴技術陪")),
-                    "quantity_unit": "計時",
-                    "min_quantity": 1,
-                    "max_quantity": 1,
-                    "vip_timer": True,
-                    "vip_timer_source_category": "delta_mobile_basic",
-                    "vip_timer_service_type": "雙陪",
-                    "vip_timer_spec_label": "絕巴技術陪",
-                }
-            )
 
         result: list[dict] = []
         for label in _GAME_ORDER:
@@ -355,7 +316,6 @@ def install_vip_timer_policy_v5() -> None:
     global _INSTALLED
     if _INSTALLED:
         return
-    _install_mobile_exbar_rule()
     _install_catalog_guard_policy()
     _install_selector_policy()
     _install_switch_catalog_policy()
