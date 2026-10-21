@@ -40,13 +40,12 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
 
     from services.vip_timer_billing_guard import install_vip_timer_billing_guard
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
-    from services.vip_timer_runtime import (
-        VipTimerControlView,
-        install_acceptance_payment_hook,
-    )
+    from services import vip_timer_runtime as timer_runtime
     from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
     from services.vip_timer_runtime_order_v5 import install_vip_timer_runtime_order_v5
     from services.vip_timer_runtime_selector_v6 import install_vip_timer_runtime_selector_v6
+    from services.vip_timer_roster_payout import install_vip_timer_roster_payout
+    from services.vip_timer_roster_runtime import install_vip_timer_roster_runtime
 
     install_vip_timer_billing_guard()
     install_vip_timer_runtime_order_v5()
@@ -54,18 +53,27 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     # compatibility patch. The switcher now mirrors checkout exactly:
     # game -> gameplay -> currently-available headcount package.
     install_vip_timer_runtime_selector_v6()
-    install_acceptance_payment_hook()
+    timer_runtime.install_acceptance_payment_hook()
     install_vip_timer_payment_recovery()
     install_vip_timer_runtime_guard(
         bot_instance=bot_instance,
         guild_id=int(guild_id),
     )
+    # Roster controls must wrap the final guarded runtime so Resume can open a
+    # fresh segment after an add/reduce/replace boundary.
+    install_vip_timer_roster_runtime(
+        bot_instance=bot_instance,
+        guild_id=int(guild_id),
+    )
+    # Payment finalization imports acceptance promotion lazily, so this wrapper
+    # safely replaces the equal-share payout with the timer segment ledger.
+    install_vip_timer_roster_payout()
 
     if getattr(bot_instance, "_vip_timer_control_view_registered", False):
         return
 
     try:
-        add_view(VipTimerControlView())
+        add_view(timer_runtime.VipTimerControlView())
     except ValueError:
         pass
 
