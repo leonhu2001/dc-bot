@@ -54,15 +54,20 @@ def assert_customer_can_create_new_order(customer_id: Any) -> None:
 
 
 def install_discord_pending_order_guard() -> None:
-    """Guard the canonical Discord self-service dispatch creation boundary."""
+    """Guard both Discord self-service dispatch references after timer wrapping."""
     global _DISCORD_INSTALLED
     if _DISCORD_INSTALLED:
         return
 
+    from services import self_service_dispatch_runtime as dispatch
     from services import self_service_runtime as runtime
 
+    # VIP timer self-service replaces this creator with its timer-aware wrapper.
+    # Install this guard after that integration so the pending-payment check is
+    # the outermost boundary for both normal and VIP self-service orders.
     original = runtime.create_self_service_waiting_acceptance_order
     if getattr(original, "_vip_timer_pending_order_guard", False):
+        dispatch.create_waiting_acceptance_order = original
         _DISCORD_INSTALLED = True
         return
 
@@ -84,6 +89,7 @@ def install_discord_pending_order_guard() -> None:
     guarded_create_waiting_acceptance_order._vip_timer_pending_order_guard = True
     guarded_create_waiting_acceptance_order._vip_timer_pending_order_original = original
     runtime.create_self_service_waiting_acceptance_order = guarded_create_waiting_acceptance_order
+    dispatch.create_waiting_acceptance_order = guarded_create_waiting_acceptance_order
     _DISCORD_INSTALLED = True
 
 
