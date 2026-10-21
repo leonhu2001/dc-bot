@@ -21,7 +21,7 @@
                 <span>角色身分</span>
                 <select class="input" name="role">
                     <option value="all" {% if role == "all" %}selected{% endif %}>全部身分</option>
-                    <option value="worker" {% if role == "worker" %}selected{% endif %}>護航 / 陪玩</option>
+                    <option value="worker" {% if role == "worker" %}selected{% endif %}>陪玩</option>
                     <option value="customer_service" {% if role == "customer_service" %}selected{% endif %}>客服</option>
                 </select>
             </label>
@@ -81,6 +81,7 @@
                         <tr>
                             <th>人員</th>
                             <th>身分</th>
+                            <th title="陪玩完成訂單的歸屬業績；店內轉入、轉出與雞腿不會改變這個數字">業績</th>
                             <th>待發放</th>
                             <th>報單鎖定</th>
                             <th>已發放</th>
@@ -111,6 +112,24 @@
 
                                 <td>
                                     <span class="staff-role-badge">{{ row.role_label }}</span>
+                                </td>
+
+                                <td>
+                                    {% if row.role == "customer_service" and (row.performance_total|default(0)|int) == 0 %}
+                                        <span class="staff-money">—</span>
+                                        <span class="staff-count-sub">客服不計陪玩業績</span>
+                                    {% else %}
+                                        <span class="staff-money">{{ row.performance_total|default(0)|round(0, 'common')|int }}T</span>
+                                        {% if month %}
+                                            {% if (row.performance_total|default(0)|int) >= 5000 %}
+                                                <span class="staff-count-sub">已達 5,000T</span>
+                                            {% else %}
+                                                <span class="staff-count-sub">差 {{ 5000 - (row.performance_total|default(0)|int) }}T 達標</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="staff-count-sub">店內轉帳不影響</span>
+                                        {% endif %}
+                                    {% endif %}
                                 </td>
 
                                 <td>
@@ -146,9 +165,11 @@
                                                 <input type="hidden" name="person_role" value="{{ row.role }}">
                                                 <input type="hidden" name="person_id" value="{{ row.discord_id }}">
                                                 {% if row.unpaid_count > 0 %}
-                                                    <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">已發放</button>
+                                                    <button class="staff-summary-button primary" type="submit" name="target_status" value="paid">標記已發放</button>
+                                                {% elif row.locked_count > 0 %}
+                                                    <button class="staff-summary-button primary" type="button" disabled title="仍有報單尚未審核通過，通過後才可發放">待報單</button>
                                                 {% else %}
-                                                    <button class="staff-summary-button primary" type="button" disabled title="報單尚未審核通過，薪資目前鎖定">已發放（鎖定）</button>
+                                                    <button class="staff-summary-button primary" type="button" disabled>已發放</button>
                                                 {% endif %}
                                             </form>
 
@@ -166,7 +187,7 @@
                             </tr>
 
                             <tr class="staff-summary-detail-row" id="staff-summary-detail-{{ loop.index }}" hidden>
-                                <td colspan="8">
+                                <td colspan="9">
                                     <div class="staff-summary-detail">
                                         <h3>{{ row.display_name }}｜分潤明細</h3>
 
@@ -177,7 +198,7 @@
                                                     <th>委託人</th>
                                                     <th>內容</th>
                                                     <th>結單日期</th>
-                                                    <th>身份</th>
+                                                    <th>身分</th>
                                                     <th>狀態</th>
                                                     <th>賞金</th>
                                                 </tr>

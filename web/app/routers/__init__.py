@@ -50,4 +50,12 @@ _admin_centers.build_accounting_reconciliation_snapshot = (
     _build_policy_aware_accounting_reconciliation_snapshot
 )
 
+# Payroll totals and business performance are separate ledgers. Internal payroll
+# transfers may move salary between employees but must never move the underlying
+# companion performance. The same policy also merges dual-role staff into one row
+# and normalizes all visible role labels to 陪玩 / 客服.
+from web.app.services.payout_summary_policy import install_payout_summary_policy
+
+install_payout_summary_policy()
+
 __all__ = []
