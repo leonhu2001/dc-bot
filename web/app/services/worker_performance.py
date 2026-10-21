@@ -32,13 +32,14 @@ def build_worker_performance_map(
     month: str = "",
     employee_ids: Iterable[str] | None = None,
 ) -> dict[str, int]:
-    """Return attributed companion sales without payroll-transfer effects.
+    """Return earned companion wages without payroll-transfer effects.
 
-    Performance is the worker payout row's ``gross_share``: the portion of the
-    closed order attributed to that companion before wage-rate calculation and
-    before any internal payroll transfer.  Therefore a transfer-out never lowers
-    the sender's performance and a transfer-in never creates performance for the
-    receiver. Tips and customer-service payouts are intentionally excluded too.
+    Performance is the worker payout row's ``final_payout`` attributed to the
+    month in which the order was closed. It is therefore the companion wage the
+    worker actually earned from completed orders, regardless of when payroll is
+    later marked paid. Internal payroll transfers never lower the sender's
+    performance or create performance for the receiver. Tips and customer-
+    service payouts are intentionally excluded too.
     """
 
     ids = {
@@ -57,7 +58,7 @@ def build_worker_performance_map(
     try:
         if not _table_exists(conn, "worker_payouts") or not _table_exists(conn, "web_orders"):
             return {}
-        if not _column_exists(conn, "worker_payouts", "gross_share"):
+        if not _column_exists(conn, "worker_payouts", "final_payout"):
             return {}
 
         where = [
@@ -83,7 +84,7 @@ def build_worker_performance_map(
             f"""
             SELECT
                 CAST(p.worker_discord_id AS TEXT) AS discord_id,
-                COALESCE(p.gross_share, 0) AS gross_share
+                COALESCE(p.final_payout, 0) AS final_payout
             FROM worker_payouts p
             JOIN web_orders w ON w.id = p.order_id
             WHERE {' AND '.join(where)}
@@ -101,7 +102,7 @@ def build_worker_performance_map(
         if not discord_id:
             continue
         try:
-            amount = int(round(float(row["gross_share"] or 0)))
+            amount = int(round(float(row["final_payout"] or 0)))
         except (TypeError, ValueError):
             amount = 0
         totals[discord_id] = int(totals.get(discord_id, 0)) + amount
