@@ -100,7 +100,7 @@ def _close_live_segment(db, order_id: int, status: str, now) -> None:
     db.execute(
         text(
             "UPDATE vip_timer_sessions SET status='paused', paused_at=:now, "
-            "updated_at=:now WHERE order_id=:order_id"
+            "current_hourly_rate=0, updated_at=:now WHERE order_id=:order_id"
         ),
         {"now": utc_iso(now), "order_id": int(order_id)},
     )
@@ -132,6 +132,107 @@ def _sync_acceptance_rule_meta(db, *, order_id: int, rule_key: str, rule, target
             "order_id": int(order_id),
         },
     )
+
+
+def has_open_segment(order_id: int) -> bool:
+    db = SessionLocal()
+    try:
+        return _current_segment(db, int(order_id)) is not None
+    finally:
+        db.close()
+
+
+def resume_with_new_roster_segment(
+    order_id: int,
+    *,
+    actor_id: Any,
+    pricing_snapshot: dict,
+    staff_ids: list[str],
+) -> dict[str, Any]:
+    """Resume a paused timer after a roster boundary by opening a new segment."""
+    db = SessionLocal()
+    try:
+        session = get_session(int(order_id), db)
+        if not session or str(session.get("status") or "") != "paused":
+            raise ValueError("目前不是暫停狀態。")
+        if _current_segment(db, int(order_id)) is not None:
+            raise ValueError("目前已有可繼續的計時區段。")
+
+        state = get_acceptance_state(int(order_id))
+        if not state.is_full:
+            raise ValueError(
+                f"陪玩名單尚未補滿（{state.accepted_count}/{state.required_staff_count}），不能繼續計時。"
+            )
+
+        now_text = utc_iso()
+        seq = int(
+            db.execute(
+                text("SELECT COALESCE(MAX(seq),0)+1 FROM vip_timer_segments WHERE order_id=:order_id"),
+                {"order_id": int(order_id)},
+            ).scalar_one()
+        )
+        db.execute(
+            text(
+                """
+                INSERT INTO vip_timer_segments(
+                    order_id, seq, rule_key, rule_label, category_label, hourly_rate,
+                    started_at, active_started_at, ended_at, billable_seconds,
+                    actor_discord_id, staff_ids_json, player_count, required_staff_count,
+                    created_at, updated_at
+                ) VALUES (
+                    :order_id, :seq, :rule_key, :rule_label, :category_label, :rate,
+                    :now, :now, NULL, 0, :actor, :staff, :player_count,
+                    :required_staff_count, :now, :now
+                )
+                """
+            ),
+            {
+                "order_id": int(order_id),
+                "seq": seq,
+                "rule_key": str(session.get("current_rule_key") or pricing_snapshot.get("rule_key") or ""),
+                "rule_label": str(session.get("current_rule_label") or ""),
+                "category_label": str(session.get("current_category_label") or ""),
+                "rate": int(pricing_snapshot.get("hourly_rate") or 0),
+                "now": now_text,
+                "actor": str(actor_id or ""),
+                "staff": json.dumps(staff_ids, ensure_ascii=False),
+                "player_count": int(pricing_snapshot.get("player_count") or len(staff_ids)),
+                "required_staff_count": int(pricing_snapshot.get("required_staff_count") or len(staff_ids)),
+            },
+        )
+        db.execute(
+            text(
+                """
+                UPDATE vip_timer_sessions
+                SET status='running', paused_at=NULL,
+                    current_hourly_rate=:rate, updated_at=:now
+                WHERE order_id=:order_id
+                """
+            ),
+            {
+                "rate": int(pricing_snapshot.get("hourly_rate") or 0),
+                "now": now_text,
+                "order_id": int(order_id),
+            },
+        )
+        _event(
+            db,
+            int(order_id),
+            "resume_after_roster_change",
+            actor_id,
+            {
+                "staff_ids": staff_ids,
+                "hourly_rate": int(pricing_snapshot.get("hourly_rate") or 0),
+                "player_count": int(pricing_snapshot.get("player_count") or len(staff_ids)),
+            },
+        )
+        db.commit()
+        return get_session(int(order_id)) or {}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def adjust_roster(
@@ -211,11 +312,7 @@ def adjust_roster(
         )
 
         remaining_count = current_count - (1 if action in {"reduce", "replace"} else 0)
-        target_status = (
-            ACCEPTED_PENDING_PAY
-            if remaining_count >= target_count
-            else WAITING_ACCEPTANCE
-        )
+        target_status = ACCEPTED_PENDING_PAY if remaining_count >= target_count else WAITING_ACCEPTANCE
         transition_order_state_in_connection(
             db.connection(),
             order_id=int(order_id),
@@ -259,5 +356,7 @@ def adjust_roster(
 
 __all__ = [
     "adjust_roster",
+    "has_open_segment",
+    "resume_with_new_roster_segment",
     "roster_capabilities",
 ]
