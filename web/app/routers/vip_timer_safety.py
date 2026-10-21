@@ -6,18 +6,30 @@ from services.vip_timer import (
     is_vip_timer_rule_key,
     strip_vip_timer_rule_key,
 )
-from services.vip_timer_catalog_guard import is_public_timer_rule
 
 
 _INSTALLED = False
 
 
-def install(vip_timer_module) -> None:
-    """Keep VIP timer v1 inside its deliberately narrow billing contract.
+def _is_public_timer_rule(rule_key) -> bool:
+    """Resolve the live shared policy instead of freezing the pre-policy function.
 
-    V1 settles metered hourly segments only: no one-time specify fee, no hidden
-    history-only product, and no source product whose normal purchase requires a
-    multi-hour minimum. Crafted requests receive the same checks as the UI.
+    services.vip_timer_policy_v5 replaces catalog_guard.is_public_timer_rule at
+    runtime to exclude sweet/teaching, mobile-only forbidden modes and products
+    that reject VIP discounts. Importing the function once at module import time
+    would bypass those later policy refinements on the website.
+    """
+    from services import vip_timer_catalog_guard as catalog_guard
+
+    return bool(catalog_guard.is_public_timer_rule(rule_key))
+
+
+def install(vip_timer_module) -> None:
+    """Keep the public website inside the same timer contract as Discord.
+
+    Every UI list and every crafted quote/create request resolves the live shared
+    catalog guard, so website and Discord cannot drift on which products are
+    eligible for VIP timing.
     """
     global _INSTALLED
     if _INSTALLED:
@@ -30,9 +42,7 @@ def install(vip_timer_module) -> None:
     def safe_timer_key_check(rule_key) -> bool:
         if not original_timer_key_check(rule_key):
             return False
-        return is_public_timer_rule(
-            strip_vip_timer_rule_key(rule_key)
-        )
+        return _is_public_timer_rule(strip_vip_timer_rule_key(rule_key))
 
     # quote/options/preview/create wrappers in vip_timer.py resolve this module
     # global at call time, so one replacement protects every public endpoint.
@@ -44,7 +54,7 @@ def install(vip_timer_module) -> None:
         for source in group.get("variants") or []:
             item = dict(source)
             real_key = strip_vip_timer_rule_key(item.get("rule_key"))
-            if not is_public_timer_rule(real_key):
+            if not _is_public_timer_rule(real_key):
                 continue
             item["allow_specify"] = False
             item["max_specified_count"] = 0
@@ -71,7 +81,7 @@ def install(vip_timer_module) -> None:
         rule_key = str((payload or {}).get("rule_key") or "")
         if is_vip_timer_rule_key(rule_key):
             real_key = strip_vip_timer_rule_key(rule_key)
-            if not is_public_timer_rule(real_key):
+            if not _is_public_timer_rule(real_key):
                 raise ValueError(
                     "這個玩法目前不能用於 VIP 自由計時，請重新選擇玩法。"
                 )
