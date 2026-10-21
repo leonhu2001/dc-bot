@@ -129,3 +129,24 @@ def test_monitor_has_long_timer_and_pending_payment_thresholds():
     assert any(key == "pending_30m" for _, key, _ in monitor.PENDING_THRESHOLDS)
     assert any(key == "pending_24h" for _, key, _ in monitor.PENDING_THRESHOLDS)
     assert monitor.CHECK_INTERVAL_SECONDS <= 60
+
+
+def test_monitor_registers_on_ready_when_configured_before_event_loop(monkeypatch):
+    monkeypatch.setattr(monitor, "ensure_vip_timer_ops_tables", lambda: None)
+
+    class DummyBot:
+        def __init__(self):
+            self.listeners = []
+
+        def add_listener(self, callback, name):
+            self.listeners.append((callback, name))
+
+        def is_ready(self):
+            return False
+
+    bot = DummyBot()
+    monitor.install_vip_timer_monitor(bot)
+
+    assert bot._vip_timer_monitor_installed is True
+    assert len(bot.listeners) == 1
+    assert bot.listeners[0][1] == "on_ready"
