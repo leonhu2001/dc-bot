@@ -13,7 +13,7 @@ PENDING_THRESHOLDS = (
     (2 * 60 * 60, "pending_2h", "2 小時"),
     (24 * 60 * 60, "pending_24h", "24 小時"),
 )
-CHECK_INTERVAL_SECONDS = 300
+CHECK_INTERVAL_SECONDS = 60
 
 
 def _sent_alert_keys(db, order_id: int) -> set[str]:
@@ -90,6 +90,24 @@ def _due_alerts() -> list[dict]:
         db.close()
 
 
+def _pending_rows() -> list[dict]:
+    from services import vip_timer as timer
+
+    db = timer.SessionLocal()
+    try:
+        ensure_vip_timer_ops_tables(db)
+        return [
+            dict(row)
+            for row in db.execute(text("""
+                SELECT order_id, ticket_channel_id
+                FROM vip_timer_sessions
+                WHERE status='pending_payment' AND ticket_channel_id IS NOT NULL
+            """)).mappings().all()
+        ]
+    finally:
+        db.close()
+
+
 def _active_staff_ids(order_id: int) -> list[str]:
     try:
         from shared.order_acceptance import get_acceptance_state
@@ -105,16 +123,23 @@ def _active_staff_ids(order_id: int) -> list[str]:
     return result
 
 
+async def _get_channel(bot, channel_id: int):
+    channel = bot.get_channel(int(channel_id))
+    if channel is not None:
+        return channel
+    try:
+        return await bot.fetch_channel(int(channel_id))
+    except Exception:
+        return None
+
+
 async def _send_alert(bot, item: dict) -> bool:
     channel_id = int(item.get("ticket_channel_id") or 0)
     if channel_id <= 0:
         return False
-    channel = bot.get_channel(channel_id)
+    channel = await _get_channel(bot, channel_id)
     if channel is None:
-        try:
-            channel = await bot.fetch_channel(channel_id)
-        except Exception:
-            return False
+        return False
     customer_id = str(item.get("customer_discord_id") or "").strip()
     customer_ping = f"<@{customer_id}>" if customer_id else "老闆"
     if item.get("kind") == "running":
@@ -145,6 +170,26 @@ async def _send_alert(bot, item: dict) -> bool:
         return False
 
 
+async def _sync_pending_payment_panel(bot, item: dict) -> None:
+    channel_id = int(item.get("ticket_channel_id") or 0)
+    if channel_id <= 0:
+        return
+    channel = await _get_channel(bot, channel_id)
+    guild = getattr(channel, "guild", None)
+    if guild is None:
+        return
+    try:
+        from services.acceptance.dispatch_refresh import refresh_acceptance_dispatch_from_web_order
+
+        await refresh_acceptance_dispatch_from_web_order(guild, int(item["order_id"]))
+    except Exception as exc:
+        print(
+            f"[vip-timer-monitor] payment panel sync failed order_id={item.get('order_id')}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 async def _monitor_loop(bot) -> None:
     try:
         await bot.wait_until_ready()
@@ -164,6 +209,13 @@ async def _monitor_loop(bot) -> None:
                                 "escalated": bool(item.get("escalated")),
                             },
                         )
+
+                # The web admin can correct a pending timer while the bot stays
+                # online. Refresh from the authoritative web_order once a minute
+                # so the Discord payment panel cannot keep a stale pre-correction amount.
+                pending = await asyncio.to_thread(_pending_rows)
+                for item in pending:
+                    await _sync_pending_payment_panel(bot, item)
             except Exception as exc:
                 print(
                     f"[vip-timer-monitor] iteration failed: {type(exc).__name__}: {exc}",
