@@ -129,7 +129,7 @@ def fetch_guild_member(discord_user_id: str) -> dict:
         headers={
             "Authorization": f"Bot {config.DISCORD_BOT_TOKEN}",
         },
-        timeout=15,
+        timeout=5,
     )
 
     if response.status_code == 404:

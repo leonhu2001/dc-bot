@@ -56,7 +56,7 @@ from web.app.routers.discord_avatars import router as discord_avatars_router
 from web.app.routers import admin_staff_profiles
 from web.app.routers import admin_staff_profiles_ui
 from web.app.routers import admin_payouts_grouped
-from web.app.services.discord_service import get_member_role_ids
+from web.app.services.admin_role_cache import get_admin_member_role_ids
 from web.app.services.health_check import check_runtime_dependencies
 from web.app.services.http_security import (
     build_content_security_policy,
@@ -150,9 +150,12 @@ async def security_and_refresh_access(request: Request, call_next):
                 refreshed_user = revoke_staff_access(refreshed_user)
             else:
                 try:
-                    role_ids = await run_in_threadpool(
-                        get_member_role_ids,
+                    role_ids = await get_admin_member_role_ids(
                         discord_id,
+                        force_refresh=(
+                            is_sensitive_path(request.url.path)
+                            or requires_csrf(request.method)
+                        ),
                     )
                     refreshed_user = apply_live_access(
                         refreshed_user,
