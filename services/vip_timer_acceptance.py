@@ -30,6 +30,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
 
     install_vip_timer_self_service()
 
+    # VIP timer self-service replaces the generic dispatch creator. Install the
+    # unpaid-timer guard afterward so it is the outer boundary for every new
+    # Discord self-service order, normal or VIP timer.
+    from services.vip_timer_pending_order_guard import install_discord_pending_order_guard
+
+    install_discord_pending_order_guard()
+
     from services.vip_timer_select_flow import install_vip_timer_select_flow
     from services.vip_timer_selector_order_v2 import install_vip_timer_selector_order_v2
     from services.vip_timer_selector_order_v3 import install_vip_timer_selector_order_v3

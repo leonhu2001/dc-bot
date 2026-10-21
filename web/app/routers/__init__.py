@@ -9,6 +9,7 @@ from services.vip_timer_ops import (
     ensure_vip_timer_ops_tables,
     install_vip_timer_snapshot_guard,
 )
+from services.vip_timer_pending_order_guard import install_web_pending_order_guard
 from services.vip_timer_roster_payout import install_vip_timer_roster_payout
 
 install_vip_timer_catalog_guard()
@@ -16,6 +17,9 @@ install_vip_timer_lifecycle_guard()
 install_vip_timer_snapshot_guard()
 ensure_vip_timer_ops_tables()
 install_vip_timer_roster_payout()
+# Patch the canonical public-order creation service before any request handler
+# imports it locally. A pending VIP timer payment blocks every new website order.
+install_web_pending_order_guard()
 
 from services import vip_timer as _timer_service
 from web.app.routers import site as _site
