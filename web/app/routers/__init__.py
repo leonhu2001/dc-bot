@@ -66,4 +66,14 @@ from web.app.services.payout_summary_policy import install_payout_summary_policy
 
 install_payout_summary_policy()
 
+# APEX used to price new orders by the customer's current rank. Those legacy
+# rule keys must remain resolvable for historical orders, but they are not live
+# products and must not appear as editable/on-shelf items in 商品與規則.
+from web.app.routers import admin_order_rules as _admin_order_rules
+from web.app.services.admin_order_rules_policy import (
+    install_admin_order_rules_policy as _install_admin_order_rules_policy,
+)
+
+_install_admin_order_rules_policy(_admin_order_rules)
+
 __all__ = []
