@@ -53,14 +53,18 @@ _RULE_SPECS = (
 
 
 def _install_rules() -> None:
-    for category, key, label, price, game_roles, _value, _detail_label in _RULE_SPECS:
+    for category, key, legacy_label, price, game_roles, _value, detail_label in _RULE_SPECS:
         if key in ORDER_RULES:
             continue
+
+        group_label, separator, _legacy_detail = str(legacy_label).partition("｜")
+        if not separator:
+            group_label = GROUP_LABEL
 
         rule = OrderRule(
             category=category,
             key=key,
-            label=label,
+            label=str(detail_label),
             pricing_type="hourly",
             price=price,
             unit_label="H",
@@ -71,6 +75,7 @@ def _install_rules() -> None:
             allow_specify=False,
             min_protector_count=1,
             required_game_roles=game_roles,
+            catalog_group_label=str(group_label).strip(),
         )
         validate_rule_definition(key, rule)
         ORDER_RULES[key] = rule
