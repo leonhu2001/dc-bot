@@ -1,0 +1,55 @@
+{% extends "site_layout.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/pages/member_order_detail_inline_1.css?v=20261013">
+{% endblock %}
+
+{% block content %}
+{% set s = detail.session %}
+<section class="customer-order-detail" id="vipTimerLive" data-status-url="/me/orders/{{ order_id }}/timer/status">
+    <div class="customer-order-detail-head">
+        <div>
+            <div class="section-eyebrow">VIP TIMER LIVE</div>
+            <h1>VIP 自由計時</h1>
+            <p>WEB-{{ order_id }}｜即時畫面約每 5 秒同步一次；正式計費仍以伺服器保存的時間戳為準。</p>
+        </div>
+        <div class="customer-order-detail-actions">
+            <a class="button button-secondary" href="/me/orders/{{ order_id }}">返回訂單</a>
+            {% if detail.order.ticket_channel_id %}
+            <a class="button button-primary" href="https://discord.com/channels/{{ request.app.state.get('guild_id', '') }}/{{ detail.order.ticket_channel_id }}" target="_blank" rel="noopener noreferrer">前往 Discord 票口</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <section class="customer-detail-card">
+        <span class="customer-detail-status" id="vipTimerStatus">{{ s.status }}</span>
+        <div class="customer-detail-grid">
+            <div class="customer-detail-item"><small>目前遊戲</small><strong id="vipTimerCategory">{{ s.current_category_label }}</strong></div>
+            <div class="customer-detail-item"><small>目前玩法</small><strong id="vipTimerRule">{{ s.current_rule_label }}</strong></div>
+            <div class="customer-detail-item"><small>目前時薪</small><strong id="vipTimerRate">{{ s.current_hourly_rate }}T/H</strong></div>
+            <div class="customer-detail-item"><small>累積計時</small><strong id="vipTimerDuration">--</strong></div>
+            <div class="customer-detail-item"><small>開單 VIP</small><strong id="vipTimerVip">{{ detail.vip_name_snapshot }} · {{ detail.vip_discount_pay_rate_snapshot }}%</strong></div>
+            <div class="customer-detail-item"><small>預估應付</small><strong id="vipTimerPay">{{ detail.customer_preview }}T</strong></div>
+        </div>
+        <p class="customer-detail-note" id="vipTimerNotice">15 分鐘最低計費；VIP 折扣固定使用開單當下等級。月券、點數與其他活動不適用。</p>
+    </section>
+
+    <section class="customer-detail-card">
+        <div class="section-eyebrow">SEGMENTS</div>
+        <h2>計時區段</h2>
+        <div id="vipTimerSegments">
+            <p class="customer-detail-note">正在同步計時區段…</p>
+        </div>
+    </section>
+
+    <section class="customer-detail-card">
+        <div class="section-eyebrow">CONTROL</div>
+        <h2>操作方式</h2>
+        <p class="customer-detail-note">開始、暫停、切換玩法、調整陪玩與結束計時仍以 Discord 票口為正式操作介面。暫停與結束都需要老闆／陪玩兩側確認；多人陪玩由任一位已接單陪玩代表陪玩方。</p>
+    </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/pages/vip_timer_live.js?v=20261021_1" defer></script>
+{% endblock %}
