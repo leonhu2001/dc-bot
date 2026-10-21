@@ -7,6 +7,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable
 
+from services import order_rule_store
 from services.order_rule_store import (
     load_active_overrides,
     load_custom_rule_definitions,
@@ -17,27 +18,65 @@ _RULE_CACHE_TTL_SECONDS = 15.0
 _CATALOG_CACHE_TTL_SECONDS = 60.0
 _lock = threading.RLock()
 _rule_cache_expires_at = 0.0
+_rule_cache_source = ""
 _active_overrides: dict[str, dict[str, Any]] = {}
 _custom_rules: dict[str, dict[str, Any]] = {}
-_result_cache: dict[tuple[str, str], tuple[float, Any]] = {}
+_result_cache: dict[tuple[str, str, str], tuple[float, Any]] = {}
+
+
+def _file_revision(path: Path) -> str:
+    try:
+        stat = path.stat()
+        return f"{stat.st_mtime_ns}:{stat.st_size}"
+    except OSError:
+        return "missing"
+
+
+def _rule_source_revision() -> str:
+    """Return a cheap revision token for the active storefront rule database.
+
+    Include the WAL file because production SQLite may commit there without
+    immediately changing the main DB file. This also keeps tests that switch
+    `default_db_path()` isolated from a snapshot created for another database.
+    """
+    try:
+        path = Path(order_rule_store.default_db_path()).resolve()
+    except Exception:
+        path = Path(order_rule_store.default_db_path())
+
+    wal_path = Path(f"{path}-wal")
+    return "|".join(
+        (
+            str(path),
+            _file_revision(path),
+            _file_revision(wal_path),
+        )
+    )
 
 
 def _load_rule_snapshot() -> tuple[
     dict[str, dict[str, Any]],
     dict[str, dict[str, Any]],
 ]:
-    global _rule_cache_expires_at, _active_overrides, _custom_rules
+    global _rule_cache_expires_at, _rule_cache_source
+    global _active_overrides, _custom_rules
 
     now = time.monotonic()
+    source_revision = _rule_source_revision()
+
     with _lock:
-        if _rule_cache_expires_at > now:
+        if (
+            _rule_cache_expires_at > now
+            and _rule_cache_source == source_revision
+        ):
             return _active_overrides, _custom_rules
 
-        # Public storefront presentation can tolerate a very short delay after
-        # a manager edit. Pricing/checkout still use the authoritative rule
-        # path and are never served from this presentation cache.
+        # Public storefront presentation can reuse a snapshot, but never across
+        # a different DB/revision. Quote/checkout/order creation remain on the
+        # authoritative rule path and are not served by this cache.
         _active_overrides = load_active_overrides()
         _custom_rules = load_custom_rule_definitions()
+        _rule_cache_source = source_revision
         _rule_cache_expires_at = time.monotonic() + _RULE_CACHE_TTL_SECONDS
         return _active_overrides, _custom_rules
 
@@ -69,7 +108,12 @@ def _cached_result(
     key: str,
     builder: Callable[[], Any],
 ) -> Any:
-    cache_key = (str(namespace), str(key))
+    source_revision = _rule_source_revision()
+    cache_key = (
+        str(namespace),
+        str(key),
+        source_revision,
+    )
     now = time.monotonic()
 
     with _lock:
@@ -85,16 +129,27 @@ def _cached_result(
             result,
         )
 
+        # A database revision makes older entries unreachable. Keep the cache
+        # bounded instead of accumulating one entry for every manager edit.
+        if len(_result_cache) > 64:
+            stale_keys = [
+                item_key
+                for item_key, item_value in _result_cache.items()
+                if item_value[0] <= time.monotonic()
+                or item_key[2] != source_revision
+            ]
+            for stale_key in stale_keys:
+                _result_cache.pop(stale_key, None)
+
     return result
 
 
 def install_order_catalog_read_cache(order_groups: ModuleType) -> None:
     """Keep public catalog rendering off repeated SQLite/Python rebuild paths.
 
-    The first implementation used a one-second cache. That only collapsed work
-    inside one burst of requests, so normal navigation still rebuilt the whole
-    storefront. Public presentation data now lives for up to one minute, while
-    quote/checkout/order creation continue to revalidate against live rules.
+    Normal navigation can reuse catalog presentation for up to one minute. The
+    cache key also includes the SQLite revision, so manager rule edits become a
+    cache miss immediately while quote/checkout/create continue to revalidate.
     """
     order_groups.get_active_override = get_active_override_cached
     order_groups.get_custom_rule_definition = get_custom_rule_definition_cached
@@ -164,10 +219,12 @@ def install_order_catalog_read_cache(order_groups: ModuleType) -> None:
 
 
 def clear_order_catalog_read_cache() -> None:
-    global _rule_cache_expires_at, _active_overrides, _custom_rules
+    global _rule_cache_expires_at, _rule_cache_source
+    global _active_overrides, _custom_rules
 
     with _lock:
         _rule_cache_expires_at = 0.0
+        _rule_cache_source = ""
         _active_overrides = {}
         _custom_rules = {}
         _result_cache.clear()
