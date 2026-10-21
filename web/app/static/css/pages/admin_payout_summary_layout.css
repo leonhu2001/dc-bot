@@ -1,0 +1,138 @@
+.staff-summary-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable;
+}
+
+.staff-summary-table {
+    width: 100%;
+    min-width: 1580px;
+    table-layout: fixed;
+}
+
+.staff-summary-table th,
+.staff-summary-table td {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    vertical-align: middle;
+}
+
+.staff-summary-table th:not(:first-child),
+.staff-summary-table td:not(:first-child) {
+    text-align: center;
+}
+
+.staff-summary-table th:nth-child(1),
+.staff-summary-table td:nth-child(1) {
+    width: 285px;
+    text-align: left;
+}
+
+.staff-summary-table th:nth-child(2),
+.staff-summary-table td:nth-child(2) {
+    width: 105px;
+}
+
+.staff-summary-table th:nth-child(3),
+.staff-summary-table td:nth-child(3) {
+    width: 135px;
+}
+
+.staff-summary-table th:nth-child(4),
+.staff-summary-table td:nth-child(4),
+.staff-summary-table th:nth-child(5),
+.staff-summary-table td:nth-child(5),
+.staff-summary-table th:nth-child(6),
+.staff-summary-table td:nth-child(6) {
+    width: 120px;
+}
+
+.staff-summary-table th:nth-child(7),
+.staff-summary-table td:nth-child(7) {
+    width: 145px;
+}
+
+.staff-summary-table th:nth-child(8),
+.staff-summary-table td:nth-child(8) {
+    width: 180px;
+}
+
+.staff-summary-table th:nth-child(9),
+.staff-summary-table td:nth-child(9) {
+    width: 320px;
+}
+
+.staff-summary-table .staff-person,
+.staff-summary-table .staff-person > div:last-child {
+    min-width: 0;
+}
+
+.staff-summary-table .staff-person-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+}
+
+.staff-summary-table .staff-person-id {
+    white-space: nowrap;
+}
+
+.staff-summary-table .staff-money,
+.staff-summary-table .staff-count-main,
+.staff-summary-table .staff-count-sub {
+    display: block;
+}
+
+.staff-summary-table .staff-count-sub {
+    margin-top: 4px;
+    white-space: normal;
+    line-height: 1.3;
+}
+
+.staff-summary-table .staff-status-badge {
+    display: inline-flex;
+    width: 100%;
+    max-width: 160px;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.25;
+}
+
+.staff-summary-table .staff-summary-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+}
+
+.staff-summary-table .staff-summary-actions form {
+    display: flex;
+    min-width: 0;
+    margin: 0;
+}
+
+.staff-summary-table .staff-summary-actions .staff-summary-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding-left: 8px;
+    padding-right: 8px;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.staff-summary-detail-row > td {
+    width: auto !important;
+    text-align: left !important;
+}
+
+@media (max-width: 1500px) {
+    .staff-summary-table {
+        min-width: 1500px;
+    }
+}

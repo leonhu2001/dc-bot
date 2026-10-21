@@ -19,6 +19,15 @@ from .one_companion_one_guard_catalog import (
 
 _install_one_companion_one_guard_catalog()
 
+# The legacy Black Diamond monthly free-choice benefit has been retired. Install
+# this before monthly-benefit integration so both Web and Discord read the same
+# current entitlement source while historical benefit rows remain auditable.
+from .retired_black_diamond_benefit import (
+    install_retired_black_diamond_benefit_policy as _install_retired_black_diamond_benefit_policy,
+)
+
+_install_retired_black_diamond_benefit_policy()
+
 # Keep coupon reservation / release / redemption and the VIP monthly entitlement
 # policy centralized for both Discord and Web entry points.
 from .benefit_runtime_integration import install_root_benefit_integrations as _install_benefits

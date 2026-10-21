@@ -27,14 +27,22 @@ from web.app.routers import vip_timer as _vip_timer_module
 from web.app.routers.vip_timer import install as _install_vip_timer
 from web.app.routers.vip_timer_safety import install as _install_vip_timer_safety
 from web.app.routers.vip_timer_ops import router as _vip_timer_ops_router
+from web.app.routers.member_vip_timer import (
+    install as _install_member_vip_timer,
+    router as _member_vip_timer_router,
+)
 
 # vip_timer.py imports create_vip_timer_session by name. Rebind it after the
 # snapshot guard so website-created timers lock the VIP tier at order creation.
 _vip_timer_module.create_vip_timer_session = _timer_service.create_vip_timer_session
 
 _install_vip_timer(_site)
+# VIP timer remains fully functional, but its storefront exposure is restricted
+# to the authenticated member area after the base integration is installed.
+_install_member_vip_timer(_site)
 _install_vip_timer_safety(_vip_timer_module)
 _site.router.include_router(_vip_timer_ops_router)
+_site.router.include_router(_member_vip_timer_router)
 
 # Finance Center used the raw reconciliation count while System Operations used
 # the policy-aware view, so historical/known-safe differences could show as a red

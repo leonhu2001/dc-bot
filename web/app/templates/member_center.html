@@ -51,7 +51,9 @@
 </section>
 
 <section class="mc-shell mc-main">
-    {% if request.query_params.get('denied') %}
+    {% if request.query_params.get('denied') == 'vip_timer' %}
+        <div class="mc-alert">VIP 自由計時僅限金級會員以上使用。</div>
+    {% elif request.query_params.get('denied') %}
         <div class="mc-alert">目前 Discord 身分組沒有該入口權限，系統已重新確認你的伺服器身分。</div>
     {% endif %}
 
@@ -174,6 +176,16 @@
                 <div><span>目前可用點數</span><b>{{ "{:,}".format(member.points) }} 點</b></div>
                 <div><span>已完成訂單</span><b>{{ member.completed_orders }}</b></div>
             </div>
+
+            {% if member.vip_name in ['金級魔丸', '白金魔丸', '鑽石魔丸', '白鑽魔丸', '黑鑽魔丸'] %}
+                <div class="mc-coupon-stack">
+                    <div class="mc-empty compact">
+                        <b>VIP 自由計時已解鎖</b>
+                        <span>金級以上專屬。先玩後付，只計實際遊玩時間；途中可切換遊戲／玩法。</span>
+                        <a href="/me/vip-timer">開始自由計時 →</a>
+                    </div>
+                </div>
+            {% endif %}
         </section>
     </div>
 </section>
