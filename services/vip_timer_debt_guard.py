@@ -69,20 +69,28 @@ def install_discord_pending_timer_debt_guard() -> None:
     if _DISCORD_INSTALLED:
         return
 
+    from services import self_service_runtime as runtime
     from services import self_service_ui_runtime as ui
 
-    original_create = ui.create_waiting_acceptance_order_from_self_service
+    original_runtime_create = runtime.create_waiting_acceptance_order_from_self_service
 
-    @wraps(original_create)
-    async def guarded_create(interaction, *, customer_id: int, channel_id: int):
+    @wraps(original_runtime_create)
+    async def guarded_runtime_create(interaction, *, customer_id: int, channel_id: int):
         assert_customer_can_create_order(str(customer_id))
-        return await original_create(
+        return await original_runtime_create(
             interaction,
             customer_id=customer_id,
             channel_id=channel_id,
         )
 
-    ui.create_waiting_acceptance_order_from_self_service = guarded_create
+    runtime.create_waiting_acceptance_order_from_self_service = guarded_runtime_create
+
+    # self_service_ui_runtime stores the callback at configuration time. If it
+    # is already configured, replace the captured callback too. If not, the
+    # patched runtime function above will be captured later by configuration.
+    if bool(getattr(ui, "_CONFIGURED", False)):
+        ui.create_waiting_acceptance_order_from_self_service = guarded_runtime_create
+
     _DISCORD_INSTALLED = True
 
 
