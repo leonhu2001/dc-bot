@@ -22,10 +22,16 @@ _INSTALLED = False
 
 
 def _is_timer_order(order_id: int, db) -> bool:
-    row = db.execute(
-        text("SELECT 1 FROM vip_timer_sessions WHERE order_id=:order_id LIMIT 1"),
-        {"order_id": int(order_id)},
-    ).first()
+    # The web process installs the payout guard during router bootstrap, which
+    # can happen before the raw vip_timer_* tables have been created. Ordinary
+    # order payout recalculation must remain usable in that window.
+    try:
+        row = db.execute(
+            text("SELECT 1 FROM vip_timer_sessions WHERE order_id=:order_id LIMIT 1"),
+            {"order_id": int(order_id)},
+        ).first()
+    except Exception:
+        return False
     return row is not None
 
 
