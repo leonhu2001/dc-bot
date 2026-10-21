@@ -154,8 +154,13 @@ def _ensure_segment_snapshot_columns() -> None:
     db = SessionLocal()
     try:
         ensure_vip_timer_tables(db)
-        bind = db.get_bind()
-        existing = {str(column.get("name") or "") for column in inspect(bind).get_columns("vip_timer_segments")}
+        # Inspect the same DB connection that created/owns the timer tables.
+        # This avoids visibility issues with transactional SQLite DDL.
+        connection = db.connection()
+        existing = {
+            str(column.get("name") or "")
+            for column in inspect(connection).get_columns("vip_timer_segments")
+        }
         if "player_count" not in existing:
             db.execute(text("ALTER TABLE vip_timer_segments ADD COLUMN player_count INTEGER"))
         if "required_staff_count" not in existing:
