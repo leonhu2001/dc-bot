@@ -351,15 +351,12 @@
 
         renderVariant();
         showDialog();
-        window.dispatchEvent(
-            new CustomEvent(
-                "mawan:order-group-loaded",
-                {
-                    detail: {
-                        group_key: String(group.key || ""),
-                    },
-                }
-            )
+
+        // The specified-staff guard attaches its own change listener. Trigger
+        // it only after lazy variants exist so ineligible variants remain
+        // fail-closed even when the detail request took longer than 120 ms.
+        variantSelect.dispatchEvent(
+            new Event("change", { bubbles: true })
         );
     }
 
