@@ -17,6 +17,7 @@ from services.vip_timer_ops import (
     resolve_dispute,
 )
 from services.vip_timer_pause_confirmation import clear_pause_request
+from services.vip_timer_pause_expiry import pause_state
 from web.app.routers.admin_common import require_admin_user
 from web.app.services.customer_portal import get_customer_order
 from web.app.config import config
@@ -67,6 +68,11 @@ async def admin_vip_timers(request: Request):
         row["age_text"] = _duration(int(row.get("age_seconds") or 0))
         row["pending_age_text"] = _duration(int(row.get("pending_age_seconds") or 0))
         row["needs_payment_attention"] = int(row.get("pending_age_seconds") or 0) >= 24 * 3600
+        state = pause_state(row)
+        row["pause_age_text"] = _duration(int(state.get("age_seconds") or 0))
+        row["pause_warning"] = bool(state.get("warning"))
+        row["pause_expired"] = bool(state.get("expired"))
+        row["pause_reason"] = str(state.get("reason") or "")
     return templates.TemplateResponse(
         request=request,
         name="admin_vip_timers.html",
@@ -93,6 +99,8 @@ async def admin_vip_timer_detail(
         return RedirectResponse(url="/admin/vip-timers?error=找不到自由計時單", status_code=303)
     detail["live_text"] = _duration(int(detail.get("live_seconds") or 0))
     detail["pending_age_text"] = _duration(int(detail.get("pending_age_seconds") or 0))
+    detail["pause_state"] = pause_state(detail.get("session") or {})
+    detail["pause_state"]["age_text"] = _duration(int(detail["pause_state"].get("age_seconds") or 0))
     for segment in detail.get("segments") or []:
         segment["duration_text"] = _duration(int(segment.get("billable_seconds") or 0))
         try:
@@ -247,6 +255,7 @@ async def member_vip_timer_live(order_id: int, request: Request):
             context={"title": "找不到自由計時單", "message": "這筆自由計時單不存在，或不屬於目前登入的 Discord 帳號。", "user": user},
             status_code=404,
         )
+    detail["pause_state"] = pause_state(detail.get("session") or {})
     return templates.TemplateResponse(
         request=request,
         name="member_vip_timer_live.html",
@@ -267,6 +276,7 @@ async def member_vip_timer_status(order_id: int, request: Request):
     if detail is None:
         return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
     session = detail.get("session") or {}
+    pause = pause_state(session)
     segments = []
     from services.vip_timer_ops import _segment_effective_seconds
     for row in detail.get("segments") or []:
@@ -294,6 +304,10 @@ async def member_vip_timer_status(order_id: int, request: Request):
         "vip_discount_pay_rate": int(detail.get("vip_discount_pay_rate_snapshot") or 100),
         "pending_age_seconds": int(detail.get("pending_age_seconds") or 0),
         "end_confirmation_pending": bool(detail.get("end_request")),
+        "pause_age_seconds": int(pause.get("age_seconds") or 0),
+        "pause_warning": bool(pause.get("warning")),
+        "pause_expired": bool(pause.get("expired")),
+        "pause_reason": str(pause.get("reason") or ""),
         "segments": segments,
     }, headers={"Cache-Control": "no-store"})
 
