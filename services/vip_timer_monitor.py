@@ -5,6 +5,11 @@ import asyncio
 from sqlalchemy import text
 
 from services.vip_timer_ops import ensure_vip_timer_ops_tables, record_alert
+from services.vip_timer_pause_expiry import (
+    PAUSE_HARD_LIMIT_SECONDS,
+    PAUSE_REMINDER_SECONDS,
+    get_pause_policy,
+)
 
 
 RUNNING_THRESHOLDS = (2, 4, 6, 8, 12, 24)
@@ -44,9 +49,9 @@ def _due_alerts() -> list[dict]:
         ensure_vip_timer_ops_tables(db)
         rows = db.execute(text("""
             SELECT s.order_id, s.customer_discord_id, s.ticket_channel_id, s.status,
-                   s.ended_at, s.timer_message_id
+                   s.paused_at, s.ended_at, s.timer_message_id
             FROM vip_timer_sessions s
-            WHERE s.status IN ('running','pending_payment')
+            WHERE s.status IN ('running','paused','pending_payment')
         """)).mappings().all()
         now = timer.utc_now()
         due: list[dict] = []
@@ -68,23 +73,58 @@ def _due_alerts() -> list[dict]:
                         "label": f"{hours} 小時",
                         "seconds": seconds,
                     })
-            else:
-                ended = timer.parse_dt(row.get("ended_at"))
-                if ended is None:
-                    continue
-                age = max(0, int((now - ended).total_seconds()))
-                reached = [item for item in PENDING_THRESHOLDS if age >= item[0]]
-                unsent = [item for item in reached if item[1] not in sent]
-                if unsent:
-                    threshold, key, label = max(unsent, key=lambda item: item[0])
+                continue
+
+            if status == "paused":
+                policy = get_pause_policy(order_id, db=db)
+                paused_seconds = int(policy.get("paused_seconds") or 0)
+                if (
+                    paused_seconds >= PAUSE_REMINDER_SECONDS
+                    and "paused_1h" not in sent
+                ):
                     due.append({
                         **row,
-                        "alert_key": key,
-                        "kind": "pending",
-                        "label": label,
-                        "seconds": age,
-                        "escalated": threshold >= 24 * 3600,
+                        "alert_key": "paused_1h",
+                        "kind": "paused_reminder",
+                        "label": "1 小時",
+                        "seconds": paused_seconds,
                     })
+                if bool(policy.get("resume_locked")):
+                    key = (
+                        "paused_extension_expired"
+                        if bool(policy.get("extension_used"))
+                        else "paused_2h_locked"
+                    )
+                    if key not in sent:
+                        due.append({
+                            **row,
+                            "alert_key": key,
+                            "kind": "paused_locked",
+                            "label": (
+                                "客服延長期限"
+                                if bool(policy.get("extension_used"))
+                                else "2 小時"
+                            ),
+                            "seconds": paused_seconds,
+                        })
+                continue
+
+            ended = timer.parse_dt(row.get("ended_at"))
+            if ended is None:
+                continue
+            age = max(0, int((now - ended).total_seconds()))
+            reached = [item for item in PENDING_THRESHOLDS if age >= item[0]]
+            unsent = [item for item in reached if item[1] not in sent]
+            if unsent:
+                threshold, key, label = max(unsent, key=lambda item: item[0])
+                due.append({
+                    **row,
+                    "alert_key": key,
+                    "kind": "pending",
+                    "label": label,
+                    "seconds": age,
+                    "escalated": threshold >= 24 * 3600,
+                })
         return due
     finally:
         db.close()
@@ -142,19 +182,34 @@ async def _send_alert(bot, item: dict) -> bool:
         return False
     customer_id = str(item.get("customer_discord_id") or "").strip()
     customer_ping = f"<@{customer_id}>" if customer_id else "老闆"
-    if item.get("kind") == "running":
-        staff_ids = _active_staff_ids(int(item["order_id"]))
-        staff_ping = " ".join(f"<@{worker_id}>" for worker_id in staff_ids)
+    staff_ids = _active_staff_ids(int(item["order_id"]))
+    staff_ping = " ".join(f"<@{worker_id}>" for worker_id in staff_ids)
+
+    kind = str(item.get("kind") or "")
+    if kind == "running":
         content = (
             f"⏱️ {customer_ping} {staff_ping}\n"
             f"VIP 自由計時已累積約 **{item['label']}**。請確認目前仍在遊玩；"
             "若已休息或結束，請使用票口的「暫停」或「結束計時」，避免忘記關表。"
         )
+    elif kind == "paused_reminder":
+        content = (
+            f"⏸️ {customer_ping} {staff_ping}\n"
+            "這張 VIP 自由計時已暫停約 **1 小時**。暫停只供短暫休息；"
+            "暫停滿 **2 小時**後將不能直接繼續，需由雙方確認結束並結算。"
+        )
+    elif kind == "paused_locked":
+        content = (
+            f"🛑 {customer_ping} {staff_ping}\n"
+            f"這張 VIP 自由計時的暫停期限已到（{item['label']}）。"
+            "系統已禁止直接繼續，請由老闆與陪玩雙方使用「結束計時」完成確認與結算。"
+            "若有斷線、維修等特殊情況，請聯繫客服處理。"
+        )
     else:
         prefix = "⚠️ **待付款逾期提醒**" if item.get("escalated") else "💳 **VIP 自由計時待付款提醒**"
         content = (
             f"{prefix}\n{customer_ping} 本單結束後已等待 **{item['label']}**，"
-            "請使用票口付款面板完成付款。付款完成前無法再建立新的 VIP 自由計時單。"
+            "請使用票口付款面板完成付款。付款完成前無法建立任何新訂單。"
         )
         if item.get("escalated"):
             content += "\n此單已列入客服待處理清單。"
