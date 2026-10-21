@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
+<script src="/static/js/csrf.js?v=1"></script>
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
+</head>
+<body class="mw-r5-admin">
+{% set s = detail.session %}
+{% set o = detail.order %}
+<div class="mw-r5-shell">
+    {% include "_admin_sidebar.html" %}
+    <section class="mw-r5-main-host">
+        <header class="mw-r5-page-header">
+            <div class="mw-r5-kicker">VIP TIMER DETAIL</div>
+            <h1>{{ o.bot_order_no or ('WEB-' ~ s.order_id) }}</h1>
+            <p>{{ o.customer_display_name or s.customer_discord_id }} · {{ s.current_category_label }} · {{ s.current_rule_label }}</p>
+        </header>
+        <div class="mw-r5-legacy-body">
+            <main class="page">
+                <p><a class="button secondary" href="/admin/vip-timers">返回自由計時列表</a> <a class="button secondary" href="/admin/order-workspace/{{ s.order_id }}">返回訂單工作區</a></p>
+                {% if message %}<div class="notice success">{{ message }}</div>{% endif %}
+                {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+
+                <div class="card">
+                    <div class="card-head">計時狀態</div>
+                    <div class="grid">
+                        <div class="cell"><div class="label">狀態</div><div class="value">{{ s.status }}</div></div>
+                        <div class="cell"><div class="label">累積計時</div><div class="value">{{ detail.live_text }}</div></div>
+                        <div class="cell"><div class="label">目前時薪</div><div class="value">{{ s.current_hourly_rate }}T/H</div></div>
+                        <div class="cell"><div class="label">開單 VIP 快照</div><div class="value">{{ detail.vip_name_snapshot }} · 實付 {{ detail.vip_discount_pay_rate_snapshot }}%</div></div>
+                        <div class="cell"><div class="label">預估原始金額</div><div class="value">{{ detail.gross_preview }}T</div></div>
+                        <div class="cell"><div class="label">預估／最終應付</div><div class="value">{% if s.status == 'pending_payment' %}{{ s.final_amount }}{% else %}{{ detail.customer_preview }}{% endif %}T</div></div>
+                    </div>
+                    {% if s.status == 'pending_payment' %}
+                    <p>待付款已經過：<strong>{{ detail.pending_age_text }}</strong>。30 分鐘、2 小時與 24 小時會自動提醒；24 小時後列入客服待處理。</p>
+                    <form method="post" action="/admin/vip-timers/{{ s.order_id }}/recalculate">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <input type="hidden" name="reason" value="客服後台重新結算">
+                        <button class="button secondary" type="submit">依開單 VIP 快照重新結算</button>
+                    </form>
+                    {% elif s.status == 'running' %}
+                    <p>客服修正前必須先暫停，避免修正與即時計時同時寫入。</p>
+                    <form method="post" action="/admin/vip-timers/{{ s.order_id }}/pause">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <button class="button secondary" type="submit">客服強制暫停以進行修正</button>
+                    </form>
+                    {% endif %}
+                    {% if detail.end_request %}
+                    <div class="notice">已有一方提出結束申請，仍在等待另一方確認。</div>
+                    {% endif %}
+                </div>
+
+                <div class="card">
+                    <div class="card-head">計時區段與客服修正</div>
+                    <p>修正會保存修改前／後內容、原因與操作人。結算依「已計秒數」為準；開始／結束時間保留作稽核時間軸。</p>
+                    {% for segment in detail.segments %}
+                    <section class="card">
+                        <h3>#{{ segment.seq }}｜{{ segment.category_label }}｜{{ segment.rule_label }}</h3>
+                        <p>{{ segment.duration_text }} · {{ segment.hourly_rate }}T/H · 人員：{{ segment.staff_ids_text or '-' }}</p>
+                        {% if s.status in ['paused', 'pending_payment'] %}
+                        <form method="post" action="/admin/vip-timers/{{ s.order_id }}/segments/{{ segment.id }}/correct">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <div class="grid">
+                                <label class="cell"><span class="label">已計秒數</span><input name="billable_seconds" type="number" min="0" value="{{ segment.billable_seconds }}" required></label>
+                                <label class="cell"><span class="label">時薪 T/H</span><input name="hourly_rate" type="number" min="1" value="{{ segment.hourly_rate }}" required></label>
+                                <label class="cell"><span class="label">開始時間</span><input name="started_at" type="text" value="{{ segment.started_at or '' }}" required></label>
+                                <label class="cell"><span class="label">結束時間</span><input name="ended_at" type="text" value="{{ segment.ended_at or '' }}"></label>
+                                <label class="cell"><span class="label">陪玩 Discord ID（逗號分隔）</span><input name="staff_ids" type="text" value="{{ segment.staff_ids_text }}"></label>
+                                <label class="cell"><span class="label">修正原因</span><input name="reason" type="text" maxlength="300" required placeholder="例如：21:36 忘記暫停，雙方確認扣除 8 分鐘"></label>
+                            </div>
+                            <button class="button secondary" type="submit">儲存此區段修正</button>
+                        </form>
+                        {% endif %}
+                    </section>
+                    {% else %}
+                    <p>尚未建立計時區段。</p>
+                    {% endfor %}
+                </div>
+
+                <div class="card">
+                    <div class="card-head">爭議處理</div>
+                    <form method="post" action="/admin/vip-timers/{{ s.order_id }}/disputes">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <label>新增爭議內容 <input name="reason" type="text" maxlength="500" required placeholder="記錄雙方對時間、玩法、人員或金額的爭議"></label>
+                        <button class="button secondary" type="submit">建立爭議紀錄</button>
+                    </form>
+                    {% for dispute in detail.disputes %}
+                    <section class="card">
+                        <strong>#{{ dispute.id }} · {{ dispute.status }}</strong>
+                        <p>{{ dispute.reason }}</p>
+                        {% if dispute.status == 'open' %}
+                        <form method="post" action="/admin/vip-timers/{{ s.order_id }}/disputes/{{ dispute.id }}/resolve">
+                            <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                            <input name="resolution" type="text" maxlength="500" required placeholder="處理結果／雙方共識">
+                            <button class="button secondary" type="submit">標記已解決</button>
+                        </form>
+                        {% else %}
+                        <p>處理結果：{{ dispute.resolution or '-' }}</p>
+                        {% endif %}
+                    </section>
+                    {% else %}
+                    <p>目前沒有爭議紀錄。</p>
+                    {% endfor %}
+                </div>
+
+                <div class="card">
+                    <div class="card-head">修正稽核紀錄</div>
+                    {% for row in detail.corrections %}
+                        <p><strong>#{{ row.id }} · {{ row.action }}</strong>｜{{ row.created_at }}｜操作人 {{ row.actor_discord_id or '-' }}<br>{{ row.reason }}</p>
+                    {% else %}
+                        <p>目前沒有人工修正。</p>
+                    {% endfor %}
+                </div>
+
+                <div class="card">
+                    <div class="card-head">提醒紀錄</div>
+                    {% for row in detail.alerts %}
+                        <p>{{ row.sent_at }}｜{{ row.alert_key }}</p>
+                    {% else %}
+                        <p>目前沒有自動提醒紀錄。</p>
+                    {% endfor %}
+                </div>
+
+                <div class="card">
+                    <div class="card-head">系統事件</div>
+                    {% for row in detail.events %}
+                        <p>{{ row.created_at }}｜<strong>{{ row.action }}</strong>｜{{ row.actor_discord_id or '-' }}<br><small>{{ row.payload_json }}</small></p>
+                    {% else %}
+                        <p>尚無事件。</p>
+                    {% endfor %}
+                </div>
+            </main>
+        </div>
+    </section>
+</div>
+</body>
+</html>

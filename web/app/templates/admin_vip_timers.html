@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
+<script src="/static/js/csrf.js?v=1"></script>
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
+</head>
+<body class="mw-r5-admin">
+<div class="mw-r5-shell">
+    {% include "_admin_sidebar.html" %}
+    <section class="mw-r5-main-host">
+        <header class="mw-r5-page-header">
+            <div class="mw-r5-kicker">VIP TIMER OPERATIONS</div>
+            <h1>VIP 自由計時</h1>
+            <p>集中查看進行中、暫停中與待付款的自由計時單；24 小時以上未付款會標記為客服待處理。</p>
+        </header>
+        <div class="mw-r5-legacy-body">
+            <main class="page">
+                <div class="card">
+                    <div class="card-head">目前需要關注的計時單</div>
+                    {% if rows %}
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>訂單</th>
+                                    <th>老闆</th>
+                                    <th>狀態</th>
+                                    <th>目前玩法</th>
+                                    <th>開單 VIP</th>
+                                    <th>持續／待付款</th>
+                                    <th>爭議</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in rows %}
+                                <tr>
+                                    <td>{{ row.bot_order_no or ('WEB-' ~ row.order_id) }}</td>
+                                    <td>{{ row.customer_display_name or row.customer_discord_id }}</td>
+                                    <td>
+                                        {% if row.needs_payment_attention %}<strong>⚠️ {% endif %}
+                                        {{ row.status }}
+                                        {% if row.needs_payment_attention %}</strong>{% endif %}
+                                    </td>
+                                    <td>{{ row.current_rule_label or '-' }}</td>
+                                    <td>{{ row.vip_name_snapshot or '-' }}{% if row.vip_discount_pay_rate_snapshot is not none %} · {{ row.vip_discount_pay_rate_snapshot }}%{% endif %}</td>
+                                    <td>
+                                        {% if row.status == 'pending_payment' %}
+                                            {{ row.pending_age_text }}
+                                            {% if row.needs_payment_attention %}<br>已列入待處理{% endif %}
+                                        {% else %}
+                                            {{ row.age_text }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ row.open_disputes }}</td>
+                                    <td><a class="button secondary" href="/admin/vip-timers/{{ row.order_id }}">查看明細</a></td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                        <p>目前沒有進行中或待付款的 VIP 自由計時單。</p>
+                    {% endif %}
+                </div>
+            </main>
+        </div>
+    </section>
+</div>
+</body>
+</html>

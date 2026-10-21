@@ -18,9 +18,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
 
     from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
     from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
+    from services.vip_timer_ops import install_vip_timer_snapshot_guard
 
     install_vip_timer_catalog_guard()
     install_vip_timer_lifecycle_guard()
+    # Install before importing the Discord self-service bridge so every new
+    # timer session records the member level that existed at order creation.
+    install_vip_timer_snapshot_guard()
 
     from services.vip_timer_self_service import install_vip_timer_self_service
 
@@ -39,6 +43,8 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     install_vip_timer_policy_v5()
 
     from services.vip_timer_billing_guard import install_vip_timer_billing_guard
+    from services.vip_timer_end_confirmation import install_vip_timer_end_confirmation
+    from services.vip_timer_monitor import install_vip_timer_monitor
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services import vip_timer_runtime as timer_runtime
     from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
@@ -65,9 +71,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
         bot_instance=bot_instance,
         guild_id=int(guild_id),
     )
+    # End confirmation is installed after roster guards so the second side's
+    # confirmation still observes incomplete-roster protections.
+    install_vip_timer_end_confirmation()
     # Payment finalization imports acceptance promotion lazily, so this wrapper
     # safely replaces the equal-share payout with the timer segment ledger.
     install_vip_timer_roster_payout()
+    install_vip_timer_monitor(bot_instance)
 
     if getattr(bot_instance, "_vip_timer_control_view_registered", False):
         return
