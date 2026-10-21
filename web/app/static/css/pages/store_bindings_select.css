@@ -1,0 +1,30 @@
+/* Store-binding employee picker layering.
+   The picker is absolutely positioned inside the direct-grant card, so allow
+   it to escape the card and stay above the review queue while open. */
+.employee-workspace-site .sbm .grant-panel{
+    position:relative!important;
+    z-index:30!important;
+    overflow:visible!important;
+}
+
+.employee-workspace-site .sbm .grant-panel .grant-form{
+    position:relative;
+    z-index:2;
+}
+
+.employee-workspace-site .sbm .grant-panel .mw-employee-select{
+    position:relative;
+}
+
+.employee-workspace-site .sbm .grant-panel .mw-employee-select.is-open{
+    z-index:80!important;
+}
+
+.employee-workspace-site .sbm .grant-panel .mw-employee-select-panel{
+    z-index:900!important;
+}
+
+.employee-workspace-site .sbm .sbm-section{
+    position:relative;
+    z-index:1;
+}
