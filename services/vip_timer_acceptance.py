@@ -17,6 +17,7 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     install_self_service_retract_runtime_fix()
 
     from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
+    from services.vip_timer_debt_guard import install_discord_pending_timer_debt_guard
     from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
     from services.vip_timer_ops import install_vip_timer_snapshot_guard
 
@@ -45,6 +46,7 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     from services.vip_timer_billing_guard import install_vip_timer_billing_guard
     from services.vip_timer_end_confirmation import install_vip_timer_end_confirmation
     from services.vip_timer_monitor import install_vip_timer_monitor
+    from services.vip_timer_pause_expiry import install_vip_timer_pause_expiry
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services import vip_timer_runtime as timer_runtime
     from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
@@ -74,6 +76,12 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     # End confirmation is installed after roster guards so the second side's
     # confirmation still observes incomplete-roster protections.
     install_vip_timer_end_confirmation()
+    # Pause expiry wraps the final resume chain: after two paused hours users
+    # must settle instead of carrying a timer forward indefinitely.
+    install_vip_timer_pause_expiry()
+    # A timer already waiting for payment blocks every new customer order,
+    # including normal self-service orders, until the debt is settled.
+    install_discord_pending_timer_debt_guard()
     # Payment finalization imports acceptance promotion lazily, so this wrapper
     # safely replaces the equal-share payout with the timer segment ledger.
     install_vip_timer_roster_payout()
