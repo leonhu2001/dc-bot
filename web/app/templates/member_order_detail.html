@@ -6,6 +6,7 @@
 
 {% block content %}
 {% set is_roulette_order = '俄羅斯輪盤' in (order.item or '') %}
+{% set is_vip_timer_order = (order.category == 'VIP 自由計時') or ('VIP 自由計時' in (order.item or '')) %}
 <section class="customer-order-detail">
     <div class="customer-order-detail-head">
         <div>
@@ -15,6 +16,9 @@
         </div>
         <div class="customer-order-detail-actions">
             <a class="button button-secondary" href="/me/orders">返回我的訂單</a>
+            {% if is_vip_timer_order %}
+                <a class="button button-primary" href="/me/orders/{{ order.id }}/timer">查看即時計時</a>
+            {% endif %}
             {% if order.ticket_url and order.is_open %}
                 <a class="button button-secondary" href="{{ order.ticket_url }}" target="_blank" rel="noopener noreferrer">前往 Discord 票口</a>
             {% endif %}
