@@ -6,7 +6,7 @@
 
 {% block content %}
 {% set is_roulette_order = '俄羅斯輪盤' in (order.item or '') %}
-{% set is_vip_timer_order = (order.category == 'VIP 自由計時') or ('VIP 自由計時' in (order.item or '')) %}
+{% set is_vip_timer_order = (order.category == 'VIP 自由計時') or ('VIP 自由計時' in (order.item or '')) or ('自由計時｜' in (order.item or '')) %}
 <section class="customer-order-detail">
     <div class="customer-order-detail-head">
         <div>
