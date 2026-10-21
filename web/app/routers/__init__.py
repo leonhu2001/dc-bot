@@ -36,4 +36,18 @@ _install_vip_timer(_site)
 _install_vip_timer_safety(_vip_timer_module)
 _site.router.include_router(_vip_timer_ops_router)
 
+# Finance Center used the raw reconciliation count while System Operations used
+# the policy-aware view, so historical/known-safe differences could show as a red
+# number in one page while the maintenance page correctly said everything was
+# normal. Rebind only the Finance Center's imported builder so both surfaces use
+# the same policy without changing low-level reconciliation diagnostics.
+from web.app.routers import admin_centers as _admin_centers
+from web.app.services.accounting_reconciliation_policy import (
+    build_policy_aware_accounting_reconciliation_snapshot as _build_policy_aware_accounting_reconciliation_snapshot,
+)
+
+_admin_centers.build_accounting_reconciliation_snapshot = (
+    _build_policy_aware_accounting_reconciliation_snapshot
+)
+
 __all__ = []
