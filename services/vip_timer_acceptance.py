@@ -13,12 +13,8 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
         return
 
     from services.self_service_retract_runtime_fix import install_self_service_retract_runtime_fix
-    from services.vip_timer_pending_order_guard import install_discord_pending_order_guard
 
     install_self_service_retract_runtime_fix()
-    # A VIP timer that has already ended but is still unpaid blocks every new
-    # Discord self-service order, not only another timer order.
-    install_discord_pending_order_guard()
 
     from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
     from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
@@ -33,6 +29,13 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     from services.vip_timer_self_service import install_vip_timer_self_service
 
     install_vip_timer_self_service()
+
+    # VIP timer self-service replaces the generic dispatch creator. Install the
+    # unpaid-timer guard afterward so it is the outer boundary for every new
+    # Discord self-service order, normal or VIP timer.
+    from services.vip_timer_pending_order_guard import install_discord_pending_order_guard
+
+    install_discord_pending_order_guard()
 
     from services.vip_timer_select_flow import install_vip_timer_select_flow
     from services.vip_timer_selector_order_v2 import install_vip_timer_selector_order_v2
