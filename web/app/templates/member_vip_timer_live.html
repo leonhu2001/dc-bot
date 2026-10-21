@@ -28,7 +28,15 @@
             <div class="customer-detail-item"><small>開單 VIP</small><strong id="vipTimerVip">{{ detail.vip_name_snapshot }} · {{ detail.vip_discount_pay_rate_snapshot }}%</strong></div>
             <div class="customer-detail-item"><small>預估應付</small><strong id="vipTimerPay">{{ detail.customer_preview }}T</strong></div>
         </div>
-        <p class="customer-detail-note" id="vipTimerNotice">15 分鐘最低計費；VIP 折扣固定使用開單當下等級。月券、點數與其他活動不適用。</p>
+        <p class="customer-detail-note" id="vipTimerNotice">
+            {% if detail.pause_state and detail.pause_state.expired %}
+                暫停期限已到，這張單不可再繼續；請回 Discord 完成雙方結束確認與結算。
+            {% elif s.status == 'paused' %}
+                暫停僅供短暫休息，最長 2 小時且不可跨日；超過後不能再繼續這張計時單。
+            {% else %}
+                15 分鐘最低計費；VIP 折扣固定使用開單當下等級。月券、點數與其他活動不適用。
+            {% endif %}
+        </p>
     </section>
 
     <section class="customer-detail-card">
@@ -42,11 +50,11 @@
     <section class="customer-detail-card">
         <div class="section-eyebrow">CONTROL</div>
         <h2>操作方式</h2>
-        <p class="customer-detail-note">開始、暫停、切換玩法、調整陪玩與結束計時仍以 Discord 票口為正式操作介面。暫停與結束都需要老闆／陪玩兩側確認；多人陪玩由任一位已接單陪玩代表陪玩方。</p>
+        <p class="customer-detail-note">開始、暫停、切換玩法、調整陪玩與結束計時仍以 Discord 票口為正式操作介面。暫停與結束都需要老闆／陪玩兩側確認；多人陪玩由任一位已接單陪玩代表陪玩方。暫停最長 2 小時且不可跨日，逾期後必須結束結算。</p>
     </section>
 </section>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/pages/vip_timer_live.js?v=20261021_1" defer></script>
+<script src="/static/js/pages/vip_timer_live.js?v=20261021_2" defer></script>
 {% endblock %}

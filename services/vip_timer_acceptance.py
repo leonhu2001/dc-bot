@@ -45,6 +45,7 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     from services.vip_timer_billing_guard import install_vip_timer_billing_guard
     from services.vip_timer_end_confirmation import install_vip_timer_end_confirmation
     from services.vip_timer_monitor import install_vip_timer_monitor
+    from services.vip_timer_pause_expiry import install_vip_timer_pause_expiry
     from services.vip_timer_recovery import install_vip_timer_payment_recovery
     from services import vip_timer_runtime as timer_runtime
     from services.vip_timer_runtime_guard import install_vip_timer_runtime_guard
@@ -74,6 +75,10 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     # End confirmation is installed after roster guards so the second side's
     # confirmation still observes incomplete-roster protections.
     install_vip_timer_end_confirmation()
+    # Pause expiry must be the outermost resume guard: every resume path,
+    # including a fresh post-roster segment, is blocked after two hours or a
+    # Taiwan calendar-day rollover.
+    install_vip_timer_pause_expiry()
     # Payment finalization imports acceptance promotion lazily, so this wrapper
     # safely replaces the equal-share payout with the timer segment ledger.
     install_vip_timer_roster_payout()

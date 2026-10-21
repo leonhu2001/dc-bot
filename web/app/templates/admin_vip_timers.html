@@ -15,7 +15,7 @@
         <header class="mw-r5-page-header">
             <div class="mw-r5-kicker">VIP TIMER OPERATIONS</div>
             <h1>VIP 自由計時</h1>
-            <p>集中查看進行中、暫停中與待付款的自由計時單；24 小時以上未付款會標記為客服待處理。</p>
+            <p>集中查看進行中、暫停中與待付款的自由計時單；暫停超過 2 小時或跨日會鎖定續玩，24 小時以上未付款會標記為客服待處理。</p>
         </header>
         <div class="mw-r5-legacy-body">
             <main class="page">
@@ -31,7 +31,7 @@
                                     <th>狀態</th>
                                     <th>目前玩法</th>
                                     <th>開單 VIP</th>
-                                    <th>持續／待付款</th>
+                                    <th>持續／暫停／待付款</th>
                                     <th>爭議</th>
                                     <th></th>
                                 </tr>
@@ -42,9 +42,10 @@
                                     <td>{{ row.bot_order_no or ('WEB-' ~ row.order_id) }}</td>
                                     <td>{{ row.customer_display_name or row.customer_discord_id }}</td>
                                     <td>
-                                        {% if row.needs_payment_attention %}<strong>⚠️ {% endif %}
+                                        {% if row.needs_payment_attention or row.pause_expired %}<strong>⚠️ {% endif %}
                                         {{ row.status }}
-                                        {% if row.needs_payment_attention %}</strong>{% endif %}
+                                        {% if row.needs_payment_attention or row.pause_expired %}</strong>{% endif %}
+                                        {% if row.pause_expired %}<br>不可再繼續{% endif %}
                                     </td>
                                     <td>{{ row.current_rule_label or '-' }}</td>
                                     <td>{{ row.vip_name_snapshot or '-' }}{% if row.vip_discount_pay_rate_snapshot is not none %} · {{ row.vip_discount_pay_rate_snapshot }}%{% endif %}</td>
@@ -52,6 +53,13 @@
                                         {% if row.status == 'pending_payment' %}
                                             {{ row.pending_age_text }}
                                             {% if row.needs_payment_attention %}<br>已列入待處理{% endif %}
+                                        {% elif row.status == 'paused' %}
+                                            {{ row.pause_age_text }}
+                                            {% if row.pause_expired %}
+                                                <br>{% if row.pause_reason == 'cross_day' %}已跨日{% else %}已達暫停上限{% endif %}
+                                            {% elif row.pause_warning %}
+                                                <br>接近 2 小時上限
+                                            {% endif %}
                                         {% else %}
                                             {{ row.age_text }}
                                         {% endif %}

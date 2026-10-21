@@ -64,10 +64,19 @@
         }
         const notice = el("vipTimerNotice");
         if (notice) {
-            if (data.end_confirmation_pending) {
+            if (data.pause_expired) {
+                const reason = data.pause_reason === "cross_day"
+                    ? "本次暫停已跨日"
+                    : "本次暫停已超過 2 小時";
+                notice.textContent = `${reason}，這張計時單已不能再繼續。請回 Discord 由老闆與陪玩雙方確認結束並完成結算；特殊狀況請聯繫客服。`;
+            } else if (data.pause_warning) {
+                notice.textContent = `已暫停 ${fmtDuration(data.pause_age_seconds)}。暫停最長 2 小時且不可跨日，超過後將鎖定繼續並要求結束結算。`;
+            } else if (data.end_confirmation_pending) {
                 notice.textContent = "目前已有一方提出結束申請，等待另一方確認；確認完成前不會結算。";
             } else if (data.status === "pending_payment") {
                 notice.textContent = `計時已結束，待付款 ${fmtDuration(data.pending_age_seconds)}。付款完成前無法再開新的 VIP 自由計時單。`;
+            } else if (data.status === "paused") {
+                notice.textContent = "暫停僅供短暫休息，最長 2 小時且不可跨日；超過後不能再繼續這張計時單。";
             } else {
                 notice.textContent = "15 分鐘最低計費；VIP 折扣固定使用開單當下等級。月券、點數與其他活動不適用。";
             }
