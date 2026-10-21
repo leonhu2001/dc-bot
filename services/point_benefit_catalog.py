@@ -21,7 +21,7 @@ POINT_BENEFIT_SPECS = {
     "discount_50": {
         "kind": "cash_discount",
         "amount": 50,
-        "summary": "50T 折價券，店內吸收，不影響陪玩分潤",
+        "summary": "50T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準",
     },
     "free_specify_fee": {
         "kind": "free_specify_fee",
@@ -30,7 +30,7 @@ POINT_BENEFIT_SPECS = {
     "discount_100": {
         "kind": "cash_discount",
         "amount": 100,
-        "summary": "100T 折價券，店內吸收，不影響陪玩分潤",
+        "summary": "100T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準",
     },
     "entertain_service_small": {
         "kind": "service_bonus",
@@ -75,12 +75,12 @@ LEGACY_POINT_BENEFIT_SPECS = {
     "discount_20": {
         "kind": "cash_discount",
         "amount": 20,
-        "summary": "20T 折價券，店內吸收，不影響陪玩分潤",
+        "summary": "20T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準",
     },
     "discount_30": {
         "kind": "cash_discount",
         "amount": 30,
-        "summary": "30T 折價券，店內吸收，不影響陪玩分潤",
+        "summary": "30T 折價券，共同分攤；折後金額作為陪玩／團隊分潤基準",
     },
     "extra_hour_30m": {
         "kind": "extra_hours",
