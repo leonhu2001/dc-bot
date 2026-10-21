@@ -7,6 +7,15 @@ root services package and install the centralized promotion-benefit adapter.
 from __future__ import annotations
 
 from . import order_groups as _order_groups
+from .order_catalog_read_cache import (
+    install_order_catalog_read_cache as _install_order_catalog_read_cache,
+)
+
+
+# The public catalog asks for presentation overrides once per product variant.
+# Install a tiny live snapshot so one page render does not reopen SQLite dozens
+# of times; manager edits become visible again after at most one second.
+_install_order_catalog_read_cache(_order_groups)
 
 
 for _spec in _order_groups.GROUP_SPECS:
