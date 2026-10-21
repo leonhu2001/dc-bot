@@ -101,9 +101,6 @@ def _install_builtin_catalog_columns() -> None:
             dict.__setitem__(effective_rules, rule_key, normalized)
 
 
-_install_builtin_catalog_columns()
-
-
 # Public storefront presentation uses a short shared snapshot/cache so normal
 # navigation does not repeatedly rebuild the catalog or reopen SQLite. Pricing,
 # checkout and formal order creation still revalidate against authoritative
@@ -166,6 +163,10 @@ for _spec in _order_groups.GROUP_SPECS:
 
 
 del _spec, _description, _category, _key
+
+# Normalize code rules only after all storefront copy/variant adjustments above
+# have finished, otherwise the admin page could inherit stale legacy labels.
+_install_builtin_catalog_columns()
 
 # Load the established checkout module once, then attach the promotion-benefit
 # policy adapter. All public-order entry points import the same module object, so
