@@ -179,13 +179,6 @@ def _rewrite_worker_payouts(db, order: WebOrder) -> int:
 
 
 def recalculate_vip_timer_worker_payouts(order_id: int) -> int:
-    """Rebuild worker payouts from historical timer-segment participation.
-
-    Segment gross is divided only among the staff recorded on that segment. The
-    accumulated worker shares are then scaled to the canonical payout basis, so
-    the 15-minute whole-order minimum and VIP percentage discount stay aligned
-    with the existing financial policy without inventing a second billing rule.
-    """
     db = SessionLocal()
     try:
         if not _is_timer_order(int(order_id), db):
@@ -214,9 +207,10 @@ def install_vip_timer_roster_payout() -> None:
     original_promote = acceptance.promote_acceptance_claims_to_assignments
     original_recalculate = order_service.recalculate_order_payouts
 
-    def recalculate_with_timer_ledger(db, order):
-        result = original_recalculate(db, order)
-        if _is_timer_order(int(order.id), db):
+    def recalculate_with_timer_ledger(db, order_id: int):
+        result = original_recalculate(db, int(order_id))
+        order = db.get(WebOrder, int(order_id))
+        if order is not None and _is_timer_order(int(order_id), db):
             _rewrite_worker_payouts(db, order)
             db.flush()
         return result
@@ -227,8 +221,6 @@ def install_vip_timer_roster_payout() -> None:
         if order_id is None and args:
             order_id = args[0]
         if order_id is not None:
-            # Defensive second pass: callers that captured the pre-install
-            # recalculate function still end with the segment-based ledger.
             recalculate_vip_timer_worker_payouts(int(order_id))
         return promoted
 
