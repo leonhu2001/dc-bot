@@ -4,17 +4,20 @@
 # integration here lets the existing /order router keep ownership of the public
 # storefront while adding one special category without duplicating the catalog.
 from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
+from services.vip_timer_debt_guard import install_web_pending_timer_debt_guard
 from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
 from services.vip_timer_ops import (
     ensure_vip_timer_ops_tables,
     install_vip_timer_snapshot_guard,
 )
+from services.vip_timer_pause_expiry import ensure_pause_expiry_tables
 from services.vip_timer_roster_payout import install_vip_timer_roster_payout
 
 install_vip_timer_catalog_guard()
 install_vip_timer_lifecycle_guard()
 install_vip_timer_snapshot_guard()
 ensure_vip_timer_ops_tables()
+ensure_pause_expiry_tables()
 install_vip_timer_roster_payout()
 
 from services import vip_timer as _timer_service
@@ -30,6 +33,9 @@ _vip_timer_module.create_vip_timer_session = _timer_service.create_vip_timer_ses
 
 _install_vip_timer(_site)
 _install_vip_timer_safety(_vip_timer_module)
+# Install last so the guard wraps both ordinary website orders and the special
+# VIP timer creation wrapper. A pending timer payment blocks every new order.
+install_web_pending_timer_debt_guard()
 _site.router.include_router(_vip_timer_ops_router)
 
 __all__ = []
