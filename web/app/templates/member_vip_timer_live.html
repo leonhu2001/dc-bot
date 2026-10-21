@@ -15,9 +15,6 @@
         </div>
         <div class="customer-order-detail-actions">
             <a class="button button-secondary" href="/me/orders/{{ order_id }}">返回訂單</a>
-            {% if detail.order.ticket_channel_id %}
-            <a class="button button-primary" href="https://discord.com/channels/{{ request.app.state.get('guild_id', '') }}/{{ detail.order.ticket_channel_id }}" target="_blank" rel="noopener noreferrer">前往 Discord 票口</a>
-            {% endif %}
         </div>
     </div>
 
