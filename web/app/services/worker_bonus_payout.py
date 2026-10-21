@@ -61,18 +61,37 @@ def _previous_month_utc_bounds(now: datetime | None = None) -> tuple[datetime, d
     )
 
 
-def previous_month_paid_salary(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
+def previous_month_performance(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
+    """Return wages earned from orders closed in the previous Taipei month.
+
+    Performance follows the same definition as the payout-summary page: sum the
+    worker's ``final_payout`` on closed orders by the order's closing month. It
+    deliberately does not depend on payout status or ``paid_at`` so a late payroll
+    run cannot move September performance into October.
+    """
     start_at, end_at = _previous_month_utc_bounds(now)
+    order_date = func.coalesce(
+        WebOrder.closed_at,
+        WebOrder.updated_at,
+        WebOrder.created_at,
+    )
     total = db.scalar(
-        select(func.coalesce(func.sum(WorkerPayout.final_payout), 0)).where(
+        select(func.coalesce(func.sum(WorkerPayout.final_payout), 0))
+        .join(WebOrder, WebOrder.id == WorkerPayout.order_id)
+        .where(
             WorkerPayout.worker_discord_id == str(worker_discord_id),
-            WorkerPayout.payout_status == PayoutStatus.PAID.value,
-            WorkerPayout.paid_at.is_not(None),
-            WorkerPayout.paid_at >= start_at,
-            WorkerPayout.paid_at < end_at,
+            WebOrder.status == "closed",
+            func.coalesce(WorkerPayout.final_payout, 0) > 0,
+            order_date >= start_at,
+            order_date < end_at,
         )
     )
     return max(0, int(total or 0))
+
+
+def previous_month_paid_salary(db, worker_discord_id: str, *, now: datetime | None = None) -> int:
+    """Backward-compatible alias for callers that still use the old function name."""
+    return previous_month_performance(db, worker_discord_id, now=now)
 
 
 def _approved_stream_map(db, order_id: int) -> dict[str, bool]:
@@ -153,10 +172,10 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
     """Apply report-reviewed worker bonuses and then refresh CS margin share.
 
     New-policy orders use 80% base + named 3% + streamed 2% + previous-month
-    paid salary >= 5000 bonus 2%, capped at the normal 87%. A worker who had an
-    effective Web DB store binding when the order closed receives another 3%,
-    capped at 90%. Existing legacy orders retain their historical 80% + named 5%
-    rule and never receive the new store-binding bonus.
+    earned worker wages >= 5000 bonus 2%, capped at the normal 87%. A worker who
+    had an effective Web DB store binding when the order closed receives another
+    3%, capped at 90%. Existing legacy orders retain their historical 80% + named
+    5% rule and never receive the new store-binding bonus.
     """
     with SessionLocal() as db:
         order = db.get(WebOrder, int(order_id))
@@ -175,8 +194,8 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
         details: list[dict] = []
         for payout in payouts:
             worker_id = str(payout.worker_discord_id or "")
-            previous_salary = previous_month_paid_salary(db, worker_id, now=now)
-            previous_bonus = (not legacy) and previous_salary >= WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD
+            previous_performance = previous_month_performance(db, worker_id, now=now)
+            previous_bonus = (not legacy) and previous_performance >= WORKER_PREVIOUS_MONTH_SALARY_THRESHOLD
             stream_override = stream_override_map.get(worker_id)
             streamed = _effective_stream_bonus(
                 legacy=legacy,
@@ -215,9 +234,9 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                     f"分潤：基礎80%"
                     + (f"＋掛名{5 if legacy else 3}%" if named else "")
                     + ("＋直播2%" if streamed else "")
-                    + ("＋前月已結算薪資達5000T 2%" if previous_bonus else "")
+                    + ("＋前月業績達5000T 2%" if previous_bonus else "")
                     + ("＋綁店3%" if store_bound else "")
-                    + f"｜前月已結算薪資 {previous_salary}T"
+                    + f"｜前月業績 {previous_performance}T"
                 )
 
             details.append({
@@ -226,7 +245,8 @@ def apply_approved_report_worker_bonuses(order_id: int, *, now: datetime | None 
                 "streamed": streamed,
                 "stream_bonus_override": stream_override,
                 "named": named,
-                "previous_month_paid_salary": previous_salary,
+                "previous_month_performance": previous_performance,
+                "previous_month_paid_salary": previous_performance,
                 "previous_month_bonus": previous_bonus,
                 "store_bound_at_close": store_bound,
                 "locked": locked,
