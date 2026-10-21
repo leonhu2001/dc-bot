@@ -115,6 +115,29 @@ def test_segment_roster_payout_follows_actual_participation(tmp_path, monkeypatc
         db.close()
 
 
+def test_payout_install_preserves_order_service_recalc_signature(monkeypatch):
+    from shared import order_acceptance as acceptance
+    from web.app.services import order_service
+
+    calls: list[int] = []
+
+    def original_recalc(db, order_id: int):
+        calls.append(int(order_id))
+
+    monkeypatch.setattr(payout, "_INSTALLED", False)
+    monkeypatch.setattr(order_service, "recalculate_order_payouts", original_recalc)
+    monkeypatch.setattr(acceptance, "promote_acceptance_claims_to_assignments", lambda *a, **k: 0)
+    monkeypatch.setattr(payout, "_is_timer_order", lambda order_id, db: False)
+
+    class DummyDb:
+        def get(self, model, order_id):
+            return None
+
+    payout.install_vip_timer_roster_payout()
+    order_service.recalculate_order_payouts(DummyDb(), 123)
+    assert calls == [123]
+
+
 def test_roster_runtime_has_persistent_adjust_button_and_fast_ack_source():
     source = open("services/vip_timer_roster_runtime.py", encoding="utf-8").read()
     assert 'custom_id="vip_timer:roster"' in source
