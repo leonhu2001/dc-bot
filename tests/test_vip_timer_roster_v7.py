@@ -12,15 +12,46 @@ from shared.db import Base
 from shared.models import WebOrder, WorkerPayout
 
 
-def test_variable_roster_bounds_and_fixed_rule():
-    variable = SimpleNamespace(
-        required_staff_count="player_count",
-        min_player_count=1,
-        max_player_count=4,
+def test_fixed_headcount_variants_can_resolve_adjacent_package(monkeypatch):
+    rules = {
+        "single": SimpleNamespace(required_staff_count=1, label="娛樂單陪"),
+        "double": SimpleNamespace(required_staff_count=2, label="娛樂雙陪"),
+        "triple": SimpleNamespace(required_staff_count=3, label="娛樂三陪"),
+    }
+    group = {
+        "label": "娛樂",
+        "details": [
+            {"rule_key": "single", "value": "s", "vip_timer_service_type": "單陪"},
+            {"rule_key": "double", "value": "d", "vip_timer_service_type": "雙陪"},
+            {"rule_key": "triple", "value": "t", "vip_timer_service_type": "三陪"},
+        ],
+    }
+    monkeypatch.setattr(roster, "ORDER_RULES", rules)
+    monkeypatch.setattr(
+        roster,
+        "_current_gameplay_group",
+        lambda rule_key, current_count: ("三角洲端遊", group),
     )
-    fixed = SimpleNamespace(required_staff_count=2)
-    assert roster._rule_count_bounds(variable) == (1, 4)
-    assert roster._rule_count_bounds(fixed) == (2, 2)
+
+    target = roster._target_variant("single", 1, 2)
+    assert target is not None
+    assert target["rule_key"] == "double"
+    assert target["service_type"] == "雙陪"
+    assert roster._supported_counts("single", 1) == [1, 2, 3]
+
+
+def test_player_count_detail_uses_selected_variant_count(monkeypatch):
+    monkeypatch.setattr(
+        roster,
+        "ORDER_RULES",
+        {
+            "dynamic": SimpleNamespace(
+                required_staff_count="player_count",
+                min_player_count=1,
+            )
+        },
+    )
+    assert roster._detail_staff_count({"rule_key": "dynamic", "player_count": 4}) == 4
 
 
 def test_scaled_integer_worker_shares_sum_to_canonical_payout_base():
@@ -153,8 +184,16 @@ def test_roster_runtime_has_persistent_adjust_button_and_fast_ack_source():
     assert source.index("await interaction.response.defer()") < source.index("result = adjust_roster(")
 
 
-def test_roster_changes_close_old_segment_and_zero_pending_rate_source():
+def test_roster_changes_close_old_segment_and_switch_pending_rule_source():
     source = open("services/vip_timer_roster.py", encoding="utf-8").read()
     assert "ended_at=:now" in source
     assert "current_hourly_rate=0" in source
     assert "resume_after_roster_change" in source
+    assert "target_rule_key" in source
+    assert "_target_variant" in source
+
+
+def test_web_process_installs_timer_roster_payout_guard():
+    source = open("web/app/routers/__init__.py", encoding="utf-8").read()
+    assert "install_vip_timer_roster_payout" in source
+    assert "install_vip_timer_roster_payout()" in source
