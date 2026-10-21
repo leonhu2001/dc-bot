@@ -227,14 +227,34 @@ async def _monitor_loop(bot) -> None:
 
 
 def install_vip_timer_monitor(bot_instance) -> None:
-    if getattr(bot_instance, "_vip_timer_monitor_task", None) is not None:
+    if getattr(bot_instance, "_vip_timer_monitor_installed", False):
         return
     ensure_vip_timer_ops_tables()
+    bot_instance._vip_timer_monitor_installed = True
+
+    async def ensure_monitor_started() -> None:
+        existing = getattr(bot_instance, "_vip_timer_monitor_task", None)
+        if existing is not None and not existing.done():
+            return
+        bot_instance._vip_timer_monitor_task = asyncio.create_task(
+            _monitor_loop(bot_instance),
+            name="vip-timer-monitor",
+        )
+
+    # Acceptance configuration is performed while bot.py is imported, before
+    # discord.py starts its event loop. Registering on_ready makes startup
+    # deterministic instead of silently losing the background monitor.
+    add_listener = getattr(bot_instance, "add_listener", None)
+    if callable(add_listener):
+        add_listener(ensure_monitor_started, "on_ready")
+
+    # Also cover hot-reload/test situations where configuration happens after
+    # the client is already ready and a running event loop exists.
     try:
-        task = asyncio.create_task(_monitor_loop(bot_instance), name="vip-timer-monitor")
-    except RuntimeError:
-        return
-    bot_instance._vip_timer_monitor_task = task
+        if bool(bot_instance.is_ready()):
+            asyncio.get_running_loop().create_task(ensure_monitor_started())
+    except (AttributeError, RuntimeError):
+        pass
 
 
 __all__ = ["install_vip_timer_monitor"]
