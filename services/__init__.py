@@ -10,6 +10,15 @@ from . import order_rules as _order_rules
 
 _order_rules.validate_rules()
 
+# Register system-owned catalog extensions before the remaining runtime wrappers are
+# installed. The extension injects its rules before services.orders builds label maps,
+# then adds the matching storefront groups for desktop and mobile Delta Force.
+from .one_companion_one_guard_catalog import (
+    install_one_companion_one_guard_catalog as _install_one_companion_one_guard_catalog,
+)
+
+_install_one_companion_one_guard_catalog()
+
 # Keep coupon reservation / release / redemption and the VIP monthly entitlement
 # policy centralized for both Discord and Web entry points.
 from .benefit_runtime_integration import install_root_benefit_integrations as _install_benefits
