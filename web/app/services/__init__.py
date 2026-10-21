@@ -7,8 +7,12 @@ root services package and install the centralized promotion-benefit adapter.
 from __future__ import annotations
 
 from . import order_groups as _order_groups
+from . import staff_service as _staff_service
 from .order_catalog_read_cache import (
     install_order_catalog_read_cache as _install_order_catalog_read_cache,
+)
+from .public_staff_refresh import (
+    install_nonblocking_public_staff_refresh as _install_public_staff_refresh,
 )
 
 
@@ -16,6 +20,11 @@ from .order_catalog_read_cache import (
 # Install a tiny live snapshot so one page render does not reopen SQLite dozens
 # of times; manager edits become visible again after at most one second.
 _install_order_catalog_read_cache(_order_groups)
+
+# Public pages should never wait for a full Discord guild-member sync. The last
+# successful DB snapshot is rendered immediately while stale data is refreshed
+# by one coalesced background worker.
+_install_public_staff_refresh(_staff_service)
 
 
 for _spec in _order_groups.GROUP_SPECS:
