@@ -162,5 +162,6 @@ def test_payout_summary_template_exposes_report_lock_state():
 
     source = (Path(__file__).resolve().parents[1] / "web/app/templates/admin_payout_summary.html").read_text(encoding="utf-8")
     assert "報單鎖定" in source
-    assert "已發放（鎖定）" in source
+    assert "待報單" in source
+    assert "已發放（鎖定）" not in source
     assert "item.status_label" in source
