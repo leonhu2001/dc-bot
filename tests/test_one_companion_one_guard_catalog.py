@@ -20,8 +20,8 @@ def test_one_companion_one_guard_prices_and_staffing():
     expected = {
         DESKTOP_SECRET: (720, "delta_desktop_basic", "delta_desktop"),
         DESKTOP_TOPSECRET: (770, "delta_desktop_basic", "delta_desktop"),
-        MOBILE_SECRET: (720, "delta_mobile_basic", "delta_mobile"),
-        MOBILE_TOPSECRET: (770, "delta_mobile_basic", "delta_mobile"),
+        MOBILE_SECRET: (700, "delta_mobile_basic", "delta_mobile"),
+        MOBILE_TOPSECRET: (740, "delta_mobile_basic", "delta_mobile"),
     }
 
     for key, (price, category, game_role) in expected.items():
@@ -63,7 +63,7 @@ def test_one_companion_one_guard_requires_matching_delta_platform_role():
     )
 
 
-def test_one_companion_one_guard_requires_exactly_one_protector_slot():
+def test_one_companion_one_guard_allows_two_protectors():
     expected_rule_keys = {
         DESKTOP_SECRET,
         DESKTOP_TOPSECRET,
@@ -71,7 +71,9 @@ def test_one_companion_one_guard_requires_exactly_one_protector_slot():
         MOBILE_TOPSECRET,
     }
 
-    assert expected_rule_keys <= EXACT_ONE_PROTECTOR_RULE_KEYS
+    # These products require at least one protector but intentionally do not
+    # enforce the old fun-order exact-one-protector rule, so 護+護 remains valid.
+    assert expected_rule_keys.isdisjoint(EXACT_ONE_PROTECTOR_RULE_KEYS)
 
 
 def test_one_companion_one_guard_catalog_has_clear_difficulty_choices():
