@@ -1,7 +1,9 @@
 name: Targeted VIP AW V4
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - ci-vip-aw-v4-20261022
 
 jobs:
   targeted:
