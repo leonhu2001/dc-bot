@@ -57,12 +57,16 @@ def _assignment_role_type_from_role_ids(
         return "companion"
     return "booster"
 
-# These two-person fun orders must end with exactly one protector-level
+# These two-person composition orders must end with exactly one protector-level
 # staff member and one companion-only staff member. A member who has both
 # a companion role and any protector role is counted as protector-level.
 EXACT_ONE_PROTECTOR_RULE_KEYS = {
     "fun_lovebirds",
     "fun_read_no_reply",
+    "basic_one_companion_one_guard_secret",
+    "basic_one_companion_one_guard_topsecret",
+    "basic_mobile_one_companion_one_guard_secret",
+    "basic_mobile_one_companion_one_guard_topsecret",
 }
 
 
