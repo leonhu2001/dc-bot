@@ -11,9 +11,9 @@ from starlette.concurrency import run_in_threadpool
 from web.app.routers.admin_common import require_admin_user
 from web.app.services.lottery_admin import (
     build_lottery_admin_snapshot,
-    draw_free_giveaway,
-    publish_free_giveaway,
-    save_lottery_settings,
+    draw_campaign,
+    publish_campaign,
+    save_campaign_draft,
 )
 
 
@@ -37,11 +37,7 @@ def _actor_id(user: dict) -> str:
 
 
 @router.get("/admin/lottery")
-async def admin_lottery(
-    request: Request,
-    message: str = "",
-    error: str = "",
-):
+async def admin_lottery(request: Request, message: str = "", error: str = ""):
     user = require_admin_user(request)
     if not user:
         return RedirectResponse(url="/service", status_code=303)
@@ -60,94 +56,76 @@ async def admin_lottery(
     )
 
 
-@router.post("/admin/lottery/free/publish")
-async def admin_publish_free_giveaway(
+@router.post("/admin/lottery/draft")
+async def admin_save_lottery_draft(
     request: Request,
-    prize: str = Form(...),
+    title: str = Form(...),
     description: str = Form(default=""),
+    template_id: list[int] = Form(...),
+    winner_count: list[int] = Form(...),
 ):
     user = require_admin_user(request)
     if not user:
         return RedirectResponse(url="/service", status_code=303)
-
     try:
-        result = await run_in_threadpool(
-            publish_free_giveaway,
-            prize=prize,
+        campaign = await run_in_threadpool(
+            save_campaign_draft,
+            title=title,
             description=description,
+            template_ids=[int(value) for value in template_id],
+            winner_counts=[int(value) for value in winner_count],
             actor_discord_id=_actor_id(user),
         )
     except (ValueError, TypeError) as exc:
         return _redirect(error=str(exc))
     except Exception as exc:
-        return _redirect(error=f"發送抽獎報名訊息失敗：{exc}")
-
-    return _redirect(
-        message=f"免費抽獎已送到抽獎頻道，訊息 ID：{result['message_id']}。"
-    )
+        return _redirect(error=f"儲存抽獎設定失敗：{exc}")
+    return _redirect(message=f"抽獎設定已儲存，共 {len(campaign['prizes'])} 個獎項。")
 
 
-@router.post("/admin/lottery/free/draw")
-async def admin_draw_free_giveaway(
+@router.post("/admin/lottery/publish")
+async def admin_publish_lottery(request: Request):
+    user = require_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/service", status_code=303)
+    try:
+        campaign = await run_in_threadpool(
+            publish_campaign,
+            actor_discord_id=_actor_id(user),
+        )
+    except (ValueError, TypeError) as exc:
+        return _redirect(error=str(exc))
+    except Exception as exc:
+        return _redirect(error=f"發布抽獎失敗：{exc}")
+    return _redirect(message=f"抽獎已發布到指定頻道，訊息 ID：{campaign['message_id']}。")
+
+
+@router.post("/admin/lottery/draw")
+async def admin_draw_lottery(
     request: Request,
-    winners: int = Form(default=1),
+    prize_id: int = Form(default=0),
 ):
     user = require_admin_user(request)
     if not user:
         return RedirectResponse(url="/service", status_code=303)
-
     try:
         result = await run_in_threadpool(
-            draw_free_giveaway,
-            winners=int(winners),
+            draw_campaign,
             actor_discord_id=_actor_id(user),
+            prize_id=(int(prize_id) or None),
         )
     except (ValueError, TypeError) as exc:
         return _redirect(error=str(exc))
     except Exception as exc:
-        return _redirect(error=f"免費抽獎開獎失敗：{exc}")
+        return _redirect(error=f"開獎失敗：{exc}")
 
+    winner_total = sum(len(row["winner_ids"]) for row in result["results"])
     return _redirect(
         message=(
-            f"免費抽獎已開獎並公布到抽獎頻道："
-            f"{result['participant_count']} 人參加，"
-            f"抽出 {result['winner_count']} 人。"
+            f"開獎完成：{result['participant_count']} 人參加，"
+            f"本次共抽出 {winner_total} 位，福利券已自動發放。"
         )
     )
-
-
-@router.post("/admin/lottery/settings")
-async def admin_lottery_settings(
-    request: Request,
-    period: str = Form(...),
-    title: str = Form(...),
-    prizes: str = Form(default=""),
-    note: str = Form(default=""),
-    status: str = Form(default="open"),
-    cost_per_chance: int = Form(default=5),
-    max_chances_per_user: int = Form(default=20),
-):
-    user = require_admin_user(request)
-    if not user:
-        return RedirectResponse(url="/service", status_code=303)
-
-    try:
-        await run_in_threadpool(
-            save_lottery_settings,
-            period=period,
-            title=title,
-            prizes=prizes,
-            note=note,
-            status=status,
-            cost_per_chance=int(cost_per_chance),
-            max_chances_per_user=int(max_chances_per_user),
-        )
-    except (ValueError, TypeError) as exc:
-        return _redirect(error=str(exc))
-    except Exception as exc:
-        return _redirect(error=f"儲存抽獎設定失敗：{type(exc).__name__}")
-
-    return _redirect(message="點數抽獎設定已更新。")
 
 
 __all__ = ["router"]
