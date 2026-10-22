@@ -11,7 +11,6 @@ from services.vip_timer_self_service import install_vip_timer_self_service
 from services.quick_order_v2 import install_quick_order_v2
 from services.quick_order_v2_fixes import install_quick_order_v2_fixes
 from services.quick_order_v2_production import install_quick_order_v2_production
-from services.main_service_panel_runtime import install_main_service_panel_sync
 from services.order_ticket_name_runtime import install_order_ticket_name_sync
 from views.panels import MainPanelView, build_main_panel_embed
 from views.topups import TopupPanelView
@@ -35,7 +34,6 @@ class SetupCommands(commands.Cog):
         install_quick_order_v2_fixes(bot)
         install_quick_order_v2(bot)
         install_quick_order_v2_production(bot)
-        install_main_service_panel_sync(bot)
         install_order_ticket_name_sync(bot)
 
         if not getattr(
