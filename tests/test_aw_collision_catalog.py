@@ -8,6 +8,7 @@ from services.aw_collision_catalog import (
     aw_collision_original_amount,
     validate_aw_quantity_for_rule,
 )
+from services.order_credential_runtime import OrderCredentialModal
 from services.order_rules import ORDER_RULES, calculate_price
 
 
@@ -66,3 +67,5 @@ def test_aw_rules_require_one_delta_worker_and_no_specify():
 
 def test_credential_hint_mentions_safe_box_slots():
     assert "安全箱格數" in CREDENTIAL_NOTE_PLACEHOLDER
+    modal = OrderCredentialModal(order_channel_id=123)
+    assert "安全箱格數" in str(modal.login_note.placeholder or "")
