@@ -9,6 +9,7 @@ from services.topup_runtime import ensure_topup_credit_worker_started
 from services.payment_review_runtime import ensure_payment_review_worker_started
 from services.vip_timer_self_service import install_vip_timer_self_service
 from services.quick_order_v2 import install_quick_order_v2
+from services.quick_order_v2_fixes import install_quick_order_v2_fixes
 from views.panels import MainPanelView
 from views.topups import TopupPanelView
 from views.staff_management import (
@@ -28,6 +29,7 @@ class SetupCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         install_vip_timer_self_service()
+        install_quick_order_v2_fixes(bot)
         install_quick_order_v2(bot)
 
         if not getattr(
