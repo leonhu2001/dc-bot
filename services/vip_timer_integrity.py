@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from functools import wraps
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import inspect, or_, select, text
 
@@ -12,6 +12,13 @@ from shared.models import WebOrder
 
 
 _INSTALLED = False
+_ACCOUNTING_INSTALLED = False
+_TIMER_WORKER_ISSUE_CODES = {
+    "worker_payout_missing",
+    "worker_payout_duplicate",
+    "worker_payout_amount_mismatch",
+    "worker_payout_without_assignment",
+}
 
 # All known VIP timer tables that are keyed by order_id. Child/history tables are
 # intentionally deleted before the session row so this remains safe if foreign
@@ -217,6 +224,102 @@ def _resolve_web_order_id(*, ticket_channel_id=None, dispatch_message_id=None) -
         db.close()
 
 
+def _provably_normal_timer_session_order_ids(web) -> set[int]:
+    """Return closed orders whose session row is stale, not timer identity.
+
+    This intentionally excludes structural-only historical rows. Those remain
+    ambiguous and should not be silently reinterpreted in either direction.
+    """
+    try:
+        rows = web.execute(
+            """
+            SELECT
+                s.order_id,
+                o.category,
+                o.item,
+                o.note,
+                o.price_snapshot_json
+            FROM vip_timer_sessions AS s
+            JOIN web_orders AS o ON o.id = s.order_id
+            WHERE LOWER(COALESCE(o.status, '')) = 'closed'
+            """
+        ).fetchall()
+    except Exception:
+        return set()
+
+    result: set[int] = set()
+    for row in rows:
+        payload = dict(row)
+        marker_present, structural_signal = _vip_timer_identity_parts(payload)
+        if structural_signal:
+            continue
+        # No timer structure means the WebOrder is demonstrably an ordinary
+        # order. This also covers marker-only residue on a repurposed row.
+        _ = marker_present
+        try:
+            result.add(int(payload.get("order_id") or 0))
+        except (TypeError, ValueError):
+            continue
+    result.discard(0)
+    return result
+
+
+def _restore_generic_worker_issues_for_noncanonical_timers(
+    web,
+    issues: list[dict[str, Any]],
+    generic_checker: Callable[[Any, list[dict[str, Any]]], None],
+) -> None:
+    stale_ids = _provably_normal_timer_session_order_ids(web)
+    if not stale_ids:
+        return
+
+    generic_issues: list[dict[str, Any]] = []
+    generic_checker(web, generic_issues)
+    existing = {
+        (
+            int(item.get("order_id") or 0),
+            str(item.get("code") or ""),
+            str(item.get("detail") or ""),
+        )
+        for item in issues
+    }
+    for item in generic_issues:
+        order_id = int(item.get("order_id") or 0)
+        code = str(item.get("code") or "")
+        if order_id not in stale_ids or code not in _TIMER_WORKER_ISSUE_CODES:
+            continue
+        identity = (order_id, code, str(item.get("detail") or ""))
+        if identity in existing:
+            continue
+        issues.append(item)
+        existing.add(identity)
+
+
+def install_vip_timer_accounting_integrity_guard(
+    generic_checker: Callable[[Any, list[dict[str, Any]]], None],
+) -> None:
+    """Ensure stale timer rows can never suppress ordinary payout diagnostics."""
+    global _ACCOUNTING_INSTALLED
+    if _ACCOUNTING_INSTALLED:
+        return
+
+    from web.app.services import accounting_reconciliation as reconciliation
+
+    timer_aware_checker = reconciliation._check_payouts
+
+    @wraps(timer_aware_checker)
+    def checked(web, issues):
+        timer_aware_checker(web, issues)
+        _restore_generic_worker_issues_for_noncanonical_timers(
+            web,
+            issues,
+            generic_checker,
+        )
+
+    reconciliation._check_payouts = checked
+    _ACCOUNTING_INSTALLED = True
+
+
 def install_vip_timer_integrity_guard() -> None:
     """Install cross-process guards without changing timer business logic."""
     global _INSTALLED
@@ -261,6 +364,7 @@ def install_vip_timer_integrity_guard() -> None:
 __all__ = [
     "cleanup_stale_vip_timer_rows",
     "delete_vip_timer_rows",
+    "install_vip_timer_accounting_integrity_guard",
     "install_vip_timer_integrity_guard",
     "is_canonical_vip_timer_order",
     "web_order_has_vip_timer_identity",
