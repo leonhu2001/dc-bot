@@ -252,6 +252,13 @@ def install_vip_timer_roster_payout() -> None:
 
     def recalculate_with_timer_ledger(db, order_id: int):
         result = original_recalculate(db, int(order_id))
+
+        # SessionLocal has autoflush disabled. The generic recalculation above
+        # creates replacement WorkerPayout rows in session.new; flush them before
+        # the timer-ledger rewrite so its bulk DELETE can actually see/remove
+        # that first generation instead of committing both generations together.
+        db.flush()
+
         order = db.get(WebOrder, int(order_id))
         if order is not None and _is_timer_order(int(order_id), db):
             _rewrite_worker_payouts(db, order)
@@ -259,13 +266,11 @@ def install_vip_timer_roster_payout() -> None:
         return result
 
     def promote_with_timer_ledger(*args, **kwargs):
-        promoted = original_promote(*args, **kwargs)
-        order_id = kwargs.get("order_id")
-        if order_id is None and args:
-            order_id = args[0]
-        if order_id is not None:
-            recalculate_vip_timer_worker_payouts(int(order_id))
-        return promoted
+        # original_promote dynamically imports order_service.recalculate_order_payouts,
+        # which is replaced by recalculate_with_timer_ledger below. A second
+        # SessionLocal recalculation here used to rebuild the same payout again
+        # after payment promotion and was redundant/race-prone.
+        return original_promote(*args, **kwargs)
 
     order_service.recalculate_order_payouts = recalculate_with_timer_ledger
     acceptance.promote_acceptance_claims_to_assignments = promote_with_timer_ledger
