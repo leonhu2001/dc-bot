@@ -63,7 +63,6 @@ jobs:
             scripts
 
       - name: Audit templates and static references
-        continue-on-error: true
         run: |
           python tools/audit_templates.py
 
@@ -80,9 +79,9 @@ jobs:
         run: |
           python -m pytest -q tests/golden
 
-      - name: Run VIP timer payout regression
+      - name: Run regression suite
         run: |
-          python -m pytest -q tests/test_vip_timer_roster_v7.py
+          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
 
       - name: Install Chromium for browser tests
         run: |
