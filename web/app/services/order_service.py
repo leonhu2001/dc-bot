@@ -535,16 +535,34 @@ def recalculate_order_payouts(db: Session, order_id: int) -> None:
         if assignment.has_named_bonus
     ]
 
-    payout_result = calculate_order_payout(
-        total_amount=int(
-            getattr(order, "payout_base_amount", None)
-            or order.amount
-            or 0
-        ),
-        worker_discord_ids=worker_ids,
-        named_bonus_worker_ids=named_bonus_worker_ids,
-        customer_service_total_amount=_customer_service_payout_base(order),
+    payout_base_amount = int(
+        getattr(order, "payout_base_amount", None)
+        or order.amount
+        or 0
     )
+    customer_service_base = _customer_service_payout_base(order)
+
+    from services.one_companion_one_guard_payout import (
+        calculate_one_companion_one_guard_order_payout,
+    )
+
+    payout_result = calculate_one_companion_one_guard_order_payout(
+        rule_key=getattr(order, "order_rule_key", None),
+        total_amount=payout_base_amount,
+        worker_roles=[
+            (assignment.worker_discord_id, assignment.role_type)
+            for assignment in assignments
+        ],
+        named_bonus_worker_ids=named_bonus_worker_ids,
+        customer_service_total_amount=customer_service_base,
+    )
+    if payout_result is None:
+        payout_result = calculate_order_payout(
+            total_amount=payout_base_amount,
+            worker_discord_ids=worker_ids,
+            named_bonus_worker_ids=named_bonus_worker_ids,
+            customer_service_total_amount=customer_service_base,
+        )
 
     overrides = {
         override.worker_discord_id: override
