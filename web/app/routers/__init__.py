@@ -4,6 +4,7 @@
 # integration here lets the existing /order router keep ownership of the public
 # storefront while adding one special category without duplicating the catalog.
 from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
+from services.vip_timer_integrity import cleanup_stale_vip_timer_rows
 from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
 from services.vip_timer_ops import (
     ensure_vip_timer_ops_tables,
@@ -16,6 +17,13 @@ install_vip_timer_catalog_guard()
 install_vip_timer_lifecycle_guard()
 install_vip_timer_snapshot_guard()
 ensure_vip_timer_ops_tables()
+_stale_timer_order_ids = cleanup_stale_vip_timer_rows()
+if _stale_timer_order_ids:
+    print(
+        "[vip-timer-integrity] removed stale timer metadata for order_ids="
+        + ",".join(str(order_id) for order_id in _stale_timer_order_ids),
+        flush=True,
+    )
 install_vip_timer_roster_payout()
 # Patch the canonical public-order creation service before any request handler
 # imports it locally. A pending VIP timer payment blocks every new website order.
