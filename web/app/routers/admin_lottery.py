@@ -11,6 +11,8 @@ from starlette.concurrency import run_in_threadpool
 from web.app.routers.admin_common import require_admin_user
 from web.app.services.lottery_admin import (
     build_lottery_admin_snapshot,
+    draw_free_giveaway,
+    publish_free_giveaway,
     save_lottery_settings,
 )
 
@@ -28,6 +30,10 @@ def _redirect(*, message: str = "", error: str = "") -> RedirectResponse:
         params["error"] = error
     query = "?" + urlencode(params) if params else ""
     return RedirectResponse(url="/admin/lottery" + query, status_code=303)
+
+
+def _actor_id(user: dict) -> str:
+    return str(user.get("id") or "").strip()
 
 
 @router.get("/admin/lottery")
@@ -51,6 +57,62 @@ async def admin_lottery(
             "message": str(message or ""),
             "error": str(error or ""),
         },
+    )
+
+
+@router.post("/admin/lottery/free/publish")
+async def admin_publish_free_giveaway(
+    request: Request,
+    prize: str = Form(...),
+    description: str = Form(default=""),
+):
+    user = require_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/service", status_code=303)
+
+    try:
+        result = await run_in_threadpool(
+            publish_free_giveaway,
+            prize=prize,
+            description=description,
+            actor_discord_id=_actor_id(user),
+        )
+    except (ValueError, TypeError) as exc:
+        return _redirect(error=str(exc))
+    except Exception as exc:
+        return _redirect(error=f"發送抽獎報名訊息失敗：{exc}")
+
+    return _redirect(
+        message=f"免費抽獎已送到抽獎頻道，訊息 ID：{result['message_id']}。"
+    )
+
+
+@router.post("/admin/lottery/free/draw")
+async def admin_draw_free_giveaway(
+    request: Request,
+    winners: int = Form(default=1),
+):
+    user = require_admin_user(request)
+    if not user:
+        return RedirectResponse(url="/service", status_code=303)
+
+    try:
+        result = await run_in_threadpool(
+            draw_free_giveaway,
+            winners=int(winners),
+            actor_discord_id=_actor_id(user),
+        )
+    except (ValueError, TypeError) as exc:
+        return _redirect(error=str(exc))
+    except Exception as exc:
+        return _redirect(error=f"免費抽獎開獎失敗：{exc}")
+
+    return _redirect(
+        message=(
+            f"免費抽獎已開獎並公布到抽獎頻道："
+            f"{result['participant_count']} 人參加，"
+            f"抽出 {result['winner_count']} 人。"
+        )
     )
 
 
