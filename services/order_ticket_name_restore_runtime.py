@@ -84,11 +84,13 @@ async def restore_unintentionally_simplified_order_ticket_names(
         display_name = None
         if member is None and isinstance(data, dict):
             display_name = str(data.get("customer_display_name") or "").strip() or None
+        if member is None and display_name is None:
+            display_name = str(customer_id)
 
         new_name = build_ticket_channel_name(
             prefix,
             member,
-            display_name=display_name or str(customer_id),
+            display_name=display_name,
         )
         if channel.name == new_name:
             continue
