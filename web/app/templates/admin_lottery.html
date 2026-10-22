@@ -7,7 +7,7 @@
 <script src="/static/js/csrf.js?v=1"></script>
 <title>{{ title }}</title>
 <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
-<link rel="stylesheet" href="/static/css/pages/admin_lottery_20261023.css?v=1">
+<link rel="stylesheet" href="/static/css/pages/admin_lottery_20261023.css?v=2">
 </head>
 <body class="mw-r5-admin">
 <div class="mw-r5-shell">
@@ -16,7 +16,7 @@
         <header class="mw-r5-page-header">
             <div class="mw-r5-kicker">LOTTERY OPERATIONS</div>
             <h1>抽獎管理</h1>
-            <p>免費反應抽獎與點數抽獎集中管理；俄羅斯輪盤仍屬於趣味單，不與一般活動抽獎混在一起。</p>
+            <p>免費反應抽獎與點數抽獎集中管理；客服直接從後台發送報名與開獎，不需要再輸入 Discord 指令。</p>
         </header>
         {% include "_admin_backbar.html" %}
 
@@ -28,15 +28,49 @@
                 <article class="lottery-mode-card">
                     <div class="lottery-mode-head">
                         <div><small>DISCORD GIVEAWAY</small><h2>免費反應抽獎</h2></div>
-                        <span class="lottery-badge">每人 1 次</span>
+                        {% if snapshot.free_event %}
+                        <span class="lottery-badge open">報名中{% if snapshot.free_participant_count is not none %} · {{ snapshot.free_participant_count }} 人{% endif %}</span>
+                        {% else %}
+                        <span class="lottery-badge">待建立</span>
+                        {% endif %}
                     </div>
-                    <p>顧客在 Discord 抽獎訊息按 🎉 參加，不消耗點數。客服與管理都可操作。</p>
-                    <div class="lottery-command-list">
-                        <code>/lottery panel</code><span>建立抽獎面板</span>
-                        <code>/lottery status</code><span>查看目前參加人數</span>
-                        <code>/lottery draw</code><span>抽出得獎者</span>
+                    <p>按「發送報名抽獎」後，Bot 會直接在抽獎頻道發布 🎉 報名訊息；開獎時由後台讀取該訊息的參加名單並公布結果。</p>
+
+                    {% if snapshot.free_event %}
+                    <div class="lottery-free-current">
+                        <small>目前進行中</small>
+                        <strong>{{ snapshot.free_event.prize }}</strong>
+                        {% if snapshot.free_event.description %}<p>{{ snapshot.free_event.description }}</p>{% endif %}
+                        <div class="lottery-free-meta">
+                            <span>訊息 ID：{{ snapshot.free_event.message_id }}</span>
+                            <span>參加人數：{% if snapshot.free_participant_count is not none %}{{ snapshot.free_participant_count }} 人{% else %}讀取失敗{% endif %}</span>
+                            {% if snapshot.free_event.message_url %}<a href="{{ snapshot.free_event.message_url }}" target="_blank" rel="noopener">查看 Discord 抽獎訊息 →</a>{% endif %}
+                        </div>
+                        {% if snapshot.free_participant_error %}<div class="lottery-inline-warning">目前無法讀取即時參加人數，但不會清除這場抽獎。</div>{% endif %}
                     </div>
-                    <div class="lottery-mini-stat">歷史開獎 {{ snapshot.free_draws | length }} 筆</div>
+
+                    <form class="lottery-free-draw-form" method="post" action="/admin/lottery/free/draw">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <label>得獎人數
+                            <input type="number" name="winners" value="1" min="1" max="50" required>
+                        </label>
+                        <button type="submit">開獎</button>
+                    </form>
+                    <div class="lottery-action-hint">開獎後會直接在抽獎頻道公布得獎者，並結束本場報名。</div>
+                    {% else %}
+                    <form class="lottery-free-publish-form" method="post" action="/admin/lottery/free/publish">
+                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                        <label>抽獎獎品
+                            <input name="prize" maxlength="300" placeholder="例：200T 代金券 × 1" required>
+                        </label>
+                        <label>活動說明
+                            <textarea name="description" rows="3" maxlength="1000" placeholder="可不填，例如：截止時間、使用限制"></textarea>
+                        </label>
+                        <button type="submit">發送報名抽獎</button>
+                    </form>
+                    <div class="lottery-action-hint">同一時間只保留一場免費抽獎；開獎完成後才可建立下一場。</div>
+                    {% endif %}
+                    <div class="lottery-mini-stat">歷史中獎紀錄 {{ snapshot.free_draws | length }} 筆</div>
                 </article>
 
                 <article class="lottery-mode-card accent">
