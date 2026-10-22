@@ -25,6 +25,14 @@ from .aw_collision_catalog import install_aw_collision_catalog as _install_aw_co
 
 _install_aw_collision_catalog()
 
+# AW is a pass-through service: no member/point discounts or specification,
+# optional CSR internal pricing, and 100% of the payout basis to the worker.
+from .aw_collision_business_policy import (
+    install_aw_collision_business_policy as _install_aw_collision_business_policy,
+)
+
+_install_aw_collision_business_policy()
+
 # The legacy Black Diamond monthly free-choice benefit has been retired. Install
 # this before monthly-benefit integration so both Web and Discord read the same
 # current entitlement source while historical benefit rows remain auditable.
