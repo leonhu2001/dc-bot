@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR
 import json
 
-from sqlalchemy import select, text
+from sqlalchemy import inspect, select, text
 
 from shared.db import SessionLocal
 from shared.models import (
@@ -73,10 +73,23 @@ def _staff_role_types(order_id: int, db) -> dict[str, str]:
 
 
 def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
+    # Early VIP-timer installations (and historical test fixtures) predate the
+    # rule_key column. Keep those ledgers readable: without a rule key they use
+    # the original equal-per-staff split, while current ledgers can still apply
+    # rule-aware weighting such as one-companion-one-guard.
+    try:
+        segment_columns = {
+            str(column.get("name") or "")
+            for column in inspect(db.get_bind()).get_columns("vip_timer_segments")
+        }
+    except Exception:
+        segment_columns = set()
+    rule_key_select = "rule_key" if "rule_key" in segment_columns else "'' AS rule_key"
+
     rows = db.execute(
         text(
-            """
-            SELECT rule_key, hourly_rate, billable_seconds, staff_ids_json
+            f"""
+            SELECT {rule_key_select}, hourly_rate, billable_seconds, staff_ids_json
             FROM vip_timer_segments
             WHERE order_id=:order_id
               AND billable_seconds > 0
@@ -153,7 +166,8 @@ def _allocate_integer_shares(raw: dict[str, Decimal], target_total: int) -> dict
     return allocated
 
 
-def _rewrite_worker_payouts(db, order: WebOrder) -> int:
+def _worker_payout_plan(db, order: WebOrder) -> dict[str, dict[str, int | float | bool | str]]:
+    """Build the authoritative VIP timer worker payout plan without writing rows."""
     payout_base = max(
         0,
         int(order.payout_base_amount if order.payout_base_amount is not None else order.amount or 0),
@@ -161,9 +175,8 @@ def _rewrite_worker_payouts(db, order: WebOrder) -> int:
     raw = _raw_worker_shares(int(order.id), db)
     shares = _allocate_integer_shares(raw, payout_base)
     if not shares:
-        return 0
+        return {}
 
-    names = _staff_names(int(order.id), db)
     overrides = {
         str(row.worker_discord_id): row
         for row in db.scalars(
@@ -171,13 +184,57 @@ def _rewrite_worker_payouts(db, order: WebOrder) -> int:
         ).all()
     }
 
+    plan: dict[str, dict[str, int | float | bool | str]] = {}
+    for worker_id in sorted(shares):
+        gross_share = int(shares[worker_id])
+        base_payout = int(gross_share * WORKER_BASE_PAYOUT_RATE)
+        final_payout = base_payout
+        note = "VIP 自由計時｜依各計時區段實際參與人員與單型分潤基準分帳"
+        override = overrides.get(worker_id)
+        if override is not None:
+            final_payout = max(0, int(override.manual_final_payout or 0))
+            reason = str(override.reason or "人工覆寫")
+            note = f"{note}｜人工覆寫：{reason}"
+        plan[worker_id] = {
+            "gross_share": gross_share,
+            "base_rate": float(WORKER_BASE_PAYOUT_RATE),
+            "base_payout": base_payout,
+            "named_bonus_rate": float(WORKER_NAMED_BONUS_RATE),
+            "named_bonus_amount": 0,
+            "has_named_bonus": False,
+            "final_payout": final_payout,
+            "note": note,
+        }
+    return plan
+
+
+def get_vip_timer_worker_payout_plan(order_id: int) -> dict[str, dict[str, int | float | bool | str]]:
+    """Return the persisted-ledger payout expectation used by settlement and auditing."""
+    db = SessionLocal()
+    try:
+        if not _is_timer_order(int(order_id), db):
+            return {}
+        order = db.get(WebOrder, int(order_id))
+        if order is None:
+            return {}
+        return _worker_payout_plan(db, order)
+    finally:
+        db.close()
+
+
+def _rewrite_worker_payouts(db, order: WebOrder) -> int:
+    plan = _worker_payout_plan(db, order)
+    if not plan:
+        return 0
+
+    names = _staff_names(int(order.id), db)
     existing_assignments = {
         str(row.worker_discord_id): row
         for row in db.scalars(
             select(OrderAssignment).where(OrderAssignment.order_id == int(order.id))
         ).all()
     }
-    for worker_id in shares:
+    for worker_id in plan:
         if worker_id not in existing_assignments:
             db.add(
                 OrderAssignment(
@@ -192,33 +249,290 @@ def _rewrite_worker_payouts(db, order: WebOrder) -> int:
             )
 
     db.query(WorkerPayout).filter(WorkerPayout.order_id == int(order.id)).delete(synchronize_session=False)
-    for worker_id in sorted(shares):
-        gross_share = int(shares[worker_id])
-        base_payout = int(gross_share * WORKER_BASE_PAYOUT_RATE)
-        final_payout = base_payout
-        note = "VIP 自由計時｜依各計時區段實際參與人員與單型分潤基準分帳"
-        override = overrides.get(worker_id)
-        if override is not None:
-            final_payout = max(0, int(override.manual_final_payout or 0))
-            reason = str(override.reason or "人工覆寫")
-            note = f"{note}｜人工覆寫：{reason}"
+    for worker_id, item in plan.items():
         db.add(
             WorkerPayout(
                 order_id=int(order.id),
                 worker_discord_id=worker_id,
                 worker_display_name=names.get(worker_id),
-                gross_share=gross_share,
-                base_rate=WORKER_BASE_PAYOUT_RATE,
-                base_payout=base_payout,
-                named_bonus_rate=WORKER_NAMED_BONUS_RATE,
-                named_bonus_amount=0,
-                has_named_bonus=False,
-                final_payout=final_payout,
+                gross_share=int(item["gross_share"]),
+                base_rate=float(item["base_rate"]),
+                base_payout=int(item["base_payout"]),
+                named_bonus_rate=float(item["named_bonus_rate"]),
+                named_bonus_amount=int(item["named_bonus_amount"]),
+                has_named_bonus=bool(item["has_named_bonus"]),
+                final_payout=int(item["final_payout"]),
                 payout_status=PayoutStatus.UNPAID.value,
-                note=note,
+                note=str(item["note"]),
             )
         )
-    return len(shares)
+    return len(plan)
+
+
+def _install_accounting_integrations(recalculate_with_timer_ledger) -> None:
+    """Make reconciliation and safe repair use the same timer-ledger payout plan."""
+    try:
+        from web.app.services import accounting_reconciliation as reconciliation
+        from web.app.services import accounting_repair as repair
+    except Exception:
+        # Bot-only processes do not import the web accounting stack.
+        return
+
+    # accounting_repair imports the order-service function by value. Replace that
+    # captured reference so "安全修復" cannot bypass the timer-aware wrapper.
+    repair.recalculate_order_payouts = recalculate_with_timer_ledger
+
+    original_validate = repair._validate_recalculate_unpaid_payouts
+
+    def validate_recalculate_unpaid_payouts(db, order):
+        if not _is_timer_order(int(order.id), db):
+            return original_validate(db, order)
+
+        status = str(order.status or "").strip().lower()
+        if status not in {"active", "stored", "closed"}:
+            raise ValueError("只有 active / stored / closed 訂單可以重算未發放分潤。")
+
+        plan = _worker_payout_plan(db, order)
+        if not plan:
+            raise ValueError("這張 VIP 計時單沒有可結算的歷史計時人員，不能自動重算分潤。")
+
+        payout_base = int(
+            getattr(order, "payout_base_amount", None)
+            or getattr(order, "amount", 0)
+            or 0
+        )
+        if payout_base <= 0:
+            raise ValueError("這張訂單的分潤計算基礎金額不是正數，需人工確認。")
+
+        cs_id = str(getattr(order, "customer_service_discord_id", None) or "").strip()
+        if not cs_id or cs_id == "demo_customer_service":
+            raise ValueError("這張訂單缺少真實客服 Discord ID，不能自動重算。")
+
+        worker_rows, cs_rows = repair._load_payout_rows(db, int(order.id))
+        if not repair._all_rows_unpaid_and_clear([*worker_rows, *cs_rows]):
+            raise ValueError(
+                "這張訂單已有 paid、void、未知狀態或 paid_at 資料，禁止自動重算分潤。"
+            )
+
+    repair._validate_recalculate_unpaid_payouts = validate_recalculate_unpaid_payouts
+
+    original_check = reconciliation._check_payouts
+    worker_issue_codes = {
+        "worker_payout_missing",
+        "worker_payout_duplicate",
+        "worker_payout_amount_mismatch",
+        "worker_payout_without_assignment",
+    }
+
+    def check_payouts_with_timer_ledger(web, issues):
+        start = len(issues)
+        original_check(web, issues)
+
+        try:
+            timer_rows = web.execute(
+                """
+                SELECT s.order_id
+                FROM vip_timer_sessions AS s
+                JOIN web_orders AS o ON o.id = s.order_id
+                WHERE LOWER(COALESCE(o.status, '')) = 'closed'
+                """
+            ).fetchall()
+        except Exception:
+            return
+
+        timer_order_ids = {int(row[0]) for row in timer_rows}
+        if not timer_order_ids:
+            return
+
+        # Remove only the generic worker checks for timer orders. Customer-service
+        # checks and every non-timer issue remain untouched; timer worker checks are
+        # rebuilt immediately below from the persisted segment ledger.
+        preserved = issues[:start]
+        for issue in issues[start:]:
+            if (
+                int(issue.get("order_id") or 0) in timer_order_ids
+                and str(issue.get("code") or "") in worker_issue_codes
+            ):
+                continue
+            preserved.append(issue)
+        issues[:] = preserved
+
+        db = SessionLocal()
+        try:
+            for order_id in sorted(timer_order_ids):
+                order = db.get(WebOrder, int(order_id))
+                if order is None or not _is_timer_order(int(order_id), db):
+                    continue
+
+                expected_plan = _worker_payout_plan(db, order)
+                expected_by_worker = {
+                    worker_id: float(item["final_payout"])
+                    for worker_id, item in expected_plan.items()
+                }
+                worker_ids = list(expected_by_worker)
+
+                worker_payouts = [
+                    dict(row)
+                    for row in web.execute(
+                        """
+                        SELECT
+                            id,
+                            worker_discord_id,
+                            final_payout,
+                            payout_status,
+                            paid_at
+                        FROM worker_payouts
+                        WHERE order_id = ?
+                        ORDER BY id ASC
+                        """,
+                        (int(order_id),),
+                    ).fetchall()
+                ]
+                cs_payouts = [
+                    dict(row)
+                    for row in web.execute(
+                        """
+                        SELECT
+                            id,
+                            customer_service_discord_id,
+                            payout_amount,
+                            payout_status,
+                            paid_at
+                        FROM customer_service_payouts
+                        WHERE order_id = ?
+                        ORDER BY id ASC
+                        """,
+                        (int(order_id),),
+                    ).fetchall()
+                ]
+
+                payout_base = max(
+                    0,
+                    int(
+                        order.payout_base_amount
+                        if order.payout_base_amount is not None
+                        else order.amount or 0
+                    ),
+                )
+                historical_locked = reconciliation._payout_rows_are_historical_locked(
+                    worker_payouts,
+                    cs_payouts,
+                )
+                repair_block_reason = reconciliation._payout_repair_block_reason(
+                    worker_ids=worker_ids,
+                    payout_base=payout_base,
+                    customer_service_discord_id=str(
+                        order.customer_service_discord_id or ""
+                    ).strip(),
+                    worker_payouts=worker_payouts,
+                    cs_payouts=cs_payouts,
+                )
+                repair_action = (
+                    "recalculate_unpaid_payouts"
+                    if repair_block_reason is None
+                    else None
+                )
+                reference = str(order.bot_order_no or "").strip() or f"WEB-{int(order_id)}"
+
+                actual_by_worker: dict[str, list[dict]] = defaultdict(list)
+                for payout in worker_payouts:
+                    actual_by_worker[
+                        str(payout.get("worker_discord_id") or "").strip()
+                    ].append(payout)
+
+                for worker_id, expected_amount in expected_by_worker.items():
+                    actual_rows = actual_by_worker.get(worker_id, [])
+                    if not actual_rows:
+                        reconciliation._issue(
+                            issues,
+                            category="payout",
+                            code="worker_payout_missing",
+                            severity="critical",
+                            reference=reference,
+                            title="接單人員缺少分潤資料",
+                            detail=(
+                                f"worker {worker_id} 有 VIP 計時區段紀錄，"
+                                "但沒有 worker_payout。"
+                            ),
+                            expected=expected_amount,
+                            actual=None,
+                            order_id=int(order_id),
+                            repair_action=repair_action,
+                            repair_block_reason=repair_block_reason,
+                        )
+                        continue
+
+                    if len(actual_rows) > 1:
+                        reconciliation._issue(
+                            issues,
+                            category="payout",
+                            code="worker_payout_duplicate",
+                            severity="critical",
+                            reference=reference,
+                            title="同一接單人員有重複分潤資料",
+                            detail=(
+                                f"worker {worker_id} 在同一 VIP 計時訂單共有 "
+                                f"{len(actual_rows)} 筆 worker_payout。"
+                            ),
+                            expected=1,
+                            actual=len(actual_rows),
+                            order_id=int(order_id),
+                            repair_action=repair_action,
+                            repair_block_reason=repair_block_reason,
+                        )
+
+                    actual_amount = float(actual_rows[0].get("final_payout") or 0)
+                    if (
+                        not historical_locked
+                        and not reconciliation._money_equal(
+                            expected_amount,
+                            actual_amount,
+                        )
+                    ):
+                        reconciliation._issue(
+                            issues,
+                            category="payout",
+                            code="worker_payout_amount_mismatch",
+                            severity="critical",
+                            reference=reference,
+                            title="接單人員分潤金額不一致",
+                            detail=(
+                                f"worker {worker_id} 的分潤與 VIP 計時區段歷史紀錄"
+                                "重算結果不同。"
+                            ),
+                            expected=expected_amount,
+                            actual=actual_amount,
+                            order_id=int(order_id),
+                            repair_action=repair_action,
+                            repair_block_reason=repair_block_reason,
+                        )
+
+                for worker_id, actual_rows in actual_by_worker.items():
+                    if worker_id not in expected_by_worker and not historical_locked:
+                        reconciliation._issue(
+                            issues,
+                            category="payout",
+                            code="worker_payout_without_assignment",
+                            severity="critical",
+                            reference=reference,
+                            title="分潤存在但沒有對應 VIP 計時紀錄",
+                            detail=(
+                                f"worker {worker_id} 有 worker_payout，"
+                                "但不在任何可計費 VIP 計時區段。"
+                            ),
+                            expected=None,
+                            actual=sum(
+                                float(row.get("final_payout") or 0)
+                                for row in actual_rows
+                            ),
+                            order_id=int(order_id),
+                            repair_action=repair_action,
+                            repair_block_reason=repair_block_reason,
+                        )
+        finally:
+            db.close()
+
+    reconciliation._check_payouts = check_payouts_with_timer_ledger
 
 
 def recalculate_vip_timer_worker_payouts(order_id: int) -> int:
@@ -257,12 +571,15 @@ def install_vip_timer_roster_payout() -> None:
         # creates replacement WorkerPayout rows in session.new; flush them before
         # the timer-ledger rewrite so its bulk DELETE can actually see/remove
         # that first generation instead of committing both generations together.
-        db.flush()
+        flush = getattr(db, "flush", None)
+        if callable(flush):
+            flush()
 
         order = db.get(WebOrder, int(order_id))
         if order is not None and _is_timer_order(int(order_id), db):
             _rewrite_worker_payouts(db, order)
-            db.flush()
+            if callable(flush):
+                flush()
         return result
 
     def promote_with_timer_ledger(*args, **kwargs):
@@ -274,10 +591,12 @@ def install_vip_timer_roster_payout() -> None:
 
     order_service.recalculate_order_payouts = recalculate_with_timer_ledger
     acceptance.promote_acceptance_claims_to_assignments = promote_with_timer_ledger
+    _install_accounting_integrations(recalculate_with_timer_ledger)
     _INSTALLED = True
 
 
 __all__ = [
+    "get_vip_timer_worker_payout_plan",
     "install_vip_timer_roster_payout",
     "recalculate_vip_timer_worker_payouts",
 ]
