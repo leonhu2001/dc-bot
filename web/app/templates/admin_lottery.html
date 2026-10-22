@@ -7,168 +7,136 @@
 <script src="/static/js/csrf.js?v=1"></script>
 <title>{{ title }}</title>
 <link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
-<link rel="stylesheet" href="/static/css/pages/admin_lottery_20261023.css?v=2">
+<link rel="stylesheet" href="/static/css/pages/admin_lottery_20261023.css?v=3">
 </head>
 <body class="mw-r5-admin">
 <div class="mw-r5-shell">
-    {% include "_admin_sidebar.html" %}
-    <section class="mw-r5-main-host">
-        <header class="mw-r5-page-header">
-            <div class="mw-r5-kicker">LOTTERY OPERATIONS</div>
-            <h1>抽獎管理</h1>
-            <p>免費反應抽獎與點數抽獎集中管理；客服直接從後台發送報名與開獎，不需要再輸入 Discord 指令。</p>
-        </header>
-        {% include "_admin_backbar.html" %}
+{% include "_admin_sidebar.html" %}
+<section class="mw-r5-main-host">
+<header class="mw-r5-page-header">
+<div class="mw-r5-kicker">LOTTERY OPERATIONS</div>
+<h1>抽獎管理</h1>
+<p>先設定活動與獎項，再發布到 Discord；所有獎品直接使用「優惠與福利」現有券，不使用點數。</p>
+</header>
+{% include "_admin_backbar.html" %}
+<div class="mw-r5-legacy-body lottery-admin-page">
+{% if message %}<div class="lottery-notice success">{{ message }}</div>{% endif %}
+{% if error %}<div class="lottery-notice error">{{ error }}</div>{% endif %}
 
-        <div class="mw-r5-legacy-body lottery-admin-page">
-            {% if message %}<div class="lottery-notice success">{{ message }}</div>{% endif %}
-            {% if error %}<div class="lottery-notice error">{{ error }}</div>{% endif %}
-
-            <section class="lottery-mode-grid">
-                <article class="lottery-mode-card">
-                    <div class="lottery-mode-head">
-                        <div><small>DISCORD GIVEAWAY</small><h2>免費反應抽獎</h2></div>
-                        {% if snapshot.free_event %}
-                        <span class="lottery-badge open">報名中{% if snapshot.free_participant_count is not none %} · {{ snapshot.free_participant_count }} 人{% endif %}</span>
-                        {% else %}
-                        <span class="lottery-badge">待建立</span>
-                        {% endif %}
-                    </div>
-                    <p>按「發送報名抽獎」後，Bot 會直接在抽獎頻道發布 🎉 報名訊息；開獎時由後台讀取該訊息的參加名單並公布結果。</p>
-
-                    {% if snapshot.free_event %}
-                    <div class="lottery-free-current">
-                        <small>目前進行中</small>
-                        <strong>{{ snapshot.free_event.prize }}</strong>
-                        {% if snapshot.free_event.description %}<p>{{ snapshot.free_event.description }}</p>{% endif %}
-                        <div class="lottery-free-meta">
-                            <span>訊息 ID：{{ snapshot.free_event.message_id }}</span>
-                            <span>參加人數：{% if snapshot.free_participant_count is not none %}{{ snapshot.free_participant_count }} 人{% else %}讀取失敗{% endif %}</span>
-                            {% if snapshot.free_event.message_url %}<a href="{{ snapshot.free_event.message_url }}" target="_blank" rel="noopener">查看 Discord 抽獎訊息 →</a>{% endif %}
-                        </div>
-                        {% if snapshot.free_participant_error %}<div class="lottery-inline-warning">目前無法讀取即時參加人數，但不會清除這場抽獎。</div>{% endif %}
-                    </div>
-
-                    <form class="lottery-free-draw-form" method="post" action="/admin/lottery/free/draw">
-                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                        <label>得獎人數
-                            <input type="number" name="winners" value="1" min="1" max="50" required>
-                        </label>
-                        <button type="submit">開獎</button>
-                    </form>
-                    <div class="lottery-action-hint">開獎後會直接在抽獎頻道公布得獎者，並結束本場報名。</div>
-                    {% else %}
-                    <form class="lottery-free-publish-form" method="post" action="/admin/lottery/free/publish">
-                        <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                        <label>抽獎獎品
-                            <input name="prize" maxlength="300" placeholder="例：200T 代金券 × 1" required>
-                        </label>
-                        <label>活動說明
-                            <textarea name="description" rows="3" maxlength="1000" placeholder="可不填，例如：截止時間、使用限制"></textarea>
-                        </label>
-                        <button type="submit">發送報名抽獎</button>
-                    </form>
-                    <div class="lottery-action-hint">同一時間只保留一場免費抽獎；開獎完成後才可建立下一場。</div>
-                    {% endif %}
-                    <div class="lottery-mini-stat">歷史中獎紀錄 {{ snapshot.free_draws | length }} 筆</div>
-                </article>
-
-                <article class="lottery-mode-card accent">
-                    <div class="lottery-mode-head">
-                        <div><small>POINT LOTTERY</small><h2>點數抽獎</h2></div>
-                        <span class="lottery-badge {% if snapshot.settings.status == 'open' %}open{% endif %}">{% if snapshot.settings.status == 'open' %}開放中{% else %}已關閉{% endif %}</span>
-                    </div>
-                    <p>{{ snapshot.settings.title }} · {{ snapshot.settings.period }}</p>
-                    <div class="lottery-stat-grid">
-                        <div><small>參加人數</small><strong>{{ snapshot.participant_count }}</strong></div>
-                        <div><small>總抽獎次數</small><strong>{{ snapshot.total_chances }}</strong></div>
-                        <div><small>已投入點數</small><strong>{{ snapshot.total_points }}</strong></div>
-                    </div>
-                    <div class="lottery-mini-stat">{{ snapshot.settings.cost_per_chance }} 點 / 次 · 每人最多 {{ snapshot.settings.max_chances_per_user }} 次</div>
-                </article>
-            </section>
-
-            <section class="lottery-panel">
-                <div class="lottery-section-head">
-                    <div><small>POINT LOTTERY SETTINGS</small><h2>點數抽獎設定</h2></div>
-                    <span>最後更新 {{ snapshot.settings.updated_at or '—' }}</span>
-                </div>
-                <form class="lottery-settings-form" method="post" action="/admin/lottery/settings">
-                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
-                    <label>期別
-                        <input name="period" value="{{ snapshot.settings.period }}" placeholder="2026-10" required>
-                    </label>
-                    <label>活動名稱
-                        <input name="title" value="{{ snapshot.settings.title }}" maxlength="100" required>
-                    </label>
-                    <label>狀態
-                        <select name="status">
-                            <option value="open" {% if snapshot.settings.status == 'open' %}selected{% endif %}>開放報名</option>
-                            <option value="closed" {% if snapshot.settings.status != 'open' %}selected{% endif %}>關閉報名</option>
-                        </select>
-                    </label>
-                    <label>每次消耗點數
-                        <input type="number" name="cost_per_chance" min="1" max="100000" value="{{ snapshot.settings.cost_per_chance }}" required>
-                    </label>
-                    <label>每人最多次數
-                        <input type="number" name="max_chances_per_user" min="1" max="1000" value="{{ snapshot.settings.max_chances_per_user }}" required>
-                    </label>
-                    <label class="wide">獎池內容
-                        <textarea name="prizes" rows="4" maxlength="4000">{{ snapshot.settings.prizes }}</textarea>
-                    </label>
-                    <label class="wide">活動備註
-                        <textarea name="note" rows="3" maxlength="2000">{{ snapshot.settings.note }}</textarea>
-                    </label>
-                    <div class="lottery-form-action wide"><button type="submit">儲存抽獎設定</button></div>
-                </form>
-            </section>
-
-            <section class="lottery-panel">
-                <div class="lottery-section-head">
-                    <div><small>CURRENT POOL</small><h2>本期參加名單</h2></div>
-                    <span>{{ snapshot.settings.period }} · {{ snapshot.participant_count }} 人</span>
-                </div>
-                {% if snapshot.entries %}
-                <div class="lottery-table-wrap">
-                    <table class="lottery-table">
-                        <thead><tr><th>Discord ID</th><th>抽獎次數</th><th>已用點數</th><th>最後更新</th></tr></thead>
-                        <tbody>
-                        {% for row in snapshot.entries %}
-                            <tr><td>{{ row.user_id }}</td><td>{{ row.chances }}</td><td>{{ row.points_used }}</td><td>{{ row.updated_at }}</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="lottery-empty">本期目前還沒有人加入點數抽獎。</div>
-                {% endif %}
-            </section>
-
-            <section class="lottery-panel">
-                <div class="lottery-section-head">
-                    <div><small>DRAW HISTORY</small><h2>開獎紀錄</h2></div>
-                    <span>最近 {{ snapshot.draws | length }} 筆</span>
-                </div>
-                {% if snapshot.draws %}
-                <div class="lottery-table-wrap">
-                    <table class="lottery-table">
-                        <thead><tr><th>類型 / 期別</th><th>獎品</th><th>得獎者</th><th>開獎人</th><th>時間</th></tr></thead>
-                        <tbody>
-                        {% for row in snapshot.draws %}
-                            <tr>
-                                <td>{% if row.period == 'free-reaction' %}<span class="lottery-type-tag">免費反應</span>{% else %}{{ row.period }}{% endif %}</td>
-                                <td>{{ row.prize }}</td><td>{{ row.winner_id }}</td><td>{{ row.drawn_by }}</td><td>{{ row.drawn_at }}</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="lottery-empty">目前還沒有開獎紀錄。</div>
-                {% endif %}
-            </section>
-        </div>
-    </section>
+<section class="lottery-panel">
+<div class="lottery-section-head">
+<div><small>STEP 1 · GIVEAWAY SETUP</small><h2>設定抽獎</h2></div>
+{% if snapshot.is_open %}<span class="lottery-badge open">已發布 · 設定鎖定</span>{% elif snapshot.is_draft %}<span class="lottery-badge">草稿</span>{% else %}<span class="lottery-badge">尚未設定</span>{% endif %}
 </div>
+{% if snapshot.is_open %}
+<div class="lottery-free-current">
+<strong>{{ snapshot.campaign.title }}</strong>
+{% if snapshot.campaign.description %}<p>{{ snapshot.campaign.description }}</p>{% endif %}
+<div class="lottery-prize-summary">
+{% for prize in snapshot.campaign.prizes %}<div><span>獎項 {{ loop.index }}</span><strong>{{ prize.prize_name }}</strong><em>{{ prize.winner_count }} 名</em></div>{% endfor %}
+</div>
+<div class="lottery-action-hint">活動已發布，為避免公告與發獎內容不一致，需完成本場後才能建立下一場。</div>
+</div>
+{% else %}
+<form class="lottery-campaign-form" method="post" action="/admin/lottery/draft" id="lotteryDraftForm">
+<input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+<label>活動名稱
+<input name="title" maxlength="120" value="{{ snapshot.campaign.title if snapshot.campaign else '' }}" placeholder="例：十月老闆回饋抽獎" required>
+</label>
+<label>活動說明
+<textarea name="description" rows="3" maxlength="1500" placeholder="可填活動說明、截止時間或注意事項">{{ snapshot.campaign.description if snapshot.campaign else '' }}</textarea>
+</label>
+<div class="lottery-prize-editor">
+<div class="lottery-prize-editor-head"><div><small>PRIZES</small><h3>獎項</h3></div><button type="button" id="addPrizeRow">＋ 新增獎項</button></div>
+<div id="prizeRows">
+{% if snapshot.campaign and snapshot.campaign.prizes %}
+{% for prize in snapshot.campaign.prizes %}
+<div class="lottery-prize-row">
+<span class="lottery-prize-index">{{ loop.index }}</span>
+<label>福利券<select name="template_id" required>{% for item in snapshot.templates %}<option value="{{ item.id }}" {% if item.id == prize.template_id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
+<label class="count">名額<input type="number" name="winner_count" min="1" max="50" value="{{ prize.winner_count }}" required></label>
+<button type="button" class="remove-prize">移除</button>
+</div>
+{% endfor %}
+{% else %}
+<div class="lottery-prize-row">
+<span class="lottery-prize-index">1</span>
+<label>福利券<select name="template_id" required><option value="">選擇優惠與福利中的券</option>{% for item in snapshot.templates %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+<label class="count">名額<input type="number" name="winner_count" min="1" max="50" value="1" required></label>
+<button type="button" class="remove-prize">移除</button>
+</div>
+{% endif %}
+</div>
+<div class="lottery-action-hint">清單會自動讀取「優惠與福利」目前啟用中的券；之後新增的券也會直接出現在這裡。</div>
+</div>
+<div class="lottery-form-action"><button type="submit">儲存抽獎設定</button></div>
+</form>
+{% endif %}
+</section>
+
+<section class="lottery-panel">
+<div class="lottery-section-head">
+<div><small>STEP 2 · PUBLISH / DRAW</small><h2>發布與開獎</h2></div>
+<span>頻道 {{ snapshot.channel_id }}</span>
+</div>
+{% if snapshot.is_draft %}
+<div class="lottery-publish-box">
+<div><strong>{{ snapshot.campaign.title }}</strong><p>設定已儲存。確認獎項後再發布到 Discord 抽獎頻道。</p></div>
+<form method="post" action="/admin/lottery/publish"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><button type="submit">發布抽獎</button></form>
+</div>
+{% elif snapshot.is_open %}
+<div class="lottery-free-current">
+<div class="lottery-mode-head"><div><small>LIVE GIVEAWAY</small><strong>{{ snapshot.campaign.title }}</strong></div><span class="lottery-badge open">報名中{% if snapshot.participant_count is not none %} · {{ snapshot.participant_count }} 人{% endif %}</span></div>
+<div class="lottery-free-meta"><span>訊息 ID：{{ snapshot.campaign.message_id }}</span>{% if snapshot.campaign.message_url %}<a href="{{ snapshot.campaign.message_url }}" target="_blank" rel="noopener">查看 Discord 抽獎訊息 →</a>{% endif %}</div>
+{% if snapshot.participant_error %}<div class="lottery-inline-warning">目前無法讀取即時參加人數，但活動不會被清除。</div>{% endif %}
+</div>
+<div class="lottery-draw-list">
+{% for prize in snapshot.campaign.prizes %}
+<div class="lottery-draw-row"><div><small>獎項 {{ loop.index }}</small><strong>{{ prize.prize_name }}</strong><span>{{ prize.winner_count }} 名</span></div>{% if prize.drawn_at %}<span class="lottery-badge">已開獎</span>{% else %}<form method="post" action="/admin/lottery/draw"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><input type="hidden" name="prize_id" value="{{ prize.id }}"><button type="submit">開這個獎</button></form>{% endif %}</div>
+{% endfor %}
+</div>
+{% set pending = snapshot.campaign.prizes | selectattr('drawn_at', 'none') | list %}
+{% if pending %}<form class="lottery-draw-all" method="post" action="/admin/lottery/draw"><input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}"><input type="hidden" name="prize_id" value="0"><button type="submit">一次開完所有剩餘獎項</button></form>{% endif %}
+<div class="lottery-action-hint">同一場活動所有得獎者不會重複；中獎後會自動把對應福利券發到會員帳戶。</div>
+{% else %}
+<div class="lottery-empty">先在上方完成抽獎設定並儲存，這裡才會出現「發布抽獎」。</div>
+{% endif %}
+</section>
+
+<section class="lottery-panel">
+<div class="lottery-section-head"><div><small>HISTORY</small><h2>歷史抽獎</h2></div><span>最近 {{ snapshot.history | length }} 場</span></div>
+{% if snapshot.history %}<div class="lottery-table-wrap"><table class="lottery-table"><thead><tr><th>活動</th><th>獎項</th><th>得獎人數</th><th>開獎時間</th></tr></thead><tbody>{% for event in snapshot.history %}<tr><td>{{ event.title }}</td><td>{% for prize in event.prizes %}{{ prize.prize_name }} × {{ prize.winner_count }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td><td>{{ event.winners | length }}</td><td>{{ event.drawn_at or '—' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="lottery-empty">目前還沒有新版抽獎紀錄。</div>{% endif %}
+</section>
+</div>
+</section>
+</div>
+
+<script nonce="{{ request.state.csp_nonce }}">
+(() => {
+  const rows = document.getElementById('prizeRows');
+  const add = document.getElementById('addPrizeRow');
+  if (!rows || !add) return;
+  const options = `{% for item in snapshot.templates %}<option value="{{ item.id }}">{{ item.name|e }}</option>{% endfor %}`;
+  const renumber = () => {
+    rows.querySelectorAll('.lottery-prize-row').forEach((row, index) => {
+      row.querySelector('.lottery-prize-index').textContent = String(index + 1);
+      const remove = row.querySelector('.remove-prize');
+      if (remove) remove.disabled = rows.children.length <= 1;
+    });
+  };
+  add.addEventListener('click', () => {
+    const row = document.createElement('div');
+    row.className = 'lottery-prize-row';
+    row.innerHTML = `<span class="lottery-prize-index"></span><label>福利券<select name="template_id" required><option value="">選擇優惠與福利中的券</option>${options}</select></label><label class="count">名額<input type="number" name="winner_count" min="1" max="50" value="1" required></label><button type="button" class="remove-prize">移除</button>`;
+    rows.appendChild(row); renumber();
+  });
+  rows.addEventListener('click', (event) => {
+    const button = event.target.closest('.remove-prize');
+    if (!button || rows.children.length <= 1) return;
+    button.closest('.lottery-prize-row').remove(); renumber();
+  });
+  renumber();
+})();
+</script>
 </body>
 </html>
