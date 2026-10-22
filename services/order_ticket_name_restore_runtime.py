@@ -1,16 +1,38 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import re
 
 import discord
 from discord.ext import commands
 
 from core.config import config_int
+from services.orders import (
+    ORDER_CATEGORY_LABELS,
+    get_order_item_detail_for_selection,
+    get_order_item_group_label,
+)
 from services.ticket_identity import build_ticket_channel_name
 
 
 CUSTOMER_CATEGORY_ID = config_int("CUSTOMER_CATEGORY_ID", 1483895536938651809)
 _SIMPLIFIED_NAME_RE = re.compile(r"^[🟢🟡🟠⚫🔴⚪][・┃]客服中心$")
+
+_GAME_LABELS = {
+    "delta_desktop_basic": "三角洲端遊",
+    "delta_mobile_basic": "三角洲手遊",
+    "delta_desktop_fun": "三角洲趣味",
+    "farm": "三角洲代肝",
+    "basic": "三角洲",
+    "fun": "三角洲趣味",
+    "general": "通用",
+    "steam": "STEAM",
+    "valorant": "特戰英豪",
+    "lol": "英雄聯盟",
+    "apex": "APEX",
+    "custom": "自訂",
+    "vip_timer": "VIP計時",
+}
 
 
 def _topic_customer_id(channel: discord.TextChannel) -> int | None:
@@ -49,11 +71,169 @@ def _legacy_prefix(status: str) -> str:
     return "下單"
 
 
+def _merge_claim_fallback(channel_id: int, data: dict) -> dict:
+    merged = dict(data or {})
+    try:
+        from services import order_storage_runtime as storage
+
+        claims = getattr(storage, "ORDER_CLAIMS", {})
+        for claim in claims.values():
+            if not isinstance(claim, dict):
+                continue
+            try:
+                source_channel_id = int(claim.get("source_channel_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            if source_channel_id != int(channel_id):
+                continue
+            for key in (
+                "customer_id",
+                "category_label",
+                "item",
+                "quantity",
+                "payment_method",
+                "status",
+            ):
+                if not merged.get(key) and claim.get(key) is not None:
+                    merged[key] = claim.get(key)
+            break
+    except Exception:
+        pass
+    return merged
+
+
+def _game_label(data: dict) -> str:
+    category = str(data.get("category") or "").strip()
+    if category in _GAME_LABELS:
+        return _GAME_LABELS[category]
+
+    raw = str(
+        data.get("category_label")
+        or ORDER_CATEGORY_LABELS.get(category, "")
+        or category
+        or "訂單"
+    ).strip()
+    lower = raw.casefold()
+
+    if "三角洲" in raw:
+        if "手遊" in raw:
+            return "三角洲手遊"
+        if "趣味" in raw:
+            return "三角洲趣味"
+        if "代肝" in raw or "代解" in raw:
+            return "三角洲代肝"
+        if "端遊" in raw:
+            return "三角洲端遊"
+        return "三角洲"
+    if "特戰" in raw or "valorant" in lower:
+        return "特戰英豪"
+    if "英雄聯盟" in raw or lower == "lol" or "lol" in lower:
+        return "英雄聯盟"
+    if "apex" in lower:
+        return "APEX"
+    if "steam" in lower:
+        return "STEAM"
+    if "vip" in lower and "計時" in raw:
+        return "VIP計時"
+    return raw or "訂單"
+
+
+def _play_labels(data: dict) -> list[str]:
+    category = str(data.get("category") or "").strip() or None
+    group = str(data.get("item_group") or "").strip()
+    item = str(data.get("item") or "").strip()
+    detail_value = str(data.get("item_detail_value") or "").strip() or None
+
+    if not group and item:
+        try:
+            group = str(get_order_item_group_label(item) or "").strip()
+        except Exception:
+            group = ""
+
+    detail_label = ""
+    if category and group and detail_value:
+        try:
+            detail = get_order_item_detail_for_selection(category, group, detail_value)
+            detail_label = str((detail or {}).get("label") or "").strip()
+        except Exception:
+            detail_label = ""
+
+    if not detail_label and item and item != group:
+        detail_label = item
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in (group, detail_label):
+        text = str(value or "").strip()
+        key = text.casefold()
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        result.append(text)
+    return result
+
+
+def _stored_prefix(data: dict) -> str:
+    parts = ["存單", _game_label(data), *_play_labels(data)]
+    return "-".join(str(part).strip() for part in parts if str(part).strip())
+
+
+def _install_store_renamer_patch() -> bool:
+    """Future store actions keep game + service/detail in the channel name."""
+    try:
+        from services import order_runtime
+
+        state = getattr(order_runtime, "_RUNTIME_STATE", None)
+        if state is None:
+            return False
+        if getattr(order_runtime, "_rich_store_ticket_renamer_installed", False):
+            return True
+
+        original = state.ticket_channel_renamer
+
+        async def rich_ticket_channel_renamer(
+            channel,
+            prefix: str,
+            member=None,
+            *,
+            display_name: str | None = None,
+        ) -> None:
+            effective_prefix = str(prefix or "")
+            if isinstance(channel, discord.TextChannel) and effective_prefix.startswith("存單"):
+                data = state.order_selections.get(channel.id, {})
+                if not isinstance(data, dict):
+                    data = {}
+                data = _merge_claim_fallback(channel.id, data)
+                effective_prefix = _stored_prefix(data)
+
+            await original(
+                channel,
+                effective_prefix,
+                member=member,
+                display_name=display_name,
+            )
+
+        order_runtime._RUNTIME_STATE = replace(
+            state,
+            ticket_channel_renamer=rich_ticket_channel_renamer,
+        )
+        order_runtime._rich_store_ticket_renamer_installed = True
+        return True
+    except Exception as exc:
+        print(
+            f"[order-ticket-name] cannot install stored-name wrapper: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+
 async def restore_unintentionally_simplified_order_ticket_names(
     bot: commands.Bot,
 ) -> None:
-    """Undo only the temporary status-emoji-only ticket naming rollout."""
+    """Repair the mistaken simplified rollout and enrich all currently stored tickets."""
     await bot.wait_until_ready()
+    _install_store_renamer_patch()
 
     category = bot.get_channel(CUSTOMER_CATEGORY_ID)
     if not isinstance(category, discord.CategoryChannel):
@@ -74,18 +254,27 @@ async def restore_unintentionally_simplified_order_ticket_names(
 
     restored = 0
     for channel in list(category.text_channels):
-        if not _SIMPLIFIED_NAME_RE.fullmatch(str(channel.name or "")):
-            continue
-
         customer_id = _topic_customer_id(channel)
         if customer_id is None:
             continue
 
         data = selections.get(channel.id, {}) if isinstance(selections, dict) else {}
-        status = str(data.get("status") or "") if isinstance(data, dict) else ""
-        if not status:
+        if not isinstance(data, dict):
+            data = {}
+        data = _merge_claim_fallback(channel.id, data)
+
+        status = str(data.get("status") or "").strip().lower()
+        simplified = bool(_SIMPLIFIED_NAME_RE.fullmatch(str(channel.name or "")))
+        if not status and simplified:
             status = _status_from_simplified_name(channel.name)
-        prefix = _legacy_prefix(status)
+
+        is_stored = status == "stored" or str(channel.name or "").startswith("存單-")
+        if is_stored:
+            prefix = _stored_prefix(data)
+        elif simplified:
+            prefix = _legacy_prefix(status)
+        else:
+            continue
 
         member = channel.guild.get_member(customer_id)
         if member is None:
@@ -95,10 +284,8 @@ async def restore_unintentionally_simplified_order_ticket_names(
                 member = None
 
         display_name = None
-        if member is None and isinstance(data, dict):
-            display_name = str(data.get("customer_display_name") or "").strip() or None
-        if member is None and display_name is None:
-            display_name = str(customer_id)
+        if member is None:
+            display_name = str(data.get("customer_display_name") or "").strip() or str(customer_id)
 
         new_name = build_ticket_channel_name(
             prefix,
@@ -111,7 +298,7 @@ async def restore_unintentionally_simplified_order_ticket_names(
         try:
             await channel.edit(
                 name=new_name,
-                reason="Restore legacy order ticket naming after mistaken rollout",
+                reason="Restore informative order ticket naming",
             )
             restored += 1
         except (discord.Forbidden, discord.HTTPException) as exc:
@@ -129,6 +316,7 @@ async def restore_unintentionally_simplified_order_ticket_names(
 
 
 def install_order_ticket_name_restore(bot: commands.Bot) -> None:
+    _install_store_renamer_patch()
     if getattr(bot, "_order_ticket_name_restore_started", False):
         return
     bot._order_ticket_name_restore_started = True
