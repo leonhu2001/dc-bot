@@ -63,7 +63,6 @@ jobs:
             scripts
 
       - name: Audit templates and static references
-        continue-on-error: true
         run: |
           python tools/audit_templates.py
 
@@ -80,9 +79,36 @@ jobs:
         run: |
           python -m pytest -q tests/golden
 
-      - name: Run focused VIP timer payout regressions
+      - name: Run regression suite
         run: |
-          python -m pytest -q \
-            tests/test_vip_timer_legacy_roster_reconciliation.py \
-            tests/test_vip_timer_roster_v7.py \
-            tests/test_vip_timer_payout_boundary.py
+          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
+
+      - name: Install Chromium for browser tests
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run browser smoke flows
+        run: |
+          set -Eeuo pipefail
+          python -m uvicorn web.app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            >/tmp/dc-bot-web-ci.log 2>&1 &
+          WEB_PID=$!
+          trap 'kill "$WEB_PID" 2>/dev/null || true' EXIT
+
+          ready=0
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/dc-bot-web-ci.log
+            exit 1
+          fi
+
+          python -m pytest -q tests/e2e
