@@ -26,10 +26,10 @@ PANEL_SELECTIONS: dict[int, str] = {}
 
 def build_main_panel_embed() -> discord.Embed:
     return discord.Embed(
-        title="魔丸娛樂｜服務大廳",
+        title="魔丸娛樂｜客服中心",
         description=(
             "歡迎來到魔丸娛樂，請選擇下方需要的服務。\n"
-            "點單、入職、客訴與顧客意見皆可由此進入。\n"
+            "入職、客訴與顧客意見皆可由此進入。\n"
             "客服服務時間：**AM 10:00－隔日 AM 2:00**"
         ),
         color=discord.Color.purple(),
@@ -71,6 +71,8 @@ def _require_configured(name: str, value):
     return value
 
 
+# Retained for compatibility with old persistent interaction payloads while the
+# public customer-service panel no longer exposes an ordering button.
 class OrderModal(discord.ui.Modal, title="我要下單"):
     rule_confirm = discord.ui.TextInput(
         label="是否已詳閱規章內容",
@@ -80,46 +82,9 @@ class OrderModal(discord.ui.Modal, title="我要下單"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        agree_checker = _require_configured("is_agree_answer", is_agree_answer)
-
-        if not agree_checker(self.rule_confirm.value):
-            await interaction.response.send_message(
-                "你尚未詳閱規章內容，暫時無法下單。請詳閱規章後再重新開單。",
-                ephemeral=True,
-            )
-            return
-
-        guild = interaction.guild
-        member = interaction.user
-
-        if guild is None or not isinstance(member, discord.Member):
-            await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-            return
-
-        customer_role_id = _require_configured("CUSTOMER_ROLE_ID", CUSTOMER_ROLE_ID)
-        customer_category_id = _require_configured("CUSTOMER_CATEGORY_ID", CUSTOMER_CATEGORY_ID)
-        name_builder = _require_configured("safe_channel_name", safe_channel_name)
-        notes_formatter = _require_configured("format_customer_notes_for_ticket", format_customer_notes_for_ticket)
-        channel_creator = _require_configured("create_private_channel", create_private_channel)
-        order_view_factory = _require_configured("order_control_view_factory", order_control_view_factory)
-
-        customer_role = guild.get_role(customer_role_id)
-
-        intro = (
-            f"這裡有闆闆開單。\n\n"
-            f"開單人：{member.mention}\n"
-            f"狀態：已確認詳閱規章內容"
-            f"{notes_formatter(member.id)}"
-        )
-
-        await channel_creator(
-            interaction=interaction,
-            category_id=customer_category_id,
-            channel_name=name_builder("下單", member),
-            allowed_roles=[customer_role],
-            intro_message=intro,
-            view=order_view_factory(),
-            topic=f"order_customer_id={member.id}",
+        await interaction.response.send_message(
+            "下單入口已移至各遊戲下單頻道，請由對應遊戲頻道下單。",
+            ephemeral=True,
         )
 
 
@@ -217,16 +182,6 @@ class MainPanelView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="我要下單",
-        emoji="🛒",
-        style=discord.ButtonStyle.primary,
-        custom_id="mawan_main_panel_order_button",
-        row=0,
-    )
-    async def order_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(OrderModal())
-
-    @discord.ui.button(
         label="我要入職",
         emoji="💼",
         style=discord.ButtonStyle.success,
@@ -241,7 +196,7 @@ class MainPanelView(discord.ui.View):
         emoji="⚠️",
         style=discord.ButtonStyle.danger,
         custom_id="mawan_main_panel_complaint_button",
-        row=1,
+        row=0,
     )
     async def complaint_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(ComplaintModal())
@@ -251,7 +206,7 @@ class MainPanelView(discord.ui.View):
         emoji="💬",
         style=discord.ButtonStyle.secondary,
         custom_id="mawan_main_panel_feedback_button",
-        row=1,
+        row=0,
     )
     async def feedback_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(FeedbackModal())
