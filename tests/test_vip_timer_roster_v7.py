@@ -110,12 +110,13 @@ def test_segment_roster_payout_follows_actual_participation(tmp_path, monkeypatc
     try:
         order = WebOrder(
             category="VIP 自由計時",
-            item="測試",
+            item="自由計時｜測試",
             quantity=1,
             amount=900,
             payout_base_amount=900,
             customer_pay_amount=900,
             status="active",
+            note="VIP_TIMER｜test_fixture",
         )
         db.add(order)
         db.flush()
