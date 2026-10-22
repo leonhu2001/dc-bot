@@ -7,6 +7,7 @@ from discord.ext import commands
 from core.vip_levels import build_topup_rebate_public_summary
 from services.topup_runtime import ensure_topup_credit_worker_started
 from services.payment_review_runtime import ensure_payment_review_worker_started
+from services.quick_order_v2 import install_quick_order_v2
 from views.panels import MainPanelView
 from views.topups import TopupPanelView
 from views.staff_management import (
@@ -25,6 +26,8 @@ class SetupCommands(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        install_quick_order_v2(bot)
+
         if not getattr(
             bot,
             "_staff_management_panel_view_registered",
@@ -63,7 +66,6 @@ class SetupCommands(commands.Cog):
 
         await interaction.channel.send(embed=embed, view=MainPanelView())
         await interaction.response.send_message("客服面板已建立。", ephemeral=True)
-
 
     @setup.command(
         name="staff_panel",
