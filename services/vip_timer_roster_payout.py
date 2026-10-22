@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR
 import json
 
-from sqlalchemy import select, text
+from sqlalchemy import inspect, select, text
 
 from shared.db import SessionLocal
 from shared.models import (
@@ -73,10 +73,23 @@ def _staff_role_types(order_id: int, db) -> dict[str, str]:
 
 
 def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
+    # Early VIP-timer installations (and historical test fixtures) predate the
+    # rule_key column. Keep those ledgers readable: without a rule key they use
+    # the original equal-per-staff split, while current ledgers can still apply
+    # rule-aware weighting such as one-companion-one-guard.
+    try:
+        segment_columns = {
+            str(column.get("name") or "")
+            for column in inspect(db.get_bind()).get_columns("vip_timer_segments")
+        }
+    except Exception:
+        segment_columns = set()
+    rule_key_select = "rule_key" if "rule_key" in segment_columns else "'' AS rule_key"
+
     rows = db.execute(
         text(
-            """
-            SELECT rule_key, hourly_rate, billable_seconds, staff_ids_json
+            f"""
+            SELECT {rule_key_select}, hourly_rate, billable_seconds, staff_ids_json
             FROM vip_timer_segments
             WHERE order_id=:order_id
               AND billable_seconds > 0
@@ -558,12 +571,15 @@ def install_vip_timer_roster_payout() -> None:
         # creates replacement WorkerPayout rows in session.new; flush them before
         # the timer-ledger rewrite so its bulk DELETE can actually see/remove
         # that first generation instead of committing both generations together.
-        db.flush()
+        flush = getattr(db, "flush", None)
+        if callable(flush):
+            flush()
 
         order = db.get(WebOrder, int(order_id))
         if order is not None and _is_timer_order(int(order_id), db):
             _rewrite_worker_payouts(db, order)
-            db.flush()
+            if callable(flush):
+                flush()
         return result
 
     def promote_with_timer_ledger(*args, **kwargs):
