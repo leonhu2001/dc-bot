@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from services import self_service_selection_state as selection
 from services import vip_timer_integrity as integrity
+from shared import db as shared_db
 from shared import web_order_sync
 from shared.db import Base
 from shared.models import WebOrder
@@ -57,6 +58,7 @@ def _db(tmp_path, monkeypatch):
             """))
 
     monkeypatch.setattr(integrity, "SessionLocal", Local)
+    monkeypatch.setattr(shared_db, "SessionLocal", Local)
     monkeypatch.setattr(web_order_sync, "SessionLocal", Local)
     return engine, Local
 
