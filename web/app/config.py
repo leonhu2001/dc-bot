@@ -36,10 +36,8 @@ class WebConfig:
     )
     DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
     DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
-    LOTTERY_ANNOUNCE_CHANNEL_ID = os.getenv(
-        "LOTTERY_ANNOUNCE_CHANNEL_ID",
-        "1537182199827267645",
-    ).strip()
+    # 抽獎後台只允許發布到這個專用頻道，不接受環境變數覆寫。
+    LOTTERY_ANNOUNCE_CHANNEL_ID = "1537182199827267645"
 
     ADMIN_ROLE_IDS = _parse_role_ids(
         "ADMIN_ROLE_IDS",
