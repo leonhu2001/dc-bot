@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -273,6 +274,56 @@ def test_web_order_delete_also_removes_vip_timer_metadata(tmp_path, monkeypatch)
     finally:
         db.close()
     assert _timer_row_count(Local, "vip_timer_sessions", 20) == 0
+
+
+def test_stale_timer_session_restores_normal_worker_accounting_issue(tmp_path, monkeypatch):
+    engine, Local = _db(tmp_path, monkeypatch)
+    _add_order(
+        Local,
+        order_id=266,
+        category="通用單",
+        item="甜蜜雙陪",
+    )
+
+    web = sqlite3.connect(str(engine.url.database))
+    web.row_factory = sqlite3.Row
+    try:
+        issues: list[dict] = []
+
+        def generic_checker(_web, target):
+            target.extend(
+                [
+                    {
+                        "order_id": 266,
+                        "code": "worker_payout_without_assignment",
+                        "detail": "worker A 有 worker_payout，但不在目前有效接單名單。",
+                        "title": "分潤存在但已無有效 assignment",
+                    },
+                    {
+                        "order_id": 999,
+                        "code": "worker_payout_without_assignment",
+                        "detail": "unrelated",
+                    },
+                    {
+                        "order_id": 266,
+                        "code": "customer_service_payout_count",
+                        "detail": "should not be duplicated by restore helper",
+                    },
+                ]
+            )
+
+        integrity._restore_generic_worker_issues_for_noncanonical_timers(
+            web,
+            issues,
+            generic_checker,
+        )
+
+        assert len(issues) == 1
+        assert issues[0]["order_id"] == 266
+        assert issues[0]["code"] == "worker_payout_without_assignment"
+        assert issues[0]["title"] == "分潤存在但已無有效 assignment"
+    finally:
+        web.close()
 
 
 def test_product_change_clears_stale_vip_timer_draft_flags():
