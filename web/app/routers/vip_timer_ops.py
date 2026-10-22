@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
@@ -43,6 +44,36 @@ def _duration(seconds: int) -> str:
     return f"{seconds} 秒"
 
 
+def _open_order_ids(order_ids: list[int]) -> set[int]:
+    ids = sorted({int(value) for value in order_ids if int(value or 0) > 0})
+    if not ids:
+        return set()
+
+    database_url = str(config.DATABASE_URL or "")
+    if not database_url.startswith("sqlite:///"):
+        return set(ids)
+
+    db_path = database_url.replace("sqlite:///", "", 1)
+    placeholders = ",".join("?" for _ in ids)
+    try:
+        with sqlite3.connect(db_path, timeout=5) as conn:
+            rows = conn.execute(
+                f"""
+                SELECT id
+                FROM web_orders
+                WHERE id IN ({placeholders})
+                  AND LOWER(COALESCE(status, '')) NOT IN ('closed', 'cancelled', 'canceled')
+                  AND COALESCE(closed_at, '') = ''
+                """,
+                ids,
+            ).fetchall()
+    except sqlite3.Error:
+        # The timer service remains available even if this defensive visibility
+        # check cannot read the order table; do not turn a DB hiccup into a 500.
+        return set(ids)
+    return {int(row[0]) for row in rows}
+
+
 def _timer_redirect(order_id: int, *, message: str | None = None, error: str | None = None):
     from urllib.parse import urlencode
 
@@ -64,6 +95,8 @@ async def admin_vip_timers(request: Request):
         return RedirectResponse(url="/service", status_code=303)
     ensure_vip_timer_ops_tables()
     rows = list_open_timer_operations()
+    open_ids = _open_order_ids([int(row.get("order_id") or 0) for row in rows])
+    rows = [row for row in rows if int(row.get("order_id") or 0) in open_ids]
     for row in rows:
         row["age_text"] = _duration(int(row.get("age_seconds") or 0))
         row["pending_age_text"] = _duration(int(row.get("pending_age_seconds") or 0))
