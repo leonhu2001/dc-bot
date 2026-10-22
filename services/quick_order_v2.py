@@ -17,6 +17,7 @@ from services.vip_timer_self_service import (
     refresh_vip_timer_self_service_catalog,
 )
 
+
 QUICK_ORDER_V2_CHANNELS = {
     "delta": 1562940108246753331,
     "valorant": 1562940127976890509,
@@ -107,6 +108,7 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
             ),
             color=discord.Color.purple(),
         )
+
     embed.add_field(
         name="新版測試中",
         value="舊點單入口目前仍保留；新版若遇到異常，可先使用舊入口。",
@@ -123,7 +125,13 @@ class QuickServiceSelect(discord.ui.Select):
         options = _options(category)
         disabled = not options
         if not options:
-            options = [discord.SelectOption(label="目前沒有可下單服務", value="__empty__")]
+            options = [
+                discord.SelectOption(
+                    label="目前沒有可下單服務",
+                    value="__empty__",
+                )
+            ]
+
         super().__init__(
             placeholder="請選擇服務",
             options=options,
@@ -141,6 +149,7 @@ class QuickServiceSelect(discord.ui.Select):
         if not self.values or self.values[0] == "__empty__":
             await interaction.response.defer()
             return
+
         await _send_confirmation(
             interaction,
             category=self.category,
@@ -162,7 +171,15 @@ class QuickGameEntryView(discord.ui.View):
 
 
 class QuickDeltaCategoryButton(discord.ui.Button):
-    def __init__(self, *, emoji: str, label: str, category: str, style: discord.ButtonStyle, row: int):
+    def __init__(
+        self,
+        *,
+        emoji: str,
+        label: str,
+        category: str,
+        style: discord.ButtonStyle,
+        row: int,
+    ):
         self.category = category
         self.category_label = label
         self.category_emoji = emoji
@@ -176,8 +193,12 @@ class QuickDeltaCategoryButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         if not _options(self.category):
-            await interaction.response.send_message("這個分類目前沒有可下單服務。", ephemeral=True)
+            await interaction.response.send_message(
+                "這個分類目前沒有可下單服務。",
+                ephemeral=True,
+            )
             return
+
         embed = discord.Embed(
             title=f"{self.category_emoji} 三角洲行動｜{self.category_label}",
             description="請選擇服務。選完後會先讓你確認，不會立刻開票口。",
@@ -191,7 +212,11 @@ class QuickDeltaCategoryButton(discord.ui.Button):
                 persistent=False,
             )
         )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(
+            embed=embed,
+            view=view,
+            ephemeral=True,
+        )
 
 
 class QuickDeltaEntryView(discord.ui.View):
@@ -213,12 +238,22 @@ class QuickVipGameSelect(discord.ui.Select):
     def __init__(self):
         refresh_vip_timer_self_service_catalog()
         options = [
-            discord.SelectOption(label=group[:100], value=group[:100], description="起始遊戲")
+            discord.SelectOption(
+                label=group[:100],
+                value=group[:100],
+                description="起始遊戲",
+            )
             for group in _groups(VIP_TIMER_CATEGORY)[:25]
         ]
         disabled = not options
         if not options:
-            options = [discord.SelectOption(label="目前沒有可用計時方案", value="__empty__")]
+            options = [
+                discord.SelectOption(
+                    label="目前沒有可用計時方案",
+                    value="__empty__",
+                )
+            ]
+
         super().__init__(
             placeholder="請選擇起始遊戲",
             options=options,
@@ -233,13 +268,21 @@ class QuickVipGameSelect(discord.ui.Select):
             await interaction.response.defer()
             return
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("無法確認你的會員身分。", ephemeral=True)
+            await interaction.response.send_message(
+                "無法確認你的會員身分。",
+                ephemeral=True,
+            )
             return
+
         try:
-            assert_vip_timer_self_service_eligible(interaction.user.id, check_open_order=True)
+            assert_vip_timer_self_service_eligible(
+                interaction.user.id,
+                check_open_order=True,
+            )
         except ValueError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
+
         await _send_confirmation(
             interaction,
             category=VIP_TIMER_CATEGORY,
@@ -255,7 +298,14 @@ class QuickVipEntryView(discord.ui.View):
 
 
 class QuickOrderConfirmView(discord.ui.View):
-    def __init__(self, *, customer_id: int, category: str, item_group: str, source_channel_id: int):
+    def __init__(
+        self,
+        *,
+        customer_id: int,
+        category: str,
+        item_group: str,
+        source_channel_id: int,
+    ):
         super().__init__(timeout=180)
         self.customer_id = customer_id
         self.category = category
@@ -263,14 +313,29 @@ class QuickOrderConfirmView(discord.ui.View):
         self.source_channel_id = source_channel_id
         self.opening = False
 
-    @discord.ui.button(label="確認下單", emoji="✅", style=discord.ButtonStyle.success)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(
+        label="確認下單",
+        emoji="✅",
+        style=discord.ButtonStyle.success,
+    )
+    async def confirm(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
         if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("這不是你的下單確認畫面。", ephemeral=True)
+            await interaction.response.send_message(
+                "這不是你的下單確認畫面。",
+                ephemeral=True,
+            )
             return
         if self.opening:
-            await interaction.response.send_message("票口正在建立，請勿重複點擊。", ephemeral=True)
+            await interaction.response.send_message(
+                "票口正在建立，請勿重複點擊。",
+                ephemeral=True,
+            )
             return
+
         self.opening = True
         button.disabled = True
         try:
@@ -283,23 +348,50 @@ class QuickOrderConfirmView(discord.ui.View):
         finally:
             self.opening = False
 
-    @discord.ui.button(label="取消", emoji="✖️", style=discord.ButtonStyle.secondary)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(
+        label="取消",
+        emoji="✖️",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def cancel(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
         if interaction.user.id != self.customer_id:
-            await interaction.response.send_message("這不是你的下單確認畫面。", ephemeral=True)
+            await interaction.response.send_message(
+                "這不是你的下單確認畫面。",
+                ephemeral=True,
+            )
             return
-        await interaction.response.edit_message(content="已取消本次快速下單。", embed=None, view=None)
+
+        await interaction.response.edit_message(
+            content="已取消本次快速下單。",
+            embed=None,
+            view=None,
+        )
 
 
-async def _send_confirmation(interaction: discord.Interaction, *, category: str, item_group: str, source_channel_id: int):
+async def _send_confirmation(
+    interaction: discord.Interaction,
+    *,
+    category: str,
+    item_group: str,
+    source_channel_id: int,
+):
     if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
+        await interaction.response.send_message(
+            "這個功能只能在伺服器內使用。",
+            ephemeral=True,
+        )
         return
+
     timer = category == VIP_TIMER_CATEGORY
     embed = discord.Embed(
         title="💎 VIP 自由計時｜確認下單" if timer else "🛒 快速下單｜確認",
         description=(
-            f"**遊戲／類型：** {VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
+            f"**遊戲／類型：** "
+            f"{VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
             f"**{'起始遊戲' if timer else '服務'}：** {item_group}\n\n"
             "按下 **確認下單** 後才會建立私人票口。\n"
             "票口內再完成剩餘規格與數量。\n\n"
@@ -307,6 +399,7 @@ async def _send_confirmation(interaction: discord.Interaction, *, category: str,
         ),
         color=discord.Color.green(),
     )
+
     await interaction.response.send_message(
         embed=embed,
         view=QuickOrderConfirmView(
@@ -319,28 +412,46 @@ async def _send_confirmation(interaction: discord.Interaction, *, category: str,
     )
 
 
-async def _create_ticket(interaction: discord.Interaction, *, category: str, item_group: str, source_channel_id: int):
+async def _create_ticket(
+    interaction: discord.Interaction,
+    *,
+    category: str,
+    item_group: str,
+    source_channel_id: int,
+) -> discord.TextChannel | None:
     guild = interaction.guild
     member = interaction.user
     if guild is None or not isinstance(member, discord.Member):
-        await interaction.response.send_message("這個功能只能在伺服器內使用。", ephemeral=True)
-        return
+        await interaction.response.send_message(
+            "這個功能只能在伺服器內使用。",
+            ephemeral=True,
+        )
+        return None
+
     if category == VIP_TIMER_CATEGORY:
         try:
-            assert_vip_timer_self_service_eligible(member.id, check_open_order=True)
+            assert_vip_timer_self_service_eligible(
+                member.id,
+                check_open_order=True,
+            )
         except ValueError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
-            return
+            return None
         refresh_vip_timer_self_service_catalog()
 
     await interaction.response.defer(ephemeral=True)
+
     ticket_category = guild.get_channel(CUSTOMER_CATEGORY_ID)
     if not isinstance(ticket_category, discord.CategoryChannel):
-        await interaction.followup.send("找不到下單票口類別，請通知客服。", ephemeral=True)
-        return
+        await interaction.edit_original_response(
+            content="找不到下單票口類別，請通知客服。",
+            embed=None,
+            view=None,
+        )
+        return None
 
     role = guild.get_role(CUSTOMER_ROLE_ID)
-    overwrites = {
+    overwrites: dict[discord.abc.Snowflake, discord.PermissionOverwrite] = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         member: discord.PermissionOverwrite(
             view_channel=True,
@@ -350,6 +461,7 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
             embed_links=True,
         ),
     }
+
     if role is not None:
         overwrites[role] = discord.PermissionOverwrite(
             view_channel=True,
@@ -358,6 +470,7 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
             attach_files=True,
             embed_links=True,
         )
+
     if guild.me is not None:
         overwrites[guild.me] = discord.PermissionOverwrite(
             view_channel=True,
@@ -375,7 +488,11 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
             name=build_ticket_channel_name("下單", member),
             category=ticket_category,
             overwrites=overwrites,
-            topic=f"order_customer_id={member.id};quick_order_v2=1;source_channel_id={source_channel_id}",
+            topic=(
+                f"order_customer_id={member.id};"
+                f"quick_order_v2=1;"
+                f"source_channel_id={source_channel_id}"
+            ),
             reason=f"Quick order v2 opened by {member}",
         )
 
@@ -386,15 +503,19 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
         selection_state.apply_self_service_category_selection(data, category)
         if category == VIP_TIMER_CATEGORY:
             prepare_vip_timer_draft(data)
+
         selection_state.apply_self_service_item_group_selection(data, item_group)
         if category == VIP_TIMER_CATEGORY:
+            # item-group selection clears product-dependent flags; restore timer identity.
             data["vip_timer_order"] = True
+
         data.update(
             quick_order_v2=True,
             quick_order_source_channel_id=source_channel_id,
             quick_order_started_category=category,
             quick_order_started_group=item_group,
         )
+
         ui.SELF_SERVICE_ORDER_SELECTIONS[ticket.id] = data
         remember_order_data(ticket.id, data)
 
@@ -403,13 +524,19 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
             if category == VIP_TIMER_CATEGORY
             else f"{ORDER_CATEGORY_LABELS.get(category, category)}｜{item_group}"
         )
+
         await ticket.send(
             f"{member.mention} 新版快速下單票口已建立。\n"
             f"已選：**{selected_label}**\n"
             "請在下方面板完成剩餘選項後送出等待接單。"
             f"{format_customer_notes_for_ticket(member.id)}",
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
         )
+
         await ticket.send(
             embed=ui.build_self_service_panel_embed(member.id, data, guild),
             view=ui.SelfServiceOrderView(
@@ -417,7 +544,11 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
                 channel_id=ticket.id,
                 selected_category=data.get("category"),
             ),
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+            allowed_mentions=discord.AllowedMentions(
+                users=True,
+                roles=False,
+                everyone=False,
+            ),
         )
     except Exception as exc:
         if ticket is not None:
@@ -425,14 +556,28 @@ async def _create_ticket(interaction: discord.Interaction, *, category: str, ite
                 await ticket.delete(reason="Quick order v2 setup failed")
             except (discord.Forbidden, discord.HTTPException):
                 pass
-        print(f"[quick-order-v2] create ticket failed: {type(exc).__name__}: {exc}", flush=True)
-        await interaction.followup.send(
-            f"建立新版下單票口失敗：{type(exc).__name__}。請先使用舊點單入口或通知客服。",
-            ephemeral=True,
-        )
-        return
 
-    await interaction.followup.send(f"票口已建立：{ticket.mention}", ephemeral=True)
+        print(
+            f"[quick-order-v2] create ticket failed: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        await interaction.edit_original_response(
+            content=(
+                f"建立新版下單票口失敗：{type(exc).__name__}。"
+                "請先使用舊點單入口或通知客服。"
+            ),
+            embed=None,
+            view=None,
+        )
+        return None
+
+    await interaction.edit_original_response(
+        content=f"✅ 票口已建立：{ticket.mention}",
+        embed=None,
+        view=None,
+    )
+    return ticket
 
 
 def _install_ticket_patch() -> None:
@@ -448,25 +593,45 @@ def _install_ticket_patch() -> None:
     _ORIGINAL_VIEW_INIT = ui.SelfServiceOrderView.__init__
     _ORIGINAL_PANEL_BUILDER = runtime.build_self_service_panel_embed
 
-    def quick_view_init(self, customer_id: int, channel_id: int, selected_category: str | None = None):
+    def quick_view_init(
+        self,
+        customer_id: int,
+        channel_id: int,
+        selected_category: str | None = None,
+    ):
         _ORIGINAL_VIEW_INIT(self, customer_id, channel_id, selected_category)
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
         if not data.get("quick_order_v2"):
             return
+
         for child in list(self.children):
             if getattr(child, "custom_id", None) in {
                 "self_service_order_category_select",
                 "self_service_order_item_select",
             }:
                 self.remove_item(child)
+
+        is_timer = str(data.get("category") or "") == VIP_TIMER_CATEGORY
         for child in self.children:
             if getattr(child, "custom_id", None) == "self_service_order_detail_select":
-                child.placeholder = "請選擇規格／陪玩人數"
+                child.placeholder = (
+                    "選擇起始玩法"
+                    if is_timer
+                    else "請選擇規格／陪玩人數"
+                )
 
-    def quick_panel_builder(customer_id: int, data: dict, guild: discord.Guild | None = None):
+    def quick_panel_builder(
+        customer_id: int,
+        data: dict,
+        guild: discord.Guild | None = None,
+    ):
         embed = _ORIGINAL_PANEL_BUILDER(customer_id, data, guild)
-        if not data.get("quick_order_v2") or str(data.get("category") or "") == VIP_TIMER_CATEGORY:
+        if (
+            not data.get("quick_order_v2")
+            or str(data.get("category") or "") == VIP_TIMER_CATEGORY
+        ):
             return embed
+
         category = str(data.get("category") or "")
         group = str(data.get("item_group") or "尚未選擇")
         embed.title = f"快速下單｜{ORDER_CATEGORY_LABELS.get(category, category)}"
@@ -476,11 +641,18 @@ def _install_ticket_patch() -> None:
             "請完成規格／陪玩人數與時長／數量；不需要重新選遊戲或服務。\n"
             "送出後先進入等待接單，人數滿後才開放付款。"
         )
+
         for index, name in enumerate(("遊戲", "服務", "規格", "數量")):
             if index >= len(embed.fields):
                 break
             field = embed.fields[index]
-            embed.set_field_at(index, name=name, value=field.value, inline=field.inline)
+            embed.set_field_at(
+                index,
+                name=name,
+                value=field.value,
+                inline=field.inline,
+            )
+
         embed.set_footer(text="新版快速下單｜遊戲與服務已在開票前確認")
         return embed
 
@@ -488,12 +660,17 @@ def _install_ticket_patch() -> None:
     ui.build_self_service_panel_embed = quick_panel_builder
     runtime.build_self_service_panel_embed = quick_panel_builder
     selection_runtime.build_self_service_panel_embed = quick_panel_builder
+
     state = getattr(order_runtime, "_RUNTIME_STATE", None)
     if state is not None:
         try:
-            order_runtime._RUNTIME_STATE = replace(state, self_service_panel_embed_builder=quick_panel_builder)
+            order_runtime._RUNTIME_STATE = replace(
+                state,
+                self_service_panel_embed_builder=quick_panel_builder,
+            )
         except Exception:
             pass
+
     _PATCH_INSTALLED = True
     print("[quick-order-v2] ticket patch installed", flush=True)
 
@@ -503,8 +680,12 @@ def _view_for_channel(channel_id: int) -> discord.ui.View:
         return QuickDeltaEntryView()
     if channel_id == QUICK_ORDER_V2_CHANNELS["vip_timer"]:
         return QuickVipEntryView()
+
     category, _ = _GAME_ENTRY_META[channel_id]
-    return QuickGameEntryView(category=category, source_channel_id=channel_id)
+    return QuickGameEntryView(
+        category=category,
+        source_channel_id=channel_id,
+    )
 
 
 async def _ensure_panel(bot: commands.Bot, channel_id: int) -> None:
@@ -515,8 +696,12 @@ async def _ensure_panel(bot: commands.Bot, channel_id: int) -> None:
             channel = fetched if isinstance(fetched, discord.TextChannel) else None
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             channel = None
+
     if not isinstance(channel, discord.TextChannel):
-        print(f"[quick-order-v2] channel not found: {channel_id}", flush=True)
+        print(
+            f"[quick-order-v2] channel not found: {channel_id}",
+            flush=True,
+        )
         return
 
     target: discord.Message | None = None
@@ -524,19 +709,28 @@ async def _ensure_panel(bot: commands.Bot, channel_id: int) -> None:
         async for message in channel.history(limit=50):
             if bot.user is not None and message.author.id != bot.user.id:
                 continue
-            if any(str(getattr(embed.footer, "text", "") or "") == _marker(channel_id) for embed in message.embeds):
+            if any(
+                str(getattr(embed.footer, "text", "") or "") == _marker(channel_id)
+                for embed in message.embeds
+            ):
                 target = message
                 break
     except (discord.Forbidden, discord.HTTPException):
         pass
 
     try:
+        view = _view_for_channel(channel_id)
+        embed = build_entry_embed(channel_id)
         if target is None:
-            await channel.send(embed=build_entry_embed(channel_id), view=_view_for_channel(channel_id))
+            await channel.send(embed=embed, view=view)
         else:
-            await target.edit(embed=build_entry_embed(channel_id), view=_view_for_channel(channel_id))
+            await target.edit(embed=embed, view=view)
     except (discord.Forbidden, discord.HTTPException) as exc:
-        print(f"[quick-order-v2] panel sync failed {channel_id}: {type(exc).__name__}: {exc}", flush=True)
+        print(
+            f"[quick-order-v2] panel sync failed {channel_id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
 
 
 async def ensure_quick_order_v2_panels(bot: commands.Bot) -> None:
@@ -547,11 +741,13 @@ async def ensure_quick_order_v2_panels(bot: commands.Bot) -> None:
 
 def install_quick_order_v2(bot: commands.Bot) -> None:
     _install_ticket_patch()
+
     if not getattr(bot, "_quick_order_v2_views_registered", False):
         for channel_id in QUICK_ORDER_V2_CHANNELS.values():
             bot.add_view(_view_for_channel(channel_id))
         bot._quick_order_v2_views_registered = True
         print("[quick-order-v2] persistent views registered", flush=True)
+
     if not getattr(bot, "_quick_order_v2_panel_task_started", False):
         bot._quick_order_v2_panel_task_started = True
         bot.loop.create_task(ensure_quick_order_v2_panels(bot))
