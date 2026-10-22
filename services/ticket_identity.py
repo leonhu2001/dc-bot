@@ -9,6 +9,19 @@ from core.time_utils import get_taipei_now
 
 _RECRUIT_APPLICANT_ROLE_ID = 0
 
+_ORDER_TICKET_STATUS_EMOJI = {
+    "created": "🟢",
+    "pending_cs_dispatch": "🟡",
+    "waiting_acceptance": "🟡",
+    "accepted_pending_pay": "🟡",
+    "paid": "🟢",
+    "active": "🟢",
+    "stored": "🟠",
+    "closed": "⚫",
+    "cancelled": "🔴",
+    "canceled": "🔴",
+}
+
 
 def configure_ticket_identity(*, recruit_applicant_role_id: int) -> None:
     global _RECRUIT_APPLICANT_ROLE_ID
@@ -21,12 +34,44 @@ def _clean_ticket_channel_part(value: str, *, fallback: str = "user") -> str:
     return clean or fallback
 
 
+def _order_prefix_emoji(prefix: str) -> str | None:
+    text = str(prefix or "").strip().lower()
+
+    # Preserve a status emoji supplied by a caller while removing any legacy
+    # "點單・" / status wording from the rest of the channel name.
+    for emoji in ("🔴", "⚫", "🟠", "🟡", "🟢", "⚪"):
+        if emoji in text:
+            return emoji
+
+    if any(token in text for token in ("取消", "cancel")):
+        return "🔴"
+    if any(token in text for token in ("結單", "closed", "完成")):
+        return "⚫"
+    if any(token in text for token in ("存單", "stored", "暫存")):
+        return "🟠"
+    if any(token in text for token in ("等待", "待付款", "待接單", "pending", "acceptance")):
+        return "🟡"
+    if any(token in text for token in ("下單", "點單", "訂單", "服務中", "active", "paid", "客服中心")):
+        return "🟢"
+    return None
+
+
+def order_ticket_channel_name_for_status(status: str | None) -> str:
+    normalized = str(status or "created").strip().lower()
+    emoji = _ORDER_TICKET_STATUS_EMOJI.get(normalized, "🟢")
+    return f"{emoji}・客服中心"
+
+
 def build_ticket_channel_name(
     prefix: str,
     member: discord.Member | None = None,
     *,
     display_name: str | None = None,
 ) -> str:
+    order_emoji = _order_prefix_emoji(prefix)
+    if order_emoji is not None:
+        return f"{order_emoji}・客服中心"
+
     raw_name = (
         display_name
         or (member.display_name if member is not None else None)
