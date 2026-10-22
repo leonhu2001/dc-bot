@@ -37,10 +37,50 @@ def _rule_group_label(detail: dict) -> str:
     return str(getattr(rule, "catalog_group_label", "") or "").strip()
 
 
+def _semantic_family(detail: dict) -> str:
+    """Keep distinct gameplay products apart before grouping by headcount.
+
+    Several Delta products intentionally share the same spec label (for example
+    技術｜機密), but they are not the same gameplay: ordinary 技術陪 and
+    一陪一護 have different staffing and payout rules. Grouping by spec first can
+    therefore silently replace one product with the other. Prefer the product's
+    explicit catalog group whenever present; otherwise derive a stable gameplay
+    family from the VIP spec label.
+    """
+    explicit = _rule_group_label(detail)
+    if explicit:
+        return f"group:{explicit}"
+
+    spec = str(detail.get("vip_timer_spec_label") or "").strip()
+    item = str(detail.get("item") or detail.get("label") or "").strip()
+    text = f"{spec}｜{item}"
+
+    if "絕巴技術陪" in text:
+        return "builtin:絕巴技術陪"
+    if "黑潮" in text:
+        return "builtin:黑潮爆破"
+    if "娛樂" in text:
+        return "builtin:娛樂陪"
+    if "甜蜜" in text:
+        return "builtin:甜蜜"
+    if "教學" in text or "導師" in text:
+        return "builtin:教學"
+    if "技術" in text:
+        return "builtin:技術陪"
+
+    head = spec.split("｜", 1)[0].strip() if spec else "其他"
+    return f"builtin:{head or '其他'}"
+
+
 def _display_gameplay_label(group: dict) -> str:
     details = list(group.get("details") or ())
     original = str(group.get("label") or "玩法").strip() or "玩法"
-    base = next((_rule_group_label(row) for row in details if _rule_group_label(row)), "")
+    bases = [
+        _rule_group_label(row)
+        for row in details
+        if _rule_group_label(row)
+    ]
+    base = bases[0] if bases and all(value == bases[0] for value in bases) else ""
 
     if not base:
         if original == "娛樂":
@@ -71,11 +111,40 @@ def _gameplay_groups(details: list[dict]) -> list[dict]:
     if _ORIGINAL_SPEC_GROUPS is None:
         return []
 
-    rows = []
-    for raw_group in list(_ORIGINAL_SPEC_GROUPS(details) or ()):
-        group = dict(raw_group)
-        group["label"] = _display_gameplay_label(group)
-        rows.append(group)
+    # Split by semantic gameplay family *before* v3 collapses equal spec labels.
+    # This prevents ordinary 技術陪 and 一陪一護 from competing for the same
+    # 單陪/雙陪 slot simply because both happen to use 機密／絕密 wording.
+    family_rows: dict[str, list[dict]] = {}
+    family_order: list[str] = []
+    for detail in list(details or ()):
+        family = _semantic_family(detail)
+        if family not in family_rows:
+            family_rows[family] = []
+            family_order.append(family)
+        family_rows[family].append(detail)
+
+    rows: list[dict] = []
+    seen_keys: set[str] = set()
+    for family in family_order:
+        for raw_group in list(_ORIGINAL_SPEC_GROUPS(family_rows[family]) or ()):
+            group = dict(raw_group)
+            display = _display_gameplay_label(group)
+            group["label"] = display
+            # v2 uses the group key as the select value. Make it family-aware so
+            # two distinct gameplay families can never collide on Discord.
+            group["key"] = f"{family}:{str(group.get('key') or display)}"[:100]
+            if group["key"] in seen_keys:
+                continue
+            seen_keys.add(group["key"])
+            rows.append(group)
+
+    # Keep the pre-existing gameplay ordering from v3/v5 after the family split.
+    try:
+        from services import vip_timer_selector_order_v3 as v3
+
+        rows.sort(key=v3._group_sort_key)
+    except Exception:
+        pass
     return rows
 
 
