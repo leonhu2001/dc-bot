@@ -36,6 +36,10 @@ class WebConfig:
     )
     DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
     DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
+    LOTTERY_ANNOUNCE_CHANNEL_ID = os.getenv(
+        "LOTTERY_ANNOUNCE_CHANNEL_ID",
+        "1482079302739693739",
+    ).strip()
 
     # 總管：整店最高管理層。既有 is_admin 欄位保留相容，但真正的
     # 全店敏感功能應以這組角色作為 manager 判斷來源。
