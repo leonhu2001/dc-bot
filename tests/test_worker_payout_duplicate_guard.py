@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import Column, Integer, String, create_engine, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import Column, Integer, String, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Session
 
-from shared.db import ensure_worker_payout_constraints
+import shared.db  # noqa: F401 - registers the payout Session guards
 
 
 class _TestBase(DeclarativeBase):
@@ -21,25 +20,14 @@ class _PendingWorkerPayout(_TestBase):
     final_payout = Column(Integer, nullable=False, default=0)
 
 
-def _create_minimal_worker_payout_table(engine) -> None:
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                CREATE TABLE worker_payouts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    order_id INTEGER NOT NULL,
-                    worker_discord_id TEXT NOT NULL,
-                    final_payout INTEGER NOT NULL DEFAULT 0
-                )
-                """
-            )
-        )
+def _create_engine(tmp_path, name: str):
+    engine = create_engine(f"sqlite:///{tmp_path / name}")
+    _TestBase.metadata.create_all(engine)
+    return engine
 
 
 def test_pending_duplicate_worker_payouts_are_collapsed_before_flush(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'pending.db'}")
-    _TestBase.metadata.create_all(engine)
+    engine = _create_engine(tmp_path, "pending.db")
 
     with Session(engine, autoflush=False) as db:
         db.add(
@@ -69,9 +57,8 @@ def test_pending_duplicate_worker_payouts_are_collapsed_before_flush(tmp_path):
     assert rows == [(270, "worker-1", 120)]
 
 
-def test_existing_duplicates_are_preserved_but_future_duplicates_are_blocked(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'historical.db'}")
-    _create_minimal_worker_payout_table(engine)
+def test_new_duplicate_against_existing_rows_rolls_back_without_rewriting_history(tmp_path):
+    engine = _create_engine(tmp_path, "historical.db")
 
     with engine.begin() as conn:
         conn.execute(
@@ -81,64 +68,105 @@ def test_existing_duplicates_are_preserved_but_future_duplicates_are_blocked(tmp
             )
         )
 
-    ensure_worker_payout_constraints(engine)
-
-    with engine.begin() as conn:
-        count = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM worker_payouts "
-                "WHERE order_id=270 AND worker_discord_id='worker-1'"
-            )
-        ).scalar_one()
-        unique_index = conn.execute(
-            text(
-                "SELECT 1 FROM sqlite_master "
-                "WHERE type='index' AND name='uq_worker_payouts_order_worker'"
-            )
-        ).first()
-
-    assert count == 2
-    assert unique_index is None
-
-    with pytest.raises(IntegrityError, match="worker_payout_duplicate_guard"):
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO worker_payouts(order_id, worker_discord_id, final_payout) "
-                    "VALUES (270, 'worker-1', 100)"
+    with pytest.raises(RuntimeError, match="worker_payout_duplicate_guard"):
+        with Session(engine, autoflush=False) as db:
+            db.add(
+                _PendingWorkerPayout(
+                    order_id=270,
+                    worker_discord_id="worker-1",
+                    final_payout=130,
                 )
             )
+            db.commit()
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT final_payout FROM worker_payouts "
+                "WHERE order_id=270 AND worker_discord_id='worker-1' "
+                "ORDER BY id"
+            )
+        ).all()
+
+    assert rows == [(100,), (100,)]
 
 
-def test_clean_worker_payout_table_gets_unique_index(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'clean.db'}")
-    _create_minimal_worker_payout_table(engine)
+def test_legacy_delete_then_add_rebuild_remains_compatible(tmp_path):
+    engine = _create_engine(tmp_path, "replace.db")
 
     with engine.begin() as conn:
         conn.execute(
             text(
                 "INSERT INTO worker_payouts(order_id, worker_discord_id, final_payout) "
-                "VALUES (270, 'worker-1', 100), (270, 'worker-2', 100)"
+                "VALUES (270, 'worker-1', 100)"
             )
         )
 
-    ensure_worker_payout_constraints(engine)
+    with Session(engine, autoflush=False) as db:
+        existing = db.scalar(
+            select(_PendingWorkerPayout)
+            .where(_PendingWorkerPayout.order_id == 270)
+            .where(_PendingWorkerPayout.worker_discord_id == "worker-1")
+        )
+        assert existing is not None
+        db.delete(existing)
+        db.add(
+            _PendingWorkerPayout(
+                order_id=270,
+                worker_discord_id="worker-1",
+                final_payout=120,
+            )
+        )
+        db.commit()
 
     with engine.begin() as conn:
-        unique_index = conn.execute(
+        rows = conn.execute(
             text(
-                "SELECT 1 FROM sqlite_master "
-                "WHERE type='index' AND name='uq_worker_payouts_order_worker'"
+                "SELECT final_payout FROM worker_payouts "
+                "WHERE order_id=270 AND worker_discord_id='worker-1'"
             )
-        ).first()
+        ).all()
 
-    assert unique_index is not None
+    assert rows == [(120,)]
 
-    with pytest.raises(IntegrityError):
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO worker_payouts(order_id, worker_discord_id, final_payout) "
-                    "VALUES (270, 'worker-1', 100)"
-                )
+
+def test_safe_repair_can_replace_historical_duplicates_with_one_row(tmp_path):
+    engine = _create_engine(tmp_path, "repair.db")
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO worker_payouts(order_id, worker_discord_id, final_payout) "
+                "VALUES (270, 'worker-1', 100), (270, 'worker-1', 100)"
             )
+        )
+
+    with Session(engine, autoflush=False) as db:
+        existing_rows = list(
+            db.scalars(
+                select(_PendingWorkerPayout)
+                .where(_PendingWorkerPayout.order_id == 270)
+                .where(_PendingWorkerPayout.worker_discord_id == "worker-1")
+            ).all()
+        )
+        assert len(existing_rows) == 2
+        for row in existing_rows:
+            db.delete(row)
+        db.add(
+            _PendingWorkerPayout(
+                order_id=270,
+                worker_discord_id="worker-1",
+                final_payout=120,
+            )
+        )
+        db.commit()
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT final_payout FROM worker_payouts "
+                "WHERE order_id=270 AND worker_discord_id='worker-1'"
+            )
+        ).all()
+
+    assert rows == [(120,)]
