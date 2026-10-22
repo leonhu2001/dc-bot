@@ -40,10 +40,14 @@ def configure_vip_timer_acceptance(bot_instance, guild_id: int) -> None:
     from services.vip_timer_select_flow import install_vip_timer_select_flow
     from services.vip_timer_selector_order_v2 import install_vip_timer_selector_order_v2
     from services.vip_timer_selector_order_v3 import install_vip_timer_selector_order_v3
+    from services.vip_timer_selector_order_v4 import install_vip_timer_selector_order_v4
 
     install_vip_timer_select_flow()
     install_vip_timer_selector_order_v2()
     install_vip_timer_selector_order_v3()
+    # v4 fixes the checkout hierarchy to category -> game -> gameplay ->
+    # headcount without changing the normal self-service catalog.
+    install_vip_timer_selector_order_v4()
 
     from services.vip_timer_policy_v5 import install_vip_timer_policy_v5
 
