@@ -90,4 +90,20 @@ from web.app.services.admin_order_rules_policy import (
 
 _install_admin_order_rules_policy(_admin_order_rules)
 
+# Roulette identity must follow the live product catalog. The original module
+# accidentally hard-coded a 2026-10-07 historical fun-order key (說都不會話),
+# which made that old order appear in roulette operations. Install the identity
+# correction before the roulette router imports its service functions by name.
+from web.app.services.roulette_identity_policy import (
+    install_roulette_identity_policy as _install_roulette_identity_policy,
+)
+
+_install_roulette_identity_policy()
+
+# Lottery operations belong to the shared admin shell. Mount the small admin
+# router through site.router so main.py does not need another bootstrap import.
+from web.app.routers.admin_lottery import router as _admin_lottery_router
+
+_site.router.include_router(_admin_lottery_router)
+
 __all__ = []
