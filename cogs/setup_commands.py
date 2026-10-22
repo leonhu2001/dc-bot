@@ -10,7 +10,10 @@ from services.payment_review_runtime import ensure_payment_review_worker_started
 from services.vip_timer_self_service import install_vip_timer_self_service
 from services.quick_order_v2 import install_quick_order_v2
 from services.quick_order_v2_fixes import install_quick_order_v2_fixes
-from views.panels import MainPanelView
+from services.quick_order_v2_production import install_quick_order_v2_production
+from services.main_service_panel_runtime import install_main_service_panel_sync
+from services.order_ticket_name_runtime import install_order_ticket_name_sync
+from views.panels import MainPanelView, build_main_panel_embed
 from views.topups import TopupPanelView
 from views.staff_management import (
     StaffManagementPanelView,
@@ -31,6 +34,9 @@ class SetupCommands(commands.Cog):
         install_vip_timer_self_service()
         install_quick_order_v2_fixes(bot)
         install_quick_order_v2(bot)
+        install_quick_order_v2_production(bot)
+        install_main_service_panel_sync(bot)
+        install_order_ticket_name_sync(bot)
 
         if not getattr(
             bot,
@@ -55,20 +61,11 @@ class SetupCommands(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.default_permissions(manage_messages=True)
     async def setup_panel(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="魔丸娛樂客服中心",
-            description=(
-                "歡迎來到魔丸娛樂，點擊下方按鈕聯絡客服\n"
-                "客服上班時間為： **AM 10:00 - 隔日 AM 2:00**"
-            ),
-            color=discord.Color.purple(),
-        )
-
         if not isinstance(interaction.channel, discord.TextChannel):
             await interaction.response.send_message("請在文字頻道使用這個指令。", ephemeral=True)
             return
 
-        await interaction.channel.send(embed=embed, view=MainPanelView())
+        await interaction.channel.send(embed=build_main_panel_embed(), view=MainPanelView())
         await interaction.response.send_message("客服面板已建立。", ephemeral=True)
 
     @setup.command(
