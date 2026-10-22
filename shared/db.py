@@ -47,6 +47,49 @@ if config.DATABASE_URL.startswith("sqlite"):
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
+
+@event.listens_for(Session, "before_flush")
+def _deduplicate_pending_worker_payouts(session, flush_context, instances) -> None:
+    """Collapse duplicate pending worker payouts before SQL is emitted.
+
+    SessionLocal intentionally disables autoflush. If a payout recalculation is
+    triggered twice in one transaction, the first set of newly-added
+    WorkerPayout objects may still only exist in ``session.new`` when the second
+    recalculation runs. A bulk DELETE therefore cannot see or remove them, and
+    both sets would otherwise be inserted together at commit time.
+
+    A worker has exactly one payout row per order, so keeping the newest pending
+    object for the same ``(order_id, worker_discord_id)`` key is deterministic
+    and prevents that same-session failure mode without touching persisted
+    accounting history.
+    """
+
+    newest_by_key = {}
+    stale_objects = []
+
+    for obj in list(session.new):
+        if getattr(obj, "__tablename__", None) != "worker_payouts":
+            continue
+
+        order_id = getattr(obj, "order_id", None)
+        worker_discord_id = str(
+            getattr(obj, "worker_discord_id", "") or ""
+        ).strip()
+
+        if order_id is None or not worker_discord_id:
+            continue
+
+        key = (int(order_id), worker_discord_id)
+        previous = newest_by_key.get(key)
+        if previous is not None:
+            stale_objects.append(previous)
+        newest_by_key[key] = obj
+
+    for obj in stale_objects:
+        if obj in session:
+            session.expunge(obj)
+
+
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -118,6 +161,87 @@ def ensure_sqlite_additive_columns(bind=engine) -> None:
                         "ADD COLUMN stream_bonus_override INTEGER"
                     )
                 )
+
+
+def ensure_worker_payout_constraints(bind=engine) -> None:
+    """Prevent new duplicate worker payout identities without rewriting history.
+
+    Historical duplicates are intentionally left untouched so startup can never
+    discard or merge potentially paid accounting rows. SQLite triggers block all
+    future duplicate inserts/identity changes immediately. When the table is
+    already clean, a normal unique index is installed as an additional database
+    invariant and query-planner hint.
+    """
+
+    if getattr(bind.dialect, "name", "") != "sqlite":
+        return
+
+    with bind.begin() as conn:
+        table_exists = conn.execute(
+            text(
+                "SELECT 1 FROM sqlite_master "
+                "WHERE type='table' AND name='worker_payouts'"
+            )
+        ).first()
+        if not table_exists:
+            return
+
+        conn.execute(
+            text(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_worker_payouts_unique_insert
+                BEFORE INSERT ON worker_payouts
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM worker_payouts
+                    WHERE order_id = NEW.order_id
+                      AND worker_discord_id = NEW.worker_discord_id
+                )
+                BEGIN
+                    SELECT RAISE(ABORT, 'worker_payout_duplicate_guard');
+                END
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TRIGGER IF NOT EXISTS trg_worker_payouts_unique_update
+                BEFORE UPDATE OF order_id, worker_discord_id ON worker_payouts
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM worker_payouts
+                    WHERE order_id = NEW.order_id
+                      AND worker_discord_id = NEW.worker_discord_id
+                      AND id <> OLD.id
+                )
+                BEGIN
+                    SELECT RAISE(ABORT, 'worker_payout_duplicate_guard');
+                END
+                """
+            )
+        )
+
+        duplicate_exists = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM worker_payouts
+                GROUP BY order_id, worker_discord_id
+                HAVING COUNT(*) > 1
+                LIMIT 1
+                """
+            )
+        ).first()
+
+        if duplicate_exists is None:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_worker_payouts_order_worker "
+                    "ON worker_payouts(order_id, worker_discord_id)"
+                )
+            )
 
 
 def ensure_store_binding_constraints(bind=engine) -> None:
@@ -202,6 +326,7 @@ def create_all_tables() -> None:
 
     Base.metadata.create_all(bind=engine)
     ensure_sqlite_additive_columns(engine)
+    ensure_worker_payout_constraints(engine)
     ensure_store_binding_constraints(engine)
 
     # order_acceptance_meta / claims are maintained outside SQLAlchemy's
