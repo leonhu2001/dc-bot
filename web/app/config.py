@@ -38,11 +38,9 @@ class WebConfig:
     DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID", "")
     LOTTERY_ANNOUNCE_CHANNEL_ID = os.getenv(
         "LOTTERY_ANNOUNCE_CHANNEL_ID",
-        "1482079302739693739",
+        "1537182199827267645",
     ).strip()
 
-    # 總管：整店最高管理層。既有 is_admin 欄位保留相容，但真正的
-    # 全店敏感功能應以這組角色作為 manager 判斷來源。
     ADMIN_ROLE_IDS = _parse_role_ids(
         "ADMIN_ROLE_IDS",
         "1537067761141030972",
@@ -73,8 +71,6 @@ class WebConfig:
     if not WEB_SECRET_KEY or WEB_SECRET_KEY == "change-this-secret":
         raise RuntimeError("WEB_SECRET_KEY 未設定或仍為預設值，請在 web/.env 設定正式密鑰")
 
-    # 正式環境預設一定使用 Secure cookie；本機 HTTP 開發若真的需要，
-    # 可在自己的 web/.env 明確設 WEB_COOKIE_HTTPS_ONLY=false。
     WEB_COOKIE_HTTPS_ONLY = os.getenv(
         "WEB_COOKIE_HTTPS_ONLY",
         "true",
@@ -85,19 +81,11 @@ class WebConfig:
         "https://mowanentertainment.com,https://www.mowanentertainment.com",
     )
 
-
     WEB_RECENT_AUTH_SECONDS = max(
         300,
-        int(
-            os.getenv(
-                "WEB_RECENT_AUTH_SECONDS",
-                "1800",
-            )
-        ),
+        int(os.getenv("WEB_RECENT_AUTH_SECONDS", "1800")),
     )
 
-    # Website support AI is optional. When unset, the chat widget and human
-    # handoff still work and a conservative local FAQ responder is used.
     AI_SUPPORT_API_URL = os.getenv(
         "AI_SUPPORT_API_URL",
         "https://api.openai.com/v1/responses",
@@ -112,10 +100,7 @@ class WebConfig:
     ).strip()
     AI_SUPPORT_TIMEOUT_SECONDS = max(
         3,
-        min(
-            30,
-            int(os.getenv("AI_SUPPORT_TIMEOUT_SECONDS", "12")),
-        ),
+        min(30, int(os.getenv("AI_SUPPORT_TIMEOUT_SECONDS", "12"))),
     )
 
     AI_OPERATIONS_MODEL = os.getenv(
@@ -124,10 +109,7 @@ class WebConfig:
     ).strip()
     AI_OPERATIONS_TIMEOUT_SECONDS = max(
         5,
-        min(
-            45,
-            int(os.getenv("AI_OPERATIONS_TIMEOUT_SECONDS", "20")),
-        ),
+        min(45, int(os.getenv("AI_OPERATIONS_TIMEOUT_SECONDS", "20"))),
     )
 
 
