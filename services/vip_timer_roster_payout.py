@@ -55,11 +55,28 @@ def _staff_names(order_id: int, db) -> dict[str, str | None]:
     return result
 
 
+def _staff_role_types(order_id: int, db) -> dict[str, str]:
+    """Return the best persisted service-role classification for timer staff."""
+    rows = db.scalars(
+        select(OrderAssignment)
+        .where(OrderAssignment.order_id == int(order_id))
+        .order_by(OrderAssignment.assigned_at.asc())
+    ).all()
+    result: dict[str, str] = {}
+    for row in rows:
+        worker_id = str(row.worker_discord_id or "").strip()
+        if not worker_id:
+            continue
+        role_type = str(row.role_type or "booster").strip().lower()
+        result[worker_id] = "companion" if role_type == "companion" else "booster"
+    return result
+
+
 def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
     rows = db.execute(
         text(
             """
-            SELECT hourly_rate, billable_seconds, staff_ids_json
+            SELECT rule_key, hourly_rate, billable_seconds, staff_ids_json
             FROM vip_timer_segments
             WHERE order_id=:order_id
               AND billable_seconds > 0
@@ -69,6 +86,12 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
         {"order_id": int(order_id)},
     ).mappings().all()
     shares: dict[str, Decimal] = defaultdict(Decimal)
+    role_types = _staff_role_types(int(order_id), db)
+
+    from services.one_companion_one_guard_payout import (
+        allocate_decimal_gross_shares,
+    )
+
     for row in rows:
         try:
             staff = json.loads(str(row.get("staff_ids_json") or "[]"))
@@ -84,6 +107,20 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
         seconds = max(0, int(row.get("billable_seconds") or 0))
         rate = max(0, int(row.get("hourly_rate") or 0))
         segment_gross = Decimal(rate) * Decimal(seconds) / Decimal(3600)
+
+        weighted = allocate_decimal_gross_shares(
+            str(row.get("rule_key") or ""),
+            [
+                (worker_id, role_types.get(worker_id, "booster"))
+                for worker_id in unique
+            ],
+            segment_gross,
+        )
+        if weighted is not None:
+            for worker_id, amount in weighted.items():
+                shares[worker_id] += amount
+            continue
+
         per_worker = segment_gross / Decimal(len(unique))
         for worker_id in unique:
             shares[worker_id] += per_worker
@@ -159,7 +196,7 @@ def _rewrite_worker_payouts(db, order: WebOrder) -> int:
         gross_share = int(shares[worker_id])
         base_payout = int(gross_share * WORKER_BASE_PAYOUT_RATE)
         final_payout = base_payout
-        note = "VIP 自由計時｜依各計時區段實際參與人員分帳"
+        note = "VIP 自由計時｜依各計時區段實際參與人員與單型分潤基準分帳"
         override = overrides.get(worker_id)
         if override is not None:
             final_payout = max(0, int(override.manual_final_payout or 0))
