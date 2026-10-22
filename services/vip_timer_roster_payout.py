@@ -72,6 +72,85 @@ def _staff_role_types(order_id: int, db) -> dict[str, str]:
     return result
 
 
+def _legacy_static_roster_staff_ids(order_id: int, db) -> list[str]:
+    """Recover a provably-static roster for early timer segments with no snapshot.
+
+    Some early production timer rows can have billable seconds while
+    ``staff_ids_json`` is still ``[]``. We only recover those rows when the
+    persisted acceptance ledger proves the roster stayed static: there must be
+    active claims, no inactive historical claims, and no timer roster-change
+    event. If assignments already exist, they must name the same workers.
+
+    Any ambiguity fails closed so a changed roster can never be guessed during
+    accounting reconciliation or safe repair.
+    """
+    try:
+        event_row = db.execute(
+            text(
+                """
+                SELECT 1
+                FROM vip_timer_events
+                WHERE order_id=:order_id
+                  AND action IN ('roster_change', 'resume_after_roster_change')
+                LIMIT 1
+                """
+            ),
+            {"order_id": int(order_id)},
+        ).first()
+    except Exception:
+        return []
+    if event_row is not None:
+        return []
+
+    try:
+        claim_columns = {
+            str(column.get("name") or "")
+            for column in inspect(db.get_bind()).get_columns("order_acceptance_claims")
+        }
+    except Exception:
+        return []
+    if "is_active" not in claim_columns:
+        return []
+
+    try:
+        claim_rows = db.execute(
+            text(
+                """
+                SELECT staff_discord_id, is_active
+                FROM order_acceptance_claims
+                WHERE order_id=:order_id
+                ORDER BY id ASC
+                """
+            ),
+            {"order_id": int(order_id)},
+        ).mappings().all()
+    except Exception:
+        return []
+
+    if not claim_rows or any(int(row.get("is_active") or 0) != 1 for row in claim_rows):
+        return []
+
+    staff_ids: list[str] = []
+    for row in claim_rows:
+        worker_id = str(row.get("staff_discord_id") or "").strip()
+        if worker_id and worker_id not in staff_ids:
+            staff_ids.append(worker_id)
+    if not staff_ids:
+        return []
+
+    assignment_ids = {
+        str(row.worker_discord_id or "").strip()
+        for row in db.scalars(
+            select(OrderAssignment).where(OrderAssignment.order_id == int(order_id))
+        ).all()
+        if str(row.worker_discord_id or "").strip()
+    }
+    if assignment_ids and assignment_ids != set(staff_ids):
+        return []
+
+    return staff_ids
+
+
 def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
     # Early VIP-timer installations (and historical test fixtures) predate the
     # rule_key column. Keep those ledgers readable: without a rule key they use
@@ -100,6 +179,7 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
     ).mappings().all()
     shares: dict[str, Decimal] = defaultdict(Decimal)
     role_types = _staff_role_types(int(order_id), db)
+    legacy_static_roster: list[str] | None = None
 
     from services.one_companion_one_guard_payout import (
         allocate_decimal_gross_shares,
@@ -115,6 +195,10 @@ def _raw_worker_shares(order_id: int, db) -> dict[str, Decimal]:
             worker_id = str(value or "").strip()
             if worker_id and worker_id not in unique:
                 unique.append(worker_id)
+        if not unique:
+            if legacy_static_roster is None:
+                legacy_static_roster = _legacy_static_roster_staff_ids(int(order_id), db)
+            unique = list(legacy_static_roster)
         if not unique:
             continue
         seconds = max(0, int(row.get("billable_seconds") or 0))
