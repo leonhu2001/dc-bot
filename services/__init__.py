@@ -56,3 +56,12 @@ from .self_service_financial_copy import (
 )
 
 _install_financial_copy()
+
+# A VIP timer session row alone is not enough to redefine an order's accounting
+# semantics. Install the shared identity/deletion guard for both Discord and Web
+# processes so retracted timer metadata cannot later attach to a normal order ID.
+from .vip_timer_integrity import (
+    install_vip_timer_integrity_guard as _install_vip_timer_integrity_guard,
+)
+
+_install_vip_timer_integrity_guard()

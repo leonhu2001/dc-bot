@@ -49,6 +49,10 @@ _PRODUCT_DEPENDENT_KEYS = (
     "effective_specify_fee",
     "specified_fee_before_waiver",
     "price_formula_version",
+    # Timer identity belongs to the selected timer product, never to a later
+    # ordinary product selected in the same ticket draft.
+    "vip_timer_order",
+    "vip_timer_source_category",
     # A manually entered base price belongs to one product only. Percentage/fixed
     # discounts are order-level inputs and are recalculated against the new product.
     "manual_staff_amount",

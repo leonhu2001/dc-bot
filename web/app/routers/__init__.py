@@ -4,6 +4,10 @@
 # integration here lets the existing /order router keep ownership of the public
 # storefront while adding one special category without duplicating the catalog.
 from services.vip_timer_catalog_guard import install_vip_timer_catalog_guard
+from services.vip_timer_integrity import (
+    cleanup_stale_vip_timer_rows,
+    install_vip_timer_accounting_integrity_guard,
+)
 from services.vip_timer_lifecycle import install_vip_timer_lifecycle_guard
 from services.vip_timer_ops import (
     ensure_vip_timer_ops_tables,
@@ -11,12 +15,22 @@ from services.vip_timer_ops import (
 )
 from services.vip_timer_pending_order_guard import install_web_pending_order_guard
 from services.vip_timer_roster_payout import install_vip_timer_roster_payout
+from web.app.services import accounting_reconciliation as _accounting_reconciliation
 
 install_vip_timer_catalog_guard()
 install_vip_timer_lifecycle_guard()
 install_vip_timer_snapshot_guard()
 ensure_vip_timer_ops_tables()
+_stale_timer_order_ids = cleanup_stale_vip_timer_rows()
+if _stale_timer_order_ids:
+    print(
+        "[vip-timer-integrity] removed stale timer metadata for order_ids="
+        + ",".join(str(order_id) for order_id in _stale_timer_order_ids),
+        flush=True,
+    )
+_generic_payout_checker = _accounting_reconciliation._check_payouts
 install_vip_timer_roster_payout()
+install_vip_timer_accounting_integrity_guard(_generic_payout_checker)
 # Patch the canonical public-order creation service before any request handler
 # imports it locally. A pending VIP timer payment blocks every new website order.
 install_web_pending_order_guard()
