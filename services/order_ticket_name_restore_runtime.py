@@ -27,6 +27,17 @@ def _topic_customer_id(channel: discord.TextChannel) -> int | None:
     return None
 
 
+def _status_from_simplified_name(name: str) -> str:
+    text = str(name or "")
+    if text.startswith("🟠"):
+        return "stored"
+    if text.startswith("⚫"):
+        return "closed"
+    if text.startswith("🔴"):
+        return "cancelled"
+    return "active"
+
+
 def _legacy_prefix(status: str) -> str:
     normalized = str(status or "").strip().lower()
     if normalized == "stored":
@@ -72,6 +83,8 @@ async def restore_unintentionally_simplified_order_ticket_names(
 
         data = selections.get(channel.id, {}) if isinstance(selections, dict) else {}
         status = str(data.get("status") or "") if isinstance(data, dict) else ""
+        if not status:
+            status = _status_from_simplified_name(channel.name)
         prefix = _legacy_prefix(status)
 
         member = channel.guild.get_member(customer_id)
