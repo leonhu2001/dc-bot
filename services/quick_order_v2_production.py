@@ -11,6 +11,16 @@ from services import quick_order_v2 as quick
 _INSTALLED = False
 _ORIGINAL_CREATE_TICKET = None
 _ORIGINAL_PANEL_BUILDER = None
+_ORIGINAL_VIEW_INIT = None
+
+
+_FARM_3X3_DETAIL_ORDER = {
+    "season_3x3": 0,
+    "season_3x3_loss": 1,
+    "season_3x3_skin": 2,
+    "season_3x3_skin_loss": 3,
+    "season_contract": 4,
+}
 
 
 def _clean_entry_embed(channel_id: int) -> discord.Embed:
@@ -305,6 +315,116 @@ def _install_panel_builder_cleanup() -> None:
             pass
 
 
+def _install_farm_ticket_ui() -> None:
+    """Make quick-order farm tickets reflect their actual product structure."""
+    global _ORIGINAL_VIEW_INIT
+    if _ORIGINAL_VIEW_INIT is not None:
+        return
+
+    from services import self_service_ui_runtime as ui
+    from services.order_rules import ORDER_RULES
+    from services.orders import get_self_service_quantity_meta
+
+    _ORIGINAL_VIEW_INIT = ui.SelfServiceOrderView.__init__
+    original = _ORIGINAL_VIEW_INIT
+
+    def farm_view_init(
+        self,
+        customer_id: int,
+        channel_id: int,
+        selected_category: str | None = None,
+    ):
+        original(self, customer_id, channel_id, selected_category)
+
+        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
+        if not data.get("quick_order_v2") or str(data.get("category") or "") != "farm":
+            return
+
+        item = str(data.get("item") or "").strip()
+        rule_key = str(data.get("order_rule_key") or "").strip()
+        rule = ORDER_RULES.get(rule_key)
+
+        for child in list(self.children):
+            custom_id = getattr(child, "custom_id", None)
+
+            if custom_id == "self_service_order_detail_select":
+                child.placeholder = "請選擇方案"
+                if hasattr(child, "options"):
+                    options = list(child.options)
+                    if any(str(getattr(option, "value", "")) in _FARM_3X3_DETAIL_ORDER for option in options):
+                        options.sort(
+                            key=lambda option: _FARM_3X3_DETAIL_ORDER.get(
+                                str(getattr(option, "value", "")),
+                                99,
+                            )
+                        )
+                        child.options.clear()
+                        child.options.extend(options)
+
+                    # Single-detail farm products (for example 部門任務) are
+                    # already auto-selected by selection_state; don't show a dead select.
+                    if item and len(options) <= 1:
+                        self.remove_item(child)
+
+            elif custom_id == "self_service_order_quantity_select":
+                if not item:
+                    self.remove_item(child)
+                    continue
+
+                meta = get_self_service_quantity_meta(
+                    data.get("category"),
+                    data.get("item_group"),
+                    data.get("item_detail_value"),
+                )
+                if meta and int(meta.get("min") or 1) == int(meta.get("max") or 1):
+                    self.remove_item(child)
+                else:
+                    child.placeholder = "請選擇數量"
+
+            elif custom_id == "self_service_order_specified_staff_button":
+                # Current farm/boosting products are not specifiable.
+                self.remove_item(child)
+
+            elif custom_id in {
+                "self_service_order_point_benefit_button",
+                "self_service_order_staff_discount_coupon_button",
+            }:
+                # These only make sense after a concrete farm variant is selected.
+                if not item:
+                    self.remove_item(child)
+
+            elif custom_id == "self_service_order_staff_price_button":
+                if not item or rule is None or str(getattr(rule, "pricing_type", "")) != "manual":
+                    self.remove_item(child)
+
+            elif custom_id == "self_service_order_go_payment_button" and not item:
+                child.disabled = True
+
+    ui.SelfServiceOrderView.__init__ = farm_view_init
+
+
+def install_quick_order_v2_production(bot: commands.Bot) -> None:
+    global _INSTALLED
+    if _INSTALLED:
+        return
+
+    quick.build_entry_embed = _clean_entry_embed
+    quick._ensure_panel = _clean_ensure_panel
+    quick._send_confirmation = _clean_confirmation
+    quick.QuickDeltaCategoryButton.callback = _clean_delta_callback
+
+    _install_create_ticket_cleanup()
+    _install_panel_builder_cleanup()
+    _install_farm_ticket_ui()
+
+    if not getattr(bot, "_quick_order_v2_copy_repair_started", False):
+        bot._quick_order_v2_copy_repair_started = True
+        bot.loop.create_task(repair_existing_quick_order_v2_copy(bot))
+
+    _INSTALLED = True
+    print("[quick-order-v2] production copy installed", flush=True)
+
+
 async def repair_existing_quick_order_v2_copy(bot: commands.Bot) -> None:
     await bot.wait_until_ready()
 
@@ -321,27 +441,6 @@ async def repair_existing_quick_order_v2_copy(bot: commands.Bot) -> None:
         if "quick_order_v2=1" not in str(channel.topic or ""):
             continue
         await _clean_ticket_messages(channel)
-
-
-def install_quick_order_v2_production(bot: commands.Bot) -> None:
-    global _INSTALLED
-    if _INSTALLED:
-        return
-
-    quick.build_entry_embed = _clean_entry_embed
-    quick._ensure_panel = _clean_ensure_panel
-    quick._send_confirmation = _clean_confirmation
-    quick.QuickDeltaCategoryButton.callback = _clean_delta_callback
-
-    _install_create_ticket_cleanup()
-    _install_panel_builder_cleanup()
-
-    if not getattr(bot, "_quick_order_v2_copy_repair_started", False):
-        bot._quick_order_v2_copy_repair_started = True
-        bot.loop.create_task(repair_existing_quick_order_v2_copy(bot))
-
-    _INSTALLED = True
-    print("[quick-order-v2] production copy installed", flush=True)
 
 
 __all__ = ["install_quick_order_v2_production", "repair_existing_quick_order_v2_copy"]
