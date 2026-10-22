@@ -11,6 +11,7 @@ from services import quick_order_v2 as quick
 
 _INSTALLED = False
 _ORIGINAL_CREATE_TICKET = None
+_ORIGINAL_DETAILS_RESOLVER = None
 
 
 def _normalized_label(value) -> str:
@@ -18,29 +19,83 @@ def _normalized_label(value) -> str:
     return " ".join(text.split())
 
 
-def _live_groups(category: str) -> list[str]:
-    """Read the live storefront catalog instead of the startup-time group snapshot.
+def _normalized_key(value) -> str:
+    return _normalized_label(value).casefold()
 
-    VIP timer groups are generated dynamically, and runtime catalog extensions may
-    add or replace groups after services.orders first built its compatibility maps.
-    Reading SELF_SERVICE_ORDER_CATALOG here keeps the quick-order entry aligned with
-    what the ticket UI actually uses.
+
+def _live_groups(category: str) -> list[str]:
+    """Return the live effective group labels used by the real ticket catalog.
+
+    This intentionally goes through DynamicOrderItemGroups instead of reading raw
+    catalog labels. Manager catalog_group_label overrides therefore stay aligned
+    between the public quick-order entry and the ticket detail selector.
     """
     if str(category) == str(quick.VIP_TIMER_CATEGORY):
         quick.refresh_vip_timer_self_service_catalog()
 
     result: list[str] = []
     seen: set[str] = set()
-    for group in orders.SELF_SERVICE_ORDER_CATALOG.get(str(category), []):
-        if not isinstance(group, dict):
-            continue
-        text = _normalized_label(group.get("label"))
+    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
+        text = _normalized_label(value)
         key = text.casefold()
         if not text or key in seen:
             continue
         seen.add(key)
         result.append(text)
     return result
+
+
+def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
+    """Merge visually-equivalent group names into one canonical detail list.
+
+    Older manager overrides can differ only by full/half-width characters or
+    whitespace. The public entry de-duplicates those names, so the ticket resolver
+    must use the same equivalence rule or it can show a group with zero details.
+    """
+    if _ORIGINAL_DETAILS_RESOLVER is None:
+        return []
+    if category is None or group_label is None:
+        return []
+
+    target_key = _normalized_key(group_label)
+    candidates: list[str] = []
+
+    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
+        text = str(value or "").strip()
+        if text and _normalized_key(text) == target_key and text not in candidates:
+            candidates.append(text)
+
+    raw_group = str(group_label or "").strip()
+    if raw_group and raw_group not in candidates:
+        candidates.insert(0, raw_group)
+
+    result: list[dict] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        for detail in _ORIGINAL_DETAILS_RESOLVER(category, candidate):
+            key = str(detail.get("rule_key") or detail.get("value") or detail.get("label") or "")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            result.append(dict(detail))
+    return result
+
+
+def _install_canonical_group_resolver() -> None:
+    global _ORIGINAL_DETAILS_RESOLVER
+    if _ORIGINAL_DETAILS_RESOLVER is not None:
+        return
+
+    _ORIGINAL_DETAILS_RESOLVER = orders.get_order_item_details_for_group
+    orders.get_order_item_details_for_group = _canonical_details
+
+    # These modules imported the resolver directly, so update their local aliases
+    # too. This is Discord-runtime only; the separate web process keeps its own UI.
+    from services import order_runtime
+    from services import self_service_selection_state as selection_state
+
+    order_runtime.get_order_item_details_for_group = _canonical_details
+    selection_state.get_order_item_details_for_group = _canonical_details
 
 
 def _delta_entry_init(self) -> None:
@@ -76,7 +131,15 @@ async def _attach_order_control_view(channel: discord.TextChannel) -> bool:
 
     try:
         async for message in channel.history(limit=12, oldest_first=True):
-            if "新版快速下單票口已建立" not in str(message.content or ""):
+            content = str(message.content or "")
+            if not any(
+                marker in content
+                for marker in (
+                    "新版快速下單票口已建立",
+                    "已選服務：",
+                    "請完成下方選項。",
+                )
+            ):
                 continue
             await message.edit(view=view_type())
             return True
@@ -144,7 +207,9 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # 1. Live catalog fixes both stale VIP start-game options and duplicate groups.
+    # 1. Public entry and ticket detail lookup now use the same effective group
+    # labels. This fixes the 3x3 group opening with an empty/disabled detail select.
+    _install_canonical_group_resolver()
     quick._groups = _live_groups
 
     # 2. Discord supports up to five buttons per action row; keep all four Delta
