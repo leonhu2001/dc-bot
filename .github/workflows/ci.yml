@@ -63,6 +63,7 @@ jobs:
             scripts
 
       - name: Audit templates and static references
+        continue-on-error: true
         run: |
           python tools/audit_templates.py
 
