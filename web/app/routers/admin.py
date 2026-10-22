@@ -342,6 +342,8 @@ async def admin_set_worker_payout_status(
 
     if not user:
         return redirect_to_admin(error="你沒有客服後台權限，或登入狀態已過期。")
+    if not user.get("is_manager"):
+        return redirect_to_admin(error="只有管理可以變更薪資已發放／未發放狀態。")
 
     db = SessionLocal()
 
@@ -371,6 +373,8 @@ async def admin_set_customer_service_payout_status(
 
     if not user:
         return redirect_to_admin(error="你沒有客服後台權限，或登入狀態已過期。")
+    if not user.get("is_manager"):
+        return redirect_to_admin(error="只有管理可以變更薪資已發放／未發放狀態。")
 
     db = SessionLocal()
 
