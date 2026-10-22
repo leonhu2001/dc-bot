@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import re
 import secrets
 import sqlite3
 from pathlib import Path
@@ -10,16 +8,15 @@ from urllib.parse import quote
 
 import requests
 
-from core.time_utils import get_taipei_now, get_taipei_now_iso
+from core.time_utils import get_taipei_now_iso
+from services.promotion_benefits import issue_benefit, list_templates
 from web.app.config import config
 
 
 ROOT = Path(__file__).resolve().parents[3]
 BOT_DB = ROOT / "bot.db"
-_PERIOD_RE = re.compile(r"^\d{4}-(?:0[1-9]|1[0-2])$")
 DISCORD_API_BASE = "https://discord.com/api/v10"
 GIVEAWAY_EMOJI = "🎉"
-FREE_GIVEAWAY_PERIOD = "free-reaction"
 
 
 def _connect() -> sqlite3.Connection:
@@ -32,10 +29,7 @@ def _discord_headers() -> dict[str, str]:
     token = str(config.DISCORD_BOT_TOKEN or "").strip()
     if not token:
         raise RuntimeError("網站尚未設定 Discord Bot Token，無法操作抽獎頻道。")
-    return {
-        "Authorization": f"Bot {token}",
-        "Content-Type": "application/json",
-    }
+    return {"Authorization": f"Bot {token}", "Content-Type": "application/json"}
 
 
 def _lottery_channel_id() -> str:
@@ -45,238 +39,135 @@ def _lottery_channel_id() -> str:
     return channel_id
 
 
+def _actor_id(value: str | int) -> int:
+    try:
+        actor = int(str(value or "0"))
+    except ValueError as exc:
+        raise ValueError("目前登入帳號缺少 Discord ID。") from exc
+    if actor <= 0:
+        raise ValueError("目前登入帳號缺少 Discord ID。")
+    return actor
+
+
 def ensure_lottery_admin_tables() -> None:
     BOT_DB.parent.mkdir(parents=True, exist_ok=True)
     with _connect() as conn:
         conn.executescript(
             """
-            CREATE TABLE IF NOT EXISTS lottery_settings (
-                key TEXT PRIMARY KEY,
-                data TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS lottery_entries (
-                period TEXT NOT NULL,
-                user_id INTEGER NOT NULL,
-                chances INTEGER NOT NULL DEFAULT 0,
-                points_used INTEGER NOT NULL DEFAULT 0,
-                updated_at TEXT NOT NULL,
-                PRIMARY KEY (period, user_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS lottery_draws (
+            CREATE TABLE IF NOT EXISTS lottery_campaigns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                period TEXT NOT NULL,
-                prize TEXT NOT NULL,
-                winner_id INTEGER NOT NULL,
-                drawn_by INTEGER NOT NULL,
-                drawn_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS lottery_free_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                channel_id TEXT NOT NULL,
-                message_id TEXT NOT NULL UNIQUE,
-                prize TEXT NOT NULL,
+                title TEXT NOT NULL,
                 description TEXT,
-                status TEXT NOT NULL DEFAULT 'open',
+                status TEXT NOT NULL DEFAULT 'draft',
+                channel_id TEXT,
+                message_id TEXT UNIQUE,
                 created_by INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
-                drawn_by INTEGER,
-                drawn_at TEXT,
-                winner_count INTEGER NOT NULL DEFAULT 0
+                updated_at TEXT NOT NULL,
+                published_at TEXT,
+                drawn_at TEXT
             );
 
-            CREATE INDEX IF NOT EXISTS idx_lottery_free_events_status
-            ON lottery_free_events(status, id DESC);
+            CREATE TABLE IF NOT EXISTS lottery_campaign_prizes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaign_id INTEGER NOT NULL,
+                template_id INTEGER NOT NULL,
+                prize_name TEXT NOT NULL,
+                winner_count INTEGER NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                drawn_at TEXT,
+                FOREIGN KEY(campaign_id) REFERENCES lottery_campaigns(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_lottery_campaign_status
+            ON lottery_campaigns(status, id DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_lottery_campaign_prizes_campaign
+            ON lottery_campaign_prizes(campaign_id, sort_order, id);
+
+            CREATE TABLE IF NOT EXISTS lottery_campaign_winners (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaign_id INTEGER NOT NULL,
+                prize_id INTEGER NOT NULL,
+                winner_id INTEGER NOT NULL,
+                issued_benefit_id INTEGER,
+                drawn_by INTEGER NOT NULL,
+                drawn_at TEXT NOT NULL,
+                UNIQUE(campaign_id, winner_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_lottery_campaign_winners_campaign
+            ON lottery_campaign_winners(campaign_id, prize_id, id);
             """
         )
         conn.commit()
 
 
-def _default_settings() -> dict[str, Any]:
-    return {
-        "period": get_taipei_now().strftime("%Y-%m"),
-        "title": "魔丸點數抽獎",
-        "note": "獎品由管理層討論後設定。",
-        "prizes": "獎池尚未設定，請等待管理層公告。",
-        "status": "open",
-        "cost_per_chance": 5,
-        "max_chances_per_user": 20,
-        "updated_at": get_taipei_now_iso(),
-    }
-
-
-def get_lottery_settings() -> dict[str, Any]:
-    ensure_lottery_admin_tables()
-    default = _default_settings()
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT data, updated_at FROM lottery_settings WHERE key='current'"
-        ).fetchone()
-
-    if row is None:
-        return default
-
-    try:
-        data = json.loads(str(row["data"] or "{}"))
-    except (TypeError, ValueError):
-        data = {}
-    if not isinstance(data, dict):
-        data = {}
-    for key, value in default.items():
-        data.setdefault(key, value)
-    data["updated_at"] = str(row["updated_at"] or data.get("updated_at") or "")
-    return data
-
-
-def save_lottery_settings(
-    *,
-    period: str,
-    title: str,
-    note: str,
-    prizes: str,
-    status: str,
-    cost_per_chance: int,
-    max_chances_per_user: int,
-) -> dict[str, Any]:
-    ensure_lottery_admin_tables()
-    period = str(period or "").strip()
-    if not _PERIOD_RE.fullmatch(period):
-        raise ValueError("期別請使用 YYYY-MM，例如 2026-10。")
-
-    title = str(title or "").strip()
-    if not title:
-        raise ValueError("請填寫抽獎名稱。")
-    if len(title) > 100:
-        raise ValueError("抽獎名稱最多 100 字。")
-
-    status = str(status or "open").strip().lower()
-    if status not in {"open", "closed"}:
-        raise ValueError("抽獎狀態不正確。")
-
-    cost = int(cost_per_chance or 0)
-    maximum = int(max_chances_per_user or 0)
-    if cost < 1 or cost > 100000:
-        raise ValueError("每次抽獎點數需介於 1～100000。")
-    if maximum < 1 or maximum > 1000:
-        raise ValueError("每人最多次數需介於 1～1000。")
-
-    data = {
-        "period": period,
-        "title": title,
-        "note": str(note or "").strip()[:2000],
-        "prizes": str(prizes or "").strip()[:4000],
-        "status": status,
-        "cost_per_chance": cost,
-        "max_chances_per_user": maximum,
-        "updated_at": get_taipei_now_iso(),
-    }
-
-    with _connect() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        conn.execute(
-            """
-            INSERT INTO lottery_settings (key, data, updated_at)
-            VALUES ('current', ?, ?)
-            ON CONFLICT(key)
-            DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at
-            """,
-            (
-                json.dumps(data, ensure_ascii=False, separators=(",", ":")),
-                data["updated_at"],
-            ),
-        )
-        conn.commit()
-    return data
-
-
-def _entries(period: str) -> list[dict[str, Any]]:
-    with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT user_id, chances, points_used, updated_at
-            FROM lottery_entries
-            WHERE period = ? AND chances > 0
-            ORDER BY chances DESC, updated_at ASC
-            """,
-            (str(period),),
-        ).fetchall()
-    return [dict(row) for row in rows]
-
-
-def _draws(limit: int = 80) -> list[dict[str, Any]]:
-    with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT rowid AS draw_rowid, period, prize, winner_id, drawn_by, drawn_at
-            FROM lottery_draws
-            ORDER BY rowid DESC
-            LIMIT ?
-            """,
-            (max(1, min(int(limit or 80), 300)),),
-        ).fetchall()
-    return [dict(row) for row in rows]
-
-
-def _active_free_event() -> dict[str, Any] | None:
+def _campaign_row(status: str) -> dict[str, Any] | None:
     ensure_lottery_admin_tables()
     with _connect() as conn:
         row = conn.execute(
-            """
-            SELECT *
-            FROM lottery_free_events
-            WHERE status = 'open'
-            ORDER BY id DESC
-            LIMIT 1
-            """
+            "SELECT * FROM lottery_campaigns WHERE status=? ORDER BY id DESC LIMIT 1",
+            (status,),
         ).fetchone()
     return dict(row) if row is not None else None
 
 
-def _free_event_message_url(event: dict[str, Any]) -> str:
+def _campaign_prizes(campaign_id: int) -> list[dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM lottery_campaign_prizes
+            WHERE campaign_id=? ORDER BY sort_order ASC, id ASC
+            """,
+            (int(campaign_id),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _campaign_winners(campaign_id: int) -> list[dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT w.*, p.prize_name
+            FROM lottery_campaign_winners w
+            JOIN lottery_campaign_prizes p ON p.id=w.prize_id
+            WHERE w.campaign_id=? ORDER BY w.id ASC
+            """,
+            (int(campaign_id),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _message_url(campaign: dict[str, Any]) -> str:
     guild_id = str(config.DISCORD_GUILD_ID or "").strip()
-    channel_id = str(event.get("channel_id") or "").strip()
-    message_id = str(event.get("message_id") or "").strip()
+    channel_id = str(campaign.get("channel_id") or "").strip()
+    message_id = str(campaign.get("message_id") or "").strip()
     if not guild_id or not channel_id or not message_id:
         return ""
     return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
 
 
-def _collect_free_participants(event: dict[str, Any]) -> list[dict[str, Any]]:
-    channel_id = str(event.get("channel_id") or "").strip()
-    message_id = str(event.get("message_id") or "").strip()
+def _collect_participants(campaign: dict[str, Any]) -> list[dict[str, Any]]:
+    channel_id = str(campaign.get("channel_id") or "").strip()
+    message_id = str(campaign.get("message_id") or "").strip()
     if not channel_id or not message_id:
         raise RuntimeError("目前抽獎活動缺少 Discord 訊息資料。")
 
     emoji = quote(GIVEAWAY_EMOJI, safe="")
-    url = (
-        f"{DISCORD_API_BASE}/channels/{channel_id}/messages/{message_id}"
-        f"/reactions/{emoji}"
-    )
+    url = f"{DISCORD_API_BASE}/channels/{channel_id}/messages/{message_id}/reactions/{emoji}"
     participants: dict[int, dict[str, Any]] = {}
     after = ""
-
     for _ in range(50):
         params: dict[str, Any] = {"limit": 100}
         if after:
             params["after"] = after
-        response = requests.get(
-            url,
-            headers=_discord_headers(),
-            params=params,
-            timeout=15,
-        )
+        response = requests.get(url, headers=_discord_headers(), params=params, timeout=15)
         if response.status_code != 200:
-            raise RuntimeError(
-                f"讀取 Discord 抽獎名單失敗（HTTP {response.status_code}）。"
-            )
-
+            raise RuntimeError(f"讀取 Discord 抽獎名單失敗（HTTP {response.status_code}）。")
         batch = response.json()
         if not isinstance(batch, list):
             raise RuntimeError("Discord 抽獎名單格式不正確。")
-
         for user in batch:
             if not isinstance(user, dict) or bool(user.get("bot")):
                 continue
@@ -286,298 +177,303 @@ def _collect_free_participants(event: dict[str, Any]) -> list[dict[str, Any]]:
                 continue
             if user_id > 0:
                 participants[user_id] = user
-
         if len(batch) < 100:
             break
         after = str((batch[-1] or {}).get("id") or "").strip()
         if not after:
             break
-
     return list(participants.values())
 
 
-def publish_free_giveaway(
+def save_campaign_draft(
     *,
-    prize: str,
+    title: str,
     description: str,
+    template_ids: list[int],
+    winner_counts: list[int],
     actor_discord_id: str | int,
 ) -> dict[str, Any]:
     ensure_lottery_admin_tables()
-    if _active_free_event() is not None:
-        raise ValueError("目前已有一場免費抽獎正在報名，請先開獎後再建立下一場。")
+    if _campaign_row("open") is not None:
+        raise ValueError("目前已有抽獎正在報名，請先完成開獎再建立下一場。")
 
-    prize_text = str(prize or "").strip()
-    if not prize_text:
-        raise ValueError("請填寫抽獎獎品。")
-    if len(prize_text) > 300:
-        raise ValueError("抽獎獎品最多 300 字。")
-    description_text = str(description or "").strip()[:1000]
+    actor = _actor_id(actor_discord_id)
+    title_text = str(title or "").strip()
+    if not title_text:
+        raise ValueError("請輸入抽獎活動名稱。")
+    if len(title_text) > 120:
+        raise ValueError("活動名稱最多 120 字。")
+    description_text = str(description or "").strip()[:1500]
 
-    try:
-        actor_id = int(str(actor_discord_id or "0"))
-    except ValueError as exc:
-        raise ValueError("目前登入帳號缺少 Discord ID。") from exc
-    if actor_id <= 0:
-        raise ValueError("目前登入帳號缺少 Discord ID。")
+    if len(template_ids) != len(winner_counts) or not template_ids:
+        raise ValueError("至少要設定一個獎項。")
 
+    active_templates = {int(row["id"]): row for row in list_templates(include_inactive=False)}
+    prizes: list[tuple[int, str, int]] = []
+    for raw_template_id, raw_count in zip(template_ids, winner_counts):
+        template_id = int(raw_template_id)
+        count = int(raw_count)
+        template = active_templates.get(template_id)
+        if template is None:
+            raise ValueError("有獎項已停用或不存在，請重新選擇。")
+        if count < 1 or count > 50:
+            raise ValueError("每個獎項的名額需介於 1～50 人。")
+        prizes.append((template_id, str(template.get("name") or "福利券"), count))
+
+    now = get_taipei_now_iso()
+    with _connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        draft = conn.execute(
+            "SELECT id FROM lottery_campaigns WHERE status='draft' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if draft is None:
+            cur = conn.execute(
+                """
+                INSERT INTO lottery_campaigns (
+                    title, description, status, created_by, created_at, updated_at
+                ) VALUES (?, ?, 'draft', ?, ?, ?)
+                """,
+                (title_text, description_text, actor, now, now),
+            )
+            campaign_id = int(cur.lastrowid)
+        else:
+            campaign_id = int(draft["id"])
+            conn.execute(
+                "UPDATE lottery_campaigns SET title=?, description=?, updated_at=? WHERE id=?",
+                (title_text, description_text, now, campaign_id),
+            )
+            conn.execute("DELETE FROM lottery_campaign_prizes WHERE campaign_id=?", (campaign_id,))
+
+        for index, (template_id, prize_name, count) in enumerate(prizes):
+            conn.execute(
+                """
+                INSERT INTO lottery_campaign_prizes (
+                    campaign_id, template_id, prize_name, winner_count, sort_order
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (campaign_id, template_id, prize_name, count, index),
+            )
+        conn.commit()
+
+    return get_campaign(campaign_id)
+
+
+def get_campaign(campaign_id: int) -> dict[str, Any]:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM lottery_campaigns WHERE id=?", (int(campaign_id),)).fetchone()
+    if row is None:
+        raise LookupError("找不到抽獎活動。")
+    campaign = dict(row)
+    campaign["prizes"] = _campaign_prizes(int(campaign["id"]))
+    campaign["winners"] = _campaign_winners(int(campaign["id"]))
+    campaign["message_url"] = _message_url(campaign)
+    return campaign
+
+
+def publish_campaign(*, actor_discord_id: str | int) -> dict[str, Any]:
+    ensure_lottery_admin_tables()
+    if _campaign_row("open") is not None:
+        raise ValueError("目前已有抽獎正在報名。")
+    draft = _campaign_row("draft")
+    if draft is None:
+        raise ValueError("請先儲存抽獎設定，再發布抽獎。")
+    campaign = get_campaign(int(draft["id"]))
+    if not campaign["prizes"]:
+        raise ValueError("請先新增至少一個獎項。")
+    _actor_id(actor_discord_id)
+
+    prize_lines = "\n".join(
+        f"{index}. **{prize['prize_name']}** × {int(prize['winner_count'])} 名"
+        for index, prize in enumerate(campaign["prizes"], start=1)
+    )
+    description = (
+        f"{str(campaign.get('description') or '').strip()}\n\n" if campaign.get("description") else ""
+    ) + (
+        f"**獎項**\n{prize_lines}\n\n"
+        f"**參加方式：** 按下方 {GIVEAWAY_EMOJI} 表情即可參加\n"
+        "**規則：** 每人僅計 1 次；同一場活動不會重複中獎"
+    )
     channel_id = _lottery_channel_id()
-    embed: dict[str, Any] = {
-        "title": "🎁 魔丸全店抽獎活動",
-        "description": (
-            f"**獎品：** {prize_text}\n\n"
-            f"**參加方式：** 按下方 {GIVEAWAY_EMOJI} 表情即可參加\n"
-            "**參加限制：** 每人限參加 1 次\n"
-            "**消耗：** 不消耗點數、不消耗任何東西"
-        ),
-        "color": 0xE0BA64,
-        "footer": {"text": "開獎時會從按下 🎉 的成員中隨機抽出得獎者。"},
-    }
-    if description_text:
-        embed["fields"] = [
-            {
-                "name": "活動說明",
-                "value": description_text,
-                "inline": False,
-            }
-        ]
-
     response = requests.post(
         f"{DISCORD_API_BASE}/channels/{channel_id}/messages",
         headers=_discord_headers(),
         json={
-            "content": "@everyone 🎁 魔丸全店抽獎開始！按下 🎉 參加抽獎！",
-            "embeds": [embed],
+            "content": "@everyone 🎁 魔丸抽獎開始！按下 🎉 參加抽獎！",
+            "embeds": [{"title": f"🎁 {campaign['title']}", "description": description[:4000], "color": 0xE0BA64}],
             "allowed_mentions": {"parse": ["everyone"]},
         },
         timeout=15,
     )
     if response.status_code not in {200, 201}:
-        raise RuntimeError(
-            f"發送抽獎報名訊息失敗（HTTP {response.status_code}）。"
-        )
-
-    payload = response.json()
-    message_id = str(payload.get("id") or "").strip()
+        raise RuntimeError(f"發送抽獎訊息失敗（HTTP {response.status_code}）。")
+    message_id = str(response.json().get("id") or "").strip()
     if not message_id:
         raise RuntimeError("Discord 沒有回傳抽獎訊息 ID。")
 
     emoji = quote(GIVEAWAY_EMOJI, safe="")
-    reaction_response = requests.put(
-        (
-            f"{DISCORD_API_BASE}/channels/{channel_id}/messages/{message_id}"
-            f"/reactions/{emoji}/@me"
-        ),
+    reaction = requests.put(
+        f"{DISCORD_API_BASE}/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me",
         headers=_discord_headers(),
         timeout=15,
     )
-    if reaction_response.status_code not in {200, 204}:
-        try:
-            requests.delete(
-                f"{DISCORD_API_BASE}/channels/{channel_id}/messages/{message_id}",
-                headers=_discord_headers(),
-                timeout=10,
-            )
-        except requests.RequestException:
-            pass
-        raise RuntimeError(
-            f"抽獎訊息已建立，但加入 🎉 反應失敗（HTTP {reaction_response.status_code}）。"
-        )
+    if reaction.status_code not in {200, 204}:
+        raise RuntimeError(f"抽獎訊息已建立，但加入 🎉 失敗（HTTP {reaction.status_code}）。")
 
-    created_at = get_taipei_now_iso()
+    now = get_taipei_now_iso()
     with _connect() as conn:
-        cursor = conn.execute(
+        conn.execute(
             """
-            INSERT INTO lottery_free_events (
-                channel_id, message_id, prize, description, status,
-                created_by, created_at, winner_count
-            )
-            VALUES (?, ?, ?, ?, 'open', ?, ?, 0)
+            UPDATE lottery_campaigns
+            SET status='open', channel_id=?, message_id=?, published_at=?, updated_at=?
+            WHERE id=? AND status='draft'
             """,
-            (
-                channel_id,
-                message_id,
-                prize_text,
-                description_text,
-                actor_id,
-                created_at,
-            ),
+            (channel_id, message_id, now, now, int(campaign["id"])),
         )
         conn.commit()
-        event_id = int(cursor.lastrowid)
-
-    return {
-        "id": event_id,
-        "channel_id": channel_id,
-        "message_id": message_id,
-        "prize": prize_text,
-        "description": description_text,
-        "status": "open",
-        "created_by": actor_id,
-        "created_at": created_at,
-    }
+    return get_campaign(int(campaign["id"]))
 
 
-def draw_free_giveaway(
+def draw_campaign(
     *,
-    winners: int,
     actor_discord_id: str | int,
+    prize_id: int | None = None,
 ) -> dict[str, Any]:
     ensure_lottery_admin_tables()
-    event = _active_free_event()
-    if event is None:
-        raise ValueError("目前沒有等待開獎的免費抽獎。")
-
-    try:
-        actor_id = int(str(actor_discord_id or "0"))
-    except ValueError as exc:
-        raise ValueError("目前登入帳號缺少 Discord ID。") from exc
-    if actor_id <= 0:
-        raise ValueError("目前登入帳號缺少 Discord ID。")
-
-    winner_count = int(winners or 0)
-    if winner_count < 1 or winner_count > 50:
-        raise ValueError("得獎人數需介於 1～50 人。")
-
-    participants = _collect_free_participants(event)
+    actor = _actor_id(actor_discord_id)
+    open_row = _campaign_row("open")
+    if open_row is None:
+        raise ValueError("目前沒有等待開獎的活動。")
+    campaign = get_campaign(int(open_row["id"]))
+    participants = _collect_participants(campaign)
     if not participants:
         raise ValueError("目前還沒有人按 🎉 參加抽獎。")
 
-    picked_count = min(winner_count, len(participants))
-    picked = secrets.SystemRandom().sample(participants, picked_count)
-    prize_text = str(event.get("prize") or "抽獎獎品")
-    winner_mentions = "\n".join(
-        f"{index}. <@{str(user.get('id') or '')}>"
-        for index, user in enumerate(picked, start=1)
-    )
+    drawn_user_ids = {int(row["winner_id"]) for row in campaign["winners"]}
+    available = [u for u in participants if int(str(u.get("id") or "0")) not in drawn_user_ids]
+    pending = [p for p in campaign["prizes"] if not p.get("drawn_at")]
+    if prize_id:
+        pending = [p for p in pending if int(p["id"]) == int(prize_id)]
+        if not pending:
+            raise ValueError("這個獎項已經開過獎或不存在。")
+    if not pending:
+        raise ValueError("這場活動已沒有待開獎項。")
 
-    channel_id = str(event.get("channel_id") or "").strip()
-    message_id = str(event.get("message_id") or "").strip()
-    result_response = requests.post(
+    results: list[dict[str, Any]] = []
+    rng = secrets.SystemRandom()
+    now = get_taipei_now_iso()
+
+    for prize in pending:
+        wanted = int(prize["winner_count"])
+        picked = rng.sample(available, min(wanted, len(available))) if available else []
+        prize_winners: list[int] = []
+        for user in picked:
+            user_id = int(str(user.get("id") or "0"))
+            issued_id = issue_benefit(
+                template_id=int(prize["template_id"]),
+                customer_discord_id=user_id,
+                actor_discord_id=actor,
+                note=f"抽獎活動：{campaign['title']}",
+            )
+            with _connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO lottery_campaign_winners (
+                        campaign_id, prize_id, winner_id, issued_benefit_id, drawn_by, drawn_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (int(campaign["id"]), int(prize["id"]), user_id, int(issued_id), actor, now),
+                )
+                conn.commit()
+            prize_winners.append(user_id)
+            available = [candidate for candidate in available if int(str(candidate.get("id") or "0")) != user_id]
+
+        with _connect() as conn:
+            conn.execute("UPDATE lottery_campaign_prizes SET drawn_at=? WHERE id=?", (now, int(prize["id"])))
+            conn.commit()
+        results.append({"prize": prize, "winner_ids": prize_winners, "shortage": max(0, wanted - len(prize_winners))})
+
+    lines: list[str] = []
+    for result in results:
+        prize = result["prize"]
+        winners = result["winner_ids"]
+        mentions = "、".join(f"<@{user_id}>" for user_id in winners) if winners else "無可用參加者"
+        shortage = f"（尚缺 {result['shortage']} 名）" if result["shortage"] else ""
+        lines.append(f"**{prize['prize_name']}**：{mentions}{shortage}")
+
+    channel_id = str(campaign.get("channel_id") or "")
+    response = requests.post(
         f"{DISCORD_API_BASE}/channels/{channel_id}/messages",
         headers=_discord_headers(),
         json={
-            "content": "@everyone 🎉 魔丸全店抽獎開獎啦！恭喜得獎者！",
-            "embeds": [
-                {
-                    "title": "🎉 魔丸全店抽獎開獎",
-                    "description": (
-                        f"**獎品：** {prize_text}\n"
-                        f"**參加人數：** {len(participants)} 人\n"
-                        f"**得獎人數：** {picked_count} 人\n\n"
-                        f"{winner_mentions}"
-                    ),
-                    "color": 0x45B96B,
-                    "fields": [
-                        {
-                            "name": "原抽獎訊息",
-                            "value": f"https://discord.com/channels/{str(config.DISCORD_GUILD_ID or '@me')}/{channel_id}/{message_id}",
-                            "inline": False,
-                        }
-                    ],
-                    "footer": {
-                        "text": "本次抽獎不消耗點數，每人依 🎉 反應限算一次。"
-                    },
-                }
-            ],
+            "content": "@everyone 🎉 抽獎開獎！恭喜得獎者！",
+            "embeds": [{
+                "title": f"🎉 {campaign['title']}｜開獎結果",
+                "description": "\n\n".join(lines)[:4000],
+                "color": 0x45B96B,
+            }],
             "allowed_mentions": {"parse": ["everyone", "users"]},
         },
         timeout=15,
     )
-    if result_response.status_code not in {200, 201}:
-        raise RuntimeError(
-            f"抽獎完成，但公布結果失敗（HTTP {result_response.status_code}）。請勿重複按開獎，先確認 Discord 狀態。"
-        )
+    if response.status_code not in {200, 201}:
+        raise RuntimeError(f"得獎券已發放，但 Discord 公布結果失敗（HTTP {response.status_code}）。")
 
-    drawn_at = get_taipei_now_iso()
-    with _connect() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        current = conn.execute(
-            "SELECT status FROM lottery_free_events WHERE id = ? LIMIT 1",
-            (int(event["id"]),),
-        ).fetchone()
-        if current is None or str(current["status"] or "") != "open":
-            conn.rollback()
-            raise ValueError("這場抽獎已經開過獎，請重新整理頁面。")
-
-        for user in picked:
+    remaining = _campaign_prizes(int(campaign["id"]))
+    if all(bool(row.get("drawn_at")) for row in remaining):
+        with _connect() as conn:
             conn.execute(
-                """
-                INSERT INTO lottery_draws (
-                    period, prize, winner_id, drawn_by, drawn_at
-                )
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    FREE_GIVEAWAY_PERIOD,
-                    prize_text,
-                    int(str(user.get("id") or "0")),
-                    actor_id,
-                    drawn_at,
-                ),
+                "UPDATE lottery_campaigns SET status='drawn', drawn_at=?, updated_at=? WHERE id=?",
+                (now, now, int(campaign["id"])),
             )
-
-        conn.execute(
-            """
-            UPDATE lottery_free_events
-            SET status = 'drawn',
-                drawn_by = ?,
-                drawn_at = ?,
-                winner_count = ?
-            WHERE id = ?
-            """,
-            (actor_id, drawn_at, picked_count, int(event["id"])),
-        )
-        conn.commit()
+            conn.commit()
 
     return {
-        "event_id": int(event["id"]),
+        "campaign_id": int(campaign["id"]),
         "participant_count": len(participants),
-        "winner_count": picked_count,
-        "winner_ids": [int(str(user.get("id") or "0")) for user in picked],
+        "results": results,
     }
 
 
 def build_lottery_admin_snapshot() -> dict[str, Any]:
     ensure_lottery_admin_tables()
-    settings = get_lottery_settings()
-    period = str(settings.get("period") or get_taipei_now().strftime("%Y-%m"))
-    entries = _entries(period)
-    draws = _draws()
-    total_chances = sum(int(row.get("chances") or 0) for row in entries)
-    total_points = sum(int(row.get("points_used") or 0) for row in entries)
-    free_draws = [row for row in draws if str(row.get("period") or "") == FREE_GIVEAWAY_PERIOD]
-    point_draws = [row for row in draws if str(row.get("period") or "") != FREE_GIVEAWAY_PERIOD]
-    free_event = _active_free_event()
-    free_participant_count: int | None = None
-    free_participant_error = ""
+    templates = list_templates(include_inactive=False)
+    open_campaign = _campaign_row("open")
+    draft_campaign = _campaign_row("draft") if open_campaign is None else None
+    current = get_campaign(int(open_campaign["id"])) if open_campaign else (get_campaign(int(draft_campaign["id"])) if draft_campaign else None)
 
-    if free_event is not None:
-        free_event["message_url"] = _free_event_message_url(free_event)
+    participant_count: int | None = None
+    participant_error = ""
+    if open_campaign:
         try:
-            free_participant_count = len(_collect_free_participants(free_event))
+            participant_count = len(_collect_participants(current or open_campaign))
         except Exception as exc:
-            free_participant_error = f"{type(exc).__name__}: {exc}"
+            participant_error = f"{type(exc).__name__}: {exc}"
+
+    with _connect() as conn:
+        history_rows = conn.execute(
+            "SELECT * FROM lottery_campaigns WHERE status='drawn' ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+    history = []
+    for row in history_rows:
+        item = get_campaign(int(row["id"]))
+        history.append(item)
 
     return {
-        "settings": settings,
-        "entries": entries,
-        "draws": draws,
-        "free_draws": free_draws,
-        "point_draws": point_draws,
-        "participant_count": len(entries),
-        "total_chances": total_chances,
-        "total_points": total_points,
-        "free_event": free_event,
-        "free_participant_count": free_participant_count,
-        "free_participant_error": free_participant_error,
+        "templates": templates,
+        "campaign": current,
+        "is_open": bool(open_campaign),
+        "is_draft": bool(draft_campaign),
+        "participant_count": participant_count,
+        "participant_error": participant_error,
+        "history": history,
+        "channel_id": _lottery_channel_id(),
     }
 
 
 __all__ = [
     "build_lottery_admin_snapshot",
-    "draw_free_giveaway",
+    "draw_campaign",
     "ensure_lottery_admin_tables",
-    "get_lottery_settings",
-    "publish_free_giveaway",
-    "save_lottery_settings",
+    "publish_campaign",
+    "save_campaign_draft",
 ]
