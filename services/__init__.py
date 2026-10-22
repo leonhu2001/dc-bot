@@ -19,6 +19,12 @@ from .one_companion_one_guard_catalog import (
 
 _install_one_companion_one_guard_catalog()
 
+# AW 代撞沿用台服代肝代解分類，但需要分段單價與 Modal 發數輸入，
+# 因此集中由一個 system-owned extension 安裝，避免價格/UI 各自硬編碼。
+from .aw_collision_catalog import install_aw_collision_catalog as _install_aw_collision_catalog
+
+_install_aw_collision_catalog()
+
 # The legacy Black Diamond monthly free-choice benefit has been retired. Install
 # this before monthly-benefit integration so both Web and Discord read the same
 # current entitlement source while historical benefit rows remain auditable.
