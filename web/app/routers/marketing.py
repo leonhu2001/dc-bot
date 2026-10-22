@@ -82,18 +82,6 @@ async def admin_marketing(
     if not user or not user.get("is_admin"):
         return RedirectResponse(url="/no-access", status_code=303)
 
-    if not user.get("is_manager"):
-        return templates.TemplateResponse(
-            request=request,
-            name="no_access.html",
-            context={
-                "title": "沒有權限",
-                "message": "行銷漏斗僅限總管查看。",
-                "user": user,
-            },
-            status_code=403,
-        )
-
     snapshot = await run_in_threadpool(
         build_marketing_snapshot,
         days=days,
