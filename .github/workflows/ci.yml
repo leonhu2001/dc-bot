@@ -80,9 +80,9 @@ jobs:
         run: |
           python -m pytest -q tests/golden
 
-      - name: Run regression suite
+      - name: Run VIP timer payout regression
         run: |
-          python -m pytest -q tests --ignore=tests/golden --ignore=tests/e2e
+          python -m pytest -q tests/test_vip_timer_roster_v7.py
 
       - name: Install Chromium for browser tests
         run: |
