@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
+<script src="/static/js/csrf.js?v=1"></script>
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
+<link rel="stylesheet" href="/static/css/pages/admin_lottery_20261023.css?v=1">
+</head>
+<body class="mw-r5-admin">
+<div class="mw-r5-shell">
+    {% include "_admin_sidebar.html" %}
+    <section class="mw-r5-main-host">
+        <header class="mw-r5-page-header">
+            <div class="mw-r5-kicker">LOTTERY OPERATIONS</div>
+            <h1>抽獎管理</h1>
+            <p>免費反應抽獎與點數抽獎集中管理；俄羅斯輪盤仍屬於趣味單，不與一般活動抽獎混在一起。</p>
+        </header>
+        {% include "_admin_backbar.html" %}
+
+        <div class="mw-r5-legacy-body lottery-admin-page">
+            {% if message %}<div class="lottery-notice success">{{ message }}</div>{% endif %}
+            {% if error %}<div class="lottery-notice error">{{ error }}</div>{% endif %}
+
+            <section class="lottery-mode-grid">
+                <article class="lottery-mode-card">
+                    <div class="lottery-mode-head">
+                        <div><small>DISCORD GIVEAWAY</small><h2>免費反應抽獎</h2></div>
+                        <span class="lottery-badge">每人 1 次</span>
+                    </div>
+                    <p>顧客在 Discord 抽獎訊息按 🎉 參加，不消耗點數。客服與管理都可操作。</p>
+                    <div class="lottery-command-list">
+                        <code>/lottery panel</code><span>建立抽獎面板</span>
+                        <code>/lottery status</code><span>查看目前參加人數</span>
+                        <code>/lottery draw</code><span>抽出得獎者</span>
+                    </div>
+                    <div class="lottery-mini-stat">歷史開獎 {{ snapshot.free_draws | length }} 筆</div>
+                </article>
+
+                <article class="lottery-mode-card accent">
+                    <div class="lottery-mode-head">
+                        <div><small>POINT LOTTERY</small><h2>點數抽獎</h2></div>
+                        <span class="lottery-badge {% if snapshot.settings.status == 'open' %}open{% endif %}">{% if snapshot.settings.status == 'open' %}開放中{% else %}已關閉{% endif %}</span>
+                    </div>
+                    <p>{{ snapshot.settings.title }} · {{ snapshot.settings.period }}</p>
+                    <div class="lottery-stat-grid">
+                        <div><small>參加人數</small><strong>{{ snapshot.participant_count }}</strong></div>
+                        <div><small>總抽獎次數</small><strong>{{ snapshot.total_chances }}</strong></div>
+                        <div><small>已投入點數</small><strong>{{ snapshot.total_points }}</strong></div>
+                    </div>
+                    <div class="lottery-mini-stat">{{ snapshot.settings.cost_per_chance }} 點 / 次 · 每人最多 {{ snapshot.settings.max_chances_per_user }} 次</div>
+                </article>
+            </section>
+
+            <section class="lottery-panel">
+                <div class="lottery-section-head">
+                    <div><small>POINT LOTTERY SETTINGS</small><h2>點數抽獎設定</h2></div>
+                    <span>最後更新 {{ snapshot.settings.updated_at or '—' }}</span>
+                </div>
+                <form class="lottery-settings-form" method="post" action="/admin/lottery/settings">
+                    <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+                    <label>期別
+                        <input name="period" value="{{ snapshot.settings.period }}" placeholder="2026-10" required>
+                    </label>
+                    <label>活動名稱
+                        <input name="title" value="{{ snapshot.settings.title }}" maxlength="100" required>
+                    </label>
+                    <label>狀態
+                        <select name="status">
+                            <option value="open" {% if snapshot.settings.status == 'open' %}selected{% endif %}>開放報名</option>
+                            <option value="closed" {% if snapshot.settings.status != 'open' %}selected{% endif %}>關閉報名</option>
+                        </select>
+                    </label>
+                    <label>每次消耗點數
+                        <input type="number" name="cost_per_chance" min="1" max="100000" value="{{ snapshot.settings.cost_per_chance }}" required>
+                    </label>
+                    <label>每人最多次數
+                        <input type="number" name="max_chances_per_user" min="1" max="1000" value="{{ snapshot.settings.max_chances_per_user }}" required>
+                    </label>
+                    <label class="wide">獎池內容
+                        <textarea name="prizes" rows="4" maxlength="4000">{{ snapshot.settings.prizes }}</textarea>
+                    </label>
+                    <label class="wide">活動備註
+                        <textarea name="note" rows="3" maxlength="2000">{{ snapshot.settings.note }}</textarea>
+                    </label>
+                    <div class="lottery-form-action wide"><button type="submit">儲存抽獎設定</button></div>
+                </form>
+            </section>
+
+            <section class="lottery-panel">
+                <div class="lottery-section-head">
+                    <div><small>CURRENT POOL</small><h2>本期參加名單</h2></div>
+                    <span>{{ snapshot.settings.period }} · {{ snapshot.participant_count }} 人</span>
+                </div>
+                {% if snapshot.entries %}
+                <div class="lottery-table-wrap">
+                    <table class="lottery-table">
+                        <thead><tr><th>Discord ID</th><th>抽獎次數</th><th>已用點數</th><th>最後更新</th></tr></thead>
+                        <tbody>
+                        {% for row in snapshot.entries %}
+                            <tr><td>{{ row.user_id }}</td><td>{{ row.chances }}</td><td>{{ row.points_used }}</td><td>{{ row.updated_at }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="lottery-empty">本期目前還沒有人加入點數抽獎。</div>
+                {% endif %}
+            </section>
+
+            <section class="lottery-panel">
+                <div class="lottery-section-head">
+                    <div><small>DRAW HISTORY</small><h2>開獎紀錄</h2></div>
+                    <span>最近 {{ snapshot.draws | length }} 筆</span>
+                </div>
+                {% if snapshot.draws %}
+                <div class="lottery-table-wrap">
+                    <table class="lottery-table">
+                        <thead><tr><th>類型 / 期別</th><th>獎品</th><th>得獎者</th><th>開獎人</th><th>時間</th></tr></thead>
+                        <tbody>
+                        {% for row in snapshot.draws %}
+                            <tr>
+                                <td>{% if row.period == 'free-reaction' %}<span class="lottery-type-tag">免費反應</span>{% else %}{{ row.period }}{% endif %}</td>
+                                <td>{{ row.prize }}</td><td>{{ row.winner_id }}</td><td>{{ row.drawn_by }}</td><td>{{ row.drawn_at }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="lottery-empty">目前還沒有開獎紀錄。</div>
+                {% endif %}
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>
