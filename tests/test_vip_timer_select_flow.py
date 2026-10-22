@@ -31,6 +31,29 @@ def test_timer_catalog_is_grouped_by_game_and_service_type():
             seen_values.add(value)
 
 
+def test_second_layer_contains_games_not_play_styles():
+    labels = {
+        str(group.get("label") or "").strip()
+        for group in flow.build_vip_timer_self_service_catalog()
+    }
+
+    assert labels
+    assert labels.isdisjoint({
+        "娛樂陪",
+        "技術陪",
+        "黑潮爆破",
+        "絕巴技術陪",
+        "一陪一護",
+        "一陪一護〈端遊〉",
+        "一陪一護〈手遊〉",
+    })
+    assert any(
+        label in {"特戰英豪", "英雄聯盟", "APEX", "STEAM", "STEAM 遊戲"}
+        or "三角洲" in label
+        for label in labels
+    )
+
+
 def test_service_pages_never_exceed_discord_select_limit():
     for group in flow.build_vip_timer_self_service_catalog():
         pages = flow._service_pages(list(group.get("details") or []))
