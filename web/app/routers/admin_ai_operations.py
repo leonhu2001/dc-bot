@@ -21,11 +21,11 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 _ALLOWED_PERIODS = {"month", "quarter", "year", "all"}
 
 
-def _manager(request: Request) -> dict | None:
+def _admin(request: Request) -> dict | None:
     user = request.session.get("user")
     if not isinstance(user, dict):
         return None
-    if not user.get("is_manager"):
+    if not user.get("is_admin"):
         return None
     return user
 
@@ -41,7 +41,7 @@ def _no_access(request: Request):
         name="no_access.html",
         context={
             "title": "沒有權限",
-            "message": "AI 營運分析僅限總管使用。",
+            "message": "AI 營運分析僅限客服與管理人員使用。",
             "user": request.session.get("user"),
         },
         status_code=403,
@@ -53,7 +53,7 @@ async def admin_ai_operations(
     request: Request,
     period: str | None = "quarter",
 ):
-    user = _manager(request)
+    user = _admin(request)
     if user is None:
         return _no_access(request)
 
@@ -84,7 +84,7 @@ async def admin_ai_operations_analyze(
     period: str = Form("quarter"),
     question: str = Form(""),
 ):
-    user = _manager(request)
+    user = _admin(request)
     if user is None:
         return _no_access(request)
 
