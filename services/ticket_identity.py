@@ -34,26 +34,27 @@ def _clean_ticket_channel_part(value: str, *, fallback: str = "user") -> str:
     return clean or fallback
 
 
-def _order_prefix_emoji(prefix: str) -> str | None:
+def _order_status_emoji_from_prefix(prefix: str) -> str:
     text = str(prefix or "").strip().lower()
 
-    # Preserve a status emoji supplied by a caller while removing any legacy
-    # "點單・" / status wording from the rest of the channel name.
     for emoji in ("🔴", "⚫", "🟠", "🟡", "🟢", "⚪"):
         if emoji in text:
             return emoji
 
     if any(token in text for token in ("取消", "cancel")):
         return "🔴"
-    if any(token in text for token in ("結單", "closed", "完成")):
+    if any(token in text for token in ("結單", "closed")):
         return "⚫"
     if any(token in text for token in ("存單", "stored", "暫存")):
         return "🟠"
     if any(token in text for token in ("等待", "待付款", "待接單", "pending", "acceptance")):
         return "🟡"
-    if any(token in text for token in ("下單", "點單", "訂單", "服務中", "active", "paid", "客服中心")):
-        return "🟢"
-    return None
+    return "🟢"
+
+
+def _is_order_creation_prefix(prefix: str) -> bool:
+    text = str(prefix or "").strip().lower()
+    return any(token in text for token in ("下單", "點單", "訂單", "客服中心"))
 
 
 def order_ticket_channel_name_for_status(status: str | None) -> str:
@@ -68,9 +69,10 @@ def build_ticket_channel_name(
     *,
     display_name: str | None = None,
 ) -> str:
-    order_emoji = _order_prefix_emoji(prefix)
-    if order_emoji is not None:
-        return f"{order_emoji}・客服中心"
+    # New order tickets are intentionally anonymous in the channel list. The
+    # customer identity remains in the channel topic / order data.
+    if _is_order_creation_prefix(prefix):
+        return f"{_order_status_emoji_from_prefix(prefix)}・客服中心"
 
     raw_name = (
         display_name
@@ -97,7 +99,13 @@ async def rename_ticket_channel(
     if not isinstance(channel, discord.TextChannel):
         return
 
-    new_name = build_ticket_channel_name(prefix, member, display_name=display_name)
+    # Status-only naming applies strictly to order tickets. Recruitment and other
+    # support tickets keep their existing prefix/name/date format.
+    if "order_customer_id=" in str(channel.topic or ""):
+        new_name = f"{_order_status_emoji_from_prefix(prefix)}・客服中心"
+    else:
+        new_name = build_ticket_channel_name(prefix, member, display_name=display_name)
+
     if channel.name == new_name:
         return
 
