@@ -48,7 +48,7 @@ _HIDDEN_BENEFIT_CATEGORIES = {"general", "basic", "fun"}
 
 def _admin(request: Request) -> dict | None:
     user = request.session.get("user")
-    if not isinstance(user, dict) or not user.get("is_admin"):
+    if not isinstance(user, dict) or not user.get("is_manager"):
         return None
     return user
 
