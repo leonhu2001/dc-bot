@@ -1,5 +1,5 @@
 {% set _p = request.url.path %}
-<link rel="stylesheet" href="/static/css/pages/admin_shell_layout_20261022.css?v=1">
+<link rel="stylesheet" href="/static/css/pages/admin_shell_layout_20261022.css?v=2">
 
 <aside class="mw-r5-sidebar">
 
@@ -9,53 +9,12 @@
     </div>
 
     <nav class="mw-r5-nav">
+        <div class="mw-r5-nav-section">營運</div>
         <a
             class="{% if _p == '/admin' or _p == '/admin/search' or _p.startswith('/admin/order-workspace') %}active{% endif %}"
             href="/admin"
         >
             營運總覽
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/staff-center') or _p.startswith('/admin/staff') %}active{% endif %}"
-            href="/admin/staff-center"
-        >
-            人員中心
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/customer-center') or _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') or _p.startswith('/admin/search/customer/') %}active{% endif %}"
-            href="/admin/customer-center"
-        >
-            客戶中心
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/vip-timers') %}active{% endif %}"
-            href="/admin/vip-timers"
-        >
-            VIP 自由計時
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/finance-center') or _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') or _p.startswith('/admin/payout') or _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
-            href="/admin/finance-center"
-        >
-            財務中心
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/support-center') or _p.startswith('/admin/tickets') or _p.startswith('/admin/support-calls') or _p.startswith('/admin/ai-support-knowledge') %}active{% endif %}"
-            href="/admin/support-center"
-        >
-            客服中心
-        </a>
-
-        <a
-            class="{% if _p.startswith('/admin/fun-orders') or _p.startswith('/admin/roulette') %}active{% endif %}"
-            href="/admin/fun-orders"
-        >
-            趣味單管理
         </a>
 
         <a
@@ -72,7 +31,60 @@
             行銷漏斗
         </a>
 
+        <div class="mw-r5-nav-section">客戶與服務</div>
+        <a
+            class="{% if _p.startswith('/admin/staff-center') or _p.startswith('/admin/staff') %}active{% endif %}"
+            href="/admin/staff-center"
+        >
+            人員中心
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/customer-center') or _p.startswith('/admin/customers') or _p.startswith('/admin/wallets') or _p.startswith('/admin/reviews') or _p.startswith('/admin/search/customer/') %}active{% endif %}"
+            href="/admin/customer-center"
+        >
+            客戶中心
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/support-center') or _p.startswith('/admin/tickets') or _p.startswith('/admin/support-calls') or _p.startswith('/admin/ai-support-knowledge') %}active{% endif %}"
+            href="/admin/support-center"
+        >
+            客服中心
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/vip-timers') %}active{% endif %}"
+            href="/admin/vip-timers"
+        >
+            VIP 自由計時
+        </a>
+
+        <div class="mw-r5-nav-section">訂單與活動</div>
+        <a
+            class="{% if _p.startswith('/admin/fun-orders') or _p.startswith('/admin/roulette') %}active{% endif %}"
+            href="/admin/fun-orders"
+        >
+            趣味單管理
+        </a>
+
+        <a
+            class="{% if _p.startswith('/admin/lottery') %}active{% endif %}"
+            href="/admin/lottery"
+        >
+            抽獎管理
+        </a>
+
+        <div class="mw-r5-nav-section">財務</div>
+        <a
+            class="{% if _p.startswith('/admin/finance-center') or _p.startswith('/admin/payment-reviews') or _p.startswith('/admin/topups') or _p.startswith('/admin/payout') or _p.startswith('/admin/accounting-reconciliation') %}active{% endif %}"
+            href="/admin/finance-center"
+        >
+            財務中心
+        </a>
+
         {% if user and user.is_manager %}
+        <div class="mw-r5-nav-section">管理設定</div>
         <a
             class="{% if _p.startswith('/admin/benefits') %}active{% endif %}"
             href="/admin/benefits"
@@ -95,6 +107,7 @@
         </a>
         {% endif %}
 
+        <div class="mw-r5-nav-section mw-r5-nav-section-muted">其他</div>
         <a href="/">
             返回官網
         </a>
