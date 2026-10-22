@@ -35,9 +35,14 @@ def test_second_layer_is_game_only_and_third_layer_is_gameplay():
 
     assert "娛樂陪" in gameplay_labels
     assert any(label.startswith("技術陪") for label in gameplay_labels)
-    assert "黑潮爆破" in gameplay_labels
     assert "絕巴技術陪" in gameplay_labels
     assert any(label.startswith("一陪一護") for label in gameplay_labels)
+
+    # The third layer is derived only from currently eligible hourly products.
+    # Do not hard-code non-hourly gameplay names merely because the legacy
+    # generic selector used to show them in the wrong layer.
+    detail_rule_keys = {str(detail.get("rule_key") or "") for detail in desktop_details}
+    assert all(detail_rule_keys)
 
 
 def test_fourth_layer_contains_only_supported_headcount_options():
