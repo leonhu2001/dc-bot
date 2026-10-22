@@ -7,6 +7,7 @@ from services.order_rules import (
     role_ids_match_requirements,
 )
 from services.orders import get_order_item_details_for_group
+from shared.order_acceptance import EXACT_ONE_PROTECTOR_RULE_KEYS
 
 
 DESKTOP_SECRET = "basic_one_companion_one_guard_secret"
@@ -60,6 +61,17 @@ def test_one_companion_one_guard_requires_matching_delta_platform_role():
     assert not role_ids_match_requirements(
         [companion_id, mobile_id], allowed, required_games
     )
+
+
+def test_one_companion_one_guard_requires_exactly_one_protector_slot():
+    expected_rule_keys = {
+        DESKTOP_SECRET,
+        DESKTOP_TOPSECRET,
+        MOBILE_SECRET,
+        MOBILE_TOPSECRET,
+    }
+
+    assert expected_rule_keys <= EXACT_ONE_PROTECTOR_RULE_KEYS
 
 
 def test_one_companion_one_guard_catalog_has_clear_difficulty_choices():
