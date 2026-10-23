@@ -182,6 +182,16 @@ def _delta_cover_url(category: str) -> str | None:
     return public_order_panel_image_url(filename)
 
 
+def _live_vip_timer_eligibility(customer_id: int | str, *, check_open_order: bool = True) -> None:
+    """Resolve the shared VIP gate at interaction time instead of a stale import."""
+    from services import vip_timer_self_service as self_service
+
+    return self_service.assert_vip_timer_self_service_eligible(
+        customer_id,
+        check_open_order=check_open_order,
+    )
+
+
 class QuickPriceListButton(discord.ui.Button):
     def __init__(self, channel_id: int):
         self.source_channel_id = int(channel_id)
@@ -207,7 +217,7 @@ class QuickPriceListButton(discord.ui.Button):
 
 
 def _install_entry_copy() -> None:
-    """Keep Delta's public copy as compact as the other game panels."""
+    """Keep Delta compact and keep the VIP public gate copy authoritative."""
     global _ORIGINAL_ENTRY_EMBED
     if _ORIGINAL_ENTRY_EMBED is not None:
         return
@@ -219,6 +229,11 @@ def _install_entry_copy() -> None:
         embed = original(channel_id)
         if int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
             embed.description = "請選擇你要的服務。"
+        elif int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["vip_timer"]):
+            embed.description = str(embed.description or "").replace(
+                "金級會員以上限定。",
+                "白金級會員以上限定。",
+            )
         return embed
 
     production._clean_entry_embed = compact_entry_embed
@@ -314,6 +329,9 @@ def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
+    # quick_order_v2 imported the eligibility function early. Route it through a
+    # live lookup so the Platinum gate installed by vip_timer_policy_v5 is used.
+    quick.assert_vip_timer_self_service_eligible = _live_vip_timer_eligibility
     _install_entry_copy()
     _install_view_factory()
     _install_delta_cover_callback()
