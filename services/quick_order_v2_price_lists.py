@@ -309,19 +309,18 @@ def _install_delta_cover_callback() -> None:
     quick.QuickDeltaCategoryButton.callback = _delta_category_callback
 
 
-async def _refresh_delta_panel(bot: commands.Bot) -> None:
+async def _refresh_policy_panels(bot: commands.Bot) -> None:
     await bot.wait_until_ready()
-    try:
-        await quick._ensure_panel(
-            bot,
-            int(quick.QUICK_ORDER_V2_CHANNELS["delta"]),
-        )
-    except Exception as exc:
-        print(
-            f"[quick-order-price] delta panel refresh failed: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
+    for key in ("delta", "vip_timer"):
+        channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[key])
+        try:
+            await quick._ensure_panel(bot, channel_id)
+        except Exception as exc:
+            print(
+                f"[quick-order-price] panel refresh failed {channel_id}: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
 
 
 def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
@@ -341,10 +340,10 @@ def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
 
     if not getattr(bot, "_quick_order_v2_price_panel_refresh_started", False):
         bot._quick_order_v2_price_panel_refresh_started = True
-        bot.loop.create_task(_refresh_delta_panel(bot))
+        bot.loop.create_task(_refresh_policy_panels(bot))
 
     _INSTALLED = True
-    print("[quick-order-price] text price lists and public delta covers installed", flush=True)
+    print("[quick-order-price] text price lists and policy panel copy installed", flush=True)
 
 
 __all__ = [
