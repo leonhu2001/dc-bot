@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import hashlib
-from pathlib import Path
-
 import discord
 from discord.ext import commands
 
 from services import quick_order_v2 as quick
 from services import quick_order_v2_production as production
+from services.quick_order_v2_assets import public_order_panel_image_url
 
 
 _INSTALLED = False
 _ORIGINAL_ENSURE_PANEL = None
 
-_ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "order_panels"
 _IMAGE_FILENAME_BY_KEY = {
     "apex": "apex_panel.png",
     "lol": "lol_panel.png",
@@ -24,28 +21,6 @@ _IMAGE_FILENAME_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS[key]): filename
     for key, filename in _IMAGE_FILENAME_BY_KEY.items()
 }
-
-
-def _image_asset(channel_id: int) -> tuple[Path, str] | None:
-    filename = _IMAGE_FILENAME_BY_CHANNEL_ID.get(int(channel_id))
-    if not filename:
-        return None
-
-    path = _ASSET_DIR / filename
-    if not path.is_file():
-        return None
-
-    try:
-        data = path.read_bytes()
-    except OSError:
-        return None
-
-    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return None
-
-    digest = hashlib.sha256(data).hexdigest()[:12]
-    attachment_name = f"{Path(filename).stem}_{digest}.png"
-    return path, attachment_name
 
 
 async def _find_existing_panels(
@@ -72,20 +47,21 @@ def _install_panel_sync() -> None:
 
     async def image_ensure_panel(bot: commands.Bot, channel_id: int) -> None:
         channel_id = int(channel_id)
-        if channel_id not in _IMAGE_FILENAME_BY_CHANNEL_ID:
+        filename = _IMAGE_FILENAME_BY_CHANNEL_ID.get(channel_id)
+        if not filename:
             await original(bot, channel_id)
             return
 
-        asset = _image_asset(channel_id)
-        if asset is None:
+        image_url = public_order_panel_image_url(filename)
+        if image_url is None:
             await original(bot, channel_id)
             print(
-                f"[quick-order-panel-image] PNG missing/invalid; kept text-only panel: {channel_id}",
+                f"[quick-order-panel-image] public PNG missing/invalid; kept text-only panel: "
+                f"{channel_id} {filename}",
                 flush=True,
             )
             return
 
-        path, attachment_name = asset
         channel = bot.get_channel(channel_id)
         if not isinstance(channel, discord.TextChannel):
             try:
@@ -108,39 +84,35 @@ def _install_panel_sync() -> None:
             old_panels = []
 
         embed = production._clean_entry_embed(channel_id)
-        embed.set_image(url=f"attachment://{attachment_name}")
+        embed.set_image(url=image_url)
         view = quick._view_for_channel(channel_id)
-
-        # Never replace an existing public panel with a new message merely to
-        # refresh copy, controls, or artwork. Editing the existing message keeps
-        # its message id and does not generate a new-message notification.
         target = old_panels[0] if old_panels else None
+
         try:
             if target is not None:
+                # Edit the existing public panel in place so maintenance does not
+                # create a new-message notification. attachments=[] removes any
+                # legacy attachment:// artwork left by older deployments.
                 await target.edit(
                     embed=embed,
                     view=view,
-                    attachments=[discord.File(path, filename=attachment_name)],
+                    attachments=[],
                 )
                 print(
-                    f"[quick-order-panel-image] embedded PNG panel edited in place: "
-                    f"{channel_id} {attachment_name}",
+                    f"[quick-order-panel-image] public-URL panel edited in place: "
+                    f"{channel_id} {filename}",
                     flush=True,
                 )
                 return
 
-            # First-time setup only: if no panel exists at all, create one.
-            await channel.send(
-                embed=embed,
-                view=view,
-                file=discord.File(path, filename=attachment_name),
-            )
+            # First-time setup only: no existing panel exists in this channel.
+            await channel.send(embed=embed, view=view)
             print(
-                f"[quick-order-panel-image] embedded PNG panel created: "
-                f"{channel_id} {attachment_name}",
+                f"[quick-order-panel-image] public-URL panel created: "
+                f"{channel_id} {filename}",
                 flush=True,
             )
-        except (discord.Forbidden, discord.HTTPException, OSError, ValueError, TypeError) as exc:
+        except (discord.Forbidden, discord.HTTPException, ValueError, TypeError) as exc:
             print(
                 f"[quick-order-panel-image] sync failed {channel_id}: "
                 f"{type(exc).__name__}: {exc}",
@@ -171,9 +143,8 @@ def install_quick_order_v2_panel_images(bot: commands.Bot) -> None:
 
     _install_panel_sync()
 
-    # The price-list button layer wraps quick._view_for_channel. Install it before
-    # the four image panels are refreshed so every updated panel already has the
-    # extra button. It also owns the Delta category-cover callback.
+    # Install the price-list layer before refreshing the public panels so the
+    # existing messages receive the current controls in the same in-place edit.
     from services.quick_order_v2_price_lists import install_quick_order_v2_price_lists
 
     install_quick_order_v2_price_lists(bot)
@@ -183,7 +154,7 @@ def install_quick_order_v2_panel_images(bot: commands.Bot) -> None:
         bot.loop.create_task(refresh_quick_order_panel_images(bot))
 
     _INSTALLED = True
-    print("[quick-order-panel-image] embedded-attachment layer installed", flush=True)
+    print("[quick-order-panel-image] public static-image layer installed", flush=True)
 
 
 __all__ = [
