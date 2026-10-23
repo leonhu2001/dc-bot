@@ -111,33 +111,41 @@ def _install_panel_sync() -> None:
         embed.set_image(url=f"attachment://{attachment_name}")
         view = quick._view_for_channel(channel_id)
 
+        # Never replace an existing public panel with a new message merely to
+        # refresh copy, controls, or artwork. Editing the existing message keeps
+        # its message id and does not generate a new-message notification.
+        target = old_panels[0] if old_panels else None
         try:
-            replacement = await channel.send(
+            if target is not None:
+                await target.edit(
+                    embed=embed,
+                    view=view,
+                    attachments=[discord.File(path, filename=attachment_name)],
+                )
+                print(
+                    f"[quick-order-panel-image] embedded PNG panel edited in place: "
+                    f"{channel_id} {attachment_name}",
+                    flush=True,
+                )
+                return
+
+            # First-time setup only: if no panel exists at all, create one.
+            await channel.send(
                 embed=embed,
                 view=view,
                 file=discord.File(path, filename=attachment_name),
             )
+            print(
+                f"[quick-order-panel-image] embedded PNG panel created: "
+                f"{channel_id} {attachment_name}",
+                flush=True,
+            )
         except (discord.Forbidden, discord.HTTPException, OSError, ValueError, TypeError) as exc:
             print(
-                f"[quick-order-panel-image] send failed {channel_id}: "
+                f"[quick-order-panel-image] sync failed {channel_id}: "
                 f"{type(exc).__name__}: {exc}",
                 flush=True,
             )
-            return
-
-        for message in old_panels:
-            if message.id == replacement.id:
-                continue
-            try:
-                await message.delete()
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                pass
-
-        print(
-            f"[quick-order-panel-image] embedded PNG panel replaced: "
-            f"{channel_id} {attachment_name}",
-            flush=True,
-        )
 
     production._clean_ensure_panel = image_ensure_panel
     quick._ensure_panel = image_ensure_panel
@@ -164,8 +172,8 @@ def install_quick_order_v2_panel_images(bot: commands.Bot) -> None:
     _install_panel_sync()
 
     # The price-list button layer wraps quick._view_for_channel. Install it before
-    # the four image panels are refreshed so every newly rebuilt panel already has
-    # the extra button. It also owns the Delta category-cover callback.
+    # the four image panels are refreshed so every updated panel already has the
+    # extra button. It also owns the Delta category-cover callback.
     from services.quick_order_v2_price_lists import install_quick_order_v2_price_lists
 
     install_quick_order_v2_price_lists(bot)
