@@ -253,6 +253,59 @@ async def _attach_order_control_view(channel: discord.TextChannel) -> bool:
     return False
 
 
+async def _refresh_existing_farm_3x3_panel(channel: discord.TextChannel) -> bool:
+    """Replace stale two-option 3x3 components on already-open quick tickets."""
+    try:
+        from services import self_service_ui_runtime as ui
+
+        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel.id, {})
+        if not isinstance(data, dict) or not data.get("quick_order_v2"):
+            return False
+        if str(data.get("category") or "") != "farm":
+            return False
+        if _normalized_key(data.get("item_group")) != _normalized_key(_FARM_3X3_GROUP_LABEL):
+            return False
+
+        customer_id = int(data.get("customer_id") or 0)
+        if customer_id <= 0:
+            return False
+
+        bot_user_id = getattr(getattr(channel.guild, "me", None), "id", None)
+        async for message in channel.history(limit=25, oldest_first=True):
+            if bot_user_id is not None and message.author.id != bot_user_id:
+                continue
+
+            has_detail_select = any(
+                getattr(component, "custom_id", None) == "self_service_order_detail_select"
+                for row in message.components
+                for component in getattr(row, "children", [])
+            )
+            if not has_detail_select:
+                continue
+
+            await message.edit(
+                embed=ui.build_self_service_panel_embed(customer_id, data, channel.guild),
+                view=ui.SelfServiceOrderView(
+                    customer_id=customer_id,
+                    channel_id=channel.id,
+                    selected_category=data.get("category"),
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True,
+                    roles=False,
+                    everyone=False,
+                ),
+            )
+            return True
+    except (ValueError, TypeError, discord.Forbidden, discord.HTTPException) as exc:
+        print(
+            f"[quick-order-v2-fix] refresh 3x3 panel failed channel={channel.id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+    return False
+
+
 def _install_create_ticket_wrapper() -> None:
     global _ORIGINAL_CREATE_TICKET
     if _ORIGINAL_CREATE_TICKET is not None:
@@ -288,17 +341,25 @@ async def repair_existing_quick_order_v2_tickets(bot: commands.Bot) -> None:
     if not isinstance(category, discord.CategoryChannel):
         return
 
-    repaired = 0
+    control_repaired = 0
+    farm_panels_refreshed = 0
     for channel in list(category.text_channels):
         if "quick_order_v2=1" not in str(channel.topic or ""):
             continue
         if await _attach_order_control_view(channel):
-            repaired += 1
+            control_repaired += 1
+        if await _refresh_existing_farm_3x3_panel(channel):
+            farm_panels_refreshed += 1
 
-    if repaired:
+    if control_repaired:
         print(
             f"[quick-order-v2-fix] restored customer-service control row "
-            f"for {repaired} quick-order ticket(s)",
+            f"for {control_repaired} quick-order ticket(s)",
+            flush=True,
+        )
+    if farm_panels_refreshed:
+        print(
+            f"[quick-order-v2-fix] refreshed {farm_panels_refreshed} existing 3x3 panel(s)",
             flush=True,
         )
 
