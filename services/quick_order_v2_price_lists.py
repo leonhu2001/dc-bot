@@ -30,11 +30,37 @@ _PRICE_LIST_IMAGE_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "pricelists/valorant_pricelist.png",
 }
 
+_APEX_PRICE_LIST_TEXT = """**娛樂陪**
+NG｜每人 **300T / H**
+積分｜每人 **350T / H**
+
+**鑽石陪**
+NG｜每人 **400T / H**
+積分｜每人 **450T / H**
+
+**大師陪**
+NG｜每人 **500T / H**
+積分｜每人 **550T / H**
+
+**頂獵陪**
+NG｜每人 **600T / H**
+積分｜每人 **650T / H**
+
+🎁 **娛樂陪累積福利**
+累積 10 小時 → 送 1 小時券
+
+👤 **指定打手／陪玩**
+每人 +100T
+⚠️ 兩單（2H）以上免指定費"""
+
 # Temporary copy for games whose image price list has not been supplied yet.
 _PRICE_LIST_TEXT_BY_CHANNEL_ID = {
     channel_id: "價目表內容整理中，稍後更新。"
     for channel_id in _PRICE_LIST_LABEL_BY_CHANNEL_ID
 }
+_PRICE_LIST_TEXT_BY_CHANNEL_ID[int(quick.QUICK_ORDER_V2_CHANNELS["apex"])] = (
+    _APEX_PRICE_LIST_TEXT
+)
 
 
 def _delta_cover_url(category: str) -> str | None:
