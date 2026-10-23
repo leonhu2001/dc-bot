@@ -10,6 +10,15 @@ from . import order_rules as _order_rules
 
 _order_rules.validate_rules()
 
+# Keep the 2026-10-23 owner-approved game price list authoritative for both Web
+# checkout and Discord self-service before any catalog presentation modules read it.
+from .game_price_policy_20261023 import (
+    install_game_price_policy_20261023 as _install_game_price_policy_20261023,
+)
+
+_install_game_price_policy_20261023()
+_order_rules.validate_rules()
+
 # Register system-owned catalog extensions before the remaining runtime wrappers are
 # installed. The extension injects its rules before services.orders builds label maps,
 # then adds the matching storefront groups for desktop and mobile Delta Force.
