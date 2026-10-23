@@ -55,6 +55,7 @@
     Array.from(branch.children).find((child) => child.matches && child.matches(selector)) || null;
 
   const branchRow = (branch) => directChild(branch, '.benefit-tree-row');
+  const branchChildren = (branch) => directChild(branch, '[data-benefit-tree-children]');
   const branchParentCheckbox = (branch) => {
     const row = branchRow(branch);
     return row ? row.querySelector('[data-benefit-tree-parent]') : null;
@@ -66,9 +67,15 @@
   const branchLeaves = (branch) => Array.from(branch.querySelectorAll('[data-benefit-tree-leaf-checkbox]'));
 
   const setBranchOpen = (branch, open) => {
+    const children = branchChildren(branch);
     const toggle = branchToggle(branch);
-    branch.classList.toggle('is-open', Boolean(open));
-    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const isOpen = Boolean(open);
+    branch.classList.toggle('is-open', isOpen);
+    if (children) {
+      if (isOpen) children.removeAttribute('hidden');
+      else children.setAttribute('hidden', '');
+    }
+    if (toggle) toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   };
 
   const syncBranch = (branch) => {
