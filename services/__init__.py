@@ -74,3 +74,11 @@ from .vip_timer_integrity import (
 )
 
 _install_vip_timer_integrity_guard()
+
+# Keep the customer-service re-dispatch action on the original four-selector UI,
+# while paid quick-order tickets use 訂單-... instead of staying 下單-....
+from .order_ticket_ui_policy import (
+    install_order_ticket_ui_policy as _install_order_ticket_ui_policy,
+)
+
+_install_order_ticket_ui_policy()
