@@ -86,18 +86,12 @@ foreach ($PanelAssetName in $RequiredPanelAssetNames) {
     $PanelAssetPaths += $PanelAssetPath
 }
 
-$PriceListAssetDir = Join-Path $PanelAssetDir "pricelists"
-$RequiredPriceListAssetNames = @(
-    "lol_pricelist.png",
-    "valorant_pricelist.png"
-)
-$PriceListAssetPaths = @()
-foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
-    $PriceListAssetPath = Join-Path $PriceListAssetDir $PriceListAssetName
-    if (-not (Test-Path -LiteralPath $PriceListAssetPath -PathType Leaf)) {
-        throw "Missing order price-list image: $PriceListAssetPath"
-    }
-    $PriceListAssetPaths += $PriceListAssetPath
+# Price lists are text embeds now. Remove the obsolete local image folder so it
+# cannot accidentally become a second source of truth again.
+$ObsoletePriceListAssetDir = Join-Path $PanelAssetDir "pricelists"
+if (Test-Path -LiteralPath $ObsoletePriceListAssetDir) {
+    Remove-Item -LiteralPath $ObsoletePriceListAssetDir -Recurse -Force
+    Write-Host "PASS: removed obsolete local price-list image directory" -ForegroundColor Green
 }
 
 # Upload root artwork before the safe deployment. These files are already part of
@@ -118,7 +112,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Installing public panel images..." -ForegroundColor DarkGray
-& ssh @SshTransportArgs $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf '$RemotePanelStage'"
+$InstallPanelCommand = "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf /opt/dc-bot/web/app/static/order_panels/pricelists /opt/dc-bot/assets/order_panels/pricelists '$RemotePanelStage'"
+& ssh @SshTransportArgs $Vps $InstallPanelCommand
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to install order panel images on VPS."
 }
@@ -132,50 +127,15 @@ if ($LASTEXITCODE -ne 0) {
     throw "VPS deployment failed. Check rollback output above."
 }
 
-# Price-list images are only resolved when a customer presses the price-list
-# button, so they can be installed after the safe deployment without another bot
-# restart. Stage first, then install with the final mode in a single remote command.
-# This avoids opening a second SSH session just for chmod, which can leave Windows
-# OpenSSH waiting even though the file transfer has already completed.
-Write-Host ""
-Write-Host "=== SYNC ORDER PRICE-LIST IMAGES ===" -ForegroundColor Yellow
-$RemotePriceListStage = "/tmp/dc-bot-order-pricelists"
-Write-Host "Preparing remote price-list staging directory..." -ForegroundColor DarkGray
-& ssh @SshTransportArgs $Vps "rm -rf '$RemotePriceListStage' && mkdir -p '$RemotePriceListStage'"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to prepare VPS price-list staging directory."
-}
-Write-Host "PASS: remote price-list staging directory ready" -ForegroundColor Green
-
-Write-Host "Uploading 2 price-list images..." -ForegroundColor DarkGray
-& scp @SshTransportArgs @PriceListAssetPaths "${Vps}:${RemotePriceListStage}/"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to upload order price-list images to VPS staging."
-}
-Write-Host "PASS: price-list image transfer complete" -ForegroundColor Green
-
-Write-Host "Installing price-list images..." -ForegroundColor DarkGray
-$InstallPriceListCommand = "mkdir -p /opt/dc-bot/web/app/static/order_panels/pricelists && install -m 0644 '$RemotePriceListStage'/*.png /opt/dc-bot/web/app/static/order_panels/pricelists/ && rm -rf '$RemotePriceListStage'"
-& ssh @SshTransportArgs $Vps $InstallPriceListCommand
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to install order price-list images."
-}
-Write-Host "PASS: order price-list images uploaded without extra service restart" -ForegroundColor Green
-
 Write-Host ""
 Write-Host "=== VERIFY PUBLIC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
-$RequiredPublicAssetRelativePaths = @()
-$RequiredPublicAssetRelativePaths += $RequiredPanelAssetNames
-foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
-    $RequiredPublicAssetRelativePaths += "pricelists/$PriceListAssetName"
-}
 
 # Verify the same GET request shape that Discord uses instead of HEAD. Cloudflare
 # returns CRLF-delimited response headers; parsing them after storing the raw block
 # in a shell variable can make carriage returns overwrite console output and cause
 # false negatives. Ask curl for the effective content type directly, and normalize
 # CRLF only for the header-specific CORP check.
-foreach ($AssetRelativePath in $RequiredPublicAssetRelativePaths) {
+foreach ($AssetRelativePath in $RequiredPanelAssetNames) {
     $PublicAssetUrl = "https://mowanentertainment.com/static/order_panels/${AssetRelativePath}?deploy=$Target"
     $VerifyAssetCommand = "curl --fail --silent --show-error --max-time 10 -o /dev/null -w '%{content_type}\n' '$PublicAssetUrl' | grep -Eqi '^image/png([;[:space:]]|$)' || { echo '--- response headers for $AssetRelativePath ---'; curl --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r'; echo 'Invalid image content-type for $AssetRelativePath'; exit 1; }; curl --fail --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r' | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)' || { echo '--- response headers for $AssetRelativePath ---'; curl --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r'; echo 'Missing cross-origin image policy for $AssetRelativePath'; exit 1; }"
 
@@ -186,7 +146,7 @@ foreach ($AssetRelativePath in $RequiredPublicAssetRelativePaths) {
 
     Write-Host "PASS: $AssetRelativePath" -ForegroundColor Green
 }
-Write-Host "PASS: public order panel and price-list image URLs are reachable" -ForegroundColor Green
+Write-Host "PASS: public order panel image URLs are reachable" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DEPLOY COMPLETED" -ForegroundColor Green
