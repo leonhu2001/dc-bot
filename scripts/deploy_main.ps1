@@ -8,6 +8,16 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
 
+# Keep SSH/SCP from hanging forever on a dead transport. ConnectTimeout covers
+# connection establishment; the keepalive pair terminates a session when the
+# remote stops responding after it has connected.
+$SshTransportArgs = @(
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=10",
+    "-o", "ServerAliveInterval=5",
+    "-o", "ServerAliveCountMax=2"
+)
+
 Write-Host "=== SAFE DEPLOY PRECHECK ===" -ForegroundColor Yellow
 
 if (git status --porcelain) {
@@ -74,17 +84,20 @@ foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
 # during bot startup.
 Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
 $RemotePanelStage = "/tmp/dc-bot-order-panels"
-ssh $Vps "rm -rf '$RemotePanelStage' && mkdir -p '$RemotePanelStage'"
+Write-Host "Preparing remote panel staging directory..." -ForegroundColor DarkGray
+& ssh @SshTransportArgs $Vps "rm -rf '$RemotePanelStage' && mkdir -p '$RemotePanelStage'"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to prepare remote order-panel staging directory."
 }
 
-& scp @PanelAssetPaths "${Vps}:${RemotePanelStage}/"
+Write-Host "Uploading 5 public panel images..." -ForegroundColor DarkGray
+& scp @SshTransportArgs @PanelAssetPaths "${Vps}:${RemotePanelStage}/"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to upload order panel images to VPS staging."
 }
 
-ssh $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf '$RemotePanelStage'"
+Write-Host "Installing public panel images..." -ForegroundColor DarkGray
+& ssh @SshTransportArgs $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf '$RemotePanelStage'"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to install order panel images on VPS."
 }
@@ -93,7 +106,7 @@ Write-Host ""
 
 # Run the existing safe deployment. deploy_main.sh owns the single bot/web restart.
 $RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
-ssh $Vps $RemoteCommand
+& ssh @SshTransportArgs $Vps $RemoteCommand
 if ($LASTEXITCODE -ne 0) {
     throw "VPS deployment failed. Check rollback output above."
 }
@@ -104,17 +117,22 @@ if ($LASTEXITCODE -ne 0) {
 # does not dirty the VPS working tree.
 Write-Host ""
 Write-Host "=== SYNC ORDER PRICE-LIST IMAGES ===" -ForegroundColor Yellow
-ssh $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels/pricelists"
+Write-Host "Preparing remote price-list directory..." -ForegroundColor DarkGray
+& ssh @SshTransportArgs $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels/pricelists"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to prepare VPS price-list image directory."
 }
+Write-Host "PASS: remote price-list directory ready" -ForegroundColor Green
 
-& scp @PriceListAssetPaths "${Vps}:/opt/dc-bot/web/app/static/order_panels/pricelists/"
+Write-Host "Uploading 2 price-list images..." -ForegroundColor DarkGray
+& scp @SshTransportArgs @PriceListAssetPaths "${Vps}:/opt/dc-bot/web/app/static/order_panels/pricelists/"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to upload order price-list images to VPS."
 }
+Write-Host "PASS: price-list image transfer complete" -ForegroundColor Green
 
-ssh $Vps "chmod 0644 /opt/dc-bot/web/app/static/order_panels/pricelists/*.png"
+Write-Host "Applying price-list image permissions..." -ForegroundColor DarkGray
+& ssh @SshTransportArgs $Vps "chmod 0644 /opt/dc-bot/web/app/static/order_panels/pricelists/*.png"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to set price-list image permissions."
 }
@@ -133,7 +151,7 @@ $PanelAssetNameList = ($RequiredPublicAssetRelativePaths -join " ")
 # directory with an explicit image/png MIME mapping. When validation fails, print
 # the real response headers so the next diagnosis has concrete data.
 $VerifyCommand = "set -e; for name in $PanelAssetNameList; do url=`"https://mowanentertainment.com/static/order_panels/`$name?deploy=$Target`"; headers=`$(curl --fail --silent --show-error --max-time 10 -I `"`$url`"); echo `"`$headers`" | grep -Eqi '^content-type:[[:space:]]*image/png([;[:space:]]|$)' || { echo `"--- headers for `$name ---`"; echo `"`$headers`"; echo `"Invalid image content-type for `$name`"; exit 1; }; echo `"`$headers`" | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)' || { echo `"--- headers for `$name ---`"; echo `"`$headers`"; echo `"Missing cross-origin image policy for `$name`"; exit 1; }; done"
-ssh $Vps $VerifyCommand
+& ssh @SshTransportArgs $Vps $VerifyCommand
 if ($LASTEXITCODE -ne 0) {
     throw "One or more public order panel image URLs failed Discord-safe HTTP verification."
 }
