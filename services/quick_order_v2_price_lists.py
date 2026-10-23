@@ -13,6 +13,7 @@ from services import quick_order_v2_production as production
 _INSTALLED = False
 _ORIGINAL_VIEW_FOR_CHANNEL = None
 _ORIGINAL_DELTA_CALLBACK = None
+_ORIGINAL_ENTRY_EMBED = None
 
 _ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "order_panels"
 _DELTA_COVER_BY_CATEGORY = {
@@ -83,6 +84,25 @@ class QuickPriceListButton(discord.ui.Button):
             color=discord.Color.blurple(),
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+def _install_entry_copy() -> None:
+    """Keep Delta's public copy as compact as the other game panels."""
+    global _ORIGINAL_ENTRY_EMBED
+    if _ORIGINAL_ENTRY_EMBED is not None:
+        return
+
+    _ORIGINAL_ENTRY_EMBED = production._clean_entry_embed
+    original = _ORIGINAL_ENTRY_EMBED
+
+    def compact_entry_embed(channel_id: int) -> discord.Embed:
+        embed = original(channel_id)
+        if int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
+            embed.description = "請選擇你要的服務。"
+        return embed
+
+    production._clean_entry_embed = compact_entry_embed
+    quick.build_entry_embed = compact_entry_embed
 
 
 def _install_view_factory() -> None:
@@ -192,6 +212,7 @@ def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
+    _install_entry_copy()
     _install_view_factory()
     _install_delta_cover_callback()
 
