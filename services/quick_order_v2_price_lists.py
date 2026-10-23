@@ -25,8 +25,12 @@ _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
 
-# Temporary copy. The store-specific text can be replaced here later without
-# touching the ordering flow or panel layout.
+_PRICE_LIST_IMAGE_BY_CHANNEL_ID = {
+    int(quick.QUICK_ORDER_V2_CHANNELS["lol"]): "pricelists/lol_pricelist.png",
+    int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "pricelists/valorant_pricelist.png",
+}
+
+# Temporary copy for games whose image price list has not been supplied yet.
 _PRICE_LIST_TEXT_BY_CHANNEL_ID = {
     channel_id: "價目表內容整理中，稍後更新。"
     for channel_id in _PRICE_LIST_LABEL_BY_CHANNEL_ID
@@ -56,15 +60,22 @@ class QuickPriceListButton(discord.ui.Button):
             self.source_channel_id,
             "遊戲",
         )
-        text = _PRICE_LIST_TEXT_BY_CHANNEL_ID.get(
-            self.source_channel_id,
-            "價目表內容整理中，稍後更新。",
-        )
         embed = discord.Embed(
             title=f"📋 {label}｜價目表",
-            description=text,
             color=discord.Color.blurple(),
         )
+
+        image_path = _PRICE_LIST_IMAGE_BY_CHANNEL_ID.get(self.source_channel_id)
+        image_url = public_order_panel_image_url(image_path) if image_path else None
+        if image_url is not None:
+            embed.description = "點擊圖片可放大查看。"
+            embed.set_image(url=image_url)
+        else:
+            embed.description = _PRICE_LIST_TEXT_BY_CHANNEL_ID.get(
+                self.source_channel_id,
+                "價目表內容整理中，稍後更新。",
+            )
+
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -131,9 +142,6 @@ async def _delta_category_callback(
 
     image_url = _delta_cover_url(self.category)
     if image_url is not None:
-        # The browser/Discord client fetches this public static URL after the
-        # interaction response is sent. The bot no longer uploads the PNG on
-        # every button click, keeping the ephemeral response fast.
         embed.set_image(url=image_url)
     elif self.category in _DELTA_COVER_BY_CATEGORY:
         print(
@@ -155,10 +163,6 @@ def _install_delta_cover_callback() -> None:
         return
 
     _ORIGINAL_DELTA_CALLBACK = quick.QuickDeltaCategoryButton.callback
-
-    # Make this callback authoritative no matter which display layer installs
-    # first. production.install_quick_order_v2_production() assigns the class
-    # callback from production._clean_delta_callback, so replace both references.
     production._clean_delta_callback = _delta_category_callback
     quick.QuickDeltaCategoryButton.callback = _delta_category_callback
 
@@ -166,8 +170,6 @@ def _install_delta_cover_callback() -> None:
 async def _refresh_delta_panel(bot: commands.Bot) -> None:
     await bot.wait_until_ready()
     try:
-        # Existing public panels are edited in place. No delete/re-send means
-        # routine copy or button changes do not generate a new-message alert.
         await quick._ensure_panel(
             bot,
             int(quick.QUICK_ORDER_V2_CHANNELS["delta"]),
@@ -189,10 +191,6 @@ def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
     _install_view_factory()
     _install_delta_cover_callback()
 
-    # quick_order_v2 registered its persistent views before this display layer was
-    # installed. Re-register the five customer-facing game views so the new price
-    # buttons also survive bot restarts. Existing custom_ids are intentionally the
-    # same; discord.py updates the dispatch mapping to these current view objects.
     for channel_id in _PRICE_LIST_LABEL_BY_CHANNEL_ID:
         bot.add_view(quick._view_for_channel(channel_id))
 
