@@ -55,10 +55,23 @@ foreach ($PanelAssetName in $RequiredPanelAssetNames) {
     $PanelAssetPaths += $PanelAssetPath
 }
 
-# Upload artwork before the safe deployment. The files live in ignored runtime
-# directories, so git reset/checkout does not remove them. Keeping a compatibility
-# copy under assets/order_panels also lets the previous attachment-based build keep
-# working if the safe deploy rolls back.
+$PriceListAssetDir = Join-Path $PanelAssetDir "pricelists"
+$RequiredPriceListAssetNames = @(
+    "lol_pricelist.png",
+    "valorant_pricelist.png"
+)
+$PriceListAssetPaths = @()
+foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
+    $PriceListAssetPath = Join-Path $PriceListAssetDir $PriceListAssetName
+    if (-not (Test-Path -LiteralPath $PriceListAssetPath -PathType Leaf)) {
+        throw "Missing order price-list image: $PriceListAssetPath"
+    }
+    $PriceListAssetPaths += $PriceListAssetPath
+}
+
+# Upload root artwork before the safe deployment. These files are already part of
+# the established runtime-artwork flow and are needed when public panels refresh
+# during bot startup.
 Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
 $RemotePanelStage = "/tmp/dc-bot-order-panels"
 ssh $Vps "rm -rf '$RemotePanelStage' && mkdir -p '$RemotePanelStage'"
@@ -78,25 +91,50 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "PASS: order panel images synchronized before service restart" -ForegroundColor Green
 Write-Host ""
 
-# Run the existing safe deployment after artwork is already in place. deploy_main.sh
-# owns the single bot/web restart, so image support no longer adds a second restart.
+# Run the existing safe deployment. deploy_main.sh owns the single bot/web restart.
 $RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
 ssh $Vps $RemoteCommand
 if ($LASTEXITCODE -ne 0) {
     throw "VPS deployment failed. Check rollback output above."
 }
 
+# Price-list images are only resolved when a customer presses the price-list
+# button, so they can be installed after the safe deployment without another bot
+# restart. The target .gitignore is active by this point, so nested runtime artwork
+# does not dirty the VPS working tree.
+Write-Host ""
+Write-Host "=== SYNC ORDER PRICE-LIST IMAGES ===" -ForegroundColor Yellow
+ssh $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels/pricelists"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to prepare VPS price-list image directory."
+}
+
+& scp @PriceListAssetPaths "${Vps}:/opt/dc-bot/web/app/static/order_panels/pricelists/"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload order price-list images to VPS."
+}
+
+ssh $Vps "chmod 0644 /opt/dc-bot/web/app/static/order_panels/pricelists/*.png"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to set price-list image permissions."
+}
+Write-Host "PASS: order price-list images uploaded without extra service restart" -ForegroundColor Green
+
 Write-Host ""
 Write-Host "=== VERIFY PUBLIC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
-$PanelAssetNameList = ($RequiredPanelAssetNames -join " ")
-# Verify a fresh query-string URL so Cloudflare cannot satisfy this check from a
-# response cached before the cross-origin image headers were installed.
+$RequiredPublicAssetRelativePaths = @()
+$RequiredPublicAssetRelativePaths += $RequiredPanelAssetNames
+foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
+    $RequiredPublicAssetRelativePaths += "pricelists/$PriceListAssetName"
+}
+$PanelAssetNameList = ($RequiredPublicAssetRelativePaths -join " ")
+
 $VerifyCommand = "set -e; for name in $PanelAssetNameList; do url=`"https://mowanentertainment.com/static/order_panels/`$name?deploy=$Target`"; headers=`$(curl --fail --silent --show-error --max-time 10 -I `"`$url`"); echo `"`$headers`" | grep -qi '^content-type: image/png' || { echo `"Invalid image content-type for `$name`"; exit 1; }; echo `"`$headers`" | grep -qi '^cross-origin-resource-policy: cross-origin' || { echo `"Missing cross-origin image policy for `$name`"; exit 1; }; done"
 ssh $Vps $VerifyCommand
 if ($LASTEXITCODE -ne 0) {
     throw "One or more public order panel image URLs failed Discord-safe HTTP verification."
 }
-Write-Host "PASS: public order panel image URLs are reachable with cross-origin image headers" -ForegroundColor Green
+Write-Host "PASS: public order panel and price-list image URLs are reachable" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DEPLOY COMPLETED" -ForegroundColor Green
