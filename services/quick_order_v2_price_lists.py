@@ -149,6 +149,11 @@ async def _delta_category_callback(
 
     asset = _delta_cover_asset(self.category)
     if asset is None:
+        print(
+            f"[quick-order-price] delta cover missing category={self.category} "
+            f"expected={_DELTA_COVER_BY_CATEGORY.get(str(self.category))}",
+            flush=True,
+        )
         await interaction.response.send_message(
             embed=embed,
             view=view,
@@ -189,12 +194,19 @@ def _install_delta_cover_callback() -> None:
         return
 
     _ORIGINAL_DELTA_CALLBACK = quick.QuickDeltaCategoryButton.callback
+
+    # Make this callback authoritative no matter which display layer installs
+    # first. production.install_quick_order_v2_production() assigns the class
+    # callback from production._clean_delta_callback, so replace both references.
+    production._clean_delta_callback = _delta_category_callback
     quick.QuickDeltaCategoryButton.callback = _delta_category_callback
 
 
 async def _refresh_delta_panel(bot: commands.Bot) -> None:
     await bot.wait_until_ready()
     try:
+        # Existing public panels are edited in place. No delete/re-send means
+        # routine copy or button changes do not generate a new-message alert.
         await quick._ensure_panel(
             bot,
             int(quick.QUICK_ORDER_V2_CHANNELS["delta"]),
