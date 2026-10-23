@@ -20,6 +20,7 @@ _QUICK_SELECT_IDS = {
     "self_service_order_quantity_select",
 }
 _QUANTITY_SELECTED_KEY = "quick_order_quantity_selected"
+_LEGACY_RESELECT_FLAG = "legacy_four_selector_panel"
 
 
 def _clear_defaults(select: discord.ui.Select) -> None:
@@ -27,17 +28,33 @@ def _clear_defaults(select: discord.ui.Select) -> None:
         option.default = False
 
 
-def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
-    """Keep quick-order selects neutral until the customer actually chooses.
+def _select_value(select: discord.ui.Select, value: object) -> bool:
+    selected = str(value or "").strip()
+    matched = False
+    for option in getattr(select, "options", []) or []:
+        is_match = bool(selected) and str(getattr(option, "value", "")) == selected
+        option.default = is_match
+        matched = matched or is_match
+    return matched
 
-    A newly created quick-order draft may already contain system defaults such as
-    the minimum quantity. Those values are useful internally but must not look like
-    a customer choice in Discord. Once the customer really selects a detail or
-    quantity, the refreshed Select should show that selected value normally.
+
+def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
+    """Keep quick-order display neutral, except explicit classic re-selection.
+
+    Normal quick-order tickets already chose category/service before the ticket was
+    opened, so those routing values should not look like fresh customer choices.
+    Customer-service "重派自助下單" intentionally switches a quick ticket back to
+    the original four-selector panel; in that mode all saved selections must stay
+    visible just like the legacy/classic self-service flow.
     """
     category = str(data.get("category") or "")
+    item_group = str(data.get("item_group") or "")
     detail_selected = bool(str(data.get("item_detail_value") or "").strip())
     quantity_selected = bool(data.get(_QUANTITY_SELECTED_KEY))
+    classic_reselect = bool(data.get(_LEGACY_RESELECT_FLAG))
+
+    if classic_reselect:
+        from services.orders import ORDER_CATEGORY_LABELS
 
     for child in list(view.children):
         if not isinstance(child, discord.ui.Select):
@@ -48,6 +65,24 @@ def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None
             continue
 
         options = list(getattr(child, "options", []) or [])
+
+        if classic_reselect and custom_id == "self_service_order_category_select":
+            _select_value(child, category)
+            if category:
+                selected_label = str(ORDER_CATEGORY_LABELS.get(category, category))
+                child.placeholder = f"已選：{selected_label}"[:150]
+            else:
+                child.placeholder = "請選擇類型"
+            continue
+
+        if classic_reselect and custom_id == "self_service_order_item_select":
+            _select_value(child, item_group)
+            child.placeholder = (
+                f"已選：{item_group}"[:150]
+                if item_group
+                else "請選擇服務"
+            )
+            continue
 
         if custom_id == "self_service_order_detail_select":
             # Multi-option detail selectors start neutral. After the callback writes
@@ -66,8 +101,8 @@ def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None
             continue
 
         # Category/service were already chosen in the public quick-order entry.
-        # If either selector is still present in a quick ticket, don't make the
-        # pre-filled routing value look like another customer choice.
+        # If either selector is still present in a normal quick ticket, don't make
+        # the pre-filled routing value look like another customer choice.
         _clear_defaults(child)
         if custom_id == "self_service_order_item_select":
             child.placeholder = "請選擇服務"
