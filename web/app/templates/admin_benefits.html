@@ -3,12 +3,10 @@
 {% block page_title %}優惠與福利{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261018">
+<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261023-1">
 
 {% set form_template = editing_template or {} %}
-{% set form_scope_type = form_template.get('scope_type', 'all') %}
-{% set form_scope_values = form_template.get('scope_values', []) %}
-{% set form_excluded = form_template.get('excluded_rule_keys', []) %}
+{% set form_applicable = form_template.get('applicable_rule_keys', []) %}
 
 <div class="benefits-page">
     <section class="panel compact-panel benefits-head">
@@ -93,6 +91,7 @@
                 class="benefit-form"
                 method="post"
                 action="{% if editing_template %}/admin/benefits/templates/{{ editing_template.id }}{% else %}/admin/benefits/templates{% endif %}"
+                data-benefit-template-form
             >
                 <input type="hidden" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
 
@@ -148,15 +147,6 @@
                     </label>
 
                     <label>
-                        適用範圍
-                        <select name="scope_type" data-benefit-scope-select>
-                            <option value="all" {% if form_scope_type == 'all' %}selected{% endif %}>全館</option>
-                            <option value="category" {% if form_scope_type == 'category' %}selected{% endif %}>指定分類</option>
-                            <option value="rule" {% if form_scope_type == 'rule' %}selected{% endif %}>指定商品</option>
-                        </select>
-                    </label>
-
-                    <label>
                         時數／局數作用範圍
                         <select name="seat_mode">
                             <option value="one_seat" {% if form_template.get('seat_mode', 'one_seat') == 'one_seat' %}selected{% endif %}>一個陪玩席位</option>
@@ -165,55 +155,54 @@
                     </label>
                 </div>
 
-                <div class="benefit-picker-section" data-scope-panel="category">
-                    <div class="benefit-picker-head">
+                <div class="benefit-picker-section benefit-product-picker" data-benefit-product-picker>
+                    <div class="benefit-picker-head benefit-product-picker-head">
                         <div>
-                            <strong>指定分類</strong>
-                            <small>勾選這張福利可以使用的分類。</small>
+                            <strong>適用商品</strong>
+                            <small>只有勾選的商品能使用這張福利；勾遊戲或玩法可一次選取底下全部商品。</small>
+                            <small class="benefit-selected-count" data-benefit-product-count>已選 0 項</small>
+                        </div>
+                        <div class="benefit-product-tools">
+                            <input class="benefit-filter-input" type="search" placeholder="搜尋遊戲、玩法或商品" data-benefit-product-search>
+                            <button class="button secondary benefit-mini-button" type="button" data-benefit-tree-select-all>全選</button>
+                            <button class="button secondary benefit-mini-button" type="button" data-benefit-tree-clear>清除</button>
                         </div>
                     </div>
-                    <div class="benefit-check-grid compact">
-                        {% for category in category_options %}
-                        <label class="benefit-check-row">
-                            <input type="checkbox" name="scope_category_values" value="{{ category.key }}" {% if category.key in form_scope_values %}checked{% endif %}>
-                            <span>{{ category.label }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
 
-                <div class="benefit-picker-section" data-scope-panel="rule">
-                    <div class="benefit-picker-head">
-                        <div>
-                            <strong>指定商品</strong>
-                            <small>不用再貼 rule key，直接勾商品。</small>
-                        </div>
-                        <input class="benefit-filter-input" type="search" placeholder="搜尋商品" data-benefit-filter="scope-rule-picker">
-                    </div>
-                    <div class="benefit-check-grid" id="scope-rule-picker">
-                        {% for rule in rule_options %}
-                        <label class="benefit-check-row" data-benefit-option="{{ rule.category_label }} {{ rule.label }} {{ rule.key }}">
-                            <input type="checkbox" name="scope_rule_values" value="{{ rule.key }}" {% if rule.key in form_scope_values %}checked{% endif %}>
-                            <span><b>{{ rule.label }}</b><small>{{ rule.category_label }}</small></span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="benefit-picker-section">
-                    <div class="benefit-picker-head">
-                        <div>
-                            <strong>排除商品</strong>
-                            <small>即使上面選了全館或某分類，這裡勾選的商品仍不可使用。</small>
-                        </div>
-                        <input class="benefit-filter-input" type="search" placeholder="搜尋要排除的商品" data-benefit-filter="excluded-rule-picker">
-                    </div>
-                    <div class="benefit-check-grid" id="excluded-rule-picker">
-                        {% for rule in rule_options %}
-                        <label class="benefit-check-row" data-benefit-option="{{ rule.category_label }} {{ rule.label }} {{ rule.key }}">
-                            <input type="checkbox" name="excluded_rule_keys" value="{{ rule.key }}" {% if rule.key in form_excluded %}checked{% endif %}>
-                            <span><b>{{ rule.label }}</b><small>{{ rule.category_label }}</small></span>
-                        </label>
+                    <div class="benefit-product-tree" data-benefit-product-tree>
+                        {% for game in benefit_rule_tree %}
+                        <details class="benefit-tree-game" open data-benefit-tree-branch data-benefit-tree-game data-benefit-option="{{ game.label }}">
+                            <summary>
+                                <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ game.label }} 全部商品">
+                                <span class="benefit-tree-title"><b>{{ game.label }}</b><small>{{ game.rule_count }} 項商品</small></span>
+                            </summary>
+                            <div class="benefit-tree-groups">
+                                {% for group in game.groups %}
+                                <details class="benefit-tree-group" data-benefit-tree-branch data-benefit-tree-group data-benefit-option="{{ game.label }} {{ group.label }}">
+                                    <summary>
+                                        <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ group.label }} 全部商品">
+                                        <span class="benefit-tree-title"><b>{{ group.label }}</b><small>{{ group.rules|length }} 項</small></span>
+                                    </summary>
+                                    <div class="benefit-tree-leaves">
+                                        {% for rule in group.rules %}
+                                        <label class="benefit-tree-leaf" data-benefit-option="{{ game.label }} {{ group.label }} {{ rule.leaf_label }} {{ rule.label }} {{ rule.key }}">
+                                            <input
+                                                type="checkbox"
+                                                name="applicable_rule_keys"
+                                                value="{{ rule.key }}"
+                                                data-benefit-tree-leaf-checkbox
+                                                {% if rule.key in form_applicable %}checked{% endif %}
+                                            >
+                                            <span><b>{{ rule.leaf_label }}</b><small>{{ rule.key }}</small></span>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                </details>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% else %}
+                        <div class="muted-text">目前沒有可選的商品。</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -244,7 +233,7 @@
                 </div>
 
                 <div class="benefit-warning">
-                    整單免單、店家全吸收與高額券可能讓客人付款降到 0；店家吸收模式下，打手／客服仍依原本結算基數計算。請在儲存前確認活動預算與適用範圍。
+                    整單免單、店家全吸收與高額券可能讓客人付款降到 0；店家吸收模式下，打手／客服仍依原本結算基數計算。請在儲存前確認活動預算與適用商品。
                 </div>
 
                 <div class="benefit-form-submit">
@@ -259,7 +248,7 @@
             <div class="benefit-table-wrap benefit-template-table-wrap">
                 <table class="benefit-table">
                     <thead>
-                        <tr><th>模板</th><th>效果</th><th>負擔</th><th>範圍</th><th>門檻</th><th>期限</th><th>操作</th></tr>
+                        <tr><th>模板</th><th>效果</th><th>負擔</th><th>適用商品</th><th>門檻</th><th>期限</th><th>操作</th></tr>
                     </thead>
                     <tbody>
                     {% for item in templates %}
@@ -267,13 +256,7 @@
                         <td><strong>#{{ item.id }} {{ item.name }}</strong>{% if not item.is_active %}<br><small>已停用</small>{% endif %}</td>
                         <td>{{ effect_labels.get(item.effect_kind, item.effect_kind) }}{% if item.effect_value %} {{ item.effect_value|float|round(2) }}{% endif %}</td>
                         <td><span class="benefit-tag {{ item.funding }}">{{ funding_labels.get(item.funding, item.funding) }}</span></td>
-                        <td>
-                            {% if item.scope_type == 'all' %}全館
-                            {% elif item.scope_type == 'category' %}{{ item.scope_values|length }} 個分類
-                            {% else %}{{ item.scope_values|length }} 個商品
-                            {% endif %}
-                            {% if item.excluded_rule_keys %}<br><small>排除 {{ item.excluded_rule_keys|length }} 項</small>{% endif %}
-                        </td>
+                        <td>{% if item.applicable_count %}{{ item.applicable_count }} 項{% else %}<span class="muted-text">無適用商品</span>{% endif %}</td>
                         <td>{% if item.min_order_amount %}滿 {{ item.min_order_amount }}T{% else %}無{% endif %}</td>
                         <td>{% if item.valid_days %}發放後 {{ item.valid_days }} 天{% else %}不限{% endif %}</td>
                         <td>
@@ -335,5 +318,5 @@
     </section>
 </div>
 
-<script src="/static/js/pages/admin_benefits.js?v=20261018-2"></script>
+<script src="/static/js/pages/admin_benefits.js?v=20261023-1"></script>
 {% endblock %}
