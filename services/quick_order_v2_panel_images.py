@@ -112,9 +112,6 @@ def _install_panel_sync() -> None:
         view = quick._view_for_channel(channel_id)
 
         try:
-            # Send image and embed in the SAME Discord request. This is the reliable
-            # attachment:// path: Discord consumes the attachment as the embed image
-            # instead of rendering it as a separate message attachment block.
             replacement = await channel.send(
                 embed=embed,
                 view=view,
@@ -152,7 +149,6 @@ async def refresh_quick_order_panel_images(bot: commands.Bot) -> None:
         try:
             await production._clean_ensure_panel(bot, channel_id)
         except Exception as exc:
-            # A failure in one game must not stop the other three panels.
             print(
                 f"[quick-order-panel-image] refresh failed {channel_id}: "
                 f"{type(exc).__name__}: {exc}",
@@ -166,6 +162,13 @@ def install_quick_order_v2_panel_images(bot: commands.Bot) -> None:
         return
 
     _install_panel_sync()
+
+    # The price-list button layer wraps quick._view_for_channel. Install it before
+    # the four image panels are refreshed so every newly rebuilt panel already has
+    # the extra button. It also owns the Delta category-cover callback.
+    from services.quick_order_v2_price_lists import install_quick_order_v2_price_lists
+
+    install_quick_order_v2_price_lists(bot)
 
     if not getattr(bot, "_quick_order_v2_panel_images_started", False):
         bot._quick_order_v2_panel_images_started = True
