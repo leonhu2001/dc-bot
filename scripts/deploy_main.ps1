@@ -43,9 +43,7 @@ $RequiredPanelAssetNames = @(
     "apex_panel.png",
     "lol_panel.png",
     "steam_panel.png",
-    "valorant_panel.png"
-)
-$OptionalPanelAssetNames = @(
+    "valorant_panel.png",
     "delta_fun_panel.png"
 )
 $PanelAssetPaths = @()
@@ -55,14 +53,6 @@ foreach ($PanelAssetName in $RequiredPanelAssetNames) {
         throw "Missing order panel image: $PanelAssetPath"
     }
     $PanelAssetPaths += $PanelAssetPath
-}
-foreach ($PanelAssetName in $OptionalPanelAssetNames) {
-    $PanelAssetPath = Join-Path $PanelAssetDir $PanelAssetName
-    if (Test-Path -LiteralPath $PanelAssetPath -PathType Leaf) {
-        $PanelAssetPaths += $PanelAssetPath
-    } else {
-        Write-Host "SKIP: optional order panel image not found: $PanelAssetName" -ForegroundColor DarkYellow
-    }
 }
 
 # Deploy source first using the existing safe rollback flow.
@@ -91,8 +81,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "PASS: order panel images uploaded beside bot" -ForegroundColor Green
 
 # Restart only the bot after the real PNG files are in place. On startup the
-# quick-order image layer sends each panel as one embed+file request, then removes
-# the previous panel message.
+# quick-order layer edits existing public panels in place; it only sends a new
+# panel when a channel has no existing panel at all, avoiding update notifications.
 ssh $Vps "systemctl restart dc-bot.service && systemctl is-active --quiet dc-bot.service"
 if ($LASTEXITCODE -ne 0) {
     throw "Bot restart after order panel image sync failed."
