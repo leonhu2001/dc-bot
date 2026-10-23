@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import discord
 from discord.ext import commands
 
@@ -19,48 +21,158 @@ _DELTA_COVER_BY_CATEGORY = {
 
 _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["delta"]): "三角洲行動",
-    int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "特戰英豪",
+    int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "VALORANT",
     int(quick.QUICK_ORDER_V2_CHANNELS["lol"]): "英雄聯盟",
     int(quick.QUICK_ORDER_V2_CHANNELS["apex"]): "APEX",
     int(quick.QUICK_ORDER_V2_CHANNELS["steam"]): "STEAM",
 }
 
-_PRICE_LIST_IMAGE_BY_CHANNEL_ID = {
-    int(quick.QUICK_ORDER_V2_CHANNELS["lol"]): "pricelists/lol_pricelist.png",
-    int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]): "pricelists/valorant_pricelist.png",
-}
 
-_APEX_PRICE_LIST_TEXT = """**娛樂陪**
+def _normalise_emoji_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value or "").casefold())
+
+
+def _guild_emoji(interaction: discord.Interaction, token: str) -> str:
+    """Resolve a server custom emoji by the shortcode the owner uses in Discord.
+
+    Discord's client can display duplicate emoji shortcodes with a ``~1`` suffix,
+    while the API may expose either a distinct suffixed name or duplicate base
+    names. Try the full normalized name first, then treat ``~N`` as the Nth
+    duplicate of the base name. Missing emojis simply fall back to text labels.
+    """
+    guild = interaction.guild
+    if guild is None:
+        return ""
+
+    raw = str(token or "").strip().strip(":")
+    if not raw:
+        return ""
+
+    full_key = _normalise_emoji_name(raw)
+    exact = [emoji for emoji in guild.emojis if _normalise_emoji_name(emoji.name) == full_key]
+    if exact:
+        return str(exact[0])
+
+    duplicate_index: int | None = None
+    base = raw
+    if "~" in raw:
+        candidate, suffix = raw.rsplit("~", 1)
+        if suffix.isdigit():
+            base = candidate
+            duplicate_index = int(suffix)
+
+    base_key = _normalise_emoji_name(base)
+    matches = [emoji for emoji in guild.emojis if _normalise_emoji_name(emoji.name) == base_key]
+    if not matches:
+        return ""
+
+    if duplicate_index is not None and duplicate_index < len(matches):
+        return str(matches[duplicate_index])
+    return str(matches[0])
+
+
+def _rank_heading(interaction: discord.Interaction, emoji_token: str, label: str) -> str:
+    emoji = _guild_emoji(interaction, emoji_token)
+    return f"{emoji} **{label}**" if emoji else f"**{label}**"
+
+
+def _valorant_price_list(interaction: discord.Interaction) -> str:
+    return f"""**娛樂陪**
+NG｜每人 **300T / H**
+積分｜每人 **250T / 局**
+
+{_rank_heading(interaction, "Ascendant", "超凡陪")}
+NG｜每人 **330T / H**
+積分｜每人 **290T / 局**
+
+{_rank_heading(interaction, "Immortal", "神話陪")}
+NG｜每人 **350T / H**
+積分｜每人 **330T / 局**
+
+{_rank_heading(interaction, "Radiant", "輻能陪")}
+NG｜每人 **380T / H**
+積分｜每人 **370T / 局**
+
+🎁 **娛樂陪累積回饋**
+計局｜累積 **15 局** → 贈送 **1 局券**
+計時｜累積 **10 小時** → 贈送 **1 小時券**
+
+📌 **指定陪玩**
+指定打手／陪玩｜每人 **+100T**
+單筆消費滿 **500T** 免指定費"""
+
+
+def _apex_price_list(interaction: discord.Interaction) -> str:
+    return f"""**娛樂陪**
 NG｜每人 **300T / H**
 積分｜每人 **350T / H**
 
-**鑽石陪**
+{_rank_heading(interaction, "Diamond", "鑽石陪")}
 NG｜每人 **400T / H**
 積分｜每人 **450T / H**
 
-**大師陪**
-NG｜每人 **500T / H**
-積分｜每人 **550T / H**
+{_rank_heading(interaction, "Master~1", "大師陪")}
+NG｜每人 **480T / H**
+積分｜每人 **530T / H**
 
-**頂獵陪**
-NG｜每人 **600T / H**
-積分｜每人 **650T / H**
+{_rank_heading(interaction, "Predator", "頂獵陪")}
+NG｜每人 **580T / H**
+積分｜每人 **630T / H**
 
-🎁 **娛樂陪累積福利**
-累積 10 小時 → 送 1 小時券
+🎁 **娛樂陪累積回饋**
+累積 **10 小時** → 贈送 **1 小時券**
 
-👤 **指定打手／陪玩**
-每人 +100T
-⚠️ 兩單（2H）以上免指定費"""
+📌 **指定陪玩**
+指定打手／陪玩｜每人 **+100T**
+⚠️ **2H 以上免指定費**"""
 
-# Temporary copy for games whose image price list has not been supplied yet.
-_PRICE_LIST_TEXT_BY_CHANNEL_ID = {
-    channel_id: "價目表內容整理中，稍後更新。"
-    for channel_id in _PRICE_LIST_LABEL_BY_CHANNEL_ID
-}
-_PRICE_LIST_TEXT_BY_CHANNEL_ID[int(quick.QUICK_ORDER_V2_CHANNELS["apex"])] = (
-    _APEX_PRICE_LIST_TEXT
-)
+
+def _lol_price_list(interaction: discord.Interaction) -> str:
+    return f"""**娛樂陪**
+ARAM｜每人 **300T / H**
+NG｜每人 **300T / H**
+積分｜每人 **250T / 局**
+
+{_rank_heading(interaction, "Master", "大師陪")}
+NG｜每人 **340T / H**
+積分｜每人 **300T / 局**
+
+{_rank_heading(interaction, "Grandmaster", "宗師陪")}
+NG｜每人 **370T / H**
+積分｜每人 **340T / 局**
+
+{_rank_heading(interaction, "Challenger", "菁英陪")}
+NG｜每人 **400T / H**
+積分｜每人 **400T / 局**
+
+🎁 **娛樂陪累積回饋**
+計局｜累積 **15 局** → 贈送 **1 局券**
+計時｜累積 **10 小時** → 贈送 **1 小時券**
+
+📌 **指定陪玩**
+指定打手／陪玩｜每人 **+100T**
+⚠️ **2H 或 2局以上免指定費**"""
+
+
+def _steam_price_list(_: discord.Interaction) -> str:
+    return """**娛樂陪**
+每人 **320T / H**
+
+📌 **指定陪玩**
+指定打手／陪玩｜每人 **+100T**
+⚠️ **2H 以上免指定費**"""
+
+
+def _price_list_text(interaction: discord.Interaction, channel_id: int) -> str:
+    if int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["valorant"]):
+        return _valorant_price_list(interaction)
+    if int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["lol"]):
+        return _lol_price_list(interaction)
+    if int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["apex"]):
+        return _apex_price_list(interaction)
+    if int(channel_id) == int(quick.QUICK_ORDER_V2_CHANNELS["steam"]):
+        return _steam_price_list(interaction)
+    return "價目表內容整理中，稍後更新。"
 
 
 def _delta_cover_url(category: str) -> str | None:
@@ -87,21 +199,10 @@ class QuickPriceListButton(discord.ui.Button):
             "遊戲",
         )
         embed = discord.Embed(
-            title=f"📋 {label}｜價目表",
+            title=f"📋 {label}｜陪玩價目",
+            description=_price_list_text(interaction, self.source_channel_id),
             color=discord.Color.blurple(),
         )
-
-        image_path = _PRICE_LIST_IMAGE_BY_CHANNEL_ID.get(self.source_channel_id)
-        image_url = public_order_panel_image_url(image_path) if image_path else None
-        if image_url is not None:
-            embed.description = "點擊圖片可放大查看。"
-            embed.set_image(url=image_url)
-        else:
-            embed.description = _PRICE_LIST_TEXT_BY_CHANNEL_ID.get(
-                self.source_channel_id,
-                "價目表內容整理中，稍後更新。",
-            )
-
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -225,7 +326,7 @@ def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
         bot.loop.create_task(_refresh_delta_panel(bot))
 
     _INSTALLED = True
-    print("[quick-order-price] price buttons and public delta covers installed", flush=True)
+    print("[quick-order-price] text price lists and public delta covers installed", flush=True)
 
 
 __all__ = [
