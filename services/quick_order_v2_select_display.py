@@ -271,6 +271,13 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
         bot._quick_order_v2_select_repair_started = True
         bot.loop.create_task(repair_existing_quick_order_selects(bot))
 
+    # The public game-panel image layer is installed here because setup_commands
+    # loads production first and this display layer immediately afterwards. Keeping
+    # it here avoids another setup hook and does not touch ticket/order behavior.
+    from services.quick_order_v2_panel_images import install_quick_order_v2_panel_images
+
+    install_quick_order_v2_panel_images(bot)
+
     _INSTALLED = True
     print("[quick-order-v2-select] interaction-aware select display installed", flush=True)
 
