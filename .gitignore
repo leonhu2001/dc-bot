@@ -91,5 +91,5 @@ data/deployed_version.json
 
 # High-resolution local order-panel source artwork.
 # deploy_main.ps1 syncs these files to the website static directory on the VPS.
-assets/order_panels/*.png
-web/app/static/order_panels/*.png
+assets/order_panels/**/*.png
+web/app/static/order_panels/**/*.png
