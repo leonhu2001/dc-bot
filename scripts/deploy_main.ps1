@@ -89,12 +89,14 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "=== VERIFY PUBLIC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
 $PanelAssetNameList = ($RequiredPanelAssetNames -join " ")
-$VerifyCommand = "for name in $PanelAssetNameList; do curl --fail --silent --show-error --max-time 10 -o /dev/null 'https://mowanentertainment.com/static/order_panels/'`$name || exit 1; done"
+# Verify a fresh query-string URL so Cloudflare cannot satisfy this check from a
+# response cached before the cross-origin image headers were installed.
+$VerifyCommand = "set -e; for name in $PanelAssetNameList; do url=`"https://mowanentertainment.com/static/order_panels/`$name?deploy=$Target`"; headers=`$(curl --fail --silent --show-error --max-time 10 -I `"`$url`"); echo `"`$headers`" | tr -d '' | grep -qi '^content-type: image/png' || { echo `"Invalid image content-type for `$name`"; exit 1; }; echo `"`$headers`" | tr -d '' | grep -qi '^cross-origin-resource-policy: cross-origin' || { echo `"Missing cross-origin image policy for `$name`"; exit 1; }; done"
 ssh $Vps $VerifyCommand
 if ($LASTEXITCODE -ne 0) {
-    throw "One or more public order panel image URLs failed HTTP verification."
+    throw "One or more public order panel image URLs failed Discord-safe HTTP verification."
 }
-Write-Host "PASS: public order panel image URLs are reachable" -ForegroundColor Green
+Write-Host "PASS: public order panel image URLs are reachable with cross-origin image headers" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DEPLOY COMPLETED" -ForegroundColor Green
