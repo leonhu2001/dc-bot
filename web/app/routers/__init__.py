@@ -106,4 +106,10 @@ from web.app.routers.admin_lottery import router as _admin_lottery_router
 
 _site.router.include_router(_admin_lottery_router)
 
+# Reviews are implemented in their own admin router. Mount them through the same
+# shared site router so /admin/reviews/ is registered before main.py includes it.
+from web.app.routers.admin_reviews import router as _admin_reviews_router
+
+_site.router.include_router(_admin_reviews_router)
+
 __all__ = []
