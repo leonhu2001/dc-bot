@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import io
 from pathlib import Path
 
 import discord
@@ -14,7 +13,14 @@ from services import quick_order_v2_production as production
 _INSTALLED = False
 _ORIGINAL_ENSURE_PANEL = None
 
-_ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "order_panels"
+_WEB_STATIC_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "web"
+    / "app"
+    / "static"
+    / "order_panels"
+)
+_PUBLIC_BASE_URL = "https://mowanentertainment.com/static/order_panels"
 _IMAGE_FILENAME_BY_KEY = {
     "apex": "apex_panel.png",
     "lol": "lol_panel.png",
@@ -27,17 +33,18 @@ _IMAGE_FILENAME_BY_CHANNEL_ID = {
 }
 
 
-def _image_payload(channel_id: int) -> tuple[str, bytes] | None:
-    """Load the real PNG deployed beside the bot.
+def _image_url(channel_id: int) -> str | None:
+    """Return a public static URL for a valid deployed PNG.
 
-    Do not fall back to the old base64 placeholders. If the PNG is missing we keep
-    the normal text-only panel instead of publishing a broken attachment image.
+    The file is served by the existing FastAPI /static mount. A content hash is
+    appended as a query string so Discord does not keep an old cached image when
+    the local artwork is replaced later.
     """
     filename = _IMAGE_FILENAME_BY_CHANNEL_ID.get(int(channel_id))
     if not filename:
         return None
 
-    path = _ASSET_DIR / filename
+    path = _WEB_STATIC_DIR / filename
     if not path.is_file():
         return None
 
@@ -50,33 +57,20 @@ def _image_payload(channel_id: int) -> tuple[str, bytes] | None:
         return None
 
     digest = hashlib.sha256(data).hexdigest()[:12]
-    stem = Path(filename).stem
-    attachment_name = f"{stem}_{digest}.png"
-    return attachment_name, data
+    return f"{_PUBLIC_BASE_URL}/{filename}?v={digest}"
 
 
-def _image_file(channel_id: int) -> tuple[str, discord.File] | None:
-    payload = _image_payload(channel_id)
-    if payload is None:
-        return None
-    filename, data = payload
-    return filename, discord.File(io.BytesIO(data), filename=filename)
-
-
-def _find_existing_panel_message(
+async def _find_existing_panel_message(
     channel: discord.TextChannel,
     channel_id: int,
     bot_user_id: int | None,
-):
-    async def finder() -> discord.Message | None:
-        async for message in channel.history(limit=50):
-            if bot_user_id is not None and message.author.id != bot_user_id:
-                continue
-            if production._is_existing_entry_panel(message, channel_id):
-                return message
-        return None
-
-    return finder()
+) -> discord.Message | None:
+    async for message in channel.history(limit=50):
+        if bot_user_id is not None and message.author.id != bot_user_id:
+            continue
+        if production._is_existing_entry_panel(message, channel_id):
+            return message
+    return None
 
 
 def _install_panel_sync() -> None:
@@ -93,18 +87,6 @@ def _install_panel_sync() -> None:
             await original(bot, channel_id)
             return
 
-        payload = _image_file(channel_id)
-        if payload is None:
-            # Missing local asset must never create an attachment:// blank box.
-            await original(bot, channel_id)
-            print(
-                f"[quick-order-panel-image] PNG missing; kept text-only panel: {channel_id}",
-                flush=True,
-            )
-            return
-
-        attachment_name, file = payload
-
         channel = bot.get_channel(channel_id)
         if not isinstance(channel, discord.TextChannel):
             try:
@@ -118,7 +100,12 @@ def _install_panel_sync() -> None:
             return
 
         embed = production._clean_entry_embed(channel_id)
-        embed.set_image(url=f"attachment://{attachment_name}")
+        image_url = _image_url(channel_id)
+        if image_url:
+            # External image URL keeps the artwork inside the Discord embed. No
+            # message attachment is used, so it cannot render as a separate block.
+            embed.set_image(url=image_url)
+
         view = quick._view_for_channel(channel_id)
 
         target: discord.Message | None = None
@@ -132,27 +119,32 @@ def _install_panel_sync() -> None:
             target = None
 
         try:
-            # Discord attachment replacement on an existing embed can leave a stale
-            # attachment:// URL. Keep a panel only when it already owns this exact
-            # content-addressed attachment; otherwise send the replacement first and
-            # delete the old panel afterwards.
-            if target is not None and any(
-                attachment.filename == attachment_name
-                for attachment in target.attachments
-            ):
-                await target.edit(embed=embed, view=view)
-                return
-
-            replacement = await channel.send(embed=embed, view=view, file=file)
-            if target is not None and target.id != replacement.id:
-                try:
-                    await target.delete()
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    pass
+            if target is None:
+                await channel.send(embed=embed, view=view)
+            else:
+                # Explicitly clear the old Discord attachment from the previous
+                # rollout, then keep only the normal embed + its external image.
+                await target.edit(
+                    embed=embed,
+                    view=view,
+                    attachments=[],
+                )
         except (discord.Forbidden, discord.HTTPException, OSError, ValueError, TypeError) as exc:
             print(
                 f"[quick-order-panel-image] sync failed {channel_id}: "
                 f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            return
+
+        if image_url:
+            print(
+                f"[quick-order-panel-image] embedded image ready: {channel_id} {image_url}",
+                flush=True,
+            )
+        else:
+            print(
+                f"[quick-order-panel-image] PNG missing; kept text-only panel: {channel_id}",
                 flush=True,
             )
 
@@ -166,7 +158,7 @@ async def refresh_quick_order_panel_images(bot: commands.Bot) -> None:
         try:
             await production._clean_ensure_panel(bot, channel_id)
         except Exception as exc:
-            # One broken channel must not prevent the remaining three panels from
+            # One broken channel must not prevent the remaining game panels from
             # being refreshed.
             print(
                 f"[quick-order-panel-image] refresh failed {channel_id}: "
@@ -187,7 +179,7 @@ def install_quick_order_v2_panel_images(bot: commands.Bot) -> None:
         bot.loop.create_task(refresh_quick_order_panel_images(bot))
 
     _INSTALLED = True
-    print("[quick-order-panel-image] real PNG panel images installed", flush=True)
+    print("[quick-order-panel-image] embed-image layer installed", flush=True)
 
 
 __all__ = [
