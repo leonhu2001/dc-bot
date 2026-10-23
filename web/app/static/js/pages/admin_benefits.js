@@ -51,12 +51,28 @@
   const clearButton = picker.querySelector('[data-benefit-tree-clear]');
   const templateForm = document.querySelector('[data-benefit-template-form]');
 
-  const branchParentCheckbox = (branch) => {
-    const summary = Array.from(branch.children).find((child) => child.tagName === 'SUMMARY');
-    return summary ? summary.querySelector('[data-benefit-tree-parent]') : null;
-  };
+  const directChild = (branch, selector) =>
+    Array.from(branch.children).find((child) => child.matches && child.matches(selector)) || null;
 
+  const branchRow = (branch) => directChild(branch, '.benefit-tree-row');
+  const branchChildren = (branch) => directChild(branch, '[data-benefit-tree-children]');
+  const branchParentCheckbox = (branch) => {
+    const row = branchRow(branch);
+    return row ? row.querySelector('[data-benefit-tree-parent]') : null;
+  };
+  const branchToggle = (branch) => {
+    const row = branchRow(branch);
+    return row ? row.querySelector('[data-benefit-tree-toggle]') : null;
+  };
   const branchLeaves = (branch) => Array.from(branch.querySelectorAll('[data-benefit-tree-leaf-checkbox]'));
+
+  const setBranchOpen = (branch, open) => {
+    const children = branchChildren(branch);
+    const toggle = branchToggle(branch);
+    branch.classList.toggle('is-open', Boolean(open));
+    if (children) children.hidden = !open;
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
 
   const syncBranch = (branch) => {
     const parent = branchParentCheckbox(branch);
@@ -77,18 +93,24 @@
 
   branches.forEach((branch) => {
     const parent = branchParentCheckbox(branch);
-    if (!parent) return;
+    const toggle = branchToggle(branch);
 
-    parent.addEventListener('click', (event) => {
-      event.stopPropagation();
-    });
-    parent.addEventListener('change', () => {
-      const checked = parent.checked;
-      branchLeaves(branch).forEach((checkbox) => {
-        checkbox.checked = checked;
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        setBranchOpen(branch, !branch.classList.contains('is-open'));
       });
-      refreshTreeState();
-    });
+    }
+
+    if (parent) {
+      parent.addEventListener('change', () => {
+        const checked = parent.checked;
+        branchLeaves(branch).forEach((checkbox) => {
+          checkbox.checked = checked;
+        });
+        if (checked) setBranchOpen(branch, true);
+        refreshTreeState();
+      });
+    }
   });
 
   leaves.forEach((checkbox) => checkbox.addEventListener('change', refreshTreeState));
@@ -115,6 +137,7 @@
     const applyProductFilter = () => {
       const query = String(searchInput.value || '').trim().toLowerCase();
       const leafRows = Array.from(tree.querySelectorAll('.benefit-tree-leaf'));
+
       leafRows.forEach((row) => {
         const haystack = String(row.dataset.benefitOption || '').toLowerCase();
         row.hidden = Boolean(query) && !haystack.includes(query);
@@ -123,13 +146,13 @@
       Array.from(tree.querySelectorAll('[data-benefit-tree-group]')).forEach((group) => {
         const visibleLeaves = Array.from(group.querySelectorAll('.benefit-tree-leaf')).filter((row) => !row.hidden);
         group.hidden = Boolean(query) && visibleLeaves.length === 0;
-        if (query && visibleLeaves.length) group.open = true;
+        if (query && visibleLeaves.length) setBranchOpen(group, true);
       });
 
       Array.from(tree.querySelectorAll('[data-benefit-tree-game]')).forEach((game) => {
         const visibleGroups = Array.from(game.querySelectorAll('[data-benefit-tree-group]')).filter((group) => !group.hidden);
         game.hidden = Boolean(query) && visibleGroups.length === 0;
-        if (query && visibleGroups.length) game.open = true;
+        if (query && visibleGroups.length) setBranchOpen(game, true);
       });
     };
 
@@ -145,4 +168,11 @@
   }
 
   refreshTreeState();
+
+  // Editing an existing template should immediately reveal any selected paths.
+  branches.forEach((branch) => {
+    if (branchLeaves(branch).some((checkbox) => checkbox.checked)) {
+      setBranchOpen(branch, true);
+    }
+  });
 })();
