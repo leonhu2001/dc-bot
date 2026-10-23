@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from services.order_product_status import is_order_product_active
 from services.order_rules import CATEGORY_LABELS, ORDER_RULES
+from services.orders import ORDER_ITEM_GROUPS_BY_CATEGORY, get_order_item_details_for_group
 from services.promotion_benefit_admin import update_template
 from services.promotion_benefits import (
     EFFECT_FIXED_CASH,
@@ -98,8 +99,27 @@ def _split_rule_label(label: str) -> list[str]:
     return [part.strip() for part in text.split("｜") if part.strip()]
 
 
+def _catalog_group_lookup() -> dict[tuple[str, str], str]:
+    """Resolve benefit rules through the same live catalog used by ordering."""
+    result: dict[tuple[str, str], str] = {}
+    for category in CATEGORY_LABELS:
+        if category in _HIDDEN_BENEFIT_CATEGORIES:
+            continue
+        for group_label in ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, []) or []:
+            try:
+                details = get_order_item_details_for_group(category, group_label)
+            except Exception:
+                details = []
+            for detail in details:
+                rule_key = str(detail.get("rule_key") or "").strip()
+                if rule_key:
+                    result.setdefault((str(category), rule_key), str(group_label))
+    return result
+
+
 def _benefit_catalog_options() -> list[dict]:
     rules: list[dict] = []
+    catalog_groups = _catalog_group_lookup()
 
     for rule_key, rule in ORDER_RULES.items():
         category = str(getattr(rule, "category", "") or "").strip()
@@ -110,7 +130,9 @@ def _benefit_catalog_options() -> list[dict]:
 
         raw_label = str(getattr(rule, "label", rule_key) or rule_key).strip()
         parts = _split_rule_label(raw_label)
-        catalog_group = str(getattr(rule, "catalog_group_label", "") or "").strip()
+        catalog_group = str(catalog_groups.get((category, str(rule_key))) or "").strip()
+        if not catalog_group:
+            catalog_group = str(getattr(rule, "catalog_group_label", "") or "").strip()
         if not catalog_group:
             catalog_group = parts[-2] if len(parts) >= 3 else "其他商品"
         leaf_label = parts[-1] if len(parts) >= 2 else raw_label
