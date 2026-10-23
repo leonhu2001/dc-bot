@@ -100,7 +100,7 @@ def _split_rule_label(label: str) -> list[str]:
 
 
 def _catalog_group_lookup() -> dict[tuple[str, str], str]:
-    """Resolve benefit rules through the same live catalog used by ordering."""
+    """Resolve selectable benefits from the same live catalog used by ordering."""
     result: dict[tuple[str, str], str] = {}
     for category in CATEGORY_LABELS:
         if category in _HIDDEN_BENEFIT_CATEGORIES:
@@ -128,9 +128,16 @@ def _benefit_catalog_options() -> list[dict]:
         if not is_order_product_active(rule_key):
             continue
 
+        # A rule may still exist for historical orders without being present in
+        # the current ordering catalog. Benefit setup should only expose products
+        # that customers can actually order now.
+        catalog_key = (category, str(rule_key))
+        if catalog_key not in catalog_groups:
+            continue
+
         raw_label = str(getattr(rule, "label", rule_key) or rule_key).strip()
         parts = _split_rule_label(raw_label)
-        catalog_group = str(catalog_groups.get((category, str(rule_key))) or "").strip()
+        catalog_group = str(catalog_groups.get(catalog_key) or "").strip()
         if not catalog_group:
             catalog_group = str(getattr(rule, "catalog_group_label", "") or "").strip()
         if not catalog_group:
@@ -239,13 +246,11 @@ def _template_rules_from_form(form) -> dict:
         if str(value).strip()
     ]
     requested = list(dict.fromkeys(requested))
+    allowed_rule_keys = {str(rule["key"]) for rule in _benefit_catalog_options()}
     applicable_rule_keys = [
         rule_key
         for rule_key in requested
-        if rule_key in ORDER_RULES
-        and is_order_product_active(rule_key)
-        and str(getattr(ORDER_RULES[rule_key], "category", "") or "")
-        not in _HIDDEN_BENEFIT_CATEGORIES
+        if rule_key in allowed_rule_keys
     ]
     if not applicable_rule_keys:
         raise ValueError("請至少勾選一個適用商品。")
