@@ -134,28 +134,31 @@ if ($LASTEXITCODE -ne 0) {
 
 # Price-list images are only resolved when a customer presses the price-list
 # button, so they can be installed after the safe deployment without another bot
-# restart. The target .gitignore is active by this point, so nested runtime artwork
-# does not dirty the VPS working tree.
+# restart. Stage first, then install with the final mode in a single remote command.
+# This avoids opening a second SSH session just for chmod, which can leave Windows
+# OpenSSH waiting even though the file transfer has already completed.
 Write-Host ""
 Write-Host "=== SYNC ORDER PRICE-LIST IMAGES ===" -ForegroundColor Yellow
-Write-Host "Preparing remote price-list directory..." -ForegroundColor DarkGray
-& ssh @SshTransportArgs $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels/pricelists"
+$RemotePriceListStage = "/tmp/dc-bot-order-pricelists"
+Write-Host "Preparing remote price-list staging directory..." -ForegroundColor DarkGray
+& ssh @SshTransportArgs $Vps "rm -rf '$RemotePriceListStage' && mkdir -p '$RemotePriceListStage'"
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to prepare VPS price-list image directory."
+    throw "Failed to prepare VPS price-list staging directory."
 }
-Write-Host "PASS: remote price-list directory ready" -ForegroundColor Green
+Write-Host "PASS: remote price-list staging directory ready" -ForegroundColor Green
 
 Write-Host "Uploading 2 price-list images..." -ForegroundColor DarkGray
-& scp @SshTransportArgs @PriceListAssetPaths "${Vps}:/opt/dc-bot/web/app/static/order_panels/pricelists/"
+& scp @SshTransportArgs @PriceListAssetPaths "${Vps}:${RemotePriceListStage}/"
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to upload order price-list images to VPS."
+    throw "Failed to upload order price-list images to VPS staging."
 }
 Write-Host "PASS: price-list image transfer complete" -ForegroundColor Green
 
-Write-Host "Applying price-list image permissions..." -ForegroundColor DarkGray
-& ssh @SshTransportArgs $Vps "chmod 0644 /opt/dc-bot/web/app/static/order_panels/pricelists/*.png"
+Write-Host "Installing price-list images..." -ForegroundColor DarkGray
+$InstallPriceListCommand = "mkdir -p /opt/dc-bot/web/app/static/order_panels/pricelists && install -m 0644 '$RemotePriceListStage'/*.png /opt/dc-bot/web/app/static/order_panels/pricelists/ && rm -rf '$RemotePriceListStage'"
+& ssh @SshTransportArgs $Vps $InstallPriceListCommand
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to set price-list image permissions."
+    throw "Failed to install order price-list images."
 }
 Write-Host "PASS: order price-list images uploaded without extra service restart" -ForegroundColor Green
 
