@@ -22,14 +22,19 @@ _X_EQUIVALENTS = str.maketrans({
     "ｘ": "x",
 })
 
+_FARM_3X3_GROUP_LABEL = "賽季3x3"
+_FARM_3X3_RULE_ORDER = (
+    "farm_season_3x3_normal",
+    "farm_season_3x3_dc_loss",
+    "farm_season_3x3_dc_skin",
+    "farm_season_3x3_dc_skin_loss",
+    "farm_season_3x3_contract",
+)
+_FARM_3X3_RULE_KEYS = frozenset(_FARM_3X3_RULE_ORDER)
+
 
 def _normalized_label(value) -> str:
-    """Normalize storefront labels for Discord display.
-
-    Copy/pasted manager labels can contain zero-width/control/combining characters
-    that Discord does not visibly distinguish. Strip those invisible characters,
-    normalize width, and collapse whitespace before showing the label.
-    """
+    """Normalize storefront labels for Discord display."""
     text = unicodedata.normalize("NFKC", str(value or "")).translate(_X_EQUIVALENTS)
     cleaned: list[str] = []
     for char in text:
@@ -43,45 +48,63 @@ def _normalized_label(value) -> str:
 
 
 def _normalized_key(value) -> str:
-    """Return a semantic key for storefront group identity.
-
-    Group names are navigation labels, so formatting punctuation/spacing must not
-    create a second service that looks identical in Discord. Keep letters/numbers
-    (including CJK), fold x-like multiplication glyphs, and ignore presentation
-    punctuation. This is intentionally stricter than the display normalization.
-    """
+    """Return a semantic key for storefront group identity."""
     text = _normalized_label(value).casefold()
     return "".join(char for char in text if char.isalnum())
 
 
 def _display_group_label(value) -> str:
     text = _normalized_label(value)
-    if _normalized_key(text) == _normalized_key("賽季3x3"):
-        return "賽季3x3"
+    if _normalized_key(text) == _normalized_key(_FARM_3X3_GROUP_LABEL):
+        return _FARM_3X3_GROUP_LABEL
     return text
 
 
-def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
-    """Merge every raw spelling of one visible group into one detail list.
+def _farm_3x3_details() -> list[dict]:
+    """Return the five canonical built-in 3x3 schemes in the store-defined order.
 
-    Public selects collapse visually/semantically equivalent labels into one option.
-    Detail lookup therefore scans every distinct raw group with the same semantic key
-    and merges all products. A stale/ghost group that resolves to no product contributes
-    nothing and can safely be ignored by the public entry.
+    These are variants of one service, not independent second-level groups. Manager
+    catalog_group_label overrides must never split them apart in Discord quick order.
+    Price/rule data is still resolved later through each detail's rule_key.
     """
+    by_rule_key: dict[str, dict] = {}
+    for group in orders.SELF_SERVICE_ORDER_CATALOG.get("farm", []):
+        if _normalized_key(group.get("label")) != _normalized_key(_FARM_3X3_GROUP_LABEL):
+            continue
+        for detail in group.get("details", []):
+            rule_key = str(detail.get("rule_key") or "")
+            if rule_key in _FARM_3X3_RULE_KEYS:
+                by_rule_key[rule_key] = dict(detail)
+        break
+
+    return [
+        by_rule_key[rule_key]
+        for rule_key in _FARM_3X3_RULE_ORDER
+        if rule_key in by_rule_key
+    ]
+
+
+def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
+    """Resolve a visible Discord service group to its selectable details."""
     if _ORIGINAL_DETAILS_RESOLVER is None:
         return []
     if category is None or group_label is None:
         return []
 
+    category_text = str(category)
     target_key = _normalized_key(group_label)
     if not target_key:
         return []
 
+    # 3x3 is a fixed built-in five-scheme service. Do not let per-rule manager
+    # catalog_group_label overrides split three variants away from this selector.
+    if category_text == "farm" and target_key == _normalized_key(_FARM_3X3_GROUP_LABEL):
+        return _farm_3x3_details()
+
     candidates: list[str] = []
     seen_raw: set[str] = set()
 
-    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
+    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category_text, []):
         text = str(value or "").strip()
         if not text or _normalized_key(text) != target_key or text in seen_raw:
             continue
@@ -95,7 +118,7 @@ def _canonical_details(category: str | None, group_label: str | None) -> list[di
     result: list[dict] = []
     seen_details: set[str] = set()
     for candidate in candidates:
-        for detail in _ORIGINAL_DETAILS_RESOLVER(category, candidate):
+        for detail in _ORIGINAL_DETAILS_RESOLVER(category_text, candidate):
             detail_key = str(
                 detail.get("rule_key")
                 or detail.get("value")
@@ -111,25 +134,51 @@ def _canonical_details(category: str | None, group_label: str | None) -> list[di
 
 def _live_groups(category: str) -> list[str]:
     """Return only real, selectable storefront groups for the public quick entry."""
-    if str(category) == str(quick.VIP_TIMER_CATEGORY):
+    category_text = str(category)
+    if category_text == str(quick.VIP_TIMER_CATEGORY):
         quick.refresh_vip_timer_self_service_catalog()
 
     result: list[str] = []
     seen: set[str] = set()
-    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
+    farm_3x3_added = False
+
+    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category_text, []):
+        details = _canonical_details(category_text, value)
+        if not details:
+            continue
+
+        # Any effective group made exclusively from the built-in 3x3 variants is
+        # one service. This collapses stale/manager-split groups into 賽季3x3 while
+        # keeping unrelated custom farm services untouched.
+        detail_rule_keys = {
+            str(detail.get("rule_key") or "")
+            for detail in details
+            if str(detail.get("rule_key") or "")
+        }
+        if (
+            category_text == "farm"
+            and detail_rule_keys
+            and detail_rule_keys.issubset(_FARM_3X3_RULE_KEYS)
+        ):
+            if not farm_3x3_added:
+                result.append(_FARM_3X3_GROUP_LABEL)
+                seen.add(_normalized_key(_FARM_3X3_GROUP_LABEL))
+                farm_3x3_added = True
+            continue
+
         text = _display_group_label(value)
         key = _normalized_key(text)
         if not text or not key or key in seen:
             continue
 
-        # Do not expose stale manager groups that have no real product/details.
-        # This specifically prevents a ghost duplicate (e.g. a second 賽季3x3)
-        # from opening a ticket whose scheme selector is empty/disabled.
-        if not _canonical_details(category, value):
-            continue
-
         seen.add(key)
         result.append(text)
+
+    # Defensive fallback: the raw catalog is authoritative for the built-in 3x3
+    # service even if every effective group label was overridden in manager data.
+    if category_text == "farm" and not farm_3x3_added and _farm_3x3_details():
+        result.insert(0, _FARM_3X3_GROUP_LABEL)
+
     return result
 
 
@@ -259,17 +308,17 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # 1. Public entry and ticket detail lookup use one semantic group identity.
-    # The entry shows only groups that resolve to at least one real product.
+    # Public entry and ticket detail lookup use one resolver. Built-in 3x3 is
+    # explicitly kept as one service with five schemes.
     _install_canonical_group_resolver()
     quick._groups = _live_groups
 
-    # 2. Discord supports up to five buttons per action row; keep all four Delta
+    # Discord supports up to five buttons per action row; keep all four Delta
     # entry buttons on the same row instead of forcing the fourth onto row 2.
     quick.QuickDeltaEntryView.__init__ = _delta_entry_init
 
-    # 3. Quick tickets bypassed the legacy create_private_channel helper, so the
-    # customer-service OrderControlView was never attached. Put the real view back.
+    # Quick tickets bypass the legacy create_private_channel helper, so attach the
+    # real customer-service OrderControlView to their first message.
     _install_create_ticket_wrapper()
 
     if not getattr(bot, "_quick_order_v2_control_repair_started", False):
