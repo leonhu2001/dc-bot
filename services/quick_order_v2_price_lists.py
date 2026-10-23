@@ -138,8 +138,8 @@ NG｜每人 **340T / H**
 積分｜每人 **300T / 局**
 
 {_rank_heading(interaction, "Grandmaster", "宗師陪")}
-NG｜每人 **370T / H**
-積分｜每人 **340T / 局**
+NG｜每人 **360T / H**
+積分｜每人 **300T / 局**
 
 {_rank_heading(interaction, "Challenger", "菁英陪")}
 NG｜每人 **400T / H**
