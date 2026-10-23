@@ -88,3 +88,7 @@ views.bak.*/
 
 # Deployment runtime marker
 data/deployed_version.json
+
+# High-resolution local order-panel source artwork.
+# Deployment uses the tracked Discord-optimized .png.b64 copies.
+assets/order_panels/*.png
