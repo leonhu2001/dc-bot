@@ -20,16 +20,21 @@ def _normalized_label(value) -> str:
     Manager-edited catalog labels can pick up invisible Unicode format/control
     characters (zero-width space/joiner, BOM, word joiner, etc.) through copy/paste.
     Discord renders those labels identically, while Python string equality treats
-    them as different groups. Strip those invisible code points before comparing
-    or displaying the label so one visual service can never appear twice.
+    them as different groups. Strip invisible formatting characters and normalize
+    whitespace before comparing or displaying the label.
     """
     text = unicodedata.normalize("NFKC", str(value or ""))
-    text = "".join(
-        char
-        for char in text
-        if unicodedata.category(char) not in {"Cf", "Cc"}
-    )
-    return " ".join(text.strip().split())
+    cleaned: list[str] = []
+    for char in text:
+        category = unicodedata.category(char)
+        if category == "Cf":
+            continue
+        if category == "Cc":
+            if char.isspace():
+                cleaned.append(" ")
+            continue
+        cleaned.append(char)
+    return " ".join("".join(cleaned).strip().split())
 
 
 def _normalized_key(value) -> str:
@@ -37,12 +42,7 @@ def _normalized_key(value) -> str:
 
 
 def _live_groups(category: str) -> list[str]:
-    """Return the live effective group labels used by the real ticket catalog.
-
-    This intentionally goes through DynamicOrderItemGroups instead of reading raw
-    catalog labels. Manager catalog_group_label overrides therefore stay aligned
-    between the public quick-order entry and the ticket detail selector.
-    """
+    """Return one visible option for each effective storefront group."""
     if str(category) == str(quick.VIP_TIMER_CATEGORY):
         quick.refresh_vip_timer_self_service_catalog()
 
@@ -59,12 +59,13 @@ def _live_groups(category: str) -> list[str]:
 
 
 def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
-    """Merge visually-equivalent group names into one canonical detail list.
+    """Merge every raw spelling of one visible group into one detail list.
 
-    Older manager overrides can differ only by full/half-width characters,
-    whitespace, or invisible Unicode format characters. The public entry
-    de-duplicates those names, so the ticket resolver must use the same
-    equivalence rule or it can show a group with zero details.
+    The public select intentionally collapses visually-equivalent labels into one
+    option. Detail lookup must do the opposite internally: inspect every distinct
+    raw group string whose normalized key matches, then merge their products. This
+    keeps all 3x3 variants even when one manager override contains an invisible
+    Unicode character.
     """
     if _ORIGINAL_DETAILS_RESOLVER is None:
         return []
@@ -73,29 +74,32 @@ def _canonical_details(category: str | None, group_label: str | None) -> list[di
 
     target_key = _normalized_key(group_label)
     candidates: list[str] = []
-    candidate_keys: set[str] = set()
+    seen_raw: set[str] = set()
 
     for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
         text = str(value or "").strip()
-        key = _normalized_key(text)
-        if not text or key != target_key or key in candidate_keys:
+        if not text or _normalized_key(text) != target_key or text in seen_raw:
             continue
-        candidate_keys.add(key)
+        seen_raw.add(text)
         candidates.append(text)
 
     raw_group = str(group_label or "").strip()
-    raw_key = _normalized_key(raw_group)
-    if raw_group and raw_key not in candidate_keys:
+    if raw_group and _normalized_key(raw_group) == target_key and raw_group not in seen_raw:
         candidates.insert(0, raw_group)
 
     result: list[dict] = []
-    seen: set[str] = set()
+    seen_details: set[str] = set()
     for candidate in candidates:
         for detail in _ORIGINAL_DETAILS_RESOLVER(category, candidate):
-            key = str(detail.get("rule_key") or detail.get("value") or detail.get("label") or "")
-            if not key or key in seen:
+            detail_key = str(
+                detail.get("rule_key")
+                or detail.get("value")
+                or detail.get("label")
+                or ""
+            )
+            if not detail_key or detail_key in seen_details:
                 continue
-            seen.add(key)
+            seen_details.add(detail_key)
             result.append(dict(detail))
     return result
 
@@ -226,8 +230,8 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # 1. Public entry and ticket detail lookup now use the same effective group
-    # labels. This fixes duplicate visually-identical groups and empty detail lists.
+    # 1. Public entry and ticket detail lookup use the same canonical visible label.
+    # The entry shows one option; detail lookup merges all raw Unicode variants.
     _install_canonical_group_resolver()
     quick._groups = _live_groups
 
