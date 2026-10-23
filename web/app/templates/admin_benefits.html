@@ -3,10 +3,36 @@
 {% block page_title %}優惠與福利{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261023-3">
+<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261023-4">
 
 {% set form_template = editing_template or {} %}
 {% set form_applicable = form_template.get('applicable_rule_keys', []) %}
+
+{% macro render_product_group(game, group, mode_label='') -%}
+<div class="benefit-tree-group benefit-tree-play" data-benefit-tree-branch data-benefit-tree-group data-benefit-option="{{ game.label }} {{ mode_label }} {{ group.label }}">
+    <div class="benefit-tree-row benefit-tree-group-row benefit-tree-play-row">
+        <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ group.label }} 全部商品">
+        <button class="benefit-tree-toggle" type="button" data-benefit-tree-toggle aria-expanded="false">
+            <span class="benefit-tree-title"><b>{{ group.label }}</b><small>{{ group['rules']|length }} 項</small></span>
+            <span class="benefit-tree-chevron" aria-hidden="true">›</span>
+        </button>
+    </div>
+    <div class="benefit-tree-leaves" data-benefit-tree-children hidden>
+        {% for rule in group['rules'] %}
+        <label class="benefit-tree-leaf" data-benefit-option="{{ game.label }} {{ mode_label }} {{ group.label }} {{ rule.leaf_label }} {{ rule.label }} {{ rule.key }}">
+            <input
+                type="checkbox"
+                name="applicable_rule_keys"
+                value="{{ rule.key }}"
+                data-benefit-tree-leaf-checkbox
+                {% if rule.key in form_applicable %}checked{% endif %}
+            >
+            <span><b>{{ rule.leaf_label }}</b><small>{{ rule.key }}</small></span>
+        </label>
+        {% endfor %}
+    </div>
+</div>
+{%- endmacro %}
 
 <div class="benefits-page">
     <section class="panel compact-panel benefits-head">
@@ -159,11 +185,11 @@
                     <div class="benefit-picker-head benefit-product-picker-head">
                         <div>
                             <strong>適用商品</strong>
-                            <small>只有勾選的商品能使用這張福利；勾遊戲或玩法可一次選取底下全部商品。</small>
+                            <small>只有勾選的商品能使用這張福利；勾遊戲、分類或玩法可一次選取底下全部商品。</small>
                             <small class="benefit-selected-count" data-benefit-product-count>已選 0 項</small>
                         </div>
                         <div class="benefit-product-tools">
-                            <input class="benefit-filter-input" type="search" placeholder="搜尋遊戲、玩法或商品" data-benefit-product-search>
+                            <input class="benefit-filter-input" type="search" placeholder="搜尋遊戲、分類、玩法或商品" data-benefit-product-search>
                             <button class="button secondary benefit-mini-button" type="button" data-benefit-tree-select-all>全選</button>
                             <button class="button secondary benefit-mini-button" type="button" data-benefit-tree-clear>清除</button>
                         </div>
@@ -180,30 +206,27 @@
                                 </button>
                             </div>
                             <div class="benefit-tree-groups" data-benefit-tree-children hidden>
-                                {% for group in game['groups'] %}
-                                <div class="benefit-tree-group" data-benefit-tree-branch data-benefit-tree-group data-benefit-option="{{ game.label }} {{ group.label }}">
-                                    <div class="benefit-tree-row benefit-tree-group-row">
-                                        <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ group.label }} 全部商品">
-                                        <button class="benefit-tree-toggle" type="button" data-benefit-tree-toggle aria-expanded="false">
-                                            <span class="benefit-tree-title"><b>{{ group.label }}</b><small>{{ group['rules']|length }} 項</small></span>
-                                            <span class="benefit-tree-chevron" aria-hidden="true">›</span>
-                                        </button>
+                                {% for section in game.sections %}
+                                    {% if section.label %}
+                                    <div class="benefit-tree-group benefit-tree-mode" data-benefit-tree-branch data-benefit-tree-group data-benefit-option="{{ game.label }} {{ section.label }}">
+                                        <div class="benefit-tree-row benefit-tree-group-row benefit-tree-mode-row">
+                                            <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ section.label }} 全部商品">
+                                            <button class="benefit-tree-toggle" type="button" data-benefit-tree-toggle aria-expanded="false">
+                                                <span class="benefit-tree-title"><b>{{ section.label }}</b><small>{{ section.rule_count }} 項</small></span>
+                                                <span class="benefit-tree-chevron" aria-hidden="true">›</span>
+                                            </button>
+                                        </div>
+                                        <div class="benefit-tree-groups benefit-tree-mode-groups" data-benefit-tree-children hidden>
+                                            {% for group in section.groups %}
+                                                {{ render_product_group(game, group, section.label) }}
+                                            {% endfor %}
+                                        </div>
                                     </div>
-                                    <div class="benefit-tree-leaves" data-benefit-tree-children hidden>
-                                        {% for rule in group['rules'] %}
-                                        <label class="benefit-tree-leaf" data-benefit-option="{{ game.label }} {{ group.label }} {{ rule.leaf_label }} {{ rule.label }} {{ rule.key }}">
-                                            <input
-                                                type="checkbox"
-                                                name="applicable_rule_keys"
-                                                value="{{ rule.key }}"
-                                                data-benefit-tree-leaf-checkbox
-                                                {% if rule.key in form_applicable %}checked{% endif %}
-                                            >
-                                            <span><b>{{ rule.leaf_label }}</b><small>{{ rule.key }}</small></span>
-                                        </label>
+                                    {% else %}
+                                        {% for group in section.groups %}
+                                            {{ render_product_group(game, group) }}
                                         {% endfor %}
-                                    </div>
-                                </div>
+                                    {% endif %}
                                 {% endfor %}
                             </div>
                         </div>
