@@ -13,6 +13,12 @@ _GAME_LABELS = {
     "steam": "STEAM",
 }
 _GAME_ORDER = tuple(_GAME_LABELS.values())
+_PLATINUM_OR_ABOVE = {
+    "白金魔丸",
+    "鑽石魔丸",
+    "白鑽魔丸",
+    "黑鑽魔丸",
+}
 
 
 def _rule_text(rule) -> str:
@@ -297,17 +303,66 @@ def _install_loyalty_exclusion() -> None:
     loyalty._vip_timer_exclusion_installed = True
 
 
+def _install_membership_gate() -> None:
+    from services import vip_timer_self_service as self_service
+
+    if getattr(self_service, "_vip_timer_platinum_gate_installed", False):
+        return
+
+    legacy_gate = getattr(self_service, "_GOLD_OR_ABOVE", None)
+    if isinstance(legacy_gate, set):
+        legacy_gate.clear()
+        legacy_gate.update(_PLATINUM_OR_ABOVE)
+
+    original_assert = self_service.assert_vip_timer_self_service_eligible
+
+    def assert_vip_timer_self_service_eligible(
+        customer_id: int | str,
+        *,
+        check_open_order: bool = True,
+    ) -> None:
+        if self_service._customer_vip_name(customer_id) not in _PLATINUM_OR_ABOVE:
+            raise ValueError("VIP 自由計時單僅限白金級會員以上使用。")
+        return original_assert(customer_id, check_open_order=check_open_order)
+
+    original_panel = self_service.build_vip_timer_self_service_panel_embed
+
+    def build_vip_timer_self_service_panel_embed(customer_id, data, guild=None):
+        embed = original_panel(customer_id, data, guild)
+        if embed.description:
+            embed.description = str(embed.description).replace(
+                "金級會員以上限定。",
+                "白金級會員以上限定。",
+            )
+        return embed
+
+    self_service.assert_vip_timer_self_service_eligible = assert_vip_timer_self_service_eligible
+    self_service.build_vip_timer_self_service_panel_embed = build_vip_timer_self_service_panel_embed
+    self_service._vip_timer_platinum_gate_installed = True
+
+
 def _install_vip_benefit_text() -> None:
     from core import vip_levels
 
-    key = "vip_timer"
-    vip_levels.VIP_BENEFIT_ITEMS[key] = "・可使用 VIP 自由計時"
+    weekly_key = "weekly_prestige_trial"
+    timer_key = "vip_timer"
+    vip_levels.VIP_BENEFIT_ITEMS[weekly_key] = "・每週一次尊爵體驗單"
+    vip_levels.VIP_BENEFIT_ITEMS[timer_key] = "・可使用 VIP 自由計時"
+
     for level in vip_levels.VIP_LEVELS:
-        if int(level.get("threshold") or 0) < 6000:
-            continue
+        threshold = int(level.get("threshold") or 0)
         benefit_keys = level.setdefault("benefit_keys", [])
-        if key not in benefit_keys:
-            benefit_keys.append(key)
+
+        if threshold >= 6000 and weekly_key not in benefit_keys:
+            benefit_keys.append(weekly_key)
+        elif threshold < 6000 and weekly_key in benefit_keys:
+            benefit_keys.remove(weekly_key)
+
+        if threshold >= 12000 and timer_key not in benefit_keys:
+            benefit_keys.append(timer_key)
+        elif threshold < 12000 and timer_key in benefit_keys:
+            benefit_keys.remove(timer_key)
+
     vip_levels.VIP_LEVEL_BENEFITS.clear()
     vip_levels.VIP_LEVEL_BENEFITS.update(vip_levels.build_vip_level_benefits())
 
@@ -320,6 +375,7 @@ def install_vip_timer_policy_v5() -> None:
     _install_selector_policy()
     _install_switch_catalog_policy()
     _install_loyalty_exclusion()
+    _install_membership_gate()
     _install_vip_benefit_text()
     _INSTALLED = True
 
