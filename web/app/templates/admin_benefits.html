@@ -3,7 +3,7 @@
 {% block page_title %}優惠與福利{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261023-1">
+<link rel="stylesheet" href="/static/css/pages/admin_benefits.css?v=20261023-2">
 
 {% set form_template = editing_template or {} %}
 {% set form_applicable = form_template.get('applicable_rule_keys', []) %}
@@ -171,20 +171,26 @@
 
                     <div class="benefit-product-tree" data-benefit-product-tree>
                         {% for game in benefit_rule_tree %}
-                        <details class="benefit-tree-game" open data-benefit-tree-branch data-benefit-tree-game data-benefit-option="{{ game.label }}">
-                            <summary>
+                        <div class="benefit-tree-game" data-benefit-tree-branch data-benefit-tree-game data-benefit-option="{{ game.label }}">
+                            <div class="benefit-tree-row benefit-tree-game-row">
                                 <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ game.label }} 全部商品">
-                                <span class="benefit-tree-title"><b>{{ game.label }}</b><small>{{ game.rule_count }} 項商品</small></span>
-                            </summary>
-                            <div class="benefit-tree-groups">
-                                {% for group in game.groups %}
-                                <details class="benefit-tree-group" data-benefit-tree-branch data-benefit-tree-group data-benefit-option="{{ game.label }} {{ group.label }}">
-                                    <summary>
+                                <button class="benefit-tree-toggle" type="button" data-benefit-tree-toggle aria-expanded="false">
+                                    <span class="benefit-tree-title"><b>{{ game.label }}</b><small>{{ game.rule_count }} 項商品</small></span>
+                                    <span class="benefit-tree-chevron" aria-hidden="true">›</span>
+                                </button>
+                            </div>
+                            <div class="benefit-tree-groups" data-benefit-tree-children hidden>
+                                {% for group in game['groups'] %}
+                                <div class="benefit-tree-group" data-benefit-tree-branch data-benefit-tree-group data-benefit-option="{{ game.label }} {{ group.label }}">
+                                    <div class="benefit-tree-row benefit-tree-group-row">
                                         <input type="checkbox" data-benefit-tree-parent aria-label="選取 {{ group.label }} 全部商品">
-                                        <span class="benefit-tree-title"><b>{{ group.label }}</b><small>{{ group.rules|length }} 項</small></span>
-                                    </summary>
-                                    <div class="benefit-tree-leaves">
-                                        {% for rule in group.rules %}
+                                        <button class="benefit-tree-toggle" type="button" data-benefit-tree-toggle aria-expanded="false">
+                                            <span class="benefit-tree-title"><b>{{ group.label }}</b><small>{{ group['rules']|length }} 項</small></span>
+                                            <span class="benefit-tree-chevron" aria-hidden="true">›</span>
+                                        </button>
+                                    </div>
+                                    <div class="benefit-tree-leaves" data-benefit-tree-children hidden>
+                                        {% for rule in group['rules'] %}
                                         <label class="benefit-tree-leaf" data-benefit-option="{{ game.label }} {{ group.label }} {{ rule.leaf_label }} {{ rule.label }} {{ rule.key }}">
                                             <input
                                                 type="checkbox"
@@ -197,10 +203,10 @@
                                         </label>
                                         {% endfor %}
                                     </div>
-                                </details>
+                                </div>
                                 {% endfor %}
                             </div>
-                        </details>
+                        </div>
                         {% else %}
                         <div class="muted-text">目前沒有可選的商品。</div>
                         {% endfor %}
@@ -318,5 +324,5 @@
     </section>
 </div>
 
-<script src="/static/js/pages/admin_benefits.js?v=20261023-1"></script>
+<script src="/static/js/pages/admin_benefits.js?v=20261023-2"></script>
 {% endblock %}
