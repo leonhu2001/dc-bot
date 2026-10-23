@@ -129,7 +129,10 @@ foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
 }
 $PanelAssetNameList = ($RequiredPublicAssetRelativePaths -join " ")
 
-$VerifyCommand = "set -e; for name in $PanelAssetNameList; do url=`"https://mowanentertainment.com/static/order_panels/`$name?deploy=$Target`"; headers=`$(curl --fail --silent --show-error --max-time 10 -I `"`$url`"); echo `"`$headers`" | grep -qi '^content-type: image/png' || { echo `"Invalid image content-type for `$name`"; exit 1; }; echo `"`$headers`" | grep -qi '^cross-origin-resource-policy: cross-origin' || { echo `"Missing cross-origin image policy for `$name`"; exit 1; }; done"
+# Query the public URL exactly as Discord will. Nginx serves this PNG-only
+# directory with an explicit image/png MIME mapping. When validation fails, print
+# the real response headers so the next diagnosis has concrete data.
+$VerifyCommand = "set -e; for name in $PanelAssetNameList; do url=`"https://mowanentertainment.com/static/order_panels/`$name?deploy=$Target`"; headers=`$(curl --fail --silent --show-error --max-time 10 -I `"`$url`"); echo `"`$headers`" | grep -Eqi '^content-type:[[:space:]]*image/png([;[:space:]]|$)' || { echo `"--- headers for `$name ---`"; echo `"`$headers`"; echo `"Invalid image content-type for `$name`"; exit 1; }; echo `"`$headers`" | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)' || { echo `"--- headers for `$name ---`"; echo `"`$headers`"; echo `"Missing cross-origin image policy for `$name`"; exit 1; }; done"
 ssh $Vps $VerifyCommand
 if ($LASTEXITCODE -ne 0) {
     throw "One or more public order panel image URLs failed Discord-safe HTTP verification."
