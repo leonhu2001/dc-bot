@@ -48,9 +48,6 @@ Write-Host "Target: $Target" -ForegroundColor Cyan
 Write-Host "VPS:    $Vps" -ForegroundColor Cyan
 Write-Host ""
 
-# Order-panel artwork is intentionally kept as local source PNGs instead of
-# tracked Git binaries. Copy the four real files to the VPS before the safe
-# deploy restarts the bot, so the startup panel refresh can attach them directly.
 $PanelAssetDir = Join-Path $RepoRoot "assets\order_panels"
 $PanelAssetNames = @(
     "apex_panel.png",
@@ -67,19 +64,9 @@ foreach ($PanelAssetName in $PanelAssetNames) {
     $PanelAssetPaths += $PanelAssetPath
 }
 
-Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
-ssh $Vps "mkdir -p /opt/dc-bot/assets/order_panels"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to prepare VPS order panel asset directory."
-}
-
-& scp @PanelAssetPaths "${Vps}:/opt/dc-bot/assets/order_panels/"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to upload order panel images to VPS."
-}
-Write-Host "PASS: order panel images uploaded" -ForegroundColor Green
-Write-Host ""
-
+# First complete the normal safe source deployment. The target commit includes a
+# gitignore rule for the generated website static copies, so future deploy
+# prechecks remain clean after the artwork is synchronized below.
 $RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
 
 ssh $Vps $RemoteCommand
@@ -87,6 +74,28 @@ ssh $Vps $RemoteCommand
 if ($LASTEXITCODE -ne 0) {
     throw "VPS deployment failed. Check rollback output above."
 }
+
+Write-Host ""
+Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
+ssh $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to prepare VPS order panel static directory."
+}
+
+& scp @PanelAssetPaths "${Vps}:/opt/dc-bot/web/app/static/order_panels/"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload order panel images to VPS."
+}
+Write-Host "PASS: order panel images uploaded to web static" -ForegroundColor Green
+
+# StaticFiles serves directly from disk, so the web process does not need another
+# restart. Restart only the bot so it rebuilds the four Discord panels after the
+# public image URLs are guaranteed to exist.
+ssh $Vps "systemctl restart dc-bot.service && systemctl is-active --quiet dc-bot.service"
+if ($LASTEXITCODE -ne 0) {
+    throw "Bot restart after order panel image sync failed."
+}
+Write-Host "PASS: bot restarted after order panel image sync" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DEPLOY COMPLETED" -ForegroundColor Green
