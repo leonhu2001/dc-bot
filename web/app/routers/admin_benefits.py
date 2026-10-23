@@ -56,6 +56,13 @@ _BENEFIT_GAME_META = {
     "steam": ("05-steam", "STEAM", ""),
     "custom": ("99-custom", "自訂", ""),
 }
+_BENEFIT_MODE_SORT = {
+    "": 0,
+    "端遊": 10,
+    "手遊": 20,
+    "趣味單": 30,
+    "代肝代解": 40,
+}
 
 
 def _admin(request: Request) -> dict | None:
@@ -144,13 +151,10 @@ def _benefit_catalog_options() -> list[dict]:
             catalog_group = parts[-2] if len(parts) >= 3 else "其他商品"
         leaf_label = parts[-1] if len(parts) >= 2 else raw_label
 
-        game_sort, game_label, category_mode = _BENEFIT_GAME_META.get(
+        game_sort, game_label, mode_label = _BENEFIT_GAME_META.get(
             category,
             (f"50-{category}", CATEGORY_LABELS.get(category, category), ""),
         )
-        group_label = catalog_group
-        if category_mode:
-            group_label = f"{category_mode}｜{catalog_group}"
 
         rules.append(
             {
@@ -161,7 +165,9 @@ def _benefit_catalog_options() -> list[dict]:
                 "category_label": CATEGORY_LABELS.get(category, category),
                 "game_sort": game_sort,
                 "game_label": game_label,
-                "group_label": group_label,
+                "mode_label": mode_label,
+                "mode_sort": _BENEFIT_MODE_SORT.get(mode_label, 50),
+                "group_label": catalog_group,
             }
         )
 
@@ -169,6 +175,8 @@ def _benefit_catalog_options() -> list[dict]:
         key=lambda item: (
             item["game_sort"],
             item["game_label"],
+            item["mode_sort"],
+            item["mode_label"],
             item["group_label"],
             item["leaf_label"],
             item["key"],
@@ -186,11 +194,23 @@ def _benefit_catalog_tree(rule_options: list[dict]) -> list[dict]:
             {
                 "key": game_key,
                 "label": rule["game_label"],
+                "sections": {},
+            },
+        )
+
+        section_key = f"{game_key}:{rule['category']}:{rule['mode_label'] or 'default'}"
+        section = game["sections"].setdefault(
+            section_key,
+            {
+                "key": section_key,
+                "label": rule["mode_label"],
+                "sort": int(rule["mode_sort"]),
                 "groups": {},
             },
         )
-        group_key = f"{game_key}:{rule['category']}:{rule['group_label']}"
-        group = game["groups"].setdefault(
+
+        group_key = f"{section_key}:{rule['group_label']}"
+        group = section["groups"].setdefault(
             group_key,
             {
                 "key": group_key,
@@ -203,14 +223,26 @@ def _benefit_catalog_tree(rule_options: list[dict]) -> list[dict]:
     result: list[dict] = []
     for game_key in sorted(games):
         game = games[game_key]
-        group_rows = list(game["groups"].values())
-        group_rows.sort(key=lambda item: (item["label"], item["key"]))
+        section_rows: list[dict] = []
+        for section in game["sections"].values():
+            group_rows = list(section["groups"].values())
+            group_rows.sort(key=lambda item: (item["label"], item["key"]))
+            section_rows.append(
+                {
+                    "key": section["key"],
+                    "label": section["label"],
+                    "sort": section["sort"],
+                    "groups": group_rows,
+                    "rule_count": sum(len(group["rules"]) for group in group_rows),
+                }
+            )
+        section_rows.sort(key=lambda item: (item["sort"], item["label"], item["key"]))
         result.append(
             {
                 "key": game["key"],
                 "label": game["label"],
-                "groups": group_rows,
-                "rule_count": sum(len(group["rules"]) for group in group_rows),
+                "sections": section_rows,
+                "rule_count": sum(section["rule_count"] for section in section_rows),
             }
         )
     return result
