@@ -13,23 +13,28 @@ _INSTALLED = False
 _ORIGINAL_CREATE_TICKET = None
 _ORIGINAL_DETAILS_RESOLVER = None
 
+_X_EQUIVALENTS = str.maketrans({
+    "×": "x",
+    "✕": "x",
+    "✖": "x",
+    "⨯": "x",
+    "Ｘ": "X",
+    "ｘ": "x",
+})
+
 
 def _normalized_label(value) -> str:
-    """Normalize storefront labels for Discord grouping/deduplication.
+    """Normalize storefront labels for Discord display.
 
-    Manager-edited catalog labels can pick up invisible Unicode format/control
-    characters (zero-width space/joiner, BOM, word joiner, etc.) through copy/paste.
-    Discord renders those labels identically, while Python string equality treats
-    them as different groups. Strip invisible formatting characters and normalize
-    whitespace before comparing or displaying the label.
+    Copy/pasted manager labels can contain zero-width/control/combining characters
+    that Discord does not visibly distinguish. Strip those invisible characters,
+    normalize width, and collapse whitespace before showing the label.
     """
-    text = unicodedata.normalize("NFKC", str(value or ""))
+    text = unicodedata.normalize("NFKC", str(value or "")).translate(_X_EQUIVALENTS)
     cleaned: list[str] = []
     for char in text:
         category = unicodedata.category(char)
-        if category == "Cf":
-            continue
-        if category == "Cc":
+        if category.startswith("C") or category.startswith("M"):
             if char.isspace():
                 cleaned.append(" ")
             continue
@@ -38,34 +43,31 @@ def _normalized_label(value) -> str:
 
 
 def _normalized_key(value) -> str:
-    return _normalized_label(value).casefold()
+    """Return a semantic key for storefront group identity.
+
+    Group names are navigation labels, so formatting punctuation/spacing must not
+    create a second service that looks identical in Discord. Keep letters/numbers
+    (including CJK), fold x-like multiplication glyphs, and ignore presentation
+    punctuation. This is intentionally stricter than the display normalization.
+    """
+    text = _normalized_label(value).casefold()
+    return "".join(char for char in text if char.isalnum())
 
 
-def _live_groups(category: str) -> list[str]:
-    """Return one visible option for each effective storefront group."""
-    if str(category) == str(quick.VIP_TIMER_CATEGORY):
-        quick.refresh_vip_timer_self_service_catalog()
-
-    result: list[str] = []
-    seen: set[str] = set()
-    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
-        text = _normalized_label(value)
-        key = _normalized_key(text)
-        if not text or key in seen:
-            continue
-        seen.add(key)
-        result.append(text)
-    return result
+def _display_group_label(value) -> str:
+    text = _normalized_label(value)
+    if _normalized_key(text) == _normalized_key("賽季3x3"):
+        return "賽季3x3"
+    return text
 
 
 def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
     """Merge every raw spelling of one visible group into one detail list.
 
-    The public select intentionally collapses visually-equivalent labels into one
-    option. Detail lookup must do the opposite internally: inspect every distinct
-    raw group string whose normalized key matches, then merge their products. This
-    keeps all 3x3 variants even when one manager override contains an invisible
-    Unicode character.
+    Public selects collapse visually/semantically equivalent labels into one option.
+    Detail lookup therefore scans every distinct raw group with the same semantic key
+    and merges all products. A stale/ghost group that resolves to no product contributes
+    nothing and can safely be ignored by the public entry.
     """
     if _ORIGINAL_DETAILS_RESOLVER is None:
         return []
@@ -73,6 +75,9 @@ def _canonical_details(category: str | None, group_label: str | None) -> list[di
         return []
 
     target_key = _normalized_key(group_label)
+    if not target_key:
+        return []
+
     candidates: list[str] = []
     seen_raw: set[str] = set()
 
@@ -101,6 +106,30 @@ def _canonical_details(category: str | None, group_label: str | None) -> list[di
                 continue
             seen_details.add(detail_key)
             result.append(dict(detail))
+    return result
+
+
+def _live_groups(category: str) -> list[str]:
+    """Return only real, selectable storefront groups for the public quick entry."""
+    if str(category) == str(quick.VIP_TIMER_CATEGORY):
+        quick.refresh_vip_timer_self_service_catalog()
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
+        text = _display_group_label(value)
+        key = _normalized_key(text)
+        if not text or not key or key in seen:
+            continue
+
+        # Do not expose stale manager groups that have no real product/details.
+        # This specifically prevents a ghost duplicate (e.g. a second 賽季3x3)
+        # from opening a ticket whose scheme selector is empty/disabled.
+        if not _canonical_details(category, value):
+            continue
+
+        seen.add(key)
+        result.append(text)
     return result
 
 
@@ -230,8 +259,8 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # 1. Public entry and ticket detail lookup use the same canonical visible label.
-    # The entry shows one option; detail lookup merges all raw Unicode variants.
+    # 1. Public entry and ticket detail lookup use one semantic group identity.
+    # The entry shows only groups that resolve to at least one real product.
     _install_canonical_group_resolver()
     quick._groups = _live_groups
 
