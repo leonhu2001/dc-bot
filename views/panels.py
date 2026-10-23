@@ -7,7 +7,6 @@ import discord
 from views.support import ComplaintModal, FeedbackModal
 
 # Dependencies configured by bot.py after IDs and helper functions are available.
-CUSTOMER_CATEGORY_ID: int | None = None
 EXAM_CATEGORY_ID: int | None = None
 CUSTOMER_ROLE_ID: int | None = None
 EXAMINER_ROLE_ID: int | None = None
@@ -15,13 +14,8 @@ MANAGER_ROLE_ID: int | None = None
 RECRUIT_APPLICANT_ROLE_ID: int | None = None
 
 safe_channel_name: Callable[[str, discord.Member], str] | None = None
-is_agree_answer: Callable[[str], bool] | None = None
-format_customer_notes_for_ticket: Callable[[int], str] | None = None
 create_private_channel: Callable[..., Awaitable[Any]] | None = None
-order_control_view_factory: Callable[[], discord.ui.View] | None = None
 recruit_control_view_factory: Callable[[], discord.ui.View] | None = None
-
-PANEL_SELECTIONS: dict[int, str] = {}
 
 
 def build_main_panel_embed() -> discord.Embed:
@@ -38,30 +32,29 @@ def build_main_panel_embed() -> discord.Embed:
 
 def configure_panel_views(
     *,
-    customer_category_id: int,
     exam_category_id: int,
     customer_role_id: int,
     examiner_role_id: int,
     manager_role_id: int,
     recruit_applicant_role_id: int,
     safe_channel_name: Callable[[str, discord.Member], str],
-    is_agree_answer: Callable[[str], bool],
-    format_customer_notes_for_ticket: Callable[[int], str],
     create_private_channel: Callable[..., Awaitable[Any]],
-    order_control_view_factory: Callable[[], discord.ui.View],
     recruit_control_view_factory: Callable[[], discord.ui.View],
+    **_legacy_order_kwargs,
 ) -> None:
-    globals()["CUSTOMER_CATEGORY_ID"] = customer_category_id
+    """Configure the customer-service panel.
+
+    Old ordering-related keyword arguments are intentionally ignored so the main
+    bot wiring remains backward compatible while the removed legacy order entry
+    is no longer kept alive inside this view module.
+    """
     globals()["EXAM_CATEGORY_ID"] = exam_category_id
     globals()["CUSTOMER_ROLE_ID"] = customer_role_id
     globals()["EXAMINER_ROLE_ID"] = examiner_role_id
     globals()["MANAGER_ROLE_ID"] = manager_role_id
     globals()["RECRUIT_APPLICANT_ROLE_ID"] = recruit_applicant_role_id
     globals()["safe_channel_name"] = safe_channel_name
-    globals()["is_agree_answer"] = is_agree_answer
-    globals()["format_customer_notes_for_ticket"] = format_customer_notes_for_ticket
     globals()["create_private_channel"] = create_private_channel
-    globals()["order_control_view_factory"] = order_control_view_factory
     globals()["recruit_control_view_factory"] = recruit_control_view_factory
 
 
@@ -69,23 +62,6 @@ def _require_configured(name: str, value):
     if value is None:
         raise RuntimeError(f"views.panels 尚未設定 {name}")
     return value
-
-
-# Retained for compatibility with old persistent interaction payloads while the
-# public customer-service panel no longer exposes an ordering button.
-class OrderModal(discord.ui.Modal, title="我要下單"):
-    rule_confirm = discord.ui.TextInput(
-        label="是否已詳閱規章內容",
-        placeholder="請輸入：是",
-        required=True,
-        max_length=20,
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            "下單入口已移至各遊戲下單頻道，請由對應遊戲頻道下單。",
-            ephemeral=True,
-        )
 
 
 class RecruitModal(discord.ui.Modal, title="我要入職"):
