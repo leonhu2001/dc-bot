@@ -145,15 +145,22 @@ $RequiredPublicAssetRelativePaths += $RequiredPanelAssetNames
 foreach ($PriceListAssetName in $RequiredPriceListAssetNames) {
     $RequiredPublicAssetRelativePaths += "pricelists/$PriceListAssetName"
 }
-$PanelAssetNameList = ($RequiredPublicAssetRelativePaths -join " ")
 
-# Query the public URL exactly as Discord will. Nginx serves this PNG-only
-# directory with an explicit image/png MIME mapping. When validation fails, print
-# the real response headers so the next diagnosis has concrete data.
-$VerifyCommand = "set -e; for name in $PanelAssetNameList; do url=`"https://mowanentertainment.com/static/order_panels/`$name?deploy=$Target`"; headers=`$(curl --fail --silent --show-error --max-time 10 -I `"`$url`"); echo `"`$headers`" | grep -Eqi '^content-type:[[:space:]]*image/png([;[:space:]]|$)' || { echo `"--- headers for `$name ---`"; echo `"`$headers`"; echo `"Invalid image content-type for `$name`"; exit 1; }; echo `"`$headers`" | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)' || { echo `"--- headers for `$name ---`"; echo `"`$headers`"; echo `"Missing cross-origin image policy for `$name`"; exit 1; }; done"
-& ssh @SshTransportArgs $Vps $VerifyCommand
-if ($LASTEXITCODE -ne 0) {
-    throw "One or more public order panel image URLs failed Discord-safe HTTP verification."
+# Verify the same GET request shape that Discord uses instead of HEAD. Cloudflare
+# returns CRLF-delimited response headers; parsing them after storing the raw block
+# in a shell variable can make carriage returns overwrite console output and cause
+# false negatives. Ask curl for the effective content type directly, and normalize
+# CRLF only for the header-specific CORP check.
+foreach ($AssetRelativePath in $RequiredPublicAssetRelativePaths) {
+    $PublicAssetUrl = "https://mowanentertainment.com/static/order_panels/${AssetRelativePath}?deploy=$Target"
+    $VerifyAssetCommand = "curl --fail --silent --show-error --max-time 10 -o /dev/null -w '%{content_type}\n' '$PublicAssetUrl' | grep -Eqi '^image/png([;[:space:]]|$)' || { echo '--- response headers for $AssetRelativePath ---'; curl --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r'; echo 'Invalid image content-type for $AssetRelativePath'; exit 1; }; curl --fail --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r' | grep -Eqi '^cross-origin-resource-policy:[[:space:]]*cross-origin([[:space:]]|$)' || { echo '--- response headers for $AssetRelativePath ---'; curl --silent --show-error --max-time 10 -o /dev/null -D - '$PublicAssetUrl' | tr -d '\r'; echo 'Missing cross-origin image policy for $AssetRelativePath'; exit 1; }"
+
+    & ssh @SshTransportArgs $Vps $VerifyAssetCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Public order panel image verification failed: $AssetRelativePath"
+    }
+
+    Write-Host "PASS: $AssetRelativePath" -ForegroundColor Green
 }
 Write-Host "PASS: public order panel and price-list image URLs are reachable" -ForegroundColor Green
 
