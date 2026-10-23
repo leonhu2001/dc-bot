@@ -43,6 +43,116 @@
   const tree = picker.querySelector('[data-benefit-product-tree]');
   if (!tree) return;
 
+  let scrollShell = tree.parentElement;
+  if (!scrollShell || !scrollShell.classList.contains('benefit-product-scroll-shell')) {
+    scrollShell = document.createElement('div');
+    scrollShell.className = 'benefit-product-scroll-shell';
+    tree.parentNode.insertBefore(scrollShell, tree);
+    scrollShell.appendChild(tree);
+  }
+
+  let scrollTrack = scrollShell.querySelector('[data-benefit-scroll-track]');
+  if (!scrollTrack) {
+    scrollTrack = document.createElement('div');
+    scrollTrack.className = 'benefit-product-scrollbar';
+    scrollTrack.dataset.benefitScrollTrack = '';
+    scrollTrack.setAttribute('aria-hidden', 'true');
+    scrollShell.appendChild(scrollTrack);
+  }
+
+  let scrollThumb = scrollTrack.querySelector('[data-benefit-scroll-thumb]');
+  if (!scrollThumb) {
+    scrollThumb = document.createElement('div');
+    scrollThumb.className = 'benefit-product-scrollbar-thumb';
+    scrollThumb.dataset.benefitScrollThumb = '';
+    scrollTrack.appendChild(scrollThumb);
+  }
+
+  let scrollbarFrame = 0;
+  const updateProductScrollbar = () => {
+    scrollbarFrame = 0;
+    const viewportHeight = Math.max(0, tree.clientHeight);
+    const contentHeight = Math.max(viewportHeight, tree.scrollHeight);
+    const trackHeight = Math.max(0, scrollTrack.clientHeight);
+    const maxScroll = Math.max(0, contentHeight - viewportHeight);
+
+    if (!viewportHeight || !trackHeight || maxScroll <= 1) {
+      scrollTrack.classList.add('is-disabled');
+      scrollThumb.style.height = `${trackHeight}px`;
+      scrollThumb.style.transform = 'translateY(0px)';
+      return;
+    }
+
+    scrollTrack.classList.remove('is-disabled');
+    const proportionalHeight = trackHeight * (viewportHeight / contentHeight);
+    const thumbHeight = Math.min(trackHeight, Math.max(48, proportionalHeight));
+    const travel = Math.max(0, trackHeight - thumbHeight);
+    const offset = maxScroll > 0 ? (tree.scrollTop / maxScroll) * travel : 0;
+    scrollThumb.style.height = `${thumbHeight}px`;
+    scrollThumb.style.transform = `translateY(${Math.max(0, Math.min(travel, offset))}px)`;
+  };
+
+  const scheduleProductScrollbar = () => {
+    if (scrollbarFrame) cancelAnimationFrame(scrollbarFrame);
+    scrollbarFrame = requestAnimationFrame(updateProductScrollbar);
+  };
+
+  tree.addEventListener('scroll', scheduleProductScrollbar, { passive: true });
+  tree.addEventListener('wheel', (event) => {
+    if (scrollTrack.classList.contains('is-disabled')) return;
+    const previous = tree.scrollTop;
+    tree.scrollTop += event.deltaY;
+    if (tree.scrollTop !== previous) event.preventDefault();
+  }, { passive: false });
+
+  let dragStartY = 0;
+  let dragStartScrollTop = 0;
+  let dragging = false;
+
+  const stopThumbDrag = (event) => {
+    if (!dragging) return;
+    dragging = false;
+    scrollThumb.classList.remove('is-dragging');
+    if (event && scrollThumb.releasePointerCapture) {
+      try {
+        scrollThumb.releasePointerCapture(event.pointerId);
+      } catch (_) {
+        // Pointer capture may already have been released by the browser.
+      }
+    }
+  };
+
+  scrollThumb.addEventListener('pointerdown', (event) => {
+    if (scrollTrack.classList.contains('is-disabled')) return;
+    dragging = true;
+    dragStartY = event.clientY;
+    dragStartScrollTop = tree.scrollTop;
+    scrollThumb.classList.add('is-dragging');
+    if (scrollThumb.setPointerCapture) scrollThumb.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  scrollThumb.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const maxScroll = Math.max(0, tree.scrollHeight - tree.clientHeight);
+    const travel = Math.max(1, scrollTrack.clientHeight - scrollThumb.offsetHeight);
+    tree.scrollTop = dragStartScrollTop + ((event.clientY - dragStartY) / travel) * maxScroll;
+    event.preventDefault();
+  });
+
+  scrollThumb.addEventListener('pointerup', stopThumbDrag);
+  scrollThumb.addEventListener('pointercancel', stopThumbDrag);
+
+  scrollTrack.addEventListener('pointerdown', (event) => {
+    if (event.target === scrollThumb || scrollTrack.classList.contains('is-disabled')) return;
+    const rect = scrollTrack.getBoundingClientRect();
+    const maxScroll = Math.max(0, tree.scrollHeight - tree.clientHeight);
+    const travel = Math.max(1, scrollTrack.clientHeight - scrollThumb.offsetHeight);
+    const targetOffset = Math.max(0, Math.min(travel, event.clientY - rect.top - scrollThumb.offsetHeight / 2));
+    tree.scrollTop = (targetOffset / travel) * maxScroll;
+    event.preventDefault();
+  });
+
   const leaves = Array.from(tree.querySelectorAll('[data-benefit-tree-leaf-checkbox]'));
   const branches = Array.from(tree.querySelectorAll('[data-benefit-tree-branch]'));
   const countLabel = picker.querySelector('[data-benefit-product-count]');
@@ -76,6 +186,7 @@
       else children.setAttribute('hidden', '');
     }
     if (toggle) toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    scheduleProductScrollbar();
   };
 
   const syncBranch = (branch) => {
@@ -93,6 +204,7 @@
       const count = leaves.filter((checkbox) => checkbox.checked).length;
       countLabel.textContent = `已選 ${count} 項`;
     }
+    scheduleProductScrollbar();
   };
 
   branches.forEach((branch) => {
@@ -158,6 +270,9 @@
         game.hidden = Boolean(query) && visibleGroups.length === 0;
         if (query && visibleGroups.length) setBranchOpen(game, true);
       });
+
+      tree.scrollTop = 0;
+      scheduleProductScrollbar();
     };
 
     searchInput.addEventListener('input', applyProductFilter);
@@ -171,8 +286,27 @@
     });
   }
 
+  if (window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(scheduleProductScrollbar);
+    resizeObserver.observe(tree);
+    resizeObserver.observe(scrollTrack);
+  } else {
+    window.addEventListener('resize', scheduleProductScrollbar);
+  }
+
+  if (window.MutationObserver) {
+    const mutationObserver = new MutationObserver(scheduleProductScrollbar);
+    mutationObserver.observe(tree, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'class'],
+    });
+  }
+
   // Keep the tree collapsed on load even when an old all-store template maps to
   // every current product. The user can expand only the game/group they need.
   branches.forEach((branch) => setBranchOpen(branch, false));
   refreshTreeState();
+  scheduleProductScrollbar();
 })();
