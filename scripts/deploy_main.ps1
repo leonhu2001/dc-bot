@@ -7,6 +7,8 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
+$ScriptPath = $PSCommandPath
+$ScriptHashBeforePull = (Get-FileHash -LiteralPath $ScriptPath -Algorithm SHA256).Hash
 
 # Keep SSH/SCP from hanging forever on a dead transport. ConnectTimeout covers
 # connection establishment; the keepalive pair terminates a session when the
@@ -33,6 +35,25 @@ if ($LASTEXITCODE -ne 0) { throw "git checkout main failed" }
 
 git pull --ff-only origin main
 if ($LASTEXITCODE -ne 0) { throw "git pull --ff-only failed" }
+
+# PowerShell parses the current script before execution. If git pull replaces this
+# file, continuing this process would still run the stale in-memory version. Relaunch
+# once from disk so the rest of deployment always uses the newly pulled script.
+$ScriptHashAfterPull = (Get-FileHash -LiteralPath $ScriptPath -Algorithm SHA256).Hash
+if ($ScriptHashAfterPull -ne $ScriptHashBeforePull) {
+    Write-Host "Deploy script updated during precheck; relaunching updated script..." -ForegroundColor Yellow
+    $RelaunchArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $ScriptPath,
+        "-Vps", $Vps
+    )
+    if ($Target) {
+        $RelaunchArgs += @("-Target", $Target)
+    }
+    & powershell.exe @RelaunchArgs
+    exit $LASTEXITCODE
+}
 
 if (-not $Target) {
     $Target = (git rev-parse origin/main).Trim()
