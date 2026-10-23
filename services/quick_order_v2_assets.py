@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote
 
 
 PUBLIC_ORDER_PANEL_BASE_URL = "https://mowanentertainment.com/static/order_panels"
@@ -12,22 +13,39 @@ _STATIC_ORDER_PANEL_DIR = (
 )
 
 
-@lru_cache(maxsize=32)
-def public_order_panel_image_url(filename: str) -> str | None:
-    """Return a cache-busted public URL for a deployed order-panel PNG.
-
-    Nginx serves this small public artwork directory directly with cross-origin
-    image headers so Discord can render the PNG inside embeds. The local file is
-    read only once per bot process to compute a content hash; deployments restart
-    the bot after syncing artwork, so changing a PNG naturally refreshes the URL.
-    The explicit revision also lets infrastructure/header changes invalidate old
-    Cloudflare/Discord caches even when the image bytes themselves did not change.
-    """
-    clean_name = Path(str(filename or "")).name
-    if not clean_name.lower().endswith(".png"):
+def _safe_relative_png_path(filename: str) -> PurePosixPath | None:
+    raw = str(filename or "").strip().replace("\\", "/")
+    if not raw:
         return None
 
-    path = _STATIC_ORDER_PANEL_DIR / clean_name
+    relative = PurePosixPath(raw)
+    if relative.is_absolute():
+        return None
+    if any(part in {"", ".", ".."} for part in relative.parts):
+        return None
+    if relative.suffix.lower() != ".png":
+        return None
+    return relative
+
+
+@lru_cache(maxsize=64)
+def public_order_panel_image_url(filename: str) -> str | None:
+    """Return a cache-busted public URL for deployed order-panel artwork.
+
+    Root artwork and nested price-list artwork are both allowed, but traversal
+    outside web/app/static/order_panels is rejected. Nginx serves this public
+    artwork directory directly with cross-origin image headers so Discord can
+    render the PNG inside embeds. The file is read only once per bot process to
+    compute a content hash; deployments restart the bot after syncing artwork.
+    """
+    relative = _safe_relative_png_path(filename)
+    if relative is None:
+        return None
+
+    root = _STATIC_ORDER_PANEL_DIR.resolve()
+    path = root.joinpath(*relative.parts).resolve()
+    if root not in path.parents:
+        return None
     if not path.is_file():
         return None
 
@@ -40,8 +58,9 @@ def public_order_panel_image_url(filename: str) -> str | None:
         return None
 
     digest = hashlib.sha256(data).hexdigest()[:12]
+    public_path = quote(relative.as_posix(), safe="/")
     return (
-        f"{PUBLIC_ORDER_PANEL_BASE_URL}/{clean_name}"
+        f"{PUBLIC_ORDER_PANEL_BASE_URL}/{public_path}"
         f"?v={PUBLIC_ORDER_PANEL_URL_REVISION}-{digest}"
     )
 
