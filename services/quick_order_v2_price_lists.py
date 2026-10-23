@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-from pathlib import Path
-
 import discord
 from discord.ext import commands
 
 from services import quick_order_v2 as quick
 from services import quick_order_v2_production as production
+from services.quick_order_v2_assets import public_order_panel_image_url
 
 
 _INSTALLED = False
@@ -15,7 +13,6 @@ _ORIGINAL_VIEW_FOR_CHANNEL = None
 _ORIGINAL_DELTA_CALLBACK = None
 _ORIGINAL_ENTRY_EMBED = None
 
-_ASSET_DIR = Path(__file__).resolve().parents[1] / "assets" / "order_panels"
 _DELTA_COVER_BY_CATEGORY = {
     "delta_desktop_fun": "delta_fun_panel.png",
 }
@@ -36,26 +33,11 @@ _PRICE_LIST_TEXT_BY_CHANNEL_ID = {
 }
 
 
-def _delta_cover_asset(category: str) -> tuple[Path, str] | None:
+def _delta_cover_url(category: str) -> str | None:
     filename = _DELTA_COVER_BY_CATEGORY.get(str(category))
     if not filename:
         return None
-
-    path = _ASSET_DIR / filename
-    if not path.is_file():
-        return None
-
-    try:
-        data = path.read_bytes()
-    except OSError:
-        return None
-
-    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return None
-
-    digest = hashlib.sha256(data).hexdigest()[:12]
-    attachment_name = f"{Path(filename).stem}_{digest}.png"
-    return path, attachment_name
+    return public_order_panel_image_url(filename)
 
 
 class QuickPriceListButton(discord.ui.Button):
@@ -147,45 +129,24 @@ async def _delta_category_callback(
         )
     )
 
-    asset = _delta_cover_asset(self.category)
-    if asset is None:
+    image_url = _delta_cover_url(self.category)
+    if image_url is not None:
+        # The browser/Discord client fetches this public static URL after the
+        # interaction response is sent. The bot no longer uploads the PNG on
+        # every button click, keeping the ephemeral response fast.
+        embed.set_image(url=image_url)
+    elif self.category in _DELTA_COVER_BY_CATEGORY:
         print(
-            f"[quick-order-price] delta cover missing category={self.category} "
+            f"[quick-order-price] delta cover missing/invalid category={self.category} "
             f"expected={_DELTA_COVER_BY_CATEGORY.get(str(self.category))}",
             flush=True,
         )
-        await interaction.response.send_message(
-            embed=embed,
-            view=view,
-            ephemeral=True,
-        )
-        return
 
-    path, attachment_name = asset
-    embed.set_image(url=f"attachment://{attachment_name}")
-    try:
-        await interaction.response.send_message(
-            embed=embed,
-            view=view,
-            ephemeral=True,
-            file=discord.File(path, filename=attachment_name),
-        )
-    except (discord.HTTPException, OSError, ValueError, TypeError) as exc:
-        print(
-            f"[quick-order-price] delta cover failed category={self.category}: "
-            f"{type(exc).__name__}: {exc}",
-            flush=True,
-        )
-        if not interaction.response.is_done():
-            await interaction.response.send_message(
-                embed=discord.Embed(
-                    title=f"{self.category_emoji} 三角洲行動｜{self.category_label}",
-                    description="請選擇服務。",
-                    color=discord.Color.green(),
-                ),
-                view=view,
-                ephemeral=True,
-            )
+    await interaction.response.send_message(
+        embed=embed,
+        view=view,
+        ephemeral=True,
+    )
 
 
 def _install_delta_cover_callback() -> None:
@@ -240,7 +201,7 @@ def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
         bot.loop.create_task(_refresh_delta_panel(bot))
 
     _INSTALLED = True
-    print("[quick-order-price] price buttons and delta covers installed", flush=True)
+    print("[quick-order-price] price buttons and public delta covers installed", flush=True)
 
 
 __all__ = [
