@@ -48,6 +48,38 @@ Write-Host "Target: $Target" -ForegroundColor Cyan
 Write-Host "VPS:    $Vps" -ForegroundColor Cyan
 Write-Host ""
 
+# Order-panel artwork is intentionally kept as local source PNGs instead of
+# tracked Git binaries. Copy the four real files to the VPS before the safe
+# deploy restarts the bot, so the startup panel refresh can attach them directly.
+$PanelAssetDir = Join-Path $RepoRoot "assets\order_panels"
+$PanelAssetNames = @(
+    "apex_panel.png",
+    "lol_panel.png",
+    "steam_panel.png",
+    "valorant_panel.png"
+)
+$PanelAssetPaths = @()
+foreach ($PanelAssetName in $PanelAssetNames) {
+    $PanelAssetPath = Join-Path $PanelAssetDir $PanelAssetName
+    if (-not (Test-Path -LiteralPath $PanelAssetPath -PathType Leaf)) {
+        throw "Missing order panel image: $PanelAssetPath"
+    }
+    $PanelAssetPaths += $PanelAssetPath
+}
+
+Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
+ssh $Vps "mkdir -p /opt/dc-bot/assets/order_panels"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to prepare VPS order panel asset directory."
+}
+
+& scp @PanelAssetPaths "${Vps}:/opt/dc-bot/assets/order_panels/"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload order panel images to VPS."
+}
+Write-Host "PASS: order panel images uploaded" -ForegroundColor Green
+Write-Host ""
+
 $RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
 
 ssh $Vps $RemoteCommand
