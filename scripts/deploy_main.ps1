@@ -39,19 +39,30 @@ Write-Host "VPS:    $Vps" -ForegroundColor Cyan
 Write-Host ""
 
 $PanelAssetDir = Join-Path $RepoRoot "assets\order_panels"
-$PanelAssetNames = @(
+$RequiredPanelAssetNames = @(
     "apex_panel.png",
     "lol_panel.png",
     "steam_panel.png",
     "valorant_panel.png"
 )
+$OptionalPanelAssetNames = @(
+    "delta_fun_panel.png"
+)
 $PanelAssetPaths = @()
-foreach ($PanelAssetName in $PanelAssetNames) {
+foreach ($PanelAssetName in $RequiredPanelAssetNames) {
     $PanelAssetPath = Join-Path $PanelAssetDir $PanelAssetName
     if (-not (Test-Path -LiteralPath $PanelAssetPath -PathType Leaf)) {
         throw "Missing order panel image: $PanelAssetPath"
     }
     $PanelAssetPaths += $PanelAssetPath
+}
+foreach ($PanelAssetName in $OptionalPanelAssetNames) {
+    $PanelAssetPath = Join-Path $PanelAssetDir $PanelAssetName
+    if (Test-Path -LiteralPath $PanelAssetPath -PathType Leaf) {
+        $PanelAssetPaths += $PanelAssetPath
+    } else {
+        Write-Host "SKIP: optional order panel image not found: $PanelAssetName" -ForegroundColor DarkYellow
+    }
 }
 
 # Deploy source first using the existing safe rollback flow.
@@ -63,7 +74,6 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
-# Remove the obsolete website-static rollout from the previous implementation.
 ssh $Vps "rm -rf /opt/dc-bot/web/app/static/order_panels && mkdir -p /opt/dc-bot/assets/order_panels"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to prepare VPS order panel asset directory."
