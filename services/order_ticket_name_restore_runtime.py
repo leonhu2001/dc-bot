@@ -17,6 +17,7 @@ from services.ticket_identity import build_ticket_channel_name
 
 CUSTOMER_CATEGORY_ID = config_int("CUSTOMER_CATEGORY_ID", 1483895536938651809)
 _SIMPLIFIED_NAME_RE = re.compile(r"^[🟢🟡🟠⚫🔴⚪][・┃]客服中心$")
+_ORIGINAL_QUICK_CREATE_TICKET = None
 
 _GAME_LABELS = {
     "delta_desktop_basic": "三角洲端遊",
@@ -49,6 +50,10 @@ def _topic_customer_id(channel: discord.TextChannel) -> int | None:
     return None
 
 
+def _is_quick_order_ticket(channel: discord.TextChannel, data: dict) -> bool:
+    return bool(data.get("quick_order_v2")) or "quick_order_v2=1" in str(channel.topic or "")
+
+
 def _status_from_simplified_name(name: str) -> str:
     text = str(name or "")
     if text.startswith("🟠"):
@@ -71,6 +76,21 @@ def _legacy_prefix(status: str) -> str:
     return "下單"
 
 
+def _requested_status(prefix: str, data: dict) -> str:
+    requested = str(prefix or "").strip()
+    if requested.startswith("存單"):
+        return "stored"
+    if requested.startswith("已結單"):
+        return "closed"
+    if requested.startswith("已取消"):
+        return "cancelled"
+
+    current = str(data.get("status") or "").strip().lower()
+    if current in {"stored", "closed", "cancelled", "canceled"}:
+        return current
+    return "active"
+
+
 def _merge_claim_fallback(channel_id: int, data: dict) -> dict:
     merged = dict(data or {})
     try:
@@ -88,7 +108,10 @@ def _merge_claim_fallback(channel_id: int, data: dict) -> dict:
                 continue
             for key in (
                 "customer_id",
+                "category",
                 "category_label",
+                "item_group",
+                "item_detail_value",
                 "item",
                 "quantity",
                 "payment_method",
@@ -173,13 +196,108 @@ def _play_labels(data: dict) -> list[str]:
     return result
 
 
-def _stored_prefix(data: dict) -> str:
-    parts = ["存單", _game_label(data), *_play_labels(data)]
+def _order_prefix(data: dict, status: str = "active") -> str:
+    parts = [_legacy_prefix(status), _game_label(data), *_play_labels(data)]
     return "-".join(str(part).strip() for part in parts if str(part).strip())
 
 
+def _stored_prefix(data: dict) -> str:
+    return _order_prefix(data, "stored")
+
+
+async def _rename_quick_ticket_from_data(
+    channel: discord.TextChannel,
+    data: dict,
+    *,
+    status: str = "active",
+    member: discord.Member | None = None,
+) -> None:
+    if not _is_quick_order_ticket(channel, data):
+        return
+
+    customer_id = _topic_customer_id(channel) or int(data.get("customer_id") or 0) or None
+    if member is None and customer_id:
+        member = channel.guild.get_member(customer_id)
+        if member is None:
+            try:
+                member = await channel.guild.fetch_member(customer_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                member = None
+
+    display_name = None
+    if member is None:
+        display_name = str(data.get("customer_display_name") or customer_id or "客人").strip()
+
+    new_name = build_ticket_channel_name(
+        _order_prefix(data, status),
+        member,
+        display_name=display_name,
+    )
+    if channel.name == new_name:
+        return
+
+    try:
+        await channel.edit(
+            name=new_name,
+            reason="Keep quick-order ticket game and service visible",
+        )
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        print(
+            f"[order-ticket-name] quick rename failed channel={channel.id}: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _install_quick_create_ticket_patch() -> bool:
+    global _ORIGINAL_QUICK_CREATE_TICKET
+    if _ORIGINAL_QUICK_CREATE_TICKET is not None:
+        return True
+
+    try:
+        from services import quick_order_v2 as quick
+        from services import self_service_ui_runtime as ui
+
+        original = quick._create_ticket
+        _ORIGINAL_QUICK_CREATE_TICKET = original
+
+        async def informative_quick_create_ticket(
+            interaction: discord.Interaction,
+            *,
+            category: str,
+            item_group: str,
+            source_channel_id: int,
+        ) -> discord.TextChannel | None:
+            ticket = await original(
+                interaction,
+                category=category,
+                item_group=item_group,
+                source_channel_id=source_channel_id,
+            )
+            if isinstance(ticket, discord.TextChannel):
+                data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(ticket.id, {})
+                if isinstance(data, dict):
+                    await _rename_quick_ticket_from_data(
+                        ticket,
+                        data,
+                        status="active",
+                        member=interaction.user if isinstance(interaction.user, discord.Member) else None,
+                    )
+            return ticket
+
+        quick._create_ticket = informative_quick_create_ticket
+        return True
+    except Exception as exc:
+        print(
+            f"[order-ticket-name] cannot install quick-create wrapper: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+
 def _install_store_renamer_patch() -> bool:
-    """Future store actions keep game + service/detail in the channel name."""
+    """Keep game + service/detail in every quick-order rename and stored order."""
     try:
         from services import order_runtime
 
@@ -199,12 +317,19 @@ def _install_store_renamer_patch() -> bool:
             display_name: str | None = None,
         ) -> None:
             effective_prefix = str(prefix or "")
-            if isinstance(channel, discord.TextChannel) and effective_prefix.startswith("存單"):
+            if isinstance(channel, discord.TextChannel):
                 data = state.order_selections.get(channel.id, {})
                 if not isinstance(data, dict):
                     data = {}
                 data = _merge_claim_fallback(channel.id, data)
-                effective_prefix = _stored_prefix(data)
+
+                if _is_quick_order_ticket(channel, data):
+                    effective_prefix = _order_prefix(
+                        data,
+                        _requested_status(effective_prefix, data),
+                    )
+                elif effective_prefix.startswith("存單"):
+                    effective_prefix = _stored_prefix(data)
 
             await original(
                 channel,
@@ -231,9 +356,10 @@ def _install_store_renamer_patch() -> bool:
 async def restore_unintentionally_simplified_order_ticket_names(
     bot: commands.Bot,
 ) -> None:
-    """Repair the mistaken simplified rollout and enrich all currently stored tickets."""
+    """Repair simplified names, enrich quick tickets, and preserve stored-ticket detail."""
     await bot.wait_until_ready()
     _install_store_renamer_patch()
+    _install_quick_create_ticket_patch()
 
     category = bot.get_channel(CUSTOMER_CATEGORY_ID)
     if not isinstance(category, discord.CategoryChannel):
@@ -268,8 +394,11 @@ async def restore_unintentionally_simplified_order_ticket_names(
         if not status and simplified:
             status = _status_from_simplified_name(channel.name)
 
+        is_quick = _is_quick_order_ticket(channel, data)
         is_stored = status == "stored" or str(channel.name or "").startswith("存單-")
-        if is_stored:
+        if is_quick:
+            prefix = _order_prefix(data, status or "active")
+        elif is_stored:
             prefix = _stored_prefix(data)
         elif simplified:
             prefix = _legacy_prefix(status)
@@ -317,6 +446,7 @@ async def restore_unintentionally_simplified_order_ticket_names(
 
 def install_order_ticket_name_restore(bot: commands.Bot) -> None:
     _install_store_renamer_patch()
+    _install_quick_create_ticket_patch()
     if getattr(bot, "_order_ticket_name_restore_started", False):
         return
     bot._order_ticket_name_restore_started = True
