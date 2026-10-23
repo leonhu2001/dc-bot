@@ -8,6 +8,10 @@ from services import quick_order_v2 as quick
 
 _INSTALLED = False
 _ORIGINAL_VIEW_INIT = None
+_ORIGINAL_QUANTITY_CALLBACK = None
+_ORIGINAL_DETAIL_CALLBACK = None
+_ORIGINAL_ITEM_CALLBACK = None
+_ORIGINAL_CATEGORY_CALLBACK = None
 
 _QUICK_SELECT_IDS = {
     "self_service_order_category_select",
@@ -15,19 +19,25 @@ _QUICK_SELECT_IDS = {
     "self_service_order_detail_select",
     "self_service_order_quantity_select",
 }
+_QUANTITY_SELECTED_KEY = "quick_order_quantity_selected"
+
+
+def _clear_defaults(select: discord.ui.Select) -> None:
+    for option in getattr(select, "options", []) or []:
+        option.default = False
 
 
 def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
-    """Do not render customer-choice selects with a pre-selected Discord option.
+    """Keep quick-order selects neutral until the customer actually chooses.
 
-    The order draft may already contain a value used for pricing/state, but a Discord
-    SelectOption(default=True) visually looks as if the customer actively chose it.
-    That is especially confusing on newly created quick-order tickets because no
-    interaction callback has fired yet. Quick-order tickets therefore keep the
-    current value in the embed/state while the select itself always starts from a
-    neutral prompt.
+    A newly created quick-order draft may already contain system defaults such as
+    the minimum quantity. Those values are useful internally but must not look like
+    a customer choice in Discord. Once the customer really selects a detail or
+    quantity, the refreshed Select should show that selected value normally.
     """
     category = str(data.get("category") or "")
+    detail_selected = bool(str(data.get("item_detail_value") or "").strip())
+    quantity_selected = bool(data.get(_QUANTITY_SELECTED_KEY))
 
     for child in list(view.children):
         if not isinstance(child, discord.ui.Select):
@@ -37,17 +47,121 @@ def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None
         if custom_id not in _QUICK_SELECT_IDS:
             continue
 
-        for option in getattr(child, "options", []) or []:
-            option.default = False
+        options = list(getattr(child, "options", []) or [])
 
         if custom_id == "self_service_order_detail_select":
+            # Multi-option detail selectors start neutral. After the callback writes
+            # item_detail_value, preserve the original view's selected default.
+            if len(options) > 1 and not detail_selected:
+                _clear_defaults(child)
             child.placeholder = "請選擇方案" if category == "farm" else "請選擇規格"
-        elif custom_id == "self_service_order_quantity_select":
+            continue
+
+        if custom_id == "self_service_order_quantity_select":
+            # Quantity is initialized to the minimum by the pricing state, so only
+            # display it as selected after the customer has actually used this Select.
+            if len(options) > 1 and not quantity_selected:
+                _clear_defaults(child)
             child.placeholder = "請選擇時長 / 數量"
-        elif custom_id == "self_service_order_item_select":
+            continue
+
+        # Category/service were already chosen in the public quick-order entry.
+        # If either selector is still present in a quick ticket, don't make the
+        # pre-filled routing value look like another customer choice.
+        _clear_defaults(child)
+        if custom_id == "self_service_order_item_select":
             child.placeholder = "請選擇服務"
         elif custom_id == "self_service_order_category_select":
             child.placeholder = "請選擇類型"
+
+
+def _install_selection_markers() -> None:
+    """Track only choices that really came from a Discord interaction callback."""
+    global _ORIGINAL_QUANTITY_CALLBACK
+    global _ORIGINAL_DETAIL_CALLBACK
+    global _ORIGINAL_ITEM_CALLBACK
+    global _ORIGINAL_CATEGORY_CALLBACK
+
+    from services import order_runtime as runtime
+
+    if _ORIGINAL_QUANTITY_CALLBACK is None:
+        _ORIGINAL_QUANTITY_CALLBACK = runtime.SelfServiceOrderQuantitySelect.callback
+        original_quantity = _ORIGINAL_QUANTITY_CALLBACK
+
+        async def quantity_callback(self, interaction: discord.Interaction):
+            try:
+                state = runtime._require_runtime_state()
+                data = state.order_selections.get(self.channel_id, {})
+                if (
+                    isinstance(data, dict)
+                    and data.get("quick_order_v2")
+                    and state.can_operate_self_service_order(interaction.user, self.customer_id)
+                    and self.values
+                    and self.values[0] != "need_item"
+                ):
+                    # Set before the original callback rebuilds the View so the
+                    # refreshed Select immediately shows the chosen quantity.
+                    data[_QUANTITY_SELECTED_KEY] = True
+            except Exception:
+                pass
+            await original_quantity(self, interaction)
+
+        runtime.SelfServiceOrderQuantitySelect.callback = quantity_callback
+
+    if _ORIGINAL_DETAIL_CALLBACK is None:
+        _ORIGINAL_DETAIL_CALLBACK = runtime.SelfServiceOrderDetailSelect.callback
+        original_detail = _ORIGINAL_DETAIL_CALLBACK
+
+        async def detail_callback(self, interaction: discord.Interaction):
+            try:
+                state = runtime._require_runtime_state()
+                data = state.order_selections.get(self.channel_id, {})
+                if (
+                    isinstance(data, dict)
+                    and data.get("quick_order_v2")
+                    and state.can_operate_self_service_order(interaction.user, self.customer_id)
+                    and self.values
+                    and self.values[0] != "need_item"
+                ):
+                    # A different scheme may have a different quantity range.
+                    data.pop(_QUANTITY_SELECTED_KEY, None)
+            except Exception:
+                pass
+            await original_detail(self, interaction)
+
+        runtime.SelfServiceOrderDetailSelect.callback = detail_callback
+
+    if _ORIGINAL_ITEM_CALLBACK is None:
+        _ORIGINAL_ITEM_CALLBACK = runtime.SelfServiceOrderItemSelect.callback
+        original_item = _ORIGINAL_ITEM_CALLBACK
+
+        async def item_callback(self, interaction: discord.Interaction):
+            try:
+                state = runtime._require_runtime_state()
+                data = state.order_selections.get(self.channel_id, {})
+                if isinstance(data, dict) and data.get("quick_order_v2"):
+                    data.pop(_QUANTITY_SELECTED_KEY, None)
+            except Exception:
+                pass
+            await original_item(self, interaction)
+
+        runtime.SelfServiceOrderItemSelect.callback = item_callback
+
+    if _ORIGINAL_CATEGORY_CALLBACK is None:
+        _ORIGINAL_CATEGORY_CALLBACK = runtime.SelfServiceOrderCategorySelect.callback
+        original_category = _ORIGINAL_CATEGORY_CALLBACK
+
+        async def category_callback(self, interaction: discord.Interaction):
+            try:
+                state = runtime._require_runtime_state()
+                data = state.order_selections.get(self.channel_id, {})
+                if isinstance(data, dict) and data.get("quick_order_v2"):
+                    data.pop(_QUANTITY_SELECTED_KEY, None)
+            except Exception:
+                pass
+            await original_category(self, interaction)
+
+        runtime.SelfServiceOrderCategorySelect.callback = category_callback
 
 
 def _install_quick_order_view_patch() -> None:
@@ -78,7 +192,7 @@ def _install_quick_order_view_patch() -> None:
 
 
 async def repair_existing_quick_order_selects(bot: commands.Bot) -> None:
-    """Refresh already-open quick-order panels so stale default checks disappear."""
+    """Refresh already-open quick-order panels with the current Select display rules."""
     await bot.wait_until_ready()
 
     from services import self_service_ui_runtime as ui
@@ -150,6 +264,7 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
+    _install_selection_markers()
     _install_quick_order_view_patch()
 
     if not getattr(bot, "_quick_order_v2_select_repair_started", False):
@@ -157,7 +272,7 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
         bot.loop.create_task(repair_existing_quick_order_selects(bot))
 
     _INSTALLED = True
-    print("[quick-order-v2-select] neutral select display installed", flush=True)
+    print("[quick-order-v2-select] interaction-aware select display installed", flush=True)
 
 
 __all__ = [
