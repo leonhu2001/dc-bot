@@ -63,7 +63,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
-ssh $Vps "mkdir -p /opt/dc-bot/assets/order_panels"
+# Remove the obsolete website-static rollout from the previous implementation.
+ssh $Vps "rm -rf /opt/dc-bot/web/app/static/order_panels && mkdir -p /opt/dc-bot/assets/order_panels"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to prepare VPS order panel asset directory."
 }
