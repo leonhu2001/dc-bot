@@ -55,7 +55,31 @@ foreach ($PanelAssetName in $RequiredPanelAssetNames) {
     $PanelAssetPaths += $PanelAssetPath
 }
 
-# Deploy source first using the existing safe rollback flow.
+# Upload artwork before the safe deployment. The files live in ignored runtime
+# directories, so git reset/checkout does not remove them. Keeping a compatibility
+# copy under assets/order_panels also lets the previous attachment-based build keep
+# working if the safe deploy rolls back.
+Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
+$RemotePanelStage = "/tmp/dc-bot-order-panels"
+ssh $Vps "rm -rf '$RemotePanelStage' && mkdir -p '$RemotePanelStage'"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to prepare remote order-panel staging directory."
+}
+
+& scp @PanelAssetPaths "${Vps}:${RemotePanelStage}/"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to upload order panel images to VPS staging."
+}
+
+ssh $Vps "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf '$RemotePanelStage'"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to install order panel images on VPS."
+}
+Write-Host "PASS: order panel images synchronized before service restart" -ForegroundColor Green
+Write-Host ""
+
+# Run the existing safe deployment after artwork is already in place. deploy_main.sh
+# owns the single bot/web restart, so image support no longer adds a second restart.
 $RemoteCommand = "cd /opt/dc-bot && git fetch origin main && git show '${Target}:scripts/deploy_main.sh' | bash -s -- '$Target'"
 ssh $Vps $RemoteCommand
 if ($LASTEXITCODE -ne 0) {
@@ -63,31 +87,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "=== SYNC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
-ssh $Vps "rm -rf /opt/dc-bot/web/app/static/order_panels && mkdir -p /opt/dc-bot/assets/order_panels"
+Write-Host "=== VERIFY PUBLIC ORDER PANEL IMAGES ===" -ForegroundColor Yellow
+$PanelAssetNameList = ($RequiredPanelAssetNames -join " ")
+$VerifyCommand = "for name in $PanelAssetNameList; do curl --fail --silent --show-error --max-time 10 -o /dev/null 'https://mowanentertainment.com/static/order_panels/'`$name || exit 1; done"
+ssh $Vps $VerifyCommand
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to prepare VPS order panel asset directory."
+    throw "One or more public order panel image URLs failed HTTP verification."
 }
-
-& scp @PanelAssetPaths "${Vps}:/opt/dc-bot/assets/order_panels/"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to upload order panel images to VPS."
-}
-
-ssh $Vps "chmod 0644 /opt/dc-bot/assets/order_panels/*.png"
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to set order panel image permissions."
-}
-Write-Host "PASS: order panel images uploaded beside bot" -ForegroundColor Green
-
-# Restart only the bot after the real PNG files are in place. On startup the
-# quick-order layer edits existing public panels in place; it only sends a new
-# panel when a channel has no existing panel at all, avoiding update notifications.
-ssh $Vps "systemctl restart dc-bot.service && systemctl is-active --quiet dc-bot.service"
-if ($LASTEXITCODE -ne 0) {
-    throw "Bot restart after order panel image sync failed."
-}
-Write-Host "PASS: bot restarted after order panel image sync" -ForegroundColor Green
+Write-Host "PASS: public order panel image URLs are reachable" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "DEPLOY COMPLETED" -ForegroundColor Green
