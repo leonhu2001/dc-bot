@@ -44,6 +44,17 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # Historical-only categories should not clutter the benefit picker.
 _HIDDEN_BENEFIT_CATEGORIES = {"general", "basic", "fun"}
+_BENEFIT_GAME_META = {
+    "delta_desktop_basic": ("01-delta", "三角洲行動", "端遊"),
+    "delta_mobile_basic": ("01-delta", "三角洲行動", "手遊"),
+    "delta_desktop_fun": ("01-delta", "三角洲行動", "趣味單"),
+    "farm": ("01-delta", "三角洲行動", "代肝代解"),
+    "valorant": ("02-valorant", "特戰英豪", ""),
+    "lol": ("03-lol", "英雄聯盟", ""),
+    "apex": ("04-apex", "APEX", ""),
+    "steam": ("05-steam", "STEAM", ""),
+    "custom": ("99-custom", "自訂", ""),
+}
 
 
 def _admin(request: Request) -> dict | None:
@@ -82,9 +93,13 @@ def _customer_options(limit: int = 400) -> list[dict]:
         return []
 
 
-def _benefit_catalog_options() -> tuple[list[dict], list[dict]]:
+def _split_rule_label(label: str) -> list[str]:
+    text = str(label or "").replace("／", "｜")
+    return [part.strip() for part in text.split("｜") if part.strip()]
+
+
+def _benefit_catalog_options() -> list[dict]:
     rules: list[dict] = []
-    used_categories: set[str] = set()
 
     for rule_key, rule in ORDER_RULES.items():
         category = str(getattr(rule, "category", "") or "").strip()
@@ -92,34 +107,126 @@ def _benefit_catalog_options() -> tuple[list[dict], list[dict]]:
             continue
         if not is_order_product_active(rule_key):
             continue
-        used_categories.add(category)
+
+        raw_label = str(getattr(rule, "label", rule_key) or rule_key).strip()
+        parts = _split_rule_label(raw_label)
+        catalog_group = str(getattr(rule, "catalog_group_label", "") or "").strip()
+        if not catalog_group:
+            catalog_group = parts[-2] if len(parts) >= 3 else "其他商品"
+        leaf_label = parts[-1] if len(parts) >= 2 else raw_label
+
+        game_sort, game_label, category_mode = _BENEFIT_GAME_META.get(
+            category,
+            (f"50-{category}", CATEGORY_LABELS.get(category, category), ""),
+        )
+        group_label = catalog_group
+        if category_mode:
+            group_label = f"{category_mode}｜{catalog_group}"
+
         rules.append(
             {
                 "key": str(rule_key),
-                "label": str(getattr(rule, "label", rule_key) or rule_key),
+                "label": raw_label,
+                "leaf_label": leaf_label,
                 "category": category,
                 "category_label": CATEGORY_LABELS.get(category, category),
+                "game_sort": game_sort,
+                "game_label": game_label,
+                "group_label": group_label,
             }
         )
 
-    categories = [
-        {"key": key, "label": CATEGORY_LABELS.get(key, key)}
-        for key in CATEGORY_LABELS
-        if key in used_categories and key not in _HIDDEN_BENEFIT_CATEGORIES
-    ]
-    categories.sort(key=lambda item: (item["label"], item["key"]))
-    rules.sort(key=lambda item: (item["category_label"], item["label"], item["key"]))
-    return categories, rules
+    rules.sort(
+        key=lambda item: (
+            item["game_sort"],
+            item["game_label"],
+            item["group_label"],
+            item["leaf_label"],
+            item["key"],
+        )
+    )
+    return rules
+
+
+def _benefit_catalog_tree(rule_options: list[dict]) -> list[dict]:
+    games: dict[str, dict] = {}
+    for rule in rule_options:
+        game_key = str(rule["game_sort"])
+        game = games.setdefault(
+            game_key,
+            {
+                "key": game_key,
+                "label": rule["game_label"],
+                "groups": {},
+            },
+        )
+        group_key = f"{game_key}:{rule['category']}:{rule['group_label']}"
+        group = game["groups"].setdefault(
+            group_key,
+            {
+                "key": group_key,
+                "label": rule["group_label"],
+                "rules": [],
+            },
+        )
+        group["rules"].append(rule)
+
+    result: list[dict] = []
+    for game_key in sorted(games):
+        game = games[game_key]
+        group_rows = list(game["groups"].values())
+        group_rows.sort(key=lambda item: (item["label"], item["key"]))
+        result.append(
+            {
+                "key": game["key"],
+                "label": game["label"],
+                "groups": group_rows,
+                "rule_count": sum(len(group["rules"]) for group in group_rows),
+            }
+        )
+    return result
+
+
+def _effective_rule_keys(template: dict | None, rule_options: list[dict]) -> list[str]:
+    if not isinstance(template, dict):
+        return []
+
+    active_keys = {str(rule["key"]) for rule in rule_options}
+    excluded = {str(value) for value in template.get("excluded_rule_keys") or []}
+    scope_type = str(template.get("scope_type") or "all")
+    scope_values = {str(value) for value in template.get("scope_values") or []}
+
+    if scope_type == "rule":
+        selected = active_keys & scope_values
+    elif scope_type == "category":
+        selected = {
+            str(rule["key"])
+            for rule in rule_options
+            if str(rule["category"]) in scope_values
+        }
+    else:
+        selected = set(active_keys)
+
+    return sorted(selected - excluded)
 
 
 def _template_rules_from_form(form) -> dict:
-    scope_type = str(form.get("scope_type") or "all").strip()
-    if scope_type == "category":
-        scope_values = [str(value) for value in form.getlist("scope_category_values")]
-    elif scope_type == "rule":
-        scope_values = [str(value) for value in form.getlist("scope_rule_values")]
-    else:
-        scope_values = []
+    requested = [
+        str(value).strip()
+        for value in form.getlist("applicable_rule_keys")
+        if str(value).strip()
+    ]
+    requested = list(dict.fromkeys(requested))
+    applicable_rule_keys = [
+        rule_key
+        for rule_key in requested
+        if rule_key in ORDER_RULES
+        and is_order_product_active(rule_key)
+        and str(getattr(ORDER_RULES[rule_key], "category", "") or "")
+        not in _HIDDEN_BENEFIT_CATEGORIES
+    ]
+    if not applicable_rule_keys:
+        raise ValueError("請至少勾選一個適用商品。")
 
     effect_kind = str(form.get("effect_kind") or EFFECT_FIXED_CASH)
     high_risk = (
@@ -131,11 +238,11 @@ def _template_rules_from_form(form) -> dict:
         "effect_value": form.get("effect_value") or 0,
         "funding": str(form.get("funding") or FUNDING_STORE),
         "min_order_amount": form.get("min_order_amount") or 0,
-        "scope_type": scope_type,
-        "scope_values": scope_values,
-        "excluded_rule_keys": [
-            str(value) for value in form.getlist("excluded_rule_keys")
-        ],
+        # New/edited templates use one canonical product whitelist. Existing
+        # issued snapshots keep their historical all/category/exclusion rules.
+        "scope_type": "rule",
+        "scope_values": applicable_rule_keys,
+        "excluded_rule_keys": [],
         "valid_days": form.get("valid_days") or None,
         "usage_limit": form.get("usage_limit") or 1,
         "consume_mode": form.get("consume_mode") or "one_shot",
@@ -179,7 +286,17 @@ async def benefits_center(
     issued = list_issued_benefits(limit=300)
     template_rows = list_templates(include_inactive=True)
     editing_template = get_template(edit_template) if edit_template else None
-    category_options, rule_options = _benefit_catalog_options()
+    rule_options = _benefit_catalog_options()
+    benefit_rule_tree = _benefit_catalog_tree(rule_options)
+
+    for template in template_rows:
+        template["applicable_rule_keys"] = _effective_rule_keys(template, rule_options)
+        template["applicable_count"] = len(template["applicable_rule_keys"])
+    if editing_template is not None:
+        editing_template["applicable_rule_keys"] = _effective_rule_keys(
+            editing_template,
+            rule_options,
+        )
 
     effect_labels = {
         EFFECT_FIXED_CASH: "固定金額抵免",
@@ -207,8 +324,8 @@ async def benefits_center(
             "message": str(message or ""),
             "effect_labels": effect_labels,
             "funding_labels": funding_labels,
-            "category_options": category_options,
             "rule_options": rule_options,
+            "benefit_rule_tree": benefit_rule_tree,
             "effect_kinds": [
                 (EFFECT_FIXED_CASH, "固定金額抵免"),
                 (EFFECT_PERCENT, "百分比折扣"),
