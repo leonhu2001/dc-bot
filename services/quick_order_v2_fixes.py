@@ -15,8 +15,21 @@ _ORIGINAL_DETAILS_RESOLVER = None
 
 
 def _normalized_label(value) -> str:
-    text = unicodedata.normalize("NFKC", str(value or "")).strip()
-    return " ".join(text.split())
+    """Normalize storefront labels for Discord grouping/deduplication.
+
+    Manager-edited catalog labels can pick up invisible Unicode format/control
+    characters (zero-width space/joiner, BOM, word joiner, etc.) through copy/paste.
+    Discord renders those labels identically, while Python string equality treats
+    them as different groups. Strip those invisible code points before comparing
+    or displaying the label so one visual service can never appear twice.
+    """
+    text = unicodedata.normalize("NFKC", str(value or ""))
+    text = "".join(
+        char
+        for char in text
+        if unicodedata.category(char) not in {"Cf", "Cc"}
+    )
+    return " ".join(text.strip().split())
 
 
 def _normalized_key(value) -> str:
@@ -37,7 +50,7 @@ def _live_groups(category: str) -> list[str]:
     seen: set[str] = set()
     for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
         text = _normalized_label(value)
-        key = text.casefold()
+        key = _normalized_key(text)
         if not text or key in seen:
             continue
         seen.add(key)
@@ -48,9 +61,10 @@ def _live_groups(category: str) -> list[str]:
 def _canonical_details(category: str | None, group_label: str | None) -> list[dict]:
     """Merge visually-equivalent group names into one canonical detail list.
 
-    Older manager overrides can differ only by full/half-width characters or
-    whitespace. The public entry de-duplicates those names, so the ticket resolver
-    must use the same equivalence rule or it can show a group with zero details.
+    Older manager overrides can differ only by full/half-width characters,
+    whitespace, or invisible Unicode format characters. The public entry
+    de-duplicates those names, so the ticket resolver must use the same
+    equivalence rule or it can show a group with zero details.
     """
     if _ORIGINAL_DETAILS_RESOLVER is None:
         return []
@@ -59,14 +73,19 @@ def _canonical_details(category: str | None, group_label: str | None) -> list[di
 
     target_key = _normalized_key(group_label)
     candidates: list[str] = []
+    candidate_keys: set[str] = set()
 
     for value in orders.ORDER_ITEM_GROUPS_BY_CATEGORY.get(str(category), []):
         text = str(value or "").strip()
-        if text and _normalized_key(text) == target_key and text not in candidates:
-            candidates.append(text)
+        key = _normalized_key(text)
+        if not text or key != target_key or key in candidate_keys:
+            continue
+        candidate_keys.add(key)
+        candidates.append(text)
 
     raw_group = str(group_label or "").strip()
-    if raw_group and raw_group not in candidates:
+    raw_key = _normalized_key(raw_group)
+    if raw_group and raw_key not in candidate_keys:
         candidates.insert(0, raw_group)
 
     result: list[dict] = []
@@ -208,7 +227,7 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
         return
 
     # 1. Public entry and ticket detail lookup now use the same effective group
-    # labels. This fixes the 3x3 group opening with an empty/disabled detail select.
+    # labels. This fixes duplicate visually-identical groups and empty detail lists.
     _install_canonical_group_resolver()
     quick._groups = _live_groups
 
