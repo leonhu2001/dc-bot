@@ -52,28 +52,182 @@ def calculate_total_with_minimum(order_id: int, db=None) -> tuple[int, int]:
             db.close()
 
 
-def _vip_level_and_rate(order_id: int) -> tuple[str, int]:
+def _ensure_vip_snapshot_table(db) -> None:
+    db.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS vip_timer_vip_snapshots (
+                order_id INTEGER PRIMARY KEY,
+                customer_discord_id TEXT NOT NULL,
+                vip_name TEXT NOT NULL,
+                vip_discount_pay_rate INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+    )
+
+
+def _current_vip_level_and_rate(customer_id: str) -> tuple[str, int]:
     from core.vip_levels import get_vip_discount_pay_rate
-    from services import vip_timer as timer
     from services.rewards import get_customer_reward_data, get_effective_member_level
+
+    try:
+        reward_data = get_customer_reward_data(int(customer_id))
+        level = get_effective_member_level(reward_data) or {}
+    except Exception as exc:
+        raise ValueError("暫時無法確認目前 VIP 等級，請稍後再建立自由計時單。") from exc
+
+    vip_name = str(level.get("name") or "普通魔丸")
+    pay_rate = int(get_vip_discount_pay_rate(vip_name))
+    return vip_name, max(0, min(100, pay_rate))
+
+
+def _ensure_vip_discount_snapshot(
+    order_id: int,
+    customer_id: str,
+    *,
+    db=None,
+    legacy: bool = False,
+) -> tuple[str, int]:
+    """Persist and return the order-opening VIP percentage exactly once."""
+    from services import vip_timer as timer
+
+    owns = db is None
+    if owns:
+        db = timer.SessionLocal()
+    try:
+        _ensure_vip_snapshot_table(db)
+        existing = db.execute(
+            text(
+                "SELECT vip_name, vip_discount_pay_rate FROM vip_timer_vip_snapshots "
+                "WHERE order_id=:order_id LIMIT 1"
+            ),
+            {"order_id": int(order_id)},
+        ).mappings().first()
+        if existing is not None:
+            return (
+                str(existing.get("vip_name") or "普通魔丸"),
+                max(0, min(100, int(existing.get("vip_discount_pay_rate") or 100))),
+            )
+
+        vip_name, pay_rate = _current_vip_level_and_rate(str(customer_id))
+        created_at = timer.utc_iso()
+        db.execute(
+            text(
+                "INSERT INTO vip_timer_vip_snapshots("
+                "order_id, customer_discord_id, vip_name, vip_discount_pay_rate, created_at"
+                ") VALUES ("
+                ":order_id, :customer_id, :vip_name, :pay_rate, :created_at"
+                ")"
+            ),
+            {
+                "order_id": int(order_id),
+                "customer_id": str(customer_id),
+                "vip_name": vip_name,
+                "pay_rate": int(pay_rate),
+                "created_at": created_at,
+            },
+        )
+
+        row = db.execute(
+            text(
+                "SELECT price_snapshot_json FROM web_orders "
+                "WHERE id=:order_id LIMIT 1"
+            ),
+            {"order_id": int(order_id)},
+        ).mappings().first()
+        if row is not None:
+            try:
+                snapshot = json.loads(str(row.get("price_snapshot_json") or "{}"))
+            except Exception:
+                snapshot = {}
+            if not isinstance(snapshot, dict):
+                snapshot = {}
+            snapshot.update(
+                {
+                    "vip_timer": True,
+                    "vip_name": vip_name,
+                    "vip_discount_pay_rate": int(pay_rate),
+                    "vip_discount_locked_at": created_at,
+                    "vip_discount_locked_on_create": not legacy,
+                }
+            )
+            db.execute(
+                text(
+                    "UPDATE web_orders SET price_snapshot_json=:snapshot, "
+                    "updated_at=CURRENT_TIMESTAMP WHERE id=:order_id"
+                ),
+                {
+                    "snapshot": json.dumps(snapshot, ensure_ascii=False, sort_keys=True),
+                    "order_id": int(order_id),
+                },
+            )
+
+        timer._event(
+            db,
+            int(order_id),
+            "vip_discount_snapshot_locked" if not legacy else "vip_discount_snapshot_legacy_locked",
+            None,
+            {
+                "vip_name": vip_name,
+                "pay_rate": int(pay_rate),
+                "locked_at": created_at,
+            },
+        )
+        if owns:
+            db.commit()
+        return vip_name, int(pay_rate)
+    except Exception:
+        if owns:
+            db.rollback()
+        raise
+    finally:
+        if owns:
+            db.close()
+
+
+def _vip_level_and_rate(order_id: int) -> tuple[str, int]:
+    """Return the order-opening VIP snapshot, never the customer's later level."""
+    from services import vip_timer as timer
 
     session = timer.get_session(int(order_id)) or {}
     customer_id = str(session.get("customer_discord_id") or "").strip()
     if not customer_id:
         raise ValueError("找不到 VIP 自由計時單的會員資料，暫時無法結算。")
 
+    db = timer.SessionLocal()
     try:
-        reward_data = get_customer_reward_data(int(customer_id))
-        level = get_effective_member_level(reward_data) or {}
-    except Exception as exc:
-        raise ValueError("暫時無法確認目前 VIP 等級，請稍後再結束計時。") from exc
+        _ensure_vip_snapshot_table(db)
+        row = db.execute(
+            text(
+                "SELECT vip_name, vip_discount_pay_rate FROM vip_timer_vip_snapshots "
+                "WHERE order_id=:order_id LIMIT 1"
+            ),
+            {"order_id": int(order_id)},
+        ).mappings().first()
+        if row is not None:
+            return (
+                str(row.get("vip_name") or "普通魔丸"),
+                max(0, min(100, int(row.get("vip_discount_pay_rate") or 100))),
+            )
 
-    vip_name = str(level.get("name") or "普通魔丸")
-    # VIP timer is itself a VIP-only benefit. The timer catalog already removes
-    # source products that explicitly disallow VIP discounts, so settlement uses
-    # the canonical level percentage directly instead of maintaining another rate table.
-    pay_rate = int(get_vip_discount_pay_rate(vip_name))
-    return vip_name, max(0, min(100, pay_rate))
+        # Compatibility for a timer order that was already open before this
+        # deployment. It cannot reconstruct the historical opening tier, so lock
+        # the first post-deploy observation once and never re-read it afterward.
+        result = _ensure_vip_discount_snapshot(
+            int(order_id),
+            customer_id,
+            db=db,
+            legacy=True,
+        )
+        db.commit()
+        return result
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def _discount_amount(amount: int, pay_rate: int) -> int:
@@ -86,7 +240,7 @@ def _discount_amount(amount: int, pay_rate: int) -> int:
 
 
 def _apply_vip_discount_to_result(order_id: int, result: dict) -> dict:
-    """Apply only the canonical VIP percentage discount to a finished timer.
+    """Apply only the locked VIP percentage discount to a finished timer.
 
     VIP percentage discounts use the same shared funding policy as ordinary
     orders: customer payment and payout base are reduced together. Monthly
@@ -211,15 +365,38 @@ def install_vip_timer_billing_guard() -> None:
 
     from services import vip_timer as timer
     from services import vip_timer_runtime as runtime
+    from services import vip_timer_self_service as self_service
 
     timer.calculate_total = calculate_total_with_minimum
     timer.VIP_TIMER_MINIMUM_SECONDS = VIP_TIMER_MINIMUM_SECONDS
 
+    original_create_vip_timer_session = timer.create_vip_timer_session
+
+    def create_vip_timer_session(db, *, order_id: int, customer_id: str, initial_rule_key: str):
+        result = original_create_vip_timer_session(
+            db,
+            order_id=int(order_id),
+            customer_id=str(customer_id),
+            initial_rule_key=str(initial_rule_key),
+        )
+        _ensure_vip_discount_snapshot(
+            int(order_id),
+            str(customer_id),
+            db=db,
+            legacy=False,
+        )
+        return result
+
+    timer.create_vip_timer_session = create_vip_timer_session
+    # vip_timer_self_service imports this function directly at module import time,
+    # so update that bound reference as well as the canonical timer module.
+    self_service.create_vip_timer_session = create_vip_timer_session
+
     original_end_timer = timer.end_timer
 
     def end_timer(order_id: int, actor_id):
-        # Resolve membership before closing so a transient VIP lookup failure does
-        # not leave the order closed at an incorrect undiscounted amount.
+        # Read the order-opening snapshot before closing. A later VIP upgrade or
+        # downgrade must never change this order's percentage.
         _vip_level_and_rate(int(order_id))
         result = original_end_timer(int(order_id), actor_id)
         return _apply_vip_discount_to_result(int(order_id), result)
@@ -239,7 +416,7 @@ def install_vip_timer_billing_guard() -> None:
         embed.add_field(
             name="VIP 優惠",
             value=(
-                "適用目前 VIP 等級的百分比折扣。\n"
+                "依開單當下的 VIP 等級鎖定百分比折扣；之後升級或降級不回溯本單。\n"
                 "不適用月券、點數福利、跨單累積福利券、娛樂陪累積送時數與其他活動／折扣。"
             ),
             inline=False,
