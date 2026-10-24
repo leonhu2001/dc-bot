@@ -13,7 +13,10 @@ from services.ticket_identity import build_ticket_channel_name
 
 
 CUSTOM_ORDER_QUICK_CHANNEL_ID = 1563459313635168256
-CUSTOM_ORDER_PANEL_MARKER = "custom-order-quick-entry:v1"
+CUSTOM_ORDER_PANEL_MARKER = "custom-order-quick-entry:v2"
+CUSTOM_ORDER_CATEGORY = "custom"
+CUSTOM_ORDER_GROUP = "自訂"
+CUSTOM_ORDER_RULE_KEY = "custom_custom_order"
 _CUSTOM_ORDER_LEVELS = frozenset(
     {
         "金級魔丸",
@@ -52,14 +55,15 @@ def build_custom_order_entry_embed() -> discord.Embed:
         title="✨ VIP 自訂單｜快速下單",
         description=(
             "此專屬頻道可直接提出自訂單需求。\n\n"
-            "填寫你想玩的遊戲、玩法／規則與目標後，系統會建立私人客服中心。\n"
-            "客服確認內容與價格後，才會正式成立訂單；送出需求本身不會扣款或派單。"
+            "先選擇 **1～4 位陪玩**，再填寫遊戲、玩法／規則與目標。\n"
+            "建立私人票口後會直接開啟 **自助下單** 面板；客服確認內容與價格後再正式送單。\n"
+            "送出需求本身不會扣款或派單。"
         ),
         color=discord.Color.purple(),
     )
     embed.add_field(
         name="建議先準備",
-        value="遊戲／服務內容、玩法或機制、方案／目標，以及其他特殊需求。",
+        value="陪玩人數、遊戲／服務內容、玩法或機制、方案／目標，以及其他特殊需求。",
         inline=False,
     )
     embed.set_footer(text=CUSTOM_ORDER_PANEL_MARKER)
@@ -78,12 +82,7 @@ def _existing_request_channel(
 
 
 def _order_control_view(client: discord.Client) -> discord.ui.View | None:
-    """Clone the already-registered canonical order control view.
-
-    Core persistent views are registered before READY. Reusing its concrete
-    view type keeps custom-order tickets on the same customer-service controls
-    as normal order tickets without importing bot.py or duplicating callbacks.
-    """
+    """Clone the already-registered canonical order control view."""
     for view in getattr(client, "persistent_views", ()):
         custom_ids = {
             str(getattr(child, "custom_id", "") or "")
@@ -116,21 +115,159 @@ def _message_has_order_controls(message: discord.Message) -> bool:
     }.issubset(custom_ids)
 
 
-def _custom_order_customer_id_from_topic(topic: str | None) -> int | None:
+def _message_has_self_service_panel(message: discord.Message) -> bool:
+    return any(
+        str(getattr(embed, "title", "") or "").startswith("自助下單")
+        for embed in getattr(message, "embeds", ())
+    )
+
+
+def _topic_int(topic: str | None, marker: str) -> int | None:
     text = str(topic or "")
-    marker = "custom_order_customer_id="
-    if marker not in text:
+    token = f"{marker}="
+    if token not in text:
         return None
-    raw = text.split(marker, 1)[1].split(";", 1)[0].strip()
+    raw = text.split(token, 1)[1].split(";", 1)[0].strip()
     try:
         return int(raw)
     except (TypeError, ValueError):
         return None
 
 
+def _custom_order_customer_id_from_topic(topic: str | None) -> int | None:
+    return _topic_int(topic, "custom_order_customer_id")
+
+
+def _custom_order_companion_count_from_topic(topic: str | None) -> int | None:
+    value = _topic_int(topic, "custom_order_companion_count")
+    if value is None:
+        return None
+    return max(1, min(4, int(value)))
+
+
+def _custom_order_detail(companion_count: int) -> dict:
+    from services.orders import get_order_item_details_for_group
+
+    count = max(1, min(4, int(companion_count or 1)))
+    for detail in get_order_item_details_for_group(
+        CUSTOM_ORDER_CATEGORY,
+        CUSTOM_ORDER_GROUP,
+    ):
+        try:
+            detail_count = int(detail.get("player_count") or 0)
+        except (TypeError, ValueError):
+            detail_count = 0
+        if (
+            str(detail.get("rule_key") or "") == CUSTOM_ORDER_RULE_KEY
+            and detail_count == count
+        ):
+            return dict(detail)
+    raise RuntimeError(f"找不到自訂單 {count} 人規格。")
+
+
+def _seed_custom_order_self_service(
+    channel_id: int,
+    *,
+    customer_id: int,
+    companion_count: int,
+    game_or_service: str = "",
+    gameplay_rules: str = "",
+    goal_plan: str = "",
+    extra_request: str = "",
+) -> dict:
+    from core.database import remember_order_data
+    from services import self_service_ui_runtime as ui
+    from services.self_service_selection_state import (
+        apply_self_service_category_selection,
+        apply_self_service_detail_selection,
+        apply_self_service_item_group_selection,
+    )
+
+    count = max(1, min(4, int(companion_count or 1)))
+    data = ui.SELF_SERVICE_ORDER_SELECTIONS.setdefault(int(channel_id), {})
+
+    if str(data.get("order_rule_key") or "") != CUSTOM_ORDER_RULE_KEY:
+        apply_self_service_category_selection(data, CUSTOM_ORDER_CATEGORY)
+        apply_self_service_item_group_selection(data, CUSTOM_ORDER_GROUP)
+        apply_self_service_detail_selection(data, _custom_order_detail(count))
+    elif not data.get("player_count"):
+        apply_self_service_detail_selection(data, _custom_order_detail(count))
+
+    data["customer_id"] = int(customer_id)
+    data["custom_order_request"] = True
+    data["custom_order_companion_count"] = int(data.get("player_count") or count)
+
+    if game_or_service:
+        data["custom_order_game_or_service"] = str(game_or_service).strip()
+    if gameplay_rules:
+        data["custom_order_gameplay_rules"] = str(gameplay_rules).strip()
+    if goal_plan:
+        data["custom_order_goal_plan"] = str(goal_plan).strip()
+    if extra_request:
+        data["custom_order_extra_request"] = str(extra_request).strip()
+
+    remember_order_data(int(channel_id), data)
+    return data
+
+
+def _build_custom_order_self_service_embed(
+    customer_id: int,
+    data: dict,
+    guild: discord.Guild | None,
+) -> discord.Embed:
+    from services import self_service_ui_runtime as ui
+
+    embed = ui.build_self_service_panel_embed(int(customer_id), data, guild)
+    embed.title = "自助下單｜自訂單"
+    embed.description = (
+        f"下單用戶：<@{int(customer_id)}>\n\n"
+        "陪玩人數可在 **1～4 位**之間調整；時數／數量也可在此修改。\n"
+        "自訂單由客服使用「客服填價格」完成報價，確認後再送出等待接單。\n"
+        "上方需求單保留遊戲、玩法與目標，這張面板負責正式訂單規格。"
+    )
+    return embed
+
+
+async def _send_custom_order_self_service_panel(
+    channel: discord.TextChannel,
+    *,
+    customer_id: int,
+    companion_count: int,
+    game_or_service: str = "",
+    gameplay_rules: str = "",
+    goal_plan: str = "",
+    extra_request: str = "",
+) -> discord.Message:
+    from services import self_service_ui_runtime as ui
+
+    data = _seed_custom_order_self_service(
+        channel.id,
+        customer_id=int(customer_id),
+        companion_count=int(companion_count),
+        game_or_service=game_or_service,
+        gameplay_rules=gameplay_rules,
+        goal_plan=goal_plan,
+        extra_request=extra_request,
+    )
+    return await channel.send(
+        embed=_build_custom_order_self_service_embed(customer_id, data, channel.guild),
+        view=ui.SelfServiceOrderView(
+            customer_id=int(customer_id),
+            channel_id=channel.id,
+            selected_category=CUSTOM_ORDER_CATEGORY,
+        ),
+        allowed_mentions=discord.AllowedMentions(
+            users=True,
+            roles=False,
+            everyone=False,
+        ),
+    )
+
+
 async def _create_custom_order_request_ticket(
     interaction: discord.Interaction,
     *,
+    companion_count: int,
     game_or_service: str,
     gameplay_rules: str,
     goal_plan: str,
@@ -142,8 +279,7 @@ async def _create_custom_order_request_ticket(
         await interaction.edit_original_response(content="這個功能只能在伺服器內使用。")
         return None
 
-    # Discord channel visibility is the access gate for this entry point.
-    # Keep the current member level only as useful context for customer service.
+    count = max(1, min(4, int(companion_count or 1)))
     level_name = custom_order_level_name(member.id)
 
     existing = _existing_request_channel(guild, member.id)
@@ -195,6 +331,7 @@ async def _create_custom_order_request_ticket(
             topic=(
                 f"order_customer_id={member.id};"
                 f"custom_order_customer_id={member.id};"
+                f"custom_order_companion_count={count};"
                 f"custom_order_request=1;"
                 f"source_channel_id={CUSTOM_ORDER_QUICK_CHANNEL_ID}"
             ),
@@ -209,6 +346,7 @@ async def _create_custom_order_request_ticket(
             ),
             color=discord.Color.purple(),
         )
+        embed.add_field(name="陪玩人數", value=f"{count} 位", inline=True)
         embed.add_field(name="遊戲／服務內容", value=game_or_service[:1024], inline=False)
         embed.add_field(name="玩法／規則／機制", value=gameplay_rules[:1024], inline=False)
         embed.add_field(name="方案／目標", value=goal_plan[:1024], inline=False)
@@ -230,7 +368,17 @@ async def _create_custom_order_request_ticket(
                 everyone=False,
             ),
         )
-    except (discord.Forbidden, discord.HTTPException) as exc:
+
+        await _send_custom_order_self_service_panel(
+            ticket,
+            customer_id=member.id,
+            companion_count=count,
+            game_or_service=game_or_service,
+            gameplay_rules=gameplay_rules,
+            goal_plan=goal_plan,
+            extra_request=extra_request,
+        )
+    except (discord.Forbidden, discord.HTTPException, RuntimeError) as exc:
         if ticket is not None:
             try:
                 await ticket.delete(reason="自訂單需求建立失敗，自動清理")
@@ -242,14 +390,18 @@ async def _create_custom_order_request_ticket(
         return None
 
     await interaction.edit_original_response(
-        content=f"自訂單需求已送出：{ticket.mention}\n請到私人客服中心等待客服確認內容與價格。"
+        content=f"自訂單需求已送出：{ticket.mention}\n請到私人客服中心確認自助下單規格並等待客服報價。"
     )
     return ticket
 
 
 class CustomOrderRequestModal(discord.ui.Modal):
-    def __init__(self) -> None:
-        super().__init__(title="VIP 自訂單需求", timeout=300)
+    def __init__(self, *, companion_count: int) -> None:
+        self.companion_count = max(1, min(4, int(companion_count or 1)))
+        super().__init__(
+            title=f"VIP 自訂單需求｜{self.companion_count} 位陪玩",
+            timeout=300,
+        )
         self.game_or_service = discord.ui.TextInput(
             label="遊戲／服務內容",
             placeholder="例如：三角洲端遊／其他遊戲／特殊服務",
@@ -283,11 +435,55 @@ class CustomOrderRequestModal(discord.ui.Modal):
         await interaction.response.defer(ephemeral=True)
         await _create_custom_order_request_ticket(
             interaction,
+            companion_count=self.companion_count,
             game_or_service=str(self.game_or_service.value).strip(),
             gameplay_rules=str(self.gameplay_rules.value).strip(),
             goal_plan=str(self.goal_plan.value).strip(),
             extra_request=str(self.extra_request.value or "").strip(),
         )
+
+
+class CustomOrderCompanionCountSelect(discord.ui.Select):
+    def __init__(self, customer_id: int) -> None:
+        self.customer_id = int(customer_id)
+        super().__init__(
+            placeholder="先選擇陪玩人數（1～4 位）",
+            min_values=1,
+            max_values=1,
+            options=[
+                discord.SelectOption(
+                    label=f"{count} 位陪玩",
+                    value=str(count),
+                    description=f"這張自訂單需要 {count} 位接單人員",
+                )
+                for count in range(1, 5)
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if interaction.user.id != self.customer_id:
+            await interaction.response.send_message(
+                "這不是你的自訂單設定畫面。",
+                ephemeral=True,
+            )
+            return
+        try:
+            count = int(self.values[0])
+        except (TypeError, ValueError, IndexError):
+            await interaction.response.send_message(
+                "陪玩人數選擇異常，請重新操作。",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_modal(
+            CustomOrderRequestModal(companion_count=count)
+        )
+
+
+class CustomOrderCompanionCountView(discord.ui.View):
+    def __init__(self, customer_id: int) -> None:
+        super().__init__(timeout=180)
+        self.add_item(CustomOrderCompanionCountSelect(customer_id))
 
 
 class CustomOrderQuickEntryView(discord.ui.View):
@@ -311,8 +507,11 @@ class CustomOrderQuickEntryView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        # Access is already restricted by this Discord channel's role overwrites.
-        await interaction.response.send_modal(CustomOrderRequestModal())
+        await interaction.response.send_message(
+            "先選擇這張自訂單需要幾位陪玩，再填寫需求。",
+            view=CustomOrderCompanionCountView(interaction.user.id),
+            ephemeral=True,
+        )
 
 
 async def ensure_custom_order_quick_panel(bot: commands.Bot) -> None:
@@ -340,7 +539,7 @@ async def ensure_custom_order_quick_panel(bot: commands.Bot) -> None:
             for embed in message.embeds:
                 footer = str(getattr(getattr(embed, "footer", None), "text", "") or "")
                 title = str(getattr(embed, "title", "") or "")
-                if footer == CUSTOM_ORDER_PANEL_MARKER or title in {
+                if footer in {CUSTOM_ORDER_PANEL_MARKER, "custom-order-quick-entry:v1"} or title in {
                     "✨ VIP 自訂單｜快速下單",
                     "✨ VIP 自訂單｜下單",
                 }:
@@ -370,7 +569,7 @@ async def ensure_custom_order_quick_panel(bot: commands.Bot) -> None:
 
 
 async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> None:
-    """Backfill normal staff controls onto existing custom-order request tickets."""
+    """Backfill canonical controls and the self-service panel onto existing custom tickets."""
     await bot.wait_until_ready()
     category = bot.get_channel(CUSTOMER_CATEGORY_ID)
     if not isinstance(category, discord.CategoryChannel):
@@ -382,56 +581,83 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
     if not isinstance(category, discord.CategoryChannel):
         return
 
-    repaired = 0
+    repaired_controls = 0
+    repaired_panels = 0
+
     for channel in list(category.text_channels):
         topic = str(channel.topic or "")
         if "custom_order_request=1" not in topic:
             continue
 
         customer_id = _custom_order_customer_id_from_topic(topic)
-        if customer_id is not None and "order_customer_id=" not in topic:
+        if customer_id is None:
+            continue
+        companion_count = _custom_order_companion_count_from_topic(topic) or 1
+
+        topic_updates: list[str] = []
+        if "order_customer_id=" not in topic:
+            topic_updates.append(f"order_customer_id={customer_id}")
+        if "custom_order_companion_count=" not in topic:
+            topic_updates.append(f"custom_order_companion_count={companion_count}")
+        if topic_updates:
             try:
-                topic = f"order_customer_id={customer_id};{topic}"
+                topic = ";".join(topic_updates) + ";" + topic
                 await channel.edit(
                     topic=topic,
-                    reason="Restore canonical order identity for custom-order request",
+                    reason="Restore canonical custom-order ticket identity",
                 )
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
         has_controls = False
+        has_self_service = False
         try:
             async for message in channel.history(limit=50):
                 if bot.user is not None and message.author.id != bot.user.id:
                     continue
-                if _message_has_order_controls(message):
-                    has_controls = True
+                has_controls = has_controls or _message_has_order_controls(message)
+                has_self_service = has_self_service or _message_has_self_service_panel(message)
+                if has_controls and has_self_service:
                     break
         except (discord.Forbidden, discord.HTTPException):
             continue
 
-        if has_controls:
-            continue
+        if not has_self_service:
+            try:
+                await _send_custom_order_self_service_panel(
+                    channel,
+                    customer_id=customer_id,
+                    companion_count=companion_count,
+                )
+                repaired_panels += 1
+            except (discord.Forbidden, discord.HTTPException, RuntimeError) as exc:
+                print(
+                    f"[custom-order-quick] self-service panel repair failed "
+                    f"channel={channel.id}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
 
-        view = _order_control_view(bot)
-        if view is None:
-            print(
-                f"[custom-order-quick] canonical staff controls unavailable: {channel.id}",
-                flush=True,
-            )
-            continue
-        try:
-            await channel.send(
-                "客服操作｜請從下方清單選擇操作後按確認。",
-                view=view,
-            )
-            repaired += 1
-        except (discord.Forbidden, discord.HTTPException):
-            continue
+        if not has_controls:
+            view = _order_control_view(bot)
+            if view is None:
+                print(
+                    f"[custom-order-quick] canonical staff controls unavailable: {channel.id}",
+                    flush=True,
+                )
+                continue
+            try:
+                await channel.send(
+                    "客服操作｜請從下方清單選擇操作後按確認。",
+                    view=view,
+                )
+                repaired_controls += 1
+            except (discord.Forbidden, discord.HTTPException):
+                continue
 
-    if repaired:
+    if repaired_panels or repaired_controls:
         print(
-            f"[custom-order-quick] repaired staff controls: {repaired}",
+            "[custom-order-quick] repaired "
+            f"self_service_panels={repaired_panels} staff_controls={repaired_controls}",
             flush=True,
         )
 
@@ -452,6 +678,9 @@ def install_custom_order_quick_entry(bot: commands.Bot) -> None:
 
 __all__ = [
     "CUSTOM_ORDER_QUICK_CHANNEL_ID",
+    "CUSTOM_ORDER_RULE_KEY",
+    "CustomOrderCompanionCountSelect",
+    "CustomOrderCompanionCountView",
     "CustomOrderQuickEntryView",
     "assert_custom_order_eligible",
     "build_custom_order_entry_embed",
