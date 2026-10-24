@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -11,6 +13,10 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("DC_BOT_ROOT", str(DEFAULT_ROOT))).resolve()
 TEMPLATES = ROOT / "web" / "app" / "templates"
 STATIC = ROOT / "web" / "app" / "static"
+STATIC_PAGE_DIRS = (
+    STATIC / "js" / "pages",
+    STATIC / "css" / "pages",
+)
 
 # CSP debt is shrink-only. Style blocks and style attributes are fully retired;
 # the remaining inline scripts must carry a per-request nonce.
@@ -21,6 +27,12 @@ MAX_INLINE_SCRIPT_BLOCKS = 7
 # *_fix.js / *_fix.css fails the static audit instead of becoming permanent debt.
 ALLOWED_LEGACY_PATCH_ASSETS: set[str] = set()
 
+# Legacy extracted-asset names are still present, so keep their current counts as
+# shrink-only ceilings. Lower these values whenever files are renamed; never raise
+# them to make CI green. Exact duplicate page assets have no legacy allowance.
+MAX_INLINE_NAMED_PAGE_ASSETS = 36
+MAX_DATED_PAGE_ASSETS = 3
+
 STATIC_REF_RE = re.compile(
     r'''(?:src|href)\s*=\s*["'](/static/[^"'?#]+)(?:[?#][^"']*)?["']''',
     re.IGNORECASE,
@@ -29,6 +41,14 @@ INLINE_STYLE_RE = re.compile(r"<style(?:\s|>)", re.IGNORECASE)
 STYLE_ATTR_RE = re.compile(r"\bstyle\s*=", re.IGNORECASE)
 INLINE_SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>", re.IGNORECASE)
 PATCH_ASSET_RE = re.compile(r"(?:^|/)[^/]*_fix\.(?:js|css)$", re.IGNORECASE)
+INLINE_NAMED_ASSET_RE = re.compile(
+    r"(?:^|/)[^/]*_inline_\d+\.(?:js|css)$",
+    re.IGNORECASE,
+)
+DATED_ASSET_RE = re.compile(
+    r"(?:^|/)[^/]*_20\d{6}\.(?:js|css)$",
+    re.IGNORECASE,
+)
 
 
 def title(text: str) -> None:
@@ -49,6 +69,35 @@ def _print_debt_files(label: str, counts: dict[str, int]) -> None:
         return
     for rel, count in sorted(counts.items()):
         print(f"  {rel}: {count}")
+
+
+def _page_assets() -> list[Path]:
+    assets: list[Path] = []
+    for directory in STATIC_PAGE_DIRS:
+        if not directory.exists():
+            continue
+        assets.extend(
+            path
+            for path in directory.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".js", ".css"}
+        )
+    return sorted(assets)
+
+
+def _duplicate_page_asset_groups(
+    paths: list[Path],
+    *,
+    static_root: Path = STATIC,
+) -> list[list[str]]:
+    by_digest: dict[str, list[str]] = defaultdict(list)
+    for path in paths:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        by_digest[digest].append(path.relative_to(static_root).as_posix())
+    return sorted(
+        sorted(group)
+        for group in by_digest.values()
+        if len(group) > 1
+    )
 
 
 def main() -> None:
@@ -137,6 +186,50 @@ def main() -> None:
         errors.append(
             "patch-style frontend assets are forbidden: "
             + ", ".join(unexpected_patch_assets)
+        )
+
+    title("STATIC_PAGE_ASSET_DEBT")
+    page_assets = _page_assets()
+    inline_named_assets = sorted(
+        path.relative_to(STATIC).as_posix()
+        for path in page_assets
+        if INLINE_NAMED_ASSET_RE.search(path.relative_to(STATIC).as_posix())
+    )
+    dated_assets = sorted(
+        path.relative_to(STATIC).as_posix()
+        for path in page_assets
+        if DATED_ASSET_RE.search(path.relative_to(STATIC).as_posix())
+    )
+    duplicate_groups = _duplicate_page_asset_groups(page_assets)
+
+    print("INLINE_NAMED_PAGE_ASSETS:", len(inline_named_assets))
+    print("MAX_INLINE_NAMED_PAGE_ASSETS:", MAX_INLINE_NAMED_PAGE_ASSETS)
+    for asset in inline_named_assets:
+        print("  INLINE_NAMED:", asset)
+
+    print("DATED_PAGE_ASSETS:", len(dated_assets))
+    print("MAX_DATED_PAGE_ASSETS:", MAX_DATED_PAGE_ASSETS)
+    for asset in dated_assets:
+        print("  DATED:", asset)
+
+    print("DUPLICATE_PAGE_ASSET_GROUPS:", len(duplicate_groups))
+    for group in duplicate_groups:
+        print("  DUPLICATE:", " == ".join(group))
+
+    if len(inline_named_assets) > MAX_INLINE_NAMED_PAGE_ASSETS:
+        errors.append(
+            "inline_N page asset debt increased: "
+            f"{len(inline_named_assets)} > {MAX_INLINE_NAMED_PAGE_ASSETS}"
+        )
+    if len(dated_assets) > MAX_DATED_PAGE_ASSETS:
+        errors.append(
+            "dated page asset debt increased: "
+            f"{len(dated_assets)} > {MAX_DATED_PAGE_ASSETS}"
+        )
+    if duplicate_groups:
+        errors.append(
+            "duplicate page assets are forbidden: "
+            + "; ".join(" == ".join(group) for group in duplicate_groups)
         )
 
     title("CSP_DEBT")
