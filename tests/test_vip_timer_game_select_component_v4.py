@@ -19,4 +19,4 @@ def test_game_select_options_are_games_not_gameplay_groups():
 
     assert {"三角洲端遊", "三角洲手遊", "特戰英豪", "英雄聯盟", "APEX", "STEAM"}.issubset(labels)
     assert labels.isdisjoint({"娛樂陪", "技術陪", "黑潮爆破", "一陪一護", "絕巴技術陪"})
-    assert select.row == 1
+    assert select.row == 0
