@@ -9,7 +9,6 @@ from services import quick_order_v2 as quick
 
 
 _INSTALLED = False
-_ORIGINAL_CREATE_TICKET = None
 _ORIGINAL_PANEL_BUILDER = None
 _ORIGINAL_VIEW_INIT = None
 
@@ -189,6 +188,7 @@ async def _clean_confirmation(
 
 
 async def _clean_ticket_messages(ticket: discord.TextChannel) -> None:
+    """One-time compatibility cleanup for already-open legacy quick-order tickets."""
     try:
         async for message in ticket.history(limit=20, oldest_first=True):
             content = str(message.content or "")
@@ -235,34 +235,6 @@ async def _clean_ticket_messages(ticket: discord.TextChannel) -> None:
             await message.edit(embed=clean_embed)
     except (discord.Forbidden, discord.HTTPException):
         return
-
-
-def _install_create_ticket_cleanup() -> None:
-    global _ORIGINAL_CREATE_TICKET
-    if _ORIGINAL_CREATE_TICKET is not None:
-        return
-
-    _ORIGINAL_CREATE_TICKET = quick._create_ticket
-    original = _ORIGINAL_CREATE_TICKET
-
-    async def create_ticket_cleaned(
-        interaction: discord.Interaction,
-        *,
-        category: str,
-        item_group: str,
-        source_channel_id: int,
-    ) -> discord.TextChannel | None:
-        ticket = await original(
-            interaction,
-            category=category,
-            item_group=item_group,
-            source_channel_id=source_channel_id,
-        )
-        if isinstance(ticket, discord.TextChannel):
-            await _clean_ticket_messages(ticket)
-        return ticket
-
-    quick._create_ticket = create_ticket_cleaned
 
 
 def _install_panel_builder_cleanup() -> None:
@@ -413,7 +385,9 @@ def install_quick_order_v2_production(bot: commands.Bot) -> None:
     quick._send_confirmation = _clean_confirmation
     quick.QuickDeltaCategoryButton.callback = _clean_delta_callback
 
-    _install_create_ticket_cleanup()
+    # New quick-order tickets are already emitted with canonical copy by the core
+    # creator. Keep legacy cleanup as a startup repair only; do not wrap every new
+    # ticket creation just to scan and rewrite messages that are already correct.
     _install_panel_builder_cleanup()
     _install_farm_ticket_ui()
 
