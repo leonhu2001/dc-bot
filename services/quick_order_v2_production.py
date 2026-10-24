@@ -23,13 +23,30 @@ _FARM_3X3_DETAIL_ORDER = {
 }
 
 
-def _clean_entry_embed(channel_id: int) -> discord.Embed:
-    """Use the core entry copy as the single source of truth.
+def _live_vip_timer_eligibility(
+    customer_id: int | str,
+    *,
+    check_open_order: bool = True,
+) -> None:
+    """Resolve the shared VIP gate at interaction time instead of a stale import."""
+    from services import vip_timer_self_service as self_service
 
-    Production only removes the internal marker footer. This prevents restart-time
-    panel repair from re-introducing stale VIP/Delta copy after core changes.
-    """
-    embed = _CORE_ENTRY_EMBED(int(channel_id))
+    return self_service.assert_vip_timer_self_service_eligible(
+        customer_id,
+        check_open_order=check_open_order,
+    )
+
+
+def _clean_entry_embed(channel_id: int) -> discord.Embed:
+    """Derive public entry copy from core and apply only production presentation."""
+    channel_id = int(channel_id)
+    embed = _CORE_ENTRY_EMBED(channel_id)
+
+    # The public Delta panel intentionally stays compact because the four buttons
+    # directly below it already explain the available branches.
+    if channel_id == int(quick.QUICK_ORDER_V2_CHANNELS["delta"]):
+        embed.description = "請選擇你要的服務。"
+
     embed.remove_footer()
     return embed
 
@@ -151,7 +168,7 @@ async def _clean_ticket_messages(ticket: discord.TextChannel) -> None:
 
 
 def _install_ticket_ui_policy() -> None:
-    """Install one final Quick Order ticket UI policy instead of nested wrappers."""
+    """Install the single active Quick Order ticket UI policy."""
     global _BASE_PANEL_BUILDER, _BASE_VIEW_INIT
     if _BASE_PANEL_BUILDER is not None or _BASE_VIEW_INIT is not None:
         return
@@ -163,11 +180,11 @@ def _install_ticket_ui_policy() -> None:
     from services.order_rules import ORDER_RULES
     from services.orders import get_self_service_quantity_meta
 
-    # quick_order_v2 core records the pre-Quick canonical callables before it
-    # installs its compatibility layer. Build directly on those callables so the
-    # active runtime has one Quick Order wrapper, not core -> production -> farm.
-    _BASE_PANEL_BUILDER = quick._ORIGINAL_PANEL_BUILDER or runtime.build_self_service_panel_embed
-    _BASE_VIEW_INIT = quick._ORIGINAL_VIEW_INIT or ui.SelfServiceOrderView.__init__
+    # quick_order_v2_fixes disables the legacy core wrapper before core install,
+    # so these are the canonical bases (including the already-installed VIP timer
+    # behavior), not another Quick Order wrapper.
+    _BASE_PANEL_BUILDER = runtime.build_self_service_panel_embed
+    _BASE_VIEW_INIT = ui.SelfServiceOrderView.__init__
     base_builder = _BASE_PANEL_BUILDER
     base_view_init = _BASE_VIEW_INIT
 
@@ -261,6 +278,12 @@ def _install_ticket_ui_policy() -> None:
             elif is_farm and custom_id == "self_service_order_go_payment_button" and not item:
                 child.disabled = True
 
+        # Keep interaction-aware default/placeholder behavior in this same wrapper
+        # instead of stacking quick_order_v2_select_display on top of us.
+        from services.quick_order_v2_select_display import apply_quick_order_select_display
+
+        apply_quick_order_select_display(self, data)
+
     def ticket_panel_builder(
         customer_id: int,
         data: dict,
@@ -319,6 +342,10 @@ def install_quick_order_v2_production(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
+    # Quick Order imported this function early. Route eligibility through the live
+    # self-service module here so Platinum policy is correct even if price-list UI
+    # is disabled or changed later.
+    quick.assert_vip_timer_self_service_eligible = _live_vip_timer_eligibility
     quick.build_entry_embed = _clean_entry_embed
     quick._ensure_panel = _clean_ensure_panel
 
