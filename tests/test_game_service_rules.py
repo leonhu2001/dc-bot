@@ -617,18 +617,18 @@ def test_delta_desktop_and_mobile_pricing_are_separate():
 
 def test_delta_platform_labels_are_direct_catalog_rules():
     expected = {
-        "basic_tech_secret_single": "技術陪〈端遊〉｜機密單陪",
-        "basic_tech_secret_double": "技術陪〈端遊〉｜機密雙陪",
-        "basic_tech_topsecret_single": "技術陪〈端遊〉｜絕密單陪",
-        "basic_tech_topsecret_double": "技術陪〈端遊〉｜絕密雙陪",
-        "basic_mobile_tech_secret_single": "技術陪〈手遊〉｜機密單陪",
-        "basic_mobile_tech_secret_double": "技術陪〈手遊〉｜機密雙陪",
-        "basic_mobile_tech_topsecret_single": "技術陪〈手遊〉｜絕密單陪",
-        "basic_mobile_tech_topsecret_double": "技術陪〈手遊〉｜絕密雙陪",
-        "basic_entertain_single": "娛樂陪〈端遊〉｜單陪",
-        "basic_entertain_double": "娛樂陪〈端遊〉｜雙陪",
-        "basic_mobile_entertain_single": "娛樂陪〈手遊〉｜單陪",
-        "basic_mobile_entertain_double": "娛樂陪〈手遊〉｜雙陪",
+        "basic_tech_secret_single": "機密｜單陪",
+        "basic_tech_secret_double": "機密｜雙陪",
+        "basic_tech_topsecret_single": "絕密｜單陪",
+        "basic_tech_topsecret_double": "絕密｜雙陪",
+        "basic_mobile_tech_secret_single": "機密｜單陪",
+        "basic_mobile_tech_secret_double": "機密｜雙陪",
+        "basic_mobile_tech_topsecret_single": "絕密｜單陪",
+        "basic_mobile_tech_topsecret_double": "絕密｜雙陪",
+        "basic_entertain_single": "單陪",
+        "basic_entertain_double": "雙陪",
+        "basic_mobile_entertain_single": "單陪",
+        "basic_mobile_entertain_double": "雙陪",
     }
     for key, label in expected.items():
         rule = ORDER_RULES[key]
@@ -867,4 +867,3 @@ def test_admin_game_identity_groups_are_one_row_per_game():
     assert [option["key"] for option in groups["valorant"]["options"]] == [
         "valorant_game",
     ]
-
