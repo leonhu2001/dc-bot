@@ -1,0 +1,49 @@
+{
+  "id": "/",
+  "name": "魔丸娛樂｜MOWAN Entertainment",
+  "short_name": "魔丸娛樂",
+  "description": "魔丸娛樂網站 App：下單、會員、陪玩陣容、VIP、員工與客服後台。",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "any",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/static/img/employee-app-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/img/employee-app-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "立即下單",
+      "short_name": "下單",
+      "url": "/order"
+    },
+    {
+      "name": "我的專區",
+      "short_name": "我的專區",
+      "url": "/me"
+    },
+    {
+      "name": "員工中心",
+      "short_name": "員工",
+      "url": "/employee"
+    },
+    {
+      "name": "接單大廳",
+      "short_name": "接單",
+      "url": "/dispatch"
+    }
+  ]
+}
