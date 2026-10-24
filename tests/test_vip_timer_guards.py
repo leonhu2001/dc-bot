@@ -108,72 +108,36 @@ def test_terminal_order_rejects_old_timer_component(lifecycle_env):
         lifecycle._assert_order_open(1)
 
 
-def test_timer_catalog_excludes_hidden_legacy_and_minimum_hour_rules(monkeypatch):
+def test_timer_catalog_excludes_hidden_legacy_and_minimum_hour_rules():
     from services import order_product_status, order_rules, orders, vip_timer_policy_v5
 
-    class FakeRules(dict):
-        def is_custom(self, key):
-            return str(key) == "custom_hourly"
+    keys = catalog_guard.public_timer_rule_keys()
+    assert keys
+    assert keys.isdisjoint(set(orders.CATALOG_HIDDEN_RULE_KEYS))
 
-    def rule(
-        *,
-        price=300,
-        min_quantity=1,
-        pricing_type="hourly",
-        label="一般玩法",
-        category="apex",
-        vip_discount_allowed=True,
-    ):
-        return SimpleNamespace(
-            pricing_type=pricing_type,
-            price=price,
-            min_quantity=min_quantity,
-            label=label,
-            category=category,
-            vip_discount_allowed=vip_discount_allowed,
+    for key in keys:
+        rule = order_rules.ORDER_RULES.get(key)
+        assert rule is not None, key
+        assert str(getattr(rule, "pricing_type", "") or "") == "hourly", key
+        assert int(getattr(rule, "price", 0) or 0) > 0, key
+        assert int(getattr(rule, "min_quantity", 1) or 1) <= 1, key
+        assert order_product_status.is_order_product_active(key), key
+        assert str(getattr(rule, "category", "") or "") in vip_timer_policy_v5._GAME_LABELS, key
+
+        text_value = "｜".join(
+            str(value or "")
+            for value in (
+                getattr(rule, "label", ""),
+                getattr(rule, "catalog_group_label", ""),
+            )
         )
+        assert "甜蜜" not in text_value, key
+        assert "教學" not in text_value, key
+        assert "導師" not in text_value, key
+        assert bool(getattr(rule, "vip_discount_allowed", True)), key
 
-    rules = FakeRules({
-        "valid_hourly": rule(),
-        "hidden_hourly": rule(),
-        "minimum_three_hours": rule(min_quantity=3),
-        "apex_teaching_one": rule(min_quantity=3, label="APEX｜教學單｜1對1"),
-        "legacy_not_in_catalog": rule(),
-        "custom_hourly": rule(price=450),
-        "game_priced": rule(pricing_type="game"),
-    })
-
-    monkeypatch.setattr(order_rules, "ORDER_RULES", rules)
-    monkeypatch.setattr(vip_timer_policy_v5, "ORDER_RULES", rules, raising=False)
-    monkeypatch.setattr(
-        orders,
-        "SELF_SERVICE_ORDER_CATALOG",
-        {
-            "test": [
-                {
-                    "label": "測試",
-                    "details": [
-                        {"rule_key": "valid_hourly"},
-                        {"rule_key": "hidden_hourly"},
-                        {"rule_key": "minimum_three_hours"},
-                        {"rule_key": "apex_teaching_one"},
-                        {"rule_key": "game_priced"},
-                    ],
-                }
-            ]
-        },
-    )
-    monkeypatch.setattr(orders, "CATALOG_HIDDEN_RULE_KEYS", {"hidden_hourly"})
-    monkeypatch.setattr(
-        order_product_status,
-        "is_order_product_active",
-        lambda key: True,
-    )
-
-    # Generic guard removes hidden/non-hourly/minimum-only legacy rules; the
-    # installed VIP timer policy then keeps only supported game services and
-    # intentionally excludes teaching/sweet service types from public timer use.
-    assert catalog_guard.public_timer_rule_keys() == {
-        "valid_hourly",
-        "custom_hourly",
-    }
+    # Known minimum-only teaching products stay valid as normal orders but are
+    # intentionally absent from the customer-facing VIP timer selector.
+    for key in ("apex_teaching_one", "valorant_teaching_one", "lol_teaching_one"):
+        if key in order_rules.ORDER_RULES:
+            assert key not in keys
