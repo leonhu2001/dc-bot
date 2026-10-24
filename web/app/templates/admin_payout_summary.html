@@ -4,32 +4,7 @@
 {% block page_title %}人員總表{% endblock %}
 
 {% block content %}
-<style nonce="{{ request.state.csp_nonce }}">
-.payout-summary-v2{display:grid;gap:14px}
-.payout-summary-v2 .staff-summary-filter,.payout-summary-v2 .staff-summary-ledger-panel{min-width:0}
-.payout-ledger-scroll{width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-gutter:stable}
-.payout-ledger-grid{min-width:1440px}
-.payout-ledger-head,.payout-ledger-row{display:grid;grid-template-columns:minmax(270px,1.7fr) 105px 135px 110px 110px 110px 135px 165px 305px;align-items:center}
-.payout-ledger-head{min-height:42px;border-bottom:1px solid rgba(223,183,92,.18);background:rgba(223,183,92,.035);color:rgba(235,232,222,.62);font-size:11px;font-weight:800}
-.payout-ledger-row{min-height:62px;border-bottom:1px solid rgba(255,255,255,.065)}
-.payout-ledger-head>div,.payout-ledger-row>.payout-cell{min-width:0;padding:10px 12px;text-align:center}
-.payout-ledger-head>div:first-child,.payout-ledger-row>.payout-cell:first-child{text-align:left;padding-left:16px}
-.payout-ledger-row:hover{background:rgba(255,255,255,.018)}
-.payout-ledger-row .staff-person{min-width:0;display:flex;align-items:center;gap:10px}
-.payout-ledger-row .staff-person>div:last-child{min-width:0}
-.payout-ledger-row .staff-person-name{display:block;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
-.payout-ledger-row .staff-person-id{display:block;margin-top:3px;white-space:nowrap;font-size:10px;color:rgba(235,232,222,.45)}
-.payout-ledger-row .staff-money,.payout-ledger-row .staff-count-main,.payout-ledger-row .staff-count-sub{display:block}
-.payout-ledger-row .staff-count-sub{margin-top:4px;white-space:normal;line-height:1.25}
-.payout-ledger-row .staff-status-badge{display:inline-flex;align-items:center;justify-content:center;max-width:145px;min-height:32px;padding:5px 10px;text-align:center;white-space:normal;line-height:1.2}
-.payout-ledger-actions{display:grid;grid-template-columns:70px minmax(110px,1fr) 78px;gap:7px;align-items:center;width:100%}
-.payout-ledger-actions form{display:flex;min-width:0;margin:0}
-.payout-ledger-actions .staff-summary-button{width:100%;min-width:0;min-height:36px;padding:7px 8px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
-.payout-ledger-detail{padding:0 14px 14px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.012)}
-.payout-ledger-detail[hidden]{display:none!important}
-.payout-ledger-detail .staff-summary-detail{margin-top:0;padding-top:14px}
-@media(max-width:1500px){.payout-ledger-grid{min-width:1400px}.payout-ledger-head,.payout-ledger-row{grid-template-columns:minmax(250px,1.5fr) 95px 125px 100px 100px 100px 125px 155px 300px}}
-</style>
+<link rel="stylesheet" href="/static/css/pages/admin_payout_summary_layout.css?v=20261024-1">
 
 <div class="staff-summary-page payout-summary-v2">
     <section class="staff-summary-filter">
