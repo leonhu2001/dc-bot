@@ -43,3 +43,13 @@ def test_setup_installs_custom_order_quick_entry():
     ).read_text(encoding="utf-8")
     assert "from services.custom_order_quick_entry import install_custom_order_quick_entry" in source
     assert "install_custom_order_quick_entry(bot)" in source
+
+
+def test_vip_timer_quick_order_copy_stays_platinum_or_above():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "services"
+        / "quick_order_v2_production.py"
+    ).read_text(encoding="utf-8")
+    assert "白金級會員以上限定。" in source
+    assert "金級會員以上限定。" not in source
