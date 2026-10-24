@@ -212,12 +212,14 @@ async def _web_order_created_ensure_ticket(
                 inline=False,
             )
         embed.set_footer(text=intro_footer)
+        support_role = guild.get_role(CUSTOMER_ROLE_ID)
+        support_mention = support_role.mention if support_role is not None else "客服"
         await ticket_channel.send(
-            content=f"<@{customer_id}> 您的網站訂單已建立。",
+            content=f"{support_mention} <@{customer_id}> 您的網站訂單已建立。",
             embed=embed,
             allowed_mentions=discord.AllowedMentions(
                 users=True,
-                roles=False,
+                roles=True,
                 everyone=False,
             ),
         )
@@ -517,6 +519,9 @@ def _web_order_created_seed_state(
     from shared.order_acceptance import get_acceptance_state
 
     state = get_acceptance_state(int(order_id))
+    if state is None:
+        raise RuntimeError(f"WEB-{order_id} 找不到付款前接單狀態")
+
     claim_data = ORDER_CLAIMS.setdefault(
         dispatch_message.id,
         {"companion": set(), "booster": set(), "locked": False},
