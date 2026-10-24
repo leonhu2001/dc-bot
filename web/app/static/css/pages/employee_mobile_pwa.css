@@ -1,29 +1,5 @@
-/* Employee mobile/PWA shell. Keep authenticated data network-only; this file is presentation only. */
-.employee-pwa-install{
-    position:fixed;
-    right:max(14px,env(safe-area-inset-right));
-    bottom:max(14px,env(safe-area-inset-bottom));
-    z-index:1200;
-    display:none;
-    align-items:center;
-    gap:8px;
-    min-height:44px;
-    padding:10px 14px;
-    border:1px solid rgba(242,214,141,.34);
-    border-radius:999px;
-    background:rgba(17,17,15,.94);
-    color:#f2d68d;
-    box-shadow:0 12px 34px rgba(0,0,0,.35);
-    font:800 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    cursor:pointer;
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px)
-}
-.employee-pwa-install.is-visible{display:inline-flex}
-.employee-pwa-install svg{width:17px;height:17px;flex:0 0 auto}
-
+/* Employee mobile layout refinements used inside the site-wide installed app. */
 @media(max-width:720px){
-    html{scroll-padding-top:74px}
     body.employee-workspace-site,
     .employee-workspace-site body{min-width:0}
     .employee-workspace-site .employee-workspace-page-content,
@@ -92,16 +68,9 @@
 @media(max-width:480px){
     .employee-workspace-site .ec-overview{grid-template-columns:1fr 1fr}
     .employee-workspace-site .employee-workspace-hero{padding-left:14px;padding-right:14px}
-    .employee-pwa-install{
-        left:max(10px,env(safe-area-inset-left));
-        right:max(10px,env(safe-area-inset-right));
-        justify-content:center
-    }
 }
 
 @media(display-mode:standalone){
-    html,body{min-height:100%;min-height:100dvh}
-    body{padding-top:env(safe-area-inset-top)}
     .employee-workspace-site .site-footer{display:none}
     .employee-workspace-site .ec{
         margin-bottom:calc(36px + env(safe-area-inset-bottom))
