@@ -219,7 +219,7 @@ def test_report_review_page_keeps_compact_workspace_contract():
 
 def test_reporting_status_badges_use_static_csp_safe_styles():
     root = Path(__file__).resolve().parents[1]
-    css_source = (root / "web/app/static/css/pages/layout_inline_1.css").read_text(encoding="utf-8")
+    css_source = (root / "web/app/static/css/pages/layout.css").read_text(encoding="utf-8")
     ui_source = (root / "web/app/static/js/ui_tweaks.js").read_text(encoding="utf-8")
 
     assert ".history-report-state-badge" in css_source

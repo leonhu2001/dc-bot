@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LAYOUT = ROOT / "web" / "app" / "templates" / "admin_layout.html"
-SHARED_STYLES = ROOT / "web" / "app" / "static" / "css" / "pages" / "layout_inline_1.css"
+SHARED_STYLES = ROOT / "web" / "app" / "static" / "css" / "pages" / "layout.css"
 REPORT_TEMPLATE = ROOT / "web" / "app" / "templates" / "order_report_detail.html"
 REPORT_ENTRY_STYLES = ROOT / "web" / "app" / "static" / "css" / "order_report_entry.css"
 
@@ -25,4 +25,4 @@ def test_report_entry_page_owns_its_compact_layout() -> None:
 
 def test_reverted_shared_styles_use_fresh_cache_key() -> None:
     layout = LAYOUT.read_text(encoding="utf-8")
-    assert "layout_inline_1.css?v=20261016-backoffice-revert-1" in layout
+    assert "layout.css?v=20261016-backoffice-revert-1" in layout
