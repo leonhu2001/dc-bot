@@ -119,7 +119,7 @@ def test_apex_web_catalog_no_longer_asks_for_customer_rank():
             assert "回饋" not in group["description"]
 
 
-def test_apex_discord_catalog_uses_mode_then_single_or_double():
+def test_apex_discord_catalog_uses_compact_mode_labels_with_player_count_metadata():
     for group_label, rule_prefix in (
         ("娛樂陪", "apex_entertain"),
         ("鑽石陪", "apex_diamond"),
@@ -128,10 +128,10 @@ def test_apex_discord_catalog_uses_mode_then_single_or_double():
     ):
         details = get_order_item_details_for_group("apex", group_label)
         assert [item["label"] for item in details] == [
-            "NG｜單陪",
-            "NG｜雙陪",
-            "積分｜單陪",
-            "積分｜雙陪",
+            "NG",
+            "NG",
+            "積分",
+            "積分",
         ]
         assert [item["rule_key"] for item in details] == [
             f"{rule_prefix}_ng",
