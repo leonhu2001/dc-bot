@@ -358,13 +358,14 @@ async def _create_custom_order_request_ticket(
             embed.add_field(name="會員資訊", value=notes[:1024], inline=False)
 
         embed.set_footer(text="自訂單需求｜尚未報價、尚未成立正式訂單")
+        support_mention = support_role.mention if support_role is not None else "客服"
         await ticket.send(
-            content=member.mention,
+            content=f"{support_mention} {member.mention}",
             embed=embed,
             view=_order_control_view(interaction.client),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
-                roles=False,
+                roles=True,
                 everyone=False,
             ),
         )
