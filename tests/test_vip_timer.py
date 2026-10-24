@@ -155,7 +155,10 @@ def test_segment_keeps_rate_snapshot_after_catalog_price_changes(timer_env, monk
 
 
 def test_customer_cannot_open_second_timer_order(timer_env):
-    _create_session(timer_env, order_id=4, customer_id="same-customer")
+    # Real customer identifiers are Discord snowflakes; use a numeric string so
+    # VIP snapshot integration is exercised instead of a synthetic invalid ID.
+    customer_id = "1004"
+    _create_session(timer_env, order_id=4, customer_id=customer_id)
 
     db = timer_env.SessionLocal()
     try:
@@ -163,7 +166,7 @@ def test_customer_cannot_open_second_timer_order(timer_env):
             vip_timer.create_vip_timer_session(
                 db,
                 order_id=5,
-                customer_id="same-customer",
+                customer_id=customer_id,
                 initial_rule_key="hour_b",
             )
     finally:
