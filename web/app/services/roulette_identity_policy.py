@@ -10,7 +10,8 @@ from web.app.services import roulette_redraw_service, roulette_service
 
 # This key belongs to the old 2026-10-07 fun order「說都不會話」.  The first
 # roulette implementation accidentally adopted it as the roulette identity.
-# Keep the exclusion explicit so historical rows can never be reclassified.
+# Never identify an order as roulette from this key alone. Historical/test rows
+# with the exact roulette item name remain valid via the explicit item fallback.
 _MISIDENTIFIED_RULE_KEYS = {"admin_delta_desktop_fun_20261007053129_91eb"}
 _ROULETTE_LABEL = "俄羅斯輪盤"
 
@@ -42,14 +43,13 @@ def _live_roulette_rule_keys(
 
 def _is_roulette_order(order: dict[str, Any]) -> bool:
     rule_key = str(order.get("order_rule_key") or "").strip()
-    if rule_key in _MISIDENTIFIED_RULE_KEYS:
-        return False
-    if rule_key and rule_key in _live_roulette_rule_keys():
-        return True
+    if rule_key and rule_key not in _MISIDENTIFIED_RULE_KEYS:
+        if rule_key in _live_roulette_rule_keys():
+            return True
 
-    # Historical rows may not have kept their rule key.  Only an exact item
-    # name is accepted as fallback; substring matching caused unrelated fun
-    # orders to leak into roulette management.
+    # Historical rows may not have kept the current rule key, and the first
+    # implementation also persisted one unrelated legacy key. Only an exact item
+    # name is accepted as fallback so unrelated fun orders never leak in.
     return _clean_label(order.get("item")) == _clean_label(_ROULETTE_LABEL)
 
 
