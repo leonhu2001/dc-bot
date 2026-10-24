@@ -109,7 +109,7 @@ def test_terminal_order_rejects_old_timer_component(lifecycle_env):
 
 
 def test_timer_catalog_excludes_hidden_legacy_and_minimum_hour_rules(monkeypatch):
-    from services import order_product_status, order_rules, orders
+    from services import order_product_status, order_rules, orders, vip_timer_policy_v5
 
     class FakeRules(dict):
         def is_custom(self, key):
@@ -144,6 +144,7 @@ def test_timer_catalog_excludes_hidden_legacy_and_minimum_hour_rules(monkeypatch
     })
 
     monkeypatch.setattr(order_rules, "ORDER_RULES", rules)
+    monkeypatch.setattr(vip_timer_policy_v5, "ORDER_RULES", rules, raising=False)
     monkeypatch.setattr(
         orders,
         "SELF_SERVICE_ORDER_CATALOG",
