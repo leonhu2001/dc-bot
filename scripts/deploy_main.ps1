@@ -82,11 +82,7 @@ $GitHubHeaders = @{
 }
 
 try {
-    $CiResponse = Invoke-RestMethod \
-        -Uri $CiRunsUri \
-        -Headers $GitHubHeaders \
-        -Method Get \
-        -TimeoutSec 15
+    $CiResponse = Invoke-RestMethod -Uri $CiRunsUri -Headers $GitHubHeaders -Method Get -TimeoutSec 15
 } catch {
     throw "Unable to verify GitHub CI for target $Target. Deployment blocked. $($_.Exception.Message)"
 }
@@ -160,7 +156,7 @@ Write-Host "Installing public panel images..." -ForegroundColor DarkGray
 $InstallPanelCommand = "mkdir -p /opt/dc-bot/web/app/static/order_panels /opt/dc-bot/assets/order_panels && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/web/app/static/order_panels/ && install -m 0644 '$RemotePanelStage'/*.png /opt/dc-bot/assets/order_panels/ && rm -rf /opt/dc-bot/web/app/static/order_panels/pricelists /opt/dc-bot/assets/order_panels/pricelists '$RemotePanelStage'"
 & ssh @SshTransportArgs $Vps $InstallPanelCommand
 if ($LASTEXITCODE -ne 0) {
-    throw "Failed to install order panel images on VPS staging."
+    throw "Failed to install order panel images on VPS."
 }
 Write-Host "PASS: order panel images synchronized before service restart" -ForegroundColor Green
 Write-Host ""
