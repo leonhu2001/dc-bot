@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import services  # noqa: F401 - install current runtime VIP policy before assertions
 from core.vip_levels import VIP_LEVEL_BENEFITS
 
 
@@ -7,8 +8,14 @@ def test_vip_level_copy_matches_current_policy():
     silver_lines = VIP_LEVEL_BENEFITS["銀級魔丸"].splitlines()
     assert "・優先客服回覆" in silver_lines
 
+    gold_lines = VIP_LEVEL_BENEFITS["金級魔丸"].splitlines()
+    assert "・每週一次尊爵體驗單" in gold_lines
+    assert "・可使用 VIP 自由計時" not in gold_lines
+
     platinum_lines = VIP_LEVEL_BENEFITS["白金魔丸"].splitlines()
     assert "・儲值返利1%" in platinum_lines
+    assert "・每週一次尊爵體驗單" in platinum_lines
+    assert "・可使用 VIP 自由計時" in platinum_lines
 
     diamond_lines = VIP_LEVEL_BENEFITS["鑽石魔丸"].splitlines()
     assert diamond_lines == [
@@ -21,13 +28,15 @@ def test_vip_level_copy_matches_current_policy():
         "・儲值返利2%",
         "・體驗單、趣味單外全館96折",
         '・可根據闆闆要求製作"自訂單"',
+        "・每週一次尊爵體驗單",
+        "・可使用 VIP 自由計時",
     ]
     assert "儲值返利1%" not in VIP_LEVEL_BENEFITS["鑽石魔丸"]
     assert "全館98折" not in VIP_LEVEL_BENEFITS["鑽石魔丸"]
     assert "享有白金魔丸所有福利" not in VIP_LEVEL_BENEFITS["鑽石魔丸"]
     assert "・儲值返利3%" in VIP_LEVEL_BENEFITS["白鑽魔丸"]
     assert "・儲值返利3%" in VIP_LEVEL_BENEFITS["黑鑽魔丸"]
-    assert "・每月一次免費「機密航天保底1000w」或娛樂陪 2H" in VIP_LEVEL_BENEFITS["黑鑽魔丸"]
+    assert "・每月一次免費「機密航天保底1000w」或娛樂陪 2H" not in VIP_LEVEL_BENEFITS["黑鑽魔丸"]
 
 
 def test_vip_page_uses_refreshed_public_policy_copy():
@@ -50,13 +59,14 @@ def test_vip_page_uses_refreshed_public_policy_copy():
     assert "200T 代金券：單筆原始服務金額滿 1,500T" in template
     assert "500T 代金券：單筆原始服務金額滿 4,000T" in template
     assert "不再要求最近 30 日消費達到 2,000T／5,000T" in template
-    assert "黑鑽每月免費福利仍需最近 30 日實際訂單消費滿 8,000T" in template
-    assert "儲值本身不計入這個 8,000T 門檻" in template
+    assert "黑鑽每月免費福利仍需最近 30 日實際訂單消費滿 8,000T" not in template
+    assert "機密航天保底 1000w" not in template
     assert "白金／鑽石 2,000T、白鑽 5,000T、黑鑽 8,000T" not in template
     assert "2026/10/18 起成立的新訂單與新儲值適用新版規則" in template
-    assert "可使用「VIP 自由計時」" in template
-    assert "VIP 自由計時僅可使用 VIP 百分比折扣" in template
+    assert "白金級以上 VIP 可於「我的專區」使用 VIP 自由計時單" in template
+    assert "VIP 自由計時僅適用 VIP 百分比折扣" in template
     assert "娛樂陪累積送時數" in template
+    assert "每週一次尊爵體驗單" in template
     assert "優先安排熟悉／收藏陪玩" in template
     assert "銀級 30 天、金級 45 天、白金 60 天、鑽石 90 天、白鑽 120 天、黑鑽 180 天" in template
     assert "VIP 專屬私人文字頻道" not in template
