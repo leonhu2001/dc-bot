@@ -15,6 +15,15 @@ def test_production_layer_does_not_wrap_new_ticket_creation() -> None:
     assert "quick._create_ticket =" not in source
 
 
+def test_production_layer_does_not_override_core_entry_callbacks() -> None:
+    source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
+
+    assert "async def _clean_confirmation" not in source
+    assert "async def _clean_delta_callback" not in source
+    assert "quick._send_confirmation =" not in source
+    assert "quick.QuickDeltaCategoryButton.callback =" not in source
+
+
 def test_legacy_copy_cleanup_remains_startup_repair_only() -> None:
     source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
 
