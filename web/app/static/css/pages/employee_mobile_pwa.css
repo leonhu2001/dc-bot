@@ -1,0 +1,109 @@
+/* Employee mobile/PWA shell. Keep authenticated data network-only; this file is presentation only. */
+.employee-pwa-install{
+    position:fixed;
+    right:max(14px,env(safe-area-inset-right));
+    bottom:max(14px,env(safe-area-inset-bottom));
+    z-index:1200;
+    display:none;
+    align-items:center;
+    gap:8px;
+    min-height:44px;
+    padding:10px 14px;
+    border:1px solid rgba(242,214,141,.34);
+    border-radius:999px;
+    background:rgba(17,17,15,.94);
+    color:#f2d68d;
+    box-shadow:0 12px 34px rgba(0,0,0,.35);
+    font:800 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    cursor:pointer;
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px)
+}
+.employee-pwa-install.is-visible{display:inline-flex}
+.employee-pwa-install svg{width:17px;height:17px;flex:0 0 auto}
+
+@media(max-width:720px){
+    html{scroll-padding-top:74px}
+    body.employee-workspace-site,
+    .employee-workspace-site body{min-width:0}
+    .employee-workspace-site .employee-workspace-page-content,
+    .employee-workspace-site .employee-workspace-hero,
+    .employee-workspace-site .site-main{
+        max-width:100%;
+        overflow-x:clip
+    }
+    .employee-workspace-site input,
+    .employee-workspace-site select,
+    .employee-workspace-site textarea{
+        font-size:16px
+    }
+    .employee-workspace-site button,
+    .employee-workspace-site a.employee-workspace-action,
+    .employee-workspace-site .ec-btn,
+    .employee-workspace-site .dispatch-action,
+    .employee-workspace-site .salary-tab{
+        min-height:44px
+    }
+    .employee-workspace-site .employee-workspace-hero-actions,
+    .employee-workspace-site .ec-actions{
+        width:100%;
+        justify-content:flex-start;
+        overflow-x:auto;
+        overscroll-behavior-x:contain;
+        scrollbar-width:none;
+        padding-bottom:2px
+    }
+    .employee-workspace-site .employee-workspace-hero-actions::-webkit-scrollbar,
+    .employee-workspace-site .ec-actions::-webkit-scrollbar{display:none}
+    .employee-workspace-site .employee-workspace-hero-actions>a,
+    .employee-workspace-site .ec-actions>a{flex:0 0 auto}
+    .employee-workspace-site .ec{
+        width:min(100% - 20px,1180px);
+        margin-top:20px;
+        margin-bottom:calc(72px + env(safe-area-inset-bottom))
+    }
+    .employee-workspace-site .ec-hero{
+        border-radius:18px;
+        padding:17px
+    }
+    .employee-workspace-site .ec h1{
+        font-size:clamp(30px,11vw,44px);
+        line-height:1.02
+    }
+    .employee-workspace-site .ec-overview{
+        gap:8px
+    }
+    .employee-workspace-site .ec-stat{
+        padding:13px 12px
+    }
+    .employee-workspace-site .ec-salary,
+    .employee-workspace-site .ec-card,
+    .employee-workspace-site .binding-card{
+        border-radius:17px
+    }
+    .employee-workspace-site .salary-list,
+    .employee-workspace-site .table-wrap,
+    .employee-workspace-site .report-table-wrap,
+    .employee-workspace-site .dispatch-table-wrap{
+        -webkit-overflow-scrolling:touch
+    }
+}
+
+@media(max-width:480px){
+    .employee-workspace-site .ec-overview{grid-template-columns:1fr 1fr}
+    .employee-workspace-site .employee-workspace-hero{padding-left:14px;padding-right:14px}
+    .employee-pwa-install{
+        left:max(10px,env(safe-area-inset-left));
+        right:max(10px,env(safe-area-inset-right));
+        justify-content:center
+    }
+}
+
+@media(display-mode:standalone){
+    html,body{min-height:100%;min-height:100dvh}
+    body{padding-top:env(safe-area-inset-top)}
+    .employee-workspace-site .site-footer{display:none}
+    .employee-workspace-site .ec{
+        margin-bottom:calc(36px + env(safe-area-inset-bottom))
+    }
+}
