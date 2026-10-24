@@ -99,7 +99,7 @@ def _order_control_view(client: discord.Client) -> discord.ui.View | None:
     return None
 
 
-def _message_has_order_controls(message: discord.Message) -> bool:
+def _message_component_ids(message: discord.Message) -> set[str]:
     custom_ids: set[str] = set()
     for component in getattr(message, "components", ()):
         component_id = str(getattr(component, "custom_id", "") or "")
@@ -109,15 +109,26 @@ def _message_has_order_controls(message: discord.Message) -> bool:
             child_id = str(getattr(child, "custom_id", "") or "")
             if child_id:
                 custom_ids.add(child_id)
+    return custom_ids
+
+
+def _message_has_order_controls(message: discord.Message) -> bool:
     return {
         "order_control_select",
         "order_control_confirm",
-    }.issubset(custom_ids)
+    }.issubset(_message_component_ids(message))
 
 
 def _message_has_self_service_panel(message: discord.Message) -> bool:
     return any(
         str(getattr(embed, "title", "") or "").startswith("自助下單")
+        for embed in getattr(message, "embeds", ())
+    )
+
+
+def _message_has_custom_order_intro_embed(message: discord.Message) -> bool:
+    return any(
+        str(getattr(embed, "title", "") or "") == "✨ 自訂單需求"
         for embed in getattr(message, "embeds", ())
     )
 
@@ -223,9 +234,67 @@ def _build_custom_order_self_service_embed(
         f"下單用戶：<@{int(customer_id)}>\n\n"
         "陪玩人數可在 **1～4 位**之間調整；時數／數量也可在此修改。\n"
         "自訂單由客服使用「客服填價格」完成報價，確認後再送出等待接單。\n"
-        "上方需求單保留遊戲、玩法與目標，這張面板負責正式訂單規格。"
+        "上方文字需求保留遊戲、玩法與目標，這張面板負責正式訂單規格。"
     )
     return embed
+
+
+def _custom_order_intro_text(
+    *,
+    support_mention: str,
+    member_mention: str,
+    level_name: str,
+    companion_count: int,
+    game_or_service: str,
+    gameplay_rules: str,
+    goal_plan: str,
+    extra_request: str = "",
+    customer_notes: str = "",
+) -> str:
+    lines = [
+        f"{support_mention} {member_mention} 自訂單票口已建立。",
+        f"目前等級：**{level_name}**",
+        f"陪玩人數：**{max(1, min(4, int(companion_count or 1)))} 位**",
+        f"遊戲／服務內容：{str(game_or_service or '未填寫').strip()}",
+        f"玩法／規則／機制：{str(gameplay_rules or '未填寫').strip()}",
+        f"方案／目標：{str(goal_plan or '未填寫').strip()}",
+    ]
+    if str(extra_request or "").strip():
+        lines.append(f"其他需求：{str(extra_request).strip()}")
+    lines.extend(
+        [
+            "",
+            "目前為需求確認階段，客服確認內容與價格後再正式送出等待接單。",
+        ]
+    )
+    notes = str(customer_notes or "").strip()
+    if notes:
+        lines.extend(["", notes])
+    return "\n".join(lines)
+
+
+def _intro_text_from_embed(
+    embed: discord.Embed,
+    *,
+    support_mention: str,
+    customer_id: int,
+    companion_count: int,
+) -> str:
+    values = {
+        str(field.name or "").strip(): str(field.value or "").strip()
+        for field in getattr(embed, "fields", ())
+    }
+    return _custom_order_intro_text(
+        support_mention=support_mention,
+        member_mention=f"<@{int(customer_id)}>",
+        level_name=custom_order_level_name(customer_id),
+        companion_count=companion_count,
+        game_or_service=values.get("遊戲／服務內容", "未填寫"),
+        gameplay_rules=values.get("玩法／規則／機制", "未填寫"),
+        goal_plan=values.get("方案／目標", "未填寫"),
+        extra_request=values.get("其他需求", ""),
+        customer_notes=values.get("會員資訊", ""),
+    )
 
 
 async def _send_custom_order_self_service_panel(
@@ -337,31 +406,20 @@ async def _create_custom_order_request_ticket(
             ),
         )
 
-        embed = discord.Embed(
-            title="✨ 自訂單需求",
-            description=(
-                f"申請人：{member.mention}\n"
-                f"目前等級：**{level_name}**\n\n"
-                "此票口目前是**需求確認階段**。客服確認內容與價格後，才會正式成立訂單。"
-            ),
-            color=discord.Color.purple(),
-        )
-        embed.add_field(name="陪玩人數", value=f"{count} 位", inline=True)
-        embed.add_field(name="遊戲／服務內容", value=game_or_service[:1024], inline=False)
-        embed.add_field(name="玩法／規則／機制", value=gameplay_rules[:1024], inline=False)
-        embed.add_field(name="方案／目標", value=goal_plan[:1024], inline=False)
-        if extra_request.strip():
-            embed.add_field(name="其他需求", value=extra_request.strip()[:1024], inline=False)
-
-        notes = format_customer_notes_for_ticket(member.id).strip()
-        if notes:
-            embed.add_field(name="會員資訊", value=notes[:1024], inline=False)
-
-        embed.set_footer(text="自訂單需求｜尚未報價、尚未成立正式訂單")
         support_mention = support_role.mention if support_role is not None else "客服"
+        intro_text = _custom_order_intro_text(
+            support_mention=support_mention,
+            member_mention=member.mention,
+            level_name=level_name,
+            companion_count=count,
+            game_or_service=game_or_service,
+            gameplay_rules=gameplay_rules,
+            goal_plan=goal_plan,
+            extra_request=extra_request,
+            customer_notes=format_customer_notes_for_ticket(member.id),
+        )
         await ticket.send(
-            content=f"{support_mention} {member.mention}",
-            embed=embed,
+            content=intro_text,
             view=_order_control_view(interaction.client),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
@@ -570,7 +628,7 @@ async def ensure_custom_order_quick_panel(bot: commands.Bot) -> None:
 
 
 async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> None:
-    """Backfill canonical controls and the self-service panel onto existing custom tickets."""
+    """Backfill canonical controls, plain-text intro, and self-service panel."""
     await bot.wait_until_ready()
     category = bot.get_channel(CUSTOMER_CATEGORY_ID)
     if not isinstance(category, discord.CategoryChannel):
@@ -584,6 +642,7 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
 
     repaired_controls = 0
     repaired_panels = 0
+    repaired_intros = 0
 
     for channel in list(category.text_channels):
         topic = str(channel.topic or "")
@@ -612,16 +671,43 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
 
         has_controls = False
         has_self_service = False
+        intro_message: discord.Message | None = None
         try:
             async for message in channel.history(limit=50):
                 if bot.user is not None and message.author.id != bot.user.id:
                     continue
                 has_controls = has_controls or _message_has_order_controls(message)
                 has_self_service = has_self_service or _message_has_self_service_panel(message)
-                if has_controls and has_self_service:
+                if intro_message is None and _message_has_custom_order_intro_embed(message):
+                    intro_message = message
+                if has_controls and has_self_service and intro_message is not None:
                     break
         except (discord.Forbidden, discord.HTTPException):
             continue
+
+        if intro_message is not None and intro_message.embeds:
+            support_role = channel.guild.get_role(CUSTOMER_ROLE_ID)
+            support_mention = support_role.mention if support_role is not None else "客服"
+            try:
+                await intro_message.edit(
+                    content=_intro_text_from_embed(
+                        intro_message.embeds[0],
+                        support_mention=support_mention,
+                        customer_id=customer_id,
+                        companion_count=companion_count,
+                    ),
+                    embed=None,
+                    view=_order_control_view(bot),
+                    allowed_mentions=discord.AllowedMentions(
+                        users=False,
+                        roles=False,
+                        everyone=False,
+                    ),
+                )
+                repaired_intros += 1
+                has_controls = True
+            except (discord.Forbidden, discord.HTTPException):
+                pass
 
         if not has_self_service:
             try:
@@ -655,10 +741,11 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
             except (discord.Forbidden, discord.HTTPException):
                 continue
 
-    if repaired_panels or repaired_controls:
+    if repaired_panels or repaired_controls or repaired_intros:
         print(
             "[custom-order-quick] repaired "
-            f"self_service_panels={repaired_panels} staff_controls={repaired_controls}",
+            f"intros={repaired_intros} self_service_panels={repaired_panels} "
+            f"staff_controls={repaired_controls}",
             flush=True,
         )
 
