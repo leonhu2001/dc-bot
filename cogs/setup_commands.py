@@ -13,6 +13,7 @@ from services.quick_order_v2_fixes import install_quick_order_v2_fixes
 from services.quick_order_v2_production import install_quick_order_v2_production
 from services.quick_order_v2_select_display import install_quick_order_v2_select_display
 from services.custom_order_quick_entry import install_custom_order_quick_entry
+from services.discord_vip_channel_access import install_discord_vip_channel_access
 from services.order_ticket_name_restore_runtime import install_order_ticket_name_restore
 from views.panels import MainPanelView, build_main_panel_embed
 from views.topups import TopupPanelView
@@ -38,6 +39,7 @@ class SetupCommands(commands.Cog):
         install_quick_order_v2_production(bot)
         install_quick_order_v2_select_display(bot)
         install_custom_order_quick_entry(bot)
+        install_discord_vip_channel_access()
         install_order_ticket_name_restore(bot)
 
         if not getattr(
@@ -85,8 +87,7 @@ class SetupCommands(commands.Cog):
             discord.TextChannel,
         ):
             await interaction.response.send_message(
-                "請在文字頻道使用這個指令。",
-                ephemeral=True,
+                "請在文字頻道使用這個指令。", ephemeral=True
             )
             return
 
