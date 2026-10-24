@@ -77,7 +77,14 @@ def is_public_timer_rule(rule_key: Any) -> bool:
 
 
 def install_vip_timer_catalog_guard() -> None:
-    """Filter timer source/switch options to current public hourly products."""
+    """Filter customer-facing timer choices to current public hourly products.
+
+    Keep ``vip_timer.rule_snapshot`` as the canonical low-level hourly-rule
+    validator. Catalog eligibility belongs at the selection boundary, not inside
+    the core snapshot function: patching the core function makes internal tools,
+    migrations and unit tests depend on whichever UI catalog happens to be
+    installed at runtime.
+    """
     global _INSTALLED
     if _INSTALLED:
         return
@@ -85,7 +92,6 @@ def install_vip_timer_catalog_guard() -> None:
     from services import vip_timer as timer
 
     original_public_hourly_rules = timer.public_hourly_rules
-    original_rule_snapshot = timer.rule_snapshot
 
     def guarded_public_hourly_rules():
         allowed = public_timer_rule_keys()
@@ -95,16 +101,7 @@ def install_vip_timer_catalog_guard() -> None:
             if str(row.get("rule_key") or "").strip() in allowed
         ]
 
-    def guarded_rule_snapshot(rule_key: str):
-        key = timer.strip_vip_timer_rule_key(rule_key)
-        if not is_public_timer_rule(key):
-            raise ValueError(
-                "這個玩法目前不能用於 VIP 自由計時，請改選其他玩法。"
-            )
-        return original_rule_snapshot(key)
-
     timer.public_hourly_rules = guarded_public_hourly_rules
-    timer.rule_snapshot = guarded_rule_snapshot
 
     _INSTALLED = True
 
