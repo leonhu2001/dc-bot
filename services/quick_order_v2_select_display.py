@@ -7,7 +7,6 @@ from services import quick_order_v2 as quick
 
 
 _INSTALLED = False
-_ORIGINAL_VIEW_INIT = None
 _ORIGINAL_QUANTITY_CALLBACK = None
 _ORIGINAL_DETAIL_CALLBACK = None
 _ORIGINAL_ITEM_CALLBACK = None
@@ -38,14 +37,12 @@ def _select_value(select: discord.ui.Select, value: object) -> bool:
     return matched
 
 
-def _reset_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
-    """Keep quick-order display neutral, except explicit classic re-selection.
+def apply_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
+    """Apply Quick Order select-display rules to an already-built canonical view.
 
-    Normal quick-order tickets already chose category/service before the ticket was
-    opened, so those routing values should not look like fresh customer choices.
-    Customer-service "重派自助下單" intentionally switches a quick ticket back to
-    the original four-selector panel; in that mode all saved selections must stay
-    visible just like the legacy/classic self-service flow.
+    Production owns the only active SelfServiceOrderView wrapper. Keeping this as a
+    pure view mutator avoids stacking another __init__ wrapper just to adjust
+    placeholders/defaults while preserving interaction-aware selection markers.
     """
     category = str(data.get("category") or "")
     item_group = str(data.get("item_group") or "")
@@ -199,33 +196,6 @@ def _install_selection_markers() -> None:
         runtime.SelfServiceOrderCategorySelect.callback = category_callback
 
 
-def _install_quick_order_view_patch() -> None:
-    global _ORIGINAL_VIEW_INIT
-    if _ORIGINAL_VIEW_INIT is not None:
-        return
-
-    from services import self_service_ui_runtime as ui
-
-    _ORIGINAL_VIEW_INIT = ui.SelfServiceOrderView.__init__
-    original = _ORIGINAL_VIEW_INIT
-
-    def quick_order_view_init(
-        self,
-        customer_id: int,
-        channel_id: int,
-        selected_category: str | None = None,
-    ):
-        original(self, customer_id, channel_id, selected_category)
-
-        data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
-        if not isinstance(data, dict) or not data.get("quick_order_v2"):
-            return
-
-        _reset_quick_order_select_display(self, data)
-
-    ui.SelfServiceOrderView.__init__ = quick_order_view_init
-
-
 async def repair_existing_quick_order_selects(bot: commands.Bot) -> None:
     """Refresh already-open quick-order panels with the current Select display rules."""
     await bot.wait_until_ready()
@@ -299,8 +269,10 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
+    # Selection callbacks only record whether a value came from a real user
+    # interaction. The production ticket UI policy owns the sole View wrapper and
+    # calls apply_quick_order_select_display while building that View.
     _install_selection_markers()
-    _install_quick_order_view_patch()
 
     if not getattr(bot, "_quick_order_v2_select_repair_started", False):
         bot._quick_order_v2_select_repair_started = True
@@ -318,6 +290,7 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
 
 
 __all__ = [
+    "apply_quick_order_select_display",
     "install_quick_order_v2_select_display",
     "repair_existing_quick_order_selects",
 ]
