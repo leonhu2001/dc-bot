@@ -22,6 +22,16 @@ _QUANTITY_SELECTED_KEY = "quick_order_quantity_selected"
 LEGACY_RESELECT_FLAG = "legacy_four_selector_panel"
 
 
+def _warn_marker_failure(action: str, component, exc: Exception) -> None:
+    """Keep marker bookkeeping fail-open while making failures diagnosable."""
+    channel_id = getattr(component, "channel_id", "unknown")
+    print(
+        f"[quick-order-v2-select] marker update failed action={action} "
+        f"channel={channel_id}: {type(exc).__name__}: {exc}",
+        flush=True,
+    )
+
+
 def _clear_defaults(select: discord.ui.Select) -> None:
     for option in getattr(select, "options", []) or []:
         option.default = False
@@ -165,8 +175,8 @@ def _install_selection_markers() -> None:
                     and self.values[0] != "need_item"
                 ):
                     data[_QUANTITY_SELECTED_KEY] = True
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_marker_failure("quantity", self, exc)
             await original_quantity(self, interaction)
 
         runtime.SelfServiceOrderQuantitySelect.callback = quantity_callback
@@ -187,8 +197,8 @@ def _install_selection_markers() -> None:
                     and self.values[0] != "need_item"
                 ):
                     data.pop(_QUANTITY_SELECTED_KEY, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_marker_failure("detail", self, exc)
             await original_detail(self, interaction)
 
         runtime.SelfServiceOrderDetailSelect.callback = detail_callback
@@ -203,8 +213,8 @@ def _install_selection_markers() -> None:
                 data = state.order_selections.get(self.channel_id, {})
                 if isinstance(data, dict) and data.get("quick_order_v2"):
                     data.pop(_QUANTITY_SELECTED_KEY, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_marker_failure("item", self, exc)
             await original_item(self, interaction)
 
         runtime.SelfServiceOrderItemSelect.callback = item_callback
@@ -219,8 +229,8 @@ def _install_selection_markers() -> None:
                 data = state.order_selections.get(self.channel_id, {})
                 if isinstance(data, dict) and data.get("quick_order_v2"):
                     data.pop(_QUANTITY_SELECTED_KEY, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                _warn_marker_failure("category", self, exc)
             await original_category(self, interaction)
 
         runtime.SelfServiceOrderCategorySelect.callback = category_callback
