@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from services import order_runtime
 from services import orders as orders_service
+from services import quick_order_v2_fixes
 from services.order_rules import ORDER_RULES
 from services.self_service_selection_state import (
     apply_self_service_category_selection,
@@ -106,15 +107,17 @@ def test_single_detail_group_uses_same_canonical_transition():
 
 
 def test_all_active_catalog_paths_have_valid_discord_detail_and_quantity_contracts():
+    # Production quick-order installs this resolver before exposing the public
+    # selector. Install the same layer here so the contract test observes the
+    # actual runtime catalog, including the five-scheme 賽季3x3 group.
+    quick_order_v2_fixes._install_canonical_group_resolver()
+
     for category in orders_service.SELF_SERVICE_ACTIVE_CATEGORIES:
         groups = orders_service.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, [])
         assert groups, category
         assert len(groups) <= 25, category
 
         for group in groups:
-            # Quick-order installs a canonical resolver at runtime (notably for
-            # 賽季3x3). Read it from the module here instead of freezing a stale
-            # pre-install function reference during test collection.
             details = orders_service.get_order_item_details_for_group(category, group)
             assert details, (category, group)
             assert len(details) <= 25, (category, group)
