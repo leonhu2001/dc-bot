@@ -35,8 +35,8 @@ class SetupCommands(commands.Cog):
         self.bot = bot
         install_vip_timer_self_service()
         install_quick_order_v2_fixes(bot)
-        install_quick_order_v2(bot)
         install_quick_order_v2_production(bot)
+        install_quick_order_v2(bot)
         install_quick_order_v2_select_display(bot)
         install_custom_order_quick_entry(bot)
         install_discord_vip_channel_access()
