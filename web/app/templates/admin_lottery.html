@@ -67,6 +67,14 @@
 </div>
 {% endif %}
 </div>
+<template id="lotteryPrizeRowTemplate">
+<div class="lottery-prize-row">
+<span class="lottery-prize-index"></span>
+<label>福利券<select name="template_id" required><option value="">選擇優惠與福利中的券</option>{% for item in snapshot.templates %}<option value="{{ item.id }}">{{ item.name }}</option>{% endfor %}</select></label>
+<label class="count">名額<input type="number" name="winner_count" min="1" max="50" value="1" required></label>
+<button type="button" class="remove-prize">移除</button>
+</div>
+</template>
 <div class="lottery-action-hint">清單會自動讀取「優惠與福利」目前啟用中的券；之後新增的券也會直接出現在這裡。</div>
 </div>
 <div class="lottery-form-action"><button type="submit">儲存抽獎設定</button></div>
@@ -111,32 +119,6 @@
 </section>
 </div>
 
-<script nonce="{{ request.state.csp_nonce }}">
-(() => {
-  const rows = document.getElementById('prizeRows');
-  const add = document.getElementById('addPrizeRow');
-  if (!rows || !add) return;
-  const options = `{% for item in snapshot.templates %}<option value="{{ item.id }}">{{ item.name|e }}</option>{% endfor %}`;
-  const renumber = () => {
-    rows.querySelectorAll('.lottery-prize-row').forEach((row, index) => {
-      row.querySelector('.lottery-prize-index').textContent = String(index + 1);
-      const remove = row.querySelector('.remove-prize');
-      if (remove) remove.disabled = rows.children.length <= 1;
-    });
-  };
-  add.addEventListener('click', () => {
-    const row = document.createElement('div');
-    row.className = 'lottery-prize-row';
-    row.innerHTML = `<span class="lottery-prize-index"></span><label>福利券<select name="template_id" required><option value="">選擇優惠與福利中的券</option>${options}</select></label><label class="count">名額<input type="number" name="winner_count" min="1" max="50" value="1" required></label><button type="button" class="remove-prize">移除</button>`;
-    rows.appendChild(row); renumber();
-  });
-  rows.addEventListener('click', (event) => {
-    const button = event.target.closest('.remove-prize');
-    if (!button || rows.children.length <= 1) return;
-    button.closest('.lottery-prize-row').remove(); renumber();
-  });
-  renumber();
-})();
-</script>
+<script src="/static/js/pages/admin_lottery.js?v=20261024-1" defer></script>
 </body>
 </html>
