@@ -14,12 +14,12 @@ def test_service_type_splits_three_and_four_companions():
     assert flow_v2._service_type("技術陪", {"label": "機密", "player_count": 4}, rule) == "四陪"
 
 
-def test_unsupported_special_services_stay_out_of_vip_timer():
+def test_service_type_classifies_special_services_before_catalog_filtering():
     rule = SimpleNamespace(label="甜蜜單", required_staff_count=2)
     assert flow_v2._service_type("甜蜜單", {"label": "甜蜜雙人"}, rule) == "不支援"
 
     rule = SimpleNamespace(label="教學單", required_staff_count=1)
-    assert flow_v2._service_type("教學單", {"label": "導師教學"}, rule) == "不支援"
+    assert flow_v2._service_type("教學單", {"label": "導師教學"}, rule) == "1對1教學"
 
 
 def test_gameplay_group_collects_service_variants_for_dynamic_fourth_layer():
@@ -43,7 +43,7 @@ def test_gameplay_group_collects_service_variants_for_dynamic_fourth_layer():
         ]
     )
 
-    assert [group["label"] for group in groups] == ["技術｜機密", "技術｜絕密"]
+    assert [group["label"] for group in groups] == ["技術陪｜機密", "技術陪｜絕密"]
     assert [row["vip_timer_service_type"] for row in groups[0]["details"]] == ["雙陪", "單陪"] or [
         row["vip_timer_service_type"] for row in groups[0]["details"]
     ] == ["單陪", "雙陪"]
