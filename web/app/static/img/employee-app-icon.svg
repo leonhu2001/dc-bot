@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="魔丸員工中心">
+  <rect width="512" height="512" rx="112" fill="#11110f"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="none" stroke="#f2d68d" stroke-width="10" opacity="0.7"/>
+  <circle cx="256" cy="206" r="104" fill="#f2d68d" opacity="0.12"/>
+  <path d="M158 180c36-50 160-50 196 0l-29 161H187L158 180Z" fill="#f2d68d" opacity="0.95"/>
+  <circle cx="220" cy="224" r="18" fill="#11110f"/>
+  <circle cx="292" cy="224" r="18" fill="#11110f"/>
+  <path d="M215 278c25 24 57 24 82 0" fill="none" stroke="#11110f" stroke-width="14" stroke-linecap="round"/>
+  <path d="M185 154 151 97l70 30M327 154l34-57-70 30" fill="none" stroke="#f2d68d" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="256" y="418" text-anchor="middle" font-family="system-ui,sans-serif" font-size="46" font-weight="800" fill="#f2d68d">MOWAN</text>
+</svg>
