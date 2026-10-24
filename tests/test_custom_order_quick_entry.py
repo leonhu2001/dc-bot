@@ -6,7 +6,9 @@ from services.custom_order_quick_entry import (
     CustomOrderQuickEntryView,
     _create_custom_order_request_ticket,
     build_custom_order_entry_embed,
+    install_custom_order_quick_entry,
     is_custom_order_level_eligible,
+    repair_existing_custom_order_ticket_controls,
 )
 
 
@@ -44,6 +46,15 @@ def test_custom_order_ticket_uses_normal_order_identity_and_staff_controls():
     source = inspect.getsource(_create_custom_order_request_ticket)
     assert "order_customer_id={member.id}" in source
     assert "view=_order_control_view(interaction.client)" in source
+
+
+def test_existing_custom_order_tickets_are_repaired_idempotently_on_startup():
+    repair_source = inspect.getsource(repair_existing_custom_order_ticket_controls)
+    install_source = inspect.getsource(install_custom_order_quick_entry)
+    assert '"custom_order_request=1"' in repair_source
+    assert '"order_customer_id=" not in topic' in repair_source
+    assert "_message_has_order_controls(message)" in repair_source
+    assert "repair_existing_custom_order_ticket_controls(bot)" in install_source
 
 
 def test_custom_order_persistent_view_has_stable_open_button():
