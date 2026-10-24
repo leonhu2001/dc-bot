@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="zh-Hant">
+{% set employee_app_shell = employee_workspace_shell|default(false) or page_name|default('') == 'employee' %}
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
     <script src="/static/js/csrf.js?v=1"></script>
     <meta name="theme-color" content="#09090b">
@@ -20,6 +21,15 @@
     <script src="/static/js/mw_order_ui.js?v=20261017a" defer></script>
     <link rel="stylesheet" href="/static/css/csp_style_attrs.css?v=20261013">
     <script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
+
+    {% if employee_app_shell %}
+    <link rel="manifest" href="/static/employee-app-manifest.json?v=20261024-1">
+    <meta name="application-name" content="魔丸員工">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="魔丸員工">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-1">
+    {% endif %}
 
     {% if employee_workspace_shell|default(false) %}
     <link rel="stylesheet" href="/static/css/pages/employee_center_inline_1.css?v=20261020-2">
@@ -59,7 +69,7 @@
     {% endfor %}
 </head>
 
-<body class="site-body mw-public-r5{% if employee_workspace_shell|default(false) %} employee-workspace-site{% endif %}" data-page="{{ page_name or '' }}">
+<body class="site-body mw-public-r5{% if employee_app_shell %} employee-workspace-site{% endif %}" data-page="{{ page_name or '' }}">
     {% include "_site_header.html" %}
 
     <main class="site-main">
@@ -137,6 +147,9 @@
     <script src="/static/js/marketing_funnel.js?v=1" defer></script>
     <script src="/static/js/support_chat.js?v=1" defer></script>
     <script src="/static/js/home_crew_runtime.js?v=20261013" defer></script>
+    {% if employee_app_shell %}
+    <script src="/static/js/pages/employee_pwa.js?v=20261024-1" defer></script>
+    {% endif %}
     {% if employee_workspace_shell|default(false) %}
     <script src="/static/js/pages/employee_workspace_identity.js?v=20261020-1"></script>
     <script src="/static/js/ui_tweaks.js?v=1"></script>
