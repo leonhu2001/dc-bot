@@ -13,7 +13,8 @@ _GAME_LABELS = {
     "steam": "STEAM",
 }
 _GAME_ORDER = tuple(_GAME_LABELS.values())
-_PLATINUM_OR_ABOVE = {
+_GOLD_OR_ABOVE = {
+    "金級魔丸",
     "白金魔丸",
     "鑽石魔丸",
     "白鑽魔丸",
@@ -31,48 +32,22 @@ def _rule_text(rule) -> str:
     )
 
 
-def _install_catalog_guard_policy() -> None:
-    from services import vip_timer_catalog_guard as guard
-    from services.order_rules import ORDER_RULES
-
-    if getattr(guard, "_vip_timer_v5_policy_installed", False):
-        return
-
-    original_public_keys = guard.public_timer_rule_keys
-
-    def public_timer_rule_keys() -> set[str]:
-        result = set(original_public_keys())
-
-        filtered: set[str] = set()
-        for key in result:
-            rule = ORDER_RULES.get(str(key))
-            if rule is None:
-                continue
-            category = str(getattr(rule, "category", "") or "")
-            if category not in _GAME_LABELS:
-                continue
-            text_value = _rule_text(rule)
-            if "甜蜜" in text_value or "教學" in text_value or "導師" in text_value:
-                continue
-            # 絕巴技術陪、黑潮爆破都只屬於三角洲端遊第三層玩法。
-            if category == "delta_mobile_basic" and (
-                "黑潮爆破" in text_value or "絕巴技術陪" in text_value
-            ):
-                continue
-            # VIP 自由計時整張單會套 VIP 百分比折扣，因此不收錄原本
-            # 明確標示「不適用 VIP 折扣」的來源商品。
-            if not bool(getattr(rule, "vip_discount_allowed", True)):
-                continue
-            filtered.add(str(key))
-        return filtered
-
-    def is_public_timer_rule(rule_key) -> bool:
-        key = str(rule_key or "").strip()
-        return bool(key) and key in public_timer_rule_keys()
-
-    guard.public_timer_rule_keys = public_timer_rule_keys
-    guard.is_public_timer_rule = is_public_timer_rule
-    guard._vip_timer_v5_policy_installed = True
+def _timer_rule_allowed(rule) -> bool:
+    if rule is None:
+        return False
+    category = str(getattr(rule, "category", "") or "")
+    if category not in _GAME_LABELS:
+        return False
+    text_value = _rule_text(rule)
+    if "甜蜜" in text_value or "教學" in text_value or "導師" in text_value:
+        return False
+    if category == "delta_mobile_basic" and (
+        "黑潮爆破" in text_value or "絕巴技術陪" in text_value
+    ):
+        return False
+    if not bool(getattr(rule, "vip_discount_allowed", True)):
+        return False
+    return True
 
 
 def _special_gameplay_label(*, source_group: str, detail_label: str, variant: str, service_type: str) -> str:
@@ -127,8 +102,7 @@ def _install_selector_policy() -> None:
     if getattr(flow, "_vip_timer_v5_policy_installed", False):
         return
 
-    # 第二層只放遊戲；絕巴技術陪、黑潮爆破等玩法交由 v2/v3
-    # 在三角洲端遊底下組成第三層，第四層才是單／雙／三／四陪。
+    # 第二層只放遊戲；玩法與陪玩人數交由後續層級呈現。
     flow._GAME_META.update({key: (label, "") for key, label in _GAME_LABELS.items()})
 
     v3._vip_timer_v5_original_gameplay_label = v3._gameplay_label
@@ -155,14 +129,7 @@ def _install_selector_policy() -> None:
                     continue
                 rule_key = str(detail.get("rule_key") or "").strip()
                 rule = ORDER_RULES.get(rule_key)
-                if rule is None:
-                    continue
-                text_value = f"{_rule_text(rule)}｜{detail.get('label') or ''}｜{detail.get('item') or ''}"
-                if "甜蜜" in text_value or "教學" in text_value or "導師" in text_value:
-                    continue
-                if category == "delta_mobile_basic" and (
-                    "黑潮爆破" in text_value or "絕巴技術陪" in text_value
-                ):
+                if not _timer_rule_allowed(rule):
                     continue
                 try:
                     player_count = int(detail.get("player_count") or 0)
@@ -190,6 +157,7 @@ def _install_selector_policy() -> None:
 
 def _install_switch_catalog_policy() -> None:
     from services import vip_timer as timer
+    from services.order_rules import ORDER_RULES
 
     if getattr(timer, "_vip_timer_v5_public_rules_installed", False):
         return
@@ -202,7 +170,8 @@ def _install_switch_catalog_policy() -> None:
             row = dict(raw)
             category = str(row.get("category") or "")
             label = _GAME_LABELS.get(category)
-            if not label:
+            rule = ORDER_RULES.get(str(row.get("rule_key") or ""))
+            if not label or not _timer_rule_allowed(rule):
                 continue
             row["category_label"] = label
             rows.append(row)
@@ -306,13 +275,13 @@ def _install_loyalty_exclusion() -> None:
 def _install_membership_gate() -> None:
     from services import vip_timer_self_service as self_service
 
-    if getattr(self_service, "_vip_timer_platinum_gate_installed", False):
+    if getattr(self_service, "_vip_timer_gold_gate_installed", False):
         return
 
     legacy_gate = getattr(self_service, "_GOLD_OR_ABOVE", None)
     if isinstance(legacy_gate, set):
         legacy_gate.clear()
-        legacy_gate.update(_PLATINUM_OR_ABOVE)
+        legacy_gate.update(_GOLD_OR_ABOVE)
 
     original_assert = self_service.assert_vip_timer_self_service_eligible
 
@@ -321,8 +290,8 @@ def _install_membership_gate() -> None:
         *,
         check_open_order: bool = True,
     ) -> None:
-        if self_service._customer_vip_name(customer_id) not in _PLATINUM_OR_ABOVE:
-            raise ValueError("VIP 自由計時單僅限白金級會員以上使用。")
+        if self_service._customer_vip_name(customer_id) not in _GOLD_OR_ABOVE:
+            raise ValueError("VIP 自由計時單僅限金級會員以上使用。")
         return original_assert(customer_id, check_open_order=check_open_order)
 
     original_panel = self_service.build_vip_timer_self_service_panel_embed
@@ -331,36 +300,33 @@ def _install_membership_gate() -> None:
         embed = original_panel(customer_id, data, guild)
         if embed.description:
             embed.description = str(embed.description).replace(
-                "金級會員以上限定。",
                 "白金級會員以上限定。",
+                "金級會員以上限定。",
             )
         return embed
 
     self_service.assert_vip_timer_self_service_eligible = assert_vip_timer_self_service_eligible
     self_service.build_vip_timer_self_service_panel_embed = build_vip_timer_self_service_panel_embed
-    self_service._vip_timer_platinum_gate_installed = True
+    self_service._vip_timer_gold_gate_installed = True
 
 
 def _install_vip_benefit_text() -> None:
+    """Keep runtime benefit text aligned with the canonical VIP table."""
     from core import vip_levels
 
     weekly_key = "weekly_prestige_trial"
     timer_key = "vip_timer"
-    vip_levels.VIP_BENEFIT_ITEMS[weekly_key] = "・每週一次尊爵體驗單"
-    vip_levels.VIP_BENEFIT_ITEMS[timer_key] = "・可使用 VIP 自由計時"
+    vip_levels.VIP_BENEFIT_ITEMS.pop(weekly_key, None)
+    vip_levels.VIP_BENEFIT_ITEMS[timer_key] = "・可使用「VIP 自由計時」"
 
     for level in vip_levels.VIP_LEVELS:
         threshold = int(level.get("threshold") or 0)
         benefit_keys = level.setdefault("benefit_keys", [])
-
-        if threshold >= 6000 and weekly_key not in benefit_keys:
-            benefit_keys.append(weekly_key)
-        elif threshold < 6000 and weekly_key in benefit_keys:
+        while weekly_key in benefit_keys:
             benefit_keys.remove(weekly_key)
-
-        if threshold >= 12000 and timer_key not in benefit_keys:
+        if threshold >= 6000 and timer_key not in benefit_keys:
             benefit_keys.append(timer_key)
-        elif threshold < 12000 and timer_key in benefit_keys:
+        elif threshold < 6000 and timer_key in benefit_keys:
             benefit_keys.remove(timer_key)
 
     vip_levels.VIP_LEVEL_BENEFITS.clear()
@@ -371,7 +337,6 @@ def install_vip_timer_policy_v5() -> None:
     global _INSTALLED
     if _INSTALLED:
         return
-    _install_catalog_guard_policy()
     _install_selector_policy()
     _install_switch_catalog_policy()
     _install_loyalty_exclusion()
