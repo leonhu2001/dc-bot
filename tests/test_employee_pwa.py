@@ -39,6 +39,18 @@ def test_site_layout_links_pwa_assets_globally_not_only_employee_pages():
     assert "{% if employee_app_shell %}\n    <link rel=\"manifest\"" not in source
 
 
+def test_backoffice_layout_exposes_the_same_site_pwa_when_opened_directly():
+    source = (ROOT / "web" / "app" / "templates" / "admin_layout.html").read_text(
+        encoding="utf-8"
+    )
+    assert "/static/site-app-manifest.json" in source
+    assert "/static/css/site_pwa.css" in source
+    assert "/static/js/site_pwa.js" in source
+    assert "viewport-fit=cover" in source
+    assert 'apple-mobile-web-app-capable" content="yes"' in source
+    assert 'apple-mobile-web-app-title" content="魔丸娛樂"' in source
+
+
 def test_site_install_script_supports_android_prompt_and_ios_instruction():
     source = (
         ROOT / "web" / "app" / "static" / "js" / "site_pwa.js"
