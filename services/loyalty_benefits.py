@@ -270,15 +270,23 @@ def _extract_player_count(row: dict[str, Any]) -> int:
 
 def _loyalty_display_label(rule_key: str, fallback: object = "") -> str:
     key = str(rule_key or "").strip()
-    if key in _APEX_ENTERTAINMENT_RULE_KEYS:
-        return "APEX｜娛樂陪"
+    family = _canonical_loyalty_rule_key(key)
+    family_label = {
+        "basic_entertain": "三角洲端遊｜娛樂陪",
+        "basic_mobile_entertain": "三角洲手遊｜娛樂陪",
+        "apex_entertain": "APEX｜娛樂陪",
+    }.get(family)
+    if family_label:
+        return family_label
 
     label = str(fallback or rule_key or "").strip()
+    if label in {"單陪", "雙陪", "三陪", "四陪"}:
+        return "娛樂陪"
     for suffix in ("｜單陪", "｜雙陪", "｜三陪", "｜四陪"):
         if label.endswith(suffix):
-            label = label[: -len(suffix)]
+            label = label[: -len(suffix)].rstrip("｜")
             break
-    return label or str(rule_key or "")
+    return label or key or "娛樂陪"
 
 
 def _snapshot_preview(row: dict[str, Any]) -> dict[str, Any]:
