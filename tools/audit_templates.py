@@ -42,6 +42,15 @@ def static_path_from_url(url: str) -> Path:
     return STATIC / relative
 
 
+def _print_debt_files(label: str, counts: dict[str, int]) -> None:
+    print(f"{label}_FILES:")
+    if not counts:
+        print("  NONE")
+        return
+    for rel, count in sorted(counts.items()):
+        print(f"  {rel}: {count}")
+
+
 def main() -> None:
     title("TEMPLATE_AUDIT")
 
@@ -63,6 +72,9 @@ def main() -> None:
     inline_style_count = 0
     inline_style_attr_count = 0
     inline_script_count = 0
+    inline_style_files: dict[str, int] = {}
+    inline_style_attr_files: dict[str, int] = {}
+    inline_script_files: dict[str, int] = {}
     static_references: set[str] = set()
 
     for path in template_files:
@@ -81,9 +93,21 @@ def main() -> None:
             print("ERROR:", message)
             errors.append(message)
 
-        inline_style_count += len(INLINE_STYLE_RE.findall(source))
-        inline_style_attr_count += len(STYLE_ATTR_RE.findall(source))
-        inline_script_count += len(INLINE_SCRIPT_RE.findall(source))
+        style_blocks = len(INLINE_STYLE_RE.findall(source))
+        style_attrs = len(STYLE_ATTR_RE.findall(source))
+        script_blocks = len(INLINE_SCRIPT_RE.findall(source))
+
+        inline_style_count += style_blocks
+        inline_style_attr_count += style_attrs
+        inline_script_count += script_blocks
+
+        if style_blocks:
+            inline_style_files[rel] = style_blocks
+        if style_attrs:
+            inline_style_attr_files[rel] = style_attrs
+        if script_blocks:
+            inline_script_files[rel] = script_blocks
+
         static_references.update(STATIC_REF_RE.findall(source))
 
     title("STATIC_REFERENCES")
@@ -121,6 +145,9 @@ def main() -> None:
     print("INLINE_SCRIPT_BLOCKS:", inline_script_count)
     print("MAX_INLINE_STYLE_BLOCKS:", MAX_INLINE_STYLE_BLOCKS)
     print("MAX_INLINE_SCRIPT_BLOCKS:", MAX_INLINE_SCRIPT_BLOCKS)
+    _print_debt_files("INLINE_STYLE", inline_style_files)
+    _print_debt_files("INLINE_STYLE_ATTRIBUTE", inline_style_attr_files)
+    _print_debt_files("INLINE_SCRIPT", inline_script_files)
 
     if inline_style_attr_count:
         errors.append(
