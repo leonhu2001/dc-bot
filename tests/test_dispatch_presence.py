@@ -167,4 +167,4 @@ def test_dispatch_support_presence_expires_after_timeout(tmp_path):
 
 def test_dispatch_support_channel_name_reflects_any_online_staff():
     assert format_dispatch_support_channel_name(False) == "🛎️┃客服中心"
-    assert format_dispatch_support_channel_name(True) == "🟢┃客服值班中"
+    assert format_dispatch_support_channel_name(True) == "🟢┃客服中心"
