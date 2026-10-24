@@ -387,12 +387,6 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # entry buttons on the same row instead of forcing the fourth onto row 2.
     quick.QuickDeltaEntryView.__init__ = _delta_entry_init
 
-    # New quick tickets now receive the customer-service control row directly in
-    # quick_order_v2 core. This module only repairs already-open legacy tickets.
-    if not getattr(bot, "_quick_order_v2_control_repair_started", False):
-        bot._quick_order_v2_control_repair_started = True
-        bot.loop.create_task(repair_existing_quick_order_v2_tickets(bot))
-
     _INSTALLED = True
     print("[quick-order-v2-fix] fixes installed", flush=True)
 
