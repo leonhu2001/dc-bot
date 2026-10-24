@@ -7,6 +7,12 @@
     <meta name="csrf-token" content="{{ request.session.get('csrf_token', '') }}">
     <script src="/static/js/csrf.js?v=1"></script>
     <meta name="theme-color" content="#09090b">
+    <meta name="application-name" content="魔丸娛樂">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="魔丸娛樂">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/static/site-app-manifest.json?v=20261024-1">
 
     {% set seo_data = seo or {} %}
     <title>{{ seo_data.get("title") or title or "魔丸娛樂" }}</title>
@@ -18,17 +24,13 @@
     <link rel="stylesheet" href="/static/css/support_chat.css?v=1">
     <link rel="stylesheet" href="/static/css/site_public_extracted.css?v=20261013">
     <link rel="stylesheet" href="/static/css/order_ui.css?v=20261016">
+    <link rel="stylesheet" href="/static/css/site_pwa.css?v=20261024-1">
     <script src="/static/js/mw_order_ui.js?v=20261017a" defer></script>
     <link rel="stylesheet" href="/static/css/csp_style_attrs.css?v=20261013">
     <script src="/static/js/csp_dynamic_styles.js?v=20261013" defer></script>
 
     {% if employee_app_shell %}
-    <link rel="manifest" href="/static/employee-app-manifest.json?v=20261024-1">
-    <meta name="application-name" content="魔丸員工">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="魔丸員工">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-1">
+    <link rel="stylesheet" href="/static/css/pages/employee_mobile_pwa.css?v=20261024-2">
     {% endif %}
 
     {% if employee_workspace_shell|default(false) %}
@@ -147,9 +149,7 @@
     <script src="/static/js/marketing_funnel.js?v=1" defer></script>
     <script src="/static/js/support_chat.js?v=1" defer></script>
     <script src="/static/js/home_crew_runtime.js?v=20261013" defer></script>
-    {% if employee_app_shell %}
-    <script src="/static/js/pages/employee_pwa.js?v=20261024-1" defer></script>
-    {% endif %}
+    <script src="/static/js/site_pwa.js?v=20261024-1" defer></script>
     {% if employee_workspace_shell|default(false) %}
     <script src="/static/js/pages/employee_workspace_identity.js?v=20261020-1"></script>
     <script src="/static/js/ui_tweaks.js?v=1"></script>
