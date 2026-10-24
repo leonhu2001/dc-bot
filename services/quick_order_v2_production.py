@@ -121,72 +121,6 @@ async def _clean_ensure_panel(bot: commands.Bot, channel_id: int) -> None:
         )
 
 
-async def _clean_delta_callback(self, interaction: discord.Interaction) -> None:
-    if not quick._options(self.category):
-        await interaction.response.send_message(
-            "這個分類目前沒有可下單服務。",
-            ephemeral=True,
-        )
-        return
-
-    embed = discord.Embed(
-        title=f"{self.category_emoji} 三角洲行動｜{self.category_label}",
-        description="請選擇服務。",
-        color=discord.Color.green(),
-    )
-    view = discord.ui.View(timeout=180)
-    view.add_item(
-        quick.QuickServiceSelect(
-            category=self.category,
-            source_channel_id=quick.QUICK_ORDER_V2_CHANNELS["delta"],
-            persistent=False,
-        )
-    )
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-
-async def _clean_confirmation(
-    interaction: discord.Interaction,
-    *,
-    category: str,
-    item_group: str,
-    source_channel_id: int,
-) -> None:
-    if not isinstance(interaction.user, discord.Member):
-        await interaction.response.send_message(
-            "這個功能只能在伺服器內使用。",
-            ephemeral=True,
-        )
-        return
-
-    timer = category == quick.VIP_TIMER_CATEGORY
-    category_label = (
-        quick.VIP_TIMER_CATEGORY_LABEL
-        if timer
-        else quick.ORDER_CATEGORY_LABELS.get(category, category)
-    )
-    embed = discord.Embed(
-        title="💎 VIP 自由計時｜確認" if timer else "🛒 確認下單",
-        description=(
-            f"**遊戲／類型：** {category_label}\n"
-            f"**{'起始遊戲' if timer else '服務'}：** {item_group}\n\n"
-            "確認後建立私人客服中心。"
-        ),
-        color=discord.Color.green(),
-    )
-
-    await interaction.response.send_message(
-        embed=embed,
-        view=quick.QuickOrderConfirmView(
-            customer_id=interaction.user.id,
-            category=category,
-            item_group=item_group,
-            source_channel_id=source_channel_id,
-        ),
-        ephemeral=True,
-    )
-
-
 async def _clean_ticket_messages(ticket: discord.TextChannel) -> None:
     """One-time compatibility cleanup for already-open legacy quick-order tickets."""
     try:
@@ -382,12 +316,9 @@ def install_quick_order_v2_production(bot: commands.Bot) -> None:
 
     quick.build_entry_embed = _clean_entry_embed
     quick._ensure_panel = _clean_ensure_panel
-    quick._send_confirmation = _clean_confirmation
-    quick.QuickDeltaCategoryButton.callback = _clean_delta_callback
 
-    # New quick-order tickets are already emitted with canonical copy by the core
-    # creator. Keep legacy cleanup as a startup repair only; do not wrap every new
-    # ticket creation just to scan and rewrite messages that are already correct.
+    # Entry interactions now stay owned by quick_order_v2 core. Production only
+    # owns the remaining presentation/legacy compatibility seams.
     _install_panel_builder_cleanup()
     _install_farm_ticket_ui()
 
