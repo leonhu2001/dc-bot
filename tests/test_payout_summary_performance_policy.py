@@ -50,7 +50,8 @@ def test_worker_performance_ignores_internal_payroll_transfers(tmp_path):
         conn.execute(
             "INSERT INTO worker_payouts VALUES (2, 2, 'staff-1', 2800, 2250)"
         )
-        # Payroll transfer changes salary settlement only; it must not reduce sales.
+        # Internal payroll transfers affect settlement only. Performance continues
+        # to use the approved final_payout basis from completed companion orders.
         conn.execute(
             "INSERT INTO employee_payroll_adjustments VALUES (1, 'staff-1', -1800, '2026-10-11 12:00:00')"
         )
@@ -64,11 +65,11 @@ def test_worker_performance_ignores_internal_payroll_transfers(tmp_path):
         employee_ids={"staff-1"},
     )
 
-    assert performance == {"staff-1": 6000}
+    assert performance == {"staff-1": 4850}
     progress = performance_progress(performance["staff-1"])
     assert progress["target"] == MONTHLY_PERFORMANCE_TARGET == 5000
-    assert progress["reached"] is True
-    assert progress["remaining"] == 0
+    assert progress["reached"] is False
+    assert progress["remaining"] == 150
 
 
 def test_dual_role_employee_is_one_row_with_one_performance_total():
