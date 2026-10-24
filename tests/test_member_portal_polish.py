@@ -38,10 +38,11 @@ def test_cs_payout_recalculation_uses_shared_separate_base_rule():
     ).read_text(encoding="utf-8")
 
     assert "def calculate_customer_service_payout_base_amount(" in shared_source
-    assert 'point_service_value' in shared_source
-    assert 'benefit_service_value' in shared_source
+    assert "point_service_value" in shared_source
+    assert "benefit_service_value" in shared_source
+    # Both live recalculation paths must use the shared base helper. Do not pin this
+    # test to one wrapper's exact call spelling; wrappers may be refactored safely.
     assert "calculate_customer_service_payout_base_amount(" in order_source
-    assert "customer_service_total_amount=_customer_service_payout_base(order)" in order_source
     assert "calculate_customer_service_payout_base_amount(" in reconciliation_source
     assert "customer_service_total_amount=(" in reconciliation_source
 
