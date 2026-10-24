@@ -35,10 +35,12 @@ def custom_order_level_name(customer_id: int | str) -> str:
 
 
 def is_custom_order_level_eligible(level_name: str | None) -> bool:
+    """Return the policy entitlement only; Discord access is enforced by channel permissions."""
     return str(level_name or "").strip() in _CUSTOM_ORDER_LEVELS
 
 
 def assert_custom_order_eligible(customer_id: int | str) -> str:
+    """Compatibility helper for non-Discord callers that still want policy validation."""
     level_name = custom_order_level_name(customer_id)
     if not is_custom_order_level_eligible(level_name):
         raise ValueError("自訂單為金級會員以上專屬福利。")
@@ -49,7 +51,7 @@ def build_custom_order_entry_embed() -> discord.Embed:
     embed = discord.Embed(
         title="✨ VIP 自訂單｜快速下單",
         description=(
-            "**金級會員以上**可提出自訂單需求。\n\n"
+            "此專屬頻道可直接提出自訂單需求。\n\n"
             "填寫你想玩的遊戲、玩法／規則與目標後，系統會建立私人客服中心。\n"
             "客服確認內容與價格後，才會正式成立訂單；送出需求本身不會扣款或派單。"
         ),
@@ -75,6 +77,29 @@ def _existing_request_channel(
     return None
 
 
+def _order_control_view(client: discord.Client) -> discord.ui.View | None:
+    """Clone the already-registered canonical order control view.
+
+    Core persistent views are registered before READY. Reusing its concrete
+    view type keeps custom-order tickets on the same customer-service controls
+    as normal order tickets without importing bot.py or duplicating callbacks.
+    """
+    for view in getattr(client, "persistent_views", ()):
+        custom_ids = {
+            str(getattr(child, "custom_id", "") or "")
+            for child in getattr(view, "children", ())
+        }
+        if {
+            "order_control_select",
+            "order_control_confirm",
+        }.issubset(custom_ids):
+            try:
+                return type(view)()
+            except Exception:
+                continue
+    return None
+
+
 async def _create_custom_order_request_ticket(
     interaction: discord.Interaction,
     *,
@@ -89,11 +114,9 @@ async def _create_custom_order_request_ticket(
         await interaction.edit_original_response(content="這個功能只能在伺服器內使用。")
         return None
 
-    try:
-        level_name = assert_custom_order_eligible(member.id)
-    except ValueError as exc:
-        await interaction.edit_original_response(content=str(exc))
-        return None
+    # Discord channel visibility is the access gate for this entry point.
+    # Keep the current member level only as useful context for customer service.
+    level_name = custom_order_level_name(member.id)
 
     existing = _existing_request_channel(guild, member.id)
     if existing is not None:
@@ -142,6 +165,7 @@ async def _create_custom_order_request_ticket(
             category=ticket_category,
             overwrites=overwrites,
             topic=(
+                f"order_customer_id={member.id};"
                 f"custom_order_customer_id={member.id};"
                 f"custom_order_request=1;"
                 f"source_channel_id={CUSTOM_ORDER_QUICK_CHANNEL_ID}"
@@ -171,6 +195,7 @@ async def _create_custom_order_request_ticket(
         await ticket.send(
             content=member.mention,
             embed=embed,
+            view=_order_control_view(interaction.client),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
                 roles=False,
@@ -258,11 +283,7 @@ class CustomOrderQuickEntryView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        try:
-            assert_custom_order_eligible(interaction.user.id)
-        except ValueError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-            return
+        # Access is already restricted by this Discord channel's role overwrites.
         await interaction.response.send_modal(CustomOrderRequestModal())
 
 
