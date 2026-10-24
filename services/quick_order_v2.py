@@ -474,6 +474,23 @@ async def _send_confirmation(
     )
 
 
+def _build_order_control_view() -> discord.ui.View | None:
+    """Build the normal customer-service control row at ticket creation time."""
+    try:
+        from services import self_service_runtime as runtime
+
+        state = runtime._require_runtime_state()
+        view_type = state.order_control_view_type
+        return view_type() if view_type is not None else None
+    except Exception as exc:
+        print(
+            f"[quick-order-v2] cannot resolve order control view: "
+            f"{type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return None
+
+
 async def _create_ticket(
     interaction: discord.Interaction,
     *,
@@ -593,6 +610,7 @@ async def _create_ticket(
             f"已選服務：**{selected_label}**\n"
             "請在下方面板完成剩餘選項後送出等待接單。"
             f"{format_customer_notes_for_ticket(member.id)}",
+            view=_build_order_control_view(),
             allowed_mentions=discord.AllowedMentions(
                 users=True,
                 roles=True,
