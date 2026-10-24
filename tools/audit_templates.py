@@ -31,7 +31,7 @@ ALLOWED_LEGACY_PATCH_ASSETS: set[str] = set()
 # shrink-only ceilings. Lower these values whenever files are renamed; never raise
 # them to make CI green. Exact duplicate page assets have no legacy allowance.
 MAX_INLINE_NAMED_PAGE_ASSETS = 36
-MAX_DATED_PAGE_ASSETS = 3
+MAX_DATED_PAGE_ASSETS = 0
 
 STATIC_REF_RE = re.compile(
     r'''(?:src|href)\s*=\s*["'](/static/[^"'?#]+)(?:[?#][^"']*)?["']''',
