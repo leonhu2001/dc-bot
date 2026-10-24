@@ -24,9 +24,75 @@
 .site-pwa-install:disabled{opacity:.6;cursor:default}
 
 @media(max-width:720px){
-    html{scroll-padding-top:74px}
+    html{
+        scroll-padding-top:74px;
+        max-width:100%;
+        overflow-x:hidden
+    }
+    body{
+        max-width:100%;
+        min-width:0;
+        overflow-x:hidden
+    }
+    .site-main,
+    .site-nav-shell,
+    .site-mobile-nav,
+    .footer-grid,
+    .footer-bottom{
+        min-width:0;
+        max-width:100%
+    }
     input,select,textarea{font-size:max(16px,1em)}
-    button,.button,.discord-login{min-height:44px}
+    button,.button,.discord-login,.mobile-nav-button{min-height:44px}
+    .site-mobile-nav{
+        max-height:calc(100dvh - 72px - env(safe-area-inset-top));
+        overflow-y:auto;
+        overscroll-behavior-y:contain;
+        -webkit-overflow-scrolling:touch;
+        padding-bottom:max(14px,env(safe-area-inset-bottom))
+    }
+    .site-mobile-nav a{
+        display:flex;
+        align-items:center;
+        min-height:44px
+    }
+    .account-dropdown{
+        max-width:calc(100vw - 20px);
+        max-height:calc(100dvh - 90px);
+        overflow:auto;
+        overscroll-behavior:contain
+    }
+    .mw-support-panel{
+        left:max(10px,env(safe-area-inset-left));
+        right:max(10px,env(safe-area-inset-right));
+        bottom:max(10px,env(safe-area-inset-bottom));
+        width:auto;
+        max-width:none;
+        max-height:calc(100dvh - env(safe-area-inset-top) - 20px)
+    }
+    .mw-support-messages{
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch
+    }
+    .mw-support-launcher{
+        right:max(12px,env(safe-area-inset-right));
+        bottom:max(12px,env(safe-area-inset-bottom));
+        min-width:48px;
+        min-height:48px
+    }
+    .table-wrap,
+    .report-table-wrap,
+    .dispatch-table-wrap,
+    .salary-list,
+    [class*="table-wrap"]{
+        max-width:100%;
+        overflow-x:auto;
+        overscroll-behavior-x:contain;
+        -webkit-overflow-scrolling:touch
+    }
+    .site-footer{
+        padding-bottom:max(20px,env(safe-area-inset-bottom))
+    }
     .site-pwa-install{
         bottom:calc(72px + env(safe-area-inset-bottom))
     }
@@ -38,6 +104,8 @@
         right:max(76px,env(safe-area-inset-right));
         justify-content:center
     }
+    .site-brand-copy small{display:none}
+    .site-account{gap:6px}
 }
 
 @media(display-mode:standalone){
@@ -45,6 +113,14 @@
     body{
         padding-top:env(safe-area-inset-top);
         padding-left:env(safe-area-inset-left);
+        padding-right:env(safe-area-inset-right);
+        padding-bottom:env(safe-area-inset-bottom)
+    }
+    .site-header{
+        padding-left:env(safe-area-inset-left);
         padding-right:env(safe-area-inset-right)
+    }
+    .site-mobile-nav{
+        padding-bottom:max(16px,env(safe-area-inset-bottom))
     }
 }
