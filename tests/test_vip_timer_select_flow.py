@@ -11,7 +11,7 @@ def test_timer_catalog_is_grouped_by_game_and_service_type():
     assert len(groups) <= 25
     assert len({str(group.get("label") or "") for group in groups}) == len(groups)
 
-    allowed_services = {"單陪", "雙陪", "多人陪", "甜蜜陪", "教學單", "其他"}
+    allowed_services = {"單陪", "雙陪", "三陪", "四陪", "多人陪", "甜蜜陪", "教學單", "其他"}
     seen_values: set[str] = set()
 
     for group in groups:
@@ -66,7 +66,7 @@ def test_service_pages_never_exceed_discord_select_limit():
 def test_timer_game_grouping_keeps_delta_platforms_compact():
     labels = {str(group.get("label") or "") for group in flow.build_vip_timer_self_service_catalog()}
 
-    assert "三角洲行動｜端遊" in labels or "三角洲行動｜手遊" in labels
+    assert {"三角洲端遊", "三角洲手遊"} & labels
     assert not any("基礎單" in label for label in labels)
     assert not any("趣味單" in label for label in labels)
 
@@ -77,11 +77,11 @@ def test_spec_label_removes_redundant_staff_count_words():
         detail_label="機密單陪",
         variant="基礎",
         service_type="單陪",
-    ) == "基礎｜技術陪｜機密"
+    ) == "技術｜機密"
 
     assert flow._spec_label(
         source_group="娛樂陪",
         detail_label="NG｜陪玩2名",
         variant="",
         service_type="雙陪",
-    ) == "娛樂陪｜NG"
+    ) == "娛樂｜NG"
