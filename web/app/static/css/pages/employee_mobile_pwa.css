@@ -6,6 +6,7 @@
     .employee-workspace-site .employee-workspace-hero,
     .employee-workspace-site .site-main{
         max-width:100%;
+        min-width:0;
         overflow-x:clip
     }
     .employee-workspace-site input,
@@ -27,47 +28,90 @@
         overflow-x:auto;
         overscroll-behavior-x:contain;
         scrollbar-width:none;
-        padding-bottom:2px
+        padding:2px 0 4px;
+        scroll-snap-type:x proximity
     }
     .employee-workspace-site .employee-workspace-hero-actions::-webkit-scrollbar,
     .employee-workspace-site .ec-actions::-webkit-scrollbar{display:none}
     .employee-workspace-site .employee-workspace-hero-actions>a,
-    .employee-workspace-site .ec-actions>a{flex:0 0 auto}
+    .employee-workspace-site .ec-actions>a{
+        flex:0 0 auto;
+        scroll-snap-align:start
+    }
+    .employee-workspace-site .employee-workspace-page-content{
+        padding-left:max(10px,env(safe-area-inset-left));
+        padding-right:max(10px,env(safe-area-inset-right))
+    }
     .employee-workspace-site .ec{
-        width:min(100% - 20px,1180px);
-        margin-top:20px;
+        width:100%;
+        max-width:1180px;
+        margin-top:16px;
         margin-bottom:calc(72px + env(safe-area-inset-bottom))
     }
     .employee-workspace-site .ec-hero{
         border-radius:18px;
-        padding:17px
+        padding:16px
     }
     .employee-workspace-site .ec h1{
-        font-size:clamp(30px,11vw,44px);
-        line-height:1.02
+        font-size:clamp(28px,10vw,42px);
+        line-height:1.04;
+        overflow-wrap:anywhere
     }
     .employee-workspace-site .ec-overview{
         gap:8px
     }
     .employee-workspace-site .ec-stat{
+        min-width:0;
         padding:13px 12px
+    }
+    .employee-workspace-site .ec-stat strong,
+    .employee-workspace-site .ec-stat span{
+        overflow-wrap:anywhere
     }
     .employee-workspace-site .ec-salary,
     .employee-workspace-site .ec-card,
     .employee-workspace-site .binding-card{
+        min-width:0;
         border-radius:17px
     }
     .employee-workspace-site .salary-list,
     .employee-workspace-site .table-wrap,
     .employee-workspace-site .report-table-wrap,
     .employee-workspace-site .dispatch-table-wrap{
+        max-width:100%;
+        overflow-x:auto;
+        overscroll-behavior-x:contain;
         -webkit-overflow-scrolling:touch
+    }
+    .employee-workspace-site table{
+        width:max-content;
+        min-width:100%
+    }
+    .employee-workspace-site td,
+    .employee-workspace-site th{
+        white-space:nowrap
+    }
+    .employee-workspace-site .employee-workspace-hero-copy,
+    .employee-workspace-site .ec-card,
+    .employee-workspace-site .binding-card{
+        overflow-wrap:anywhere
     }
 }
 
 @media(max-width:480px){
     .employee-workspace-site .ec-overview{grid-template-columns:1fr 1fr}
-    .employee-workspace-site .employee-workspace-hero{padding-left:14px;padding-right:14px}
+    .employee-workspace-site .employee-workspace-hero{padding-left:10px;padding-right:10px}
+    .employee-workspace-site .ec-hero{padding:14px}
+    .employee-workspace-site .ec-stat{padding:11px 10px}
+    .employee-workspace-site .employee-workspace-hero-actions>a,
+    .employee-workspace-site .ec-actions>a,
+    .employee-workspace-site .salary-tab{
+        min-height:46px
+    }
+}
+
+@media(max-width:380px){
+    .employee-workspace-site .ec-overview{grid-template-columns:1fr}
 }
 
 @media(display-mode:standalone){
