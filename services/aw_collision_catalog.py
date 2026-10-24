@@ -514,26 +514,11 @@ def _install_panel_patch() -> None:
 
 def _patch_credential_placeholder() -> None:
     try:
-        from services.order_credential_runtime import OrderCredentialModal
+        from services.order_credential_runtime import set_order_credential_note_placeholder
     except Exception:
         return
 
-    candidates = []
-    direct = getattr(OrderCredentialModal, "login_note", None)
-    if direct is not None:
-        candidates.append(direct)
-    for attr_name in ("__modal_children_items__", "_Modal__modal_children_items__"):
-        try:
-            candidates.extend(list(getattr(OrderCredentialModal, attr_name, ()) or ()))
-        except Exception:
-            pass
-
-    for item in candidates:
-        if str(getattr(item, "label", "") or "").startswith("登入方式／備註"):
-            try:
-                item.placeholder = CREDENTIAL_NOTE_PLACEHOLDER
-            except Exception:
-                pass
+    set_order_credential_note_placeholder(CREDENTIAL_NOTE_PLACEHOLDER)
 
 
 def install_aw_collision_catalog() -> None:
