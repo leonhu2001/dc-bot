@@ -3,19 +3,9 @@ from __future__ import annotations
 import re
 
 import discord
-from discord.ext import commands
 
 from services import quick_order_v2 as quick
-from services.quick_order_v2_assets import public_order_panel_image_url
 
-
-_INSTALLED = False
-_ORIGINAL_VIEW_FOR_CHANNEL = None
-_ORIGINAL_DELTA_CALLBACK = None
-
-_DELTA_COVER_BY_CATEGORY = {
-    "delta_desktop_fun": "delta_fun_panel.png",
-}
 
 _PRICE_LIST_LABEL_BY_CHANNEL_ID = {
     int(quick.QUICK_ORDER_V2_CHANNELS["delta"]): "三角洲行動",
@@ -31,13 +21,7 @@ def _normalise_emoji_name(value: str) -> str:
 
 
 def _guild_emoji(interaction: discord.Interaction, token: str) -> str:
-    """Resolve a server custom emoji by the shortcode the owner uses in Discord.
-
-    Discord's client can display duplicate emoji shortcodes with a ``~1`` suffix,
-    while the API may expose either a distinct suffixed name or duplicate base
-    names. Try the full normalized name first, then treat ``~N`` as the Nth
-    duplicate of the base name. Missing emojis simply fall back to text labels.
-    """
+    """Resolve a server custom emoji by the shortcode the owner uses in Discord."""
     guild = interaction.guild
     if guild is None:
         return ""
@@ -173,11 +157,8 @@ def _price_list_text(interaction: discord.Interaction, channel_id: int) -> str:
     return "價目表內容整理中，稍後更新。"
 
 
-def _delta_cover_url(category: str) -> str | None:
-    filename = _DELTA_COVER_BY_CATEGORY.get(str(category))
-    if not filename:
-        return None
-    return public_order_panel_image_url(filename)
+def has_price_list(channel_id: int) -> bool:
+    return int(channel_id) in _PRICE_LIST_LABEL_BY_CHANNEL_ID
 
 
 class QuickPriceListButton(discord.ui.Button):
@@ -204,110 +185,15 @@ class QuickPriceListButton(discord.ui.Button):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-def _install_view_factory() -> None:
-    global _ORIGINAL_VIEW_FOR_CHANNEL
-    if _ORIGINAL_VIEW_FOR_CHANNEL is not None:
-        return
-
-    _ORIGINAL_VIEW_FOR_CHANNEL = quick._view_for_channel
-    original = _ORIGINAL_VIEW_FOR_CHANNEL
-
-    def price_view_for_channel(channel_id: int) -> discord.ui.View:
-        view = original(channel_id)
-        if int(channel_id) in _PRICE_LIST_LABEL_BY_CHANNEL_ID:
-            view.add_item(QuickPriceListButton(int(channel_id)))
-        return view
-
-    quick._view_for_channel = price_view_for_channel
-
-
-async def _delta_category_callback(
-    self: quick.QuickDeltaCategoryButton,
-    interaction: discord.Interaction,
-) -> None:
-    if not quick._options(self.category):
-        await interaction.response.send_message(
-            "這個分類目前沒有可下單服務。",
-            ephemeral=True,
-        )
-        return
-
-    embed = discord.Embed(
-        title=f"{self.category_emoji} 三角洲行動｜{self.category_label}",
-        description="請選擇服務。",
-        color=discord.Color.green(),
-    )
-    view = discord.ui.View(timeout=180)
-    view.add_item(
-        quick.QuickServiceSelect(
-            category=self.category,
-            source_channel_id=quick.QUICK_ORDER_V2_CHANNELS["delta"],
-            persistent=False,
-        )
-    )
-
-    image_url = _delta_cover_url(self.category)
-    if image_url is not None:
-        embed.set_image(url=image_url)
-    elif self.category in _DELTA_COVER_BY_CATEGORY:
-        print(
-            f"[quick-order-price] delta cover missing/invalid category={self.category} "
-            f"expected={_DELTA_COVER_BY_CATEGORY.get(str(self.category))}",
-            flush=True,
-        )
-
-    await interaction.response.send_message(
-        embed=embed,
-        view=view,
-        ephemeral=True,
-    )
-
-
-def _install_delta_cover_callback() -> None:
-    global _ORIGINAL_DELTA_CALLBACK
-    if _ORIGINAL_DELTA_CALLBACK is not None:
-        return
-
-    _ORIGINAL_DELTA_CALLBACK = quick.QuickDeltaCategoryButton.callback
-    quick.QuickDeltaCategoryButton.callback = _delta_category_callback
-
-
-async def _refresh_policy_panels(bot: commands.Bot) -> None:
-    await bot.wait_until_ready()
-    for key in ("delta", "vip_timer"):
-        channel_id = int(quick.QUICK_ORDER_V2_CHANNELS[key])
-        try:
-            await quick._ensure_panel(bot, channel_id)
-        except Exception as exc:
-            print(
-                f"[quick-order-price] panel refresh failed {channel_id}: "
-                f"{type(exc).__name__}: {exc}",
-                flush=True,
-            )
-
-
-def install_quick_order_v2_price_lists(bot: commands.Bot) -> None:
-    global _INSTALLED
-    if _INSTALLED:
-        return
-
-    # This module now owns presentation only: price-list controls, the Delta cover,
-    # and panel refresh. Entry copy and VIP eligibility belong to production.
-    _install_view_factory()
-    _install_delta_cover_callback()
-
-    for channel_id in _PRICE_LIST_LABEL_BY_CHANNEL_ID:
-        bot.add_view(quick._view_for_channel(channel_id))
-
-    if not getattr(bot, "_quick_order_v2_price_panel_refresh_started", False):
-        bot._quick_order_v2_price_panel_refresh_started = True
-        bot.loop.create_task(_refresh_policy_panels(bot))
-
-    _INSTALLED = True
-    print("[quick-order-price] text price lists and panel controls installed", flush=True)
+def add_price_list_control(view: discord.ui.View, channel_id: int) -> discord.ui.View:
+    """Decorate a canonical public quick-order view without patching its factory."""
+    if has_price_list(channel_id):
+        view.add_item(QuickPriceListButton(int(channel_id)))
+    return view
 
 
 __all__ = [
     "QuickPriceListButton",
-    "install_quick_order_v2_price_lists",
+    "add_price_list_control",
+    "has_price_list",
 ]
