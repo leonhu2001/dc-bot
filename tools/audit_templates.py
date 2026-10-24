@@ -84,11 +84,15 @@ def _page_assets() -> list[Path]:
     return sorted(assets)
 
 
-def _duplicate_page_asset_groups(paths: list[Path]) -> list[list[str]]:
+def _duplicate_page_asset_groups(
+    paths: list[Path],
+    *,
+    static_root: Path = STATIC,
+) -> list[list[str]]:
     by_digest: dict[str, list[str]] = defaultdict(list)
     for path in paths:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        by_digest[digest].append(path.relative_to(STATIC).as_posix())
+        by_digest[digest].append(path.relative_to(static_root).as_posix())
     return sorted(
         sorted(group)
         for group in by_digest.values()
