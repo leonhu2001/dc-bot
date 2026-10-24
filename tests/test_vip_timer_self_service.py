@@ -84,16 +84,16 @@ def test_zero_timer_financials_keeps_shape_but_removes_upfront_money():
     assert result["vip_timer"] is True
 
 
-def test_timer_eligibility_requires_gold_and_no_open_order(monkeypatch):
-    monkeypatch.setattr(bridge, "_customer_vip_name", lambda customer_id: "金級魔丸")
+def test_timer_eligibility_requires_platinum_and_no_open_order(monkeypatch):
+    monkeypatch.setattr(bridge, "_customer_vip_name", lambda customer_id: "白金魔丸")
     monkeypatch.setattr(bridge, "has_open_vip_timer", lambda customer_id: False)
     bridge.assert_vip_timer_self_service_eligible(123)
 
-    monkeypatch.setattr(bridge, "_customer_vip_name", lambda customer_id: "銀級魔丸")
-    with pytest.raises(ValueError, match="金級會員以上"):
+    monkeypatch.setattr(bridge, "_customer_vip_name", lambda customer_id: "金級魔丸")
+    with pytest.raises(ValueError, match="白金級會員以上"):
         bridge.assert_vip_timer_self_service_eligible(123)
 
-    monkeypatch.setattr(bridge, "_customer_vip_name", lambda customer_id: "金級魔丸")
+    monkeypatch.setattr(bridge, "_customer_vip_name", lambda customer_id: "白金魔丸")
     monkeypatch.setattr(bridge, "has_open_vip_timer", lambda customer_id: True)
     with pytest.raises(ValueError, match="已有一張"):
         bridge.assert_vip_timer_self_service_eligible(123)
