@@ -77,7 +77,7 @@ def _options(category: str) -> list[discord.SelectOption]:
 def build_entry_embed(channel_id: int) -> discord.Embed:
     if channel_id == QUICK_ORDER_V2_CHANNELS["delta"]:
         embed = discord.Embed(
-            title="🟢 三角洲行動｜快速下單",
+            title="🟢 三角洲行動｜下單",
             description=(
                 "先選服務類型，再選服務；**確認後才會建立私人票口**。\n"
                 "票口內再選規格、陪玩人數與時長／數量。\n\n"
@@ -90,9 +90,9 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
         )
     elif channel_id == QUICK_ORDER_V2_CHANNELS["vip_timer"]:
         embed = discord.Embed(
-            title="💎 VIP 自由計時｜快速下單",
+            title="💎 VIP 自由計時｜下單",
             description=(
-                "金級會員以上限定。先選**起始遊戲**，確認後建立私人票口。\n"
+                "請先選擇**起始遊戲**，確認後建立私人票口。\n"
                 "票口內再選起始玩法；接滿後開始計時，中途可切換遊戲／玩法。\n"
                 "結束後依實際遊玩時間結算，先玩後付。"
             ),
@@ -101,7 +101,7 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
     else:
         _, title = _GAME_ENTRY_META[channel_id]
         embed = discord.Embed(
-            title=f"{title}｜快速下單",
+            title=f"{title}｜下單",
             description=(
                 "請選擇你要的服務，確認後才會建立私人票口。\n"
                 "票口內再選規格、陪玩人數與時長／局數。"
@@ -109,11 +109,6 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
             color=discord.Color.purple(),
         )
 
-    embed.add_field(
-        name="新版測試中",
-        value="舊點單入口目前仍保留；新版若遇到異常，可先使用舊入口。",
-        inline=False,
-    )
     embed.set_footer(text=_marker(channel_id))
     return embed
 
@@ -366,7 +361,7 @@ class QuickOrderConfirmView(discord.ui.View):
             return
 
         await interaction.response.edit_message(
-            content="已取消本次快速下單。",
+            content="已取消本次下單。",
             embed=None,
             view=None,
         )
@@ -388,7 +383,7 @@ async def _send_confirmation(
 
     timer = category == VIP_TIMER_CATEGORY
     embed = discord.Embed(
-        title="💎 VIP 自由計時｜確認下單" if timer else "🛒 快速下單｜確認",
+        title="💎 VIP 自由計時｜確認下單" if timer else "🛒 確認下單",
         description=(
             f"**遊戲／類型：** "
             f"{VIP_TIMER_CATEGORY_LABEL if timer else ORDER_CATEGORY_LABELS.get(category, category)}\n"
@@ -493,7 +488,7 @@ async def _create_ticket(
                 f"quick_order_v2=1;"
                 f"source_channel_id={source_channel_id}"
             ),
-            reason=f"Quick order v2 opened by {member}",
+            reason=f"Order ticket opened by {member}",
         )
 
         from services import self_service_selection_state as selection_state
@@ -524,15 +519,16 @@ async def _create_ticket(
             if category == VIP_TIMER_CATEGORY
             else f"{ORDER_CATEGORY_LABELS.get(category, category)}｜{item_group}"
         )
+        support_mention = role.mention if role is not None else "客服"
 
         await ticket.send(
-            f"{member.mention} 新版快速下單票口已建立。\n"
-            f"已選：**{selected_label}**\n"
+            f"{support_mention} {member.mention} 下單票口已建立。\n"
+            f"已選服務：**{selected_label}**\n"
             "請在下方面板完成剩餘選項後送出等待接單。"
             f"{format_customer_notes_for_ticket(member.id)}",
             allowed_mentions=discord.AllowedMentions(
                 users=True,
-                roles=False,
+                roles=True,
                 everyone=False,
             ),
         )
@@ -553,7 +549,7 @@ async def _create_ticket(
     except Exception as exc:
         if ticket is not None:
             try:
-                await ticket.delete(reason="Quick order v2 setup failed")
+                await ticket.delete(reason="Order ticket setup failed")
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
@@ -564,8 +560,8 @@ async def _create_ticket(
         )
         await interaction.edit_original_response(
             content=(
-                f"建立新版下單票口失敗：{type(exc).__name__}。"
-                "請先使用舊點單入口或通知客服。"
+                f"建立下單票口失敗：{type(exc).__name__}。"
+                "請稍後重試或通知客服。"
             ),
             embed=None,
             view=None,
@@ -634,11 +630,11 @@ def _install_ticket_patch() -> None:
 
         category = str(data.get("category") or "")
         group = str(data.get("item_group") or "尚未選擇")
-        embed.title = f"快速下單｜{ORDER_CATEGORY_LABELS.get(category, category)}"
+        embed.title = "自助下單"
         embed.description = (
             f"下單用戶：<@{customer_id}>\n\n"
             f"已選服務：**{group}**\n"
-            "請完成規格／陪玩人數與時長／數量；不需要重新選遊戲或服務。\n"
+            "請完成規格／陪玩人數與時長／數量。\n"
             "送出後先進入等待接單，人數滿後才開放付款。"
         )
 
@@ -653,7 +649,7 @@ def _install_ticket_patch() -> None:
                 inline=field.inline,
             )
 
-        embed.set_footer(text="新版快速下單｜遊戲與服務已在開票前確認")
+        embed.remove_footer()
         return embed
 
     ui.SelfServiceOrderView.__init__ = quick_view_init
