@@ -17,8 +17,7 @@ VIP_BENEFIT_ITEMS: dict[str, str] = {
     "free_secret_space": "・每月一次免費「機密航天保底1000w」或娛樂陪 2H",
     "discount_94": "・體驗單、趣味單外全館94折",
     "custom_order": "・可根據闆闆要求製作\"自訂單\"",
-    "weekly_prestige_trial": "・每週一次尊爵體驗單",
-    "vip_timer": "・可使用 VIP 自由計時",
+    "vip_timer": "・可使用「VIP 自由計時」",
 }
 
 VIP_LEVELS: list[dict[str, Any]] = [
@@ -33,8 +32,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "threshold": 6000,
         "role_id": 1516575036973256738,
         "benefit_keys": [
-            "vip_room", "priority_cs", "discount_98", "custom_order",
-            "weekly_prestige_trial",
+            "vip_room", "priority_cs", "discount_98", "custom_order", "vip_timer",
         ],
     },
     {
@@ -43,8 +41,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "role_id": 1516575034670583929,
         "benefit_keys": [
             "vip_room", "priority_cs", "discount_98", "rebate_1",
-            "monthly_coupon_200", "priority_order", "custom_order",
-            "weekly_prestige_trial", "vip_timer",
+            "monthly_coupon_200", "priority_order", "custom_order", "vip_timer",
         ],
     },
     {
@@ -53,8 +50,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "role_id": 1516575030648115200,
         "benefit_keys": [
             "vip_room", "priority_cs", "monthly_coupon_200", "priority_order",
-            "familiar_worker", "rebate_2", "discount_96", "custom_order",
-            "weekly_prestige_trial", "vip_timer",
+            "familiar_worker", "rebate_2", "discount_96", "custom_order", "vip_timer",
         ],
     },
     {
@@ -64,7 +60,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "benefit_keys": [
             "vip_room", "priority_cs", "monthly_coupon_200", "priority_order",
             "familiar_worker", "discount_96", "rebate_3", "monthly_coupon_500",
-            "custom_order", "weekly_prestige_trial", "vip_timer",
+            "custom_order", "vip_timer",
         ],
     },
     {
@@ -74,8 +70,7 @@ VIP_LEVELS: list[dict[str, Any]] = [
         "benefit_keys": [
             "vip_room", "priority_cs", "monthly_coupon_200", "priority_order",
             "familiar_worker", "monthly_coupon_500", "free_secret_space",
-            "rebate_3", "discount_94", "custom_order",
-            "weekly_prestige_trial", "vip_timer",
+            "rebate_3", "discount_94", "custom_order", "vip_timer",
         ],
     },
 ]
