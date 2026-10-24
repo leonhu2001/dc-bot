@@ -3,8 +3,12 @@ import inspect
 
 from services.custom_order_quick_entry import (
     CUSTOM_ORDER_QUICK_CHANNEL_ID,
+    CUSTOM_ORDER_RULE_KEY,
+    CustomOrderCompanionCountSelect,
     CustomOrderQuickEntryView,
     _create_custom_order_request_ticket,
+    _custom_order_detail,
+    _send_custom_order_self_service_panel,
     build_custom_order_entry_embed,
     install_custom_order_quick_entry,
     is_custom_order_level_eligible,
@@ -31,7 +35,8 @@ def test_custom_order_discord_panel_relies_on_channel_access():
     text = f"{embed.title}\n{embed.description}"
     assert "金級會員以上" not in text
     assert "此專屬頻道可直接提出" in text
-    assert "客服確認內容與價格後" in text
+    assert "1～4 位陪玩" in text
+    assert "自助下單" in text
     assert "不會扣款或派單" in text
 
 
@@ -42,10 +47,32 @@ def test_custom_order_discord_runtime_does_not_recheck_vip_level():
     assert "assert_custom_order_eligible" not in ticket_source
 
 
-def test_custom_order_ticket_uses_normal_order_identity_and_staff_controls():
+def test_custom_order_headcount_select_exposes_one_to_four_people():
+    select = CustomOrderCompanionCountSelect(123)
+    assert [option.value for option in select.options] == ["1", "2", "3", "4"]
+    assert [option.label for option in select.options] == [
+        "1 位陪玩",
+        "2 位陪玩",
+        "3 位陪玩",
+        "4 位陪玩",
+    ]
+
+    for count in range(1, 5):
+        detail = _custom_order_detail(count)
+        assert detail["rule_key"] == CUSTOM_ORDER_RULE_KEY
+        assert detail["player_count"] == count
+
+
+def test_custom_order_ticket_uses_normal_order_identity_staff_controls_and_self_service():
     source = inspect.getsource(_create_custom_order_request_ticket)
     assert "order_customer_id={member.id}" in source
+    assert "custom_order_companion_count={count}" in source
     assert "view=_order_control_view(interaction.client)" in source
+    assert "_send_custom_order_self_service_panel(" in source
+
+    panel_source = inspect.getsource(_send_custom_order_self_service_panel)
+    assert "SelfServiceOrderView" in panel_source
+    assert "selected_category=CUSTOM_ORDER_CATEGORY" in panel_source
 
 
 def test_existing_custom_order_tickets_are_repaired_idempotently_on_startup():
@@ -53,7 +80,10 @@ def test_existing_custom_order_tickets_are_repaired_idempotently_on_startup():
     install_source = inspect.getsource(install_custom_order_quick_entry)
     assert '"custom_order_request=1"' in repair_source
     assert '"order_customer_id=" not in topic' in repair_source
+    assert '"custom_order_companion_count=" not in topic' in repair_source
     assert "_message_has_order_controls(message)" in repair_source
+    assert "_message_has_self_service_panel(message)" in repair_source
+    assert "_send_custom_order_self_service_panel(" in repair_source
     assert "repair_existing_custom_order_ticket_controls(bot)" in install_source
 
 
