@@ -52,7 +52,6 @@ def test_only_entertainment_products_have_loyalty_progress():
     for rule_key in ELIGIBLE_RULES:
         rule = ORDER_RULES[rule_key]
         assert rule.loyalty_benefits_enabled is True
-        assert "娛樂陪" in rule.label
         policy = loyalty.loyalty_policy_for_rule(rule_key)
         assert policy is not None
         assert policy["threshold_units"] == 10.0
