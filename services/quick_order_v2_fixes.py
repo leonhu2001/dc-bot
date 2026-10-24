@@ -218,6 +218,20 @@ def _install_canonical_group_resolver() -> None:
     selection_state.get_order_item_details_for_group = _canonical_details
 
 
+def _disable_legacy_ticket_patch() -> None:
+    """Keep the old core ticket wrapper from stacking under production policy.
+
+    setup_commands installs fixes before quick_order_v2. Marking the legacy patch as
+    already handled means install_quick_order_v2 still registers persistent views and
+    panel tasks, while production remains the sole owner of Quick Order ticket UI.
+    """
+    if (
+        getattr(quick, "_ORIGINAL_VIEW_INIT", None) is None
+        and getattr(quick, "_ORIGINAL_PANEL_BUILDER", None) is None
+    ):
+        quick._PATCH_INSTALLED = True
+
+
 def _delta_entry_init(self) -> None:
     discord.ui.View.__init__(self, timeout=None)
     for emoji, label, category, style in quick._DELTA_BUTTONS:
@@ -364,6 +378,10 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # explicitly kept as one service with five schemes.
     _install_canonical_group_resolver()
     quick._groups = _live_groups
+
+    # Production owns the only active Quick Order ticket UI wrapper. Disable the
+    # old core wrapper before install_quick_order_v2 runs immediately after us.
+    _disable_legacy_ticket_patch()
 
     # Discord supports up to five buttons per action row; keep all four Delta
     # entry buttons on the same row instead of forcing the fourth onto row 2.
