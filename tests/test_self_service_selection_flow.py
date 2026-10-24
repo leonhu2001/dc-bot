@@ -3,13 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from services import order_runtime
+from services import orders as orders_service
 from services.order_rules import ORDER_RULES
-from services.orders import (
-    ORDER_ITEM_GROUPS_BY_CATEGORY,
-    SELF_SERVICE_ACTIVE_CATEGORIES,
-    get_order_item_detail_for_selection,
-    get_order_item_details_for_group,
-)
 from services.self_service_selection_state import (
     apply_self_service_category_selection,
     apply_self_service_detail_selection,
@@ -28,7 +23,7 @@ def test_desktop_entertain_detail_enables_hour_quantity(monkeypatch):
         "benefit_discount_amount": 123,
         "customer_pay_amount": 456,
     }
-    detail = get_order_item_detail_for_selection(
+    detail = orders_service.get_order_item_detail_for_selection(
         data["category"], data["item_group"], "single"
     )
     assert detail is not None
@@ -111,13 +106,16 @@ def test_single_detail_group_uses_same_canonical_transition():
 
 
 def test_all_active_catalog_paths_have_valid_discord_detail_and_quantity_contracts():
-    for category in SELF_SERVICE_ACTIVE_CATEGORIES:
-        groups = ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, [])
+    for category in orders_service.SELF_SERVICE_ACTIVE_CATEGORIES:
+        groups = orders_service.ORDER_ITEM_GROUPS_BY_CATEGORY.get(category, [])
         assert groups, category
         assert len(groups) <= 25, category
 
         for group in groups:
-            details = get_order_item_details_for_group(category, group)
+            # Quick-order installs a canonical resolver at runtime (notably for
+            # 賽季3x3). Read it from the module here instead of freezing a stale
+            # pre-install function reference during test collection.
+            details = orders_service.get_order_item_details_for_group(category, group)
             assert details, (category, group)
             assert len(details) <= 25, (category, group)
 
@@ -132,6 +130,8 @@ def test_all_active_catalog_paths_have_valid_discord_detail_and_quantity_contrac
                 minimum = int(detail.get("min_quantity") or 1)
                 maximum = int(detail.get("max_quantity") or 1)
                 assert 1 <= minimum <= maximum <= 24, (category, group, detail)
-                resolved = get_order_item_detail_for_selection(category, group, detail["value"])
+                resolved = orders_service.get_order_item_detail_for_selection(
+                    category, group, detail["value"]
+                )
                 assert resolved is not None
                 assert resolved["rule_key"] == detail["rule_key"]
