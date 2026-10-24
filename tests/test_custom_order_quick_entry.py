@@ -46,10 +46,11 @@ def test_setup_installs_custom_order_quick_entry():
 
 
 def test_vip_timer_quick_order_copy_stays_platinum_or_above():
-    source = (
-        Path(__file__).resolve().parents[1]
-        / "services"
-        / "quick_order_v2_production.py"
-    ).read_text(encoding="utf-8")
-    assert "白金級會員以上限定。" in source
-    assert "金級會員以上限定。" not in source
+    from services import quick_order_v2 as quick
+    from services import quick_order_v2_production as production
+
+    embed = production._clean_entry_embed(
+        quick.QUICK_ORDER_V2_CHANNELS["vip_timer"]
+    )
+    first_line = str(embed.description or "").splitlines()[0]
+    assert first_line == "白金級會員以上限定。"
