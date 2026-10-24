@@ -13,6 +13,10 @@ from services.quick_order_v2_panel_images import (
     panel_image_url,
 )
 from services.quick_order_v2_price_lists import add_price_list_control
+from services.quick_order_v2_select_display import (
+    LEGACY_RESELECT_FLAG,
+    apply_quick_order_select_display,
+)
 
 
 _INSTALLED = False
@@ -283,11 +287,13 @@ def _install_ticket_ui_policy() -> None:
     if _BASE_PANEL_BUILDER is not None or _BASE_VIEW_INIT is not None:
         return
 
+    from core.database import remember_order_data
     from services import order_runtime
     from services import self_service_runtime as runtime
     from services import self_service_selection_runtime as selection_runtime
     from services import self_service_ui_runtime as ui
     from services.order_rules import ORDER_RULES
+    from services.order_ticket_ui_policy import install_payment_finalize_rename_policy
     from services.orders import get_self_service_quantity_meta
 
     _BASE_PANEL_BUILDER = runtime.build_self_service_panel_embed
@@ -303,7 +309,25 @@ def _install_ticket_ui_policy() -> None:
     ):
         base_view_init(self, customer_id, channel_id, selected_category)
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
-        if not data.get("quick_order_v2"):
+        if not isinstance(data, dict) or not data.get("quick_order_v2"):
+            return
+
+        # Customer-service re-dispatch intentionally constructs the view without a
+        # fixed category. Persist that mode once so every later refresh keeps the
+        # original four selectors instead of falling back to the compact quick UI.
+        if selected_category is None and not data.get(LEGACY_RESELECT_FLAG):
+            data[LEGACY_RESELECT_FLAG] = True
+            try:
+                remember_order_data(channel_id, data)
+            except Exception as exc:
+                print(
+                    f"[quick-order-v2] persist classic re-dispatch mode failed "
+                    f"channel={channel_id}: {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+        if data.get(LEGACY_RESELECT_FLAG):
+            apply_quick_order_select_display(self, data)
             return
 
         category = str(data.get("category") or "")
@@ -382,8 +406,6 @@ def _install_ticket_ui_policy() -> None:
             elif is_farm and custom_id == "self_service_order_go_payment_button" and not item:
                 child.disabled = True
 
-        from services.quick_order_v2_select_display import apply_quick_order_select_display
-
         apply_quick_order_select_display(self, data)
 
     def ticket_panel_builder(
@@ -393,7 +415,9 @@ def _install_ticket_ui_policy() -> None:
     ) -> discord.Embed:
         embed = base_builder(customer_id, data, guild)
         if (
-            not data.get("quick_order_v2")
+            not isinstance(data, dict)
+            or not data.get("quick_order_v2")
+            or data.get(LEGACY_RESELECT_FLAG)
             or str(data.get("category") or "") == quick.VIP_TIMER_CATEGORY
         ):
             return embed
@@ -433,8 +457,14 @@ def _install_ticket_ui_policy() -> None:
                 state,
                 self_service_panel_embed_builder=ticket_panel_builder,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            print(
+                f"[quick-order-v2] runtime panel builder refresh failed: "
+                f"{type(exc).__name__}: {exc}",
+                flush=True,
+            )
+
+    install_payment_finalize_rename_policy(order_runtime)
 
 
 def install_quick_order_v2_production(bot: commands.Bot) -> None:
