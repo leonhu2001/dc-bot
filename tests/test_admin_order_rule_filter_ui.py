@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_order_rule_sidebar_hidden_items_are_actually_hidden():
     layout_css = (
-        ROOT / "web/app/static/css/pages/layout_inline_1.css"
+        ROOT / "web/app/static/css/pages/layout.css"
     ).read_text(encoding="utf-8")
     template = (ROOT / "web/app/templates/admin_order_rules.html").read_text(encoding="utf-8")
     rule_js = (
