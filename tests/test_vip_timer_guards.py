@@ -115,12 +115,22 @@ def test_timer_catalog_excludes_hidden_legacy_and_minimum_hour_rules(monkeypatch
         def is_custom(self, key):
             return str(key) == "custom_hourly"
 
-    def rule(*, price=300, min_quantity=1, pricing_type="hourly", label="一般玩法"):
+    def rule(
+        *,
+        price=300,
+        min_quantity=1,
+        pricing_type="hourly",
+        label="一般玩法",
+        category="apex",
+        vip_discount_allowed=True,
+    ):
         return SimpleNamespace(
             pricing_type=pricing_type,
             price=price,
             min_quantity=min_quantity,
             label=label,
+            category=category,
+            vip_discount_allowed=vip_discount_allowed,
         )
 
     rules = FakeRules({
@@ -159,8 +169,10 @@ def test_timer_catalog_excludes_hidden_legacy_and_minimum_hour_rules(monkeypatch
         lambda key: True,
     )
 
+    # Generic guard removes hidden/non-hourly/minimum-only legacy rules; the
+    # installed VIP timer policy then keeps only supported game services and
+    # intentionally excludes teaching/sweet service types from public timer use.
     assert catalog_guard.public_timer_rule_keys() == {
         "valid_hourly",
-        "apex_teaching_one",
         "custom_hourly",
     }
