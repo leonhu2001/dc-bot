@@ -1,17 +1,18 @@
 import asyncio
 import inspect
+from pathlib import Path
 from types import SimpleNamespace
 
 from services.self_service_dispatch_cleanup import cleanup_failed_self_service_dispatch
-from services.self_service_dispatch_runtime import (
-    _create_waiting_acceptance_order_once,
-    create_waiting_acceptance_order,
-)
+from services.self_service_dispatch_runtime import _create_waiting_acceptance_order_once
 from services.self_service_runtime import (
     SelfServiceSubmitNoteModal,
     create_waiting_acceptance_order_from_self_service,
 )
 from shared import web_order_sync
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_self_service_dispatch_is_inert_until_canonical_order_is_ready():
@@ -41,7 +42,10 @@ def test_self_service_dispatch_persists_provisional_message_for_crash_cleanup():
 
 
 def test_runtime_owns_pre_activation_rollback_boundary():
-    source = inspect.getsource(create_waiting_acceptance_order)
+    # The public callable may be wrapped by AW catalog integration at import time.
+    # Inspect the canonical module source so this test protects the rollback boundary
+    # itself instead of the outermost runtime decorator/wrapper.
+    source = (ROOT / "services/self_service_dispatch_runtime.py").read_text(encoding="utf-8")
 
     assert "dispatch_rollback_pending" in source
     assert "cleanup_failed_self_service_dispatch(" in source
