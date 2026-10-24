@@ -73,8 +73,28 @@ def _farm_3x3_details() -> list[dict]:
             continue
         for detail in group.get("details", []):
             rule_key = str(detail.get("rule_key") or "")
-            if rule_key in _FARM_3X3_RULE_KEYS:
-                by_rule_key[rule_key] = dict(detail)
+            if rule_key not in _FARM_3X3_RULE_KEYS:
+                continue
+
+            item = dict(detail)
+            rule = orders.ORDER_RULES.get(rule_key)
+            manager_group_label = (
+                str(getattr(rule, "catalog_group_label", "") or "").strip()
+                if rule is not None
+                else ""
+            )
+            if manager_group_label and rule is not None:
+                item["label"] = str(
+                    getattr(rule, "label", "")
+                    or item.get("label")
+                    or ""
+                )
+            item["item"] = str(
+                getattr(rule, "label", "")
+                or item.get("label")
+                or ""
+            )
+            by_rule_key[rule_key] = item
         break
 
     return [
