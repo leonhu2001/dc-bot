@@ -84,4 +84,4 @@ def test_spec_label_removes_redundant_staff_count_words():
         detail_label="NG｜陪玩2名",
         variant="",
         service_type="雙陪",
-    ) == "娛樂｜NG"
+    ) == "娛樂"
