@@ -138,7 +138,7 @@ def test_admin_benefits_ui_uses_normal_selects_and_checkbox_pickers():
     assert "data-benefit-tree-leaf-checkbox" in template
     assert 'name="scope_category_values"' not in template
     assert 'name="scope_rule_values"' not in template
-    assert 'name="excluded_rule_keys"' in template
+    assert 'name="excluded_rule_keys"' not in template
     assert 'name="sync_unused_issued"' in template
     assert "input[type=checkbox]" in css
     assert "新制 +3%" in workspace
