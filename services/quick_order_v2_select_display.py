@@ -38,12 +38,7 @@ def _select_value(select: discord.ui.Select, value: object) -> bool:
 
 
 def apply_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
-    """Apply Quick Order select-display rules to an already-built canonical view.
-
-    Production owns the only active SelfServiceOrderView wrapper. Keeping this as a
-    pure view mutator avoids stacking another __init__ wrapper just to adjust
-    placeholders/defaults while preserving interaction-aware selection markers.
-    """
+    """Apply Quick Order select-display rules to an already-built canonical view."""
     category = str(data.get("category") or "")
     item_group = str(data.get("item_group") or "")
     detail_selected = bool(str(data.get("item_detail_value") or "").strip())
@@ -82,24 +77,17 @@ def apply_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
             continue
 
         if custom_id == "self_service_order_detail_select":
-            # Multi-option detail selectors start neutral. After the callback writes
-            # item_detail_value, preserve the original view's selected default.
             if len(options) > 1 and not detail_selected:
                 _clear_defaults(child)
             child.placeholder = "請選擇方案" if category == "farm" else "請選擇規格"
             continue
 
         if custom_id == "self_service_order_quantity_select":
-            # Quantity is initialized to the minimum by the pricing state, so only
-            # display it as selected after the customer has actually used this Select.
             if len(options) > 1 and not quantity_selected:
                 _clear_defaults(child)
             child.placeholder = "請選擇時長 / 數量"
             continue
 
-        # Category/service were already chosen in the public quick-order entry.
-        # If either selector is still present in a normal quick ticket, don't make
-        # the pre-filled routing value look like another customer choice.
         _clear_defaults(child)
         if custom_id == "self_service_order_item_select":
             child.placeholder = "請選擇服務"
@@ -131,8 +119,6 @@ def _install_selection_markers() -> None:
                     and self.values
                     and self.values[0] != "need_item"
                 ):
-                    # Set before the original callback rebuilds the View so the
-                    # refreshed Select immediately shows the chosen quantity.
                     data[_QUANTITY_SELECTED_KEY] = True
             except Exception:
                 pass
@@ -155,7 +141,6 @@ def _install_selection_markers() -> None:
                     and self.values
                     and self.values[0] != "need_item"
                 ):
-                    # A different scheme may have a different quantity range.
                     data.pop(_QUANTITY_SELECTED_KEY, None)
             except Exception:
                 pass
@@ -269,21 +254,11 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
     if _INSTALLED:
         return
 
-    # Selection callbacks only record whether a value came from a real user
-    # interaction. The production ticket UI policy owns the sole View wrapper and
-    # calls apply_quick_order_select_display while building that View.
     _install_selection_markers()
 
     if not getattr(bot, "_quick_order_v2_select_repair_started", False):
         bot._quick_order_v2_select_repair_started = True
         bot.loop.create_task(repair_existing_quick_order_selects(bot))
-
-    # The public game-panel image layer is installed here because setup_commands
-    # loads production first and this display layer immediately afterwards. Keeping
-    # it here avoids another setup hook and does not touch ticket/order behavior.
-    from services.quick_order_v2_panel_images import install_quick_order_v2_panel_images
-
-    install_quick_order_v2_panel_images(bot)
 
     _INSTALLED = True
     print("[quick-order-v2-select] interaction-aware select display installed", flush=True)
