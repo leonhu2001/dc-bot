@@ -33,6 +33,7 @@ _PANEL_MARKER_PREFIX = "quick-order-v2"
 _PATCH_INSTALLED = False
 _ORIGINAL_VIEW_INIT = None
 _ORIGINAL_PANEL_BUILDER = None
+VIP_TIMER_CUSTOM_ORDER_VALUE = "__vip_timer_custom_order__"
 
 _GAME_ENTRY_META = {
     QUICK_ORDER_V2_CHANNELS["valorant"]: ("valorant", "🎯 特戰英豪"),
@@ -46,6 +47,15 @@ _DELTA_BUTTONS = (
     ("📱", "手遊", "delta_mobile_basic", discord.ButtonStyle.success),
     ("🎉", "趣味單", "delta_desktop_fun", discord.ButtonStyle.secondary),
     ("🛠️", "代肝代解", "farm", discord.ButtonStyle.secondary),
+)
+
+_VIP_TIMER_GAME_ORDER = (
+    "三角洲｜端遊",
+    "三角洲｜手遊",
+    "特戰英豪",
+    "英雄聯盟",
+    "APEX",
+    "STEAM",
 )
 
 
@@ -74,6 +84,46 @@ def _options(category: str) -> list[discord.SelectOption]:
     ]
 
 
+def _vip_timer_game_display_label(group_label: str) -> str:
+    text = str(group_label or "").strip()
+    if "三角洲" in text and "端遊" in text:
+        return "三角洲｜端遊"
+    if "三角洲" in text and "手遊" in text:
+        return "三角洲｜手遊"
+    if text.upper().startswith("STEAM"):
+        return "STEAM"
+    return text
+
+
+def _vip_timer_entry_rows() -> list[tuple[str, str]]:
+    """Return (display label, catalog group value) for the public timer entry."""
+    refresh_vip_timer_self_service_catalog()
+    from services.orders import SELF_SERVICE_ORDER_CATALOG
+
+    rows: list[tuple[str, str]] = []
+    seen_values: set[str] = set()
+    for group in list(SELF_SERVICE_ORDER_CATALOG.get(VIP_TIMER_CATEGORY, ()) or ()):
+        if not isinstance(group, dict):
+            continue
+        value = str(group.get("label") or "").strip()
+        details = list(group.get("details") or ())
+        if not value or not details or value in seen_values:
+            continue
+        if "自訂" in value or value in {"其他", "其他／自訂", "其他/自訂"}:
+            continue
+        display = _vip_timer_game_display_label(value)
+        if not display:
+            continue
+        seen_values.add(value)
+        rows.append((display, value))
+
+    preferred = {label: index for index, label in enumerate(_VIP_TIMER_GAME_ORDER)}
+    rows.sort(key=lambda row: (preferred.get(row[0], len(preferred)), row[0]))
+    rows = rows[:24]
+    rows.append(("自訂單", VIP_TIMER_CUSTOM_ORDER_VALUE))
+    return rows
+
+
 def build_entry_embed(channel_id: int) -> discord.Embed:
     if channel_id == QUICK_ORDER_V2_CHANNELS["delta"]:
         embed = discord.Embed(
@@ -92,9 +142,10 @@ def build_entry_embed(channel_id: int) -> discord.Embed:
         embed = discord.Embed(
             title="💎 VIP 自由計時｜下單",
             description=(
-                "請先選擇**起始遊戲**，確認後建立私人票口。\n"
-                "票口內再選起始玩法；接滿後開始計時，中途可切換遊戲／玩法。\n"
-                "結束後依實際遊玩時間結算，先玩後付。"
+                "請先選擇**遊戲類型**，確認後建立私人票口。\n"
+                "一般遊戲會在票口內再選起始玩法；接滿後開始計時，中途可切換遊戲／玩法。\n"
+                "也可選 **自訂單**，改由自訂需求流程填寫內容並由客服報價。\n"
+                "自由計時結束後依實際遊玩時間結算，先玩後付。"
             ),
             color=discord.Color.gold(),
         )
@@ -231,14 +282,18 @@ class QuickDeltaEntryView(discord.ui.View):
 
 class QuickVipGameSelect(discord.ui.Select):
     def __init__(self):
-        refresh_vip_timer_self_service_catalog()
+        rows = _vip_timer_entry_rows()
         options = [
             discord.SelectOption(
-                label=group[:100],
-                value=group[:100],
-                description="起始遊戲",
+                label=label[:100],
+                value=value[:100],
+                description=(
+                    "自訂需求｜客服報價"
+                    if value == VIP_TIMER_CUSTOM_ORDER_VALUE
+                    else "自由計時｜起始遊戲"
+                ),
             )
-            for group in _groups(VIP_TIMER_CATEGORY)[:25]
+            for label, value in rows
         ]
         disabled = not options
         if not options:
@@ -250,7 +305,7 @@ class QuickVipGameSelect(discord.ui.Select):
             ]
 
         super().__init__(
-            placeholder="請選擇起始遊戲",
+            placeholder="請選擇遊戲類型",
             options=options,
             min_values=1,
             max_values=1,
@@ -269,6 +324,18 @@ class QuickVipGameSelect(discord.ui.Select):
             )
             return
 
+        selected = self.values[0]
+        if selected == VIP_TIMER_CUSTOM_ORDER_VALUE:
+            from services.custom_order_quick_entry import CustomOrderCompanionCountView
+
+            await interaction.response.send_message(
+                "先選擇這張自訂單需要幾位陪玩，再填寫遊戲、玩法／規則與目標。\n"
+                "客服確認需求後會在自訂單票口完成報價。",
+                view=CustomOrderCompanionCountView(interaction.user.id),
+                ephemeral=True,
+            )
+            return
+
         try:
             assert_vip_timer_self_service_eligible(
                 interaction.user.id,
@@ -281,7 +348,7 @@ class QuickVipGameSelect(discord.ui.Select):
         await _send_confirmation(
             interaction,
             category=VIP_TIMER_CATEGORY,
-            item_group=self.values[0],
+            item_group=selected,
             source_channel_id=QUICK_ORDER_V2_CHANNELS["vip_timer"],
         )
 
