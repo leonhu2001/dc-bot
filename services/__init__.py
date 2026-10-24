@@ -42,14 +42,14 @@ from .aw_collision_business_policy import (
 
 _install_aw_collision_business_policy()
 
-# Current monthly VIP policy: the 200T/500T vouchers are tier entitlements, while
-# only the Black Diamond free-choice benefit requires 8,000T of actual closed-order
-# spend in the trailing 30 days. Top-ups do not satisfy that activity gate.
-from .vip_monthly_policy_20261024 import (
-    install_vip_monthly_policy_20261024 as _install_vip_monthly_policy_20261024,
+# The legacy Black Diamond monthly free-choice benefit has been retired. Install
+# this before monthly-benefit integration so both Web and Discord read the same
+# current entitlement source while historical benefit rows remain auditable.
+from .retired_black_diamond_benefit import (
+    install_retired_black_diamond_benefit_policy as _install_retired_black_diamond_benefit_policy,
 )
 
-_install_vip_monthly_policy_20261024()
+_install_retired_black_diamond_benefit_policy()
 
 # Keep coupon reservation / release / redemption and the VIP monthly entitlement
 # policy centralized for both Discord and Web entry points.
