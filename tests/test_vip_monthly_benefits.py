@@ -1,8 +1,8 @@
 import json
 import sqlite3
+from datetime import datetime, timedelta, timezone
 
 import pytest
-from datetime import datetime, timezone, timedelta
 
 from services.vip_monthly_benefits import (
     BLACK_DIAMOND_CHOICE,
@@ -12,13 +12,11 @@ from services.vip_monthly_benefits import (
     REVOKED,
     get_customer_vip_monthly_snapshot,
     list_available_cash_benefits,
+    mark_month_announcement_sent,
     redeem_cash_benefits_for_channel,
     release_cash_benefits_for_channel,
-    reserve_cash_benefit_for_channel,
-    mark_month_announcement_sent,
-    redeem_black_diamond_choice,
-    release_black_diamond_choice,
     reserve_black_diamond_choice,
+    reserve_cash_benefit_for_channel,
     sync_current_month_vip_benefits,
 )
 
@@ -52,7 +50,11 @@ def _make_bot_db(path, rows):
                 "INSERT INTO customers(customer_id, data_json) VALUES (?, ?)",
                 (str(customer_id), json.dumps(data, ensure_ascii=False)),
             )
-            last_order_at = str(data.get("monthly_activity_order_at") or data.get("last_order_at") or "").strip()
+            last_order_at = str(
+                data.get("monthly_activity_order_at")
+                or data.get("last_order_at")
+                or ""
+            ).strip()
             if last_order_at:
                 conn.execute(
                     """
@@ -61,7 +63,13 @@ def _make_bot_db(path, rows):
                     """,
                     (
                         str(customer_id),
-                        int(data.get("monthly_activity_spend", data.get("total_spent", 0)) or 0),
+                        int(
+                            data.get(
+                                "monthly_activity_spend",
+                                data.get("total_spent", 0),
+                            )
+                            or 0
+                        ),
                         last_order_at,
                     ),
                 )
@@ -84,7 +92,23 @@ def _benefit_rows(web_db, customer_id, month_key):
         ]
 
 
-def test_monthly_benefits_do_not_accumulate_and_black_gets_all_three(tmp_path):
+def _rewrite_customer_data(bot_db, customer_id: str, mutate):
+    with sqlite3.connect(bot_db) as conn:
+        row = conn.execute(
+            "SELECT data_json FROM customers WHERE customer_id=?",
+            (str(customer_id),),
+        ).fetchone()
+        assert row is not None
+        data = json.loads(row[0])
+        mutate(data)
+        conn.execute(
+            "UPDATE customers SET data_json=? WHERE customer_id=?",
+            (json.dumps(data, ensure_ascii=False), str(customer_id)),
+        )
+        conn.commit()
+
+
+def test_black_diamond_receives_only_current_cash_monthly_benefits(tmp_path):
     bot_db = tmp_path / "bot.db"
     web_db = tmp_path / "web_dashboard.db"
     customer_id = "999"
@@ -108,12 +132,12 @@ def test_monthly_benefits_do_not_accumulate_and_black_gets_all_three(tmp_path):
         bot_db=bot_db,
         web_db=web_db,
     )
-    assert result["issued_count"] == 3
+    assert result["issued_count"] == 2
     assert result["announcement_needed"] is False
     assert {
         row["benefit_key"]
         for row in _benefit_rows(web_db, customer_id, "2026-10")
-    } == {MONTHLY_COUPON_200, MONTHLY_COUPON_500, BLACK_DIAMOND_CHOICE}
+    } == {MONTHLY_COUPON_200, MONTHLY_COUPON_500}
 
     again = sync_current_month_vip_benefits(
         now=october,
@@ -128,10 +152,10 @@ def test_monthly_benefits_do_not_accumulate_and_black_gets_all_three(tmp_path):
         bot_db=bot_db,
         web_db=web_db,
     )
-    assert next_month["issued_count"] == 3
+    assert next_month["issued_count"] == 2
     assert next_month["announcement_needed"] is True
-    assert len(_benefit_rows(web_db, customer_id, "2026-11")) == 3
-    assert len(_benefit_rows(web_db, customer_id, "2026-10")) == 3
+    assert len(_benefit_rows(web_db, customer_id, "2026-11")) == 2
+    assert len(_benefit_rows(web_db, customer_id, "2026-10")) == 2
 
     mark_month_announcement_sent("2026-11", now=november, web_db=web_db)
     announced = sync_current_month_vip_benefits(
@@ -180,7 +204,7 @@ def test_october_legacy_used_customers_are_recorded_as_redeemed_200_only(tmp_pat
         assert rows[0]["source"] == "legacy_import"
 
 
-def test_black_diamond_choice_reserve_release_and_redeem(tmp_path):
+def test_retired_black_diamond_choice_cannot_be_newly_reserved(tmp_path):
     bot_db = tmp_path / "bot.db"
     web_db = tmp_path / "web_dashboard.db"
     customer_id = "777"
@@ -199,74 +223,32 @@ def test_black_diamond_choice_reserve_release_and_redeem(tmp_path):
     )
     now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
 
-    reserved = reserve_black_diamond_choice(
-        customer_id,
-        "entertainment_2h",
-        now=now,
-        bot_db=bot_db,
-        web_db=web_db,
-    )
-    assert reserved["status"] == "reserved"
-    assert reserved["choice_key"] == "entertainment_2h"
-
-    assert release_black_diamond_choice(
-        customer_id,
-        month_key="2026-11",
-        now=now,
-        web_db=web_db,
-        bot_db=bot_db,
-    ) is True
-
     snapshot = get_customer_vip_monthly_snapshot(
         customer_id,
         now=now,
         bot_db=bot_db,
         web_db=web_db,
     )
-    assert snapshot["black_diamond_available"] is True
+    assert snapshot["current_level"] == "黑鑽魔丸"
+    assert snapshot["black_diamond_entitled"] is False
+    assert snapshot["black_diamond_available"] is False
+    assert snapshot["black_diamond"] is None
+    assert BLACK_DIAMOND_CHOICE not in {
+        row["benefit_key"]
+        for row in _benefit_rows(web_db, customer_id, "2026-11")
+    }
 
-    reserve_black_diamond_choice(
-        customer_id,
-        "secret_space_1000w",
-        now=now,
-        bot_db=bot_db,
-        web_db=web_db,
-    )
-    assert redeem_black_diamond_choice(
-        customer_id,
-        month_key="2026-11",
-        now=now,
-        web_db=web_db,
-    ) is True
-
-    redeemed = get_customer_vip_monthly_snapshot(
-        customer_id,
-        now=now,
-        bot_db=bot_db,
-        web_db=web_db,
-        ensure_synced=False,
-    )
-    assert redeemed["black_diamond_available"] is False
-    assert redeemed["black_diamond"]["status"] == "redeemed"
-
-
-def _rewrite_customer_data(bot_db, customer_id: str, mutate):
-    with sqlite3.connect(bot_db) as conn:
-        row = conn.execute(
-            "SELECT data_json FROM customers WHERE customer_id=?",
-            (str(customer_id),),
-        ).fetchone()
-        assert row is not None
-        data = json.loads(row[0])
-        mutate(data)
-        conn.execute(
-            "UPDATE customers SET data_json=? WHERE customer_id=?",
-            (json.dumps(data, ensure_ascii=False), str(customer_id)),
+    with pytest.raises(ValueError, match="目前 VIP 等級沒有黑鑽尊享福利"):
+        reserve_black_diamond_choice(
+            customer_id,
+            "entertainment_2h",
+            now=now,
+            bot_db=bot_db,
+            web_db=web_db,
         )
-        conn.commit()
 
 
-def test_downgrade_revokes_unused_higher_tier_monthly_benefits_and_reupgrade_restores(tmp_path):
+def test_downgrade_and_reupgrade_only_manage_current_cash_benefits(tmp_path):
     bot_db = tmp_path / "bot.db"
     web_db = tmp_path / "web_dashboard.db"
     customer_id = "black-to-platinum"
@@ -296,7 +278,7 @@ def test_downgrade_revokes_unused_higher_tier_monthly_benefits_and_reupgrade_res
         MONTHLY_COUPON_200,
         MONTHLY_COUPON_500,
     }
-    assert black["black_diamond_available"] is True
+    assert black["black_diamond_available"] is False
 
     def downgrade(data):
         data["vip_level_index"] = 3
@@ -311,7 +293,6 @@ def test_downgrade_revokes_unused_higher_tier_monthly_benefits_and_reupgrade_res
         bot_db=bot_db,
         web_db=web_db,
     )
-
     assert platinum["current_level"] == "白金魔丸"
     assert [row["benefit_key"] for row in platinum["cash_benefits"]] == [
         MONTHLY_COUPON_200
@@ -326,16 +307,7 @@ def test_downgrade_revokes_unused_higher_tier_monthly_benefits_and_reupgrade_res
     }
     assert raw[MONTHLY_COUPON_200] == "available"
     assert raw[MONTHLY_COUPON_500] == REVOKED
-    assert raw[BLACK_DIAMOND_CHOICE] == REVOKED
-
-    with pytest.raises(ValueError, match="目前 VIP 等級沒有黑鑽尊享福利"):
-        reserve_black_diamond_choice(
-            customer_id,
-            "entertainment_2h",
-            now=now,
-            bot_db=bot_db,
-            web_db=web_db,
-        )
+    assert BLACK_DIAMOND_CHOICE not in raw
 
     def upgrade_again(data):
         data["vip_level_index"] = 6
@@ -354,55 +326,8 @@ def test_downgrade_revokes_unused_higher_tier_monthly_benefits_and_reupgrade_res
         MONTHLY_COUPON_200,
         MONTHLY_COUPON_500,
     }
-    assert restored["black_diamond_available"] is True
-
-
-def test_releasing_reserved_black_benefit_after_downgrade_revokes_instead_of_reopening(tmp_path):
-    bot_db = tmp_path / "bot.db"
-    web_db = tmp_path / "web_dashboard.db"
-    customer_id = "reserved-then-downgraded"
-    _make_bot_db(
-        bot_db,
-        [
-            (
-                customer_id,
-                {
-                    "total_spent": 88888,
-                    "vip_level_index": 6,
-                    "last_order_at": "2026-11-05T10:00:00+08:00",
-                },
-            )
-        ],
-    )
-    now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
-    reserve_black_diamond_choice(
-        customer_id,
-        "entertainment_2h",
-        now=now,
-        bot_db=bot_db,
-        web_db=web_db,
-    )
-
-    def downgrade(data):
-        data["vip_level_index"] = 3
-        data["vip_progress_base_total_spent"] = 88888
-        data["vip_progress_reset_active"] = True
-        data["last_level_manual_fixed_at"] = "2026-11-05T11:00:00+08:00"
-
-    _rewrite_customer_data(bot_db, customer_id, downgrade)
-    assert release_black_diamond_choice(
-        customer_id,
-        month_key="2026-11",
-        now=now,
-        web_db=web_db,
-        bot_db=bot_db,
-    ) is True
-
-    raw = {
-        row["benefit_key"]: row["status"]
-        for row in _benefit_rows(web_db, customer_id, "2026-11")
-    }
-    assert raw[BLACK_DIAMOND_CHOICE] == REVOKED
+    assert restored["black_diamond_available"] is False
+    assert restored["black_diamond_entitled"] is False
 
 
 def test_monthly_cash_benefit_reserve_release_and_redeem_by_channel(tmp_path):
@@ -411,14 +336,16 @@ def test_monthly_cash_benefit_reserve_release_and_redeem_by_channel(tmp_path):
     customer_id = "monthly-cash-user"
     _make_bot_db(
         bot_db,
-        [(
-            customer_id,
-            {
-                "total_spent": 30000,
-                "vip_level_index": 3,
-                "last_order_at": "2026-11-05T10:00:00+08:00",
-            },
-        )],
+        [
+            (
+                customer_id,
+                {
+                    "total_spent": 30000,
+                    "vip_level_index": 3,
+                    "last_order_at": "2026-11-05T10:00:00+08:00",
+                },
+            )
+        ],
     )
     now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
 
@@ -495,15 +422,17 @@ def test_white_diamond_monthly_benefits_no_longer_require_recent_spend(tmp_path)
     customer_id = "white-diamond-activity"
     _make_bot_db(
         bot_db,
-        [(
-            customer_id,
-            {
-                "total_spent": 50000,
-                "vip_level_index": 5,
-                "last_order_at": "2026-11-05T10:00:00+08:00",
-                "monthly_activity_spend": 4999,
-            },
-        )],
+        [
+            (
+                customer_id,
+                {
+                    "total_spent": 50000,
+                    "vip_level_index": 5,
+                    "last_order_at": "2026-11-05T10:00:00+08:00",
+                    "monthly_activity_spend": 4999,
+                },
+            )
+        ],
     )
     now = datetime(2026, 11, 5, 12, tzinfo=TAIPEI_TZ)
 
@@ -528,14 +457,16 @@ def test_monthly_benefit_remains_available_without_activity_gate(tmp_path):
     customer_id = "grandfathered-october"
     _make_bot_db(
         bot_db,
-        [(
-            customer_id,
-            {
-                "total_spent": 50000,
-                "vip_level_index": 5,
-                "last_order_at": "2026-10-10T10:00:00+08:00",
-            },
-        )],
+        [
+            (
+                customer_id,
+                {
+                    "total_spent": 50000,
+                    "vip_level_index": 5,
+                    "last_order_at": "2026-10-10T10:00:00+08:00",
+                },
+            )
+        ],
     )
 
     before_policy = datetime(2026, 10, 10, 12, tzinfo=TAIPEI_TZ)
