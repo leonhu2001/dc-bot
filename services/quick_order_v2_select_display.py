@@ -19,7 +19,7 @@ _QUICK_SELECT_IDS = {
     "self_service_order_quantity_select",
 }
 _QUANTITY_SELECTED_KEY = "quick_order_quantity_selected"
-_LEGACY_RESELECT_FLAG = "legacy_four_selector_panel"
+LEGACY_RESELECT_FLAG = "legacy_four_selector_panel"
 
 
 def _clear_defaults(select: discord.ui.Select) -> None:
@@ -37,16 +37,71 @@ def _select_value(select: discord.ui.Select, value: object) -> bool:
     return matched
 
 
+def _selected_option_label(select: discord.ui.Select, value: object) -> str:
+    selected = str(value or "").strip()
+    if not selected:
+        return ""
+    for option in getattr(select, "options", []) or []:
+        if str(getattr(option, "value", "")) == selected:
+            return str(getattr(option, "label", "") or "").strip()
+    return ""
+
+
+def _apply_classic_reselect_display(
+    select: discord.ui.Select,
+    *,
+    custom_id: str,
+    data: dict,
+) -> None:
+    """Keep the classic four-selector re-dispatch UI synced from one controller."""
+    category = str(data.get("category") or "").strip()
+    item_group = str(data.get("item_group") or "").strip()
+    detail_value = str(data.get("item_detail_value") or "").strip()
+    quantity = str(data.get("quantity") or "").strip()
+
+    values = {
+        "self_service_order_category_select": category,
+        "self_service_order_item_select": item_group,
+        "self_service_order_detail_select": detail_value,
+        "self_service_order_quantity_select": quantity,
+    }
+    empty_placeholders = {
+        "self_service_order_category_select": "請選擇類型",
+        "self_service_order_item_select": "請選擇服務",
+        "self_service_order_detail_select": (
+            "請選擇方案" if category == "farm" else "請選擇規格"
+        ),
+        "self_service_order_quantity_select": "請選擇時長 / 數量",
+    }
+
+    value = values.get(custom_id, "")
+    _select_value(select, value)
+    if not value:
+        select.placeholder = empty_placeholders.get(custom_id, select.placeholder)
+        return
+
+    label = _selected_option_label(select, value)
+    if not label:
+        if custom_id == "self_service_order_category_select":
+            from services.orders import ORDER_CATEGORY_LABELS
+
+            label = str(ORDER_CATEGORY_LABELS.get(category, category))
+        elif custom_id == "self_service_order_item_select":
+            label = item_group
+        elif custom_id == "self_service_order_detail_select":
+            label = str(data.get("item") or detail_value).strip()
+        else:
+            label = quantity
+
+    select.placeholder = f"已選：{label}"[:150]
+
+
 def apply_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
     """Apply Quick Order select-display rules to an already-built canonical view."""
     category = str(data.get("category") or "")
-    item_group = str(data.get("item_group") or "")
     detail_selected = bool(str(data.get("item_detail_value") or "").strip())
     quantity_selected = bool(data.get(_QUANTITY_SELECTED_KEY))
-    classic_reselect = bool(data.get(_LEGACY_RESELECT_FLAG))
-
-    if classic_reselect:
-        from services.orders import ORDER_CATEGORY_LABELS
+    classic_reselect = bool(data.get(LEGACY_RESELECT_FLAG))
 
     for child in list(view.children):
         if not isinstance(child, discord.ui.Select):
@@ -56,25 +111,15 @@ def apply_quick_order_select_display(view: discord.ui.View, data: dict) -> None:
         if custom_id not in _QUICK_SELECT_IDS:
             continue
 
-        options = list(getattr(child, "options", []) or [])
-
-        if classic_reselect and custom_id == "self_service_order_category_select":
-            _select_value(child, category)
-            if category:
-                selected_label = str(ORDER_CATEGORY_LABELS.get(category, category))
-                child.placeholder = f"已選：{selected_label}"[:150]
-            else:
-                child.placeholder = "請選擇類型"
-            continue
-
-        if classic_reselect and custom_id == "self_service_order_item_select":
-            _select_value(child, item_group)
-            child.placeholder = (
-                f"已選：{item_group}"[:150]
-                if item_group
-                else "請選擇服務"
+        if classic_reselect:
+            _apply_classic_reselect_display(
+                child,
+                custom_id=custom_id,
+                data=data,
             )
             continue
+
+        options = list(getattr(child, "options", []) or [])
 
         if custom_id == "self_service_order_detail_select":
             if len(options) > 1 and not detail_selected:
@@ -261,6 +306,7 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
 
 
 __all__ = [
+    "LEGACY_RESELECT_FLAG",
     "apply_quick_order_select_display",
     "install_quick_order_v2_select_display",
     "repair_existing_quick_order_selects",
