@@ -10,7 +10,6 @@ from services import quick_order_v2 as quick
 
 
 _INSTALLED = False
-_ORIGINAL_CREATE_TICKET = None
 _ORIGINAL_DETAILS_RESOLVER = None
 
 _X_EQUIVALENTS = str.maketrans({
@@ -326,34 +325,6 @@ async def _refresh_existing_farm_3x3_panel(channel: discord.TextChannel) -> bool
     return False
 
 
-def _install_create_ticket_wrapper() -> None:
-    global _ORIGINAL_CREATE_TICKET
-    if _ORIGINAL_CREATE_TICKET is not None:
-        return
-
-    _ORIGINAL_CREATE_TICKET = quick._create_ticket
-    original = _ORIGINAL_CREATE_TICKET
-
-    async def create_ticket_with_control_row(
-        interaction: discord.Interaction,
-        *,
-        category: str,
-        item_group: str,
-        source_channel_id: int,
-    ) -> discord.TextChannel | None:
-        ticket = await original(
-            interaction,
-            category=category,
-            item_group=item_group,
-            source_channel_id=source_channel_id,
-        )
-        if isinstance(ticket, discord.TextChannel):
-            await _attach_order_control_view(ticket)
-        return ticket
-
-    quick._create_ticket = create_ticket_with_control_row
-
-
 async def repair_existing_quick_order_v2_tickets(bot: commands.Bot) -> None:
     await bot.wait_until_ready()
     category_id = int(getattr(quick, "CUSTOMER_CATEGORY_ID", 0) or 0)
@@ -398,10 +369,8 @@ def install_quick_order_v2_fixes(bot: commands.Bot) -> None:
     # entry buttons on the same row instead of forcing the fourth onto row 2.
     quick.QuickDeltaEntryView.__init__ = _delta_entry_init
 
-    # Quick tickets bypass the legacy create_private_channel helper, so attach the
-    # real customer-service OrderControlView to their first message.
-    _install_create_ticket_wrapper()
-
+    # New quick tickets now receive the customer-service control row directly in
+    # quick_order_v2 core. This module only repairs already-open legacy tickets.
     if not getattr(bot, "_quick_order_v2_control_repair_started", False):
         bot._quick_order_v2_control_repair_started = True
         bot.loop.create_task(repair_existing_quick_order_v2_tickets(bot))
