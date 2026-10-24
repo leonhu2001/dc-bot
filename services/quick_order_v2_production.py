@@ -9,8 +9,9 @@ from services import quick_order_v2 as quick
 
 
 _INSTALLED = False
-_ORIGINAL_PANEL_BUILDER = None
-_ORIGINAL_VIEW_INIT = None
+_BASE_PANEL_BUILDER = None
+_BASE_VIEW_INIT = None
+_CORE_ENTRY_EMBED = quick.build_entry_embed
 
 
 _FARM_3X3_DETAIL_ORDER = {
@@ -23,36 +24,14 @@ _FARM_3X3_DETAIL_ORDER = {
 
 
 def _clean_entry_embed(channel_id: int) -> discord.Embed:
-    if channel_id == quick.QUICK_ORDER_V2_CHANNELS["delta"]:
-        return discord.Embed(
-            title="🟢 三角洲行動｜下單",
-            description=(
-                "請先選擇服務類型，再選擇服務。\n\n"
-                "🖥️ **端遊**｜一般陪玩、技術陪、甜蜜單、教學等\n"
-                "📱 **手遊**｜手遊陪玩與相關方案\n"
-                "🎉 **趣味單**｜特殊趣味玩法\n"
-                "🛠️ **代肝代解**｜賽季、任務與代解服務"
-            ),
-            color=discord.Color.green(),
-        )
+    """Use the core entry copy as the single source of truth.
 
-    if channel_id == quick.QUICK_ORDER_V2_CHANNELS["vip_timer"]:
-        return discord.Embed(
-            title="💎 VIP 自由計時｜下單",
-            description=(
-                "白金級會員以上限定。\n"
-                "請選擇起始遊戲；進入客服中心後再選擇起始玩法。\n"
-                "接滿後開始計時，中途可切換遊戲／玩法，結束後依實際時間結算。"
-            ),
-            color=discord.Color.gold(),
-        )
-
-    _, title = quick._GAME_ENTRY_META[channel_id]
-    return discord.Embed(
-        title=f"{title}｜下單",
-        description="請選擇你要的服務。",
-        color=discord.Color.purple(),
-    )
+    Production only removes the internal marker footer. This prevents restart-time
+    panel repair from re-introducing stale VIP/Delta copy after core changes.
+    """
+    embed = _CORE_ENTRY_EMBED(int(channel_id))
+    embed.remove_footer()
+    return embed
 
 
 def _is_existing_entry_panel(message: discord.Message, channel_id: int) -> bool:
@@ -171,93 +150,71 @@ async def _clean_ticket_messages(ticket: discord.TextChannel) -> None:
         return
 
 
-def _install_panel_builder_cleanup() -> None:
-    global _ORIGINAL_PANEL_BUILDER
-    if _ORIGINAL_PANEL_BUILDER is not None:
+def _install_ticket_ui_policy() -> None:
+    """Install one final Quick Order ticket UI policy instead of nested wrappers."""
+    global _BASE_PANEL_BUILDER, _BASE_VIEW_INIT
+    if _BASE_PANEL_BUILDER is not None or _BASE_VIEW_INIT is not None:
         return
 
     from services import order_runtime
     from services import self_service_runtime as runtime
     from services import self_service_selection_runtime as selection_runtime
     from services import self_service_ui_runtime as ui
-
-    _ORIGINAL_PANEL_BUILDER = runtime.build_self_service_panel_embed
-    original = _ORIGINAL_PANEL_BUILDER
-
-    def clean_builder(
-        customer_id: int,
-        data: dict,
-        guild: discord.Guild | None = None,
-    ) -> discord.Embed:
-        embed = original(customer_id, data, guild)
-        if not data.get("quick_order_v2"):
-            return embed
-        if str(data.get("category") or "") == quick.VIP_TIMER_CATEGORY:
-            return embed
-
-        category = str(data.get("category") or "")
-        group = str(data.get("item_group") or "尚未選擇")
-        embed.title = f"🛒 {quick.ORDER_CATEGORY_LABELS.get(category, category)}"
-        embed.description = (
-            f"下單用戶：<@{customer_id}>\n\n"
-            f"已選服務：**{group}**\n"
-            "請完成下方選項。"
-        )
-        embed.remove_footer()
-        return embed
-
-    ui.build_self_service_panel_embed = clean_builder
-    runtime.build_self_service_panel_embed = clean_builder
-    selection_runtime.build_self_service_panel_embed = clean_builder
-
-    state = getattr(order_runtime, "_RUNTIME_STATE", None)
-    if state is not None:
-        try:
-            order_runtime._RUNTIME_STATE = replace(
-                state,
-                self_service_panel_embed_builder=clean_builder,
-            )
-        except Exception:
-            pass
-
-
-def _install_farm_ticket_ui() -> None:
-    """Make quick-order farm tickets reflect their actual product structure."""
-    global _ORIGINAL_VIEW_INIT
-    if _ORIGINAL_VIEW_INIT is not None:
-        return
-
-    from services import self_service_ui_runtime as ui
     from services.order_rules import ORDER_RULES
     from services.orders import get_self_service_quantity_meta
 
-    _ORIGINAL_VIEW_INIT = ui.SelfServiceOrderView.__init__
-    original = _ORIGINAL_VIEW_INIT
+    # quick_order_v2 core records the pre-Quick canonical callables before it
+    # installs its compatibility layer. Build directly on those callables so the
+    # active runtime has one Quick Order wrapper, not core -> production -> farm.
+    _BASE_PANEL_BUILDER = quick._ORIGINAL_PANEL_BUILDER or runtime.build_self_service_panel_embed
+    _BASE_VIEW_INIT = quick._ORIGINAL_VIEW_INIT or ui.SelfServiceOrderView.__init__
+    base_builder = _BASE_PANEL_BUILDER
+    base_view_init = _BASE_VIEW_INIT
 
-    def farm_view_init(
+    def ticket_view_init(
         self,
         customer_id: int,
         channel_id: int,
         selected_category: str | None = None,
     ):
-        original(self, customer_id, channel_id, selected_category)
-
+        base_view_init(self, customer_id, channel_id, selected_category)
         data = ui.SELF_SERVICE_ORDER_SELECTIONS.get(channel_id, {})
-        if not data.get("quick_order_v2") or str(data.get("category") or "") != "farm":
+        if not data.get("quick_order_v2"):
             return
 
+        category = str(data.get("category") or "")
+        is_timer = category == quick.VIP_TIMER_CATEGORY
+        is_farm = category == "farm"
         item = str(data.get("item") or "").strip()
         rule_key = str(data.get("order_rule_key") or "").strip()
         rule = ORDER_RULES.get(rule_key)
+
+        # Game/category is already selected by the public quick-entry panel.
+        for child in list(self.children):
+            if getattr(child, "custom_id", None) in {
+                "self_service_order_category_select",
+                "self_service_order_item_select",
+            }:
+                self.remove_item(child)
 
         for child in list(self.children):
             custom_id = getattr(child, "custom_id", None)
 
             if custom_id == "self_service_order_detail_select":
-                child.placeholder = "請選擇方案"
-                if hasattr(child, "options"):
+                child.placeholder = (
+                    "選擇起始玩法"
+                    if is_timer
+                    else "請選擇方案"
+                    if is_farm
+                    else "請選擇規格／陪玩人數"
+                )
+
+                if is_farm and hasattr(child, "options"):
                     options = list(child.options)
-                    if any(str(getattr(option, "value", "")) in _FARM_3X3_DETAIL_ORDER for option in options):
+                    if any(
+                        str(getattr(option, "value", "")) in _FARM_3X3_DETAIL_ORDER
+                        for option in options
+                    ):
                         options.sort(
                             key=lambda option: _FARM_3X3_DETAIL_ORDER.get(
                                 str(getattr(option, "value", "")),
@@ -267,12 +224,12 @@ def _install_farm_ticket_ui() -> None:
                         child.options.clear()
                         child.options.extend(options)
 
-                    # Single-detail farm products (for example 部門任務) are
-                    # already auto-selected by selection_state; don't show a dead select.
+                    # Single-detail farm products are already auto-selected by
+                    # selection_state; don't show a dead selector.
                     if item and len(options) <= 1:
                         self.remove_item(child)
 
-            elif custom_id == "self_service_order_quantity_select":
+            elif is_farm and custom_id == "self_service_order_quantity_select":
                 if not item:
                     self.remove_item(child)
                     continue
@@ -287,26 +244,74 @@ def _install_farm_ticket_ui() -> None:
                 else:
                     child.placeholder = "請選擇數量"
 
-            elif custom_id == "self_service_order_specified_staff_button":
-                # Current farm/boosting products are not specifiable.
+            elif is_farm and custom_id == "self_service_order_specified_staff_button":
                 self.remove_item(child)
 
-            elif custom_id in {
+            elif is_farm and custom_id in {
                 "self_service_order_point_benefit_button",
                 "self_service_order_staff_discount_coupon_button",
             }:
-                # These only make sense after a concrete farm variant is selected.
                 if not item:
                     self.remove_item(child)
 
-            elif custom_id == "self_service_order_staff_price_button":
+            elif is_farm and custom_id == "self_service_order_staff_price_button":
                 if not item or rule is None or str(getattr(rule, "pricing_type", "")) != "manual":
                     self.remove_item(child)
 
-            elif custom_id == "self_service_order_go_payment_button" and not item:
+            elif is_farm and custom_id == "self_service_order_go_payment_button" and not item:
                 child.disabled = True
 
-    ui.SelfServiceOrderView.__init__ = farm_view_init
+    def ticket_panel_builder(
+        customer_id: int,
+        data: dict,
+        guild: discord.Guild | None = None,
+    ) -> discord.Embed:
+        embed = base_builder(customer_id, data, guild)
+        if (
+            not data.get("quick_order_v2")
+            or str(data.get("category") or "") == quick.VIP_TIMER_CATEGORY
+        ):
+            return embed
+
+        category = str(data.get("category") or "")
+        group = str(data.get("item_group") or "尚未選擇")
+        embed.title = f"🛒 {quick.ORDER_CATEGORY_LABELS.get(category, category)}"
+        embed.description = (
+            f"下單用戶：<@{customer_id}>\n\n"
+            f"已選服務：**{group}**\n"
+            "請完成下方選項。"
+        )
+
+        # Preserve the final field labels users already see today. The previous
+        # core wrapper renamed these before the production wrapper ran.
+        for index, name in enumerate(("遊戲", "服務", "規格", "數量")):
+            if index >= len(embed.fields):
+                break
+            field = embed.fields[index]
+            embed.set_field_at(
+                index,
+                name=name,
+                value=field.value,
+                inline=field.inline,
+            )
+
+        embed.remove_footer()
+        return embed
+
+    ui.SelfServiceOrderView.__init__ = ticket_view_init
+    ui.build_self_service_panel_embed = ticket_panel_builder
+    runtime.build_self_service_panel_embed = ticket_panel_builder
+    selection_runtime.build_self_service_panel_embed = ticket_panel_builder
+
+    state = getattr(order_runtime, "_RUNTIME_STATE", None)
+    if state is not None:
+        try:
+            order_runtime._RUNTIME_STATE = replace(
+                state,
+                self_service_panel_embed_builder=ticket_panel_builder,
+            )
+        except Exception:
+            pass
 
 
 def install_quick_order_v2_production(bot: commands.Bot) -> None:
@@ -317,17 +322,16 @@ def install_quick_order_v2_production(bot: commands.Bot) -> None:
     quick.build_entry_embed = _clean_entry_embed
     quick._ensure_panel = _clean_ensure_panel
 
-    # Entry interactions now stay owned by quick_order_v2 core. Production only
-    # owns the remaining presentation/legacy compatibility seams.
-    _install_panel_builder_cleanup()
-    _install_farm_ticket_ui()
+    # Keep one active ticket UI wrapper. Legacy copy repair remains separate and
+    # only touches already-open historical tickets.
+    _install_ticket_ui_policy()
 
     if not getattr(bot, "_quick_order_v2_copy_repair_started", False):
         bot._quick_order_v2_copy_repair_started = True
         bot.loop.create_task(repair_existing_quick_order_v2_copy(bot))
 
     _INSTALLED = True
-    print("[quick-order-v2] production copy installed", flush=True)
+    print("[quick-order-v2] production UI policy installed", flush=True)
 
 
 async def repair_existing_quick_order_v2_copy(bot: commands.Bot) -> None:
