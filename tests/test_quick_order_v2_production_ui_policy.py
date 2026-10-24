@@ -16,10 +16,11 @@ def test_production_uses_one_ticket_ui_policy_instead_of_nested_wrappers() -> No
     assert "def _install_ticket_ui_policy" in source
     assert "def _install_panel_builder_cleanup" not in source
     assert "def _install_farm_ticket_ui" not in source
-    assert "quick._ORIGINAL_PANEL_BUILDER" in source
-    assert "quick._ORIGINAL_VIEW_INIT" in source
+    assert "quick._ORIGINAL_PANEL_BUILDER" not in source
+    assert "quick._ORIGINAL_VIEW_INIT" not in source
     assert source.count("ui.SelfServiceOrderView.__init__ =") == 1
     assert source.count("ui.build_self_service_panel_embed =") == 1
+    assert "apply_quick_order_select_display(self, data)" in source
 
 
 def test_consolidated_policy_keeps_farm_ui_rules() -> None:
@@ -46,9 +47,24 @@ def test_production_vip_entry_copy_derives_from_core_and_keeps_custom_order() ->
     assert str(getattr(embed.footer, "text", "") or "") == ""
 
 
+def test_production_compacts_delta_entry_without_price_list_copy_patch() -> None:
+    embed = production._clean_entry_embed(
+        quick.QUICK_ORDER_V2_CHANNELS["delta"]
+    )
+
+    assert str(embed.description or "") == "請選擇你要的服務。"
+
+
 def test_production_entry_copy_has_no_duplicate_vip_business_copy() -> None:
     source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
 
     assert "白金級會員以上限定" not in source
     assert "請選擇起始遊戲；進入客服中心後" not in source
     assert "_CORE_ENTRY_EMBED" in source
+
+
+def test_production_owns_live_vip_gate_for_quick_order() -> None:
+    source = PRODUCTION_SOURCE.read_text(encoding="utf-8")
+
+    assert "def _live_vip_timer_eligibility" in source
+    assert "quick.assert_vip_timer_self_service_eligible = _live_vip_timer_eligibility" in source
