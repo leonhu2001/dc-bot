@@ -42,7 +42,7 @@ def test_delta_special_gameplays_are_desktop_only_policy():
     assert "basic_mobile_exbar_tech" not in source
     assert 'category == "delta_mobile_basic" and (' in source
     assert '"黑潮爆破" in text_value or "絕巴技術陪" in text_value' in source
-    assert "第三層" in source
+    assert "三角洲端遊" in source
 
 
 def test_vip_timer_snapshot_is_excluded_from_entertainment_loyalty():
@@ -134,10 +134,10 @@ def test_discount_settlement_reduces_customer_and_payout_base_together(tmp_path,
 
 def test_public_vip_page_documents_timer_policy():
     text_value = Path("web/app/templates/vip.html").read_text(encoding="utf-8")
-    assert "可使用「VIP 自由計時」" in text_value
+    assert "白金級以上 VIP 可於「我的專區」使用 VIP 自由計時單" in text_value
     assert "整張單最低計費 15 分鐘" in text_value
     assert "娛樂陪累積送時數" in text_value
-    assert "VIP 自由計時僅可使用 VIP 百分比折扣" in text_value
+    assert "VIP 自由計時僅適用 VIP 百分比折扣" in text_value
 
 
 def test_web_runtime_installs_timer_policy_for_admin_loyalty_reconciliation():
