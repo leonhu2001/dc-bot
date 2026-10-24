@@ -132,7 +132,9 @@ def test_all_active_catalog_paths_have_valid_discord_detail_and_quantity_contrac
                 assert str(detail.get("item") or ""), (category, group, detail)
                 minimum = int(detail.get("min_quantity") or 1)
                 maximum = int(detail.get("max_quantity") or 1)
-                assert 1 <= minimum <= maximum <= 24, (category, group, detail)
+                assert 1 <= minimum <= maximum, (category, group, detail)
+                if str(detail.get("quantity_input_mode") or "") != "modal":
+                    assert maximum <= 24, (category, group, detail)
                 resolved = orders_service.get_order_item_detail_for_selection(
                     category, group, detail["value"]
                 )
