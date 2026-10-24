@@ -43,7 +43,7 @@ def test_gameplay_group_collects_service_variants_for_dynamic_fourth_layer():
         ]
     )
 
-    assert [group["label"] for group in groups] == ["技術陪｜機密", "技術陪｜絕密"]
+    assert [group["label"] for group in groups] == ["技術｜機密", "技術｜絕密"]
     assert [row["vip_timer_service_type"] for row in groups[0]["details"]] == ["雙陪", "單陪"] or [
         row["vip_timer_service_type"] for row in groups[0]["details"]
     ] == ["單陪", "雙陪"]
