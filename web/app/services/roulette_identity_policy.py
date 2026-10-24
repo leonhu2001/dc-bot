@@ -230,13 +230,14 @@ def _notify_ready_roulette_orders(
 
 
 def install_roulette_identity_policy() -> None:
-    # Remove the old unrelated product key from every runtime identity path.
-    roulette_service.ROULETTE_RULE_KEY = str(
-        roulette_service.LEGACY_ROULETTE_RULE_KEY
-    )
-    roulette_service.ROULETTE_RULE_KEYS = {
-        str(roulette_service.LEGACY_ROULETTE_RULE_KEY)
-    }
+    """Install dynamic roulette identity without rewriting exported constants.
+
+    ``ROULETTE_RULE_KEY`` and ``LEGACY_ROULETTE_RULE_KEY`` are public module
+    constants used by migrations and tests. Reassigning one to the other at
+    runtime makes two distinct historical identities collapse into the same key
+    and can trigger unique-key collisions. Runtime recognition is handled by the
+    dynamic resolver below instead.
+    """
     roulette_service._is_roulette_order = _is_roulette_order
     roulette_service.notify_ready_roulette_orders = _notify_ready_roulette_orders
     roulette_redraw_service.list_admin_roulette_orders = (
