@@ -69,6 +69,47 @@ Write-Host "Target: $Target" -ForegroundColor Cyan
 Write-Host "VPS:    $Vps" -ForegroundColor Cyan
 Write-Host ""
 
+# The repository is public, so the exact main/push Actions result can be checked
+# without storing another credential on the deployment machine. Fail closed when
+# GitHub cannot be reached, no run exists yet, the run is still active, or it failed.
+Write-Host "=== VERIFY TARGET CI ===" -ForegroundColor Yellow
+$GitHubRepo = "leonhu2001/dc-bot"
+$CiRunsUri = "https://api.github.com/repos/$GitHubRepo/actions/runs?event=push&head_sha=$Target&per_page=20"
+$GitHubHeaders = @{
+    "Accept" = "application/vnd.github+json"
+    "User-Agent" = "dc-bot-safe-deploy"
+    "X-GitHub-Api-Version" = "2022-11-28"
+}
+
+try {
+    $CiResponse = Invoke-RestMethod -Uri $CiRunsUri -Headers $GitHubHeaders -Method Get -TimeoutSec 15
+} catch {
+    throw "Unable to verify GitHub CI for target $Target. Deployment blocked. $($_.Exception.Message)"
+}
+
+$CiRun = @($CiResponse.workflow_runs) |
+    Where-Object {
+        $_.name -eq "CI" -and
+        $_.event -eq "push" -and
+        $_.head_branch -eq "main" -and
+        $_.head_sha -eq $Target
+    } |
+    Sort-Object { [datetime]$_.created_at } -Descending |
+    Select-Object -First 1
+
+if ($null -eq $CiRun) {
+    throw "No main/push CI run found for target $Target. Deployment blocked until CI runs."
+}
+if ($CiRun.status -ne "completed") {
+    throw "CI for target $Target is '$($CiRun.status)'. Deployment blocked until it completes successfully."
+}
+if ($CiRun.conclusion -ne "success") {
+    throw "CI for target $Target concluded '$($CiRun.conclusion)'. Deployment blocked."
+}
+
+Write-Host "PASS: GitHub CI succeeded for target $Target" -ForegroundColor Green
+Write-Host ""
+
 $PanelAssetDir = Join-Path $RepoRoot "assets\order_panels"
 $RequiredPanelAssetNames = @(
     "apex_panel.png",

@@ -75,6 +75,21 @@ jobs:
         run: |
           bash -n scripts/deploy_main.sh
 
+      - name: Validate deploy PowerShell
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/deploy_main.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
       - name: Run Golden Flows
         run: |
           python -m pytest -q tests/golden
