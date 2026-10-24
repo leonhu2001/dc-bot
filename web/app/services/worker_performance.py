@@ -32,16 +32,14 @@ def build_worker_performance_map(
     month: str = "",
     employee_ids: Iterable[str] | None = None,
 ) -> dict[str, int]:
-    """Return completed-order performance without payroll-transfer effects.
+    """Return earned companion wages without payroll-transfer effects.
 
-    Performance is the worker payout row's gross earned share attributed to the
-    month in which the order was closed. It measures completed-order business
-    volume, not the worker's eventual take-home payroll. Commission, payout
-    adjustments and internal payroll transfers therefore do not reduce the
-    performance number. Tips and customer-service payouts are excluded.
-
-    Older databases that predate ``gross_share`` fall back to ``final_payout`` so
-    the dashboard remains usable during migrations.
+    Performance is the worker payout row's ``final_payout`` attributed to the
+    month in which the order was closed. It is therefore the companion wage the
+    worker actually earned from completed orders, regardless of when payroll is
+    later marked paid. Internal payroll transfers never lower the sender's
+    performance or create performance for the receiver. Tips and customer-
+    service payouts are intentionally excluded too.
     """
 
     ids = {
@@ -60,21 +58,12 @@ def build_worker_performance_map(
     try:
         if not _table_exists(conn, "worker_payouts") or not _table_exists(conn, "web_orders"):
             return {}
-
-        has_gross_share = _column_exists(conn, "worker_payouts", "gross_share")
-        has_final_payout = _column_exists(conn, "worker_payouts", "final_payout")
-        if not has_gross_share and not has_final_payout:
+        if not _column_exists(conn, "worker_payouts", "final_payout"):
             return {}
-
-        performance_sql = (
-            "COALESCE(p.gross_share, 0)"
-            if has_gross_share
-            else "COALESCE(p.final_payout, 0)"
-        )
 
         where = [
             "w.status = 'closed'",
-            f"{performance_sql} > 0",
+            "COALESCE(p.final_payout, 0) > 0",
             "COALESCE(p.worker_discord_id, '') <> ''",
         ]
         params: list[str] = []
@@ -95,7 +84,7 @@ def build_worker_performance_map(
             f"""
             SELECT
                 CAST(p.worker_discord_id AS TEXT) AS discord_id,
-                {performance_sql} AS performance_amount
+                COALESCE(p.final_payout, 0) AS final_payout
             FROM worker_payouts p
             JOIN web_orders w ON w.id = p.order_id
             WHERE {' AND '.join(where)}
@@ -113,7 +102,7 @@ def build_worker_performance_map(
         if not discord_id:
             continue
         try:
-            amount = int(round(float(row["performance_amount"] or 0)))
+            amount = int(round(float(row["final_payout"] or 0)))
         except (TypeError, ValueError):
             amount = 0
         totals[discord_id] = int(totals.get(discord_id, 0)) + amount
