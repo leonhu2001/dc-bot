@@ -100,6 +100,34 @@ def _order_control_view(client: discord.Client) -> discord.ui.View | None:
     return None
 
 
+def _message_has_order_controls(message: discord.Message) -> bool:
+    custom_ids: set[str] = set()
+    for component in getattr(message, "components", ()):
+        component_id = str(getattr(component, "custom_id", "") or "")
+        if component_id:
+            custom_ids.add(component_id)
+        for child in getattr(component, "children", ()):
+            child_id = str(getattr(child, "custom_id", "") or "")
+            if child_id:
+                custom_ids.add(child_id)
+    return {
+        "order_control_select",
+        "order_control_confirm",
+    }.issubset(custom_ids)
+
+
+def _custom_order_customer_id_from_topic(topic: str | None) -> int | None:
+    text = str(topic or "")
+    marker = "custom_order_customer_id="
+    if marker not in text:
+        return None
+    raw = text.split(marker, 1)[1].split(";", 1)[0].strip()
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 async def _create_custom_order_request_ticket(
     interaction: discord.Interaction,
     *,
@@ -341,6 +369,73 @@ async def ensure_custom_order_quick_panel(bot: commands.Bot) -> None:
         )
 
 
+async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> None:
+    """Backfill normal staff controls onto existing custom-order request tickets."""
+    await bot.wait_until_ready()
+    category = bot.get_channel(CUSTOMER_CATEGORY_ID)
+    if not isinstance(category, discord.CategoryChannel):
+        try:
+            fetched = await bot.fetch_channel(CUSTOMER_CATEGORY_ID)
+            category = fetched if isinstance(fetched, discord.CategoryChannel) else None
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            category = None
+    if not isinstance(category, discord.CategoryChannel):
+        return
+
+    repaired = 0
+    for channel in list(category.text_channels):
+        topic = str(channel.topic or "")
+        if "custom_order_request=1" not in topic:
+            continue
+
+        customer_id = _custom_order_customer_id_from_topic(topic)
+        if customer_id is not None and "order_customer_id=" not in topic:
+            try:
+                topic = f"order_customer_id={customer_id};{topic}"
+                await channel.edit(
+                    topic=topic,
+                    reason="Restore canonical order identity for custom-order request",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+
+        has_controls = False
+        try:
+            async for message in channel.history(limit=50):
+                if bot.user is not None and message.author.id != bot.user.id:
+                    continue
+                if _message_has_order_controls(message):
+                    has_controls = True
+                    break
+        except (discord.Forbidden, discord.HTTPException):
+            continue
+
+        if has_controls:
+            continue
+
+        view = _order_control_view(bot)
+        if view is None:
+            print(
+                f"[custom-order-quick] canonical staff controls unavailable: {channel.id}",
+                flush=True,
+            )
+            continue
+        try:
+            await channel.send(
+                "客服操作｜請從下方清單選擇操作後按確認。",
+                view=view,
+            )
+            repaired += 1
+        except (discord.Forbidden, discord.HTTPException):
+            continue
+
+    if repaired:
+        print(
+            f"[custom-order-quick] repaired staff controls: {repaired}",
+            flush=True,
+        )
+
+
 def install_custom_order_quick_entry(bot: commands.Bot) -> None:
     if not getattr(bot, "_custom_order_quick_view_registered", False):
         bot.add_view(CustomOrderQuickEntryView())
@@ -350,6 +445,10 @@ def install_custom_order_quick_entry(bot: commands.Bot) -> None:
         bot._custom_order_quick_panel_task_started = True
         bot.loop.create_task(ensure_custom_order_quick_panel(bot))
 
+    if not getattr(bot, "_custom_order_control_repair_started", False):
+        bot._custom_order_control_repair_started = True
+        bot.loop.create_task(repair_existing_custom_order_ticket_controls(bot))
+
 
 __all__ = [
     "CUSTOM_ORDER_QUICK_CHANNEL_ID",
@@ -358,4 +457,5 @@ __all__ = [
     "build_custom_order_entry_embed",
     "install_custom_order_quick_entry",
     "is_custom_order_level_eligible",
+    "repair_existing_custom_order_ticket_controls",
 ]
