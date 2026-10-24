@@ -488,3 +488,20 @@ class OrderCredentialEntryView(discord.ui.View):
         await interaction.response.send_modal(
             OrderCredentialModal(interaction.channel.id)
         )
+
+
+def set_order_credential_note_placeholder(placeholder: str) -> bool:
+    """Update the shared credential note field without touching discord.py internals."""
+    value = str(placeholder or "").strip()
+    if not value:
+        return False
+
+    field = getattr(OrderCredentialModal, "login_note", None)
+    if field is None:
+        return False
+
+    try:
+        field.placeholder = value
+    except (AttributeError, TypeError):
+        return False
+    return True
