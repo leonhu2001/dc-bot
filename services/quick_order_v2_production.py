@@ -451,10 +451,6 @@ def install_quick_order_v2_production(bot: commands.Bot) -> None:
 
     _install_ticket_ui_policy()
 
-    if not getattr(bot, "_quick_order_v2_copy_repair_started", False):
-        bot._quick_order_v2_copy_repair_started = True
-        bot.loop.create_task(repair_existing_quick_order_v2_copy(bot))
-
     _INSTALLED = True
     print("[quick-order-v2] production public/ticket policy installed", flush=True)
 

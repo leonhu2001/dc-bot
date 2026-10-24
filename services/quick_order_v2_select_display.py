@@ -256,10 +256,6 @@ def install_quick_order_v2_select_display(bot: commands.Bot) -> None:
 
     _install_selection_markers()
 
-    if not getattr(bot, "_quick_order_v2_select_repair_started", False):
-        bot._quick_order_v2_select_repair_started = True
-        bot.loop.create_task(repair_existing_quick_order_selects(bot))
-
     _INSTALLED = True
     print("[quick-order-v2-select] interaction-aware select display installed", flush=True)
 
