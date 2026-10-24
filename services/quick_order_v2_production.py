@@ -41,7 +41,7 @@ def _clean_entry_embed(channel_id: int) -> discord.Embed:
         return discord.Embed(
             title="💎 VIP 自由計時｜下單",
             description=(
-                "金級會員以上限定。\n"
+                "白金級會員以上限定。\n"
                 "請選擇起始遊戲；進入客服中心後再選擇起始玩法。\n"
                 "接滿後開始計時，中途可切換遊戲／玩法，結束後依實際時間結算。"
             ),
