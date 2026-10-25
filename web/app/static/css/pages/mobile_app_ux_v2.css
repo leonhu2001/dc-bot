@@ -1,10 +1,11 @@
 @import url('/static/css/pages/mobile_app_redesign_v3.css?v=20261026-1');
 
-/* Desktop compatibility for mobile-only task hubs. */
+/* Compatibility bridge while templates still reference the v2 filename. */
 .mobile-task-hub,
 .employee-home-salary-link{display:none}
 
 @media (max-width:767px){
   .mobile-task-hub{display:grid!important}
   .employee-home-salary-link{display:block}
+  .admin-app-topbar{display:grid!important;grid-template-columns:40px minmax(0,1fr) 40px!important}
 }
