@@ -27,7 +27,7 @@ def test_employee_center_and_legacy_employee_pages_share_site_layout_shell():
 def test_employee_center_and_workspace_render_the_same_hero_on_the_same_ec_rail():
     employee = _read("web/app/templates/employee_center.html")
     site_layout = _read("web/app/templates/site_layout.html")
-    center_css = _read("web/app/static/css/pages/employee_center_inline_1.css")
+    center_css = _read("web/app/static/css/pages/employee_center.css")
 
     include = '{% include "_employee_workspace_hero.html" %}'
     assert include in employee

@@ -30,7 +30,7 @@ ALLOWED_LEGACY_PATCH_ASSETS: set[str] = set()
 # Legacy extracted-asset names are still present, so keep their current counts as
 # shrink-only ceilings. Lower these values whenever files are renamed; never raise
 # them to make CI green. Exact duplicate page assets have no legacy allowance.
-MAX_INLINE_NAMED_PAGE_ASSETS = 16
+MAX_INLINE_NAMED_PAGE_ASSETS = 14
 MAX_DATED_PAGE_ASSETS = 0
 
 STATIC_REF_RE = re.compile(
@@ -165,7 +165,12 @@ def main() -> None:
         target = static_path_from_url(reference)
         if not target.is_file():
             missing_static.append(reference)
-            print("MISSING:", reference)
+            owners = sorted(
+                path.relative_to(TEMPLATES).as_posix()
+                for path in template_files
+                if reference in STATIC_REF_RE.findall(path.read_text(encoding="utf-8-sig"))
+            )
+            print("MISSING:", reference, "REFERENCED_BY:", ", ".join(owners))
 
     if not missing_static:
         print("ALL_REFERENCED_STATIC_FILES_EXIST")
