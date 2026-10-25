@@ -448,9 +448,10 @@ async def _create_custom_order_request_ticket(
         )
         return None
 
-    await interaction.edit_original_response(
-        content=f"自訂單需求已送出：{ticket.mention}\n請到私人客服中心確認自助下單規格並等待客服報價。"
-    )
+    try:
+        await interaction.delete_original_response()
+    except (discord.NotFound, discord.HTTPException):
+        pass
     return ticket
 
 
@@ -748,31 +749,3 @@ async def repair_existing_custom_order_ticket_controls(bot: commands.Bot) -> Non
             f"staff_controls={repaired_controls}",
             flush=True,
         )
-
-
-def install_custom_order_quick_entry(bot: commands.Bot) -> None:
-    if not getattr(bot, "_custom_order_quick_view_registered", False):
-        bot.add_view(CustomOrderQuickEntryView())
-        bot._custom_order_quick_view_registered = True
-
-    if not getattr(bot, "_custom_order_quick_panel_task_started", False):
-        bot._custom_order_quick_panel_task_started = True
-        bot.loop.create_task(ensure_custom_order_quick_panel(bot))
-
-    if not getattr(bot, "_custom_order_control_repair_started", False):
-        bot._custom_order_control_repair_started = True
-        bot.loop.create_task(repair_existing_custom_order_ticket_controls(bot))
-
-
-__all__ = [
-    "CUSTOM_ORDER_QUICK_CHANNEL_ID",
-    "CUSTOM_ORDER_RULE_KEY",
-    "CustomOrderCompanionCountSelect",
-    "CustomOrderCompanionCountView",
-    "CustomOrderQuickEntryView",
-    "assert_custom_order_eligible",
-    "build_custom_order_entry_embed",
-    "install_custom_order_quick_entry",
-    "is_custom_order_level_eligible",
-    "repair_existing_custom_order_ticket_controls",
-]
