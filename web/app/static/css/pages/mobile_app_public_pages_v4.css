@@ -1,0 +1,854 @@
+/* Public mobile page composition v4.
+   This file only arranges customer-facing page components. Shared shell geometry,
+   safe areas, colors and radii live in mobile_app_visual_system_v4.css. */
+
+@media (max-width: 767px) {
+  /* Common section rhythm */
+  body.customer-mobile-app-site .site-section,
+  body.customer-mobile-app-site :where(.hero, .order3-hero, .crew-page-hero, .vip-page-hero, .mc-hero, .customer-orders-shell) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  body.customer-mobile-app-site .site-section {
+    padding: 18px 0 !important;
+  }
+
+  body.customer-mobile-app-site .section-heading {
+    display: flex !important;
+    align-items: end !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+  }
+
+  body.customer-mobile-app-site .section-eyebrow {
+    margin-bottom: 5px !important;
+    font-size: 10px !important;
+    letter-spacing: .12em !important;
+  }
+
+  body.customer-mobile-app-site .section-heading h2,
+  body.customer-mobile-app-site .site-section h2 {
+    line-height: 1.15 !important;
+  }
+
+  body.customer-mobile-app-site .section-heading h2 {
+    margin: 0 !important;
+    font-size: 23px !important;
+  }
+
+  body.customer-mobile-app-site .section-more {
+    flex: 0 0 auto !important;
+    font-size: 11px !important;
+  }
+
+  /* ---------- Home: first screen is decision + action, not desktop billboard ---------- */
+  body.customer-mobile-app-site .hero {
+    padding: 10px 0 18px !important;
+    overflow: visible !important;
+  }
+
+  body.customer-mobile-app-site .hero-glow {
+    display: none !important;
+  }
+
+  body.customer-mobile-app-site .hero-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+    min-height: 0 !important;
+  }
+
+  body.customer-mobile-app-site .hero-copy {
+    order: 1 !important;
+    min-width: 0 !important;
+    padding: 15px 2px 0 !important;
+  }
+
+  body.customer-mobile-app-site .hero-eyebrow {
+    margin-bottom: 8px !important;
+    font-size: 10px !important;
+    letter-spacing: .13em !important;
+  }
+
+  body.customer-mobile-app-site .hero h1 {
+    margin: 0 !important;
+    font-size: clamp(38px, 12vw, 52px) !important;
+    line-height: .98 !important;
+    letter-spacing: -.04em !important;
+  }
+
+  body.customer-mobile-app-site .hero-lead {
+    max-width: none !important;
+    margin: 13px 0 0 !important;
+    color: var(--m4-muted) !important;
+    font-size: 14px !important;
+    line-height: 1.65 !important;
+  }
+
+  body.customer-mobile-app-site .hero-actions {
+    display: grid !important;
+    grid-template-columns: 1.25fr 1fr !important;
+    gap: 8px !important;
+    margin-top: 15px !important;
+  }
+
+  body.customer-mobile-app-site .hero-actions .button {
+    width: 100% !important;
+    min-height: 48px !important;
+    justify-content: center !important;
+    padding: 0 12px !important;
+  }
+
+  body.customer-mobile-app-site .hero-notes {
+    display: flex !important;
+    gap: 7px !important;
+    margin-top: 12px !important;
+    overflow-x: auto !important;
+    padding-bottom: 2px !important;
+    scrollbar-width: none;
+  }
+
+  body.customer-mobile-app-site .hero-notes::-webkit-scrollbar { display: none; }
+
+  body.customer-mobile-app-site .hero-notes span {
+    flex: 0 0 auto !important;
+    font-size: 10px !important;
+    white-space: nowrap !important;
+  }
+
+  body.customer-mobile-app-site .hero-visual {
+    order: 2 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  body.customer-mobile-app-site .hero-art-frame {
+    height: clamp(190px, 56vw, 260px) !important;
+    min-height: 0 !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-xl) !important;
+    overflow: hidden !important;
+  }
+
+  body.customer-mobile-app-site .hero-mascot-image {
+    max-height: 100% !important;
+    object-fit: contain !important;
+  }
+
+  body.customer-mobile-app-site .trust-strip {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 0 18px !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  body.customer-mobile-app-site .trust-strip > div {
+    min-width: 0 !important;
+    min-height: 78px !important;
+    padding: 11px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.customer-mobile-app-site .trust-strip small { display: none !important; }
+  body.customer-mobile-app-site .trust-strip strong { font-size: 13px !important; }
+  body.customer-mobile-app-site .trust-strip span {
+    margin-top: 4px !important;
+    color: var(--m4-muted) !important;
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+  }
+
+  body.customer-mobile-app-site .experience-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  body.customer-mobile-app-site .experience-card {
+    display: grid !important;
+    min-width: 0 !important;
+    min-height: 150px !important;
+    align-content: start !important;
+    gap: 7px !important;
+    padding: 13px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.customer-mobile-app-site .experience-card p { display: none !important; }
+  body.customer-mobile-app-site .experience-no {
+    position: static !important;
+    color: var(--m4-muted-2) !important;
+    font-size: 9px !important;
+  }
+  body.customer-mobile-app-site .experience-icon {
+    width: 34px !important;
+    height: 34px !important;
+    margin: 0 !important;
+    border-radius: 11px !important;
+  }
+  body.customer-mobile-app-site .experience-card h3 {
+    margin: 0 !important;
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+  body.customer-mobile-app-site .experience-card .card-link {
+    align-self: end !important;
+    margin-top: auto !important;
+    font-size: 10px !important;
+  }
+
+  body.customer-mobile-app-site .service-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+  }
+
+  body.customer-mobile-app-site .service-card {
+    display: grid !important;
+    grid-template-columns: 118px minmax(0, 1fr) !important;
+    min-height: 118px !important;
+    overflow: hidden !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.customer-mobile-app-site .service-art {
+    width: 118px !important;
+    min-height: 118px !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+  }
+
+  body.customer-mobile-app-site .service-content {
+    min-width: 0 !important;
+    padding: 12px !important;
+  }
+
+  body.customer-mobile-app-site .service-content p { display: none !important; }
+  body.customer-mobile-app-site .service-content h3 {
+    margin: 4px 0 8px !important;
+    font-size: 17px !important;
+  }
+  body.customer-mobile-app-site .service-tag {
+    top: 8px !important;
+    right: 8px !important;
+  }
+
+  body.customer-mobile-app-site .crew-grid {
+    display: flex !important;
+    gap: 9px !important;
+    overflow-x: auto !important;
+    padding: 1px 1px 5px !important;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  body.customer-mobile-app-site .crew-grid::-webkit-scrollbar { display: none; }
+
+  body.customer-mobile-app-site .crew-type-card {
+    flex: 0 0 min(78vw, 300px) !important;
+    min-width: 0 !important;
+    scroll-snap-align: start;
+    overflow: hidden !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.customer-mobile-app-site .crew-type-card p { display: none !important; }
+
+  body.customer-mobile-app-site .special-banner {
+    display: grid !important;
+    grid-template-columns: 86px minmax(0, 1fr) !important;
+    gap: 13px !important;
+    align-items: center !important;
+    padding: 14px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-xl) !important;
+    background: var(--m4-surface) !important;
+  }
+
+  body.customer-mobile-app-site .special-banner-art {
+    width: 86px !important;
+    min-height: 100px !important;
+    border-radius: 16px !important;
+  }
+  body.customer-mobile-app-site .special-banner-copy h2 {
+    margin: 4px 0 8px !important;
+    font-size: 20px !important;
+  }
+  body.customer-mobile-app-site .special-banner-copy p { display: none !important; }
+  body.customer-mobile-app-site .special-banner-copy .button {
+    width: 100% !important;
+    margin-top: 7px !important;
+  }
+
+  body.customer-mobile-app-site .mw-social-hub {
+    margin: 18px 0 0 !important;
+    padding: 16px 0 !important;
+  }
+  body.customer-mobile-app-site .mw-social-copy { display: none !important; }
+  body.customer-mobile-app-site .mw-social-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  body.customer-mobile-app-site .mw-social-card {
+    min-width: 0 !important;
+    min-height: 90px !important;
+    padding: 12px !important;
+    border-radius: var(--m4-radius-card) !important;
+  }
+
+  /* ---------- Order catalog ---------- */
+  body.customer-mobile-app-site .order3-hero {
+    padding: 12px 2px 8px !important;
+  }
+  body.customer-mobile-app-site .order3-hero h1 {
+    margin: 0 !important;
+    font-size: 30px !important;
+    line-height: 1.04 !important;
+  }
+  body.customer-mobile-app-site .order3-hero p {
+    display: none !important;
+  }
+  body.customer-mobile-app-site .order3-store {
+    padding-top: 10px !important;
+  }
+
+  body.customer-mobile-app-site .order3-specified {
+    display: grid !important;
+    grid-template-columns: 44px minmax(0, 1fr) !important;
+    gap: 10px !important;
+    padding: 11px !important;
+    border-radius: var(--m4-radius-card) !important;
+  }
+  body.customer-mobile-app-site .order3-specified img {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 13px !important;
+  }
+  body.customer-mobile-app-site .order3-specified > a {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+  }
+
+  body.customer-mobile-app-site .order3-filter {
+    display: flex !important;
+    position: sticky !important;
+    top: calc(var(--m4-topbar-h) + env(safe-area-inset-top)) !important;
+    z-index: 120 !important;
+    gap: 6px !important;
+    width: calc(100% + (var(--m4-gutter) * 2)) !important;
+    margin: 0 calc(var(--m4-gutter) * -1) 12px !important;
+    padding: 8px var(--m4-gutter) !important;
+    overflow-x: auto !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--m4-line-soft) !important;
+    border-radius: 0 !important;
+    background: rgba(11, 11, 13, .96) !important;
+    scrollbar-width: none;
+  }
+  body.customer-mobile-app-site .order3-filter::-webkit-scrollbar { display: none; }
+  body.customer-mobile-app-site .order3-filter a {
+    flex: 0 0 auto !important;
+    min-height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 0 13px !important;
+    border-radius: 12px !important;
+    white-space: nowrap !important;
+  }
+
+  body.customer-mobile-app-site .order3-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  body.customer-mobile-app-site .order3-card {
+    display: grid !important;
+    grid-template-columns: 112px minmax(0, 1fr) !important;
+    gap: 0 12px !important;
+    min-width: 0 !important;
+    padding: 11px !important;
+    overflow: hidden !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .order3-media {
+    grid-column: 1 !important;
+    grid-row: 1 / span 5 !important;
+    width: 112px !important;
+    height: 132px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+  }
+  body.customer-mobile-app-site .order3-card-head,
+  body.customer-mobile-app-site .order3-card > h2,
+  body.customer-mobile-app-site .order3-card > p,
+  body.customer-mobile-app-site .order3-card-meta,
+  body.customer-mobile-app-site .order3-open {
+    grid-column: 2 !important;
+    min-width: 0 !important;
+  }
+  body.customer-mobile-app-site .order3-card > h2 {
+    margin: 5px 0 4px !important;
+    font-size: 18px !important;
+    line-height: 1.2 !important;
+  }
+  body.customer-mobile-app-site .order3-card > p {
+    display: none !important;
+  }
+  body.customer-mobile-app-site .order3-card-meta {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    margin: 6px 0 !important;
+  }
+  body.customer-mobile-app-site .order3-card-meta > div {
+    min-width: 0 !important;
+    padding: 7px !important;
+    border-radius: 11px !important;
+  }
+  body.customer-mobile-app-site .order3-open {
+    width: 100% !important;
+    min-height: 42px !important;
+    margin-top: auto !important;
+  }
+
+  body.customer-mobile-app-site .order3-dialog {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: min(88dvh, 760px) !important;
+    margin: auto 0 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .order3-dialog::backdrop {
+    background: rgba(0, 0, 0, .64) !important;
+  }
+  body.customer-mobile-app-site .order3-dialog-shell {
+    max-height: min(88dvh, 760px) !important;
+    overflow-y: auto !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+
+  /* ---------- Member center ---------- */
+  body.customer-mobile-app-site .mc-hero {
+    padding: 10px 0 0 !important;
+  }
+  body.customer-mobile-app-site .mc-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  body.customer-mobile-app-site .mc-hero-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+  }
+  body.customer-mobile-app-site .mc-identity {
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .mc-avatar {
+    width: 54px !important;
+    height: 54px !important;
+    flex: 0 0 54px !important;
+  }
+  body.customer-mobile-app-site .mc-identity-copy h1 {
+    margin: 2px 0 4px !important;
+    font-size: 22px !important;
+  }
+  body.customer-mobile-app-site .mc-identity-copy p { display: none !important; }
+  body.customer-mobile-app-site .mc-status-card {
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .mc-status-card > p { display: none !important; }
+  body.customer-mobile-app-site .mc-main {
+    padding: 10px 0 0 !important;
+  }
+  body.customer-mobile-app-site .mc-shortcuts {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 10px !important;
+  }
+  body.customer-mobile-app-site .mc-shortcuts a {
+    display: grid !important;
+    min-width: 0 !important;
+    min-height: 72px !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    align-content: center !important;
+    gap: 2px 8px !important;
+    padding: 10px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .mc-shortcuts a > span {
+    grid-row: 1 / 3 !important;
+    align-self: center !important;
+  }
+  body.customer-mobile-app-site .mc-shortcuts b { font-size: 13px !important; }
+  body.customer-mobile-app-site .mc-shortcuts small { font-size: 10px !important; }
+  body.customer-mobile-app-site .mc-staff-strip {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 7px !important;
+    padding: 11px !important;
+    border-radius: var(--m4-radius-card) !important;
+  }
+  body.customer-mobile-app-site .mc-staff-strip > div {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 7px !important;
+  }
+  body.customer-mobile-app-site .mc-section-title {
+    margin: 16px 0 9px !important;
+  }
+  body.customer-mobile-app-site .mc-section-title small { display: none !important; }
+  body.customer-mobile-app-site .mc-section-title h2 {
+    margin: 0 !important;
+    font-size: 20px !important;
+  }
+  body.customer-mobile-app-site .mc-focus-grid,
+  body.customer-mobile-app-site .mc-lower-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+  }
+  body.customer-mobile-app-site .mc-card {
+    min-width: 0 !important;
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .mc-card-head small { display: none !important; }
+  body.customer-mobile-app-site .mc-card-head h3 {
+    margin: 0 !important;
+    font-size: 17px !important;
+  }
+  body.customer-mobile-app-site .mc-mini-stats,
+  body.customer-mobile-app-site .mc-vip-summary {
+    gap: 7px !important;
+  }
+
+  /* ---------- My orders ---------- */
+  body.customer-mobile-app-site .customer-orders-shell {
+    padding: 10px 0 0 !important;
+  }
+  body.customer-mobile-app-site .customer-orders-head {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 0 2px !important;
+  }
+  body.customer-mobile-app-site .customer-orders-head h1 {
+    margin: 0 !important;
+    font-size: 28px !important;
+  }
+  body.customer-mobile-app-site .customer-orders-head p { display: none !important; }
+  body.customer-mobile-app-site .customer-orders-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 7px !important;
+  }
+  body.customer-mobile-app-site .customer-orders-actions .button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  body.customer-mobile-app-site .customer-order-stats {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin: 12px 0 !important;
+  }
+  body.customer-mobile-app-site .customer-order-stat {
+    min-width: 0 !important;
+    min-height: 82px !important;
+    padding: 11px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .customer-order-stat small { display: none !important; }
+  body.customer-mobile-app-site .customer-order-stat strong {
+    font-size: 28px !important;
+  }
+  body.customer-mobile-app-site .customer-order-stat span {
+    color: var(--m4-muted) !important;
+    font-size: 10px !important;
+  }
+  body.customer-mobile-app-site .customer-order-section {
+    margin-top: 14px !important;
+  }
+  body.customer-mobile-app-site .customer-order-section-head {
+    margin-bottom: 8px !important;
+  }
+  body.customer-mobile-app-site .customer-order-section-head .section-eyebrow { display: none !important; }
+  body.customer-mobile-app-site .customer-order-section-head h2 {
+    margin: 0 !important;
+    font-size: 19px !important;
+  }
+  body.customer-mobile-app-site .customer-order-list {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  body.customer-mobile-app-site .customer-order-card {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    padding: 12px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .customer-order-main,
+  body.customer-mobile-app-site .customer-order-meta { min-width: 0 !important; }
+  body.customer-mobile-app-site .customer-order-meta {
+    grid-column: 1 / -1 !important;
+    padding-top: 8px !important;
+    border-top: 1px solid var(--m4-line-soft) !important;
+  }
+  body.customer-mobile-app-site .customer-order-side {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-items: end !important;
+  }
+  body.customer-mobile-app-site .customer-order-empty {
+    min-height: 64px !important;
+    padding: 18px 12px !important;
+    border: 1px dashed var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    color: var(--m4-muted) !important;
+    text-align: center !important;
+  }
+
+  /* ---------- Staff directory ---------- */
+  body.customer-mobile-app-site .crew-page-hero {
+    padding: 12px 2px 8px !important;
+  }
+  body.customer-mobile-app-site .crew-page-heading h1 {
+    margin: 0 !important;
+    font-size: 30px !important;
+  }
+  body.customer-mobile-app-site .crew-page-heading p { display: none !important; }
+  body.customer-mobile-app-site .crew-directory { padding-top: 8px !important; }
+  body.customer-mobile-app-site .crew-filters {
+    display: flex !important;
+    gap: 6px !important;
+    width: calc(100% + (var(--m4-gutter) * 2)) !important;
+    margin: 0 calc(var(--m4-gutter) * -1) 12px !important;
+    padding: 7px var(--m4-gutter) !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+  body.customer-mobile-app-site .crew-filters::-webkit-scrollbar { display: none; }
+  body.customer-mobile-app-site .crew-filters a {
+    flex: 0 0 auto !important;
+    min-height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 0 13px !important;
+    border-radius: 12px !important;
+    white-space: nowrap !important;
+  }
+  body.customer-mobile-app-site .public-crew-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+  }
+  body.customer-mobile-app-site .public-crew-card {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .public-crew-photo {
+    aspect-ratio: 1 / 1 !important;
+    min-height: 0 !important;
+    border-radius: 0 !important;
+  }
+  body.customer-mobile-app-site .public-crew-photo img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+  body.customer-mobile-app-site .public-crew-content {
+    min-width: 0 !important;
+    padding: 10px !important;
+  }
+  body.customer-mobile-app-site .public-crew-name-row h2 {
+    margin: 2px 0 0 !important;
+    overflow: hidden !important;
+    font-size: 16px !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  body.customer-mobile-app-site .public-crew-games { display: none !important; }
+  body.customer-mobile-app-site .public-crew-stats {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 4px !important;
+    margin-top: 9px !important;
+  }
+  body.customer-mobile-app-site .public-crew-stats > div {
+    min-width: 0 !important;
+    padding: 6px 2px !important;
+  }
+  body.customer-mobile-app-site .public-crew-stats strong { font-size: 13px !important; }
+  body.customer-mobile-app-site .public-crew-stats span { font-size: 8px !important; }
+  body.customer-mobile-app-site .public-crew-more {
+    min-height: 40px !important;
+    margin-top: 8px !important;
+    justify-content: center !important;
+    font-size: 11px !important;
+  }
+
+  /* ---------- VIP: swipe levels instead of six full-width walls of text ---------- */
+  body.customer-mobile-app-site .vip-page-hero {
+    padding: 12px 2px 8px !important;
+  }
+  body.customer-mobile-app-site .vip-page-orbit { display: none !important; }
+  body.customer-mobile-app-site .vip-page-heading h1 {
+    margin: 0 !important;
+    font-size: 30px !important;
+  }
+  body.customer-mobile-app-site .vip-page-heading > p {
+    margin: 8px 0 0 !important;
+    color: var(--m4-muted) !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+  }
+  body.customer-mobile-app-site .vip-current-member {
+    margin-top: 11px !important;
+    padding: 11px !important;
+    border-radius: var(--m4-radius-card) !important;
+  }
+  body.customer-mobile-app-site .vip-level-section { padding-top: 10px !important; }
+  body.customer-mobile-app-site .vip-level-grid {
+    display: flex !important;
+    gap: 9px !important;
+    overflow-x: auto !important;
+    padding: 1px 1px 7px !important;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  body.customer-mobile-app-site .vip-level-grid::-webkit-scrollbar { display: none; }
+  body.customer-mobile-app-site .vip-level-card {
+    flex: 0 0 min(82vw, 320px) !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    scroll-snap-align: start;
+    padding: 15px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-xl) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .vip-level-card h2 {
+    margin: 8px 0 !important;
+    font-size: 22px !important;
+  }
+  body.customer-mobile-app-site .vip-level-card ul {
+    margin: 12px 0 0 !important;
+    padding-left: 18px !important;
+  }
+  body.customer-mobile-app-site .vip-level-card li {
+    margin: 6px 0 !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+  body.customer-mobile-app-site .vip-rule-grid {
+    display: flex !important;
+    gap: 9px !important;
+    overflow-x: auto !important;
+    padding: 1px 1px 7px !important;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  body.customer-mobile-app-site .vip-rule-grid::-webkit-scrollbar { display: none; }
+  body.customer-mobile-app-site .vip-rule-card {
+    flex: 0 0 min(88vw, 340px) !important;
+    min-width: 0 !important;
+    scroll-snap-align: start;
+    padding: 14px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .vip-general-card {
+    padding: 14px !important;
+    border: 1px solid var(--m4-line) !important;
+    border-radius: var(--m4-radius-card) !important;
+    background: var(--m4-surface) !important;
+  }
+  body.customer-mobile-app-site .vip-general-card ol,
+  body.customer-mobile-app-site .vip-rule-card ul {
+    padding-left: 19px !important;
+  }
+  body.customer-mobile-app-site .vip-general-card li,
+  body.customer-mobile-app-site .vip-rule-card li {
+    margin: 7px 0 !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+  }
+}
+
+@media (max-width: 390px) {
+  body.customer-mobile-app-site .service-card {
+    grid-template-columns: 100px minmax(0, 1fr) !important;
+  }
+  body.customer-mobile-app-site .service-art {
+    width: 100px !important;
+  }
+  body.customer-mobile-app-site .order3-card {
+    grid-template-columns: 96px minmax(0, 1fr) !important;
+  }
+  body.customer-mobile-app-site .order3-media {
+    width: 96px !important;
+    height: 122px !important;
+  }
+}
+
+@media (max-width: 340px) {
+  body.customer-mobile-app-site .experience-grid,
+  body.customer-mobile-app-site .trust-strip,
+  body.customer-mobile-app-site .public-crew-grid,
+  body.customer-mobile-app-site .customer-order-stats,
+  body.customer-mobile-app-site .mc-shortcuts {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.customer-mobile-app-site .hero-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
