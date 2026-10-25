@@ -27,9 +27,8 @@ MAX_INLINE_SCRIPT_BLOCKS = 7
 # *_fix.js / *_fix.css fails the static audit instead of becoming permanent debt.
 ALLOWED_LEGACY_PATCH_ASSETS: set[str] = set()
 
-# Legacy extracted-asset names are still present, so keep their current counts as
-# shrink-only ceilings. Lower these values whenever files are renamed; never raise
-# them to make CI green. Exact duplicate page assets have no legacy allowance.
+# Legacy extracted-asset names are fully retired. Keep the ceiling at zero so a
+# new *_inline_N page asset fails CI instead of becoming permanent frontend debt.
 MAX_INLINE_NAMED_PAGE_ASSETS = 0
 MAX_DATED_PAGE_ASSETS = 0
 
