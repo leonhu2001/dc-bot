@@ -168,7 +168,6 @@
     const cached = readCache();
     if(cached){
         applyData(cached);
-        loadSalary();
     }else{
         loadSalary({showLoader:true});
     }
