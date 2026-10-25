@@ -1,6 +1,5 @@
-@import url('/static/css/pages/mobile_app_redesign_v3.css?v=20261026-1');
-
-/* Compatibility bridge while templates still reference the v2 filename. */
+/* Compatibility shim for templates that still reference the former v2 layer.
+   All real mobile design now lives in mobile_app_redesign_v3.css. */
 .mobile-task-hub,
 .employee-home-salary-link{display:none}
 
