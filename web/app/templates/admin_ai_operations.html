@@ -24,6 +24,11 @@
     {% set report = snapshot.financial_orders %}
     {% set anomalies = snapshot.anomalies %}
     {% set support = snapshot.customer_service %}
+    {% set order_issues = anomalies.category_counts.get('order', 0) %}
+    {% set payment_issues = anomalies.category_counts.get('payment', 0) %}
+    {% set sync_issues = anomalies.category_counts.get('sync', 0) %}
+    {% set topup_issues = anomalies.category_counts.get('topup', 0) %}
+    {% set support_issues = anomalies.category_counts.get('support', 0) %}
     {% set accounting_issues = anomalies.category_counts.get('accounting', 0) %}
 
     <div class="payout-stat-grid">
@@ -55,7 +60,11 @@
             <span>異常中心（全部類別）</span>
             <strong>{{ anomalies.issue_count }}</strong>
             <p class="muted-text">
-                訂單／付款／同步／儲值／客服／帳務的合計，不等於帳務異常數。
+                訂單 {{ order_issues }} ｜付款 {{ payment_issues }} ｜同步 {{ sync_issues }} ｜儲值 {{ topup_issues }} ｜客服 {{ support_issues }} ｜帳務 {{ accounting_issues }}
+            </p>
+            <p class="muted-text">
+                Critical {{ anomalies.critical_count }} ｜ Warning {{ anomalies.warning_count }} ｜
+                <a href="/admin/anomalies">查看 {{ anomalies.issue_count }} 筆異常明細</a>
             </p>
         </div>
 
