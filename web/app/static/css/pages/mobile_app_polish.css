@@ -16,7 +16,6 @@
     html{
         -webkit-text-size-adjust:100%;
         text-size-adjust:100%;
-        overscroll-behavior-y:none;
     }
 
     body.customer-mobile-app-site,
@@ -35,7 +34,6 @@
         box-sizing:border-box;
     }
 
-    /* Make all three app shells feel like the same product. */
     body.customer-mobile-app-site{--customer-app-nav-h:var(--mw-app-nav-h)}
     body.employee-workspace-site,
     body:has(.employee-app-topbar){--employee-app-nav-h:var(--mw-app-nav-h)}
@@ -84,11 +82,8 @@
 
     .customer-app-title-wrap strong,
     .employee-app-topbar-copy strong,
-    .admin-app-title strong{
-        font-size:16px!important;
-    }
+    .admin-app-title strong{font-size:16px!important}
 
-    /* Bottom nav: slightly shorter, clearer active state, less visual bulk. */
     .customer-app-bottom-nav,
     .employee-app-bottom-nav,
     .admin-app-bottom-nav{
@@ -104,6 +99,7 @@
         gap:1px!important;
         border-radius:12px!important;
         font-size:10.5px!important;
+        touch-action:manipulation;
         transition:background-color .14s ease,color .14s ease,transform .08s ease;
     }
 
@@ -130,20 +126,18 @@
     .employee-app-nav-item:active,
     .admin-app-nav-item:active{transform:scale(.96)}
 
-    /* More sheets */
     .employee-app-more[open]::before,
     .admin-app-more[open]::before{
         content:"";
         position:fixed;
         inset:0;
-        z-index:1205;
         background:rgba(0,0,0,.48);
         backdrop-filter:blur(2px);
         -webkit-backdrop-filter:blur(2px);
-        pointer-events:none;
+        pointer-events:auto;
     }
-
-    .admin-app-more[open]::before{z-index:1455}
+    .employee-app-more[open]::before{z-index:1190}
+    .admin-app-more[open]::before{z-index:1440}
 
     .employee-app-more-panel,
     .admin-app-more-panel{
@@ -158,13 +152,10 @@
 
     .employee-app-sheet-head,
     .admin-app-sheet-head{padding:0 3px 10px!important}
-
     .employee-app-sheet-head strong,
     .admin-app-sheet-head strong{font-size:20px!important}
-
     .employee-app-sheet-links,
     .admin-app-sheet-links{gap:7px!important}
-
     .employee-app-sheet-links a,
     .admin-app-sheet-links a{
         min-height:70px!important;
@@ -172,7 +163,6 @@
         border-radius:14px!important;
     }
 
-    /* Consistent touch controls. */
     body.customer-mobile-app-site button,
     body.customer-mobile-app-site .button,
     body.customer-mobile-app-site input,
@@ -184,15 +174,15 @@
     body.mw-r5-admin button,
     body.mw-r5-admin .button,
     body.mw-r5-admin input,
-    body.mw-r5-admin select{
-        min-height:var(--mw-app-tap);
-    }
+    body.mw-r5-admin select{min-height:var(--mw-app-tap)}
 
     body.customer-mobile-app-site textarea,
     body.employee-workspace-site textarea,
     body.mw-r5-admin textarea{font-size:16px!important}
 
-    :where(.customer-app-nav-item,.employee-app-nav-item,.admin-app-nav-item,.customer-app-account,.employee-app-profile,.admin-app-home,.admin-app-search,button,.button,a):focus-visible{
+    body.customer-mobile-app-site :where(.customer-app-nav-item,.customer-app-account,button,.button,a):focus-visible,
+    body.employee-workspace-site :where(.employee-app-nav-item,.employee-app-profile,button,.button,a):focus-visible,
+    body.mw-r5-admin :where(.admin-app-nav-item,.admin-app-home,.admin-app-search,button,.button,a):focus-visible{
         outline:2px solid rgba(240,207,114,.86);
         outline-offset:2px;
     }
@@ -229,9 +219,7 @@
 
     body.customer-mobile-app-site .mc-shortcuts a,
     body.customer-mobile-app-site .customer-order-stat,
-    body.customer-mobile-app-site .customer-detail-item{
-        border-radius:var(--mw-app-radius-sm)!important;
-    }
+    body.customer-mobile-app-site .customer-detail-item{border-radius:var(--mw-app-radius-sm)!important}
 
     body.customer-mobile-app-site .customer-order-card{padding:12px!important}
     body.customer-mobile-app-site .customer-order-meta{font-size:12px}
@@ -270,9 +258,7 @@
     }
     body.customer-mobile-app-site .order3-dialog-media{max-height:145px!important}
     body.customer-mobile-app-site .order3-field{padding:11px!important;border-radius:14px!important}
-    body.customer-mobile-app-site .order3-quote{
-        box-shadow:0 -10px 28px rgba(0,0,0,.28);
-    }
+    body.customer-mobile-app-site .order3-quote{box-shadow:0 -10px 28px rgba(0,0,0,.28)}
 
     /* Employee / dispatch app */
     .employee-workspace-site .employee-workspace-frame{padding-top:8px!important}
@@ -350,11 +336,9 @@
     body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row){padding:11px!important}
     body.mw-r5-admin main.page .card-head{padding:11px 12px!important}
 
-    /* Keep toast / transient UI above every bottom nav. */
-    .toast,
-    .toast-container,
-    [role="status"][class*="toast"],
-    [class*="toast-container"]{
+    body.customer-mobile-app-site :where(.toast,.toast-container,[role="status"][class*="toast"],[class*="toast-container"]),
+    body.employee-workspace-site :where(.toast,.toast-container,[role="status"][class*="toast"],[class*="toast-container"]),
+    body.mw-r5-admin :where(.toast,.toast-container,[role="status"][class*="toast"],[class*="toast-container"]){
         margin-bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 8px)!important;
     }
 }
@@ -383,9 +367,7 @@
     .employee-workspace-site .ec-overview,
     .employee-workspace-site .dispatch-stats,
     body.mw-r5-admin .mw-r5-legacy-body .stats,
-    body.mw-r5-admin .history-ledger-stats{
-        grid-template-columns:1fr 1fr!important;
-    }
+    body.mw-r5-admin .history-ledger-stats{grid-template-columns:1fr 1fr!important}
 }
 
 @media (max-width:340px){
@@ -403,9 +385,7 @@
     .employee-workspace-site .ec-overview,
     .employee-workspace-site .dispatch-stats,
     body.mw-r5-admin .mw-r5-legacy-body .stats,
-    body.mw-r5-admin .history-ledger-stats{
-        grid-template-columns:1fr!important;
-    }
+    body.mw-r5-admin .history-ledger-stats{grid-template-columns:1fr!important}
 }
 
 @media (max-height:560px) and (orientation:landscape){
