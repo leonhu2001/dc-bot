@@ -1,0 +1,488 @@
+/* Mobile app redesign v3
+   One coherent phone layer for employee + customer-service workspaces.
+   Desktop remains unchanged. */
+
+@media (max-width:767px){
+  :root{
+    --m3-bg:#0b0b0d;
+    --m3-surface:#151518;
+    --m3-surface-2:#1b1b1f;
+    --m3-line:rgba(255,255,255,.105);
+    --m3-line-strong:rgba(242,207,112,.30);
+    --m3-text:#f5f2ea;
+    --m3-muted:rgba(235,232,224,.58);
+    --m3-gold:#f2cf70;
+    --m3-gold-soft:rgba(242,207,112,.12);
+    --m3-danger:#ff8f8f;
+    --m3-radius:16px;
+    --m3-gap:10px;
+    --m3-topbar-h:56px;
+    --m3-switch-h:0px;
+    --m3-bottom-h:64px;
+  }
+
+  html{background:var(--m3-bg)!important;scroll-padding-top:calc(var(--m3-topbar-h) + env(safe-area-inset-top) + var(--m3-switch-h) + 10px)}
+
+  body.employee-workspace-site,
+  body:has(.employee-app-topbar),
+  body.mw-r5-admin{
+    margin:0!important;
+    min-width:0!important;
+    min-height:100%!important;
+    padding:0!important;
+    background:var(--m3-bg)!important;
+    color:var(--m3-text);
+    overflow-x:clip;
+  }
+
+  body:has(.employee-app-topbar):has(.mobile-app-context-switch),
+  body.mw-r5-admin:has(.mobile-app-context-switch){--m3-switch-h:54px}
+
+  /* Fixed opaque app bars: no blurred content bleeding into the iOS status area. */
+  .employee-app-topbar,
+  .admin-app-topbar{
+    display:flex!important;
+    position:fixed!important;
+    top:0!important;
+    right:0!important;
+    left:0!important;
+    z-index:1300!important;
+    width:100%!important;
+    height:calc(var(--m3-topbar-h) + env(safe-area-inset-top))!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:env(safe-area-inset-top) max(14px,env(safe-area-inset-right)) 0 max(14px,env(safe-area-inset-left))!important;
+    box-sizing:border-box!important;
+    border:0!important;
+    border-bottom:1px solid var(--m3-line)!important;
+    border-radius:0!important;
+    background:#0b0b0d!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
+
+  .employee-app-topbar{align-items:center!important}
+  .admin-app-topbar{align-items:center!important;grid-template-columns:48px minmax(0,1fr) 48px!important}
+
+  .employee-app-mark,
+  .admin-app-home,
+  .admin-app-search,
+  .employee-app-profile{
+    width:40px!important;
+    height:40px!important;
+    flex:0 0 40px!important;
+    border-radius:13px!important;
+  }
+
+  .employee-app-mark{border-color:rgba(242,207,112,.25)!important;background:#171713!important}
+  .employee-app-profile{border-color:var(--m3-line)!important;background:#151518!important}
+  .mobile-app-logo-image{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:inherit!important}
+
+  .employee-app-topbar-copy small,
+  .admin-app-title small{display:none!important}
+  .employee-app-topbar-copy strong,
+  .admin-app-title strong{font-size:18px!important;line-height:1.1!important;letter-spacing:0!important;color:var(--m3-text)!important}
+
+  .mobile-app-context-switch{
+    display:grid!important;
+    position:fixed!important;
+    top:calc(var(--m3-topbar-h) + env(safe-area-inset-top))!important;
+    right:0!important;
+    left:0!important;
+    z-index:1290!important;
+    width:100%!important;
+    height:var(--m3-switch-h)!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+    align-items:center!important;
+    margin:0!important;
+    padding:7px max(12px,env(safe-area-inset-right)) 7px max(12px,env(safe-area-inset-left))!important;
+    box-sizing:border-box!important;
+    border:0!important;
+    border-bottom:1px solid var(--m3-line)!important;
+    background:#0b0b0d!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
+  .mobile-app-context-switch a{
+    min-height:40px!important;
+    padding:0 10px!important;
+    border:1px solid var(--m3-line)!important;
+    border-radius:13px!important;
+    background:#111114!important;
+    color:var(--m3-muted)!important;
+    font-size:13px!important;
+    font-weight:850!important;
+  }
+  .mobile-app-context-switch a.is-active{
+    border-color:rgba(242,207,112,.38)!important;
+    background:var(--m3-gold-soft)!important;
+    color:var(--m3-gold)!important;
+  }
+
+  /* Reserve bar space exactly once, on the actual page host. */
+  body.employee-workspace-site .site-main,
+  body:has(.employee-app-topbar) .site-main{
+    width:100%!important;
+    max-width:none!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:calc(var(--m3-topbar-h) + env(safe-area-inset-top) + var(--m3-switch-h) + 10px) 0 calc(var(--m3-bottom-h) + env(safe-area-inset-bottom) + 10px)!important;
+    box-sizing:border-box!important;
+    overflow:visible!important;
+  }
+  body.mw-r5-admin .mw-r5-shell,
+  body.mw-r5-admin .mw-r5-main-host{
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    min-height:0!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+  }
+  body.mw-r5-admin .mw-r5-main-host{
+    padding:calc(var(--m3-topbar-h) + env(safe-area-inset-top) + var(--m3-switch-h) + 10px) 0 calc(var(--m3-bottom-h) + env(safe-area-inset-bottom) + 10px)!important;
+  }
+  body.mw-r5-admin .mw-r5-content,
+  body.mw-r5-admin .mw-r5-legacy-body{margin:0!important;padding:0!important;min-height:0!important}
+
+  .employee-workspace-site .employee-workspace-frame,
+  .employee-workspace-site .employee-workspace-page-content,
+  body:has(.employee-app-topbar) .employee-workspace-frame,
+  body:has(.employee-app-topbar) .employee-workspace-page-content{
+    width:100%!important;
+    max-width:none!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    box-sizing:border-box!important;
+  }
+  .employee-workspace-site .employee-workspace-page-content,
+  body:has(.employee-app-topbar) .employee-workspace-page-content,
+  body.employee-workspace-site .site-main>.ec,
+  body:has(.employee-app-topbar) .site-main>.ec{
+    padding-right:max(12px,env(safe-area-inset-right))!important;
+    padding-left:max(12px,env(safe-area-inset-left))!important;
+  }
+  body.employee-workspace-site .site-main>.ec,
+  body:has(.employee-app-topbar) .site-main>.ec{margin:0!important;padding-top:0!important;padding-bottom:0!important}
+
+  /* Bottom navigation owns the safe area visually; there is no extra dead strip below it. */
+  .employee-app-bottom-nav,
+  .admin-app-bottom-nav{
+    display:grid!important;
+    position:fixed!important;
+    right:0!important;
+    bottom:0!important;
+    left:0!important;
+    z-index:1310!important;
+    width:100%!important;
+    height:calc(var(--m3-bottom-h) + env(safe-area-inset-bottom))!important;
+    min-height:0!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    align-items:start!important;
+    margin:0!important;
+    padding:5px max(5px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(5px,env(safe-area-inset-left))!important;
+    box-sizing:border-box!important;
+    border:0!important;
+    border-top:1px solid var(--m3-line)!important;
+    border-radius:0!important;
+    background:#101013!important;
+    box-shadow:0 -10px 28px rgba(0,0,0,.32)!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
+  .employee-app-nav-item,
+  .admin-app-nav-item{
+    min-height:54px!important;
+    gap:2px!important;
+    padding:4px 2px!important;
+    border-radius:12px!important;
+    color:rgba(235,232,224,.58)!important;
+    font-size:11px!important;
+  }
+  .employee-app-nav-icon,
+  .admin-app-nav-icon{height:25px!important;font-size:20px!important}
+  .employee-app-nav-item.is-active,
+  .employee-app-more.is-active>summary,
+  .employee-app-more[open]>summary,
+  .admin-app-nav-item.is-active,
+  .admin-app-more.is-active>summary,
+  .admin-app-more[open]>summary{
+    background:rgba(242,207,112,.14)!important;
+    color:var(--m3-gold)!important;
+  }
+  .employee-app-nav-item::before,
+  .admin-app-nav-item::before{display:none!important}
+
+  /* Shared visual language. */
+  body:has(.employee-app-topbar) .panel,
+  body:has(.employee-app-topbar) .ec-card,
+  body:has(.employee-app-topbar) .ec-stat,
+  body:has(.employee-app-topbar) .binding-card,
+  body:has(.employee-app-topbar) .dispatch-panel,
+  body:has(.employee-app-topbar) .report-card,
+  body:has(.employee-app-topbar) .my-payout-card,
+  body.mw-r5-admin .panel,
+  body.mw-r5-admin .compact-panel,
+  body.mw-r5-admin .center-row,
+  body.mw-r5-admin .center-review{
+    min-width:0!important;
+    min-height:0!important;
+    border-color:var(--m3-line)!important;
+    border-radius:var(--m3-radius)!important;
+    box-shadow:none!important;
+  }
+
+  body:has(.employee-app-topbar) input,
+  body:has(.employee-app-topbar) select,
+  body:has(.employee-app-topbar) textarea,
+  body.mw-r5-admin input,
+  body.mw-r5-admin select,
+  body.mw-r5-admin textarea{font-size:16px!important}
+
+  body:has(.employee-app-topbar) button,
+  body:has(.employee-app-topbar) .button,
+  body:has(.employee-app-topbar) a.button,
+  body.mw-r5-admin button,
+  body.mw-r5-admin .button,
+  body.mw-r5-admin a.button{min-height:44px}
+
+  .mobile-task-hub{
+    display:grid!important;
+    gap:9px!important;
+    margin:0 0 10px!important;
+    padding:12px!important;
+    border:1px solid rgba(242,207,112,.25)!important;
+    border-radius:17px!important;
+    background:linear-gradient(150deg,rgba(242,207,112,.085),rgba(255,255,255,.02))!important;
+  }
+  .mobile-task-hub-kicker,
+  .mobile-task-hub p{display:none!important}
+  .mobile-task-hub h2{margin:0!important;font-size:17px!important;line-height:1.2!important}
+  .mobile-task-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+  .mobile-task-action{
+    min-height:62px!important;
+    gap:9px!important;
+    padding:9px 10px!important;
+    border:1px solid var(--m3-line)!important;
+    border-radius:14px!important;
+    background:rgba(255,255,255,.025)!important;
+  }
+  .mobile-task-action.is-primary{border-color:rgba(242,207,112,.40)!important;background:rgba(242,207,112,.11)!important}
+  .mobile-task-icon{width:30px!important;height:30px!important;flex:0 0 30px!important;border-radius:10px!important;font-size:16px!important}
+  .mobile-task-copy strong{font-size:13px!important}
+  .mobile-task-copy small{font-size:10px!important;color:var(--m3-muted)!important}
+
+  /* Employee home: actions first, summary compact, binding becomes a status card. */
+  body:has(.employee-app-topbar) .ec{display:flex!important;flex-direction:column!important;gap:10px!important}
+  body:has(.employee-app-topbar) .employee-mobile-task-hub{order:-30!important}
+  body:has(.employee-app-topbar) .ec-overview{order:-20!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin:0!important}
+  body:has(.employee-app-topbar) .ec-stat{padding:12px!important;border-radius:15px!important}
+  body:has(.employee-app-topbar) .ec-stat span{font-size:11px!important;color:var(--m3-muted)!important}
+  body:has(.employee-app-topbar) .ec-stat b{font-size:27px!important;line-height:1.1!important}
+  body:has(.employee-app-topbar) .binding-card{order:-10!important;display:grid!important;gap:8px!important;padding:12px!important}
+  body:has(.employee-app-topbar) .binding-card .ec-k,
+  body:has(.employee-app-topbar) .binding-breakdown,
+  body:has(.employee-app-topbar) #bindingDescription{display:none!important}
+  body:has(.employee-app-topbar) .binding-title-row{gap:7px!important;align-items:center!important}
+  body:has(.employee-app-topbar) .binding-title-row h2{margin:0!important;font-size:18px!important}
+  body:has(.employee-app-topbar) .binding-side{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important;align-items:center!important}
+  body:has(.employee-app-topbar) .binding-meta{min-height:0!important;padding:9px 10px!important;border-radius:13px!important}
+  body:has(.employee-app-topbar) .binding-meta span,
+  body:has(.employee-app-topbar) .binding-meta small{font-size:10px!important}
+  body:has(.employee-app-topbar) .binding-meta b{font-size:14px!important}
+  body:has(.employee-app-topbar) .binding-action{width:auto!important;min-height:44px!important;padding:8px 12px!important}
+  body:has(.employee-app-topbar) .ec-salary{display:none!important}
+  body:has(.employee-app-topbar) .ec-grid{order:10!important;grid-template-columns:1fr!important;gap:8px!important;margin:0!important}
+  body:has(.employee-app-topbar) .ec-grid aside{display:none!important}
+  body:has(.employee-app-topbar) .ec-card{padding:12px!important}
+
+  /* Dispatch: shell already names the page, so the phone content starts with live status and jobs. */
+  body:has(.employee-app-topbar) .dispatch-shell{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+  body:has(.employee-app-topbar) .dispatch-hero{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;margin:0 0 9px!important}
+  body:has(.employee-app-topbar) .dispatch-hero-main{padding:10px!important}
+  body:has(.employee-app-topbar) .dispatch-hero-main .dispatch-order-top>div:first-child{display:none!important}
+  body:has(.employee-app-topbar) .dispatch-alert-toggle{width:100%!important;min-height:44px!important;border-radius:13px!important}
+  body:has(.employee-app-topbar) .dispatch-tags{display:flex!important;gap:6px!important;margin:7px 0 0!important;overflow-x:auto!important;padding:0 0 1px!important;scrollbar-width:none}
+  body:has(.employee-app-topbar) .dispatch-tags::-webkit-scrollbar{display:none}
+  body:has(.employee-app-topbar) .dispatch-tag{flex:0 0 auto!important;min-height:32px!important;padding:6px 9px!important;font-size:10px!important}
+  body:has(.employee-app-topbar) .dispatch-stats{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;padding:9px!important}
+  body:has(.employee-app-topbar) .dispatch-stat{padding:9px!important;border-radius:13px!important}
+  body:has(.employee-app-topbar) .dispatch-stat span{font-size:10px!important}
+  body:has(.employee-app-topbar) .dispatch-stat strong{font-size:24px!important}
+  body:has(.employee-app-topbar) .dispatch-board{display:flex!important;flex-direction:column!important;gap:9px!important}
+  body:has(.employee-app-topbar) .dispatch-board>.dispatch-column:nth-child(2){order:1!important}
+  body:has(.employee-app-topbar) .dispatch-board>.dispatch-column:nth-child(1){order:2!important}
+  body:has(.employee-app-topbar) .dispatch-column{padding:10px!important}
+  body:has(.employee-app-topbar) .dispatch-eyebrow{display:none!important}
+  body:has(.employee-app-topbar) .dispatch-column-head h2,
+  body:has(.employee-app-topbar) .dispatch-subsection-head h3{font-size:17px!important;margin:0!important}
+  body:has(.employee-app-topbar) .dispatch-order-card,
+  body:has(.employee-app-topbar) .dispatch-my-card{padding:11px!important;border-radius:14px!important}
+  body:has(.employee-app-topbar) .dispatch-order-top h3{font-size:15px!important;line-height:1.3!important}
+  body:has(.employee-app-topbar) .dispatch-meta{grid-template-columns:1fr 1fr!important;gap:6px!important}
+  body:has(.employee-app-topbar) .dispatch-meta-item{padding:8px!important;border-radius:11px!important}
+  body:has(.employee-app-topbar) .dispatch-meta-item span{font-size:10px!important}
+  body:has(.employee-app-topbar) .dispatch-meta-item strong{font-size:13px!important}
+  body:has(.employee-app-topbar) .dispatch-note{font-size:11px!important;line-height:1.45!important}
+  body:has(.employee-app-topbar) .dispatch-empty{min-height:0!important;padding:14px!important}
+
+  /* Reports: no duplicated hero; task shortcuts + compact filters + cards. */
+  body:has(.employee-app-topbar) .report-shell{display:grid!important;gap:9px!important;width:100%!important;margin:0!important;padding:0!important}
+  body:has(.employee-app-topbar) .report-hero{min-height:0!important;margin:0!important;padding:0!important;border:0!important;background:none!important}
+  body:has(.employee-app-topbar) .report-hero>div{display:none!important}
+  body:has(.employee-app-topbar) .report-hero>.report-button{width:100%!important;min-height:44px!important;margin:0 0 1px!important}
+  body:has(.employee-app-topbar) .report-mobile-task-hub{margin:0!important}
+  body:has(.employee-app-topbar) .report-filter-bar{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;margin:0!important;padding:10px!important;border:1px solid var(--m3-line)!important;border-radius:15px!important;background:var(--m3-surface)!important}
+  body:has(.employee-app-topbar) .report-filter-bar input{grid-column:1/-1!important}
+  body:has(.employee-app-topbar) .report-filter-bar input,
+  body:has(.employee-app-topbar) .report-filter-bar select,
+  body:has(.employee-app-topbar) .report-filter-bar button,
+  body:has(.employee-app-topbar) .report-filter-bar a{width:100%!important;min-height:44px!important}
+  body:has(.employee-app-topbar) .report-list{gap:8px!important}
+  body:has(.employee-app-topbar) .report-card{padding:11px!important}
+  body:has(.employee-app-topbar) .report-kicker{display:none!important}
+  body:has(.employee-app-topbar) .report-card-title-row h3{font-size:15px!important;margin:0!important}
+  body:has(.employee-app-topbar) .report-meta-grid{grid-template-columns:1fr 1fr!important;gap:6px!important}
+  body:has(.employee-app-topbar) .report-meta-grid>div{padding:8px!important;border-radius:11px!important}
+  body:has(.employee-app-topbar) .report-meta-grid>div:nth-child(3){grid-column:1/-1!important}
+  body:has(.employee-app-topbar) .report-empty{min-height:0!important;margin:0!important;padding:14px!important;text-align:center!important}
+  body:has(.employee-app-topbar) .report-empty p{display:none!important}
+
+  /* Salary: summary first, filters compact, desktop table becomes readable phone cards. */
+  body:has(.employee-app-topbar) .my-payout-page{display:grid!important;gap:9px!important;margin:0!important;padding:0!important}
+  body:has(.employee-app-topbar) .my-payout-command{display:block!important;margin:0!important}
+  body:has(.employee-app-topbar) .my-payout-intro{display:none!important}
+  body:has(.employee-app-topbar) .my-payout-filter-card{padding:10px!important}
+  body:has(.employee-app-topbar) .my-payout-filter{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+  body:has(.employee-app-topbar) .my-payout-filter .button{width:100%!important}
+  body:has(.employee-app-topbar) .my-payout-total-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;margin:0!important}
+  body:has(.employee-app-topbar) .my-payout-total-card{min-height:82px!important;padding:11px!important;border-radius:14px!important}
+  body:has(.employee-app-topbar) .my-payout-total-card span{font-size:10px!important}
+  body:has(.employee-app-topbar) .my-payout-total-card strong{font-size:25px!important}
+  body:has(.employee-app-topbar) .payout-summary-list-section{padding:11px!important}
+  body:has(.employee-app-topbar) .summary-list-head{margin-bottom:8px!important}
+  body:has(.employee-app-topbar) .summary-list-title{font-size:17px!important}
+  body:has(.employee-app-topbar) .summary-person-card{padding:10px!important;border-radius:14px!important}
+  body:has(.employee-app-topbar) .summary-person-head{gap:8px!important}
+  body:has(.employee-app-topbar) .summary-table,
+  body:has(.employee-app-topbar) .summary-table tbody,
+  body:has(.employee-app-topbar) .summary-table tr,
+  body:has(.employee-app-topbar) .summary-table td{display:block!important;width:100%!important}
+  body:has(.employee-app-topbar) .summary-table thead{display:none!important}
+  body:has(.employee-app-topbar) .summary-table tr{margin:0 0 7px!important;padding:9px 10px!important;border:1px solid var(--m3-line)!important;border-radius:12px!important;background:rgba(255,255,255,.02)!important}
+  body:has(.employee-app-topbar) .summary-table td{display:grid!important;grid-template-columns:72px minmax(0,1fr)!important;gap:8px!important;padding:4px 0!important;border:0!important;font-size:11px!important}
+  body:has(.employee-app-topbar) .summary-table td::before{color:var(--m3-muted);font-size:10px;font-weight:800}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(1)::before{content:'訂單'}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(2)::before{content:'結單'}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(3)::before{content:'老闆'}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(4)::before{content:'項目'}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(5)::before{content:'身分'}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(6)::before{content:'狀態'}
+  body:has(.employee-app-topbar) .summary-table td:nth-child(7)::before{content:'金額'}
+
+  /* Admin workbench: action + queues; statistics support the task instead of dominating it. */
+  body.mw-r5-admin .mw-r5-page-header{display:none!important}
+  body.mw-r5-admin .mw-r5-legacy-body .shell,
+  body.mw-r5-admin .mw-r5-legacy-body .main{width:100%!important;max-width:none!important;margin:0!important;padding:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))!important;box-sizing:border-box!important}
+  body.mw-r5-admin .mw-r5-legacy-body .main{display:flex!important;flex-direction:column!important;gap:9px!important}
+  body.mw-r5-admin .admin-mobile-task-hub{order:-40!important}
+  body.mw-r5-admin .queues{order:-30!important;display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  body.mw-r5-admin .stats{order:-20!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;margin:0!important}
+  body.mw-r5-admin .stats .stat{min-height:76px!important;padding:10px!important;border-radius:14px!important}
+  body.mw-r5-admin .stats .stat span{font-size:10px!important}
+  body.mw-r5-admin .stats .stat strong{font-size:25px!important}
+  body.mw-r5-admin .stats .stat:last-child{display:none!important}
+  body.mw-r5-admin .queues .panel{padding:0!important;overflow:hidden!important}
+  body.mw-r5-admin .panel-head{min-height:44px!important;padding:10px 12px!important}
+  body.mw-r5-admin .queue-row{min-height:54px!important;padding:9px 11px!important}
+  body.mw-r5-admin .queue-main strong{font-size:13px!important}
+  body.mw-r5-admin .queue-main small{font-size:10px!important}
+  body.mw-r5-admin .empty,
+  body.mw-r5-admin .empty-state{min-height:0!important;padding:13px!important}
+  body.mw-r5-admin .orders-panel{display:none!important}
+
+  /* Customer / support / finance centers: search or actionable controls first; explanations disappear on phone. */
+  body.mw-r5-admin .center-grid{display:flex!important;flex-direction:column!important;gap:9px!important;width:100%!important;margin:0!important;padding:0 max(12px,env(safe-area-inset-right))!important;box-sizing:border-box!important}
+  body.mw-r5-admin .center-grid>.panel{padding:11px!important}
+  body.mw-r5-admin .center-grid>.panel:has(.center-filter-form){order:-30!important}
+  body.mw-r5-admin .center-grid>.panel:has(.center-stats){order:-20!important}
+  body.mw-r5-admin .section-title-row{display:grid!important;gap:8px!important}
+  body.mw-r5-admin .section-title-row h2{margin:0!important;font-size:18px!important}
+  body.mw-r5-admin .section-title-row .muted-text{display:none!important}
+  body.mw-r5-admin .center-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;width:100%!important}
+  body.mw-r5-admin .center-actions>:last-child:nth-child(odd){grid-column:1/-1!important}
+  body.mw-r5-admin .center-actions .button,
+  body.mw-r5-admin .center-actions button{width:100%!important;min-height:44px!important;justify-content:center!important;padding:8px!important;font-size:12px!important}
+  body.mw-r5-admin .center-stats{grid-template-columns:1fr 1fr!important;gap:7px!important;margin-top:8px!important}
+  body.mw-r5-admin .center-stat{min-height:78px!important;padding:10px!important;border-radius:13px!important}
+  body.mw-r5-admin .center-stat span{font-size:10px!important}
+  body.mw-r5-admin .center-stat strong{font-size:25px!important}
+  body.mw-r5-admin .center-filter-form{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;padding:0!important;background:none!important}
+  body.mw-r5-admin .center-filter-form .input,
+  body.mw-r5-admin .center-filter-form .button{width:100%!important;min-height:44px!important}
+  body.mw-r5-admin .center-list{gap:7px!important}
+  body.mw-r5-admin .center-row,
+  body.mw-r5-admin .center-review{padding:10px!important;border-radius:13px!important}
+  body.mw-r5-admin .center-row .center-cell{padding:5px 0!important}
+  body.mw-r5-admin .center-row small,
+  body.mw-r5-admin .center-review p{font-size:10px!important;line-height:1.4!important}
+  body.mw-r5-admin .customer-row{grid-template-columns:1fr 1fr!important}
+  body.mw-r5-admin .customer-row>:first-child,
+  body.mw-r5-admin .customer-row .center-loyalty-cell,
+  body.mw-r5-admin .customer-row>.center-actions{grid-column:1/-1!important}
+
+  /* Secondary pages share compact phone primitives. */
+  body.mw-r5-admin table{max-width:100%!important}
+  body.mw-r5-admin .filter-form,
+  body.mw-r5-admin .toolbar,
+  body.mw-r5-admin .admin-add-worker-form{gap:7px!important}
+  body.mw-r5-admin .notice,
+  body:has(.employee-app-topbar) .notice,
+  body:has(.employee-app-topbar) .dispatch-notice,
+  body:has(.employee-app-topbar) .report-alert{margin:0!important;padding:10px 12px!important;border-radius:13px!important;font-size:12px!important}
+
+  /* More sheets: smaller, clearer, single purpose. */
+  .employee-app-more-panel,
+  .admin-app-more-panel{
+    right:max(8px,env(safe-area-inset-right))!important;
+    bottom:calc(var(--m3-bottom-h) + env(safe-area-inset-bottom) + 8px)!important;
+    left:max(8px,env(safe-area-inset-left))!important;
+    max-height:min(72dvh,620px)!important;
+    padding:8px 10px 12px!important;
+    border-radius:20px!important;
+    border-color:var(--m3-line)!important;
+    background:#1a1a1e!important;
+    box-shadow:0 24px 80px rgba(0,0,0,.58)!important;
+  }
+  .employee-app-sheet-head,
+  .admin-app-sheet-head{padding:0 2px 9px!important}
+  .employee-app-sheet-head small,
+  .admin-app-sheet-head small{display:none!important}
+  .employee-app-sheet-head strong,
+  .admin-app-sheet-head strong{font-size:18px!important}
+  .employee-app-sheet-links,
+  .admin-app-sheet-links{gap:7px!important}
+  .employee-app-sheet-links a,
+  .admin-app-sheet-links a{min-height:66px!important;padding:9px!important;border-radius:13px!important}
+  .employee-app-sheet-links a>small,
+  .admin-app-sheet-links a>small{display:none!important}
+
+  /* Remove decorative copy that adds vertical weight without helping the next action. */
+  body:has(.employee-app-topbar) .ec-muted,
+  body:has(.employee-app-topbar) .report-muted,
+  body:has(.employee-app-topbar) .my-payout-intro p,
+  body.mw-r5-admin .muted-text.mobile-hide-copy{display:none!important}
+
+  @media (max-width:360px){
+    .mobile-task-grid{grid-template-columns:1fr!important}
+    body:has(.employee-app-topbar) .ec-overview,
+    body:has(.employee-app-topbar) .my-payout-total-grid,
+    body.mw-r5-admin .stats,
+    body.mw-r5-admin .center-stats{grid-template-columns:1fr 1fr!important}
+    .employee-app-nav-item,
+    .admin-app-nav-item{font-size:10px!important}
+  }
+}
