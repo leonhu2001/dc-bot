@@ -49,6 +49,7 @@ def test_windows_shortcut_and_installed_app_use_site_logo():
 
     icons = manifest.get("icons") or []
     assert icons
+    assert {icon.get("sizes") for icon in icons} == {"192x192", "512x512"}
     assert all(str(icon.get("src") or "").startswith("/static/img/server_logo.gif") for icon in icons)
     assert all(icon.get("type") == "image/gif" for icon in icons)
     assert 'rel="icon" type="image/gif" href="/static/img/server_logo.gif?v=20261025-2"' in layout
