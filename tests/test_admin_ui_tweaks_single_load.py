@@ -32,6 +32,8 @@ def test_report_status_runtime_keeps_admin_dashboard_contract() -> None:
 
     # This is the specific behavior PR #458 accidentally removed from /admin.
     assert admin.count(UI_TWEAKS) == 1
-    assert "/admin/order-report-statuses" in ui_tweaks
-    assert "reported" in ui_tweaks
-    assert "unreported" in ui_tweaks
+    assert 'if (pathname === "/admin")' in ui_tweaks
+    assert "collectAdminReportTargets" in ui_tweaks
+    assert "syncAdminOrderReportStates" in ui_tweaks
+    assert "/dispatch/reports/statuses.json?order_ids=" in ui_tweaks
+    assert "history-report-state-badge" in ui_tweaks
