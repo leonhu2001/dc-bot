@@ -1,0 +1,427 @@
+/* Shared mobile polish for customer, employee/dispatch, and admin apps.
+   Mobile-only. Existing desktop layouts and business logic remain untouched. */
+
+@media (max-width:767px){
+    :root{
+        --mw-app-gutter:12px;
+        --mw-app-radius:18px;
+        --mw-app-radius-sm:14px;
+        --mw-app-tap:44px;
+        --mw-app-nav-h:64px;
+        --mw-app-topbar-h:58px;
+        --mw-app-shadow:0 14px 36px rgba(0,0,0,.24);
+        --mw-app-shadow-up:0 -10px 30px rgba(0,0,0,.24);
+    }
+
+    html{
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+        overscroll-behavior-y:none;
+    }
+
+    body.customer-mobile-app-site,
+    body.employee-workspace-site,
+    body:has(.employee-app-topbar),
+    body.mw-r5-admin{
+        min-height:100dvh;
+        -webkit-tap-highlight-color:transparent;
+        text-rendering:optimizeLegibility;
+    }
+
+    body.customer-mobile-app-site *,
+    body.employee-workspace-site *,
+    body:has(.employee-app-topbar) *,
+    body.mw-r5-admin *{
+        box-sizing:border-box;
+    }
+
+    /* Make all three app shells feel like the same product. */
+    body.customer-mobile-app-site{--customer-app-nav-h:var(--mw-app-nav-h)}
+    body.employee-workspace-site,
+    body:has(.employee-app-topbar){--employee-app-nav-h:var(--mw-app-nav-h)}
+    body.mw-r5-admin{--admin-app-nav-h:var(--mw-app-nav-h)}
+
+    .customer-app-topbar,
+    .employee-app-topbar,
+    .admin-app-topbar{
+        min-height:var(--mw-app-topbar-h)!important;
+        box-shadow:0 8px 24px rgba(0,0,0,.14);
+    }
+
+    .customer-app-topbar,
+    .employee-app-topbar{
+        padding-left:max(var(--mw-app-gutter),env(safe-area-inset-left))!important;
+        padding-right:max(var(--mw-app-gutter),env(safe-area-inset-right))!important;
+    }
+
+    .admin-app-topbar{
+        grid-template-columns:40px minmax(0,1fr) 40px!important;
+        padding-left:max(var(--mw-app-gutter),env(safe-area-inset-left))!important;
+        padding-right:max(var(--mw-app-gutter),env(safe-area-inset-right))!important;
+    }
+
+    .customer-app-mark,
+    .employee-app-mark{
+        width:34px!important;
+        height:34px!important;
+        flex-basis:34px!important;
+        border-radius:11px!important;
+    }
+
+    .customer-app-account,
+    .employee-app-profile{
+        width:36px!important;
+        height:36px!important;
+        flex-basis:36px!important;
+    }
+
+    .admin-app-home,
+    .admin-app-search{
+        width:38px!important;
+        height:38px!important;
+        border-radius:12px!important;
+    }
+
+    .customer-app-title-wrap strong,
+    .employee-app-topbar-copy strong,
+    .admin-app-title strong{
+        font-size:16px!important;
+    }
+
+    /* Bottom nav: slightly shorter, clearer active state, less visual bulk. */
+    .customer-app-bottom-nav,
+    .employee-app-bottom-nav,
+    .admin-app-bottom-nav{
+        min-height:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom))!important;
+        padding:5px max(5px,env(safe-area-inset-right)) max(5px,env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-left))!important;
+        box-shadow:var(--mw-app-shadow-up)!important;
+    }
+
+    .customer-app-nav-item,
+    .employee-app-nav-item,
+    .admin-app-nav-item{
+        min-height:52px!important;
+        gap:1px!important;
+        border-radius:12px!important;
+        font-size:10.5px!important;
+        transition:background-color .14s ease,color .14s ease,transform .08s ease;
+    }
+
+    .customer-app-nav-icon,
+    .employee-app-nav-icon,
+    .admin-app-nav-icon{
+        height:25px!important;
+        font-size:19px!important;
+    }
+
+    .customer-app-nav-order{font-size:23px!important}
+
+    .customer-app-nav-item.is-active,
+    .employee-app-nav-item.is-active,
+    .employee-app-more.is-active>summary,
+    .employee-app-more[open]>summary,
+    .admin-app-nav-item.is-active,
+    .admin-app-more.is-active>summary,
+    .admin-app-more[open]>summary{
+        box-shadow:inset 0 0 0 1px rgba(240,207,114,.08);
+    }
+
+    .customer-app-nav-item:active,
+    .employee-app-nav-item:active,
+    .admin-app-nav-item:active{transform:scale(.96)}
+
+    /* More sheets */
+    .employee-app-more[open]::before,
+    .admin-app-more[open]::before{
+        content:"";
+        position:fixed;
+        inset:0;
+        z-index:1205;
+        background:rgba(0,0,0,.48);
+        backdrop-filter:blur(2px);
+        -webkit-backdrop-filter:blur(2px);
+        pointer-events:none;
+    }
+
+    .admin-app-more[open]::before{z-index:1455}
+
+    .employee-app-more-panel,
+    .admin-app-more-panel{
+        right:max(8px,env(safe-area-inset-right))!important;
+        left:max(8px,env(safe-area-inset-left))!important;
+        bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 8px)!important;
+        max-height:min(72dvh,620px)!important;
+        padding:8px 10px 12px!important;
+        border-radius:20px!important;
+        box-shadow:0 20px 64px rgba(0,0,0,.5)!important;
+    }
+
+    .employee-app-sheet-head,
+    .admin-app-sheet-head{padding:0 3px 10px!important}
+
+    .employee-app-sheet-head strong,
+    .admin-app-sheet-head strong{font-size:20px!important}
+
+    .employee-app-sheet-links,
+    .admin-app-sheet-links{gap:7px!important}
+
+    .employee-app-sheet-links a,
+    .admin-app-sheet-links a{
+        min-height:70px!important;
+        padding:10px!important;
+        border-radius:14px!important;
+    }
+
+    /* Consistent touch controls. */
+    body.customer-mobile-app-site button,
+    body.customer-mobile-app-site .button,
+    body.customer-mobile-app-site input,
+    body.customer-mobile-app-site select,
+    body.employee-workspace-site button,
+    body.employee-workspace-site .button,
+    body.employee-workspace-site input,
+    body.employee-workspace-site select,
+    body.mw-r5-admin button,
+    body.mw-r5-admin .button,
+    body.mw-r5-admin input,
+    body.mw-r5-admin select{
+        min-height:var(--mw-app-tap);
+    }
+
+    body.customer-mobile-app-site textarea,
+    body.employee-workspace-site textarea,
+    body.mw-r5-admin textarea{font-size:16px!important}
+
+    :where(.customer-app-nav-item,.employee-app-nav-item,.admin-app-nav-item,.customer-app-account,.employee-app-profile,.admin-app-home,.admin-app-search,button,.button,a):focus-visible{
+        outline:2px solid rgba(240,207,114,.86);
+        outline-offset:2px;
+    }
+
+    /* Customer app */
+    body.customer-mobile-app-site .site-section,
+    body.customer-mobile-app-site .customer-orders-shell,
+    body.customer-mobile-app-site .customer-order-detail{
+        padding-left:max(var(--mw-app-gutter),env(safe-area-inset-left))!important;
+        padding-right:max(var(--mw-app-gutter),env(safe-area-inset-right))!important;
+    }
+
+    body.customer-mobile-app-site .hero{
+        padding-left:max(var(--mw-app-gutter),env(safe-area-inset-left))!important;
+        padding-right:max(var(--mw-app-gutter),env(safe-area-inset-right))!important;
+    }
+
+    body.customer-mobile-app-site .hero h1{font-size:clamp(36px,11vw,52px)!important}
+    body.customer-mobile-app-site .hero-art-frame{height:176px!important}
+    body.customer-mobile-app-site .site-section{padding-top:24px!important;padding-bottom:24px!important}
+
+    body.customer-mobile-app-site .service-card,
+    body.customer-mobile-app-site .experience-card,
+    body.customer-mobile-app-site .crew-type-card,
+    body.customer-mobile-app-site .vip-card,
+    body.customer-mobile-app-site .mc-card,
+    body.customer-mobile-app-site .customer-order-card,
+    body.customer-mobile-app-site .customer-detail-card,
+    body.customer-mobile-app-site .vip-level-card,
+    body.customer-mobile-app-site .vip-general-card{
+        border-radius:var(--mw-app-radius)!important;
+        box-shadow:0 10px 28px rgba(0,0,0,.12);
+    }
+
+    body.customer-mobile-app-site .mc-shortcuts a,
+    body.customer-mobile-app-site .customer-order-stat,
+    body.customer-mobile-app-site .customer-detail-item{
+        border-radius:var(--mw-app-radius-sm)!important;
+    }
+
+    body.customer-mobile-app-site .customer-order-card{padding:12px!important}
+    body.customer-mobile-app-site .customer-order-meta{font-size:12px}
+    body.customer-mobile-app-site .customer-order-side>strong{font-size:15px}
+
+    body.customer-mobile-app-site .mw-support-launcher{
+        width:44px!important;
+        height:44px!important;
+        right:max(9px,env(safe-area-inset-right))!important;
+        bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 8px)!important;
+        box-shadow:0 10px 26px rgba(0,0,0,.32)!important;
+    }
+
+    body.customer-mobile-app-site .mw-support-panel{
+        right:max(6px,env(safe-area-inset-right))!important;
+        left:max(6px,env(safe-area-inset-left))!important;
+        bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 6px)!important;
+        border-radius:18px!important;
+    }
+
+    body.customer-mobile-app-site .order3-dialog{border-radius:20px 20px 0 0!important}
+    body.customer-mobile-app-site .order3-dialog-head{
+        padding-top:20px!important;
+        border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    body.customer-mobile-app-site .order3-dialog-head::before{
+        content:"";
+        position:absolute;
+        top:7px;
+        left:50%;
+        width:38px;
+        height:4px;
+        transform:translateX(-50%);
+        border-radius:999px;
+        background:rgba(255,255,255,.18);
+    }
+    body.customer-mobile-app-site .order3-dialog-media{max-height:145px!important}
+    body.customer-mobile-app-site .order3-field{padding:11px!important;border-radius:14px!important}
+    body.customer-mobile-app-site .order3-quote{
+        box-shadow:0 -10px 28px rgba(0,0,0,.28);
+    }
+
+    /* Employee / dispatch app */
+    .employee-workspace-site .employee-workspace-frame{padding-top:8px!important}
+    .employee-workspace-site .employee-workspace-page-content,
+    .employee-workspace-site .site-main>.ec{
+        padding-left:max(var(--mw-app-gutter),env(safe-area-inset-left))!important;
+        padding-right:max(var(--mw-app-gutter),env(safe-area-inset-right))!important;
+    }
+
+    .employee-workspace-site .ec-stat,
+    .employee-workspace-site .ec-card,
+    .employee-workspace-site .ec-salary,
+    .employee-workspace-site .binding-card,
+    .employee-workspace-site .dispatch-panel,
+    .employee-workspace-site .dispatch-column,
+    .employee-workspace-site .dispatch-order-card,
+    .employee-workspace-site .dispatch-my-card{
+        border-radius:var(--mw-app-radius)!important;
+        box-shadow:0 9px 26px rgba(0,0,0,.11);
+    }
+
+    .employee-workspace-site .dispatch-board,
+    .employee-workspace-site .dispatch-list{gap:8px!important}
+    .employee-workspace-site .dispatch-column{padding:10px!important}
+    .employee-workspace-site .dispatch-order-card,
+    .employee-workspace-site .dispatch-my-card{padding:12px!important}
+    .employee-workspace-site .dispatch-meta{gap:6px!important}
+    .employee-workspace-site .dispatch-meta-item{padding:8px!important;border-radius:12px!important}
+    .employee-workspace-site .dispatch-footer button{min-height:46px!important}
+
+    body.employee-workspace-site .mw-support-launcher,
+    body:has(.employee-app-topbar) .mw-support-launcher{
+        width:44px!important;
+        height:44px!important;
+        right:max(9px,env(safe-area-inset-right))!important;
+        bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 8px)!important;
+    }
+
+    body.employee-workspace-site .mw-support-panel,
+    body:has(.employee-app-topbar) .mw-support-panel{
+        right:max(6px,env(safe-area-inset-right))!important;
+        left:max(6px,env(safe-area-inset-left))!important;
+        bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 6px)!important;
+        max-height:calc(100dvh - var(--mw-app-nav-h) - env(safe-area-inset-bottom) - 78px)!important;
+        border-radius:18px!important;
+    }
+
+    /* Admin / customer-service app */
+    body.mw-r5-admin .mw-r5-content,
+    body.mw-r5-admin .mw-r5-legacy-body{
+        padding-left:max(var(--mw-app-gutter),env(safe-area-inset-left))!important;
+        padding-right:max(var(--mw-app-gutter),env(safe-area-inset-right))!important;
+    }
+
+    body.mw-r5-admin .mw-r5-legacy-body .stat,
+    body.mw-r5-admin .mw-r5-legacy-body .panel,
+    body.mw-r5-admin .mw-r5-legacy-body .orders-panel,
+    body.mw-r5-admin .mw-r5-legacy-body .order-row,
+    body.mw-r5-admin .history-ledger-stat,
+    body.mw-r5-admin .history-ledger-panel,
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row),
+    body.mw-r5-admin main.page .card{
+        border-radius:var(--mw-app-radius)!important;
+        box-shadow:0 9px 26px rgba(0,0,0,.11);
+    }
+
+    body.mw-r5-admin .mw-r5-legacy-body .stats,
+    body.mw-r5-admin .mw-r5-legacy-body .queues,
+    body.mw-r5-admin main.page .layout{gap:8px!important}
+
+    body.mw-r5-admin .mw-r5-legacy-body .stat{min-height:86px!important;padding:12px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .stat strong{font-size:25px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .queue-row{min-height:58px!important;padding:10px 11px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row{margin:7px 8px!important;padding:12px!important}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row){padding:11px!important}
+    body.mw-r5-admin main.page .card-head{padding:11px 12px!important}
+
+    /* Keep toast / transient UI above every bottom nav. */
+    .toast,
+    .toast-container,
+    [role="status"][class*="toast"],
+    [class*="toast-container"]{
+        margin-bottom:calc(var(--mw-app-nav-h) + env(safe-area-inset-bottom) + 8px)!important;
+    }
+}
+
+@media (max-width:390px){
+    :root{--mw-app-gutter:10px}
+
+    .customer-app-bottom-nav,
+    .employee-app-bottom-nav,
+    .admin-app-bottom-nav{padding-left:3px!important;padding-right:3px!important}
+
+    .customer-app-nav-item,
+    .employee-app-nav-item,
+    .admin-app-nav-item{font-size:10px!important}
+
+    .customer-app-nav-icon,
+    .employee-app-nav-icon,
+    .admin-app-nav-icon{font-size:18px!important}
+
+    .employee-app-sheet-links,
+    .admin-app-sheet-links{grid-template-columns:1fr!important}
+
+    body.customer-mobile-app-site .trust-strip,
+    body.customer-mobile-app-site .mw-social-grid,
+    body.customer-mobile-app-site .customer-order-stats,
+    .employee-workspace-site .ec-overview,
+    .employee-workspace-site .dispatch-stats,
+    body.mw-r5-admin .mw-r5-legacy-body .stats,
+    body.mw-r5-admin .history-ledger-stats{
+        grid-template-columns:1fr 1fr!important;
+    }
+}
+
+@media (max-width:340px){
+    .customer-app-nav-item,
+    .employee-app-nav-item,
+    .admin-app-nav-item{font-size:9px!important}
+
+    .customer-app-title-wrap small,
+    .employee-app-topbar-copy small,
+    .admin-app-title small{display:none!important}
+
+    body.customer-mobile-app-site .trust-strip,
+    body.customer-mobile-app-site .mw-social-grid,
+    body.customer-mobile-app-site .customer-order-stats,
+    .employee-workspace-site .ec-overview,
+    .employee-workspace-site .dispatch-stats,
+    body.mw-r5-admin .mw-r5-legacy-body .stats,
+    body.mw-r5-admin .history-ledger-stats{
+        grid-template-columns:1fr!important;
+    }
+}
+
+@media (max-height:560px) and (orientation:landscape){
+    .employee-app-more-panel,
+    .admin-app-more-panel{max-height:56dvh!important}
+    body.customer-mobile-app-site .order3-dialog{max-height:96dvh!important}
+    body.customer-mobile-app-site .order3-dialog-media{display:none!important}
+}
+
+@media (prefers-reduced-motion:reduce){
+    .customer-app-nav-item,
+    .employee-app-nav-item,
+    .admin-app-nav-item,
+    .employee-app-more-panel,
+    .admin-app-more-panel{
+        animation:none!important;
+        transition:none!important;
+    }
+}
