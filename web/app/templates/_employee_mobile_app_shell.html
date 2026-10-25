@@ -1,5 +1,6 @@
 {% set _app_path = request.url.path %}
 {% set _app_user_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
+{% set _can_switch_admin = user and (user.is_admin or user.is_customer_service or user.is_manager) %}
 {% if _app_path == '/employee' %}
     {% set _app_title = '員工中心' %}
 {% elif _app_path == '/dispatch' %}
@@ -18,18 +19,34 @@
     {% set _app_title = '員工工作台' %}
 {% endif %}
 
+<link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
+<script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
+
 <header class="employee-app-topbar" aria-label="員工行動工作台">
     <a class="employee-app-topbar-brand" href="/employee" aria-label="返回員工中心">
-        <span class="employee-app-mark" aria-hidden="true">魔</span>
+        <span class="employee-app-mark" aria-hidden="true">
+            <img class="mobile-app-logo-image" src="/static/img/server_logo.gif" alt="">
+        </span>
         <span class="employee-app-topbar-copy">
             <small>魔丸工作台</small>
             <strong>{{ _app_title }}</strong>
         </span>
     </a>
     <a class="employee-app-profile" href="/me" aria-label="開啟個人中心">
-        <span aria-hidden="true">{{ _app_user_name[:1] }}</span>
+        {% if user and user.avatar %}
+            <img class="mobile-app-logo-image" src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=96" alt="">
+        {% else %}
+            <span aria-hidden="true">{{ _app_user_name[:1] }}</span>
+        {% endif %}
     </a>
 </header>
+
+{% if _can_switch_admin %}
+<nav class="mobile-app-context-switch" aria-label="工作區切換">
+    <a class="is-active" href="/employee"><span aria-hidden="true">⚡</span>員工工作台</a>
+    <a href="/admin"><span aria-hidden="true">◈</span>客服後台</a>
+</nav>
+{% endif %}
 
 <nav class="employee-app-bottom-nav" aria-label="員工 App 主要導覽">
     <a class="employee-app-nav-item{% if _app_path == '/employee' %} is-active{% endif %}" href="/employee">
@@ -54,6 +71,7 @@
             <span class="employee-app-nav-icon" aria-hidden="true">☰</span>
             <span>更多</span>
         </summary>
+        <button type="button" class="mobile-app-sheet-backdrop" data-mobile-sheet-close aria-label="關閉更多功能"></button>
         <section class="employee-app-more-panel" aria-label="更多功能">
             <div class="employee-app-sheet-handle" aria-hidden="true"></div>
             <div class="employee-app-sheet-head">
@@ -61,12 +79,15 @@
                     <small>WORKSPACE</small>
                     <strong>更多功能</strong>
                 </div>
-                <span>{{ _app_user_name }}</span>
+                <button type="button" class="mobile-app-sheet-close" data-mobile-sheet-close aria-label="關閉更多功能">×</button>
             </div>
             <div class="employee-app-sheet-links">
+                {% if _can_switch_admin %}
+                <a href="/admin"><span>◈</span><strong>切到客服後台</strong><small>訂單與客服營運</small></a>
+                {% endif %}
                 <a href="/me"><span>◎</span><strong>個人中心</strong><small>帳號與會員資料</small></a>
                 <a href="/employee/internal-transfers"><span>⇄</span><strong>內部轉帳</strong><small>員工間款項調整</small></a>
-                {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
+                {% if _can_switch_admin %}
                 <a href="/dispatch/reports/review"><span>✓</span><strong>報單審核</strong><small>審核員工報單</small></a>
                 <a href="/employee/store-bindings"><span>◇</span><strong>綁店管理</strong><small>管理綁店資格</small></a>
                 {% endif %}
