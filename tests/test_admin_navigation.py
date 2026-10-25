@@ -261,7 +261,7 @@ def test_order_rule_admin_hides_legacy_categories_and_groups_qualifications_by_g
     routers = ROOT / "web" / "app" / "routers"
     source = (routers / "admin_order_rules.py").read_text(encoding="utf-8")
     page = (TEMPLATES / "admin_order_rules.html").read_text(encoding="utf-8")
-    page_css = (ROOT / "web/app/static/css/pages/admin_order_rules_inline_1.css").read_text(encoding="utf-8")
+    page_css = (ROOT / "web/app/static/css/pages/admin_order_rules.css").read_text(encoding="utf-8")
 
     assert 'ADMIN_HIDDEN_RULE_CATEGORIES = {"general", "basic", "fun"}' in source
     assert "QUALIFICATION_GROUPS" in source

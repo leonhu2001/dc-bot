@@ -10,7 +10,7 @@ def test_order_rule_sidebar_hidden_items_are_actually_hidden():
     ).read_text(encoding="utf-8")
     template = (ROOT / "web/app/templates/admin_order_rules.html").read_text(encoding="utf-8")
     rule_js = (
-        ROOT / "web/app/static/js/pages/admin_order_rules_inline_1.js"
+        ROOT / "web/app/static/js/pages/admin_order_rules.js"
     ).read_text(encoding="utf-8")
 
     # The sidebar filter toggles the native HTML hidden property. Component CSS

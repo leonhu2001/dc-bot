@@ -34,10 +34,11 @@ def test_custom_order_discord_panel_relies_on_channel_access():
     embed = build_custom_order_entry_embed()
     text = f"{embed.title}\n{embed.description}"
     assert "金級會員以上" not in text
-    assert "此專屬頻道可直接提出" in text
     assert "1～4 位陪玩" in text
-    assert "自助下單" in text
-    assert "不會扣款或派單" in text
+    assert "遊戲／服務" in text
+    assert "客服確認內容與價格後再正式送單" in text
+    assert "此專屬頻道可直接提出" not in text
+    assert "不會扣款或派單" not in text
 
 
 def test_custom_order_discord_runtime_does_not_recheck_vip_level():

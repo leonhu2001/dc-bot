@@ -136,7 +136,7 @@ def test_discord_catalog_hides_inactive_and_selected_draft_guard_rejects_it(
 def test_admin_order_rules_template_has_async_workspace_and_status_controls():
     template = Path("web/app/templates/admin_order_rules.html").read_text(encoding="utf-8")
     router = Path("web/app/routers/admin_order_rules.py").read_text(encoding="utf-8")
-    rule_js = Path("web/app/static/js/pages/admin_order_rules_inline_1.js").read_text(
+    rule_js = Path("web/app/static/js/pages/admin_order_rules.js").read_text(
         encoding="utf-8"
     )
 

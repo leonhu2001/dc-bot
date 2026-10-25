@@ -51,23 +51,14 @@ def assert_custom_order_eligible(customer_id: int | str) -> str:
 
 
 def build_custom_order_entry_embed() -> discord.Embed:
-    embed = discord.Embed(
+    return discord.Embed(
         title="✨ VIP 自訂單｜快速下單",
         description=(
-            "此專屬頻道可直接提出自訂單需求。\n\n"
-            "先選擇 **1～4 位陪玩**，再填寫遊戲、玩法／規則與目標。\n"
-            "建立私人票口後會直接開啟 **自助下單** 面板；客服確認內容與價格後再正式送單。\n"
-            "送出需求本身不會扣款或派單。"
+            "先選擇 **1～4 位陪玩**，再填寫遊戲／服務、玩法／規則、方案／目標與其他需求。\n"
+            "客服確認內容與價格後再正式送單。"
         ),
         color=discord.Color.purple(),
     )
-    embed.add_field(
-        name="建議先準備",
-        value="陪玩人數、遊戲／服務內容、玩法或機制、方案／目標，以及其他特殊需求。",
-        inline=False,
-    )
-    embed.set_footer(text=CUSTOM_ORDER_PANEL_MARKER)
-    return embed
 
 
 def _existing_request_channel(

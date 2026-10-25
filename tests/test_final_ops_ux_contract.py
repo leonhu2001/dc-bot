@@ -36,7 +36,7 @@ def test_payment_review_runtime_has_canonical_success_rejection_and_apply_error_
 
 
 def test_admin_action_center_has_explicit_p0_p1_priority_only():
-    source = Path("web/app/static/js/pages/admin_inline_1.js").read_text(encoding="utf-8")
+    source = Path("web/app/static/js/pages/admin_dashboard.js").read_text(encoding="utf-8")
     assert 'priorityLabel: "P0"' in source
     assert 'title: "需注意訂單"' in source
     assert 'priorityLabel: "P1"' in source
