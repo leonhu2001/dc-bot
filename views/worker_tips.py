@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 import discord
 
 from core.permissions import is_customer_staff
+from services.order_flow import get_payment_method_info
 from services.worker_tips import (
     create_worker_tip,
     get_worker_tip,
@@ -96,11 +97,31 @@ async def _notify_worker_tip_paid(interaction: discord.Interaction, tip_row) -> 
             pass
 
 
+def _worker_tip_payment_accounts_text() -> str:
+    blocks: list[str] = []
+    for method in ("街口", "轉帳"):
+        payment_info = get_payment_method_info(method)
+        if payment_info:
+            blocks.append(f"**{method}**\n```text\n{payment_info}\n```")
+    if not blocks:
+        return ""
+    return "\n\n💳 **付款帳號**\n" + "\n".join(blocks)
+
+
+def _worker_tip_selected_payment_text(payment_method: str) -> str:
+    payment_info = get_payment_method_info(payment_method)
+    if not payment_info:
+        return ""
+    return f"\n\n💳 **付款資訊**\n```text\n{payment_info}\n```"
+
+
 def _worker_tip_preview_text(*, target: dict, amount: int) -> str:
     return (
         f"{WORKER_TIP_POLICY_TEXT}\n\n"
         f"指定成員：**{target.get('display_name') or target.get('staff_id')}**\n"
         f"雞腿金額：**{int(amount):,}T**"
+        f"{_worker_tip_payment_accounts_text()}"
+        "\n\n請選擇下方付款方式；使用街口／轉帳時可直接依上方帳號付款。"
     )
 
 
@@ -417,12 +438,14 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
             )
             return
 
+        selected_payment_text = _worker_tip_selected_payment_text(payment_method)
         review_message = await channel.send(
             (
                 "🍗 **雞腿付款待審核**\n"
                 f"老闆：{interaction.user.mention}\n"
                 f"指定成員：<@{self.target.get('staff_id')}>\n"
-                f"金額：**{self.amount:,}T**｜付款方式：**{payment_method}**\n\n"
+                f"金額：**{self.amount:,}T**｜付款方式：**{payment_method}**"
+                f"{selected_payment_text}\n\n"
                 "📎 請將付款截圖直接傳在此票口；客服確認後才會列入陪玩薪資。"
             ),
             allowed_mentions=discord.AllowedMentions(
@@ -442,7 +465,10 @@ class WorkerTipPaymentMethodSelect(discord.ui.Select):
         await _log_worker_tip("pending", interaction=interaction, tip_row=tip_row)
 
         await interaction.edit_original_response(
-            content="已送出審核，請把付款截圖貼在這個票口。",
+            content=(
+                f"已送出審核。{selected_payment_text}\n\n"
+                "📎 請把付款截圖貼在這個票口，客服確認後才會入帳。"
+            ),
             view=None,
         )
         await _refresh_post_close(channel, self.customer_id)
