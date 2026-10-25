@@ -1,0 +1,116 @@
+/* Mobile app redesign v3 — page components.
+   This file owns page-specific phone layouts; shell/safe-area rules live in mobile_app_redesign_v3.css. */
+@media (max-width:767px){
+  /* Employee / internal transfers: form first, policy prose out of the way. */
+  body:has(.employee-app-topbar) .it-wrap{display:grid!important;gap:9px!important;width:100%!important;margin:0!important;padding:0!important}
+  body:has(.employee-app-topbar) .it-grid{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
+  body:has(.employee-app-topbar) .it-grid>aside.it-card{display:none!important}
+  body:has(.employee-app-topbar) .it-card{min-width:0!important;padding:11px!important;border-radius:15px!important;box-shadow:none!important}
+  body:has(.employee-app-topbar) .it-card h2{margin:0 0 8px!important;font-size:18px!important}
+  body:has(.employee-app-topbar) .it-grid>section.it-card>.it-muted{display:none!important}
+  body:has(.employee-app-topbar) .it-form{gap:8px!important;margin-top:8px!important}
+  body:has(.employee-app-topbar) .it-row{grid-template-columns:1fr!important;gap:8px!important}
+  body:has(.employee-app-topbar) .it-field{gap:5px!important}
+  body:has(.employee-app-topbar) .it-field label{font-size:11px!important}
+  body:has(.employee-app-topbar) .it-input,
+  body:has(.employee-app-topbar) .it-select,
+  body:has(.employee-app-topbar) .it-textarea{min-height:44px!important;font-size:16px!important}
+  body:has(.employee-app-topbar) .it-textarea{min-height:82px!important}
+  body:has(.employee-app-topbar) .it-balance{padding:9px 10px!important;border-radius:12px!important}
+  body:has(.employee-app-topbar) .it-balance .it-muted{display:none!important}
+  body:has(.employee-app-topbar) .it-balance b{font-size:22px!important}
+  body:has(.employee-app-topbar) .it-btn{width:100%!important;min-height:46px!important}
+  body:has(.employee-app-topbar) .it-section-title{margin:0 0 8px!important}
+  body:has(.employee-app-topbar) .it-section-title h2{font-size:17px!important}
+  body:has(.employee-app-topbar) .it-list{gap:7px!important}
+  body:has(.employee-app-topbar) .it-item{padding:10px!important;border-radius:13px!important}
+  body:has(.employee-app-topbar) .it-item-head{grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important}
+  body:has(.employee-app-topbar) .it-item-head strong{font-size:12px!important}
+  body:has(.employee-app-topbar) .it-meta{font-size:10px!important;line-height:1.45!important}
+  body:has(.employee-app-topbar) .it-amount{font-size:18px!important}
+  body:has(.employee-app-topbar) .it-actions{grid-template-columns:1fr!important;gap:7px!important}
+
+  /* Employee / store binding: management queue, not a policy landing page. */
+  body:has(.employee-app-topbar) .sbm{display:grid!important;gap:9px!important;width:100%!important;margin:0!important;padding:0!important}
+  body:has(.employee-app-topbar) .sbm-hero{display:none!important}
+  body:has(.employee-app-topbar) .sbm-kicker,
+  body:has(.employee-app-topbar) .sbm-chip{display:none!important}
+  body:has(.employee-app-topbar) .sbm-stats{grid-template-columns:1fr 1fr!important;gap:7px!important;margin:0!important}
+  body:has(.employee-app-topbar) .sbm-stat{min-height:78px!important;padding:10px!important;border-radius:13px!important}
+  body:has(.employee-app-topbar) .sbm-stat span{font-size:10px!important}
+  body:has(.employee-app-topbar) .sbm-stat b{font-size:24px!important}
+  body:has(.employee-app-topbar) .sbm-stat small{display:none!important}
+  body:has(.employee-app-topbar) .sbm-toolbar{margin:0!important}
+  body:has(.employee-app-topbar) .sbm-search{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:7px!important}
+  body:has(.employee-app-topbar) .sbm-search a{grid-column:1/-1!important;text-align:center!important}
+  body:has(.employee-app-topbar) .sbm-panel,
+  body:has(.employee-app-topbar) .sbm-card{border-radius:15px!important;box-shadow:none!important}
+  body:has(.employee-app-topbar) .sbm-panel-head,
+  body:has(.employee-app-topbar) .sbm-section-title{gap:7px!important;align-items:center!important}
+  body:has(.employee-app-topbar) .sbm-panel-head h2,
+  body:has(.employee-app-topbar) .sbm-section-title h2{margin:0!important;font-size:17px!important}
+  body:has(.employee-app-topbar) .grant-form{grid-template-columns:1fr!important;gap:8px!important;padding:11px!important}
+  body:has(.employee-app-topbar) .grant-form label>span{font-size:10px!important}
+  body:has(.employee-app-topbar) .sbm-grid{grid-template-columns:1fr!important;gap:7px!important}
+  body:has(.employee-app-topbar) .sbm-person{grid-template-columns:38px minmax(0,1fr) auto!important;padding:10px!important}
+  body:has(.employee-app-topbar) .sbm-person>.sbm-status{grid-column:auto!important}
+  body:has(.employee-app-topbar) .sbm-avatar{width:38px!important;height:38px!important}
+  body:has(.employee-app-topbar) .sbm-person h3{font-size:14px!important}
+  body:has(.employee-app-topbar) .sbm-person p{font-size:9px!important}
+  body:has(.employee-app-topbar) .sbm-facts{grid-template-columns:1fr 1fr!important;gap:6px!important;padding:0 10px 10px!important}
+  body:has(.employee-app-topbar) .sbm-facts>div{padding:8px!important;border-radius:11px!important}
+  body:has(.employee-app-topbar) .sbm-facts span{font-size:9px!important}
+  body:has(.employee-app-topbar) .sbm-facts b{font-size:11px!important}
+  body:has(.employee-app-topbar) .sbm-rate{padding:9px 10px!important}
+  body:has(.employee-app-topbar) .sbm-actions,
+  body:has(.employee-app-topbar) .sbm-actions.split,
+  body:has(.employee-app-topbar) .active-actions{grid-template-columns:1fr!important;gap:7px!important;padding:9px 10px 10px!important}
+  body:has(.employee-app-topbar) .history-panel{padding:11px!important}
+  body:has(.employee-app-topbar) .history-row{grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important;padding:9px!important;font-size:10px!important}
+
+  /* Historical orders are a lookup tool: filter first, stats terse, dossier cards compact. */
+  body.mw-r5-admin .history-ledger-page{display:grid!important;gap:9px!important;width:100%!important;margin:0!important;padding:0 max(12px,env(safe-area-inset-right))!important;box-sizing:border-box!important}
+  body.mw-r5-admin .history-ledger-page>.panel{padding:10px!important}
+  body.mw-r5-admin .history-ledger-filter{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+  body.mw-r5-admin .history-ledger-filter label{min-width:0!important;gap:4px!important}
+  body.mw-r5-admin .history-ledger-filter label:nth-child(3){grid-column:1/-1!important}
+  body.mw-r5-admin .history-ledger-filter label>span{font-size:9px!important}
+  body.mw-r5-admin .history-ledger-filter :is(input,select,button,a){width:100%!important;min-height:44px!important;font-size:16px!important}
+  body.mw-r5-admin .history-ledger-stats{grid-template-columns:1fr 1fr!important;gap:7px!important;margin:0!important}
+  body.mw-r5-admin .history-ledger-stat{min-height:76px!important;padding:10px!important;border-radius:13px!important}
+  body.mw-r5-admin .history-ledger-stat span{font-size:10px!important}
+  body.mw-r5-admin .history-ledger-stat strong{font-size:24px!important}
+  body.mw-r5-admin .history-ledger-stat small{display:none!important}
+  body.mw-r5-admin .history-ledger-head{padding:10px!important}
+  body.mw-r5-admin .history-ledger-head .order-no,
+  body.mw-r5-admin .history-ledger-head .muted-text{display:none!important}
+  body.mw-r5-admin .history-ledger-head h3{margin:0!important;font-size:17px!important}
+  body.mw-r5-admin .history-ledger-panel{border-radius:15px!important;overflow:hidden!important}
+
+  /* Center pages: labels are enough; remove presentation copy and make actions feel like an app. */
+  body.mw-r5-admin .center-grid .section-title-row .muted-text{display:none!important}
+  body.mw-r5-admin .center-grid .section-title-row h2{font-size:17px!important}
+  body.mw-r5-admin .center-grid .center-actions{margin:0!important}
+  body.mw-r5-admin .center-grid .center-stat{min-height:74px!important}
+  body.mw-r5-admin .center-grid .center-row>div:first-child strong{font-size:13px!important}
+  body.mw-r5-admin .center-grid .center-row>div:first-child small{font-size:9px!important}
+  body.mw-r5-admin .center-grid .center-review p{margin:5px 0 0!important;font-size:11px!important}
+  body.mw-r5-admin .center-grid .loyalty-detail-list{font-size:10px!important}
+
+  /* Payment/topup/admin tables already become cards in page_audit; tighten the chrome here. */
+  body.mw-r5-admin .pay-review-head,
+  body.mw-r5-admin .topup-head{padding:10px!important}
+  body.mw-r5-admin .pay-review-head h1,
+  body.mw-r5-admin .pay-review-head h2,
+  body.mw-r5-admin .topup-head h1,
+  body.mw-r5-admin .topup-head h2{margin:0!important;font-size:18px!important}
+  body.mw-r5-admin .pay-review-head p,
+  body.mw-r5-admin .topup-head p,
+  body.mw-r5-admin .topup-card>p{display:none!important}
+  body.mw-r5-admin .pay-review-table tbody tr,
+  body.mw-r5-admin .topup-table tbody tr{margin:7px 0!important;padding:10px!important;border-radius:13px!important}
+
+  /* Keep support launcher above the bar without stealing content space. */
+  body:has(.employee-app-topbar) .mw-support-launcher,
+  body.mw-r5-admin .mw-support-launcher{bottom:calc(var(--m3-bottom-h) + env(safe-area-inset-bottom) + 8px)!important}
+}
