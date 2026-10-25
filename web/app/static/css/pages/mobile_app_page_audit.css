@@ -1,0 +1,284 @@
+/* Page-level mobile QA for high-frequency employee and admin screens.
+   This complements mobile_app_repair.css with page-specific table/card conversions. */
+
+@media (max-width:767px){
+    /* Close the old 720px gap for customer / employee shells. */
+    .customer-app-topbar,
+    .employee-app-topbar{display:flex!important}
+    .customer-app-bottom-nav,
+    .employee-app-bottom-nav{display:grid!important}
+
+    body.customer-mobile-app-site .site-header,
+    body.customer-mobile-app-site .site-footer,
+    body.employee-workspace-site .site-header,
+    body.employee-workspace-site .site-footer,
+    body:has(.employee-app-topbar) .site-header,
+    body:has(.employee-app-topbar) .site-footer{display:none!important}
+
+    body.customer-mobile-app-site,
+    body.employee-workspace-site,
+    body:has(.employee-app-topbar){
+        padding-bottom:calc(64px + env(safe-area-inset-bottom))!important;
+    }
+
+    /* Keyboard users and touch users get a visible, consistent interaction state. */
+    body.customer-mobile-app-site :is(a,button,input,select,textarea,summary):focus-visible,
+    body.employee-workspace-site :is(a,button,input,select,textarea,summary):focus-visible,
+    body:has(.employee-app-topbar) :is(a,button,input,select,textarea,summary):focus-visible,
+    body.mw-r5-admin :is(a,button,input,select,textarea,summary):focus-visible{
+        outline:2px solid rgba(240,207,114,.78)!important;
+        outline-offset:2px!important;
+    }
+
+    /* ---------------- Employee: internal transfer ---------------- */
+    .employee-workspace-site .it-grid{grid-template-columns:1fr!important;gap:10px!important}
+    .employee-workspace-site .it-card{min-width:0;padding:13px!important;border-radius:16px!important;background:#16161b!important}
+    .employee-workspace-site .it-form{gap:10px!important;margin-top:12px!important}
+    .employee-workspace-site .it-row{grid-template-columns:1fr!important}
+    .employee-workspace-site .it-input,
+    .employee-workspace-site .it-select,
+    .employee-workspace-site .it-textarea{min-width:0!important;max-width:100%!important;font-size:16px!important}
+    .employee-workspace-site .it-balance{align-items:center!important;padding:11px!important}
+    .employee-workspace-site .it-balance b{font-size:23px!important}
+    .employee-workspace-site .it-item{min-width:0;padding:11px!important}
+    .employee-workspace-site .it-item-head{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important}
+    .employee-workspace-site .it-item-head>div:first-child{min-width:0}
+    .employee-workspace-site .it-item strong,
+    .employee-workspace-site .it-meta{overflow-wrap:anywhere}
+    .employee-workspace-site .it-actions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+    .employee-workspace-site .it-actions form{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;min-width:0!important;width:100%!important}
+    .employee-workspace-site .it-actions .it-btn,
+    .employee-workspace-site .it-form>.it-btn{width:100%!important}
+
+    /* ---------------- Employee: store binding ---------------- */
+    .employee-workspace-site .sbm{width:100%!important;margin:0!important}
+    .employee-workspace-site .sbm-hero{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:14px!important;border-radius:16px!important}
+    .employee-workspace-site .sbm-hero h1{font-size:28px!important}
+    .employee-workspace-site .sbm-role{width:max-content;max-width:100%;white-space:normal!important;overflow-wrap:anywhere}
+    .employee-workspace-site .sbm-stats{grid-template-columns:1fr 1fr!important;gap:8px!important;margin:10px 0!important}
+    .employee-workspace-site .sbm-stat{padding:12px!important;border-radius:14px!important}
+    .employee-workspace-site .sbm-stat b{font-size:24px!important}
+    .employee-workspace-site .sbm-toolbar{margin-bottom:9px!important}
+    .employee-workspace-site .sbm-search{display:grid!important;grid-template-columns:minmax(0,1fr) auto auto!important;width:100%!important;gap:6px!important}
+    .employee-workspace-site .sbm-search input{width:100%!important;min-width:0!important;font-size:16px!important}
+    .employee-workspace-site .sbm-search :is(button,a){min-height:44px!important}
+    .employee-workspace-site .sbm-panel,
+    .employee-workspace-site .sbm-card{border-radius:16px!important;background:#16161b!important}
+    .employee-workspace-site .sbm-panel-head,
+    .employee-workspace-site .sbm-section-title{align-items:flex-start!important;gap:8px!important}
+    .employee-workspace-site .grant-form{grid-template-columns:1fr!important;padding:13px!important;gap:9px!important}
+    .employee-workspace-site .grant-form .sbm-btn{grid-column:auto!important;width:100%!important}
+    .employee-workspace-site .sbm-grid{grid-template-columns:1fr!important;gap:9px!important}
+    .employee-workspace-site .sbm-person{grid-template-columns:42px minmax(0,1fr)!important;padding:13px!important}
+    .employee-workspace-site .sbm-person>.sbm-status{grid-column:1/-1}
+    .employee-workspace-site .sbm-person p{overflow-wrap:anywhere}
+    .employee-workspace-site .sbm-facts,
+    .employee-workspace-site .sbm-card.pending .sbm-facts{grid-template-columns:1fr!important}
+    .employee-workspace-site .sbm-facts b{white-space:normal!important;overflow-wrap:anywhere}
+    .employee-workspace-site .sbm-actions,
+    .employee-workspace-site .sbm-actions.split,
+    .employee-workspace-site .active-actions{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;padding:10px 13px 13px!important}
+    .employee-workspace-site .sbm-actions form,
+    .employee-workspace-site .active-actions form{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important}
+    .employee-workspace-site .sbm-actions :is(input,.sbm-btn),
+    .employee-workspace-site .active-actions :is(input,.sbm-btn){width:100%!important;max-width:100%!important;font-size:16px!important}
+    .employee-workspace-site .history-row{grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important;padding:11px 13px!important}
+
+    /* ---------------- Admin common center pages ---------------- */
+    body.mw-r5-admin .center-grid{gap:10px!important}
+    body.mw-r5-admin .center-stats{grid-template-columns:1fr 1fr!important;gap:8px!important}
+    body.mw-r5-admin .center-stat{min-width:0;padding:12px!important;border-radius:14px!important;background:#16161b!important}
+    body.mw-r5-admin .center-stat strong{font-size:24px!important;overflow-wrap:anywhere}
+    body.mw-r5-admin .section-title-row{display:grid!important;grid-template-columns:1fr!important;align-items:start!important;gap:10px!important}
+    body.mw-r5-admin .section-title-row>div{min-width:0}
+    body.mw-r5-admin .section-title-row h2{font-size:20px!important;line-height:1.25!important}
+    body.mw-r5-admin .center-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;width:100%!important}
+    body.mw-r5-admin .center-actions form{width:100%!important;min-width:0!important}
+    body.mw-r5-admin .center-actions .button{width:100%!important;min-width:0!important;justify-content:center!important;padding-left:8px!important;padding-right:8px!important;text-align:center}
+    body.mw-r5-admin .center-filter-form{grid-template-columns:1fr!important;gap:8px!important}
+    body.mw-r5-admin .center-row,
+    body.mw-r5-admin .customer-row{grid-template-columns:1fr!important;gap:9px!important;padding:12px!important;border-radius:14px!important;background:rgba(255,255,255,.025)!important}
+    body.mw-r5-admin .center-row>div:first-child{min-width:0}
+    body.mw-r5-admin .center-cell{min-width:0;padding-top:8px;border-top:1px solid rgba(255,255,255,.065)}
+    body.mw-r5-admin .center-cell b,
+    body.mw-r5-admin .center-cell small{overflow-wrap:anywhere}
+    body.mw-r5-admin .center-loyalty-cell details{width:100%}
+    body.mw-r5-admin .center-loyalty-cell summary{display:flex;min-height:44px;align-items:center}
+    body.mw-r5-admin .loyalty-detail-list{min-width:0!important;max-width:none!important;width:100%!important}
+    body.mw-r5-admin .center-review{border-radius:14px!important;background:rgba(255,255,255,.025)!important}
+
+    /* Compact cards used in customer 360 / SLA / archive pages. */
+    body.mw-r5-admin .admin-order-list.compact-list{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
+    body.mw-r5-admin .admin-order-card.compact-order-card{min-width:0!important;padding:12px!important;border-radius:14px!important;background:#16161b!important}
+    body.mw-r5-admin .order-card-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:start!important;gap:8px!important}
+    body.mw-r5-admin .order-card-header>div{min-width:0}
+    body.mw-r5-admin .order-card-header h3{overflow-wrap:anywhere;font-size:16px!important;line-height:1.3!important}
+    body.mw-r5-admin .order-meta.compact-meta{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+    body.mw-r5-admin .order-meta.compact-meta>div{min-width:0!important;padding:9px!important;border-radius:12px!important}
+    body.mw-r5-admin .order-meta.compact-meta strong{overflow-wrap:anywhere}
+    body.mw-r5-admin .compact-order-card>.button{width:100%!important;justify-content:center!important}
+
+    /* ---------------- Admin: payment review ---------------- */
+    body.mw-r5-admin .pay-review-page,
+    body.mw-r5-admin .pay-review-panel{width:100%!important;max-width:100%!important;min-width:0!important}
+    body.mw-r5-admin .pay-review-panel{overflow:hidden;border-radius:16px!important;background:#16161b!important}
+    body.mw-r5-admin .pay-review-head{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:13px!important}
+    body.mw-r5-admin .pay-review-filter{display:flex!important;gap:6px!important;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+    body.mw-r5-admin .pay-review-filter::-webkit-scrollbar{display:none}
+    body.mw-r5-admin .pay-review-link{flex:0 0 auto;min-height:40px!important;display:inline-flex;align-items:center}
+    body.mw-r5-admin .pay-review-table-wrap{overflow:visible!important;padding:0 9px 9px!important}
+    body.mw-r5-admin .pay-review-table,
+    body.mw-r5-admin .pay-review-table tbody{display:block!important;width:100%!important;min-width:0!important}
+    body.mw-r5-admin .pay-review-table thead{display:none!important}
+    body.mw-r5-admin .pay-review-table tbody tr{display:grid!important;grid-template-columns:1fr 1fr!important;gap:9px!important;width:100%!important;margin:9px 0!important;padding:12px!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:14px!important;background:rgba(255,255,255,.025)!important}
+    body.mw-r5-admin .pay-review-table tbody td{display:block!important;min-width:0!important;padding:0!important;border:0!important;white-space:normal!important;overflow-wrap:anywhere}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(1)::before{content:"類型"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(2)::before{content:"審核編號"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(3)::before{content:"來源"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(4)::before{content:"老闆"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(5)::before{content:"對象"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(6)::before{content:"金額"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(7)::before{content:"付款方式"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(8)::before{content:"核對資訊"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(9)::before{content:"狀態"}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(10)::before{content:"操作"}
+    body.mw-r5-admin .pay-review-table tbody td::before{display:block;margin-bottom:3px;color:rgba(245,245,247,.52);font-size:9px;font-weight:850}
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(2),
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(3),
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(4),
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(5),
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(8),
+    body.mw-r5-admin .pay-review-table tbody td:nth-child(10){grid-column:1/-1}
+    body.mw-r5-admin .pay-review-actions{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important}
+    body.mw-r5-admin .pay-review-actions form{display:grid!important;grid-template-columns:1fr!important;gap:6px!important;width:100%!important}
+    body.mw-r5-admin .pay-review-action,
+    body.mw-r5-admin .pay-review-reason{width:100%!important;max-width:100%!important;min-height:44px!important;font-size:16px!important}
+
+    /* ---------------- Admin: topups ---------------- */
+    body.mw-r5-admin .topup-page{gap:10px!important}
+    body.mw-r5-admin .topup-card,
+    body.mw-r5-admin .topup-panel{min-width:0!important;border-radius:16px!important;background:#16161b!important;box-shadow:none!important}
+    body.mw-r5-admin .topup-card{padding:14px!important}
+    body.mw-r5-admin .topup-card h2{font-size:24px!important}
+    body.mw-r5-admin .topup-head{display:grid!important;grid-template-columns:1fr!important;gap:9px!important;padding:13px!important}
+    body.mw-r5-admin .topup-filter{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;gap:6px!important;scrollbar-width:none}
+    body.mw-r5-admin .topup-filter::-webkit-scrollbar{display:none}
+    body.mw-r5-admin .topup-link{flex:0 0 auto;min-height:40px!important}
+    body.mw-r5-admin .topup-table-wrap{overflow:visible!important;padding:0 9px 9px!important}
+    body.mw-r5-admin .topup-table,
+    body.mw-r5-admin .topup-table tbody{display:block!important;width:100%!important;min-width:0!important}
+    body.mw-r5-admin .topup-table thead{display:none!important}
+    body.mw-r5-admin .topup-table tbody tr{display:grid!important;grid-template-columns:1fr 1fr!important;gap:9px!important;width:100%!important;margin:9px 0!important;padding:12px!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:14px!important;background:rgba(255,255,255,.025)!important}
+    body.mw-r5-admin .topup-table tbody td{display:block!important;min-width:0!important;padding:0!important;border:0!important;white-space:normal!important;overflow-wrap:anywhere}
+    body.mw-r5-admin .topup-table tbody td:nth-child(1)::before{content:"儲值單"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(2)::before{content:"老闆"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(3)::before{content:"金額"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(4)::before{content:"付款方式"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(5)::before{content:"付款辨識"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(6)::before{content:"來源"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(7)::before{content:"狀態"}
+    body.mw-r5-admin .topup-table tbody td:nth-child(8)::before{content:"操作"}
+    body.mw-r5-admin .topup-table tbody td::before{display:block;margin-bottom:3px;color:rgba(245,245,247,.52);font-size:9px;font-weight:850}
+    body.mw-r5-admin .topup-table tbody td:nth-child(1),
+    body.mw-r5-admin .topup-table tbody td:nth-child(2),
+    body.mw-r5-admin .topup-table tbody td:nth-child(5),
+    body.mw-r5-admin .topup-table tbody td:nth-child(8){grid-column:1/-1}
+    body.mw-r5-admin .topup-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+    body.mw-r5-admin .topup-actions form,
+    body.mw-r5-admin .topup-action{width:100%!important}
+
+    /* ---------------- Admin: VIP timer list ---------------- */
+    body.mw-r5-admin .vip-timer-table-wrap{overflow:visible!important;padding:0 9px 9px!important}
+    body.mw-r5-admin .vip-timer-table,
+    body.mw-r5-admin .vip-timer-table tbody{display:block!important;width:100%!important;min-width:0!important}
+    body.mw-r5-admin .vip-timer-table thead{display:none!important}
+    body.mw-r5-admin .vip-timer-table tbody tr{display:grid!important;grid-template-columns:1fr 1fr!important;gap:9px!important;width:100%!important;margin:9px 0!important;padding:12px!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:14px!important;background:rgba(255,255,255,.025)!important}
+    body.mw-r5-admin .vip-timer-table tbody td{display:block!important;min-width:0!important;padding:0!important;border:0!important;white-space:normal!important;overflow-wrap:anywhere}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(1)::before{content:"訂單"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(2)::before{content:"老闆"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(3)::before{content:"狀態"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(4)::before{content:"目前玩法"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(5)::before{content:"開單 VIP"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(6)::before{content:"持續 / 暫停 / 待付款"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(7)::before{content:"爭議"}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(8)::before{content:"操作"}
+    body.mw-r5-admin .vip-timer-table tbody td::before{display:block;margin-bottom:3px;color:rgba(245,245,247,.52);font-size:9px;font-weight:850}
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(1),
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(2),
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(4),
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(6),
+    body.mw-r5-admin .vip-timer-table tbody td:nth-child(8){grid-column:1/-1}
+    body.mw-r5-admin .vip-timer-table .button{width:100%!important;justify-content:center!important}
+
+    /* ---------------- Admin: payout summary ---------------- */
+    body.mw-r5-admin .staff-summary-page{width:100%!important;max-width:100%!important;min-width:0!important;display:grid!important;gap:10px!important}
+    body.mw-r5-admin .staff-summary-filter form{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+    body.mw-r5-admin .staff-summary-filter :is(label,input,select,.button){width:100%!important;min-width:0!important;max-width:100%!important}
+    body.mw-r5-admin .staff-summary-total-grid{grid-template-columns:1fr 1fr!important;gap:8px!important}
+    body.mw-r5-admin .staff-summary-total-card{min-width:0!important;padding:12px!important;border-radius:14px!important;background:#16161b!important}
+    body.mw-r5-admin .staff-summary-ledger-panel{min-width:0!important;border-radius:16px!important;overflow:hidden}
+    body.mw-r5-admin .staff-summary-ledger-head{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;padding:13px!important}
+    body.mw-r5-admin .staff-summary-head-actions,
+    body.mw-r5-admin .staff-summary-head-actions .button{width:100%!important}
+    body.mw-r5-admin .payout-ledger-scroll{overflow:visible!important;padding:0 9px 9px!important}
+    body.mw-r5-admin .payout-ledger-grid{min-width:0!important;width:100%!important}
+    body.mw-r5-admin .payout-ledger-head{display:none!important}
+    body.mw-r5-admin .payout-ledger-row{display:grid!important;grid-template-columns:1fr 1fr!important;gap:9px!important;min-height:0!important;margin:9px 0 0!important;padding:12px!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:14px!important;background:rgba(255,255,255,.025)!important}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell{display:block!important;min-width:0!important;padding:0!important;text-align:left!important;overflow-wrap:anywhere}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(1){grid-column:1/-1!important}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(9){grid-column:1/-1!important}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell::before{display:block;margin-bottom:3px;color:rgba(245,245,247,.52);font-size:9px;font-weight:850}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(1)::before{content:"人員"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(2)::before{content:"身分"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(3)::before{content:"業績"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(4)::before{content:"待發放"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(5)::before{content:"報單鎖定"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(6)::before{content:"已發放"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(7)::before{content:"總筆數"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(8)::before{content:"狀態"}
+    body.mw-r5-admin .payout-ledger-row>.payout-cell:nth-child(9)::before{content:"操作"}
+    body.mw-r5-admin .payout-ledger-actions{grid-template-columns:1fr!important;gap:7px!important}
+    body.mw-r5-admin .payout-ledger-actions form,
+    body.mw-r5-admin .payout-ledger-actions .staff-summary-button{width:100%!important;min-height:44px!important}
+    body.mw-r5-admin .payout-ledger-detail{padding:0 0 9px!important}
+    body.mw-r5-admin .payout-ledger-detail .staff-summary-detail{padding:12px!important;border-radius:14px!important;background:rgba(255,255,255,.02)!important}
+    body.mw-r5-admin .staff-detail-table,
+    body.mw-r5-admin .staff-detail-table tbody{display:block!important;width:100%!important;min-width:0!important}
+    body.mw-r5-admin .staff-detail-table thead{display:none!important}
+    body.mw-r5-admin .staff-detail-table tbody tr{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;padding:10px!important;margin-top:8px!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:12px!important}
+    body.mw-r5-admin .staff-detail-table tbody td{display:block!important;padding:0!important;border:0!important;white-space:normal!important;overflow-wrap:anywhere}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(1)::before{content:"契約編號"}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(2)::before{content:"委託人"}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(3)::before{content:"內容"}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(4)::before{content:"結單日期"}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(5)::before{content:"身分"}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(6)::before{content:"狀態"}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(7)::before{content:"賞金"}
+    body.mw-r5-admin .staff-detail-table tbody td::before{display:block;margin-bottom:3px;color:rgba(245,245,247,.52);font-size:9px;font-weight:850}
+    body.mw-r5-admin .staff-detail-table tbody td:nth-child(3){grid-column:1/-1}
+
+    /* Make generic admin form actions phone-friendly without affecting text links. */
+    body.mw-r5-admin form :is(button,.button){min-height:44px}
+    body.mw-r5-admin .panel.compact-panel{min-width:0!important;border-radius:16px!important}
+}
+
+@media (max-width:430px){
+    body.mw-r5-admin .center-actions,
+    body.mw-r5-admin .order-meta.compact-meta,
+    body.mw-r5-admin .pay-review-table tbody tr,
+    body.mw-r5-admin .topup-table tbody tr,
+    body.mw-r5-admin .vip-timer-table tbody tr,
+    body.mw-r5-admin .payout-ledger-row,
+    body.mw-r5-admin .staff-detail-table tbody tr,
+    body.mw-r5-admin .staff-summary-total-grid{grid-template-columns:1fr!important}
+
+    body.mw-r5-admin .pay-review-table tbody td,
+    body.mw-r5-admin .topup-table tbody td,
+    body.mw-r5-admin .vip-timer-table tbody td,
+    body.mw-r5-admin .payout-ledger-row>.payout-cell,
+    body.mw-r5-admin .staff-detail-table tbody td{grid-column:1!important}
+
+    .employee-workspace-site .sbm-stats{grid-template-columns:1fr!important}
+    .employee-workspace-site .sbm-search{grid-template-columns:1fr 1fr!important}
+    .employee-workspace-site .sbm-search input{grid-column:1/-1}
+}
