@@ -165,7 +165,12 @@ def main() -> None:
         target = static_path_from_url(reference)
         if not target.is_file():
             missing_static.append(reference)
-            print("MISSING:", reference)
+            owners = sorted(
+                path.relative_to(TEMPLATES).as_posix()
+                for path in template_files
+                if reference in STATIC_REF_RE.findall(path.read_text(encoding="utf-8-sig"))
+            )
+            print("MISSING:", reference, "REFERENCED_BY:", ", ".join(owners))
 
     if not missing_static:
         print("ALL_REFERENCED_STATIC_FILES_EXIST")
