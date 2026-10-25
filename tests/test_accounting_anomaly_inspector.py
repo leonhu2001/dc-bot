@@ -19,4 +19,6 @@ def test_accounting_anomaly_inspector_runs_read_only_without_runtime_databases()
 
     assert completed.returncode == 0, completed.stderr
     assert "ACCOUNTING RECONCILIATION DIAGNOSTIC (READ ONLY)" in completed.stdout
+    assert "VIEW: policy-aware (same semantics as System Maintenance)" in completed.stdout
+    assert "SUPPRESSED_RAW_PAYOUT_MISMATCHES:" in completed.stdout
     assert "READ_ONLY: this script does not modify either database." in completed.stdout
