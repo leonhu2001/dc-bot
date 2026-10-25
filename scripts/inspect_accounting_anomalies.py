@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from web.app.services.accounting_reconciliation import (  # noqa: E402
-    build_accounting_reconciliation_snapshot,
+from web.app.services.accounting_reconciliation_policy import (  # noqa: E402
+    build_accounting_policy_view,
 )
 
 
@@ -37,8 +37,21 @@ def _impact_hint(issue: dict[str, Any]) -> str:
     return "financial/data mismatch candidate"
 
 
+def _print_issue(index: int, issue: dict[str, Any]) -> None:
+    print(f"[{index:03d}] {issue.get('severity', '-')} | {issue.get('code', '-')}")
+    print(f"  category: {issue.get('category', '-')}")
+    print(f"  reference: {issue.get('reference', '-')}")
+    print(f"  order_id: {issue.get('order_id')}")
+    print(f"  title: {issue.get('title', '-')}")
+    print(f"  expected: {issue.get('expected')!r}")
+    print(f"  actual: {issue.get('actual')!r}")
+    print(f"  repairable: {bool(issue.get('repairable'))}")
+    print(f"  hint: {_impact_hint(issue)}")
+    print(f"  detail: {issue.get('detail', '-')}")
+
+
 def main() -> None:
-    snapshot = build_accounting_reconciliation_snapshot(
+    snapshot, suppressed = build_accounting_policy_view(
         ROOT,
         detail_limit=1000,
     )
@@ -46,6 +59,7 @@ def main() -> None:
 
     print("=== ACCOUNTING RECONCILIATION DIAGNOSTIC (READ ONLY) ===")
     print(f"ROOT: {ROOT}")
+    print("VIEW: policy-aware (same semantics as System Maintenance)")
     print(f"STATUS: {snapshot.get('status')} / {snapshot.get('status_text')}")
     print(f"ISSUES: {snapshot.get('issue_count', 0)}")
     print(
@@ -55,9 +69,12 @@ def main() -> None:
     )
     print(f"CATEGORY_COUNTS: {snapshot.get('category_counts', {})}")
     print(f"TRUNCATED: {snapshot.get('truncated', False)}")
+    print(f"SUPPRESSED_RAW_PAYOUT_MISMATCHES: {len(suppressed)}")
 
     code_counts = Counter(str(item.get("code") or "-") for item in issues)
     print("CODE_COUNTS:")
+    if not code_counts:
+        print("  NONE")
     for code, count in sorted(code_counts.items()):
         print(f"  {code}: {count}")
 
@@ -65,16 +82,13 @@ def main() -> None:
     if not issues:
         print("  NONE")
     for index, issue in enumerate(issues, start=1):
-        print(f"[{index:03d}] {issue.get('severity', '-')} | {issue.get('code', '-')}")
-        print(f"  category: {issue.get('category', '-')}")
-        print(f"  reference: {issue.get('reference', '-')}")
-        print(f"  order_id: {issue.get('order_id')}")
-        print(f"  title: {issue.get('title', '-')}")
-        print(f"  expected: {issue.get('expected')!r}")
-        print(f"  actual: {issue.get('actual')!r}")
-        print(f"  repairable: {bool(issue.get('repairable'))}")
-        print(f"  hint: {_impact_hint(issue)}")
-        print(f"  detail: {issue.get('detail', '-')}")
+        _print_issue(index, issue)
+
+    print("\nSUPPRESSED_RAW_DETAILS:")
+    if not suppressed:
+        print("  NONE")
+    for index, issue in enumerate(suppressed, start=1):
+        _print_issue(index, issue)
 
     print("\nREAD_ONLY: this script does not modify either database.")
 
