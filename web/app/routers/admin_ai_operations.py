@@ -6,10 +6,15 @@ from fastapi import APIRouter, Form, Request
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
+from web.app.services.accounting_reconciliation_policy import (
+    build_accounting_policy_view,
+    normalize_anomaly_snapshot,
+)
 from web.app.services.ai_operations import (
     build_safe_operations_snapshot,
     generate_operations_analysis,
 )
+from web.app.services.anomaly_detection import build_anomaly_snapshot
 from web.app.services.audit_trail import write_sqlite_audit_log
 
 
@@ -33,6 +38,33 @@ def _admin(request: Request) -> dict | None:
 def _period(value: str | None) -> str:
     clean = str(value or "quarter").strip().lower()
     return clean if clean in _ALLOWED_PERIODS else "quarter"
+
+
+def _compact_anomaly_snapshot(anomaly: dict) -> dict:
+    safe_issues = []
+    for item in (anomaly.get("issues") or [])[:25]:
+        if not isinstance(item, dict):
+            continue
+        safe_issues.append(
+            {
+                "category": str(item.get("category") or "")[:80],
+                "category_label": str(
+                    item.get("category_label") or ""
+                )[:80],
+                "severity": str(item.get("severity") or "")[:40],
+                "title": str(item.get("title") or "")[:200],
+                "age_minutes": item.get("age_minutes"),
+            }
+        )
+
+    return {
+        "status": str(anomaly.get("status") or ""),
+        "issue_count": int(anomaly.get("issue_count") or 0),
+        "critical_count": int(anomaly.get("critical_count") or 0),
+        "warning_count": int(anomaly.get("warning_count") or 0),
+        "category_counts": dict(anomaly.get("category_counts") or {}),
+        "issues": safe_issues,
+    }
 
 
 def _clarify_anomaly_semantics(snapshot: dict) -> dict:
@@ -61,6 +93,15 @@ def _clarify_anomaly_semantics(snapshot: dict) -> dict:
     return snapshot
 
 
+def _build_policy_aware_operations_snapshot(period: str) -> dict:
+    snapshot = build_safe_operations_snapshot(period)
+    anomaly = build_anomaly_snapshot(limit=80)
+    _, suppressed_accounting = build_accounting_policy_view(detail_limit=10000)
+    anomaly = normalize_anomaly_snapshot(anomaly, suppressed_accounting)
+    snapshot["anomalies"] = _compact_anomaly_snapshot(anomaly)
+    return _clarify_anomaly_semantics(snapshot)
+
+
 def _no_access(request: Request):
     return templates.TemplateResponse(
         request=request,
@@ -85,10 +126,9 @@ async def admin_ai_operations(
 
     clean_period = _period(period)
     snapshot = await run_in_threadpool(
-        build_safe_operations_snapshot,
+        _build_policy_aware_operations_snapshot,
         clean_period,
     )
-    snapshot = _clarify_anomaly_semantics(snapshot)
 
     return templates.TemplateResponse(
         request=request,
@@ -119,10 +159,9 @@ async def admin_ai_operations_analyze(
     clean_question = str(question or "").strip()[:1200]
 
     snapshot = await run_in_threadpool(
-        build_safe_operations_snapshot,
+        _build_policy_aware_operations_snapshot,
         clean_period,
     )
-    snapshot = _clarify_anomaly_semantics(snapshot)
     analysis, used_external_ai = await generate_operations_analysis(
         question=clean_question,
         snapshot=snapshot,

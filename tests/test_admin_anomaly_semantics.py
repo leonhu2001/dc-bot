@@ -39,7 +39,9 @@ def test_ai_operations_does_not_present_total_anomalies_as_accounting() -> None:
     assert "不可稱為帳務異常數" in router
     assert '"anomalies.accounting_issue_count"' in router
     assert "與系統維運的帳務對帳指標同源" in router
-    assert router.count("_clarify_anomaly_semantics(snapshot)") == 2
+    assert "normalize_anomaly_snapshot(anomaly, suppressed_accounting)" in router
+    assert router.count("_build_policy_aware_operations_snapshot,") == 2
+    assert router.count("_clarify_anomaly_semantics(snapshot)") == 1
 
 
 def test_ai_operations_shows_anomaly_breakdown_and_full_detail_link() -> None:
