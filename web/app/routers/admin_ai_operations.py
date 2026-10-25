@@ -35,6 +35,32 @@ def _period(value: str | None) -> str:
     return clean if clean in _ALLOWED_PERIODS else "quarter"
 
 
+def _clarify_anomaly_semantics(snapshot: dict) -> dict:
+    """Expose accounting as a named subset before rendering or calling AI."""
+    anomalies = snapshot.get("anomalies")
+    if not isinstance(anomalies, dict):
+        anomalies = {}
+        snapshot["anomalies"] = anomalies
+
+    category_counts = anomalies.get("category_counts")
+    if not isinstance(category_counts, dict):
+        category_counts = {}
+
+    anomalies["accounting_issue_count"] = int(
+        category_counts.get("accounting") or 0
+    )
+    snapshot["metric_definitions"] = {
+        "anomalies.issue_count": (
+            "異常中心全部類別的合計；包含訂單、付款、同步、儲值、客服與帳務，"
+            "不可稱為帳務異常數。"
+        ),
+        "anomalies.accounting_issue_count": (
+            "只計帳務對帳異常；與系統維運的帳務對帳指標同源。"
+        ),
+    }
+    return snapshot
+
+
 def _no_access(request: Request):
     return templates.TemplateResponse(
         request=request,
@@ -62,6 +88,7 @@ async def admin_ai_operations(
         build_safe_operations_snapshot,
         clean_period,
     )
+    snapshot = _clarify_anomaly_semantics(snapshot)
 
     return templates.TemplateResponse(
         request=request,
@@ -95,6 +122,7 @@ async def admin_ai_operations_analyze(
         build_safe_operations_snapshot,
         clean_period,
     )
+    snapshot = _clarify_anomaly_semantics(snapshot)
     analysis, used_external_ai = await generate_operations_analysis(
         question=clean_question,
         snapshot=snapshot,
