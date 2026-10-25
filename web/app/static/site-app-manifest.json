@@ -12,16 +12,16 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/static/img/employee-app-icon.svg",
+      "src": "/static/img/favicon.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/static/img/employee-app-icon.svg",
+      "src": "/static/img/favicon.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
