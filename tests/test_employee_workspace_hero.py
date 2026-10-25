@@ -41,7 +41,7 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
     hero = _read("web/app/templates/_employee_workspace_hero.html")
 
     for label in (
-        "員工中心",
+        "員工後台",
         "接單大廳",
         "報單系統",
         "報單審核",
@@ -52,6 +52,7 @@ def test_employee_hero_keeps_fixed_navigation_and_marks_current_page_active():
     ):
         assert label in hero
 
+    assert "員工中心" not in hero
     assert "完整薪資" not in hero
     assert "active{% endif %}" in hero
     assert "_employee_path == '/employee'" in hero
