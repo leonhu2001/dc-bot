@@ -20,7 +20,7 @@ def test_employee_workspace_reserves_scrollbar_gutter():
 
 
 def test_employee_center_and_workspace_keep_same_1180px_rail():
-    center_css = _read("web/app/static/css/pages/employee_center_inline_1.css")
+    center_css = _read("web/app/static/css/pages/employee_center.css")
     workspace_css = _read("web/app/static/css/pages/employee_workspace_site_shell.css")
 
     rail = "width:min(1180px,calc(100% - 28px))"
