@@ -4,21 +4,16 @@
 {% set _employee_name = _employee_store_name or (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
 {% set _employee_id = _employee_member.get('discord_id') or (user.id if user else '') %}
 
-<link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_polish.css?v=20261026-1">
 {% include "_employee_mobile_app_shell.html" %}
-<link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3.css?v=20261026-3">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3_pages.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_ux_v2.css?v=20261026-4">
 
 <div class="ec-hero employee-workspace-hero" data-employee-store-name="{{ _employee_store_name }}" data-employee-user-id="{{ _employee_id }}">
     <div>
-        <div class="ec-k">EMPLOYEE CENTER</div>
+        <div class="ec-k">EMPLOYEE BACKOFFICE</div>
         <h1 data-employee-workspace-name>{{ _employee_name }}</h1>
-        <div class="ec-muted">你的接單、報單、評價、收藏與薪資都集中在這裡。</div>
+        <div class="ec-muted">接單、報單、評價、收藏與薪資集中在員工後台。</div>
     </div>
-    <div class="ec-actions" aria-label="員工中心快捷入口">
-        <a class="ec-btn{% if _employee_path == '/employee' %} active{% endif %}" href="/employee">員工中心</a>
+    <div class="ec-actions" aria-label="員工後台快捷入口">
+        <a class="ec-btn{% if _employee_path == '/employee' %} active{% endif %}" href="/employee">員工後台</a>
         <a class="ec-btn{% if _employee_path == '/dispatch' %} active{% endif %}" href="/dispatch">接單大廳</a>
         <a class="ec-btn{% if _employee_path.startswith('/dispatch/reports') and not _employee_path.startswith('/dispatch/reports/review') %} active{% endif %}" href="/dispatch/reports">報單系統</a>
         {% if user and (user.is_admin or user.is_customer_service or user.is_manager) %}
