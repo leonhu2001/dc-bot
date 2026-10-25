@@ -3,12 +3,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "web/app/templates/admin.html"
+LAYOUT = ROOT / "web/app/templates/admin_layout.html"
 CSS = ROOT / "web/app/static/css/admin_order_status.css"
 
 
 def test_admin_order_overview_loads_dedicated_status_stylesheet():
     source = TEMPLATE.read_text(encoding="utf-8")
-    assert "/static/css/admin_order_status.css?v=20261013_1" in source
+    layout = LAYOUT.read_text(encoding="utf-8")
+
+    # /admin now shares admin_layout with the rest of the customer-service
+    # backoffice. The layout owns the shared status stylesheet so every admin
+    # page gets the same badge language before first paint.
+    assert '{% extends "admin_layout.html" %}' in source
+    assert "/static/css/admin_order_status.css?v=20261013_1" in layout
     assert "admin-order-status-badge" in source
 
 
