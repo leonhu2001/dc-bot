@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 
 {% block page_title %}訂單管理
-<script src="/static/js/pages/order_history_inline_1.js?v=20261013"></script>
+<script src="/static/js/pages/order_history_dossier_toggle.js?v=20261013"></script>
 
-<script src="/static/js/pages/order_history_inline_2.js?v=20261013"></script>
+<script src="/static/js/pages/order_history_auto_open.js?v=20261013"></script>
 <!-- MAWAN_R5R3_AUTO_OPEN_ORDER -->
 
 
@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="/static/css/pages/order_history_inline_1.css?v=20261013">
+<link rel="stylesheet" href="/static/css/pages/order_history.css?v=20261013">
 
 <div class="history-ledger-page">
     <section class="panel">
@@ -357,7 +357,6 @@
                                                                   {% set manual_key = payout.kind ~ ":" ~ order.id ~ ":" ~ payout.person_id %}
                                                                   <div class="history-dossier-payout-row">
                                                                       <strong class="history-dossier-payout-type">{{ payout.label }}</strong>
-
                                                                       <div class="history-dossier-payout-person">
                                                                           <span>{{ payout.person_name or payout.person_id }}</span>
                                                                           <small>{{ payout.person_id }}</small>
