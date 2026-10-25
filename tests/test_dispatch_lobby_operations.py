@@ -34,7 +34,7 @@ def test_dispatch_clickable_controls_are_visually_distinct_from_status_pills():
     template = _read("web/app/templates/dispatch.html")
     css = _read("web/app/static/css/pages/dispatch_actions.css")
 
-    assert 'dispatch_inline_1.css?v=20261017-actions-2' in template
+    assert 'dispatch.css?v=20261017-actions-2' in template
     assert 'dispatch_actions.css?v=20261017-actions-5' in template
     assert ".dispatch-shell a.dispatch-my-link" in css
     assert ".dispatch-shell a.dispatch-support-link" in css
