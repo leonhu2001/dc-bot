@@ -1,78 +1,25 @@
-<!doctype html>
-<html lang="zh-Hant">
+{% extends "admin_layout.html" %}
 
-<head>
+{% block page_title %}客服工作台{% endblock %}
 
-<meta charset="utf-8">
-
-<meta
-    name="viewport"
-    content="width=device-width,initial-scale=1"
->
-
-<title>
-    {{ title }}
-</title>
-
-<!-- MAWAN_PHASE_4A2R6_ADMIN -->
-
-<link rel="stylesheet" href="/static/css/mw_portal_r5.css?v=admin_source_20261004_1">
-<link rel="stylesheet" href="/static/css/admin_order_status.css?v=20261013_1">
-</head>
-
-<body class="mw-r5-admin">
-<!-- MAWAN_R5R1_VISUAL_FINAL -->
-
-<div class="mw-r5-shell">
-
-    {% include "_admin_sidebar.html" %}
-
-    <section class="mw-r5-main-host">
-
-        <header class="mw-r5-page-header">
-
-            <div class="mw-r5-kicker">
-                CUSTOMER SERVICE BACKOFFICE
-            </div>
-
-            <h1>
-                客服後台
-            </h1>
-
-            <p>
-                訂單、客戶與目前營運狀態集中管理。
-            </p>
-
-        </header>
-
-        <div class="mw-r5-legacy-body">
-
-<div class="shell">
-
-<main class="main">
+{% block content %}
+<div class="shell admin-dashboard-shell">
+<main class="main admin-dashboard-main">
 
     {% if message %}
-
-        <div class="notice success">
-            {{ message }}
-        </div>
-
+        <div class="notice success">{{ message }}</div>
     {% endif %}
 
     {% if error %}
-
-        <div class="notice error">
-            {{ error }}
-        </div>
-
+        <div class="notice error">{{ error }}</div>
     {% endif %}
 
     <section class="mobile-task-hub admin-mobile-task-hub" aria-label="客服快捷操作">
         <div class="mobile-task-hub-head">
             <div class="mobile-task-hub-copy">
                 <span class="mobile-task-hub-kicker">NEXT ACTION</span>
-                <h2>先處理現在最重要的事</h2>
-                <p>待確認、需注意、查單與查客戶都從這裡進，不再先翻完整訂單列表。</p>
+                <h2>常用操作</h2>
+                <p>查單、查客戶、客服與財務集中從這裡進入。</p>
             </div>
         </div>
         <div class="mobile-task-grid">
@@ -95,295 +42,85 @@
         </div>
     </section>
 
-    <section class="stats">
-
-        <div class="stat">
-
-            <span>
-                今日建立
-            </span>
-
-            <strong>
-                {{ stats.today }}
-            </strong>
-
-        </div>
-
-        <div class="stat">
-
-            <span>
-                目前進行
-            </span>
-
-            <strong>
-                {{ stats.active }}
-            </strong>
-
-        </div>
-
-        <div class="stat">
-
-            <span>
-                待客服確認
-            </span>
-
-            <strong>
-                {{ stats.pending_cs }}
-            </strong>
-
-        </div>
-
-        <div class="stat">
-
-            <span>
-                需注意
-            </span>
-
-            <strong>
-                {{ attention_orders | length }}
-            </strong>
-
-        </div>
-
-        <div class="stat">
-
-            <span>
-                總客戶
-            </span>
-
-            <strong>
-                {{ stats.customers }}
-            </strong>
-
-        </div>
-
-    </section>
-
-    <section class="queues">
-
-        <div class="panel">
-
+    <section class="queues admin-priority-queues" aria-label="客服優先待辦">
+        <div class="panel admin-priority-panel admin-priority-p0">
             <div class="panel-head">
-
-                <strong>
-                    待客服確認
-                </strong>
-
-                <span class="count">
-                    {{ pending_cs_orders | length }}
-                </span>
-
+                <strong>P0 · 需注意訂單</strong>
+                <span class="count">{{ attention_orders | length }}</span>
             </div>
-
             <div class="queue-list">
-
-                {% if pending_cs_orders %}
-
-                    {% for order in pending_cs_orders %}
-
-                        <a
-                            class="queue-row"
-                            href="/admin/order-workspace/{{ order.id }}"
-                        >
-
-                            <span class="queue-no">
-                                {{ order.order_no }}
-                            </span>
-
-                            <span class="queue-main">
-
-                                <strong>
-                                    {{ order.customer_name }}
-                                </strong>
-
-                                <small>
-                                    {{ order.item }}
-                                    ·
-                                    {{ order.amount }}T
-                                </small>
-
-                            </span>
-
-                            <span
-                                class="
-                                    badge
-                                    pending
-                                "
-                            >
-                                待確認
-                            </span>
-
-                        </a>
-
-                    {% endfor %}
-
-                {% else %}
-
-                    <div class="empty">
-                        目前沒有待客服確認訂單
-                    </div>
-
-                {% endif %}
-
-            </div>
-
-        </div>
-
-        <div class="panel">
-
-            <div class="panel-head">
-
-                <strong>
-                    需注意訂單
-                </strong>
-
-                <span class="count">
-                    {{ attention_orders | length }}
-                </span>
-
-            </div>
-
-            <div class="queue-list">
-
                 {% if attention_orders %}
-
                     {% for order in attention_orders %}
-
-                        <a
-                            class="queue-row"
-                            href="/admin/order-workspace/{{ order.id }}"
-                        >
-
-                            <span class="queue-no">
-                                {{ order.order_no }}
-                            </span>
-
+                        <a class="queue-row" href="/admin/order-workspace/{{ order.id }}">
+                            <span class="queue-no">{{ order.order_no }}</span>
                             <span class="queue-main">
-
-                                <strong>
-                                    {{ order.customer_name }}
-                                </strong>
-
-                                <small>
-                                    {{
-                                        order.attention_reason
-                                        or
-                                        "尚未填寫原因"
-                                    }}
-                                </small>
-
+                                <strong>{{ order.customer_name }}</strong>
+                                <small>{{ order.attention_reason or "尚未填寫原因" }}</small>
                             </span>
-
-                            <span
-                                class="
-                                    badge
-                                    cancelled
-                                "
-                            >
-                                注意
-                            </span>
-
+                            <span class="badge cancelled">注意</span>
                         </a>
-
                     {% endfor %}
-
                 {% else %}
-
-                    <div class="empty">
-                        目前沒有需注意訂單
-                    </div>
-
+                    <div class="empty">目前沒有需注意訂單</div>
                 {% endif %}
-
             </div>
-
         </div>
 
+        <div class="panel admin-priority-panel admin-priority-p1">
+            <div class="panel-head">
+                <strong>P1 · 待客服確認</strong>
+                <span class="count">{{ pending_cs_orders | length }}</span>
+            </div>
+            <div class="queue-list">
+                {% if pending_cs_orders %}
+                    {% for order in pending_cs_orders %}
+                        <a class="queue-row" href="/admin/order-workspace/{{ order.id }}">
+                            <span class="queue-no">{{ order.order_no }}</span>
+                            <span class="queue-main">
+                                <strong>{{ order.customer_name }}</strong>
+                                <small>{{ order.item }} · {{ order.amount }}T</small>
+                            </span>
+                            <span class="badge pending">待確認</span>
+                        </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty">目前沒有待客服確認訂單</div>
+                {% endif %}
+            </div>
+        </div>
     </section>
 
-    <section class="orders-panel">
+    <section class="stats admin-dashboard-stats" aria-label="營運摘要">
+        <div class="stat"><span>今日建立</span><strong>{{ stats.today }}</strong></div>
+        <div class="stat"><span>目前進行</span><strong>{{ stats.active }}</strong></div>
+        <div class="stat"><span>待客服確認</span><strong>{{ stats.pending_cs }}</strong></div>
+        <div class="stat"><span>需注意</span><strong>{{ attention_orders | length }}</strong></div>
+        <div class="stat"><span>總客戶</span><strong>{{ stats.customers }}</strong></div>
+    </section>
 
+    <section class="orders-panel admin-dashboard-orders">
         <div class="orders-top">
-
             <div>
-
-                <h2>
-                    訂單總覽
-                </h2>
-
-                <small>
-                    共 {{ filtered_count }} 筆符合條件
-                </small>
-
+                <h2>訂單總覽</h2>
+                <small>共 {{ filtered_count }} 筆符合條件</small>
             </div>
 
-            <form
-                class="filters"
-                method="get"
-                action="/admin"
-            >
-
-                <input
-                    class="input"
-                    type="search"
-                    name="q"
-                    value="{{ q }}"
-                    placeholder="搜尋訂單、客戶、Discord ID、商品..."
-                >
-
-                <select
-                    class="select"
-                    name="status"
-                >
-
-                    <option
-                        value="all"
-                        {% if selected_status == "all" %}
-                            selected
-                        {% endif %}
-                    >
-                        全部狀態
-                    </option>
-
+            <form class="filters" method="get" action="/admin">
+                <input class="input" type="search" name="q" value="{{ q }}" placeholder="搜尋訂單、客戶、Discord ID、商品...">
+                <select class="select" name="status">
+                    <option value="all" {% if selected_status == "all" %}selected{% endif %}>全部狀態</option>
                     {% for option in status_options %}
-
-                        <option
-                            value="{{ option.value }}"
-                            {% if selected_status == option.value %}
-                                selected
-                            {% endif %}
-                        >
-                            {{ option.label }}
-                        </option>
-
+                        <option value="{{ option.value }}" {% if selected_status == option.value %}selected{% endif %}>{{ option.label }}</option>
                     {% endfor %}
-
                 </select>
-
-                <button
-                    class="button"
-                    type="submit"
-                >
-                    篩選
-                </button>
-
+                <button class="button" type="submit">篩選</button>
                 {% if q or selected_status != "all" %}
-
-                    <a
-                        class="button"
-                        href="/admin"
-                    >
-                        清除
-                    </a>
-
+                    <a class="button" href="/admin">清除</a>
                 {% endif %}
-
             </form>
-
         </div>
 
         <div class="order-head">
-
             <div>訂單</div>
             <div>客戶</div>
             <div>服務</div>
@@ -391,163 +128,57 @@
             <div>狀態</div>
             <div>客服 / 時間</div>
             <div></div>
-
         </div>
 
         {% if orders %}
-
             {% for order in orders %}
-
                 <div class="order-row">
-
                     <div>
-
-                        <div class="order-no">
-                            {{ order.order_no }}
-                        </div>
-
-                        {% if order.needs_attention %}
-
-                            <div class="secondary">
-                                ⚠ 需注意
-                            </div>
-
-                        {% endif %}
-
+                        <div class="order-no">{{ order.order_no }}</div>
+                        {% if order.needs_attention %}<div class="secondary">⚠ 需注意</div>{% endif %}
                     </div>
 
                     <div>
-
-                        <div class="primary">
-                            {{ order.customer_name }}
-                        </div>
-
-                        <div class="secondary">
-                            {{ order.customer_id or "—" }}
-                        </div>
-
+                        <div class="primary">{{ order.customer_name }}</div>
+                        <div class="secondary">{{ order.customer_id or "—" }}</div>
                     </div>
 
                     <div class="order-item-col">
-
-                        <div class="primary">
-                            {{ order.item }}
-                        </div>
-
-                        <div class="secondary">
-                            {{ order.category }}
-                        </div>
-
+                        <div class="primary">{{ order.item }}</div>
+                        <div class="secondary">{{ order.category }}</div>
                     </div>
 
-                    <div class="money">
-                        {{ order.amount }}T
-                    </div>
+                    <div class="money">{{ order.amount }}T</div>
 
                     <div class="order-status-col">
-
-                        <span
-                            class="
-                                badge
-                                admin-order-status-badge
-                                {% if order.status == "stored" %}stored{% else %}{{ order.status_class }}{% endif %}
-                            "
-                        >
+                        <span class="badge admin-order-status-badge {% if order.status == "stored" %}stored{% else %}{{ order.status_class }}{% endif %}">
                             {% if order.status == "stored" %}已暫存{% else %}{{ order.status_label }}{% endif %}
                         </span>
-
                     </div>
 
-                    <div
-                        class="
-                            order-cs-col
-                            order-time-col
-                        "
-                    >
-
-                        <div class="primary">
-                            {{
-                                order.customer_service
-                                or
-                                "尚未指派"
-                            }}
-                        </div>
-
-                        <div class="secondary">
-                            {{ order.created_display }}
-                        </div>
-
+                    <div class="order-cs-col order-time-col">
+                        <div class="primary">{{ order.customer_service or "尚未指派" }}</div>
+                        <div class="secondary">{{ order.created_display }}</div>
                     </div>
 
                     <div>
-
-                        <a
-                            class="workspace"
-                            href="/admin/order-workspace/{{ order.id }}"
-                            title="開啟訂單工作區"
-                        >
-                            →
-                        </a>
-
+                        <a class="workspace" href="/admin/order-workspace/{{ order.id }}" title="開啟訂單工作區">→</a>
                     </div>
-
                 </div>
-
             {% endfor %}
-
         {% else %}
-
-            <div class="empty">
-                沒有符合條件的訂單
-            </div>
-
+            <div class="empty">沒有符合條件的訂單</div>
         {% endif %}
 
         <div class="pagination">
-
-            {% if prev_url %}
-
-                <a
-                    class="button"
-                    href="{{ prev_url }}"
-                >
-                    ← 上一頁
-                </a>
-
-            {% endif %}
-
-            <span>
-                {{ page }} / {{ page_count }}
-            </span>
-
-            {% if next_url %}
-
-                <a
-                    class="button"
-                    href="{{ next_url }}"
-                >
-                    下一頁 →
-                </a>
-
-            {% endif %}
-
+            {% if prev_url %}<a class="button" href="{{ prev_url }}">← 上一頁</a>{% endif %}
+            <span>{{ page }} / {{ page_count }}</span>
+            {% if next_url %}<a class="button" href="{{ next_url }}">下一頁 →</a>{% endif %}
         </div>
-
     </section>
 
 </main>
-
 </div>
 
-        </div>
-
-    </section>
-
-</div>
-<!-- BEGIN MAWAN_R8_ADMIN_DIRECT_WORKSPACE -->
 <script src="/static/js/pages/admin_dashboard.js?v=20261013"></script>
-<script src="/static/js/ui_tweaks.js?v=1"></script>
-<!-- END MAWAN_R8_ADMIN_DIRECT_WORKSPACE -->
-
-</body>
-</html>
+{% endblock %}
