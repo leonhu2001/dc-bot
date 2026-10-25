@@ -30,24 +30,29 @@
         return;
     }
 
+    // Keep the install entry discoverable even before Chromium supplies a native prompt.
+    button.classList.add('is-visible');
+
     window.addEventListener('beforeinstallprompt', (event) => {
         event.preventDefault();
         deferredPrompt = event;
-        button.classList.add('is-visible');
     });
 
     button.addEventListener('click', async () => {
         if (!deferredPrompt) {
+            window.alert('瀏覽器尚未提供一鍵安裝。請在 Chrome／Edge 右上角選單選「安裝魔丸娛樂」或使用網址列的安裝圖示。');
             return;
         }
 
         button.disabled = true;
         try {
             await deferredPrompt.prompt();
-            await deferredPrompt.userChoice;
-        } finally {
+            const choice = await deferredPrompt.userChoice;
             deferredPrompt = null;
-            button.classList.remove('is-visible');
+            if (choice?.outcome === 'accepted') {
+                button.classList.remove('is-visible');
+            }
+        } finally {
             button.disabled = false;
         }
     });
