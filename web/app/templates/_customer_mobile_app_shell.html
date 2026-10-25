@@ -20,9 +20,14 @@
     {% set _customer_title = '魔丸娛樂' %}
 {% endif %}
 
+<link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
+<script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
+
 <header class="customer-app-topbar" aria-label="魔丸娛樂行動版">
     <a class="customer-app-brand" href="/" aria-label="回到首頁">
-        <span class="customer-app-mark" aria-hidden="true">魔</span>
+        <span class="customer-app-mark" aria-hidden="true">
+            <img class="mobile-app-logo-image" src="/static/img/server_logo.gif" alt="">
+        </span>
         <span class="customer-app-title-wrap">
             <small>MOWAN</small>
             <strong>{{ _customer_title }}</strong>
@@ -32,7 +37,7 @@
     {% if user %}
     <a class="customer-app-account" href="/me" aria-label="前往我的專區">
         {% if user.avatar %}
-        <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=96" alt="">
+        <img class="mobile-app-logo-image" src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png?size=96" alt="">
         {% else %}
         <span>{{ _customer_name[:1] }}</span>
         {% endif %}
