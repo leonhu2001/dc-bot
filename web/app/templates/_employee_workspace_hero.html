@@ -4,6 +4,9 @@
 {% set _employee_name = _employee_store_name or (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
 {% set _employee_id = _employee_member.get('discord_id') or (user.id if user else '') %}
 
+<link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-1">
+{% include "_employee_mobile_app_shell.html" %}
+
 <div class="ec-hero employee-workspace-hero" data-employee-store-name="{{ _employee_store_name }}" data-employee-user-id="{{ _employee_id }}">
     <div>
         <div class="ec-k">EMPLOYEE CENTER</div>
