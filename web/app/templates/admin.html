@@ -47,17 +47,9 @@
 
         <div class="mw-r5-legacy-body">
 
-
-
 <div class="shell">
 
-
-
-
 <main class="main">
-
-    
-
 
     {% if message %}
 
@@ -67,7 +59,6 @@
 
     {% endif %}
 
-
     {% if error %}
 
         <div class="notice error">
@@ -76,6 +67,33 @@
 
     {% endif %}
 
+    <section class="mobile-task-hub admin-mobile-task-hub" aria-label="客服快捷操作">
+        <div class="mobile-task-hub-head">
+            <div class="mobile-task-hub-copy">
+                <span class="mobile-task-hub-kicker">NEXT ACTION</span>
+                <h2>先處理現在最重要的事</h2>
+                <p>待確認、需注意、查單與查客戶都從這裡進，不再先翻完整訂單列表。</p>
+            </div>
+        </div>
+        <div class="mobile-task-grid">
+            <a class="mobile-task-action is-primary" href="/admin/search">
+                <span class="mobile-task-icon" aria-hidden="true">⌕</span>
+                <span class="mobile-task-copy"><strong>搜尋訂單 / 客戶</strong><small>直接進工作區處理</small></span>
+            </a>
+            <a class="mobile-task-action" href="/admin/customer-center">
+                <span class="mobile-task-icon" aria-hidden="true">◎</span>
+                <span class="mobile-task-copy"><strong>查客戶</strong><small>VIP、錢包與備註</small></span>
+            </a>
+            <a class="mobile-task-action" href="/admin/support-center">
+                <span class="mobile-task-icon" aria-hidden="true">◌</span>
+                <span class="mobile-task-copy"><strong>客服中心</strong><small>票口、SLA 與知識庫</small></span>
+            </a>
+            <a class="mobile-task-action" href="/admin/finance-center">
+                <span class="mobile-task-icon" aria-hidden="true">＄</span>
+                <span class="mobile-task-copy"><strong>財務待辦</strong><small>付款、儲值與薪資</small></span>
+            </a>
+        </div>
+    </section>
 
     <section class="stats">
 
@@ -91,7 +109,6 @@
 
         </div>
 
-
         <div class="stat">
 
             <span>
@@ -103,7 +120,6 @@
             </strong>
 
         </div>
-
 
         <div class="stat">
 
@@ -117,7 +133,6 @@
 
         </div>
 
-
         <div class="stat">
 
             <span>
@@ -129,7 +144,6 @@
             </strong>
 
         </div>
-
 
         <div class="stat">
 
@@ -144,7 +158,6 @@
         </div>
 
     </section>
-
 
     <section class="queues">
 
@@ -162,7 +175,6 @@
 
             </div>
 
-
             <div class="queue-list">
 
                 {% if pending_cs_orders %}
@@ -178,7 +190,6 @@
                                 {{ order.order_no }}
                             </span>
 
-
                             <span class="queue-main">
 
                                 <strong>
@@ -192,7 +203,6 @@
                                 </small>
 
                             </span>
-
 
                             <span
                                 class="
@@ -219,7 +229,6 @@
 
         </div>
 
-
         <div class="panel">
 
             <div class="panel-head">
@@ -233,7 +242,6 @@
                 </span>
 
             </div>
-
 
             <div class="queue-list">
 
@@ -250,7 +258,6 @@
                                 {{ order.order_no }}
                             </span>
 
-
                             <span class="queue-main">
 
                                 <strong>
@@ -266,7 +273,6 @@
                                 </small>
 
                             </span>
-
 
                             <span
                                 class="
@@ -295,7 +301,6 @@
 
     </section>
 
-
     <section class="orders-panel">
 
         <div class="orders-top">
@@ -312,7 +317,6 @@
 
             </div>
 
-
             <form
                 class="filters"
                 method="get"
@@ -327,7 +331,6 @@
                     placeholder="搜尋訂單、客戶、Discord ID、商品..."
                 >
 
-
                 <select
                     class="select"
                     name="status"
@@ -341,7 +344,6 @@
                     >
                         全部狀態
                     </option>
-
 
                     {% for option in status_options %}
 
@@ -358,14 +360,12 @@
 
                 </select>
 
-
                 <button
                     class="button"
                     type="submit"
                 >
                     篩選
                 </button>
-
 
                 {% if q or selected_status != "all" %}
 
@@ -382,7 +382,6 @@
 
         </div>
 
-
         <div class="order-head">
 
             <div>訂單</div>
@@ -394,7 +393,6 @@
             <div></div>
 
         </div>
-
 
         {% if orders %}
 
@@ -418,7 +416,6 @@
 
                     </div>
 
-
                     <div>
 
                         <div class="primary">
@@ -430,7 +427,6 @@
                         </div>
 
                     </div>
-
 
                     <div class="order-item-col">
 
@@ -444,11 +440,9 @@
 
                     </div>
 
-
                     <div class="money">
                         {{ order.amount }}T
                     </div>
-
 
                     <div class="order-status-col">
 
@@ -463,7 +457,6 @@
                         </span>
 
                     </div>
-
 
                     <div
                         class="
@@ -485,7 +478,6 @@
                         </div>
 
                     </div>
-
 
                     <div>
 
@@ -511,7 +503,6 @@
 
         {% endif %}
 
-
         <div class="pagination">
 
             {% if prev_url %}
@@ -525,11 +516,9 @@
 
             {% endif %}
 
-
             <span>
                 {{ page }} / {{ page_count }}
             </span>
-
 
             {% if next_url %}
 
@@ -549,9 +538,6 @@
 </main>
 
 </div>
-
-
-
 
         </div>
 
