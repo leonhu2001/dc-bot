@@ -1,0 +1,167 @@
+/* Shared phone viewport edge normalization.
+   Keeps safe areas inside the app bars and removes leftover desktop frame gaps. */
+
+@media (max-width: 767px) {
+    html {
+        min-height: 100%;
+        margin: 0;
+        background: #0d0d10;
+    }
+
+    body.customer-mobile-app-site,
+    body.employee-workspace-site,
+    body:has(.employee-app-topbar),
+    body.mw-r5-admin {
+        --mw-mobile-topbar-h: 60px;
+        margin: 0 !important;
+        min-height: 100dvh !important;
+        padding-top: 0 !important;
+        background: #0d0d10 !important;
+    }
+
+    body.mw-r5-admin {
+        --mw-mobile-topbar-h: 62px;
+    }
+
+    /* Make the safe area part of the bar itself instead of leaving a strip around it. */
+    .customer-app-topbar,
+    .employee-app-topbar,
+    .admin-app-topbar {
+        width: 100% !important;
+        height: calc(var(--mw-mobile-topbar-h) + env(safe-area-inset-top)) !important;
+        min-height: calc(var(--mw-mobile-topbar-h) + env(safe-area-inset-top)) !important;
+        margin: 0 !important;
+        padding-top: env(safe-area-inset-top) !important;
+        padding-bottom: 0 !important;
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .customer-app-topbar {
+        padding-right: max(14px, env(safe-area-inset-right)) !important;
+        padding-left: max(14px, env(safe-area-inset-left)) !important;
+    }
+
+    .employee-app-topbar {
+        padding-right: max(14px, env(safe-area-inset-right)) !important;
+        padding-left: max(14px, env(safe-area-inset-left)) !important;
+    }
+
+    .admin-app-topbar {
+        padding-right: max(12px, env(safe-area-inset-right)) !important;
+        padding-left: max(12px, env(safe-area-inset-left)) !important;
+    }
+
+    .mobile-app-context-switch {
+        top: calc(var(--mw-mobile-topbar-h) + env(safe-area-inset-top)) !important;
+        margin: 0 !important;
+    }
+
+    /* Employee shell used to inherit .ec { margin: 52px auto 90px }. */
+    body.employee-workspace-site .site-main,
+    body:has(.employee-app-topbar) .site-main,
+    body.employee-workspace-site .employee-workspace-frame,
+    body:has(.employee-app-topbar) .employee-workspace-frame {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body.employee-workspace-site .site-main,
+    body:has(.employee-app-topbar) .site-main,
+    body.customer-mobile-app-site .site-main {
+        display: flow-root;
+    }
+
+    body.employee-workspace-site .employee-workspace-page-content,
+    body:has(.employee-app-topbar) .employee-workspace-page-content {
+        margin: 0 !important;
+        padding: 10px max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)) !important;
+    }
+
+    /* Remove the desktop 28/32/52px host padding that was still visible on admin mobile. */
+    body.mw-r5-admin .mw-r5-shell,
+    body.mw-r5-admin .mw-r5-main-host {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body.mw-r5-admin .mw-r5-content,
+    body.mw-r5-admin .mw-r5-legacy-body {
+        display: flow-root;
+        margin: 0 !important;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+
+    /* Fixed bottom bars reserve exactly the same space in the page as they occupy. */
+    body.customer-mobile-app-site {
+        padding-bottom: calc(68px + env(safe-area-inset-bottom)) !important;
+    }
+
+    body.employee-workspace-site,
+    body:has(.employee-app-topbar) {
+        padding-bottom: calc(68px + env(safe-area-inset-bottom)) !important;
+    }
+
+    body.mw-r5-admin {
+        padding-bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .customer-app-bottom-nav,
+    .employee-app-bottom-nav {
+        height: calc(68px + env(safe-area-inset-bottom)) !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding-top: 6px !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .admin-app-bottom-nav {
+        height: calc(70px + env(safe-area-inset-bottom)) !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding-top: 6px !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .customer-app-bottom-nav {
+        padding-right: max(6px, env(safe-area-inset-right)) !important;
+        padding-left: max(6px, env(safe-area-inset-left)) !important;
+    }
+
+    .employee-app-bottom-nav {
+        padding-right: max(6px, env(safe-area-inset-right)) !important;
+        padding-left: max(6px, env(safe-area-inset-left)) !important;
+    }
+
+    .admin-app-bottom-nav {
+        padding-right: max(6px, env(safe-area-inset-right)) !important;
+        padding-left: max(6px, env(safe-area-inset-left)) !important;
+    }
+
+    /* Stop first/last child margins from collapsing outside the mobile page frame. */
+    body.customer-mobile-app-site .site-main > :first-child,
+    body.employee-workspace-site .employee-workspace-page-content > :first-child,
+    body:has(.employee-app-topbar) .employee-workspace-page-content > :first-child,
+    body.mw-r5-admin .mw-r5-content > :first-child {
+        margin-top: 0 !important;
+    }
+
+    body.customer-mobile-app-site .site-main > :last-child,
+    body.employee-workspace-site .employee-workspace-page-content > :last-child,
+    body:has(.employee-app-topbar) .employee-workspace-page-content > :last-child,
+    body.mw-r5-admin .mw-r5-content > :last-child {
+        margin-bottom: 0 !important;
+    }
+}
