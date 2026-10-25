@@ -1,0 +1,558 @@
+/* Mobile QA repair layer.
+   Loaded after the three mobile shells and shared polish rules.
+   This file is intentionally phone-only and does not alter desktop layouts. */
+
+@media (max-width: 767px) {
+    :root {
+        --mw-mobile-bg: #0d0d10;
+        --mw-mobile-panel: #16161b;
+        --mw-mobile-panel-2: #1c1c22;
+        --mw-mobile-line: rgba(255,255,255,.10);
+        --mw-mobile-muted: rgba(245,245,247,.58);
+        --mw-mobile-text: #f5f5f7;
+        --mw-mobile-gold: #f0cf72;
+        --mw-mobile-gold-soft: rgba(240,207,114,.12);
+    }
+
+    /* ---------- Shared shell repairs ---------- */
+    body.customer-mobile-app-site,
+    body.employee-workspace-site,
+    body:has(.employee-app-topbar),
+    body.mw-r5-admin {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        background: var(--mw-mobile-bg) !important;
+        overflow-x: hidden !important;
+    }
+
+    .customer-app-topbar,
+    .employee-app-topbar,
+    .admin-app-topbar {
+        background: rgba(13,13,16,.94) !important;
+    }
+
+    .customer-app-mark,
+    .employee-app-mark,
+    .admin-app-home {
+        overflow: hidden;
+        padding: 0 !important;
+        background: #151519 !important;
+    }
+
+    .mobile-app-logo-image {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        border-radius: inherit;
+    }
+
+    /* Make employee <-> customer-service switching explicit and always reachable. */
+    .mobile-app-context-switch {
+        display: grid;
+        position: sticky;
+        top: calc(58px + env(safe-area-inset-top));
+        z-index: 1165;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+        width: 100%;
+        padding: 6px max(10px, env(safe-area-inset-right)) 7px max(10px, env(safe-area-inset-left));
+        border-bottom: 1px solid var(--mw-mobile-line);
+        background: rgba(13,13,16,.94);
+        backdrop-filter: blur(18px) saturate(130%);
+        -webkit-backdrop-filter: blur(18px) saturate(130%);
+    }
+
+    .mobile-app-context-switch a {
+        display: flex;
+        min-width: 0;
+        min-height: 38px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 9px;
+        border: 1px solid var(--mw-mobile-line);
+        border-radius: 11px;
+        background: rgba(255,255,255,.025);
+        color: var(--mw-mobile-muted);
+        font-size: 12px;
+        font-weight: 850;
+        text-align: center;
+        text-decoration: none;
+        touch-action: manipulation;
+    }
+
+    .mobile-app-context-switch a.is-active {
+        border-color: rgba(240,207,114,.32);
+        background: var(--mw-mobile-gold-soft);
+        color: var(--mw-mobile-gold);
+        box-shadow: inset 0 0 0 1px rgba(240,207,114,.05);
+    }
+
+    .mobile-app-context-switch a:active { transform: scale(.985); }
+
+    /* Fourth-batch pseudo overlays could intercept the whole screen without a close action. */
+    .employee-app-more[open]::before,
+    .admin-app-more[open]::before {
+        content: none !important;
+        display: none !important;
+        pointer-events: none !important;
+    }
+
+    .mobile-app-sheet-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100dvh;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: rgba(0,0,0,.54);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        cursor: default;
+    }
+
+    .employee-app-more[open] > .mobile-app-sheet-backdrop,
+    .admin-app-more[open] > .mobile-app-sheet-backdrop { display: block; }
+    .employee-app-more[open] > .mobile-app-sheet-backdrop { z-index: 1190; }
+    .admin-app-more[open] > .mobile-app-sheet-backdrop { z-index: 1440; }
+
+    .employee-app-more-panel,
+    .admin-app-more-panel {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .mobile-app-sheet-close {
+        display: grid;
+        flex: 0 0 36px;
+        width: 36px;
+        height: 36px;
+        min-height: 36px !important;
+        place-items: center;
+        padding: 0 !important;
+        border: 1px solid var(--mw-mobile-line);
+        border-radius: 11px;
+        background: rgba(255,255,255,.045);
+        color: var(--mw-mobile-text);
+        font-size: 21px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    /* Unified button/touch behavior. */
+    body.customer-mobile-app-site :is(button,.button,a.button,.order3-open,.order-price-next),
+    body.employee-workspace-site :is(button,.button,a.button,.ec-btn,.dispatch-action,.report-button,.it-btn,.sbm-btn),
+    body:has(.employee-app-topbar) :is(button,.button,a.button,.ec-btn,.dispatch-action,.report-button,.it-btn,.sbm-btn),
+    body.mw-r5-admin :is(button,.button,a.button,.workspace,.seal-button) {
+        min-height: 44px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body.customer-mobile-app-site :is(button,.button,a.button,.order3-open,.order-price-next):not(:disabled):active,
+    body.employee-workspace-site :is(button,.button,a.button,.ec-btn,.dispatch-action,.report-button,.it-btn,.sbm-btn):not(:disabled):active,
+    body:has(.employee-app-topbar) :is(button,.button,a.button,.ec-btn,.dispatch-action,.report-button,.it-btn,.sbm-btn):not(:disabled):active,
+    body.mw-r5-admin :is(button,.button,a.button,.workspace,.seal-button):not(:disabled):active {
+        transform: scale(.985);
+    }
+
+    body.customer-mobile-app-site :is(button,input,select,textarea):disabled,
+    body.employee-workspace-site :is(button,input,select,textarea):disabled,
+    body:has(.employee-app-topbar) :is(button,input,select,textarea):disabled,
+    body.mw-r5-admin :is(button,input,select,textarea):disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    /* ---------- Employee / reports / payouts ---------- */
+    body.employee-workspace-site .site-main,
+    body:has(.employee-app-topbar) .site-main,
+    .employee-workspace-site .employee-workspace-frame,
+    .employee-workspace-site .employee-workspace-page-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        background: var(--mw-mobile-bg) !important;
+    }
+
+    .employee-workspace-site .employee-workspace-page-content {
+        margin-top: 0 !important;
+        padding-top: 10px !important;
+    }
+
+    .employee-workspace-site :is(.dispatch-shell,.report-shell,.report-detail-shell,.my-payout-page,.it-wrap,.sbm) {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        overflow: visible;
+    }
+
+    /* Reporting: remove desktop min-content sizing and horizontal gutters. */
+    .employee-workspace-site .report-shell {
+        gap: 10px !important;
+    }
+
+    .employee-workspace-site .report-hero,
+    .employee-workspace-site .report-section,
+    .employee-workspace-site .report-card,
+    .employee-workspace-site .report-empty,
+    .employee-workspace-site .report-order-summary,
+    .employee-workspace-site .report-reminder-panel,
+    .employee-workspace-site .report-review-topbar,
+    .employee-workspace-site .report-trace-details {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        border-radius: 16px !important;
+        background: var(--mw-mobile-panel) !important;
+        box-shadow: none !important;
+    }
+
+    .employee-workspace-site .report-hero {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        align-items: start !important;
+        gap: 10px !important;
+        margin: 0 !important;
+        padding: 14px !important;
+    }
+
+    .employee-workspace-site .report-hero > .report-button,
+    .employee-workspace-site .report-hero-actions,
+    .employee-workspace-site .report-card-action,
+    .employee-workspace-site .report-card-action .report-button {
+        width: 100% !important;
+    }
+
+    .employee-workspace-site .report-hero h2 {
+        overflow-wrap: anywhere;
+        font-size: 22px !important;
+        line-height: 1.25 !important;
+    }
+
+    .employee-workspace-site .report-filter-bar,
+    .employee-workspace-site .report-two-column,
+    .employee-workspace-site .report-worker-row,
+    .employee-workspace-site .report-worker-service-row,
+    .employee-workspace-site .report-recording-block,
+    .employee-workspace-site .report-recording-fields,
+    .employee-workspace-site .report-review-workspace,
+    .employee-workspace-site .report-review-worker-row,
+    .employee-workspace-site .report-review-recording-block,
+    .employee-workspace-site .report-review-recording-fields {
+        grid-template-columns: 1fr !important;
+    }
+
+    .employee-workspace-site :is(.report-filter-bar,.report-form,.report-form-fieldset,.report-worker-service-list,.report-worker-service-row,.report-recording-block,.report-recording-fields,.report-review-form,.report-review-workspace) {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .employee-workspace-site .report-form-fieldset { min-inline-size: 0 !important; }
+
+    .employee-workspace-site .report-filter-bar :is(input,select,button),
+    .employee-workspace-site .report-field :is(input,select,textarea),
+    .employee-workspace-site .report-worker-service-row select,
+    .employee-workspace-site .report-worker-service-row input,
+    .employee-workspace-site .report-recording-fields input {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        font-size: 16px !important;
+    }
+
+    .employee-workspace-site .report-card {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        padding: 13px !important;
+    }
+
+    .employee-workspace-site .report-card-title-row,
+    .employee-workspace-site .report-section-head {
+        flex-wrap: wrap;
+        gap: 8px !important;
+    }
+
+    .employee-workspace-site .report-card-title-row > div { min-width: 0; }
+    .employee-workspace-site .report-card-title-row h3 { overflow-wrap: anywhere; }
+
+    .employee-workspace-site .report-meta-grid,
+    .employee-workspace-site .report-meta-grid-four,
+    .employee-workspace-site .report-order-summary {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 7px !important;
+    }
+
+    .employee-workspace-site .report-meta-grid > div,
+    .employee-workspace-site .report-order-summary > div {
+        min-width: 0;
+        padding: 9px 10px !important;
+    }
+
+    .employee-workspace-site .report-meta-grid strong,
+    .employee-workspace-site .report-order-summary strong { overflow-wrap: anywhere; }
+
+    .employee-workspace-site .report-section { padding: 13px !important; }
+    .employee-workspace-site .report-worker-service-row { gap: 9px !important; padding: 11px !important; }
+    .employee-workspace-site .report-worker-stream-url { grid-column: auto !important; }
+    .employee-workspace-site .report-recording-block { gap: 10px !important; }
+    .employee-workspace-site .report-choice-grid { grid-template-columns: 1fr 1fr !important; }
+    .employee-workspace-site .report-choice-grid label { min-height: 44px; }
+    .employee-workspace-site .report-action-bar { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+    .employee-workspace-site .report-action-bar :is(.report-button,button) { width: 100% !important; }
+    .employee-workspace-site .report-audit-list > div { grid-template-columns: 1fr !important; }
+
+    /* Payouts: table becomes phone-native cards instead of a 900px horizontal table. */
+    .employee-workspace-site .my-payout-page {
+        display: grid;
+        gap: 10px !important;
+    }
+
+    .employee-workspace-site .my-payout-command,
+    .employee-workspace-site .my-payout-filter {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+
+    .employee-workspace-site .my-payout-card,
+    .employee-workspace-site .my-payout-total-card,
+    .employee-workspace-site .payout-summary-list-section,
+    .employee-workspace-site .summary-person-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 16px !important;
+        background: var(--mw-mobile-panel) !important;
+        box-shadow: none !important;
+    }
+
+    .employee-workspace-site .my-payout-intro,
+    .employee-workspace-site .my-payout-filter-card { padding: 14px !important; }
+    .employee-workspace-site .my-payout-intro::after { display: none !important; }
+    .employee-workspace-site .my-payout-intro h2 { font-size: 24px !important; letter-spacing: .03em !important; }
+
+    .employee-workspace-site .my-payout-total-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+    }
+
+    .employee-workspace-site .my-payout-total-card {
+        min-height: 94px !important;
+        padding: 13px !important;
+    }
+
+    .employee-workspace-site .my-payout-total-card span { margin-bottom: 7px !important; font-size: 11px !important; }
+    .employee-workspace-site .my-payout-total-card strong { font-size: 27px !important; }
+
+    .employee-workspace-site .payout-summary-list-section { padding: 12px !important; }
+    .employee-workspace-site .summary-list-title { font-size: 20px !important; }
+    .employee-workspace-site .summary-person-card { margin-top: 10px !important; padding: 12px !important; }
+
+    .employee-workspace-site .summary-person-head {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    .employee-workspace-site .summary-person-title { gap: 10px !important; }
+    .employee-workspace-site .summary-id { font-size: 11px !important; }
+    .employee-workspace-site .summary-person-meta {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 7px !important;
+        width: 100%;
+    }
+    .employee-workspace-site .summary-pill { min-width: 0 !important; padding: 9px 10px !important; text-align: left !important; }
+    .employee-workspace-site .summary-pill strong { font-size: 19px !important; }
+
+    .employee-workspace-site .summary-items {
+        width: 100%;
+        max-width: 100%;
+        margin-top: 10px !important;
+        overflow: visible !important;
+    }
+
+    .employee-workspace-site .summary-table,
+    .employee-workspace-site .summary-table tbody {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .employee-workspace-site .summary-table thead { display: none !important; }
+
+    .employee-workspace-site .summary-table tbody tr {
+        display: grid !important;
+        grid-template-columns: minmax(0,1fr) auto !important;
+        gap: 8px 10px !important;
+        width: 100% !important;
+        margin: 8px 0 0 !important;
+        padding: 11px !important;
+        border: 1px solid var(--mw-mobile-line);
+        border-radius: 14px;
+        background: rgba(255,255,255,.025);
+    }
+
+    .employee-workspace-site .summary-table tbody td {
+        display: block !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+
+    .employee-workspace-site .summary-table tbody td::before {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--mw-mobile-muted);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: .04em;
+    }
+
+    .employee-workspace-site .summary-table tbody td:nth-child(1)::before { content: "訂單"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(2)::before { content: "結單日期"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(3)::before { content: "老闆"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(4)::before { content: "項目"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(5)::before { content: "身分"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(6)::before { content: "狀態"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(7)::before { content: "金額"; }
+    .employee-workspace-site .summary-table tbody td:nth-child(1) { grid-column: 1; }
+    .employee-workspace-site .summary-table tbody td:nth-child(7) { grid-column: 2; text-align: right; font-weight: 900; }
+    .employee-workspace-site .summary-table tbody td:nth-child(4) { grid-column: 1 / -1; }
+
+    /* ---------- Customer-service / admin ---------- */
+    body.mw-r5-admin .mw-r5-shell,
+    body.mw-r5-admin .mw-r5-main-host,
+    body.mw-r5-admin .mw-r5-content,
+    body.mw-r5-admin .mw-r5-legacy-body,
+    body.mw-r5-admin .mw-r5-legacy-body > .shell,
+    body.mw-r5-admin .mw-r5-legacy-body main.main,
+    body.mw-r5-admin main.page {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        background: var(--mw-mobile-bg) !important;
+    }
+
+    body.mw-r5-admin .mw-r5-content,
+    body.mw-r5-admin .mw-r5-legacy-body {
+        padding: 9px max(9px,env(safe-area-inset-right)) 18px max(9px,env(safe-area-inset-left)) !important;
+    }
+
+    body.mw-r5-admin :is(.panel,.orders-panel,.stat,.card,.history-ledger-panel,.history-ledger-stat) {
+        max-width: 100%;
+        min-width: 0;
+        background-color: var(--mw-mobile-panel) !important;
+    }
+
+    body.mw-r5-admin :is(form,fieldset,.filters,.admin-add-worker-form) {
+        max-width: 100%;
+        min-width: 0;
+    }
+    body.mw-r5-admin fieldset { min-inline-size: 0; }
+
+    body.mw-r5-admin :is(input,select,textarea) {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        font-size: 16px !important;
+    }
+
+    body.mw-r5-admin .mw-r5-legacy-body .order-row {
+        grid-template-columns: minmax(0,1fr) auto !important;
+        grid-template-areas:
+            "number status"
+            "customer customer"
+            "service service"
+            "amount support"
+            "action action" !important;
+        gap: 9px 10px !important;
+        cursor: pointer;
+    }
+
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(1) { grid-area: number !important; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(2) { grid-area: customer !important; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(3) { grid-area: service !important; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(4) { grid-area: amount !important; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(5) { grid-area: status !important; justify-self: end; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(6) { grid-area: support !important; text-align: right; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(7) { grid-area: action !important; }
+
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(4)::before { content: "金額"; }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row > div:nth-child(6)::before { content: "客服 / 建立時間"; }
+
+    body.mw-r5-admin .mw-r5-legacy-body .order-row .workspace {
+        position: relative;
+        z-index: 2;
+        min-height: 46px !important;
+        pointer-events: auto !important;
+    }
+
+    body.mw-r5-admin .mw-r5-legacy-body .queue-row {
+        min-height: 64px !important;
+        border-radius: 12px;
+        touch-action: manipulation;
+    }
+
+    body.mw-r5-admin :is(.table-wrap,[class*="table-wrap"],[class*="table-scroll"],[class*="scroll-wrap"]) {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: auto !important;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.mw-r5-admin .pagination {
+        gap: 7px !important;
+    }
+
+    body.mw-r5-admin .pagination .button {
+        min-width: 0;
+        padding-left: 9px !important;
+        padding-right: 9px !important;
+    }
+
+    body.mw-r5-admin main.page .layout,
+    body.mw-r5-admin main.page .grid {
+        min-width: 0 !important;
+    }
+
+    body.mw-r5-admin .mw-admin-backbar {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    body.mw-r5-admin .mw-admin-backbar::-webkit-scrollbar { display: none; }
+}
+
+@media (max-width: 480px) {
+    .employee-workspace-site .report-meta-grid,
+    .employee-workspace-site .report-meta-grid-four,
+    .employee-workspace-site .report-order-summary,
+    body.mw-r5-admin main.page .grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .employee-workspace-site .summary-table tbody tr { grid-template-columns: 1fr 1fr !important; }
+}
+
+@media (max-width: 360px) {
+    .mobile-app-context-switch { grid-template-columns: 1fr; }
+    .employee-workspace-site .my-payout-total-grid,
+    .employee-workspace-site .summary-person-meta { grid-template-columns: 1fr !important; }
+    .employee-workspace-site .summary-table tbody tr { grid-template-columns: 1fr !important; }
+    .employee-workspace-site .summary-table tbody td:nth-child(1),
+    .employee-workspace-site .summary-table tbody td:nth-child(7) { grid-column: 1 !important; text-align: left; }
+}
