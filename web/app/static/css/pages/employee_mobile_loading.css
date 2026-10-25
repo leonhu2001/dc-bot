@@ -1,0 +1,73 @@
+/* Employee mobile loading-state guard. Prevent placeholders from behaving like page overlays. */
+@media (max-width: 767px) {
+  body.employee-workspace-site :is(.salary-loading,.salary-empty,.employee-load-state),
+  body:has(.employee-app-topbar) :is(.salary-loading,.salary-empty,.employee-load-state) {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 14px 12px !important;
+    overflow: visible !important;
+    pointer-events: auto !important;
+    z-index: auto !important;
+  }
+
+  body.employee-workspace-site .salary-list,
+  body:has(.employee-app-topbar) .salary-list {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  body.employee-workspace-site .binding-card.loading,
+  body:has(.employee-app-topbar) .binding-card.loading {
+    position: relative !important;
+    min-height: 0 !important;
+    height: auto !important;
+    opacity: .92 !important;
+    pointer-events: auto !important;
+    overflow: visible !important;
+  }
+
+  body.employee-workspace-site .binding-card.loading::before,
+  body.employee-workspace-site .binding-card.loading::after,
+  body:has(.employee-app-topbar) .binding-card.loading::before,
+  body:has(.employee-app-topbar) .binding-card.loading::after {
+    pointer-events: none !important;
+  }
+
+  .employee-load-state {
+    display: grid !important;
+    gap: 9px !important;
+    place-items: start stretch !important;
+    color: rgba(235,232,222,.58) !important;
+    line-height: 1.5 !important;
+    text-align: left !important;
+  }
+
+  .employee-load-message { display: block; }
+
+  .employee-load-retry {
+    display: inline-flex !important;
+    width: 100% !important;
+    min-height: 44px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 4px 0 0 !important;
+    padding: 0 12px !important;
+    border: 1px solid rgba(240,207,114,.28) !important;
+    border-radius: 12px !important;
+    background: rgba(240,207,114,.10) !important;
+    color: #f0cf72 !important;
+    font-weight: 850 !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+  }
+
+  body.employee-workspace-site [aria-busy="true"],
+  body:has(.employee-app-topbar) [aria-busy="true"] {
+    pointer-events: auto !important;
+  }
+}
