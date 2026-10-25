@@ -250,7 +250,7 @@ def test_core_admin_pages_no_longer_embed_visual_override_blocks():
 
 def test_dashboard_has_no_literal_newline_and_support_rows_have_no_link_underline():
     dashboard = (TEMPLATES / "admin.html").read_text(encoding="utf-8")
-    center_css = (ROOT / "web/app/static/css/pages/admin_center_inline_1.css").read_text(encoding="utf-8")
+    center_css = (ROOT / "web/app/static/css/pages/admin_center.css").read_text(encoding="utf-8")
 
     assert "\\n</head>" not in dashboard
     assert ".center-row{" in center_css
