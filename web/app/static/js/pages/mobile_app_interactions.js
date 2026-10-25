@@ -1,6 +1,8 @@
 (() => {
   'use strict';
 
+  const MOBILE_QUERY = '(max-width: 767px)';
+  const mobileMedia = window.matchMedia(MOBILE_QUERY);
   const SHEET_SELECTOR = 'details.employee-app-more, details.admin-app-more';
   const INTERACTIVE_SELECTOR = 'a,button,input,select,textarea,label,summary,[role="button"]';
 
@@ -62,28 +64,84 @@
   function bindAdminOrderCards() {
     document.querySelectorAll('body.mw-r5-admin .mw-r5-legacy-body .order-row').forEach((row) => {
       const link = row.querySelector('a.workspace[href]');
-      if (!link) return;
+      if (!link || row.dataset.mobileOrderBound === '1') return;
+      row.dataset.mobileOrderBound = '1';
 
-      row.classList.add('is-mobile-clickable');
-      row.setAttribute('role', 'link');
-      row.setAttribute('tabindex', '0');
-      row.setAttribute('aria-label', link.title || '開啟訂單工作區');
+      const syncSemantics = () => {
+        if (mobileMedia.matches) {
+          row.classList.add('is-mobile-clickable');
+          row.setAttribute('role', 'link');
+          row.setAttribute('tabindex', '0');
+          row.setAttribute('aria-label', link.title || '開啟訂單工作區');
+        } else {
+          row.classList.remove('is-mobile-clickable');
+          row.removeAttribute('role');
+          row.removeAttribute('tabindex');
+          row.removeAttribute('aria-label');
+        }
+      };
 
       const open = () => {
-        if (link.href) window.location.assign(link.href);
+        if (mobileMedia.matches && link.href) window.location.assign(link.href);
       };
 
       row.addEventListener('click', (event) => {
-        if (event.target.closest(INTERACTIVE_SELECTOR)) return;
+        if (!mobileMedia.matches || event.target.closest(INTERACTIVE_SELECTOR)) return;
         open();
       });
 
       row.addEventListener('keydown', (event) => {
-        if (event.target !== row) return;
+        if (!mobileMedia.matches || event.target !== row) return;
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
         open();
       });
+
+      mobileMedia.addEventListener?.('change', syncSemantics);
+      syncSemantics();
+    });
+  }
+
+  function syncHistoryWorkspaceLinks() {
+    document.querySelectorAll('.history-workspace-mobile-link').forEach((link) => link.remove());
+    document.querySelectorAll('.history-ledger-action[data-mobile-action-grid="1"]').forEach((cell) => {
+      cell.style.removeProperty('display');
+      cell.style.removeProperty('grid-template-columns');
+      cell.style.removeProperty('gap');
+      delete cell.dataset.mobileActionGrid;
+    });
+
+    if (!mobileMedia.matches) return;
+
+    document.querySelectorAll('body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)').forEach((row) => {
+      const orderId = row.querySelector('input[type="hidden"][name="order_id"]')?.value;
+      const actionCell = row.querySelector('.history-ledger-action');
+      if (!orderId || !actionCell) return;
+
+      const link = document.createElement('a');
+      link.className = 'button secondary history-workspace-mobile-link';
+      link.href = `/admin/order-workspace/${encodeURIComponent(orderId)}`;
+      link.textContent = '開啟訂單';
+      link.style.display = 'flex';
+      link.style.width = '100%';
+      link.style.minHeight = '44px';
+      link.style.alignItems = 'center';
+      link.style.justifyContent = 'center';
+      link.style.textDecoration = 'none';
+
+      actionCell.dataset.mobileActionGrid = '1';
+      actionCell.style.display = 'grid';
+      actionCell.style.gridTemplateColumns = '1fr 1fr';
+      actionCell.style.gap = '7px';
+      actionCell.appendChild(link);
+    });
+  }
+
+  function bindResponsiveEnhancements() {
+    syncHistoryWorkspaceLinks();
+    mobileMedia.addEventListener?.('change', () => {
+      closeAllSheets();
+      syncHistoryWorkspaceLinks();
     });
   }
 
@@ -97,6 +155,7 @@
     bindSheets();
     bindEscapeAndPageRestore();
     bindAdminOrderCards();
+    bindResponsiveEnhancements();
     bindPressedStateCleanup();
   }
 
