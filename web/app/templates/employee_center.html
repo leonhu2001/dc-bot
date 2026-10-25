@@ -16,6 +16,34 @@
     <div class="ec-alert error">{{ request.query_params.get('error') }}</div>
     {% endif %}
 
+    <section class="mobile-task-hub employee-mobile-task-hub" aria-label="員工快捷操作">
+        <div class="mobile-task-hub-head">
+            <div class="mobile-task-hub-copy">
+                <span class="mobile-task-hub-kicker">TODAY</span>
+                <h2>現在要做什麼？</h2>
+                <p>接單、報單與薪資放在第一屏，不用先翻過制度說明。</p>
+            </div>
+        </div>
+        <div class="mobile-task-grid">
+            <a class="mobile-task-action is-primary" href="/dispatch">
+                <span class="mobile-task-icon" aria-hidden="true">⚡</span>
+                <span class="mobile-task-copy"><strong>去接單</strong><small>查看目前可接任務</small></span>
+            </a>
+            <a class="mobile-task-action" href="/dispatch/reports">
+                <span class="mobile-task-icon" aria-hidden="true">✎</span>
+                <span class="mobile-task-copy"><strong>去報單</strong><small>結單後填寫紀錄</small></span>
+            </a>
+            <a class="mobile-task-action" href="/my/payouts">
+                <span class="mobile-task-icon" aria-hidden="true">＄</span>
+                <span class="mobile-task-copy"><strong>看薪資</strong><small>發放狀態與明細</small></span>
+            </a>
+            <a class="mobile-task-action" href="/employee/internal-transfers">
+                <span class="mobile-task-icon" aria-hidden="true">⇄</span>
+                <span class="mobile-task-copy"><strong>內部轉帳</strong><small>員工間款項調整</small></span>
+            </a>
+        </div>
+    </section>
+
     <div class="ec-overview">
         <div class="ec-stat"><span>服務訂單</span><b>{{ stats.orders }}</b></div>
         <div class="ec-stat"><span>評價</span><b>{{ stats.reviews }}</b></div>
@@ -98,6 +126,11 @@
                 <div class="salary-sub" id="salaryLifetimeSub">包含已發放與待發放</div>
             </div>
         </div>
+
+        <a class="mobile-task-action employee-home-salary-link" href="/my/payouts">
+            <span class="mobile-task-icon" aria-hidden="true">→</span>
+            <span class="mobile-task-copy"><strong>查看完整薪資明細</strong><small>月份、狀態與每筆分潤</small></span>
+        </a>
 
         <div class="salary-tabs" role="tablist" aria-label="薪資分類">
             <button class="salary-tab active" type="button" data-filter="all">全部 <span class="count" data-count="all">0</span></button>
