@@ -101,11 +101,16 @@ def _install_paid_ticket_prefix_policy() -> None:
 
 
 def install_order_ticket_ui_policy() -> None:
-    """Install order-ticket naming policy without owning Quick Order View patches."""
+    """Install all order-ticket naming policies without owning Quick Order Views."""
     global _INSTALLED
     if _INSTALLED:
         return
 
+    # order_runtime keeps a direct alias to the payment finalizer. The rich-name
+    # hook must therefore update both runtimes before this policy is marked installed.
+    from services import order_runtime
+
+    install_payment_finalize_rename_policy(order_runtime)
     _install_paid_ticket_prefix_policy()
     _INSTALLED = True
 
