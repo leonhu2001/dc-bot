@@ -1,0 +1,95 @@
+{% set _admin_app_path = request.url.path %}
+{% set _admin_app_user = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '客服' %}
+{% if _admin_app_path == '/admin' %}
+    {% set _admin_app_title = '客服工作台' %}
+{% elif _admin_app_path.startswith('/admin/orders/history') or _admin_app_path.startswith('/admin/order-workspace') %}
+    {% set _admin_app_title = '訂單管理' %}
+{% elif _admin_app_path.startswith('/admin/customer-center') or _admin_app_path.startswith('/admin/customers') or _admin_app_path.startswith('/admin/wallets') or _admin_app_path.startswith('/admin/reviews') %}
+    {% set _admin_app_title = '客戶中心' %}
+{% elif _admin_app_path.startswith('/admin/support-center') or _admin_app_path.startswith('/admin/tickets') or _admin_app_path.startswith('/admin/support-calls') or _admin_app_path.startswith('/admin/ai-support-knowledge') %}
+    {% set _admin_app_title = '客服中心' %}
+{% elif _admin_app_path.startswith('/admin/finance-center') or _admin_app_path.startswith('/admin/payment-reviews') or _admin_app_path.startswith('/admin/topups') or _admin_app_path.startswith('/admin/payout') or _admin_app_path.startswith('/admin/accounting-reconciliation') %}
+    {% set _admin_app_title = '財務中心' %}
+{% elif _admin_app_path.startswith('/admin/staff') %}
+    {% set _admin_app_title = '人員中心' %}
+{% elif _admin_app_path.startswith('/admin/vip-timers') %}
+    {% set _admin_app_title = 'VIP 自由計時' %}
+{% elif _admin_app_path.startswith('/admin/fun-orders') or _admin_app_path.startswith('/admin/roulette') %}
+    {% set _admin_app_title = '趣味單管理' %}
+{% elif _admin_app_path.startswith('/admin/search') %}
+    {% set _admin_app_title = '全域搜尋' %}
+{% else %}
+    {% set _admin_app_title = '營運管理' %}
+{% endif %}
+
+<header class="admin-app-topbar" aria-label="客服行動工作台">
+    <a class="admin-app-home" href="/admin" aria-label="返回客服工作台">
+        <span aria-hidden="true">魔</span>
+    </a>
+    <div class="admin-app-title">
+        <small>魔丸客服後台</small>
+        <strong>{{ _admin_app_title }}</strong>
+    </div>
+    <a class="admin-app-search" href="/admin/search" aria-label="全域搜尋">⌕</a>
+</header>
+
+<nav class="admin-app-bottom-nav" aria-label="客服 App 主要導覽">
+    <a class="admin-app-nav-item{% if _admin_app_path == '/admin' %} is-active{% endif %}" href="/admin">
+        <span class="admin-app-nav-icon" aria-hidden="true">⌂</span>
+        <span>工作台</span>
+    </a>
+    <a class="admin-app-nav-item{% if _admin_app_path.startswith('/admin/orders/history') or _admin_app_path.startswith('/admin/order-workspace') %} is-active{% endif %}" href="/admin/orders/history">
+        <span class="admin-app-nav-icon" aria-hidden="true">▤</span>
+        <span>訂單</span>
+    </a>
+    <a class="admin-app-nav-item{% if _admin_app_path.startswith('/admin/customer-center') or _admin_app_path.startswith('/admin/customers') or _admin_app_path.startswith('/admin/wallets') or _admin_app_path.startswith('/admin/reviews') %} is-active{% endif %}" href="/admin/customer-center">
+        <span class="admin-app-nav-icon" aria-hidden="true">◎</span>
+        <span>客戶</span>
+    </a>
+    <a class="admin-app-nav-item{% if _admin_app_path.startswith('/admin/support-center') or _admin_app_path.startswith('/admin/tickets') or _admin_app_path.startswith('/admin/support-calls') or _admin_app_path.startswith('/admin/ai-support-knowledge') %} is-active{% endif %}" href="/admin/support-center">
+        <span class="admin-app-nav-icon" aria-hidden="true">◌</span>
+        <span>客服</span>
+    </a>
+    <details class="admin-app-more{% if _admin_app_path != '/admin' and not (_admin_app_path.startswith('/admin/orders/history') or _admin_app_path.startswith('/admin/order-workspace') or _admin_app_path.startswith('/admin/customer-center') or _admin_app_path.startswith('/admin/customers') or _admin_app_path.startswith('/admin/wallets') or _admin_app_path.startswith('/admin/reviews') or _admin_app_path.startswith('/admin/support-center') or _admin_app_path.startswith('/admin/tickets') or _admin_app_path.startswith('/admin/support-calls') or _admin_app_path.startswith('/admin/ai-support-knowledge')) %} is-active{% endif %}">
+        <summary class="admin-app-nav-item">
+            <span class="admin-app-nav-icon" aria-hidden="true">☰</span>
+            <span>更多</span>
+        </summary>
+        <section class="admin-app-more-panel" aria-label="更多管理功能">
+            <div class="admin-app-sheet-handle" aria-hidden="true"></div>
+            <div class="admin-app-sheet-head">
+                <div><small>OPERATIONS</small><strong>更多功能</strong></div>
+                <span>{{ _admin_app_user }}</span>
+            </div>
+            <div class="admin-app-sheet-groups">
+                <div class="admin-app-sheet-group">
+                    <small>營運</small>
+                    <div class="admin-app-sheet-links">
+                        <a href="/admin/staff-center"><span>♙</span><strong>人員中心</strong><small>陪玩與客服</small></a>
+                        <a href="/admin/vip-timers"><span>◷</span><strong>VIP 計時</strong><small>自由計時單</small></a>
+                        <a href="/admin/fun-orders"><span>◇</span><strong>趣味單</strong><small>活動與輪盤</small></a>
+                        <a href="/admin/finance-center"><span>＄</span><strong>財務中心</strong><small>付款與薪資</small></a>
+                    </div>
+                </div>
+                {% if user and user.is_manager %}
+                <div class="admin-app-sheet-group">
+                    <small>管理設定</small>
+                    <div class="admin-app-sheet-links">
+                        <a href="/admin/benefits"><span>％</span><strong>優惠福利</strong><small>券與會員福利</small></a>
+                        <a href="/admin/order-rules"><span>⚙</span><strong>商品規則</strong><small>價格與資格</small></a>
+                        <a href="/admin/anomalies"><span>!</span><strong>系統維運</strong><small>健康與異常</small></a>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="admin-app-sheet-group">
+                    <small>其他</small>
+                    <div class="admin-app-sheet-links">
+                        <a href="/admin/search"><span>⌕</span><strong>全域搜尋</strong><small>訂單與客戶</small></a>
+                        <a href="/"><span>↗</span><strong>返回官網</strong><small>魔丸娛樂首頁</small></a>
+                        <a class="admin-app-sheet-logout" href="/auth/logout"><span>⏻</span><strong>登出</strong><small>結束目前登入</small></a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </details>
+</nav>

@@ -1,0 +1,414 @@
+/* Mobile-only app shell for the customer-service/admin backoffice. Desktop rules stay untouched. */
+.admin-app-topbar,
+.admin-app-bottom-nav{display:none}
+
+@media (max-width:767px){
+    :root{
+        --admin-app-bg:#09090b;
+        --admin-app-surface:rgba(21,21,25,.97);
+        --admin-app-surface-2:rgba(31,31,37,.98);
+        --admin-app-line:rgba(255,255,255,.10);
+        --admin-app-muted:rgba(245,245,247,.58);
+        --admin-app-text:#f5f5f7;
+        --admin-app-accent:#f0cf72;
+        --admin-app-accent-soft:rgba(240,207,114,.14);
+        --admin-app-danger:#ff9c9c;
+        --admin-app-nav-h:70px;
+    }
+
+    html{background:var(--admin-app-bg);scroll-padding-top:68px}
+    body.mw-r5-admin{
+        min-width:0!important;
+        min-height:100dvh;
+        background:var(--admin-app-bg)!important;
+        padding-bottom:calc(var(--admin-app-nav-h) + env(safe-area-inset-bottom));
+        overflow-x:clip!important;
+    }
+
+    body.mw-r5-admin .mw-r5-shell{
+        display:block!important;
+        width:100%!important;
+        min-width:0!important;
+        min-height:100dvh!important;
+        height:auto!important;
+        overflow:visible!important;
+    }
+    body.mw-r5-admin .mw-r5-sidebar{display:none!important}
+    body.mw-r5-admin .mw-r5-main-host{
+        width:100%!important;
+        max-width:none!important;
+        min-width:0!important;
+        min-height:100dvh!important;
+        height:auto!important;
+        margin:0!important;
+        overflow:visible!important;
+    }
+    body.mw-r5-admin .mw-r5-page-header{display:none!important}
+    body.mw-r5-admin .mw-admin-searchbar{display:none!important}
+
+    .admin-app-topbar{
+        display:grid;
+        position:sticky;
+        top:0;
+        z-index:1400;
+        grid-template-columns:42px minmax(0,1fr) 42px;
+        align-items:center;
+        gap:9px;
+        min-height:62px;
+        padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));
+        border-bottom:1px solid var(--admin-app-line);
+        background:rgba(9,9,11,.91);
+        box-shadow:0 8px 28px rgba(0,0,0,.18);
+        backdrop-filter:blur(22px) saturate(135%);
+        -webkit-backdrop-filter:blur(22px) saturate(135%);
+    }
+    .admin-app-home,
+    .admin-app-search{
+        display:grid;
+        width:40px;
+        height:40px;
+        place-items:center;
+        border:1px solid var(--admin-app-line);
+        border-radius:13px;
+        background:var(--admin-app-surface-2);
+        color:var(--admin-app-text);
+        font-weight:900;
+        text-decoration:none;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .admin-app-home{border-color:rgba(240,207,114,.30);color:var(--admin-app-accent)}
+    .admin-app-search{font-size:21px}
+    .admin-app-title{display:flex;min-width:0;align-items:center;flex-direction:column;line-height:1.1;text-align:center}
+    .admin-app-title small{margin-bottom:3px;color:var(--admin-app-muted);font-size:9px;font-weight:900;letter-spacing:.12em}
+    .admin-app-title strong{max-width:100%;overflow:hidden;color:var(--admin-app-text);font-size:17px;text-overflow:ellipsis;white-space:nowrap}
+
+    .admin-app-bottom-nav{
+        display:grid;
+        position:fixed;
+        right:0;
+        bottom:0;
+        left:0;
+        z-index:1450;
+        grid-template-columns:repeat(5,minmax(0,1fr));
+        align-items:start;
+        min-height:var(--admin-app-nav-h);
+        padding:6px max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
+        border-top:1px solid var(--admin-app-line);
+        background:rgba(12,12,15,.95);
+        box-shadow:0 -16px 36px rgba(0,0,0,.30);
+        backdrop-filter:blur(22px) saturate(135%);
+        -webkit-backdrop-filter:blur(22px) saturate(135%);
+    }
+    .admin-app-nav-item{
+        display:flex;
+        position:relative;
+        min-width:0;
+        min-height:55px;
+        align-items:center;
+        justify-content:center;
+        flex-direction:column;
+        gap:2px;
+        padding:4px 2px;
+        border:0;
+        border-radius:13px;
+        background:transparent;
+        color:var(--admin-app-muted);
+        font-size:11px;
+        font-weight:800;
+        line-height:1;
+        text-align:center;
+        text-decoration:none;
+        cursor:pointer;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .admin-app-nav-item::before{
+        content:"";
+        position:absolute;
+        top:1px;
+        width:24px;
+        height:3px;
+        border-radius:999px;
+        background:transparent;
+    }
+    .admin-app-nav-icon{display:grid;height:27px;place-items:center;font-size:20px;line-height:1}
+    .admin-app-nav-item.is-active,
+    .admin-app-more.is-active>summary,
+    .admin-app-more[open]>summary{background:var(--admin-app-accent-soft);color:var(--admin-app-accent)}
+    .admin-app-nav-item.is-active::before,
+    .admin-app-more.is-active>summary::before,
+    .admin-app-more[open]>summary::before{background:var(--admin-app-accent)}
+    .admin-app-nav-item:active{transform:scale(.97)}
+    .admin-app-more{min-width:0}
+    .admin-app-more>summary{list-style:none}
+    .admin-app-more>summary::-webkit-details-marker{display:none}
+    .admin-app-more[open]::before{
+        content:"";
+        position:fixed;
+        inset:0;
+        z-index:1455;
+        background:rgba(0,0,0,.52);
+        pointer-events:none;
+    }
+    .admin-app-more-panel{
+        position:fixed;
+        right:max(10px,env(safe-area-inset-right));
+        bottom:calc(var(--admin-app-nav-h) + env(safe-area-inset-bottom) + 10px);
+        left:max(10px,env(safe-area-inset-left));
+        z-index:1460;
+        max-height:min(74vh,660px);
+        overflow:auto;
+        padding:9px 12px 15px;
+        border:1px solid var(--admin-app-line);
+        border-radius:24px;
+        background:rgba(24,24,29,.99);
+        box-shadow:0 24px 80px rgba(0,0,0,.58);
+        color:var(--admin-app-text);
+        overscroll-behavior:contain;
+        animation:admin-sheet-in .16s ease-out;
+    }
+    @keyframes admin-sheet-in{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .admin-app-sheet-handle{width:38px;height:4px;margin:1px auto 12px;border-radius:999px;background:rgba(255,255,255,.20)}
+    .admin-app-sheet-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:0 4px 12px}
+    .admin-app-sheet-head>div{display:flex;flex-direction:column;gap:3px}
+    .admin-app-sheet-head small,
+    .admin-app-sheet-group>small{color:var(--admin-app-muted);font-size:9px;font-weight:900;letter-spacing:.13em}
+    .admin-app-sheet-head strong{font-size:22px}
+    .admin-app-sheet-head>span{max-width:45%;overflow:hidden;color:var(--admin-app-muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+    .admin-app-sheet-groups{display:grid;gap:13px}
+    .admin-app-sheet-group{display:grid;gap:7px}
+    .admin-app-sheet-group>small{padding:0 3px}
+    .admin-app-sheet-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .admin-app-sheet-links a{
+        display:grid;
+        min-width:0;
+        min-height:76px;
+        grid-template-columns:33px minmax(0,1fr);
+        grid-template-rows:auto auto;
+        align-content:center;
+        column-gap:8px;
+        padding:11px;
+        border:1px solid var(--admin-app-line);
+        border-radius:16px;
+        background:rgba(255,255,255,.035);
+        color:var(--admin-app-text);
+        text-decoration:none;
+    }
+    .admin-app-sheet-links a>span{grid-row:1/3;align-self:center;color:var(--admin-app-accent);font-size:21px;text-align:center}
+    .admin-app-sheet-links a>strong{align-self:end;overflow:hidden;font-size:14px;text-overflow:ellipsis;white-space:nowrap}
+    .admin-app-sheet-links a>small{align-self:start;margin-top:3px;overflow:hidden;color:var(--admin-app-muted);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+    .admin-app-sheet-links .admin-app-sheet-logout{border-color:rgba(255,110,110,.18);color:#ffb3b3}
+
+    body.mw-r5-admin .mw-r5-content,
+    body.mw-r5-admin .mw-r5-legacy-body{
+        width:100%!important;
+        max-width:none!important;
+        min-width:0!important;
+        margin:0!important;
+        padding:10px max(10px,env(safe-area-inset-right)) 18px max(10px,env(safe-area-inset-left))!important;
+        overflow-x:clip;
+    }
+    body.mw-r5-admin input,
+    body.mw-r5-admin select,
+    body.mw-r5-admin textarea{max-width:100%;font-size:16px!important}
+    body.mw-r5-admin button,
+    body.mw-r5-admin .button,
+    body.mw-r5-admin a.button{min-height:44px}
+    body.mw-r5-admin .mw-admin-backbar{margin:0 0 10px!important;padding:0!important}
+    body.mw-r5-admin .mw-admin-backbar .button{display:inline-flex;min-height:40px;align-items:center;padding:8px 12px;border-radius:12px}
+
+    /* /admin workbench */
+    body.mw-r5-admin .mw-r5-legacy-body>.shell,
+    body.mw-r5-admin .mw-r5-legacy-body .shell,
+    body.mw-r5-admin .mw-r5-legacy-body main.main{
+        width:100%!important;
+        max-width:none!important;
+        min-width:0!important;
+        margin:0!important;
+        padding:0!important;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .top-actions{display:none!important}
+    body.mw-r5-admin .mw-r5-legacy-body .stats{
+        display:grid!important;
+        grid-template-columns:1fr 1fr!important;
+        gap:8px!important;
+        margin:0 0 10px!important;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .stat{
+        min-width:0!important;
+        min-height:92px;
+        padding:13px!important;
+        border:1px solid var(--admin-app-line)!important;
+        border-radius:17px!important;
+        background:var(--admin-app-surface)!important;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .stat:last-child:nth-child(odd){grid-column:1/-1}
+    body.mw-r5-admin .mw-r5-legacy-body .stat span{color:var(--admin-app-muted);font-size:11px;font-weight:800}
+    body.mw-r5-admin .mw-r5-legacy-body .stat strong{margin-top:6px;font-size:27px;line-height:1}
+    body.mw-r5-admin .mw-r5-legacy-body .queues{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;margin:0 0 10px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .panel,
+    body.mw-r5-admin .mw-r5-legacy-body .orders-panel{
+        min-width:0!important;
+        border-radius:18px!important;
+        overflow:hidden;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .panel-head{padding:12px 13px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .queue-row{
+        display:grid!important;
+        grid-template-columns:auto minmax(0,1fr) auto!important;
+        align-items:center!important;
+        gap:9px!important;
+        min-height:62px;
+        padding:11px 12px!important;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .queue-main{min-width:0}
+    body.mw-r5-admin .mw-r5-legacy-body .queue-main strong,
+    body.mw-r5-admin .mw-r5-legacy-body .queue-main small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    body.mw-r5-admin .mw-r5-legacy-body .queue-main small{margin-top:3px;color:var(--admin-app-muted)}
+    body.mw-r5-admin .mw-r5-legacy-body .orders-top{display:grid!important;gap:10px!important;padding:13px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .filters{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;width:100%!important}
+    body.mw-r5-admin .mw-r5-legacy-body .filters .input,
+    body.mw-r5-admin .mw-r5-legacy-body .filters .select{grid-column:1/-1;width:100%!important}
+    body.mw-r5-admin .mw-r5-legacy-body .filters .button{width:100%!important}
+    body.mw-r5-admin .mw-r5-legacy-body .order-head{display:none!important}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row{
+        display:grid!important;
+        grid-template-columns:minmax(0,1fr) auto!important;
+        gap:9px 12px!important;
+        min-width:0!important;
+        margin:8px 10px!important;
+        padding:13px!important;
+        border:1px solid var(--admin-app-line)!important;
+        border-radius:17px!important;
+        background:rgba(255,255,255,.025)!important;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div{min-width:0!important;padding:0!important}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(1){grid-column:1;grid-row:1}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(5){grid-column:2;grid-row:1;justify-self:end}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(2),
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(3),
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(6),
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(7){grid-column:1/-1}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(2)::before{content:"老闆"}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(3)::before{content:"服務"}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(4)::before{content:"金額"}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(6)::before{content:"客服 / 建立時間"}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(2)::before,
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(3)::before,
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(4)::before,
+    body.mw-r5-admin .mw-r5-legacy-body .order-row>div:nth-child(6)::before{
+        display:block;
+        margin-bottom:3px;
+        color:var(--admin-app-muted);
+        font-size:10px;
+        font-weight:800;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row .primary,
+    body.mw-r5-admin .mw-r5-legacy-body .order-row .secondary{overflow-wrap:anywhere}
+    body.mw-r5-admin .mw-r5-legacy-body .order-row .workspace{
+        display:flex!important;
+        width:100%!important;
+        min-height:44px;
+        align-items:center;
+        justify-content:center;
+        border:1px solid rgba(240,207,114,.22);
+        border-radius:13px!important;
+        background:var(--admin-app-accent-soft);
+        color:var(--admin-app-accent)!important;
+        font-size:0!important;
+        font-weight:900;
+        text-decoration:none;
+    }
+    body.mw-r5-admin .mw-r5-legacy-body .order-row .workspace::after{content:"查看訂單 →";font-size:14px}
+    body.mw-r5-admin .mw-r5-legacy-body .pagination{display:flex!important;align-items:center;justify-content:space-between;gap:8px;padding:12px!important}
+    body.mw-r5-admin .mw-r5-legacy-body .pagination .button{flex:1}
+
+    /* Order history: turn the editable table into phone cards. */
+    body.mw-r5-admin .history-ledger-page{width:100%!important;min-width:0!important}
+    body.mw-r5-admin .history-ledger-filter{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
+    body.mw-r5-admin .history-ledger-filter label{min-width:0!important}
+    body.mw-r5-admin .history-ledger-filter input,
+    body.mw-r5-admin .history-ledger-filter select,
+    body.mw-r5-admin .history-ledger-filter .button{width:100%!important}
+    body.mw-r5-admin .history-ledger-stats{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important}
+    body.mw-r5-admin .history-ledger-stat{min-width:0!important;padding:12px!important;border-radius:16px!important}
+    body.mw-r5-admin .history-ledger-panel{border-radius:18px!important;overflow:hidden}
+    body.mw-r5-admin .history-ledger-head{display:grid!important;gap:7px!important;padding:13px!important}
+    body.mw-r5-admin .history-ledger-table-wrap{overflow:visible!important;padding:0 9px 9px}
+    body.mw-r5-admin .history-ledger-table,
+    body.mw-r5-admin .history-ledger-table tbody{display:block!important;width:100%!important;min-width:0!important}
+    body.mw-r5-admin .history-ledger-table thead{display:none!important}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row){
+        display:grid!important;
+        grid-template-columns:1fr 1fr!important;
+        gap:9px!important;
+        width:100%!important;
+        margin:10px 0!important;
+        padding:12px!important;
+        border:1px solid var(--admin-app-line)!important;
+        border-radius:17px!important;
+        background:rgba(255,255,255,.025)!important;
+    }
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td{
+        display:block!important;
+        min-width:0!important;
+        padding:0!important;
+        border:0!important;
+    }
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(1),
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(3),
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(4),
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(5),
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(6),
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(9){grid-column:1/-1}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(2)::before{content:"結單日期"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(3)::before{content:"委託人"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(4)::before{content:"訂單內容"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(5)::before{content:"接單人員"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(6)::before{content:"客服"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(7)::before{content:"狀態"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(8)::before{content:"金額"}
+    body.mw-r5-admin .history-ledger-table tr:not(.history-dossier-detail-row)>td:nth-child(n+2):nth-child(-n+8)::before{
+        display:block;margin-bottom:4px;color:var(--admin-app-muted);font-size:10px;font-weight:800
+    }
+    body.mw-r5-admin .history-ledger-table input,
+    body.mw-r5-admin .history-ledger-table select,
+    body.mw-r5-admin .history-ledger-action .seal-button{width:100%!important;max-width:none!important}
+    body.mw-r5-admin .history-ledger-action .seal-button{min-height:44px;border-radius:12px!important}
+    body.mw-r5-admin .history-dossier-detail-row[hidden]{display:none!important}
+    body.mw-r5-admin .history-dossier-detail-row:not([hidden]){display:block!important;width:100%!important;margin:0 0 10px!important}
+    body.mw-r5-admin .history-dossier-detail-row:not([hidden])>td{display:block!important;width:100%!important;padding:0!important;border:0!important}
+    body.mw-r5-admin .history-dossier-detail{padding:12px!important;border-radius:16px!important}
+    body.mw-r5-admin .history-dossier-overview,
+    body.mw-r5-admin .history-dossier-layout{grid-template-columns:1fr!important}
+
+    /* Order workspace and generic card-based admin pages. */
+    body.mw-r5-admin main.page{width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;padding:0!important}
+    body.mw-r5-admin main.page .layout{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
+    body.mw-r5-admin main.page .card{min-width:0!important;border-radius:18px!important;overflow:hidden}
+    body.mw-r5-admin main.page .card-head{padding:12px 13px!important}
+    body.mw-r5-admin main.page .grid{grid-template-columns:1fr 1fr!important;gap:8px!important}
+    body.mw-r5-admin main.page .cell{min-width:0!important;padding:10px!important}
+    body.mw-r5-admin main.page .cell .value{overflow-wrap:anywhere}
+    body.mw-r5-admin main.page form{min-width:0}
+    body.mw-r5-admin main.page input,
+    body.mw-r5-admin main.page select,
+    body.mw-r5-admin main.page textarea{width:100%;max-width:100%}
+
+    body.mw-r5-admin .panel,
+    body.mw-r5-admin .card{max-width:100%;min-width:0}
+    body.mw-r5-admin .table-wrap,
+    body.mw-r5-admin [class*="table-wrap"],
+    body.mw-r5-admin [class*="scroll"]{max-width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+}
+
+@media (max-width:430px){
+    .admin-app-sheet-links{grid-template-columns:1fr}
+    body.mw-r5-admin main.page .grid{grid-template-columns:1fr!important}
+    body.mw-r5-admin .history-ledger-stats{grid-template-columns:1fr 1fr!important}
+}
+
+@media (max-width:360px){
+    body.mw-r5-admin .mw-r5-legacy-body .stats,
+    body.mw-r5-admin .history-ledger-stats{grid-template-columns:1fr!important}
+    body.mw-r5-admin .mw-r5-legacy-body .stat:last-child:nth-child(odd){grid-column:auto}
+}
