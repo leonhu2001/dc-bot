@@ -39,6 +39,7 @@
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_site_shell.css?v=20261020-9">
     <link rel="stylesheet" href="/static/css/pages/employee_workspace_page_content.css?v=20261020-1">
     <link rel="stylesheet" href="/static/css/pages/employee_select_picker.css?v=20261020-1">
+    <link rel="stylesheet" href="/static/css/pages/employee_workspace_viewport.css?v=20261020-1">
     {% if request.url.path == '/dispatch' %}
     <link rel="stylesheet" href="/static/css/pages/dispatch_hero_controls.css?v=20261020-2">
     {% endif %}
@@ -50,9 +51,18 @@
     {% block head %}{% endblock %}
 
     <link rel="stylesheet" href="/static/css/mw_public_r5.css?v=scroll_perf_20260917_1">
-    {% if customer_app_shell %}
     <link rel="stylesheet" href="/static/css/pages/customer_mobile_app.css?v=20261026-1">
-    {% endif %}
+    <link rel="stylesheet" href="/static/css/pages/employee_mobile_app.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_polish.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_page_audit.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/employee_mobile_loading.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3.css?v=20261026-3">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3_pages.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_ux_v2.css?v=20261026-4">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_visual_system_v4.css?v=20261026-1">
+    <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
+
     <link rel="icon" href="/static/img/favicon.ico?v=20261025-5" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png?v=20261025-5">
     <link rel="icon" type="image/png" sizes="48x48" href="/static/img/favicon-48.png?v=20261025-5">
@@ -121,14 +131,14 @@
             <div>
                 <strong class="footer-title">會員</strong>
                 {% if user %}<a href="/me">我的專區</a>{% else %}<a href="/auth/discord/login">Discord 登入</a>{% endif %}
-                {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}<a href="/employee">員工中心</a>{% endif %}
+                {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}<a href="/employee">員工後台</a>{% endif %}
             </div>
 
             <div>
                 <strong class="footer-title">魔丸</strong>
                 <a href="/#about">關於我們</a>
                 <a class="mw-footer-link" href="/#social">社群網址</a>
-                <span><!-- MAWAN_PHASE_FOOTER_ORDER_NOTICE_V1 --><a class="mw-footer-link" href="/service-rules">下單須知</a></span>
+                <span><a class="mw-footer-link" href="/service-rules">下單須知</a></span>
             </div>
         </div>
 
