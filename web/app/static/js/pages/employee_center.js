@@ -3,6 +3,12 @@
     const rowsHost = document.getElementById('salaryRows');
     if(!rowsHost) return;
 
+    // Mobile home is task-first: the dedicated salary tab owns the full ledger.
+    // Avoid starting the expensive ledger request when this section is hidden.
+    if(window.matchMedia('(max-width: 767px)').matches && document.querySelector('.employee-mobile-task-hub')){
+        return;
+    }
+
     const tabs = Array.from(document.querySelectorAll('.salary-tab'));
     const csTab = document.getElementById('salaryCsTab');
     const hero = document.querySelector('.employee-workspace-hero');
