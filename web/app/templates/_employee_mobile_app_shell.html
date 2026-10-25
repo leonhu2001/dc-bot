@@ -2,7 +2,7 @@
 {% set _app_user_name = (user.display_name if user else '') or (user.global_name if user else '') or (user.username if user else '') or '員工' %}
 {% set _can_switch_admin = user and (user.is_admin or user.is_customer_service or user.is_manager) %}
 {% if _app_path == '/employee' %}
-    {% set _app_title = '員工中心' %}
+    {% set _app_title = '員工後台' %}
 {% elif _app_path == '/dispatch' %}
     {% set _app_title = '接單大廳' %}
 {% elif _app_path.startswith('/dispatch/reports/review') %}
@@ -16,23 +16,16 @@
 {% elif _app_path.startswith('/employee/store-bindings') %}
     {% set _app_title = '綁店管理' %}
 {% else %}
-    {% set _app_title = '員工工作台' %}
+    {% set _app_title = '員工後台' %}
 {% endif %}
 
-<link rel="stylesheet" href="/static/css/pages/mobile_app_repair.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_page_audit.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_edges.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/employee_mobile_loading.css?v=20261026-1">
-<link rel="stylesheet" href="/static/css/pages/mobile_app_ux_v2.css?v=20261026-1">
-<script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
-
-<header class="employee-app-topbar" aria-label="員工行動工作台">
-    <a class="employee-app-topbar-brand" href="/employee" aria-label="返回員工中心">
+<header class="employee-app-topbar" aria-label="員工行動後台">
+    <a class="employee-app-topbar-brand" href="/employee" aria-label="返回員工後台">
         <span class="employee-app-mark" aria-hidden="true">
             <img class="mobile-app-logo-image" src="/static/img/server_logo.gif" alt="">
         </span>
         <span class="employee-app-topbar-copy">
-            <small>魔丸工作台</small>
+            <small>魔丸員工後台</small>
             <strong>{{ _app_title }}</strong>
         </span>
     </a>
@@ -47,7 +40,7 @@
 
 {% if _can_switch_admin %}
 <nav class="mobile-app-context-switch" aria-label="工作區切換">
-    <a class="is-active" href="/employee"><span aria-hidden="true">⚡</span>員工工作台</a>
+    <a class="is-active" href="/employee"><span aria-hidden="true">⚡</span>員工後台</a>
     <a href="/admin"><span aria-hidden="true">◈</span>客服後台</a>
 </nav>
 {% endif %}
