@@ -1,8 +1,15 @@
 import json
+import struct
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _png_size(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    return struct.unpack(">II", data[16:24])
 
 
 def test_existing_custom_order_panel_clears_stale_message_content():
@@ -44,24 +51,27 @@ def test_custom_order_entry_panel_is_concise_and_hides_internal_marker():
 def test_windows_shortcut_and_installed_app_use_site_logo():
     manifest_path = ROOT / "web" / "app" / "static" / "site-app-manifest.json"
     layout_path = ROOT / "web" / "app" / "templates" / "site_layout.html"
-    app_icon_path = ROOT / "web" / "app" / "static" / "img" / "site-app-icon.svg"
+    icon_192_path = ROOT / "web" / "app" / "static" / "img" / "site-app-icon-192.png"
+    icon_512_path = ROOT / "web" / "app" / "static" / "img" / "site-app-icon-512.png"
     pwa_script_path = ROOT / "web" / "app" / "static" / "js" / "site_pwa.js"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     layout = layout_path.read_text(encoding="utf-8")
-    app_icon = app_icon_path.read_text(encoding="utf-8")
     pwa_script = pwa_script_path.read_text(encoding="utf-8")
 
     icons = manifest.get("icons") or []
     assert icons
-    assert {icon.get("sizes") for icon in icons} == {"192x192", "512x512"}
-    assert all(str(icon.get("src") or "").startswith("/static/img/site-app-icon.svg") for icon in icons)
-    assert all(icon.get("type") == "image/svg+xml" for icon in icons)
-    assert "data:image/png;base64," in app_icon
-    assert 'aria-label="魔丸娛樂"' in app_icon
-    assert 'rel="icon" type="image/gif" href="/static/img/server_logo.gif?v=20261025-2"' in layout
-    assert 'rel="shortcut icon" type="image/gif" href="/static/img/server_logo.gif?v=20261025-2"' in layout
-    assert 'rel="apple-touch-icon" href="/static/img/site-app-icon.svg?v=20261025-3"' in layout
-    assert 'href="/static/site-app-manifest.json?v=20261025-3"' in layout
+    by_size = {icon.get("sizes"): icon for icon in icons}
+    assert set(by_size) == {"192x192", "512x512"}
+    assert by_size["192x192"].get("src") == "/static/img/site-app-icon-192.png?v=20261025-4"
+    assert by_size["512x512"].get("src") == "/static/img/site-app-icon-512.png?v=20261025-4"
+    assert all(icon.get("type") == "image/png" for icon in icons)
+    assert _png_size(icon_192_path) == (192, 192)
+    assert _png_size(icon_512_path) == (512, 512)
+    assert 'rel="icon" type="image/png" href="/static/img/site-app-icon-192.png?v=20261025-4"' in layout
+    assert 'rel="shortcut icon" type="image/png" href="/static/img/site-app-icon-192.png?v=20261025-4"' in layout
+    assert 'rel="apple-touch-icon" href="/static/img/site-app-icon-512.png?v=20261025-4"' in layout
+    assert 'href="/static/site-app-manifest.json?v=20261025-4"' in layout
     assert 'src="/static/js/site_pwa.js?v=20261025-3"' in layout
     assert "button.classList.add('is-visible');\n\n    window.addEventListener('beforeinstallprompt'" in pwa_script
     assert "employee-app-icon.svg" not in manifest_path.read_text(encoding="utf-8")
+    assert "site-app-icon.svg" not in manifest_path.read_text(encoding="utf-8")
