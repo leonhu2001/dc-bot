@@ -24,6 +24,7 @@
     {% set report = snapshot.financial_orders %}
     {% set anomalies = snapshot.anomalies %}
     {% set support = snapshot.customer_service %}
+    {% set accounting_issues = anomalies.category_counts.get('accounting', 0) %}
 
     <div class="payout-stat-grid">
         <div class="payout-stat-card">
@@ -51,8 +52,25 @@
         </div>
 
         <div class="payout-stat-card">
-            <span>異常中心</span>
+            <span>異常中心（全部類別）</span>
             <strong>{{ anomalies.issue_count }}</strong>
+            <p class="muted-text">
+                訂單／付款／同步／儲值／客服／帳務的合計，不等於帳務異常數。
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>帳務對帳異常</span>
+            <strong>{{ accounting_issues }}</strong>
+            <p class="muted-text">
+                與系統維運的帳務對帳使用同一個異常來源。
+                <a href="/admin/accounting-reconciliation">查看明細</a>
+            </p>
+        </div>
+
+        <div class="payout-stat-card">
+            <span>異常嚴重度</span>
+            <strong>{{ anomalies.critical_count }}</strong>
             <p class="muted-text">
                 Critical {{ anomalies.critical_count }} ｜ Warning {{ anomalies.warning_count }}
             </p>
@@ -89,6 +107,7 @@
             <h2>問 AI</h2>
             <p class="muted-text">
                 可以問「今天取消率為什麼高？」、「哪個商品最近變差？」、「什麼時段最容易等不到人？」等營運問題。
+                異常中心總數是跨類別合計；帳務問題請以「帳務對帳異常」數字為準。
             </p>
         </div>
     </div>
