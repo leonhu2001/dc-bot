@@ -618,6 +618,7 @@ async def ensure_custom_order_quick_panel(bot: commands.Bot) -> None:
             )
         else:
             await target.edit(
+                content=None,
                 embed=build_custom_order_entry_embed(),
                 view=CustomOrderQuickEntryView(),
             )
