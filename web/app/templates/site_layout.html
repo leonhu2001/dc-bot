@@ -61,6 +61,7 @@
     <link rel="stylesheet" href="/static/css/pages/mobile_app_redesign_v3_pages.css?v=20261026-1">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_ux_v2.css?v=20261026-4">
     <link rel="stylesheet" href="/static/css/pages/mobile_app_visual_system_v4.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/css/pages/mobile_app_public_pages_v4.css?v=20261026-1">
     <script src="/static/js/pages/mobile_app_interactions.js?v=20261026-1" defer></script>
 
     <link rel="icon" href="/static/img/favicon.ico?v=20261025-5" sizes="any">
@@ -119,7 +120,6 @@
                 </a>
                 <p>陪你玩，也陪你把今晚玩得有意思。</p>
             </div>
-
             <div>
                 <strong class="footer-title">服務</strong>
                 <a href="/order">立即下單</a>
@@ -127,13 +127,11 @@
                 <a href="/staff">陪玩陣容</a>
                 <a href="/vip">VIP</a>
             </div>
-
             <div>
                 <strong class="footer-title">會員</strong>
                 {% if user %}<a href="/me">我的專區</a>{% else %}<a href="/auth/discord/login">Discord 登入</a>{% endif %}
                 {% if user and (user.is_employee or user.is_worker or user.is_companion or user.is_customer_service) %}<a href="/employee">員工後台</a>{% endif %}
             </div>
-
             <div>
                 <strong class="footer-title">魔丸</strong>
                 <a href="/#about">關於我們</a>
@@ -141,17 +139,14 @@
                 <span><a class="mw-footer-link" href="/service-rules">下單須知</a></span>
             </div>
         </div>
-
         <div class="footer-bottom">
             <span>© 魔丸娛樂 MOWAN ENTERTAINMENT</span>
             <span>Discord OAuth 安全登入</span>
         </div>
-
         <div class="mw-social-links"></div>
     </footer>
 
     <button class="mw-support-launcher" type="button" aria-label="開啟客服" aria-expanded="false" data-mw-support-launcher>💬</button>
-
     <section class="mw-support-panel" aria-label="魔丸網站客服" data-mw-support-panel>
         <header class="mw-support-head">
             <div class="mw-support-head-copy"><strong>魔丸客服</strong><span>AI 先協助，需要時轉真人</span></div>
