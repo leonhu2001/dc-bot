@@ -44,15 +44,24 @@ def test_custom_order_entry_panel_is_concise_and_hides_internal_marker():
 def test_windows_shortcut_and_installed_app_use_site_logo():
     manifest_path = ROOT / "web" / "app" / "static" / "site-app-manifest.json"
     layout_path = ROOT / "web" / "app" / "templates" / "site_layout.html"
+    app_icon_path = ROOT / "web" / "app" / "static" / "img" / "site-app-icon.svg"
+    pwa_script_path = ROOT / "web" / "app" / "static" / "js" / "site_pwa.js"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     layout = layout_path.read_text(encoding="utf-8")
+    app_icon = app_icon_path.read_text(encoding="utf-8")
+    pwa_script = pwa_script_path.read_text(encoding="utf-8")
 
     icons = manifest.get("icons") or []
     assert icons
     assert {icon.get("sizes") for icon in icons} == {"192x192", "512x512"}
-    assert all(str(icon.get("src") or "").startswith("/static/img/server_logo.gif") for icon in icons)
-    assert all(icon.get("type") == "image/gif" for icon in icons)
+    assert all(str(icon.get("src") or "").startswith("/static/img/site-app-icon.svg") for icon in icons)
+    assert all(icon.get("type") == "image/svg+xml" for icon in icons)
+    assert "data:image/png;base64," in app_icon
+    assert 'aria-label="魔丸娛樂"' in app_icon
     assert 'rel="icon" type="image/gif" href="/static/img/server_logo.gif?v=20261025-2"' in layout
     assert 'rel="shortcut icon" type="image/gif" href="/static/img/server_logo.gif?v=20261025-2"' in layout
-    assert 'href="/static/site-app-manifest.json?v=20261025-2"' in layout
+    assert 'rel="apple-touch-icon" href="/static/img/site-app-icon.svg?v=20261025-3"' in layout
+    assert 'href="/static/site-app-manifest.json?v=20261025-3"' in layout
+    assert 'src="/static/js/site_pwa.js?v=20261025-3"' in layout
+    assert "button.classList.add('is-visible');\n\n    window.addEventListener('beforeinstallprompt'" in pwa_script
     assert "employee-app-icon.svg" not in manifest_path.read_text(encoding="utf-8")
